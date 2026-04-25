@@ -628,49 +628,54 @@ async def _on_file_change(
         exec_ctx: Execution context for cache access
     """
     from victor.core.indexing.file_watcher import FileChangeType
+    from victor.core.indexing.index_lock import IndexLockRegistry
 
     index_cache = _get_index_cache(exec_ctx)
     index_key = str(root)
-    cache_entry = index_cache.get(index_key)
+    lock_registry = IndexLockRegistry.get_instance()
+    path_lock = await lock_registry.acquire_lock(root)
 
-    if not cache_entry:
-        return  # No index exists, nothing to update
+    async with path_lock:
+        cache_entry = index_cache.get(index_key)
 
-    if event.change_type in (
-        FileChangeType.DELETED,
-        FileChangeType.MODIFIED,
-        FileChangeType.CREATED,
-        FileChangeType.RENAMED,
-    ):
-        logger.info(
-            "[code_search] File change detected (%s), triggering incremental update: %s",
-            event.change_type.value,
-            event.path,
-        )
+        if not cache_entry:
+            return  # No index exists, nothing to update
 
-        try:
-            index = cache_entry["index"]
-            # Check if index supports incremental updates
-            if hasattr(index, "incremental_reindex"):
-                await index.incremental_reindex()
-                await _finalize_index_storage(index)
+        if event.change_type in (
+            FileChangeType.DELETED,
+            FileChangeType.MODIFIED,
+            FileChangeType.CREATED,
+            FileChangeType.RENAMED,
+        ):
+            logger.info(
+                "[code_search] File change detected (%s), triggering incremental update: %s",
+                event.change_type.value,
+                event.path,
+            )
 
-                # Update mtime
-                latest = _latest_mtime(root)
-                cache_entry["latest_mtime"] = latest
-                cache_entry["stale"] = False
+            try:
+                index = cache_entry["index"]
+                # Check if index supports incremental updates
+                if hasattr(index, "incremental_reindex"):
+                    await index.incremental_reindex()
+                    await _finalize_index_storage(index)
 
-                logger.info(f"[code_search] Incremental update complete for {root}")
-            else:
-                # Index doesn't support incremental updates - mark as stale
-                logger.warning(
-                    f"[code_search] Index doesn't support incremental updates, "
-                    f"marking stale: {root}"
-                )
+                    # Update mtime
+                    latest = _latest_mtime(root)
+                    cache_entry["latest_mtime"] = latest
+                    cache_entry["stale"] = False
+
+                    logger.info(f"[code_search] Incremental update complete for {root}")
+                else:
+                    # Index doesn't support incremental updates - mark as stale
+                    logger.warning(
+                        f"[code_search] Index doesn't support incremental updates, "
+                        f"marking stale: {root}"
+                    )
+                    cache_entry["stale"] = True
+            except Exception as e:
                 cache_entry["stale"] = True
-        except Exception as e:
-            cache_entry["stale"] = True
-            logger.error(f"[code_search] Incremental update failed: {e}")
+                logger.error(f"[code_search] Incremental update failed: {e}")
 
 
 def _normalize_extensions(exts: Optional[List[str]]) -> Set[str]:

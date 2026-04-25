@@ -48,6 +48,19 @@ class _NoOpAsyncLock:
         return False
 
 
+class _TrackingAsyncLock:
+    def __init__(self, registry: "_TrackingIndexLockRegistry") -> None:
+        self._registry = registry
+
+    async def __aenter__(self):
+        self._registry.in_lock = True
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self._registry.in_lock = False
+        return False
+
+
 class _FakeIndexLockRegistry:
     def __init__(self) -> None:
         self.used_paths: list[Path] = []
@@ -57,6 +70,16 @@ class _FakeIndexLockRegistry:
 
     def mark_lock_used(self, root: Path) -> None:
         self.used_paths.append(root)
+
+
+class _TrackingIndexLockRegistry(_FakeIndexLockRegistry):
+    def __init__(self) -> None:
+        super().__init__()
+        self.in_lock = False
+
+    async def acquire_lock(self, root: Path) -> _TrackingAsyncLock:
+        self.used_paths.append(root)
+        return _TrackingAsyncLock(self)
 
 
 class _FakeCapabilityRegistry:
@@ -1044,3 +1067,49 @@ class TestFileWatcherIncrementalUpdates:
 
         index.incremental_reindex.assert_awaited_once()
         assert cache_entry["stale"] is True
+
+    @pytest.mark.asyncio
+    async def test_on_file_change_acquires_index_lock_before_incremental_reindex(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        changed_file = root / "main.py"
+        changed_file.write_text("print('hello')\n", encoding="utf-8")
+
+        tracking_registry = _TrackingIndexLockRegistry()
+
+        async def _assert_locked() -> None:
+            assert tracking_registry.in_lock is True
+
+        index = SimpleNamespace(
+            incremental_reindex=AsyncMock(side_effect=_assert_locked),
+        )
+        cache_entry = {
+            "index": index,
+            "latest_mtime": 0.0,
+            "stale": True,
+        }
+        fake_cache = {str(root): cache_entry}
+
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: tracking_registry),
+        )
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+
+        await _on_file_change(
+            FileChangeEvent(
+                path=changed_file,
+                change_type=FileChangeType.MODIFIED,
+                timestamp=datetime.now(),
+            ),
+            root,
+        )
+
+        index.incremental_reindex.assert_awaited_once()
+        assert tracking_registry.used_paths == [root]
