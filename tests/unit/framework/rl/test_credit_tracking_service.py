@@ -65,7 +65,7 @@ class TestCreditTrackingService:
             execution_time_ms=50.0,
         )
         assert isinstance(signal, ToolRewardSignal)
-        assert signal.tool_name == "read_file"
+        assert signal.tool_name == "read"
         assert signal.success is True
         assert signal.reward == 1.0
         assert service.pending_signals == 1
@@ -78,8 +78,22 @@ class TestCreditTrackingService:
             execution_time_ms=100.0,
             error="No match found",
         )
+        assert signal.tool_name == "edit"
         assert signal.reward == -1.0
         assert signal.error == "No match found"
+
+    def test_record_tool_result_canonicalizes_aliases_into_single_stream(self):
+        service = CreditTrackingService()
+
+        first = service.record_tool_result("read_file", True, 50.0)
+        second = service.record_tool_result("read", True, 55.0)
+
+        assert first.tool_name == "read"
+        assert second.tool_name == "read"
+
+        signals = service.assign_turn_credit()
+        assert len(signals) == 2
+        assert all(signal.metadata and signal.metadata.tool_name == "read" for signal in signals)
 
     def test_assign_turn_credit_empty(self):
         service = CreditTrackingService()

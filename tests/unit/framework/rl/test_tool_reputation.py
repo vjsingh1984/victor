@@ -23,6 +23,15 @@ class TestToolReputationTracker:
         score = tracker.record("shell", success=False, duration_ms=100.0)
         assert score < 0
 
+    def test_aliases_merge_into_canonical_tool_reputation(self):
+        tracker = ToolReputationTracker(alpha=0.5)
+        tracker.record("read_file", success=True, duration_ms=50.0)
+        score = tracker.record("read", success=True, duration_ms=60.0)
+
+        assert score > 0
+        assert tracker.get_reputation("read") == tracker.get_reputation("read_file")
+        assert tracker.tracked_tools == 1
+
     def test_ema_smoothing(self):
         """Reputation converges via exponential moving average."""
         tracker = ToolReputationTracker(alpha=0.3)
@@ -92,6 +101,15 @@ class TestToolHints:
         hints = tracker.get_tool_hints()
         assert "read" in hints
         assert hints["read"] > 0
+
+    def test_hints_use_canonical_name_for_alias_inputs(self):
+        tracker = ToolReputationTracker(min_calls_for_guidance=2)
+        tracker.record("read_file", True, 50.0)
+        tracker.record("read", True, 60.0)
+
+        hints = tracker.get_tool_hints()
+        assert "read" in hints
+        assert "read_file" not in hints
 
 
 class TestSelectionGuidance:

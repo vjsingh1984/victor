@@ -12,16 +12,16 @@ Usage:
     tracker = ToolReputationTracker()
 
     # After each tool execution (called by ToolPipeline)
-    tracker.record(tool_name="read_file", success=True, duration_ms=50)
+    tracker.record(tool_name="read", success=True, duration_ms=50)
     tracker.record(tool_name="shell", success=False, duration_ms=5000)
 
     # Get reputation-based hints for prompt injection
     hints = tracker.get_tool_hints()
-    # → {"read_file": 0.95, "shell": -0.3}
+    # → {"read": 0.95, "shell": -0.3}
 
     # Get a concise prompt string for mid-turn injection
     guidance = tracker.get_selection_guidance()
-    # → "Prefer read_file (reliable). Avoid shell (recent failures)."
+    # → "Prefer read (reliable). Avoid shell (recent failures)."
 """
 
 from __future__ import annotations
@@ -30,6 +30,8 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+from victor.framework.tool_naming import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,8 @@ class ToolReputationTracker:
         Returns:
             Updated reputation score for this tool
         """
+        tool_name = get_canonical_name(tool_name)
+
         # Compute reward
         reward = 1.0 if success else -1.0
         if success and duration_ms > 5000:
@@ -178,7 +182,7 @@ class ToolReputationTracker:
 
     def get_reputation(self, tool_name: str) -> float:
         """Get current reputation for a specific tool."""
-        return self._reputation.get(tool_name, 0.0)
+        return self._reputation.get(get_canonical_name(tool_name), 0.0)
 
     def reset(self) -> None:
         """Reset all reputation data."""
@@ -188,6 +192,7 @@ class ToolReputationTracker:
 
     def reset_tool(self, tool_name: str) -> None:
         """Reset reputation for a single tool."""
+        tool_name = get_canonical_name(tool_name)
         self._reputation.pop(tool_name, None)
         self._call_count.pop(tool_name, None)
         self._recent.pop(tool_name, None)

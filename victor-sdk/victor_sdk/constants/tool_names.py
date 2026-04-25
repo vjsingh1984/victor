@@ -94,6 +94,8 @@ TOOL_ALIASES: Dict[str, str] = {
     "read_file": ToolNames.READ,
     "write_file": ToolNames.WRITE,
     "edit_files": ToolNames.EDIT,
+    "edit_file": ToolNames.EDIT,
+    "patch_file": ToolNames.EDIT,
     "list_directory": ToolNames.LS,
     "plan_files": ToolNames.PLAN,
     "get_project_overview": ToolNames.OVERVIEW,

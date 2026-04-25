@@ -35,6 +35,7 @@ from victor.framework.rl.credit_assignment import (
     CreditSignal,
     compute_credit_metrics,
 )
+from victor.framework.tool_naming import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +220,7 @@ class CreditTrackingService:
         Returns:
             The extracted ToolRewardSignal
         """
+        tool_name = get_canonical_name(tool_name)
         reward = extract_reward_from_tool_result(tool_name, success, execution_time_ms, error)
 
         signal = ToolRewardSignal(

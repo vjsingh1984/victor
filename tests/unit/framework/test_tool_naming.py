@@ -202,6 +202,7 @@ class TestToolAliases:
         assert TOOL_ALIASES["read_file"] == "read"
         assert TOOL_ALIASES["write_file"] == "write"
         assert TOOL_ALIASES["edit_files"] == "edit"
+        assert TOOL_ALIASES["edit_file"] == "edit"
         assert TOOL_ALIASES["list_directory"] == "ls"
         assert TOOL_ALIASES["plan_files"] == "plan"
         assert TOOL_ALIASES["get_project_overview"] == "overview"
@@ -323,6 +324,7 @@ class TestGetCanonicalName:
         assert get_canonical_name("execute_bash") == "shell"
         assert get_canonical_name("read_file") == "read"
         assert get_canonical_name("edit_files") == "edit"
+        assert get_canonical_name("edit_file") == "edit"
         assert get_canonical_name("run_tests") == "test"
 
     def test_canonical_returns_itself(self):
