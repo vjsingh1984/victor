@@ -273,6 +273,12 @@ class MLXProvider(BaseProvider):
         """MLX reuses KV cache for pure-attention models with matching prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OLLAMA, MLX_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OLLAMA, target, MLX_DEFAULT)
+
     def supports_tools(self) -> bool:
         """Check if provider supports tool calling.
 

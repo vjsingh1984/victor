@@ -230,6 +230,12 @@ class OpenAIProvider(BaseProvider):
         """OpenAI reuses KV cache server-side for matching prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OPENAI, OPENAI_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OPENAI, target, OPENAI_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],

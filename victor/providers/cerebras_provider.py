@@ -503,6 +503,12 @@ class CerebrasProvider(BaseProvider):
         """Cerebras reuses KV cache with 5min TTL for matching prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import CEREBRAS, CEREBRAS_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(CEREBRAS, target, CEREBRAS_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],

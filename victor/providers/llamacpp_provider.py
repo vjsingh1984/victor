@@ -353,6 +353,12 @@ class LlamaCppProvider(BaseProvider):
         """llama.cpp natively reuses KV cache for matching prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OLLAMA, LLAMACPP_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OLLAMA, target, LLAMACPP_DEFAULT)
+
     def get_tool_output_format(self) -> Any:
         """llama.cpp models parse XML tags in responses.
 

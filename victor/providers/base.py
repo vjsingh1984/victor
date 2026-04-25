@@ -428,6 +428,31 @@ class BaseProvider(ABC):
         """
         return False
 
+    DEFAULT_CONTEXT_WINDOW: int = 8_192
+    """Conservative default context window when model is unknown.
+
+    Triggers semantic_select_capped strategy in the tool broadcaster, which
+    is safe for any model. Override per-provider with a model lookup table.
+    """
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        """Return effective context window in tokens for the given model.
+
+        Used by the tool broadcasting strategy picker to decide whether all
+        tools fit in the cacheable prefix or whether per-turn semantic
+        selection is required.
+
+        Default implementation returns DEFAULT_CONTEXT_WINDOW. Providers
+        should override with a per-model lookup table.
+
+        Args:
+            model: Model identifier. If None, uses provider's current model.
+
+        Returns:
+            Context window in tokens. Never returns 0 or negative.
+        """
+        return self.DEFAULT_CONTEXT_WINDOW
+
     def get_tool_output_format(self) -> Any:
         """Get preferred tool output format for this provider.
 
@@ -780,6 +805,116 @@ class BaseProvider(ABC):
         from victor.processing.native.tokenizer import count_tokens_fast
 
         return count_tokens_fast(text)
+
+    def context_window(self, model: str) -> int:
+        """Get context window size for a given model.
+
+        Provides context window limits for common models to enable
+        context-budgeted tool selection strategies. Returns safe default
+        for unknown models.
+
+        Args:
+            model: Model identifier (e.g., "claude-sonnet-4-20250514", "qwen2.5-coder:7b")
+
+        Returns:
+            Context window in tokens. Returns safe default (8192) for unknown models.
+
+        Examples:
+            >>> provider = AnthropicProvider(api_key="...")
+            >>> cw = provider.context_window("claude-sonnet-4-20250514")
+            >>> assert cw == 200000
+        """
+        # Known models lookup table
+        # Source: Model documentation as of 2025-04
+        CONTEXT_WINDOWS = {
+            # Anthropic
+            "claude-sonnet-4-20250514": 200000,
+            "claude-3.5-sonnet-20240620": 200000,
+            "claude-3-5-sonnet-20241022": 200000,
+            "claude-3-opus-20240229": 200000,
+            "claude-3-haiku-20240307": 200000,
+
+            # OpenAI
+            "gpt-4o": 128000,
+            "gpt-4o-mini": 128000,
+            "gpt-4-turbo": 128000,
+            "gpt-4": 8192,
+            "gpt-3.5-turbo": 16385,
+
+            # Google Gemini
+            "gemini-2.0-flash-exp": 1000000,
+            "gemini-1.5-pro": 280000,
+            "gemini-1.5-flash": 280000,
+            "gemini-pro": 280000,
+
+            # DeepSeek
+            "deepseek-coder": 128000,
+            "deepseek-chat": 128000,
+            "deepseek-coder-v2": 128000,
+
+            # Meta Llama (via various providers)
+            "llama-3.1-405b-instruct": 128000,
+            "llama-3.1-70b-instruct": 128000,
+            "llama-3.1-8b-instruct": 128000,
+            "llama-3-1-405b-instruct": 128000,
+            "llama-3-1-70b-instruct": 128000,
+
+            # Qwen (via Ollama, vLLM, etc.)
+            "qwen2.5-coder:7b": 32768,
+            "qwen2.5-coder:14b": 32768,
+            "qwen2.5-72b-instruct": 128000,
+            "qwen2.5-7b-instruct": 128000,
+            "qwen2.5-14b": 128000,
+
+            # Edge models (small models for fast micro-decisions)
+            "qwen3.5:2b": 8192,
+            "qwen2.5:0.5b": 8192,
+            "qwen2.5:1.5b": 8192,
+            "qwen2.5:3b": 8192,
+            "phi-2:2.7b": 8192,
+            "phi-2.7b": 8192,
+            "phi:2.7b": 8192,
+            "gemma:2b": 8192,
+            "gemma2:2b": 8192,
+            "tinyllama:1.1b": 8192,
+            "tinyllama:1.1b-chat": 8192,
+
+            # CodeLlama
+            "codellama:13b": 16384,
+            "codellama:34b": 16384,
+            "codellama:7b": 16384,
+
+            # Mistral
+            "mistral:7b": 32768,
+            "mixtral:8x7b": 32768,
+            "mixtral:8x22b": 65536,
+
+            # Common Ollama models
+            "phi:2.7b-chat": 128000,
+            "gemma:7b": 8192,
+        }
+
+        # Try direct lookup
+        if model in CONTEXT_WINDOWS:
+            return CONTEXT_WINDOWS[model]
+
+        # Try pattern matching (e.g., "qwen2.5-*" or "llama-3*")
+        for pattern, cw in CONTEXT_WINDOWS.items():
+            if "*" in pattern:
+                prefix = pattern[:-1]
+                if model.startswith(prefix):
+                    logger.debug(
+                        f"Model {model} matched pattern {pattern}, using context window {cw}"
+                    )
+                    return cw
+
+        # Safe default for unknown models
+        # Use 8192 (8K) as conservative default that fits even smallest models
+        logger.warning(
+            f"Unknown model {model}, using default context window of 8192 tokens. "
+            f"Consider adding context_window mapping for this model."
+        )
+        return 8192
 
     @abstractmethod
     async def close(self) -> None:

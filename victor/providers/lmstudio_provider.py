@@ -269,6 +269,14 @@ class LMStudioProvider(BaseProvider):
         """LMStudio reuses KV cache for GGUF models with matching prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        # LMStudio loads various GGUF models; share Ollama's table since
+        # the same model files are typically served.
+        from victor.providers.context_windows import OLLAMA, LMSTUDIO_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OLLAMA, target, LMSTUDIO_DEFAULT)
+
     def model_uses_thinking_tags(self, model: Optional[str] = None) -> bool:
         """Check if model outputs thinking tags.
 

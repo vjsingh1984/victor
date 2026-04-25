@@ -243,6 +243,12 @@ class VertexAIProvider(BaseProvider):
         """Vertex AI reuses KV cache for matching prompt prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import VERTEX, VERTEX_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(VERTEX, target, VERTEX_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],

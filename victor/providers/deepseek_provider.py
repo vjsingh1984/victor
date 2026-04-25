@@ -147,6 +147,12 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
     def supports_kv_prefix_caching(self) -> bool:
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import DEEPSEEK, DEEPSEEK_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(DEEPSEEK, target, DEEPSEEK_DEFAULT)
+
     # ── Template Method overrides ─────────────────────────────────────────────
 
     def _get_provider_params(

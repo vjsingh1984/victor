@@ -368,6 +368,12 @@ class VLLMProvider(BaseProvider):
         """vLLM supports Automatic Prefix Caching (APC) for KV cache reuse."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OLLAMA, VLLM_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OLLAMA, target, VLLM_DEFAULT)
+
     def get_tool_output_format(self) -> Any:
         """vLLM models expect XML format (trained on Victor outputs).
 

@@ -193,6 +193,12 @@ class TogetherProvider(BaseProvider):
         """Together reuses KV cache for matching prompt prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import TOGETHER, TOGETHER_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(TOGETHER, target, TOGETHER_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],

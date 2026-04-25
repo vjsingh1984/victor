@@ -1185,7 +1185,8 @@ class TestSharedInfrastructureIntegration:
         # Conversation memory settings
         assert hasattr(settings, "conversation_memory_enabled")
         # conversation_memory_db now uses get_project_paths().conversation_db (project-local)
-        assert get_project_paths().conversation_db.name == "conversation.db"
+        # Database consolidation: conversation_db is an alias for project.db
+        assert get_project_paths().conversation_db.name == "project.db"
         assert hasattr(settings, "max_context_tokens")
         assert hasattr(settings, "response_token_reserve")
 

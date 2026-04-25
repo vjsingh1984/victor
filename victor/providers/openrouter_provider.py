@@ -211,6 +211,14 @@ class OpenRouterProvider(BaseProvider):
         """OpenRouter routes to providers that support KV prefix caching."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OPENROUTER_DEFAULT
+
+        # OpenRouter routes to many upstream providers — without per-route
+        # introspection we use a generous default that triggers session-lock
+        # for typical models. Override is feasible but not on the hot path.
+        return OPENROUTER_DEFAULT
+
     async def chat(
         self,
         messages: List[Message],

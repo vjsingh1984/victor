@@ -179,6 +179,12 @@ class OllamaProvider(BaseProvider):
         """Ollama reuses KV cache via llama.cpp for matching prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OLLAMA, OLLAMA_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OLLAMA, target, OLLAMA_DEFAULT)
+
     def get_tool_output_format(self) -> Any:
         """Ollama models trained on XML format - use XML for optimal cognition.
 

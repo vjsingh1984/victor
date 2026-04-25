@@ -237,6 +237,12 @@ class GoogleProvider(BaseProvider):
         """Gemini reuses KV cache for matching prompt prefixes."""
         return True
 
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import GOOGLE, GOOGLE_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(GOOGLE, target, GOOGLE_DEFAULT)
+
     async def _ensure_valid_token(self) -> None:
         """Ensure OAuth token is valid, refreshing if needed."""
         if self._oauth_manager is None:
