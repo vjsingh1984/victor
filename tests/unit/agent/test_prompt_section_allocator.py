@@ -245,6 +245,89 @@ class TestPromptSectionBudgetAllocator:
         selected2 = allocator.allocate(sections, context)
         assert PromptSection.TOOL_GUIDANCE.value in selected2
 
+    def test_record_section_measurements_updates_rolling_average(self):
+        """Measured token costs should accumulate as rolling averages."""
+        allocator = PromptSectionBudgetAllocator()
+
+        allocator.record_section_measurements({PromptSection.TOOL_GUIDANCE.value: 120})
+        allocator.record_section_measurements(
+            {
+                PromptSection.TOOL_GUIDANCE.value: 180,
+                PromptSection.GROUNDING_RULES.value: 80,
+            }
+        )
+
+        measurements = allocator.get_section_measurements()
+
+        assert measurements[PromptSection.TOOL_GUIDANCE.value]["sample_count"] == 2
+        assert measurements[PromptSection.TOOL_GUIDANCE.value]["average_token_cost"] == pytest.approx(
+            150.0
+        )
+        assert measurements[PromptSection.GROUNDING_RULES.value]["sample_count"] == 1
+        assert measurements[PromptSection.GROUNDING_RULES.value]["average_token_cost"] == 80.0
+
+    def test_allocate_uses_measured_token_cost_for_budgeting(self):
+        """Observed section costs should influence selection order and fit checks."""
+        context = {"task": "tool search", "user_query": "Use the tool to search the codebase"}
+        sections = {
+            PromptSection.SYSTEM_ROLE.value: SectionMetadata(
+                name=PromptSection.SYSTEM_ROLE.value,
+                content="You are a coding agent.",
+                token_cost=30,
+                priority=1,
+                category="core",
+            ),
+            PromptSection.TOOL_GUIDANCE.value: SectionMetadata(
+                name=PromptSection.TOOL_GUIDANCE.value,
+                content="Use tools deliberately and prefer search before edits.",
+                token_cost=130,
+                priority=3,
+                category="guidance",
+            ),
+            PromptSection.GROUNDING_RULES.value: SectionMetadata(
+                name=PromptSection.GROUNDING_RULES.value,
+                content="Base all claims on observed outputs and code evidence.",
+                token_cost=70,
+                priority=4,
+                category="guidance",
+            ),
+        }
+
+        baseline_allocator = PromptSectionBudgetAllocator(
+            max_tokens=150,
+            min_tokens=0,
+            cache_selections=False,
+        )
+        baseline_selected = baseline_allocator.allocate(sections, context)
+        assert PromptSection.GROUNDING_RULES.value in baseline_selected
+        assert PromptSection.TOOL_GUIDANCE.value not in baseline_selected
+
+        measured_allocator = PromptSectionBudgetAllocator(
+            max_tokens=150,
+            min_tokens=0,
+            cache_selections=False,
+        )
+        measured_allocator.record_section_measurements({PromptSection.TOOL_GUIDANCE.value: 40})
+        measured_selected = measured_allocator.allocate(sections, context)
+
+        assert PromptSection.TOOL_GUIDANCE.value in measured_selected
+        assert PromptSection.GROUNDING_RULES.value in measured_selected
+
+    def test_get_stats_includes_measurement_summary(self):
+        """Allocator stats should expose tracked measurement counts."""
+        allocator = PromptSectionBudgetAllocator()
+        allocator.record_section_measurements(
+            {
+                PromptSection.TOOL_GUIDANCE.value: 120,
+                PromptSection.GROUNDING_RULES.value: 80,
+            }
+        )
+
+        stats = allocator.get_stats()
+
+        assert stats["measured_sections"] == 2
+        assert stats["measurement_samples"] == 2
+
     def test_get_stats(self):
         """Test getting allocator statistics."""
         allocator = PromptSectionBudgetAllocator(max_tokens=5000)

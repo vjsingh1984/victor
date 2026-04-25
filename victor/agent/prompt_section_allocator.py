@@ -92,6 +92,23 @@ class SectionMetadata:
         return self.relevance_score * (1000.0 / self.token_cost) * (priority_weight / 10.0)
 
 
+@dataclass
+class SectionMeasurement:
+    """Rolling observed token cost for a prompt section."""
+
+    average_token_cost: float = 0.0
+    sample_count: int = 0
+    last_measured: float = 0.0
+
+    def record(self, token_cost: int) -> None:
+        """Update the rolling average with a newly observed token cost."""
+        self.average_token_cost = (
+            (self.average_token_cost * self.sample_count) + token_cost
+        ) / (self.sample_count + 1)
+        self.sample_count += 1
+        self.last_measured = time.time()
+
+
 class PromptSectionBudgetAllocator:
     """Allocates prompt sections under token budget constraints.
 
@@ -147,6 +164,7 @@ class PromptSectionBudgetAllocator:
 
         # Selection cache: context_hash -> {section_names, timestamp}
         self._selection_cache: Dict[str, Dict[str, Any]] = {}
+        self._section_measurements: Dict[str, SectionMeasurement] = {}
 
     def _hash_context(self, context: Dict[str, Any]) -> str:
         """Generate hash for caching selection decisions.
@@ -177,6 +195,22 @@ class PromptSectionBudgetAllocator:
         """
         # Rough estimation: ~4 characters per token
         return len(text) // 4
+
+    def _effective_token_cost(self, section_name: str, metadata: SectionMetadata) -> int:
+        """Use measured token cost when available, else fall back to static metadata."""
+        measurement = self._section_measurements.get(section_name)
+        if measurement and measurement.average_token_cost > 0:
+            return max(1, int(round(measurement.average_token_cost)))
+        return metadata.token_cost
+
+    def _value_score(self, section_name: str, metadata: SectionMetadata) -> float:
+        """Calculate section value while respecting measured token costs."""
+        effective_cost = self._effective_token_cost(section_name, metadata)
+        if effective_cost == 0:
+            return metadata.relevance_score * 10.0
+
+        priority_weight = 11.0 - metadata.priority
+        return metadata.relevance_score * (1000.0 / effective_cost) * (priority_weight / 10.0)
 
     def _score_section_relevance(
         self,
@@ -314,13 +348,14 @@ class PromptSectionBudgetAllocator:
 
         for name, metadata in core_sections:
             if metadata.relevance_score >= self.core_threshold:
-                if used_tokens + metadata.token_cost <= self.max_tokens:
+                effective_cost = self._effective_token_cost(name, metadata)
+                if used_tokens + effective_cost <= self.max_tokens:
                     selected.append((name, metadata))
-                    used_tokens += metadata.token_cost
+                    used_tokens += effective_cost
                     metadata.usage_count += 1
                 else:
                     logger.warning(
-                        f"Core section '{name}' ({metadata.token_cost} tokens) "
+                        f"Core section '{name}' ({effective_cost} tokens) "
                         f"exceeds remaining budget {self.max_tokens - used_tokens}"
                     )
                     break
@@ -328,13 +363,14 @@ class PromptSectionBudgetAllocator:
         # Add guidance sections if above threshold and budget permits
         for name, metadata in sorted(
             guidance_sections,
-            key=lambda x: x[1].value_score(),
+            key=lambda x: self._value_score(x[0], x[1]),
             reverse=True,
         ):
             if metadata.relevance_score >= self.guidance_threshold:
-                if used_tokens + metadata.token_cost <= self.max_tokens:
+                effective_cost = self._effective_token_cost(name, metadata)
+                if used_tokens + effective_cost <= self.max_tokens:
                     selected.append((name, metadata))
-                    used_tokens += metadata.token_cost
+                    used_tokens += effective_cost
                     metadata.usage_count += 1
                 else:
                     break
@@ -344,13 +380,14 @@ class PromptSectionBudgetAllocator:
         if remaining_budget > self.min_tokens:
             for name, metadata in sorted(
                 enhancement_sections,
-                key=lambda x: x[1].value_score(),
+                key=lambda x: self._value_score(x[0], x[1]),
                 reverse=True,
             ):
                 if metadata.relevance_score >= self.enhancement_threshold:
-                    if used_tokens + metadata.token_cost <= self.max_tokens:
+                    effective_cost = self._effective_token_cost(name, metadata)
+                    if used_tokens + effective_cost <= self.max_tokens:
                         selected.append((name, metadata))
-                        used_tokens += metadata.token_cost
+                        used_tokens += effective_cost
                         metadata.usage_count += 1
                     else:
                         break
@@ -391,12 +428,43 @@ class PromptSectionBudgetAllocator:
         if expired:
             logger.debug(f"Cleaned up {len(expired)} expired cache entries")
 
+    def record_section_measurements(self, measured_token_costs: Dict[str, int]) -> None:
+        """Record observed token costs for prompt sections.
+
+        New measurements clear the selection cache because section fit and value
+        decisions may change once observed costs replace static estimates.
+        """
+        for section_name, token_cost in measured_token_costs.items():
+            if token_cost <= 0:
+                continue
+            measurement = self._section_measurements.setdefault(section_name, SectionMeasurement())
+            measurement.record(int(token_cost))
+
+        if measured_token_costs:
+            self._selection_cache.clear()
+
+    def get_section_measurements(self) -> Dict[str, Dict[str, Any]]:
+        """Return recorded prompt-section measurements for observability."""
+        return {
+            name: {
+                "average_token_cost": measurement.average_token_cost,
+                "sample_count": measurement.sample_count,
+                "last_measured": measurement.last_measured,
+            }
+            for name, measurement in self._section_measurements.items()
+        }
+
     def get_stats(self) -> Dict[str, Any]:
         """Get allocator statistics."""
+        measurement_samples = sum(
+            measurement.sample_count for measurement in self._section_measurements.values()
+        )
         return {
             "cache_entries": len(self._selection_cache),
             "max_tokens": self.max_tokens,
             "min_tokens": self.min_tokens,
+            "measured_sections": len(self._section_measurements),
+            "measurement_samples": measurement_samples,
         }
 
 
