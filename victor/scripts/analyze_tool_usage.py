@@ -401,7 +401,7 @@ def print_summary(usage_data: List[Tuple[str, int, int, float]], tiers: Dict[str
     compact_count = sum(1 for t in tiers.values() if t == "COMPACT")
     stub_count = sum(1 for t in tiers.values() if t == "STUB")
 
-    print(f"\nTier assignments:")
+    print("\nTier assignments:")
     print(f"  FULL: {full_count} tools (top decile, >50% sessions)")
     print(f"  COMPACT: {compact_count} tools (top quartile, >20% sessions)")
     print(f"  STUB: {stub_count} tools (remainder)")
@@ -470,14 +470,14 @@ def main():
         # Ensure directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        yaml_str = generate_tiers_yaml(usage_data, tiers, args.days, output_path)
+        generate_tiers_yaml(usage_data, tiers, args.days, output_path)
 
         print(f"\nGenerated {output_path}")
-        print(f"\nNext steps:")
-        print(f"  1. Review the generated tier assignments")
-        print(f"  2. Adjust manually if needed based on domain knowledge")
-        print(f"  3. Run: victor/scripts/validate_tool_strategy.py")
-        print(f"  4. Enable feature flag: VICTOR_TOOL_STRATEGY_V2=true")
+        print("\nNext steps:")
+        print("  1. Review the generated tier assignments")
+        print("  2. Adjust manually if needed based on domain knowledge")
+        print("  3. Run: victor/scripts/validate_tool_strategy.py")
+        print("  4. Enable feature flag: VICTOR_TOOL_STRATEGY_V2=true")
 
 
 if __name__ == "__main__":

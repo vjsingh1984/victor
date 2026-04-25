@@ -287,7 +287,6 @@ def format_tool_output(
     try:
         from victor.config.tool_settings import get_tool_settings
         settings = get_tool_settings()
-        rich_enabled = settings.rich_formatting_enabled
         max_size = settings.rich_formatting_max_output_size
         max_time_ms = settings.rich_formatting_max_time_ms
         validation_enabled = settings.rich_formatting_validation_enabled
@@ -295,7 +294,6 @@ def format_tool_output(
         allowed_tools = set(settings.rich_formatting_tools)
     except Exception:
         # If settings unavailable, use safe defaults
-        rich_enabled = True
         max_size = 1_000_000
         max_time_ms = 200
         validation_enabled = True

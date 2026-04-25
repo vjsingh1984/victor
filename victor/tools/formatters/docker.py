@@ -42,8 +42,6 @@ class DockerFormatter(ToolFormatter):
         Returns:
             FormattedOutput with Rich markup
         """
-        lines = []
-
         # Route to appropriate formatter based on operation/data structure
         if "containers" in data or operation == "ps":
             return self._format_containers(data, max_items)
