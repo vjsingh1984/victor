@@ -666,6 +666,7 @@ async def _ensure_file_watcher_subscription(
         cache_entry["watcher_subscribed"] = subscribed
         if subscribed:
             return True
+        pending_task = None
 
     if not isinstance(pending_task, asyncio.Task):
         pending_task = asyncio.create_task(_subscribe_to_file_watcher(root, exec_ctx))
