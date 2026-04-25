@@ -60,6 +60,10 @@ from victor.evaluation.baseline_validator import (
     TestBaseline,
 )
 from victor.evaluation.env_setup import EnvironmentConfig, EnvironmentSetup, SetupResult
+from victor.evaluation.runtime_feedback import (
+    build_swe_bench_validated_session_feedback_payload,
+    refresh_runtime_evaluation_feedback_aggregate,
+)
 from victor.evaluation.result_correlation import (
     CorrelationReport,
     ResultCorrelator,
@@ -568,6 +572,11 @@ class EvaluationOrchestrator:
                 instance_metadata={"instance_id": task.instance_id, "repo": task.repo},
             )
             progress.score = score
+            self._save_validated_session_feedback(
+                task.instance_id,
+                validation_result,
+                score=score,
+            )
 
             # Complete
             progress.stage = EvaluationStage.COMPLETED
@@ -744,6 +753,44 @@ class EvaluationOrchestrator:
         # Also save human-readable version
         text_file = self.config.output_dir / "summary.txt"
         text_file.write_text(self._summary.to_text())
+
+    def _save_validated_session_feedback(
+        self,
+        instance_id: str,
+        validation_result: BaselineValidationResult,
+        *,
+        score: Optional[SWEBenchScore] = None,
+    ) -> Optional[Path]:
+        """Persist validated session-truth feedback from objective SWE-bench validation."""
+        evaluations_dir = self.config.output_dir / "evaluations"
+        evaluations_dir.mkdir(parents=True, exist_ok=True)
+        feedback_file = evaluations_dir / f"eval_session_{instance_id}.json"
+        payload = build_swe_bench_validated_session_feedback_payload(
+            validation_result,
+            score=score,
+            source_result_path=feedback_file,
+        )
+        if payload is None:
+            return None
+
+        record = {
+            "instance_id": instance_id,
+            "repo": getattr(getattr(validation_result, "baseline", None), "repo", None),
+            "runtime_evaluation_feedback": payload,
+            "validation_result": (
+                validation_result.to_dict()
+                if hasattr(validation_result, "to_dict")
+                else {
+                    "success": getattr(validation_result, "success", False),
+                    "partial_success": getattr(validation_result, "partial_success", False),
+                    "score": getattr(validation_result, "score", 0.0),
+                }
+            ),
+            "score": score.to_dict() if score is not None and hasattr(score, "to_dict") else None,
+        }
+        feedback_file.write_text(json.dumps(record, indent=2))
+        refresh_runtime_evaluation_feedback_aggregate(evaluations_dir)
+        return feedback_file
 
     def get_progress(self, instance_id: str) -> Optional[TaskProgress]:
         """Get progress for a specific task.

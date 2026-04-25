@@ -363,6 +363,121 @@ def build_validated_session_feedback_payload(
     )
 
 
+def build_swe_bench_validated_session_feedback_payload(
+    validation_result: Any,
+    *,
+    score: Optional[Any] = None,
+    source_result_path: Optional[Path] = None,
+    saved_at: Optional[datetime] = None,
+    metadata: Optional[Mapping[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Build validated session-truth payload from objective SWE-bench validation."""
+    baseline = getattr(validation_result, "baseline", None)
+    if baseline is None:
+        return None
+
+    baseline_status = str(getattr(getattr(baseline, "status", None), "value", "") or "").lower()
+    fail_to_pass = list(getattr(baseline, "fail_to_pass", []) or [])
+    pass_to_pass = list(getattr(baseline, "pass_to_pass", []) or [])
+    total_fail_to_pass = len(fail_to_pass)
+    total_pass_to_pass = len(pass_to_pass)
+    total_validated_tests = total_fail_to_pass + total_pass_to_pass
+    if baseline_status != "valid" or total_validated_tests == 0:
+        return None
+
+    fixed_tests = list(getattr(validation_result, "fail_to_pass_fixed", []) or [])
+    broken_tests = list(getattr(validation_result, "pass_to_pass_broken", []) or [])
+    fail_to_pass_score = (
+        float(getattr(score, "fail_to_pass_score", 0.0) or 0.0)
+        if score is not None
+        else len(fixed_tests) / max(1, total_fail_to_pass)
+    )
+    pass_to_pass_score = (
+        float(getattr(score, "pass_to_pass_score", 1.0) or 1.0)
+        if score is not None
+        else 1.0 - (len(broken_tests) / max(1, total_pass_to_pass))
+        if total_pass_to_pass > 0
+        else 1.0
+    )
+    overall_score = (
+        float(getattr(score, "overall_score", getattr(validation_result, "score", 0.0)) or 0.0)
+        if score is not None
+        else float(getattr(validation_result, "score", 0.0) or 0.0)
+    )
+    resolved = bool(getattr(score, "resolved", getattr(validation_result, "success", False)))
+    partial = bool(getattr(score, "partial", getattr(validation_result, "partial_success", False)))
+    unresolved_gap = _clamp(1.0 - overall_score, 0.0, 1.0)
+    regression_rate = len(broken_tests) / max(1, total_pass_to_pass)
+
+    completion_threshold = _clamp(
+        0.72
+        + (unresolved_gap * 0.16)
+        + (regression_rate * 0.12)
+        - (0.05 if resolved else 0.0),
+        0.58,
+        0.92,
+    )
+    progress_threshold = _clamp(
+        completion_threshold - 0.18 - (0.03 if partial and not resolved else 0.0),
+        0.35,
+        completion_threshold,
+    )
+    evidence_threshold = _clamp(
+        0.76 + (unresolved_gap * 0.10) + (regression_rate * 0.14),
+        0.65,
+        0.95,
+    )
+    truth_alignment_rate = _clamp(0.55 + (overall_score * 0.4) - (regression_rate * 0.1), 0.4, 0.99)
+
+    post_change_results = getattr(validation_result, "post_change_results", None)
+    payload_metadata = dict(metadata or {})
+    payload_metadata.update(
+        {
+            "benchmark": "swe_bench",
+            "vertical": "coding",
+            "truth_alignment_rate": round(truth_alignment_rate, 4),
+            "task_count": total_validated_tests,
+            "validation_summary": {
+                "success": bool(getattr(validation_result, "success", False)),
+                "partial_success": bool(getattr(validation_result, "partial_success", False)),
+                "fail_to_pass_total": total_fail_to_pass,
+                "fail_to_pass_fixed": len(fixed_tests),
+                "pass_to_pass_total": total_pass_to_pass,
+                "pass_to_pass_broken": len(broken_tests),
+                "post_change_total": int(getattr(post_change_results, "total", 0) or 0),
+                "post_change_passed": int(getattr(post_change_results, "passed", 0) or 0),
+            },
+            "score_summary": {
+                "resolved": resolved,
+                "partial": partial,
+                "fail_to_pass_score": round(fail_to_pass_score, 4),
+                "pass_to_pass_score": round(pass_to_pass_score, 4),
+                "overall_score": round(overall_score, 4),
+            },
+        }
+    )
+
+    return build_validated_session_feedback_payload(
+        RuntimeEvaluationFeedback(
+            completion_threshold=round(completion_threshold, 4),
+            enhanced_progress_threshold=round(progress_threshold, 4),
+            minimum_supported_evidence_score=round(evidence_threshold, 4),
+        ),
+        scope=RuntimeEvaluationFeedbackScope(
+            project=_coerce_optional_text(getattr(baseline, "repo", None)),
+            task_type="edit",
+            benchmark="swe_bench",
+            vertical="coding",
+            workflow="evaluation_orchestrator",
+            tags=("agentic", "coding", "validated-session"),
+        ),
+        validation_label="swe_bench_posthoc_validation",
+        metadata=payload_metadata,
+        source_result_path=source_result_path,
+        saved_at=saved_at,
+    )
+
+
 def _extract_feedback_payload(value: Any) -> Optional[dict[str, Any]]:
     """Normalize direct feedback payloads and evaluation result JSON records."""
     if not isinstance(value, Mapping):

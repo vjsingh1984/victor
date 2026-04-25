@@ -192,12 +192,20 @@ Completed on 2026-04-25:
   - Active prompt/runtime call sites now pass available provider/model scope into
     `RuntimeIntelligenceService` so calibration can use scoped evidence whenever
     the caller already knows that context
+- Phase 5.8 real post-hoc validator emission for coding workflows:
+  - `runtime_feedback.py` now derives validated session-truth payloads directly
+    from objective SWE-bench baseline validation plus correlated scoring, rather
+    than requiring synthetic/manual artifact creation
+  - `EvaluationOrchestrator` now persists those validated session-truth artifacts
+    under its output `evaluations/` directory and refreshes the canonical runtime
+    feedback aggregate from that real validator output
+  - The strong-evidence gate for this slice is explicit: only valid baselines with
+    actual post-change test evidence emit session truth; weak or unvalidated runs
+    remain ineligible
 
 Next recommended slice:
-- Phase 5.8: connect real post-hoc validators to the validated session-truth
-  emitter path so scoped non-benchmark evidence can enter calibration without
-  synthetic/manual artifact creation
-  - Define which evaluator outcomes are strong enough to emit validated session
-    truth for coding, browser, and research workflows
-  - Keep emission gating and source trust assignments centralized in the same
-    runtime-feedback subsystem
+- Phase 5.9: connect browser and research post-hoc validators to the same
+  validated session-truth emitter path so non-coding workflows can contribute
+  scoped calibration evidence under the same trust and gating rules
+  - Reuse the canonical scope schema and aggregation path from `runtime_feedback.py`
+  - Keep the "strong enough to emit" contract explicit for each workflow family

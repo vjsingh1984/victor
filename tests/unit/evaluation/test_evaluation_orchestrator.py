@@ -14,13 +14,19 @@
 
 """Tests for evaluation orchestrator."""
 
+import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from victor.evaluation.baseline_validator import (
+    BaselineStatus,
+    BaselineValidationResult,
+    TestBaseline,
+)
 from victor.evaluation.evaluation_orchestrator import (
     EvaluationOrchestrator,
     EvaluationStage,
@@ -29,6 +35,7 @@ from victor.evaluation.evaluation_orchestrator import (
     TaskProgress,
 )
 from victor.evaluation.result_correlation import SWEBenchScore
+from victor.evaluation.test_runners import TestRunResults
 
 
 class TestEvaluationStage:
@@ -441,6 +448,67 @@ class TestEvaluationOrchestrator:
             text_file = output_dir / "summary.txt"
             assert json_file.exists()
             assert text_file.exists()
+
+    def test_save_validated_session_feedback(self):
+        """Test saving validated session-truth feedback from real validator output."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            config = OrchestratorConfig(output_dir=output_dir)
+            orchestrator = EvaluationOrchestrator(config)
+            validation_result = BaselineValidationResult(
+                instance_id="django__123",
+                baseline=TestBaseline(
+                    instance_id="django__123",
+                    repo="django/django",
+                    base_commit="abc123",
+                    fail_to_pass=["test_fix_a", "test_fix_b"],
+                    pass_to_pass=["test_keep_green"],
+                    status=BaselineStatus.VALID,
+                ),
+                post_change_results=TestRunResults(
+                    total=3,
+                    passed=2,
+                    failed=1,
+                    duration_seconds=9.0,
+                ),
+                fail_to_pass_fixed=["test_fix_a"],
+                pass_to_pass_broken=[],
+                success=False,
+                partial_success=True,
+                score=0.5,
+            )
+            score = SWEBenchScore(
+                instance_id="django__123",
+                resolved=False,
+                partial=True,
+                fail_to_pass_score=0.5,
+                pass_to_pass_score=1.0,
+                overall_score=0.7,
+                tests_fixed=1,
+                tests_broken=0,
+                total_fail_to_pass=2,
+                total_pass_to_pass=1,
+            )
+
+            with patch(
+                "victor.evaluation.evaluation_orchestrator.refresh_runtime_evaluation_feedback_aggregate"
+            ) as refresh_aggregate:
+                orchestrator._save_validated_session_feedback(
+                    "django__123",
+                    validation_result,
+                    score=score,
+                )
+
+            feedback_file = output_dir / "evaluations" / "eval_session_django__123.json"
+            assert feedback_file.exists()
+            payload = json.loads(feedback_file.read_text())
+            assert payload["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"] == (
+                "swe_bench_posthoc_validation"
+            )
+            assert payload["runtime_evaluation_feedback"]["metadata"]["scope"]["project"] == (
+                "django/django"
+            )
+            refresh_aggregate.assert_called_once_with(output_dir / "evaluations")
 
 
 class TestProgressCallback:

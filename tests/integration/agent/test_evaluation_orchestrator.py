@@ -353,21 +353,30 @@ class TestEvaluationOrchestrator:
                         orchestrator, "_apply_patch", new_callable=AsyncMock
                     ) as mock_apply:
                         mock_apply.return_value = True
+                        with patch.object(
+                            orchestrator,
+                            "_save_validated_session_feedback",
+                        ) as mock_save_feedback:
 
-                        # Set dataset path to avoid HuggingFace loading
-                        orchestrator.config.dataset_path = Path(tmpdir) / "tasks.jsonl"
+                            # Set dataset path to avoid HuggingFace loading
+                            orchestrator.config.dataset_path = Path(tmpdir) / "tasks.jsonl"
 
-                        # Run single task
-                        orchestrator._tasks = [test_instance]
-                        orchestrator._progress["test-001"] = TaskProgress(instance_id="test-001")
+                            # Run single task
+                            orchestrator._tasks = [test_instance]
+                            orchestrator._progress["test-001"] = TaskProgress(instance_id="test-001")
 
-                        await orchestrator._run_single_task(test_instance)
+                            await orchestrator._run_single_task(test_instance)
 
-                        # Verify task completed
-                        progress = orchestrator._progress["test-001"]
-                        assert progress.stage == EvaluationStage.COMPLETED
-                        assert progress.score is not None
-                        assert progress.execution_trace is not None
+                            # Verify task completed
+                            progress = orchestrator._progress["test-001"]
+                            assert progress.stage == EvaluationStage.COMPLETED
+                            assert progress.score is not None
+                            assert progress.execution_trace is not None
+                            mock_save_feedback.assert_called_once_with(
+                                "test-001",
+                                mock_validation_result,
+                                score=mock_score,
+                            )
 
     @pytest.mark.asyncio
     async def test_run_task_environment_failure(self):
