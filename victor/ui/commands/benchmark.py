@@ -341,7 +341,10 @@ async def _run_git_with_timeout(cmd, cwd, timeout=60):
 
 @benchmark_app.command("run")
 def run_benchmark(
-    benchmark: str = typer.Argument(..., help="Benchmark to run: swe-bench, humaneval, mbpp"),
+    benchmark: str = typer.Argument(
+        ...,
+        help="Benchmark to run: swe-bench, humaneval, mbpp, clawbench, guide, vlaa-gui",
+    ),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
@@ -354,6 +357,11 @@ def run_benchmark(
     profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to use"),
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for results (JSON)"
+    ),
+    dataset_path: Optional[Path] = typer.Option(
+        None,
+        "--dataset-path",
+        help="Local JSON/JSONL dataset manifest for external benchmark adapters",
     ),
     timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
@@ -414,10 +422,20 @@ def run_benchmark(
         raise typer.Exit(1)
 
     from victor.evaluation.benchmarks import (
+        ExternalAgenticBenchmarkRunner,
         SWEBenchRunner,
         HumanEvalRunner,
         MBPPRunner,
     )
+
+    if metadata.runner_status == "benchmark-only" and dataset_path is None:
+        console.print(
+            f"[bold red]Error:[/] Benchmark '{metadata.name}' requires --dataset-path "
+            "to load a local adapter manifest."
+        )
+        raise typer.Exit(1)
+
+    benchmark_key = metadata.name
 
     # Map benchmark name to type and runner
     benchmark_map = {
@@ -429,16 +447,28 @@ def run_benchmark(
         "humaneval": (BenchmarkType.HUMAN_EVAL, HumanEvalRunner),
         "mbpp": (BenchmarkType.MBPP, MBPPRunner),
         "mbpp-test": (BenchmarkType.MBPP, lambda: MBPPRunner(split="test")),
+        "clawbench": (
+            BenchmarkType.CLAW_BENCH,
+            lambda: ExternalAgenticBenchmarkRunner(BenchmarkType.CLAW_BENCH, dataset_path),
+        ),
+        "guide": (
+            BenchmarkType.GUIDE,
+            lambda: ExternalAgenticBenchmarkRunner(BenchmarkType.GUIDE, dataset_path),
+        ),
+        "vlaa-gui": (
+            BenchmarkType.VLAA_GUI,
+            lambda: ExternalAgenticBenchmarkRunner(BenchmarkType.VLAA_GUI, dataset_path),
+        ),
     }
 
-    if benchmark_lower not in benchmark_map:
+    if benchmark_key not in benchmark_map:
         console.print(
             f"[yellow]Benchmark '{metadata.name}' is cataloged, but the runner adapter "
             f"is not wired yet ({metadata.runner_status}).[/]"
         )
         raise typer.Exit(1)
 
-    bench_type, runner_factory = benchmark_map[benchmark_lower]
+    bench_type, runner_factory = benchmark_map[benchmark_key]
     runner = runner_factory() if callable(runner_factory) else runner_factory
 
     # Resolve account if specified (overrides --profile and --provider)
@@ -499,6 +529,8 @@ def run_benchmark(
     console.print(f"Model: {config.model}")
     if max_tasks:
         console.print(f"Max tasks: {max_tasks}")
+    if dataset_path is not None:
+        console.print(f"Dataset: {dataset_path}")
     console.print(f"Timeout: {timeout}s per task")
     console.print()
     result = run_sync(
@@ -542,6 +574,9 @@ def run_benchmark(
         f"{metrics['tasks_using_code_intelligence']}/{metrics['total_tasks']}"
         f" ({metrics['code_intelligence_task_coverage']:.1%})",
     )
+    if metrics.get("failure_categories"):
+        for category, count in sorted(metrics["failure_categories"].items()):
+            results_table.add_row(f"Failure: {category}", str(count))
 
     # Extended token metrics (if available)
     cached = metrics.get("cached_tokens", 0)
@@ -633,6 +668,10 @@ def run_benchmark(
                     "tool_calls": r.tool_calls,
                     "code_search_calls": r.code_search_calls,
                     "graph_calls": r.graph_calls,
+                    "failure_category": (
+                        r.failure_category.value if r.failure_category else None
+                    ),
+                    "failure_details": r.failure_details,
                 }
                 for r in result.task_results
             ],
@@ -867,16 +906,30 @@ async def _run_benchmark_async(
 
             async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
                 """Run agent on task and return generated code with metrics."""
+                temp_work_dir = None
                 cached_repo = workspace_manager.get_cached_repo_path(benchmark_task)
-                if cached_repo and workspace_manager.is_repo_indexed(benchmark_task):
-                    work_dir = cached_repo
-                    console.print(f"  [dim]Using indexed repo: {cached_repo.name}[/]")
+                if benchmark_task.repo:
+                    if cached_repo and workspace_manager.is_repo_indexed(benchmark_task):
+                        work_dir = cached_repo
+                        console.print(f"  [dim]Using indexed repo: {cached_repo.name}[/]")
+                    else:
+                        console.print(
+                            "  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
+                        )
+                        await workspace_manager.setup_repo_with_indexes(benchmark_task)
+                        work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
                 else:
+                    import tempfile
+
+                    temp_work_dir = Path(tempfile.mkdtemp(prefix="benchmark_task_"))
+                    if benchmark_task.context_code:
+                        (temp_work_dir / "solution.py").write_text(benchmark_task.context_code)
+                    if benchmark_task.test_code:
+                        (temp_work_dir / "test_solution.py").write_text(benchmark_task.test_code)
+                    work_dir = temp_work_dir
                     console.print(
-                        "  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
+                        f"  [dim]Using ephemeral workspace for {benchmark_task.task_id}[/]"
                     )
-                    await workspace_manager.setup_repo_with_indexes(benchmark_task)
-                    work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
 
                 if benchmark_task.base_commit and work_dir:
                     # Reset workspace to base_commit with clean working tree.
@@ -931,6 +984,10 @@ async def _run_benchmark_async(
                     raise
                 finally:
                     os.chdir(original_cwd)
+                    if temp_work_dir is not None:
+                        import shutil
+
+                        shutil.rmtree(temp_work_dir, ignore_errors=True)
 
                 # Capture actual file changes as a git diff patch.
                 # The agent edits files via the edit tool (modifies on disk),

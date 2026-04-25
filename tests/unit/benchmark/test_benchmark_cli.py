@@ -19,6 +19,7 @@ Integration tests that run actual benchmarks are skipped when Ollama is unavaila
 """
 
 import socket
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -77,12 +78,54 @@ class TestBenchmarkRun:
         assert result.exit_code == 1
         assert "Unknown benchmark" in result.stdout
 
-    def test_run_cataloged_benchmark_without_runner(self):
-        """Test running a benchmark that is cataloged but not yet wired."""
+    def test_run_cataloged_benchmark_requires_dataset_path(self):
+        """External benchmark adapters should require a local manifest path."""
         result = runner.invoke(benchmark_app, ["run", "guide"])
         assert result.exit_code == 1
-        assert "runner adapter is not wired yet" in result.stdout
-        assert "benchmark-only" in result.stdout
+        assert "requires --dataset-path" in result.stdout
+
+    def test_run_external_benchmark_with_dataset_path(self, tmp_path):
+        """External benchmark adapters should route through the standard runner path."""
+        dataset = tmp_path / "guide.jsonl"
+        dataset.write_text(
+            '{"task_id":"guide-1","prompt":"Implement add","test_code":"from solution import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n"}\n'
+        )
+
+        async def fake_run_benchmark_async(**_kwargs):
+            from victor.evaluation.protocol import (
+                BenchmarkFailureCategory,
+                BenchmarkType,
+                EvaluationConfig,
+                EvaluationResult,
+                TaskResult,
+                TaskStatus,
+            )
+
+            return EvaluationResult(
+                config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test-model"),
+                task_results=[
+                    TaskResult(
+                        task_id="guide-1",
+                        status=TaskStatus.FAILED,
+                        tests_passed=0,
+                        tests_total=1,
+                        failure_category=BenchmarkFailureCategory.TEST_FAILURE,
+                    )
+                ],
+            )
+
+        with patch(
+            "victor.ui.commands.benchmark._run_benchmark_async",
+            side_effect=fake_run_benchmark_async,
+        ):
+            result = runner.invoke(
+                benchmark_app,
+                ["run", "guide", "--dataset-path", str(dataset), "--model", "test-model"],
+            )
+
+        assert result.exit_code == 0
+        assert "Dataset:" in result.stdout
+        assert "Failure: test_failure" in result.stdout
 
     def test_run_shows_help(self):
         """Test run command help."""

@@ -34,7 +34,12 @@ from victor.evaluation.agentic_harness import (
     EvalToolCall,
     ToolUsageValidator,
 )
-from victor.evaluation.protocol import BenchmarkTask, BenchmarkType, TaskStatus
+from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
+    BenchmarkTask,
+    BenchmarkType,
+    TaskStatus,
+)
 
 
 class TestEvalToolCall:
@@ -343,6 +348,27 @@ class TestAgenticMetrics:
         assert exported["summary"]["benchmarks_evaluated"] == ["claw_bench"]
         assert exported["summary"]["external_benchmark_tasks"] == 1
         assert exported["tasks"][0]["benchmark"] == "claw_bench"
+
+
+    def test_to_dict_includes_failure_taxonomy(self):
+        """Test normalized failure categories are aggregated in agentic metrics."""
+        trace = AgenticExecutionTrace(
+            task_id="test-005",
+            start_time=0.0,
+            benchmark=BenchmarkType.GUIDE.value,
+        )
+        result = AgenticTaskResult(
+            task_id="test-005",
+            status=TaskStatus.FAILED,
+            trace=trace,
+            benchmark=BenchmarkType.GUIDE,
+            failure_category=BenchmarkFailureCategory.TEST_FAILURE,
+        )
+        metrics = AgenticMetrics(total_tasks=1, failed=1, task_results=[result])
+
+        exported = metrics.to_dict()
+        assert exported["summary"]["failure_categories"] == {"test_failure": 1}
+        assert exported["tasks"][0]["failure_category"] == "test_failure"
 
 
 class TestPatchApplicationValidator:

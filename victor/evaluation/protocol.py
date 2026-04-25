@@ -18,6 +18,7 @@ Defines data structures for running evaluations against
 benchmarks like SWE-bench, HumanEval, MBPP, etc.
 """
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -127,6 +128,20 @@ class TaskStatus(Enum):
     ERROR = "error"
     TIMEOUT = "timeout"
     SKIPPED = "skipped"
+
+
+class BenchmarkFailureCategory(Enum):
+    """Normalized failure categories for benchmark reporting."""
+
+    PATCH_APPLICATION = "patch_application"
+    TEST_FAILURE = "test_failure"
+    TOOL_USAGE = "tool_usage"
+    TASK_COMPLETION = "task_completion"
+    TIMEOUT = "timeout"
+    EXECUTION_ERROR = "execution_error"
+    ENVIRONMENT_ERROR = "environment_error"
+    UNSUPPORTED_CLAIM = "unsupported_claim"
+    UNKNOWN = "unknown"
 
 
 class EvaluationMetric(Enum):
@@ -275,6 +290,8 @@ class TaskResult:
     # Error info
     error_message: str = ""
     traceback: str = ""
+    failure_category: Optional[BenchmarkFailureCategory] = None
+    failure_details: dict[str, Any] = field(default_factory=dict)
 
     # Detailed output
     stdout: str = ""
@@ -484,6 +501,11 @@ class EvaluationResult:
         code_search_calls = self.total_code_search_calls
         graph_calls = self.total_graph_calls
         code_intelligence_tasks = self.tasks_using_code_intelligence
+        failure_categories = Counter(
+            result.failure_category.value
+            for result in self.task_results
+            if result.failure_category is not None
+        )
         return {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
@@ -507,6 +529,7 @@ class EvaluationResult:
             "cached_tokens": cached,
             "reasoning_tokens": reasoning,
             "cost_usd_micros": cost_micros,
+            "failure_categories": dict(failure_categories),
         }
 
 

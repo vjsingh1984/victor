@@ -29,6 +29,7 @@ from victor.evaluation.harness import (
     get_harness,
 )
 from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
     BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
@@ -502,6 +503,32 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["total_graph_calls"] == 1
         assert loaded["tasks"][0]["code_search_calls"] == 2
         assert loaded["tasks"][0]["graph_calls"] == 1
+
+
+    def test_save_results_persists_failure_taxonomy(self, tmp_path):
+        """Saved results should include normalized failure category fields."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="test",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    failure_category=BenchmarkFailureCategory.TEST_FAILURE,
+                    failure_details={"stage": "pytest"},
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["summary"]["failure_categories"] == {"test_failure": 1}
+        assert loaded["tasks"][0]["failure_category"] == "test_failure"
+        assert loaded["tasks"][0]["failure_details"] == {"stage": "pytest"}
 
 
 class TestSaveAndLoadResults:

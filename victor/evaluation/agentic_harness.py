@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Awaitable
 
 from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
     BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
@@ -251,6 +252,8 @@ class AgenticTaskResult:
     # Error info
     error_message: str = ""
     traceback: str = ""
+    failure_category: Optional[BenchmarkFailureCategory] = None
+    failure_details: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_success(self) -> bool:
@@ -355,6 +358,18 @@ class AgenticMetrics:
             1 for result in self.task_results if is_external_agentic_benchmark(result.benchmark)
         )
 
+
+    @property
+    def failure_categories(self) -> dict[str, int]:
+        """Count benchmark failures by normalized category."""
+        counts: dict[str, int] = {}
+        for result in self.task_results:
+            if result.failure_category is None:
+                continue
+            key = result.failure_category.value
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
     def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
         return {
@@ -367,6 +382,7 @@ class AgenticMetrics:
                 "pass_rate": round(self.pass_rate, 4),
                 "benchmarks_evaluated": self.benchmarks_evaluated,
                 "external_benchmark_tasks": self.external_benchmark_task_count,
+                "failure_categories": self.failure_categories,
             },
             "efficiency": {
                 "total_turns": self.total_turns,
@@ -397,6 +413,9 @@ class AgenticMetrics:
                     "task_id": r.task_id,
                     "benchmark": r.benchmark.value,
                     "status": r.status.value,
+                    "failure_category": (
+                        r.failure_category.value if r.failure_category else None
+                    ),
                     "turns": r.trace.turns,
                     "tool_calls": r.trace.total_tool_calls,
                     "duration": round(r.trace.duration_seconds, 2),
@@ -1122,14 +1141,23 @@ class AgenticBenchmarkRunner:
             else:
                 result.status = TaskStatus.FAILED
 
+            result.failure_category = self._classify_failure_category(result, trace)
+            if result.failure_category is not None:
+                result.failure_details = {
+                    "validation_errors": dict(trace.validation_errors),
+                    "unsupported_claim_rate": result.unsupported_claim_rate,
+                }
+
         except asyncio.TimeoutError:
             result.status = TaskStatus.TIMEOUT
             result.error_message = "Agent timeout"
+            result.failure_category = BenchmarkFailureCategory.TIMEOUT
             trace.end_time = time.time()
 
         except Exception as e:
             result.status = TaskStatus.ERROR
             result.error_message = str(e)
+            result.failure_category = BenchmarkFailureCategory.EXECUTION_ERROR
             import traceback
 
             result.traceback = traceback.format_exc()
@@ -1294,6 +1322,34 @@ class AgenticBenchmarkRunner:
         else:
             metrics.errors += 1
 
+
+    def _classify_failure_category(
+        self,
+        result: AgenticTaskResult,
+        trace: AgenticExecutionTrace,
+    ) -> Optional[BenchmarkFailureCategory]:
+        """Infer a normalized failure category for agentic runs."""
+        if result.status == TaskStatus.PASSED:
+            return None
+        if result.status == TaskStatus.TIMEOUT:
+            return BenchmarkFailureCategory.TIMEOUT
+        if result.status == TaskStatus.ERROR:
+            message = result.error_message.lower()
+            if "environment" in message or "test runner" in message:
+                return BenchmarkFailureCategory.ENVIRONMENT_ERROR
+            return BenchmarkFailureCategory.EXECUTION_ERROR
+        if trace.validations.get(AgenticValidationType.PATCH_APPLIES.value) is False:
+            return BenchmarkFailureCategory.PATCH_APPLICATION
+        if trace.validations.get(AgenticValidationType.TESTS_PASS.value) is False:
+            return BenchmarkFailureCategory.TEST_FAILURE
+        if trace.validations.get(AgenticValidationType.TOOL_USAGE.value) is False:
+            return BenchmarkFailureCategory.TOOL_USAGE
+        if result.unsupported_claim_rate > 0.0:
+            return BenchmarkFailureCategory.UNSUPPORTED_CLAIM
+        if trace.validations.get(AgenticValidationType.TASK_COMPLETE.value) is False:
+            return BenchmarkFailureCategory.TASK_COMPLETION
+        return BenchmarkFailureCategory.UNKNOWN
+
     async def _setup_workspace(self, task: BenchmarkTask, workspace_dir: Path) -> None:
         """Set up the task workspace."""
         # Clone repository if specified
@@ -1352,6 +1408,13 @@ def generate_agentic_report(metrics: AgenticMetrics) -> str:
     if metrics.benchmarks_evaluated:
         lines.append(f"  Benchmarks:     {', '.join(metrics.benchmarks_evaluated)}")
         lines.append(f"  External Tasks: {metrics.external_benchmark_task_count}")
+    if metrics.failure_categories:
+        lines.append(
+            "  Failures:       "
+            + ", ".join(
+                f"{name}={count}" for name, count in sorted(metrics.failure_categories.items())
+            )
+        )
     lines.append("")
 
     lines.append("EFFICIENCY")

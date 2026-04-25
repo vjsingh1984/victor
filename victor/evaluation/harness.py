@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
     BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
@@ -531,6 +532,10 @@ class EvaluationHarness:
                     "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
                     "error_message": r.error_message,
+                    "failure_category": (
+                        r.failure_category.value if r.failure_category else None
+                    ),
+                    "failure_details": r.failure_details,
                     "generated_code": r.generated_code,
                 }
                 for r in completed_results
@@ -582,6 +587,12 @@ class EvaluationHarness:
                     graph_calls=r.get("graph_calls", 0),
                     completion_score=r.get("completion_score"),
                     error_message=r.get("error_message"),
+                    failure_category=(
+                        BenchmarkFailureCategory(r["failure_category"])
+                        if r.get("failure_category")
+                        else None
+                    ),
+                    failure_details=r.get("failure_details", {}),
                     generated_code=r.get("generated_code"),
                 )
                 completed_results.append(result)
@@ -784,6 +795,7 @@ class EvaluationHarness:
                     task_id=task.task_id,
                     status=TaskStatus.ERROR,
                     error_message=str(e),
+                    failure_category=BenchmarkFailureCategory.EXECUTION_ERROR,
                 )
                 results.append(error_result)
                 all_results.append(error_result)
@@ -844,6 +856,7 @@ class EvaluationHarness:
                         task_id=task.task_id,
                         status=TaskStatus.ERROR,
                         error_message=str(e),
+                        failure_category=BenchmarkFailureCategory.EXECUTION_ERROR,
                     )
 
                 # Save checkpoint and call progress callback with lock
@@ -910,6 +923,7 @@ class EvaluationHarness:
             except asyncio.TimeoutError:
                 task_result.status = TaskStatus.TIMEOUT
                 task_result.error_message = "Agent timeout"
+                task_result.failure_category = BenchmarkFailureCategory.TIMEOUT
                 # Check if callback stored partial data before cancellation
                 partial_data = getattr(agent_callback, "_partial_data", None)
                 if partial_data:
@@ -976,11 +990,16 @@ class EvaluationHarness:
 
                 # Merge results
                 task_result.status = eval_result.status
+                task_result.generated_patch = eval_result.generated_patch
                 task_result.tests_passed = eval_result.tests_passed
                 task_result.tests_failed = eval_result.tests_failed
                 task_result.tests_total = eval_result.tests_total
                 task_result.stdout = eval_result.stdout
                 task_result.stderr = eval_result.stderr
+                task_result.error_message = eval_result.error_message
+                task_result.traceback = eval_result.traceback
+                task_result.failure_category = eval_result.failure_category
+                task_result.failure_details = dict(eval_result.failure_details)
 
                 # Calculate completion score
                 task_result.completion_score = task_result.calculate_completion_score()
@@ -988,6 +1007,7 @@ class EvaluationHarness:
         except Exception as e:
             task_result.status = TaskStatus.ERROR
             task_result.error_message = str(e)
+            task_result.failure_category = BenchmarkFailureCategory.EXECUTION_ERROR
             import traceback
 
             task_result.traceback = traceback.format_exc()
@@ -1184,6 +1204,10 @@ class EvaluationHarness:
                     "code_search_calls": r.code_search_calls,
                     "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
+                    "failure_category": (
+                        r.failure_category.value if r.failure_category else None
+                    ),
+                    "failure_details": r.failure_details,
                     "code_quality": (
                         {
                             "syntax_valid": r.code_quality.syntax_valid,
