@@ -124,6 +124,7 @@ class SystemPromptPolicy:
             provider=provider,
         )
 
+
 def create_policy_from_settings(settings: Optional[Any]) -> SystemPromptPolicy:
     """Create a SystemPromptPolicy using VictorSettings or similar config objects."""
 

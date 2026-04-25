@@ -119,15 +119,18 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                 # Parse the formatted diff to extract content lines
                 # Strip Rich markup tags for line counting
                 import re
+
                 clean_lines = []
                 for line in formatted_diff.splitlines():
                     # Remove Rich markup tags like [green], [red], [dim], [cyan], [/]
-                    clean_line = re.sub(r'\[[a-z0-9_/]+\]', '', line)
+                    clean_line = re.sub(r"\[[a-z0-9_/]+\]", "", line)
                     clean_lines.append(clean_line)
 
                 # Count additions and removals from clean lines
                 added = sum(1 for l in clean_lines if l.startswith("+") and not l.startswith("+++"))
-                removed = sum(1 for l in clean_lines if l.startswith("-") and not l.startswith("---"))
+                removed = sum(
+                    1 for l in clean_lines if l.startswith("-") and not l.startswith("---")
+                )
 
                 # Extract file paths from the formatted diff
                 file_labels = []
@@ -158,7 +161,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
 
                 # Count additions and removals
                 added = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
-                removed = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+                removed = sum(
+                    1 for l in diff_lines if l.startswith("-") and not l.startswith("---")
+                )
 
                 # Extract file paths
                 file_labels = []

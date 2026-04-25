@@ -222,10 +222,7 @@ class TestRefactorFormatter:
         """Test max_operations parameter limits output."""
         formatter = RefactorFormatter()
         data = {
-            "operations": [
-                {"type": "rename", "description": f"Operation {i}"}
-                for i in range(25)
-            ]
+            "operations": [{"type": "rename", "description": f"Operation {i}"} for i in range(25)]
         }
 
         result = formatter.format(data, max_operations=20)

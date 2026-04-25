@@ -447,9 +447,7 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
     passed_tasks = sum(
         1 for task in task_results if str(task.get("status", "")).lower() == "passed"
     )
-    error_tasks = sum(
-        1 for task in task_results if str(task.get("status", "")).lower() == "error"
-    )
+    error_tasks = sum(1 for task in task_results if str(task.get("status", "")).lower() == "error")
     timeout_tasks = sum(
         1 for task in task_results if str(task.get("status", "")).lower() == "timeout"
     )
@@ -477,7 +475,9 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
     elif summary.get("avg_tokens_per_task") is not None:
         metrics.tokens_per_task = _safe_float(summary.get("avg_tokens_per_task"))
     else:
-        metrics.tokens_per_task = sum(_safe_float(task.get("tokens_used")) for task in task_results) / total_tasks
+        metrics.tokens_per_task = (
+            sum(_safe_float(task.get("tokens_used")) for task in task_results) / total_tasks
+        )
 
     total_tests = sum(_safe_int(task.get("tests_total")) for task in task_results)
     passed_tests = sum(_safe_int(task.get("tests_passed")) for task in task_results)
@@ -504,15 +504,17 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
     if total_turns > 0:
         metrics.turns_per_task = total_turns / total_tasks
     else:
-        metrics.turns_per_task = sum(_safe_float(task.get("turns")) for task in task_results) / total_tasks
+        metrics.turns_per_task = (
+            sum(_safe_float(task.get("turns")) for task in task_results) / total_tasks
+        )
 
     total_tool_calls = _safe_float(summary.get("total_tool_calls"))
     if total_tool_calls > 0:
         metrics.tool_calls_per_task = total_tool_calls / total_tasks
     else:
-        metrics.tool_calls_per_task = sum(
-            _safe_float(task.get("tool_calls")) for task in task_results
-        ) / total_tasks
+        metrics.tool_calls_per_task = (
+            sum(_safe_float(task.get("tool_calls")) for task in task_results) / total_tasks
+        )
 
     total_cost_micros = _safe_float(summary.get("cost_usd_micros"))
     if total_cost_micros > 0:
@@ -523,7 +525,9 @@ def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics
     summary_errors = summary.get("errors")
     summary_timeouts = summary.get("timeouts")
     metrics.error_rate = (
-        _safe_float(summary_errors) / total_tasks if summary_errors is not None else error_tasks / total_tasks
+        _safe_float(summary_errors) / total_tasks
+        if summary_errors is not None
+        else error_tasks / total_tasks
     )
     metrics.timeout_rate = (
         _safe_float(summary_timeouts) / total_tasks
@@ -548,13 +552,13 @@ def load_framework_result_from_file(
     dataset_metadata = _get_saved_dataset_metadata(data)
     resolved_model = model_override or data.get("model") or config.get("model") or "unknown"
     source_name = (
-        dataset_metadata.get("source_name")
-        or config.get("source")
-        or f"Local result ({path.name})"
+        dataset_metadata.get("source_name") or config.get("source") or f"Local result ({path.name})"
     )
     timestamp_value = data.get("timestamp") or data.get("end_time") or data.get("start_time")
     try:
-        timestamp = datetime.fromisoformat(str(timestamp_value)) if timestamp_value else datetime.now()
+        timestamp = (
+            datetime.fromisoformat(str(timestamp_value)) if timestamp_value else datetime.now()
+        )
     except ValueError:
         timestamp = datetime.now()
 

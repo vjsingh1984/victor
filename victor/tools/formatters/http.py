@@ -21,11 +21,7 @@ class HTTPFormatter(ToolFormatter):
         return isinstance(data, dict) and ("status_code" in data or "body" in data)
 
     def format(
-        self,
-        data: Dict[str, Any],
-        max_headers: int = 10,
-        max_body_length: int = 500,
-        **kwargs
+        self, data: Dict[str, Any], max_headers: int = 10, max_body_length: int = 500, **kwargs
     ) -> FormattedOutput:
         """Format HTTP response with Rich markup.
 

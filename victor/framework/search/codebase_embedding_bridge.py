@@ -129,11 +129,14 @@ def _normalized_extra_config(config: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _normalized_chunking_strategy(extra_config: Mapping[str, Any]) -> str:
-    return str(
-        extra_config.get("code_chunking_strategy")
-        or extra_config.get("chunking_strategy")
+    return (
+        str(
+            extra_config.get("code_chunking_strategy")
+            or extra_config.get("chunking_strategy")
+            or DEFAULT_CODEBASE_CHUNKING_STRATEGY
+        ).strip()
         or DEFAULT_CODEBASE_CHUNKING_STRATEGY
-    ).strip() or DEFAULT_CODEBASE_CHUNKING_STRATEGY
+    )
 
 
 def build_codebase_index_manifest(embedding_config: Mapping[str, Any]) -> dict[str, Any]:
@@ -153,9 +156,7 @@ def build_codebase_index_manifest(embedding_config: Mapping[str, Any]) -> dict[s
         "embedding_provider": str(
             embedding_config.get("embedding_model_type", "sentence-transformers")
         ),
-        "embedding_model": str(
-            embedding_config.get("embedding_model_name", "all-MiniLM-L12-v2")
-        ),
+        "embedding_model": str(embedding_config.get("embedding_model_name", "all-MiniLM-L12-v2")),
         "distance_metric": str(embedding_config.get("distance_metric", "cosine")),
         "dimension": int(extra_config.get("dimension", 384)),
         "batch_size": int(extra_config.get("batch_size", 32)),
@@ -318,8 +319,12 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
                 vector_store=self._upstream_vector_store,
                 persist_directory=getattr(self.config, "persist_directory", None),
                 distance_metric=getattr(self.config, "distance_metric", "cosine"),
-                embedding_model_type=getattr(self.config, "embedding_model_type", "sentence-transformers"),
-                embedding_model_name=getattr(self.config, "embedding_model_name", "all-MiniLM-L12-v2"),
+                embedding_model_type=getattr(
+                    self.config, "embedding_model_type", "sentence-transformers"
+                ),
+                embedding_model_name=getattr(
+                    self.config, "embedding_model_name", "all-MiniLM-L12-v2"
+                ),
                 embedding_api_key=getattr(self.config, "embedding_api_key", None),
                 extra_config=self._build_delegate_extra_config(),
             )
@@ -463,11 +468,14 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
                 self._pending_file = _PendingFileBatch(
                     file_path=file_path,
                     documents=[],
-                    replace_existing=replace_existing or file_path in self._files_flushed_since_clear,
+                    replace_existing=replace_existing
+                    or file_path in self._files_flushed_since_clear,
                 )
 
             self._pending_file.documents.append(document)
-            self._pending_file.replace_existing = self._pending_file.replace_existing or replace_existing
+            self._pending_file.replace_existing = (
+                self._pending_file.replace_existing or replace_existing
+            )
 
         async def _flush_pending_file(self) -> None:
             pending = self._pending_file
@@ -520,7 +528,9 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
             chunk_documents: list[dict[str, Any]] = []
             for index, chunk in enumerate(chunks):
                 symbol_name = chunk.symbol_name
-                unified_id = f"symbol:{file_path}:{symbol_name}" if symbol_name else f"file:{file_path}"
+                unified_id = (
+                    f"symbol:{file_path}:{symbol_name}" if symbol_name else f"file:{file_path}"
+                )
                 chunk_id = _make_chunk_id(
                     file_path=file_path,
                     start_line=chunk.start_line,

@@ -427,9 +427,7 @@ class TestStreamingShimBehavior:
         mock_orchestrator._get_service_streaming_runtime.assert_called_once_with()
 
     @pytest.mark.asyncio
-    async def test_stream_chat_prefers_bound_chat_service_over_other_paths(
-        self, mock_orchestrator
-    ):
+    async def test_stream_chat_prefers_bound_chat_service_over_other_paths(self, mock_orchestrator):
         """Shim uses bound ChatService before service runtime and the legacy compatibility hook."""
         from victor.providers.base import StreamChunk
 
@@ -465,9 +463,7 @@ class TestStreamingShimBehavior:
         mock_orchestrator._get_service_streaming_runtime.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_stream_chat_falls_back_to_legacy_compatibility_hook(
-        self, mock_orchestrator
-    ):
+    async def test_stream_chat_falls_back_to_legacy_compatibility_hook(self, mock_orchestrator):
         """Shim preserves the legacy compatibility hook as the final fallback."""
         from victor.providers.base import StreamChunk
 

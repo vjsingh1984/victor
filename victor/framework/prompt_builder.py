@@ -121,6 +121,7 @@ class PromptSection(PromptBlock):
         enabled: Whether this section is included in the final prompt
         header: Optional header format. If None, uses "## {name}". Set to "" to disable.
     """
+
     pass
 
 
@@ -421,7 +422,11 @@ class PromptBuilder:
 
     def iter_sections(self) -> List[PromptSection]:
         """Return a list of current sections."""
-        return [section for section in self._document.iter_blocks() if isinstance(section, PromptSection)]
+        return [
+            section
+            for section in self._document.iter_blocks()
+            if isinstance(section, PromptSection)
+        ]
 
     def iter_named_sections(self) -> List[Tuple[str, PromptSection]]:
         """Return (name, section) tuples for all sections."""

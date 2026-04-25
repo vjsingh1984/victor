@@ -4184,7 +4184,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 f"Tool tokens ({tool_tokens}) exceed 25% of context window ({context_window}). "
                 f"Demoting low-priority tools to STUB or dropping them."
             )
-            tools = self._demote_tools_to_fit(tools, max_tool_tokens, context_window, provider_category)
+            tools = self._demote_tools_to_fit(
+                tools, max_tool_tokens, context_window, provider_category
+            )
             tool_tokens = sum(self._estimate_tool_tokens(tool, provider_category) for tool in tools)
 
         # ECONOMY STRATEGY: Session-lock when beneficial
@@ -4203,7 +4205,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 provider=provider.name,
                 reason="cache_discount_or_large_context",
                 tools=tools,
-                provider_category=provider_category
+                provider_category=provider_category,
             )
             return tools
 
@@ -4232,7 +4234,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             provider=provider.name,
             reason="small_context_window",
             tools=result,
-            provider_category=provider_category
+            provider_category=provider_category,
         )
 
         return result
@@ -4251,7 +4253,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return provider.context_window(model)
 
         # Fallback: safe default
-        logger.warning(f"Provider {provider.name} does not support context_window(), using default 8192")
+        logger.warning(
+            f"Provider {provider.name} does not support context_window(), using default 8192"
+        )
         return 8192
 
     def _estimate_tool_tokens(self, tool, provider_category: str = None) -> int:
@@ -4282,7 +4286,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Fallback: estimate based on tool name length
             return len(tool.name) + 50  # Rough estimate
 
-    def _should_session_lock_all_tools(self, provider, context_window: int, tool_tokens: int) -> bool:
+    def _should_session_lock_all_tools(
+        self, provider, context_window: int, tool_tokens: int
+    ) -> bool:
         """Determine if all tools should be session-locked.
 
         Session-locking is economy-optimal when:
@@ -4321,7 +4327,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         provider_name = getattr(provider, "name", "").lower()
         return "gemini" in provider_name or "google" in provider_name
 
-    def _demote_tools_to_fit(self, tools, max_tokens: int, context_window: int, provider_category: str = None) -> list:
+    def _demote_tools_to_fit(
+        self, tools, max_tokens: int, context_window: int, provider_category: str = None
+    ) -> list:
         """Demote or drop low-priority tools until within budget.
 
         Args:
@@ -4336,7 +4344,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         from victor.tools.enums import Priority, SchemaLevel
 
         # Sort by priority (CRITICAL first)
-        sorted_tools = sorted(tools, key=lambda t: (t.priority.value if hasattr(t, "priority") else 99, t.name))
+        sorted_tools = sorted(
+            tools, key=lambda t: (t.priority.value if hasattr(t, "priority") else 99, t.name)
+        )
 
         result = []
         current_tokens = 0
@@ -4400,7 +4410,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         from victor.tools.enums import Priority
 
         # Always include critical tools
-        core_tools = [t for t in tools if hasattr(t, "priority") and t.priority == Priority.CRITICAL]
+        core_tools = [
+            t for t in tools if hasattr(t, "priority") and t.priority == Priority.CRITICAL
+        ]
         core_tokens = sum(self._estimate_tool_tokens(t, provider_category) for t in core_tools)
 
         logger.debug(f"Core tools: {len(core_tools)} tools, {core_tokens} tokens")
@@ -4478,7 +4490,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         try:
             # Calculate context utilization
-            context_utilization = (tool_tokens / max_tool_tokens) if (max_tool_tokens := int(context_window * 0.25)) > 0 else 0
+            context_utilization = (
+                (tool_tokens / max_tool_tokens)
+                if (max_tool_tokens := int(context_window * 0.25)) > 0
+                else 0
+            )
 
             # Determine provider category
             provider_category = self._get_provider_category(provider)
@@ -4540,8 +4556,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Caching providers (90% API discount)
         caching_providers = {
-            "anthropic", "openai", "deepseek", "google", "azure_openai",
-            "bedrock", "cerebras", "fireworks", "groq"
+            "anthropic",
+            "openai",
+            "deepseek",
+            "google",
+            "azure_openai",
+            "bedrock",
+            "cerebras",
+            "fireworks",
+            "groq",
         }
 
         return "caching" if provider_name.lower() in caching_providers else "local"
@@ -4564,19 +4587,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
             # Counter: tool strategy decisions
-            logger.debug(
-                f'METRIC: victor_tool_strategy decisions{{{labels}}} 1'
-            )
+            logger.debug(f"METRIC: victor_tool_strategy decisions{{{labels}}} 1")
 
             # Gauge: tool count
-            logger.debug(
-                f'METRIC: victor_tool_count{{{labels}}} {event_data["tool_count"]}'
-            )
+            logger.debug(f'METRIC: victor_tool_count{{{labels}}} {event_data["tool_count"]}')
 
             # Gauge: tool tokens
-            logger.debug(
-                f'METRIC: victor_tool_tokens{{{labels}}} {event_data["tool_tokens"]}'
-            )
+            logger.debug(f'METRIC: victor_tool_tokens{{{labels}}} {event_data["tool_tokens"]}')
 
             # Gauge: context utilization
             logger.debug(
@@ -4591,13 +4608,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # Emit tier distribution if available
             for tier, count in event_data.get("tier_distribution", {}).items():
-                tier_labels = (
-                    f'provider="{event_data["provider"]}",'
-                    f'tier="{tier}"'
-                )
-                logger.debug(
-                    f'METRIC: victor_tool_tier_count{{{tier_labels}}} {count}'
-                )
+                tier_labels = f'provider="{event_data["provider"]}",' f'tier="{tier}"'
+                logger.debug(f"METRIC: victor_tool_tier_count{{{tier_labels}}} {count}")
 
         except Exception as e:
             logger.debug(f"Failed to emit tool strategy metrics: {e}")

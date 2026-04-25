@@ -28,9 +28,7 @@ from victor.agent.unified_task_tracker import (
 def test_task_tool_config_loader_canonicalizes_legacy_yaml(tmp_path):
     """Legacy tool names in YAML should normalize to the canonical surface."""
     config_path = tmp_path / "task_tool_config.yaml"
-    config_path.write_text(
-        dedent(
-            """
+    config_path.write_text(dedent("""
             task_types:
               edit:
                 required_tools: [edit_files, read_file]
@@ -38,9 +36,7 @@ def test_task_tool_config_loader_canonicalizes_legacy_yaml(tmp_path):
                   executing: [edit_files, read_file, execute_bash]
                 force_action_hints:
                   after_target_read: "Use edit_files now."
-            """
-        )
-    )
+            """))
 
     loader = TaskToolConfigLoader(str(config_path))
 
@@ -57,7 +53,9 @@ def test_unified_task_tracker_accepts_legacy_aliases_for_progress_tracking():
     tracker.record_tool_call("read_file", {"path": "src/app.py"})
     assert "src/app.py" in tracker._progress.files_read
 
-    tracker.record_tool_call("edit_files", {"ops": [{"path": "src/app.py", "old_str": "a", "new_str": "b"}]})
+    tracker.record_tool_call(
+        "edit_files", {"ops": [{"path": "src/app.py", "old_str": "a", "new_str": "b"}]}
+    )
     assert "src/app.py" in tracker._progress.files_modified
 
     tracker.record_tool_call("execute_bash", {"cmd": "pytest -q"})

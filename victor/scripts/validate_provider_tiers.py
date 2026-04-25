@@ -27,7 +27,9 @@ def validate_edge_tool_budget():
     print(f"Edge tier tool cost: {edge_tokens} tokens")
     print(f"Budget utilization: {edge_tokens / max_tool_tokens * 100:.1f}%")
 
-    assert edge_tokens <= max_tool_tokens, f"Edge tools ({edge_tokens}) exceed budget ({max_tool_tokens})"
+    assert (
+        edge_tokens <= max_tool_tokens
+    ), f"Edge tools ({edge_tokens}) exceed budget ({max_tool_tokens})"
     print("✅ Edge model: Tool tokens fit within budget")
     return True
 
@@ -46,7 +48,9 @@ def validate_standard_tool_budget():
     print(f"Standard tier tool cost: {standard_tokens} tokens")
     print(f"Budget utilization: {standard_tokens / max_tool_tokens * 100:.1f}%")
 
-    assert standard_tokens <= max_tool_tokens, f"Standard tools ({standard_tokens}) exceed budget ({max_tool_tokens})"
+    assert (
+        standard_tokens <= max_tool_tokens
+    ), f"Standard tools ({standard_tokens}) exceed budget ({max_tool_tokens})"
     print("✅ Standard model: Tool tokens fit within budget")
     return True
 
@@ -65,7 +69,9 @@ def validate_large_tool_budget():
     print(f"Large tier tool cost: {large_tokens} tokens")
     print(f"Budget utilization: {large_tokens / max_tool_tokens * 100:.1f}%")
 
-    assert large_tokens <= max_tool_tokens, f"Large tools ({large_tokens}) exceed budget ({max_tool_tokens})"
+    assert (
+        large_tokens <= max_tool_tokens
+    ), f"Large tools ({large_tokens}) exceed budget ({max_tool_tokens})"
     print("✅ Large model: Tool tokens fit within budget")
     return True
 
@@ -97,7 +103,9 @@ def validate_token_savings():
     print(f"Standard savings: {standard_savings} tokens ({standard_savings_pct:.1f}% reduction)")
 
     assert edge_savings_pct == 80.0, f"Expected 80% edge savings, got {edge_savings_pct:.1f}%"
-    assert abs(standard_savings_pct - 38.8) < 0.1, f"Expected 38.8% standard savings, got {standard_savings_pct:.1f}%"
+    assert (
+        abs(standard_savings_pct - 38.8) < 0.1
+    ), f"Expected 38.8% standard savings, got {standard_savings_pct:.1f}%"
 
     print("✅ Token savings: Achieved expected reductions")
     return True

@@ -1152,9 +1152,7 @@ class PromptOptimizerLearner(BaseLearner):
                 self._save_candidate(candidate)
 
         fallback_candidates = [
-            c
-            for c in candidates
-            if c.text_hash != failed_hash and c.benchmark_passed
+            c for c in candidates if c.text_hash != failed_hash and c.benchmark_passed
         ]
         if not fallback_candidates:
             return None

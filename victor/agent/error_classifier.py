@@ -277,7 +277,9 @@ class ToolErrorClassifier:
                     and decision.source == "llm"
                     and hasattr(decision.result, "error_type")
                 ):
-                    error_type = getattr(decision.result.error_type, "value", decision.result.error_type)
+                    error_type = getattr(
+                        decision.result.error_type, "value", decision.result.error_type
+                    )
                     type_map = {
                         "permanent": ErrorType.PERMANENT,
                         "transient": ErrorType.TRANSIENT,

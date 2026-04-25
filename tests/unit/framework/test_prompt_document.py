@@ -13,12 +13,8 @@ class TestPromptDocument:
 
     def test_render_orders_blocks_by_priority(self):
         document = PromptDocument()
-        document.upsert(
-            PromptBlock(name="later", content="Later", priority=40, header="")
-        )
-        document.upsert(
-            PromptBlock(name="first", content="First", priority=10, header="")
-        )
+        document.upsert(PromptBlock(name="later", content="Later", priority=40, header=""))
+        document.upsert(PromptBlock(name="first", content="First", priority=10, header=""))
 
         assert document.render() == "First\n\nLater"
 

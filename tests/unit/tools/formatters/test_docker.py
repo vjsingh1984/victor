@@ -122,7 +122,13 @@ class TestDockerFormatter:
         formatter = DockerFormatter()
         data = {
             "containers": [
-                {"id": f"id{i}", "name": f"container{i}", "image": "img", "state": "running", "ports": ""}
+                {
+                    "id": f"id{i}",
+                    "name": f"container{i}",
+                    "image": "img",
+                    "state": "running",
+                    "ports": "",
+                }
                 for i in range(25)
             ]
         }
@@ -266,14 +272,18 @@ class TestDockerFormatter:
 
         # Test containers - summary shows "1 containers" even though it's singular
         result = formatter.format(
-            {"containers": [{"id": "abc", "name": "test", "image": "img", "state": "running", "ports": ""}]},
-            operation="ps"
+            {
+                "containers": [
+                    {"id": "abc", "name": "test", "image": "img", "state": "running", "ports": ""}
+                ]
+            },
+            operation="ps",
         )
         assert "1 containers" in result.summary  # Summary field has the count
 
         # Test images
         result = formatter.format(
             {"images": [{"id": "abc", "tags": ["test"], "size": "100MB", "created": "now"}]},
-            operation="images"
+            operation="images",
         )
         assert "1 images" in result.summary  # Summary field has the count

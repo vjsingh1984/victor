@@ -25,7 +25,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.decisions.schemas import DecisionType, ErrorClassDecision, ErrorType as DecisionErrorType
+from victor.agent.decisions.schemas import (
+    DecisionType,
+    ErrorClassDecision,
+    ErrorType as DecisionErrorType,
+)
 from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.agent.error_classifier import ToolErrorClassifier, ErrorType
 

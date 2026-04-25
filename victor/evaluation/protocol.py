@@ -644,9 +644,15 @@ class EvaluationResult:
             uncertainty_scores.append(confidence.uncertainty)
             if confidence.truth_aligned:
                 truth_aligned_tasks += 1
-            if task_result.status != TaskStatus.PASSED and confidence.bucket == ConfidenceBucket.HIGH:
+            if (
+                task_result.status != TaskStatus.PASSED
+                and confidence.bucket == ConfidenceBucket.HIGH
+            ):
                 overconfident_failures += 1
-            if task_result.status == TaskStatus.PASSED and confidence.bucket == ConfidenceBucket.LOW:
+            if (
+                task_result.status == TaskStatus.PASSED
+                and confidence.bucket == ConfidenceBucket.LOW
+            ):
                 underconfident_passes += 1
         return {
             "total_tasks": self.total_tasks,
@@ -876,9 +882,8 @@ def derive_confidence_assessment(result: TaskResult) -> ConfidenceAssessment:
     else:
         bucket = ConfidenceBucket.LOW
 
-    truth_aligned = (
-        (result.status == TaskStatus.PASSED and bucket != ConfidenceBucket.LOW)
-        or (result.status != TaskStatus.PASSED and bucket != ConfidenceBucket.HIGH)
+    truth_aligned = (result.status == TaskStatus.PASSED and bucket != ConfidenceBucket.LOW) or (
+        result.status != TaskStatus.PASSED and bucket != ConfidenceBucket.HIGH
     )
 
     return ConfidenceAssessment(
@@ -916,7 +921,6 @@ class BenchmarkMetadata:
     aliases: tuple[str, ...] = ()
     evaluation_mode: str = "code"
     runner_status: str = "implemented"
-
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize benchmark metadata for reporting."""

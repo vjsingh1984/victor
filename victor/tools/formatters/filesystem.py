@@ -193,4 +193,5 @@ class FileSystemFormatter(ToolFormatter):
             GenericFormatter instance
         """
         from .generic import GenericFormatter
+
         return GenericFormatter()

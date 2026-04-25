@@ -68,4 +68,3 @@ async def test_execute_tool_with_retry_clears_canonical_namespaces_for_shell():
     )
 
     cache.clear_namespaces.assert_called_once_with(["read", "ls"])
-

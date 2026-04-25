@@ -55,7 +55,7 @@ class TestNetworkFormatter:
             "latency_ms": 45.5,
             "packet_loss": 0,
             "packets_sent": 4,
-            "packets_received": 4
+            "packets_received": 4,
         }
 
         result = formatter.format(data)
@@ -74,7 +74,7 @@ class TestNetworkFormatter:
             "latency_ms": 0,
             "packet_loss": 25.0,  # Changed from 50.0 to be < 50
             "packets_sent": 4,
-            "packets_received": 3
+            "packets_received": 3,
         }
 
         result = formatter.format(data)
@@ -112,7 +112,7 @@ class TestNetworkFormatter:
             "avg_latency_ms": 50.0,
             "max_latency_ms": 55.0,
             "packet_loss": 0,
-            "packets_sent": 10
+            "packets_sent": 10,
         }
 
         result = formatter.format(data)
@@ -130,9 +130,14 @@ class TestNetworkFormatter:
             "operation": "traceroute",
             "host": "example.com",
             "hops": [
-                {"hop": 1, "host": "router1", "ip": "192.168.1.1", "latency_ms": [10.5, 11.2, 10.8]},
+                {
+                    "hop": 1,
+                    "host": "router1",
+                    "ip": "192.168.1.1",
+                    "latency_ms": [10.5, 11.2, 10.8],
+                },
                 {"hop": 2, "host": "router2", "ip": "10.0.0.1", "latency_ms": [25.3, 26.1, 25.5]},
-            ]
+            ],
         }
 
         result = formatter.format(data)
@@ -152,7 +157,7 @@ class TestNetworkFormatter:
             "records": [
                 {"type": "A", "value": "93.184.216.34", "ttl": 300},
                 {"type": "AAAA", "value": "2606:2800:220:1:248:1893:25c8:1946", "ttl": 300},
-            ]
+            ],
         }
 
         result = formatter.format(data)
@@ -170,11 +175,7 @@ class TestNetworkFormatter:
             {"hop": i, "host": f"router{i}", "ip": f"10.0.0.{i}", "latency_ms": [10.0]}
             for i in range(50)
         ]
-        data = {
-            "operation": "traceroute",
-            "host": "example.com",
-            "hops": many_hops
-        }
+        data = {"operation": "traceroute", "host": "example.com", "hops": many_hops}
 
         result = formatter.format(data, max_hops=10)
 
@@ -185,10 +186,7 @@ class TestNetworkFormatter:
     def test_summary_extraction_ping(self):
         """Test summary extraction for ping."""
         formatter = NetworkFormatter()
-        data = {
-            "host": "example.com",
-            "latency_ms": 45.5
-        }
+        data = {"host": "example.com", "latency_ms": 45.5}
 
         result = formatter.format(data)
 

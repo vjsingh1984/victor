@@ -271,7 +271,9 @@ class ContextAwareKeywordDetector:
 
         # 2. Check for task-type-specific completion patterns
         task_patterns = self._get_task_patterns(task_type)
-        has_task_pattern = any(pattern in response_lower for pattern in task_patterns)
+        matched_patterns = [p for p in task_patterns if p in response_lower]
+        has_task_pattern = bool(matched_patterns)
+        pattern_match_count = len(matched_patterns)
 
         if has_task_pattern:
             evidence.append(f"Found task-specific completion pattern for {task_type}")
@@ -317,6 +319,7 @@ class ContextAwareKeywordDetector:
             has_structure,
             bool(requirements),
             len(response),
+            pattern_match_count,
         )
 
         # 9. Determine if has completion indicator
@@ -453,31 +456,35 @@ class ContextAwareKeywordDetector:
         has_structure: bool,
         has_requirements: bool,
         response_length: int,
+        pattern_match_count: int = 1,
     ) -> float:
         """Calculate confidence score for completion signal."""
         confidence = 0.0
 
         # Strong signals
         if has_task_pattern:
-            confidence += 0.4
+            # Base weight + bonus for multiple pattern matches
+            confidence += 0.50
+            if pattern_match_count >= 2:
+                confidence += 0.25  # Two or more distinct task patterns → strong signal
         if has_deliverable:
-            confidence += 0.3
+            confidence += 0.35
         if has_summary:
-            confidence += 0.2
+            confidence += 0.25
 
         # Moderate signals
         if has_complete_code:
-            confidence += 0.15
+            confidence += 0.2
         if has_structure:
-            confidence += 0.1
+            confidence += 0.15
         if has_requirements:
             confidence += 0.1
 
         # Length bonus (substantial responses are more likely complete)
-        if response_length > 500:
-            confidence += 0.05
-        elif response_length > 1000:
+        if response_length > 1000:
             confidence += 0.1
+        elif response_length > 500:
+            confidence += 0.05
 
         # Cap at 1.0
         return min(confidence, 1.0)

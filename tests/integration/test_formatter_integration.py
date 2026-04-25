@@ -35,10 +35,12 @@ class TestFormatterIntegration:
     def test_convenience_functions_use_registry(self):
         """Test that convenience functions use the registry."""
         # This tests the integration between convenience functions and registry
-        result = format_test_results({
-            "summary": {"total_tests": 10, "passed": 10, "failed": 0, "skipped": 0},
-            "failures": [],
-        })
+        result = format_test_results(
+            {
+                "summary": {"total_tests": 10, "passed": 10, "failed": 0, "skipped": 0},
+                "failures": [],
+            }
+        )
 
         assert result.contains_markup is True
         assert "[green]✓ 10 passed[/]" in result.content
@@ -111,6 +113,7 @@ class TestFormatterIntegration:
 
         # Generic formatter should handle this gracefully
         from victor.tools.formatters.generic import GenericFormatter
+
         formatter = GenericFormatter()
 
         result = formatter.format(tool_data)
@@ -191,15 +194,18 @@ class TestFormatterIntegration:
     def test_contains_markup_flag_accuracy(self):
         """Test that contains_markup flag is set correctly."""
         # Test formatter that produces markup
-        result1 = format_test_results({
-            "summary": {"total_tests": 1, "passed": 1, "failed": 0, "skipped": 0},
-            "failures": [],
-        })
+        result1 = format_test_results(
+            {
+                "summary": {"total_tests": 1, "passed": 1, "failed": 0, "skipped": 0},
+                "failures": [],
+            }
+        )
         assert result1.contains_markup is True
         assert "[" in result1.content  # Has markup tags
 
         # Test generic formatter (no markup)
         from victor.tools.formatters.generic import GenericFormatter
+
         generic = GenericFormatter()
         result2 = generic.format({"key": "value"})
         assert result2.contains_markup is False
@@ -216,16 +222,16 @@ class TestFormatterIntegration:
         # Access multiple formatters concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
-                executor.submit(format_in_thread, "test", {
-                    "summary": {"total_tests": 1, "passed": 1, "failed": 0, "skipped": 0},
-                    "failures": [],
-                }),
-                executor.submit(format_in_thread, "code_search", {
-                    "results": [], "mode": "search"
-                }),
-                executor.submit(format_in_thread, "git", {
-                    "output": "", "operation": "status"
-                }),
+                executor.submit(
+                    format_in_thread,
+                    "test",
+                    {
+                        "summary": {"total_tests": 1, "passed": 1, "failed": 0, "skipped": 0},
+                        "failures": [],
+                    },
+                ),
+                executor.submit(format_in_thread, "code_search", {"results": [], "mode": "search"}),
+                executor.submit(format_in_thread, "git", {"output": "", "operation": "status"}),
             ]
 
             # All should complete without errors
@@ -373,10 +379,12 @@ class TestFormatterErrorHandling:
     def test_formatter_handles_missing_fields(self):
         """Test that formatters handle missing optional fields gracefully."""
         # Test with minimal data
-        result = format_test_results({
-            "summary": {"total_tests": 0},
-            "failures": [],
-        })
+        result = format_test_results(
+            {
+                "summary": {"total_tests": 0},
+                "failures": [],
+            }
+        )
 
         # Should still produce output
         assert result.contains_markup is True
@@ -426,6 +434,7 @@ class TestFormatterErrorHandling:
 
         # Use the format_tool_output function which has error handling
         from victor.tools.formatters.registry import format_tool_output
+
         result = format_tool_output("broken", {})
 
         # Should fall back to plain text on error
@@ -434,18 +443,24 @@ class TestFormatterErrorHandling:
 
     def test_empty_data_handling(self):
         """Test that formatters handle empty data correctly."""
-        result1 = format_test_results({
-            "summary": {},
-            "failures": [],
-        })
+        result1 = format_test_results(
+            {
+                "summary": {},
+                "failures": [],
+            }
+        )
 
-        result2 = format_search_results({
-            "results": [],
-        })
+        result2 = format_search_results(
+            {
+                "results": [],
+            }
+        )
 
-        result3 = format_git_output({
-            "output": "",
-        })
+        result3 = format_git_output(
+            {
+                "output": "",
+            }
+        )
 
         # All should produce some output
         for result in [result1, result2, result3]:

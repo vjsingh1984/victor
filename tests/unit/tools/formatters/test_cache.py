@@ -44,10 +44,7 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed",
-            format_type="rich",
-            summary="10 tests",
-            contains_markup=True
+            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
         )
 
         # Put in cache
@@ -78,8 +75,12 @@ class TestFormatCache:
         cache = _FormatCache()
         tool_name = "test"
         data = {"summary": {"total": 10}}
-        formatted1 = FormattedOutput(content="result1", format_type="rich", summary="", contains_markup=True)
-        formatted2 = FormattedOutput(content="result2", format_type="rich", summary="", contains_markup=True)
+        formatted1 = FormattedOutput(
+            content="result1", format_type="rich", summary="", contains_markup=True
+        )
+        formatted2 = FormattedOutput(
+            content="result2", format_type="rich", summary="", contains_markup=True
+        )
 
         # Put with different kwargs
         cache.put(tool_name, data, formatted1, max_failures=5)
@@ -98,10 +99,7 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed",
-            format_type="rich",
-            summary="10 tests",
-            contains_markup=True
+            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
         )
 
         # Put in cache
@@ -127,9 +125,15 @@ class TestFormatCache:
         data1 = {"id": 1}
         data2 = {"id": 2}
         data3 = {"id": 3}
-        formatted1 = FormattedOutput(content="result1", format_type="rich", summary="", contains_markup=True)
-        formatted2 = FormattedOutput(content="result2", format_type="rich", summary="", contains_markup=True)
-        formatted3 = FormattedOutput(content="result3", format_type="rich", summary="", contains_markup=True)
+        formatted1 = FormattedOutput(
+            content="result1", format_type="rich", summary="", contains_markup=True
+        )
+        formatted2 = FormattedOutput(
+            content="result2", format_type="rich", summary="", contains_markup=True
+        )
+        formatted3 = FormattedOutput(
+            content="result3", format_type="rich", summary="", contains_markup=True
+        )
 
         # Fill cache
         cache.put(tool_name, data1, formatted1)
@@ -154,10 +158,7 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed",
-            format_type="rich",
-            summary="10 tests",
-            contains_markup=True
+            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
         )
 
         # Add entry
@@ -183,10 +184,7 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed",
-            format_type="rich",
-            summary="10 tests",
-            contains_markup=True
+            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
         )
 
         # Add entries
@@ -207,16 +205,10 @@ class TestFormatCache:
         data1 = {"summary": {"total": 10}}
         data2 = {"summary": {"total": 5}}
         formatted1 = FormattedOutput(
-            content="✓ 10 passed",
-            format_type="rich",
-            summary="10 tests",
-            contains_markup=True
+            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
         )
         formatted2 = FormattedOutput(
-            content="✓ 5 passed",
-            format_type="rich",
-            summary="5 tests",
-            contains_markup=True
+            content="✓ 5 passed", format_type="rich", summary="5 tests", contains_markup=True
         )
 
         # Add entries for different tools with different data
@@ -245,10 +237,7 @@ class TestFormatCache:
         tool_name = "test"
         data = {"summary": {"total": 10}}
         formatted = FormattedOutput(
-            content="✓ 10 passed",
-            format_type="rich",
-            summary="10 tests",
-            contains_markup=True
+            content="✓ 10 passed", format_type="rich", summary="10 tests", contains_markup=True
         )
 
         # Put with custom TTL of 1 second
@@ -284,7 +273,11 @@ class TestCacheUtilityFunctions:
         """Test invalidating all format cache."""
         # Add something to cache first
         from victor.tools.formatters import format_test_results
-        test_data = {"summary": {"total_tests": 5, "passed": 5, "failed": 0, "skipped": 0}, "failures": []}
+
+        test_data = {
+            "summary": {"total_tests": 5, "passed": 5, "failed": 0, "skipped": 0},
+            "failures": [],
+        }
         format_test_results(test_data)  # This will cache
 
         # Invalidate all
@@ -298,7 +291,11 @@ class TestCacheUtilityFunctions:
         """Test invalidating cache for specific tool."""
         # Add something to cache
         from victor.tools.formatters import format_test_results
-        test_data = {"summary": {"total_tests": 5, "passed": 5, "failed": 0, "skipped": 0}, "failures": []}
+
+        test_data = {
+            "summary": {"total_tests": 5, "passed": 5, "failed": 0, "skipped": 0},
+            "failures": [],
+        }
         format_test_results(test_data)
 
         # Invalidate test tool only
@@ -313,7 +310,11 @@ class TestCacheUtilityFunctions:
         """Test clearing format cache."""
         # Add something to cache
         from victor.tools.formatters import format_test_results
-        test_data = {"summary": {"total_tests": 5, "passed": 5, "failed": 0, "skipped": 0}, "failures": []}
+
+        test_data = {
+            "summary": {"total_tests": 5, "passed": 5, "failed": 0, "skipped": 0},
+            "failures": [],
+        }
         format_test_results(test_data)
 
         # Clear cache

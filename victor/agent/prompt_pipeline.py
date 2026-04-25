@@ -687,10 +687,13 @@ class UnifiedPromptPipeline:
         )
         target_present = bool(required_files or scope_hints)
         deliverable_present = bool(required_outputs) or (action_task and not report_task)
-        ambiguous_reference = bool(
-            re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower)
-        ) and not target_present
-        search_first = bool(action_task and scope_hints and not required_files and not ambiguous_reference)
+        ambiguous_reference = (
+            bool(re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower))
+            and not target_present
+        )
+        search_first = bool(
+            action_task and scope_hints and not required_files and not ambiguous_reference
+        )
 
         missing: List[str] = []
         if action_task and not target_present:
@@ -735,7 +738,9 @@ class UnifiedPromptPipeline:
 
     def _extract_required_files(self, user_message: str) -> List[str]:
         """Extract file paths from the prompt with task analyzer fallback."""
-        if self._task_analyzer and hasattr(self._task_analyzer, "extract_required_files_from_prompt"):
+        if self._task_analyzer and hasattr(
+            self._task_analyzer, "extract_required_files_from_prompt"
+        ):
             try:
                 paths = self._task_analyzer.extract_required_files_from_prompt(user_message)
                 return self._unique_nonempty(paths)
@@ -751,7 +756,9 @@ class UnifiedPromptPipeline:
 
     def _extract_required_outputs(self, user_message: str) -> List[str]:
         """Extract output requirements from the prompt with task analyzer fallback."""
-        if self._task_analyzer and hasattr(self._task_analyzer, "extract_required_outputs_from_prompt"):
+        if self._task_analyzer and hasattr(
+            self._task_analyzer, "extract_required_outputs_from_prompt"
+        ):
             try:
                 outputs = self._task_analyzer.extract_required_outputs_from_prompt(user_message)
                 return self._unique_nonempty(outputs)
@@ -791,7 +798,8 @@ class UnifiedPromptPipeline:
         constraints: List[str] = []
         for pattern in patterns:
             constraints.extend(
-                match.group(0).strip() for match in re.finditer(pattern, user_message, re.IGNORECASE)
+                match.group(0).strip()
+                for match in re.finditer(pattern, user_message, re.IGNORECASE)
             )
         return self._unique_nonempty(constraints)
 

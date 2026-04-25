@@ -1467,12 +1467,16 @@ class ConversationStore:
         """Build persisted metadata for semantic and execution retrieval traces."""
         existing = dict(metadata or {})
         semantic_text = str(existing.get("memory_semantic_text") or content)
-        trace_kind = "execution" if self._is_execution_trace_message(
-            role,
-            tool_name,
-            tool_call_id,
-            tool_calls,
-        ) else "semantic"
+        trace_kind = (
+            "execution"
+            if self._is_execution_trace_message(
+                role,
+                tool_name,
+                tool_call_id,
+                tool_calls,
+            )
+            else "semantic"
+        )
         trace_metadata: Dict[str, Any] = {
             "memory_trace_kind": trace_kind,
             "memory_semantic_text": semantic_text,
@@ -1585,7 +1589,9 @@ class ConversationStore:
             existing = metadata.get("memory_execution_text")
             if existing:
                 return str(existing)
-            role = message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
+            role = (
+                message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
+            )
             return self._build_execution_trace_text(
                 role=role,
                 content=message.content,

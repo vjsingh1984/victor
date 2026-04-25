@@ -17,13 +17,13 @@ class TestFormatterAwarePreviewStrategies:
         """Test that test strategy uses formatted_summary when available."""
         strategy = _TestPreviewStrategyEnhanced()
 
-        raw_result = '''{
+        raw_result = """{
     "summary": {"total_tests": 10, "passed": 8, "failed": 2, "skipped": 0},
     "failures": [
         {"test_name": "test_foo.py::test_bar", "error_message": "AssertionError"}
     ],
     "formatted_summary": "[green]✓ 8 passed[/] [dim]• 10 total[/]\\n\\n[red bold]Failed Tests:[/]"
-}'''
+}"""
 
         result = strategy.render("test", {}, raw_result, max_lines=5)
 
@@ -36,7 +36,7 @@ class TestFormatterAwarePreviewStrategies:
         """Test that search strategy uses formatted_results when available."""
         strategy = _SearchPreviewStrategyEnhanced()
 
-        raw_result = '''{
+        raw_result = """{
     "success": true,
     "results": [
         {"path": "src/main.py", "line": 42, "score": 10, "snippet": "def foo():"}
@@ -44,7 +44,7 @@ class TestFormatterAwarePreviewStrategies:
     "count": 1,
     "mode": "semantic",
     "formatted_results": "[bold cyan]1 match[/] [dim]in 1 file[/]\\n\\n  [bold]src/main.py[/] [dim]• score: 10[/]"
-}'''
+}"""
 
         result = strategy.render("code_search", {}, raw_result, max_lines=5)
 
@@ -57,11 +57,11 @@ class TestFormatterAwarePreviewStrategies:
         """Test that git strategy uses formatted_output when available."""
         strategy = _GitPreviewStrategyEnhanced()
 
-        raw_result = '''{
+        raw_result = """{
     "success": true,
     "output": "* main\\n  develop",
     "formatted_output": "[bold green]*[/] [bold]main[/]\\n  [dim]develop[/]"
-}'''
+}"""
 
         result = strategy.render("git", {"operation": "status"}, raw_result, max_lines=5)
 
@@ -73,12 +73,12 @@ class TestFormatterAwarePreviewStrategies:
         """Test that test strategy falls back to base logic when no formatted output."""
         strategy = _TestPreviewStrategyEnhanced()
 
-        raw_result = '''{
+        raw_result = """{
     "summary": {"total_tests": 5, "passed": 3, "failed": 2, "skipped": 0},
     "failures": [
         {"test_name": "test_foo.py::test_bar", "error_message": "AssertionError"}
     ]
-}'''
+}"""
 
         result = strategy.render("test", {}, raw_result, max_lines=5)
 
@@ -90,14 +90,14 @@ class TestFormatterAwarePreviewStrategies:
         """Test that search strategy falls back to base logic when no formatted output."""
         strategy = _SearchPreviewStrategyEnhanced()
 
-        raw_result = '''{
+        raw_result = """{
     "success": true,
     "results": [
         {"path": "src/main.py", "line": 42, "score": 10, "snippet": "def foo():"}
     ],
     "count": 1,
     "mode": "semantic"
-}'''
+}"""
 
         result = strategy.render("code_search", {}, raw_result, max_lines=5)
 
@@ -113,10 +113,10 @@ class TestFormatterAwarePreviewStrategies:
         lines = [f"[dim]Line {i}[/]" for i in range(20)]
         formatted_summary = "\\n".join(lines)
 
-        raw_result = f'''{{
+        raw_result = f"""{{
     "summary": {{"total_tests": 20}},
     "formatted_summary": "{formatted_summary}"
-}}'''
+}}"""
 
         result = strategy.render("test", {}, raw_result, max_lines=5)
 
@@ -128,18 +128,18 @@ class TestFormatterAwarePreviewStrategies:
         strategy = _TestPreviewStrategyEnhanced()
 
         # Test with formatted output (has markup)
-        raw_result_with_markup = '''{
+        raw_result_with_markup = """{
     "formatted_summary": "[green]✓ Test passed[/]",
     "contains_markup": true
-}'''
+}"""
 
         result1 = strategy.render("test", {}, raw_result_with_markup, max_lines=5)
         assert result1.contains_rich_markup is True
 
         # Test without formatted output (no markup)
-        raw_result_without_markup = '''{
+        raw_result_without_markup = """{
     "summary": {"total_tests": 1, "passed": 1}
-}'''
+}"""
 
         result2 = strategy.render("test", {}, raw_result_without_markup, max_lines=5)
         assert result2.contains_rich_markup is False
@@ -148,9 +148,9 @@ class TestFormatterAwarePreviewStrategies:
         """Test that summary is extracted from formatted content."""
         strategy = _TestPreviewStrategyEnhanced()
 
-        raw_result = '''{
+        raw_result = """{
     "formatted_output": "[bold cyan]10 matches[/] [dim]in 5 files[/]"
-}'''
+}"""
 
         result = strategy.render("test", {}, raw_result, max_lines=5)
 
@@ -167,10 +167,10 @@ class TestPreviewRendererIntegration:
         from victor.ui.rendering.tool_preview import renderer
 
         # Test with formatted output
-        raw_result = '''{
+        raw_result = """{
     "summary": {"total_tests": 10, "passed": 8},
     "formatted_summary": "[green]✓ 8 passed[/]"
-        }'''
+        }"""
 
         result = renderer.render("test", {}, raw_result, max_lines=5)
 
@@ -194,12 +194,21 @@ class TestPreviewRendererIntegration:
         """Test that renderer handles all tools with enhanced strategies."""
         from victor.ui.rendering.tool_preview import renderer
 
-        enhanced_tools = ["test", "pytest", "run_tests", "code_search", "semantic_code_search", "git"]
+        enhanced_tools = [
+            "test",
+            "pytest",
+            "run_tests",
+            "code_search",
+            "semantic_code_search",
+            "git",
+        ]
 
         for tool_name in enhanced_tools:
             # Create minimal valid result for each tool
             if tool_name in ["test", "pytest", "run_tests"]:
-                raw_result = '{"summary": {"total_tests": 1}, "formatted_summary": "[green]✓ 1 passed[/]"}'
+                raw_result = (
+                    '{"summary": {"total_tests": 1}, "formatted_summary": "[green]✓ 1 passed[/]"}'
+                )
             elif tool_name in ["code_search", "semantic_code_search"]:
                 raw_result = '{"results": [], "formatted_results": "[dim]No matches[/]"}'
             elif tool_name == "git":

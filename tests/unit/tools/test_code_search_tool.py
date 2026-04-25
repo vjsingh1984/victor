@@ -436,18 +436,23 @@ async def test_code_search_filename_mode_uses_literal_filename_search(tmp_path) 
     """Explicit filename mode should bypass semantic indexing."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "results": [
+            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+        ],
         "count": 1,
         "mode": "filename",
     }
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parser.py",
             path=str(tmp_path),
@@ -486,19 +491,22 @@ async def test_code_search_semantic_basename_file_pattern_filters_results_after_
                     "file_path": "src/parser.py",
                     "content": "def parse_json(data): return json.loads(data)",
                     "score": 0.74,
-                }
+                },
             ]
         )
     )
     filters = SearchFilters(file_pattern="parser.py")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -537,13 +545,16 @@ async def test_code_search_semantic_path_file_pattern_uses_exact_backend_filter(
     )
     filters = SearchFilters(file_pattern="src/parser.py")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -582,13 +593,16 @@ async def test_code_search_semantic_symbol_filter_uses_symbol_name(tmp_path) -> 
     )
     filters = SearchFilters(symbol="parse_json")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -633,13 +647,16 @@ async def test_code_search_semantic_symbol_filter_post_filters_backend_results(t
     )
     filters = SearchFilters(symbol="parse_json")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -662,7 +679,9 @@ async def test_code_search_semantic_symbol_filter_post_filters_backend_results(t
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_glob_file_pattern_filters_results_after_search(tmp_path) -> None:
+async def test_code_search_semantic_glob_file_pattern_filters_results_after_search(
+    tmp_path,
+) -> None:
     """Glob file patterns should filter semantic hits after retrieval instead of exact-matching metadata."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(
@@ -682,13 +701,16 @@ async def test_code_search_semantic_glob_file_pattern_filters_results_after_sear
     )
     filters = SearchFilters(file_pattern="*.py")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -732,13 +754,16 @@ async def test_code_search_semantic_extension_filter_applies_after_search(tmp_pa
     )
     filters = SearchFilters(extensions=["py"])
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -782,13 +807,16 @@ async def test_code_search_semantic_language_filter_applies_after_search(tmp_pat
     )
     filters = SearchFilters(language="python")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -832,13 +860,16 @@ async def test_code_search_semantic_test_only_filter_applies_after_search(tmp_pa
     )
     filters = SearchFilters(test_only=True)
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -870,18 +901,23 @@ async def test_code_search_filename_mode_uses_parent_directory_for_file_path(tmp
     current_file.write_text("pass\n", encoding="utf-8")
     literal_result = {
         "success": True,
-        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "results": [
+            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+        ],
         "count": 1,
         "mode": "filename",
     }
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parser.py",
             path=str(current_file),
@@ -918,13 +954,16 @@ async def test_code_search_literal_mode_uses_parent_directory_for_missing_child_
         "mode": "literal",
     }
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="main",
             path=str(missing_child),
@@ -958,13 +997,16 @@ async def test_code_search_text_mode_preserves_explicit_text_search_for_filename
         "mode": "literal",
     }
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parser.py",
             path=str(tmp_path),
@@ -997,13 +1039,16 @@ async def test_code_search_text_mode_passes_file_pattern_to_literal_search(tmp_p
     }
     filters = SearchFilters(file_pattern="*.py")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="needle",
             path=str(tmp_path),
@@ -1052,13 +1097,16 @@ async def test_code_search_text_mode_applies_language_and_test_filters_to_litera
     }
     filters = SearchFilters(language="python", test_only=True)
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parse_json",
             path=str(tmp_path),
@@ -1104,13 +1152,16 @@ async def test_code_search_text_mode_applies_symbol_filter_to_literal_results(tm
     }
     filters = SearchFilters(symbol="parse_json")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="json parsing",
             path=str(tmp_path),
@@ -1139,18 +1190,23 @@ async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> N
     """Filename-like semantic queries should bypass semantic indexing."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "results": [
+            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+        ],
         "count": 1,
         "mode": "filename",
     }
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parser.py",
             path=str(tmp_path),
@@ -1177,18 +1233,23 @@ async def test_code_search_strips_whitespace_before_filename_auto_detection(tmp_
     """Whitespace-padded filename queries should still route to filename search."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "results": [
+            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+        ],
         "count": 1,
         "mode": "filename",
     }
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="  parser.py  ",
             path=str(tmp_path),
@@ -1244,18 +1305,23 @@ async def test_code_search_auto_detects_tsx_filename_queries(tmp_path) -> None:
     """Frontend source filenames like Component.tsx should bypass semantic indexing."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/Component.tsx", "score": 10, "snippet": "[File found: src/Component.tsx]"}],
+        "results": [
+            {"path": "src/Component.tsx", "score": 10, "snippet": "[File found: src/Component.tsx]"}
+        ],
         "count": 1,
         "mode": "filename",
     }
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="Component.tsx",
             path=str(tmp_path),
@@ -1281,13 +1347,16 @@ async def test_code_search_auto_detects_tsx_filename_queries(tmp_path) -> None:
 async def test_code_search_rejects_blank_query_before_searching(tmp_path) -> None:
     """Blank queries should fail fast instead of matching arbitrary files or content."""
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="   ",
             path=str(tmp_path),
@@ -1309,19 +1378,24 @@ async def test_code_search_allows_blank_query_when_file_pattern_is_provided(tmp_
     """A filename filter should be enough to execute filename search."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "results": [
+            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+        ],
         "count": 1,
         "mode": "filename",
     }
     filters = SearchFilters(file_pattern="parser.py")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="   ",
             path=str(tmp_path),
@@ -1351,19 +1425,24 @@ async def test_code_search_strips_whitespace_from_file_pattern_before_filename_s
     """Whitespace-padded file patterns should normalize before routing."""
     literal_result = {
         "success": True,
-        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "results": [
+            {"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}
+        ],
         "count": 1,
         "mode": "filename",
     }
     filters = SearchFilters(file_pattern="  parser.py  ")
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
-    ) as get_index, patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(),
+        ) as get_index,
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="   ",
             path=str(tmp_path),
@@ -1508,10 +1587,13 @@ async def test_literal_search_grep_fallback_honors_extension_filters_without_dot
 
     proc = SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
 
-    with patch("shutil.which", return_value=None), patch(
-        "asyncio.create_subprocess_exec",
-        new=AsyncMock(return_value=proc),
-    ) as create_proc:
+    with (
+        patch("shutil.which", return_value=None),
+        patch(
+            "asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ) as create_proc,
+    ):
         result = await _literal_search(
             "needle",
             str(tmp_path),
@@ -1577,12 +1659,15 @@ async def test_literal_search_timeout_returns_friendly_error(tmp_path) -> None:
 
     proc = SimpleNamespace(communicate=MagicMock(return_value=object()))
 
-    with patch(
-        "asyncio.create_subprocess_exec",
-        new=AsyncMock(return_value=proc),
-    ), patch(
-        "asyncio.wait_for",
-        side_effect=asyncio.TimeoutError,
+    with (
+        patch(
+            "asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ),
+        patch(
+            "asyncio.wait_for",
+            side_effect=asyncio.TimeoutError,
+        ),
     ):
         result = await _literal_search("needle", str(tmp_path), 3)
 
@@ -1595,12 +1680,15 @@ async def test_literal_search_filename_only_timeout_returns_friendly_error(tmp_p
 
     proc = SimpleNamespace(communicate=MagicMock(return_value=object()))
 
-    with patch(
-        "asyncio.create_subprocess_exec",
-        new=AsyncMock(return_value=proc),
-    ), patch(
-        "asyncio.wait_for",
-        side_effect=asyncio.TimeoutError,
+    with (
+        patch(
+            "asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ),
+        patch(
+            "asyncio.wait_for",
+            side_effect=asyncio.TimeoutError,
+        ),
     ):
         result = await _literal_search(
             "parser.py",
@@ -1638,14 +1726,19 @@ async def test_code_search_literal_mode_escalation_preserves_requested_mode_cont
         )
     )
     exec_ctx = {"settings": _settings()}
-    literal_search = AsyncMock(return_value={"success": True, "results": [], "count": 0, "mode": "literal"})
+    literal_search = AsyncMock(
+        return_value={"success": True, "results": [], "count": 0, "mode": "literal"}
+    )
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=literal_search,
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=literal_search,
+        ),
     ):
         result = await code_search(
             query="main entrypoint",
@@ -1680,14 +1773,19 @@ async def test_code_search_text_mode_escalation_preserves_requested_mode_on_sema
         semantic_search=AsyncMock(side_effect=RuntimeError("semantic search failed"))
     )
     exec_ctx = {"settings": _settings()}
-    literal_search = AsyncMock(return_value={"success": True, "results": [], "count": 0, "mode": "literal"})
+    literal_search = AsyncMock(
+        return_value={"success": True, "results": [], "count": 0, "mode": "literal"}
+    )
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=literal_search,
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=literal_search,
+        ),
     ):
         result = await code_search(
             query="main entrypoint",
@@ -1864,15 +1962,19 @@ async def test_code_search_hybrid_mode_preserves_extension_filter_for_keyword_si
                 )
             ]
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=literal_search,
-    ), patch(
-        "victor.framework.search.create_hybrid_search_engine",
-        new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=literal_search,
+        ),
+        patch(
+            "victor.framework.search.create_hybrid_search_engine",
+            new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+        ),
     ):
         result = await code_search(
             query="main entrypoint",
@@ -1932,15 +2034,19 @@ async def test_code_search_hybrid_mode_uses_keyword_results_when_semantic_is_emp
                 )
             ]
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=literal_search,
-    ), patch(
-        "victor.framework.search.create_hybrid_search_engine",
-        new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=literal_search,
+        ),
+        patch(
+            "victor.framework.search.create_hybrid_search_engine",
+            new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+        ),
     ):
         result = await code_search(
             query="main entrypoint",
@@ -2009,15 +2115,19 @@ async def test_code_search_hybrid_mode_applies_symbol_filter_to_keyword_side(tmp
                 )
             ]
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=literal_search,
-    ), patch(
-        "victor.framework.search.create_hybrid_search_engine",
-        new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=literal_search,
+        ),
+        patch(
+            "victor.framework.search.create_hybrid_search_engine",
+            new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+        ),
     ):
         result = await code_search(
             query="json parsing",
@@ -2056,8 +2166,7 @@ async def test_code_search_semantic_mode_applies_bounded_utility_reranking(tmp_p
         encoding="utf-8",
     )
     (tests_dir / "test_parser.py").write_text(
-        "def test_parse_json():\n"
-        "    assert parse_json('{}') == '{}'\n",
+        "def test_parse_json():\n" "    assert parse_json('{}') == '{}'\n",
         encoding="utf-8",
     )
 
@@ -2117,13 +2226,16 @@ async def test_code_search_reports_non_timeout_index_build_fallback_reason(
     exec_ctx = {"settings": _settings()}
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(side_effect=RuntimeError("index build failed")),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(side_effect=RuntimeError("index build failed")),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parse json entrypoint",
             path=str(tmp_path),
@@ -2147,12 +2259,15 @@ async def test_code_search_caches_index_build_failure_in_plain_dict_fallback(
     failing_build = AsyncMock(side_effect=RuntimeError("index build failed"))
     failing_build._failure_cache = failure_cache
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=failing_build,
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=failing_build,
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ),
     ):
         result = await code_search(
             query="parse json entrypoint",
@@ -2176,13 +2291,16 @@ async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(t
     exec_ctx = {"settings": _settings()}
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parse json entrypoint",
             path=str(tmp_path),
@@ -2203,13 +2321,16 @@ async def test_code_search_semantic_fallback_uses_normalized_parent_path(tmp_pat
     mock_index = SimpleNamespace(semantic_search=AsyncMock(side_effect=RuntimeError("boom")))
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="main entrypoint",
             path=str(missing_child),
@@ -2240,13 +2361,16 @@ async def test_code_search_literal_fallback_preserves_mode_context_after_semanti
     filters = SearchFilters(language="python")
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="which files should I edit to add a logger parameter to BaseRepository",
             path=str(tmp_path),
@@ -2273,13 +2397,16 @@ async def test_code_search_literal_fallback_preserves_requested_mode_on_index_bu
     filters = SearchFilters(language="python")
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(side_effect=RuntimeError("index build failed")),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(side_effect=RuntimeError("index build failed")),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="which files should I edit to add a logger parameter to BaseRepository",
             path=str(tmp_path),
@@ -2303,13 +2430,16 @@ async def test_code_search_index_build_fallback_uses_normalized_parent_path(tmp_
     missing_child = source_dir / "missing.py"
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(side_effect=RuntimeError("index build failed")),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(side_effect=RuntimeError("index build failed")),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="main entrypoint",
             path=str(missing_child),
@@ -2335,13 +2465,16 @@ async def test_code_search_literal_escalation_preserves_requested_mode_on_index_
     exec_ctx = {"settings": _settings()}
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(side_effect=RuntimeError("index build failed")),
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(side_effect=RuntimeError("index build failed")),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="main entrypoint",
             path=str(tmp_path),
@@ -2366,16 +2499,20 @@ async def test_code_search_skips_semantic_search_when_cached_index_is_stale(tmp_
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
     fake_cache = {str(tmp_path): {"stale": True}}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._get_index_cache",
-        new=lambda exec_ctx=None: fake_cache,
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._get_index_cache",
+            new=lambda exec_ctx=None: fake_cache,
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="parse json entrypoint",
             path=str(tmp_path),
@@ -2398,16 +2535,20 @@ async def test_code_search_literal_escalation_preserves_requested_mode_when_cach
     literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
     fake_cache = {str(tmp_path): {"stale": True}}
 
-    with patch(
-        "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(return_value=(mock_index, False)),
-    ), patch(
-        "victor.tools.code_search_tool._get_index_cache",
-        new=lambda exec_ctx=None: fake_cache,
-    ), patch(
-        "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
-    ) as literal_search:
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._get_index_cache",
+            new=lambda exec_ctx=None: fake_cache,
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+    ):
         result = await code_search(
             query="main entrypoint",
             path=str(tmp_path),

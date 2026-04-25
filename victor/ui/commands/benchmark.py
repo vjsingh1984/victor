@@ -730,9 +730,7 @@ def run_benchmark(
                     "tool_calls": r.tool_calls,
                     "code_search_calls": r.code_search_calls,
                     "graph_calls": r.graph_calls,
-                    "failure_category": (
-                        r.failure_category.value if r.failure_category else None
-                    ),
+                    "failure_category": (r.failure_category.value if r.failure_category else None),
                     "failure_details": r.failure_details,
                 }
                 for r in result.task_results
@@ -1150,7 +1148,9 @@ def compare_frameworks(
 
     if victor_results is not None:
         try:
-            report = create_comparison_report_from_saved_result(victor_results, include_published=True)
+            report = create_comparison_report_from_saved_result(
+                victor_results, include_published=True
+            )
         except Exception as exc:
             console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
             raise typer.Exit(1)
@@ -1215,7 +1215,10 @@ def show_leaderboard(
     ),
 ) -> None:
     """Show the leaderboard for a benchmark."""
-    from victor.evaluation.benchmarks import PUBLISHED_RESULTS, create_comparison_report_from_saved_result
+    from victor.evaluation.benchmarks import (
+        PUBLISHED_RESULTS,
+        create_comparison_report_from_saved_result,
+    )
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
     benchmark_lower = normalize_benchmark_name(benchmark)
@@ -1241,7 +1244,9 @@ def show_leaderboard(
 
     if victor_results is not None:
         try:
-            report = create_comparison_report_from_saved_result(victor_results, include_published=False)
+            report = create_comparison_report_from_saved_result(
+                victor_results, include_published=False
+            )
         except Exception as exc:
             console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
             raise typer.Exit(1)

@@ -356,11 +356,13 @@ async def _do_query(
                 "rows": results,
                 "count": len(results),
                 "limited": len(rows) == query_limit,
-                "formatted_output": format_database_results({
-                    "columns": columns,
-                    "rows": results,
-                    "count": len(results),
-                }).content,
+                "formatted_output": format_database_results(
+                    {
+                        "columns": columns,
+                        "rows": results,
+                        "count": len(results),
+                    }
+                ).content,
                 "contains_markup": True,
             }
         else:

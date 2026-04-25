@@ -647,10 +647,8 @@ class TestWorkflowOptimizationComponents:
         from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
 
         decision_service = MagicMock()
-        mock_container.get_optional.side_effect = (
-            lambda protocol: decision_service
-            if protocol is LLMDecisionServiceProtocol
-            else None
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
         )
 
         detector = factory.create_task_completion_detector()
@@ -731,10 +729,8 @@ class TestWorkflowOptimizationComponents:
         mock_settings.thinking_repetition_threshold = 4
         mock_settings.thinking_similarity_threshold = 0.7
         decision_service = MagicMock()
-        mock_container.get_optional.side_effect = (
-            lambda protocol: decision_service
-            if protocol is LLMDecisionServiceProtocol
-            else None
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
         )
 
         detector = factory.create_thinking_detector()
@@ -755,10 +751,8 @@ class TestWorkflowOptimizationComponents:
         mock_settings.context_proactive_compaction = True
         mock_settings.tool_result_truncation = True
         decision_service = MagicMock()
-        mock_container.get_optional.side_effect = (
-            lambda protocol: decision_service
-            if protocol is LLMDecisionServiceProtocol
-            else None
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
         )
 
         controller = MagicMock()
@@ -780,10 +774,8 @@ class TestWorkflowOptimizationComponents:
             max_mcp_tools_per_turn=12,
         )
         decision_service = MagicMock()
-        mock_container.get_optional.side_effect = (
-            lambda protocol: decision_service
-            if protocol is LLMDecisionServiceProtocol
-            else None
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
         )
         tools = MagicMock()
         tools.list_tools.return_value = []

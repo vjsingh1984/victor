@@ -58,7 +58,9 @@ class _FakeInnerProvider(BaseEmbeddingProvider):
         return [[float(len(text))] for text in texts]
 
     async def index_document(self, doc_id: str, content: str, metadata: dict[str, Any]) -> None:
-        self.indexed_documents.append({"id": doc_id, "content": content, "metadata": dict(metadata)})
+        self.indexed_documents.append(
+            {"id": doc_id, "content": content, "metadata": dict(metadata)}
+        )
 
     async def index_documents(self, documents: list[dict[str, Any]]) -> None:
         self.indexed_documents.extend(
@@ -80,7 +82,9 @@ class _FakeInnerProvider(BaseEmbeddingProvider):
         results: list[EmbeddingSearchResult] = []
         for index, document in enumerate(self.indexed_documents):
             metadata = dict(document["metadata"])
-            if filter_metadata and any(metadata.get(key) != value for key, value in filter_metadata.items()):
+            if filter_metadata and any(
+                metadata.get(key) != value for key, value in filter_metadata.items()
+            ):
                 continue
             results.append(
                 EmbeddingSearchResult(
@@ -248,7 +252,9 @@ async def test_structural_bridge_indexes_grounded_file_chunks(tmp_path, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_structural_bridge_replaces_by_file_for_incremental_updates(tmp_path, monkeypatch) -> None:
+async def test_structural_bridge_replaces_by_file_for_incremental_updates(
+    tmp_path, monkeypatch
+) -> None:
     pytest.importorskip("victor_coding.codebase.embeddings.base")
     provider_class = get_structural_codebase_embedding_provider_class()
     assert provider_class is not None
@@ -261,8 +267,7 @@ async def test_structural_bridge_replaces_by_file_for_incremental_updates(tmp_pa
     source_dir = tmp_path / "src"
     source_dir.mkdir()
     (source_dir / "parser.py").write_text(
-        "def parse_json(data):\n"
-        "    return data\n",
+        "def parse_json(data):\n" "    return data\n",
         encoding="utf-8",
     )
 

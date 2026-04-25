@@ -214,12 +214,10 @@ class TestComposeTurnPrefix:
         from victor.agent.services.runtime_intelligence import PromptOptimizationBundle
 
         runtime_intelligence = MagicMock()
-        runtime_intelligence.get_prompt_optimization_bundle.return_value = (
-            PromptOptimizationBundle(
-                evolved_sections=["Prefer read over cat."],
-                few_shots="Example trajectory",
-                failure_hint="Check the file path before editing.",
-            )
+        runtime_intelligence.get_prompt_optimization_bundle.return_value = PromptOptimizationBundle(
+            evolved_sections=["Prefer read over cat."],
+            few_shots="Example trajectory",
+            failure_hint="Check the file path before editing.",
         )
         pipeline = _make_pipeline(runtime_intelligence=runtime_intelligence)
         ctx = self._make_turn_context(last_turn_failed=True)

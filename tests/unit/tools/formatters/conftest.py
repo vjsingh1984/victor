@@ -37,4 +37,3 @@ def clear_rich_formatting_flag_override():
             manager.clear_runtime_override(FeatureFlag.USE_RICH_FORMATTING)
         except (ImportError, Exception):
             pass
-

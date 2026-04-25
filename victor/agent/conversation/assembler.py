@@ -106,14 +106,26 @@ class TurnBoundaryContextAssembler:
         for msg in recent_messages[-6:]:
             content = getattr(msg, "content", "") or ""
             content_lower = content.lower()
-            if any(kw in content_lower for kw in ("read(", "read_file", "code_search", "grep", "ls(")):
+            if any(
+                kw in content_lower for kw in ("read(", "read_file", "code_search", "grep", "ls(")
+            ):
                 tool_types.append("exploration")
             elif any(
                 kw in content_lower
-                for kw in ("edit(", "edit_files", "edit result", "write(", "write_file", "write result", "create")
+                for kw in (
+                    "edit(",
+                    "edit_files",
+                    "edit result",
+                    "write(",
+                    "write_file",
+                    "write result",
+                    "create",
+                )
             ):
                 tool_types.append("mutation")
-            elif any(kw in content_lower for kw in ("shell(", "execute_bash", "bash", "test", "git ")):
+            elif any(
+                kw in content_lower for kw in ("shell(", "execute_bash", "bash", "test", "git ")
+            ):
                 tool_types.append("execution")
 
         if not tool_types:
@@ -135,7 +147,15 @@ class TurnBoundaryContextAssembler:
 
         phase_keywords = {
             "exploration": ("read(", "read_file", "search", "grep", "ls("),
-            "mutation": ("edit(", "edit_files", "edit result", "write(", "write_file", "write result", "create"),
+            "mutation": (
+                "edit(",
+                "edit_files",
+                "edit result",
+                "write(",
+                "write_file",
+                "write result",
+                "create",
+            ),
             "execution": ("shell(", "execute_bash", "bash", "test", "git "),
         }
 
@@ -149,7 +169,15 @@ class TurnBoundaryContextAssembler:
             )
             is_mutation = any(
                 kw in content_lower
-                for kw in ("edit(", "edit_files", "edit result", "write(", "write_file", "write result", "create")
+                for kw in (
+                    "edit(",
+                    "edit_files",
+                    "edit result",
+                    "write(",
+                    "write_file",
+                    "write result",
+                    "create",
+                )
             )
             is_execution = any(
                 kw in content_lower for kw in ("shell(", "execute_bash", "bash", "test", "git ")

@@ -167,13 +167,16 @@ class TestToolSelectorRuntimeIntelligence:
             SimpleNamespace(name="grep"),
         ]
 
-        with patch(
-            "victor.agent.tool_selection.get_container",
-            side_effect=AssertionError("container path should not be used"),
-        ), patch(
-            "victor.agent.edge_model.select_tools_with_edge_model",
-            return_value=["edit"],
-        ) as mock_select:
+        with (
+            patch(
+                "victor.agent.tool_selection.get_container",
+                side_effect=AssertionError("container path should not be used"),
+            ),
+            patch(
+                "victor.agent.edge_model.select_tools_with_edge_model",
+                return_value=["edit"],
+            ) as mock_select,
+        ):
             filtered = selector._apply_edge_model_filter(
                 tools,
                 user_message="fix the auth bug",

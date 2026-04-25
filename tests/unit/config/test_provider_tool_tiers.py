@@ -204,8 +204,9 @@ class TestBudgetCompliance:
         # Edge tier: 2 FULL tools × 125 = 250 tokens
         edge_tokens = 2 * 125
 
-        assert edge_tokens <= max_tool_tokens, \
-            f"Edge tools ({edge_tokens}) exceed budget ({max_tool_tokens})"
+        assert (
+            edge_tokens <= max_tool_tokens
+        ), f"Edge tools ({edge_tokens}) exceed budget ({max_tool_tokens})"
 
     def test_standard_model_budget_compliance(self):
         """Test standard model tools fit within 25% context budget."""
@@ -215,8 +216,9 @@ class TestBudgetCompliance:
         # Standard tier: 5 FULL + 2 COMPACT = 765 tokens
         standard_tokens = (5 * 125) + (2 * 70)
 
-        assert standard_tokens <= max_tool_tokens, \
-            f"Standard tools ({standard_tokens}) exceed budget ({max_tool_tokens})"
+        assert (
+            standard_tokens <= max_tool_tokens
+        ), f"Standard tools ({standard_tokens}) exceed budget ({max_tool_tokens})"
 
     def test_large_model_budget_compliance(self):
         """Test large model tools fit within 25% context budget."""
@@ -226,8 +228,9 @@ class TestBudgetCompliance:
         # Large tier: 10 FULL tools = 1250 tokens
         large_tokens = 10 * 125
 
-        assert large_tokens <= max_tool_tokens, \
-            f"Large tools ({large_tokens}) exceed budget ({max_tool_tokens})"
+        assert (
+            large_tokens <= max_tool_tokens
+        ), f"Large tools ({large_tokens}) exceed budget ({max_tool_tokens})"
 
 
 class TestTierReloading:

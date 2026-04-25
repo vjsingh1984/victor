@@ -41,7 +41,6 @@ _DEFAULT_TIERS = {
     "edit": "FULL",
     "code_search": "FULL",
     "shell": "FULL",
-
     # High-frequency tools used in most sessions
     "git_status": "COMPACT",
     "git_diff": "COMPACT",
@@ -49,7 +48,6 @@ _DEFAULT_TIERS = {
     "ls": "COMPACT",
     "find": "COMPACT",
     "web_search": "COMPACT",
-
     # All other tools default to STUB
     "*": "STUB",
 }

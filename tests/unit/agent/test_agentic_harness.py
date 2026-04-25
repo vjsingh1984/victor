@@ -349,7 +349,6 @@ class TestAgenticMetrics:
         assert exported["summary"]["external_benchmark_tasks"] == 1
         assert exported["tasks"][0]["benchmark"] == "claw_bench"
 
-
     def test_to_dict_includes_failure_taxonomy(self):
         """Test normalized failure categories are aggregated in agentic metrics."""
         trace = AgenticExecutionTrace(

@@ -41,6 +41,7 @@ from .network import NetworkFormatter
 from .build import BuildFormatter
 from .generic import GenericFormatter
 
+
 # Register all formatters with the registry
 def _register_default_formatters() -> None:
     """Register all default formatters with the global registry."""
@@ -96,58 +97,72 @@ def _register_default_formatters() -> None:
     registry.register("npm", BuildFormatter())
     registry.register("pip", BuildFormatter())
 
+
 # Auto-register on import
 _register_default_formatters()
+
 
 # Convenience functions for common tools
 def format_test_results(data: dict, **kwargs) -> FormattedOutput:
     """Format test results with Rich markup."""
     return format_tool_output("test", data, **kwargs)
 
+
 def format_search_results(data: dict, **kwargs) -> FormattedOutput:
     """Format code search results with Rich markup."""
     return format_tool_output("code_search", data, **kwargs)
+
 
 def format_git_output(data: dict, operation: str = "status", **kwargs) -> FormattedOutput:
     """Format git output with Rich markup."""
     return format_tool_output("git", data, operation=operation, **kwargs)
 
+
 def format_http_response(data: dict, **kwargs) -> FormattedOutput:
     """Format HTTP response with Rich markup."""
     return format_tool_output("http", data, **kwargs)
+
 
 def format_database_results(data: dict, **kwargs) -> FormattedOutput:
     """Format database query results with Rich markup."""
     return format_tool_output("database", data, **kwargs)
 
+
 def format_refactor_operations(data: dict, **kwargs) -> FormattedOutput:
     """Format refactor operations with Rich markup."""
     return format_tool_output("refactor", data, **kwargs)
+
 
 def format_docker_output(data: dict, operation: str = "ps", **kwargs) -> FormattedOutput:
     """Format Docker output with Rich markup."""
     return format_tool_output("docker", data, operation=operation, **kwargs)
 
+
 def format_security_results(data: dict, **kwargs) -> FormattedOutput:
     """Format security scan results with Rich markup."""
     return format_tool_output("security", data, **kwargs)
+
 
 # Phase 7 convenience functions
 def format_filesystem_output(data: dict, **kwargs) -> FormattedOutput:
     """Format file system operation results with Rich markup."""
     return format_tool_output("filesystem", data, **kwargs)
 
+
 def format_shell_output(data: dict, **kwargs) -> FormattedOutput:
     """Format shell command execution results with Rich markup."""
     return format_tool_output("shell", data, **kwargs)
+
 
 def format_network_output(data: dict, **kwargs) -> FormattedOutput:
     """Format network operation results with Rich markup."""
     return format_tool_output("network", data, **kwargs)
 
+
 def format_build_output(data: dict, **kwargs) -> FormattedOutput:
     """Format build tool operation results with Rich markup."""
     return format_tool_output("build", data, **kwargs)
+
 
 __all__ = [
     # Base classes

@@ -256,9 +256,7 @@ class NudgePolicy:
         # Too many read-only turns: tailor based on intent
         if detector.consecutive_read_only_turns >= READ_ONLY_ESCALATION_THRESHOLD:
             _is_write_task = (
-                intent is not None
-                and hasattr(intent, "value")
-                and intent.value == "write_allowed"
+                intent is not None and hasattr(intent, "value") and intent.value == "write_allowed"
             )
             if _is_write_task:
                 # Model has gathered enough context — push it to edit, not search
@@ -267,8 +265,8 @@ class NudgePolicy:
                     message=(
                         "You've been reading files for several turns without making changes. "
                         "You have enough context. Stop reading and apply the fix now using:\n"
-                        "edit(ops=[{\"type\": \"replace\", \"path\": \"file.py\", "
-                        "\"old_str\": \"exact text from file\", \"new_str\": \"replacement\"}])\n"
+                        'edit(ops=[{"type": "replace", "path": "file.py", '
+                        '"old_str": "exact text from file", "new_str": "replacement"}])\n'
                         "Use the exact text you already read as old_str."
                     ),
                     role="user",

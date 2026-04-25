@@ -1184,7 +1184,9 @@ class TestSessionCommands:
         persistence._db_path = "/tmp/test_project.db"
         persistence.save_session.return_value = "test-session-123"
 
-        ctx = CommandContext(console=console, settings=settings, agent=agent, args=["Preview Session"])
+        ctx = CommandContext(
+            console=console, settings=settings, agent=agent, args=["Preview Session"]
+        )
 
         with patch(
             "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
@@ -1334,14 +1336,19 @@ class TestSessionCommands:
             resume_summary="[Resumed session. previews: app.py.]"
         )
 
-        ctx = CommandContext(console=console, settings=settings, agent=agent, args=["test-session-123"])
+        ctx = CommandContext(
+            console=console, settings=settings, agent=agent, args=["test-session-123"]
+        )
 
-        with patch(
-            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
-            return_value=persistence,
-        ), patch(
-            "victor.agent.session_context_linker.SessionContextLinker",
-            return_value=linker_instance,
+        with (
+            patch(
+                "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+                return_value=persistence,
+            ),
+            patch(
+                "victor.agent.session_context_linker.SessionContextLinker",
+                return_value=linker_instance,
+            ),
         ):
             ResumeCommand().execute(ctx)
 

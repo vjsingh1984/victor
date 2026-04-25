@@ -55,7 +55,7 @@ class TestShellFormatter:
             "success": True,
             "exit_code": 0,
             "stdout": "file1.py\nfile2.py",
-            "duration_ms": 45
+            "duration_ms": 45,
         }
 
         result = formatter.format(data)
@@ -70,12 +70,7 @@ class TestShellFormatter:
     def test_format_failed_command(self):
         """Test formatting failed command execution."""
         formatter = ShellFormatter()
-        data = {
-            "command": "false",
-            "success": False,
-            "exit_code": 1,
-            "stderr": "Command failed"
-        }
+        data = {"command": "false", "success": False, "exit_code": 1, "stderr": "Command failed"}
 
         result = formatter.format(data)
 
@@ -91,7 +86,7 @@ class TestShellFormatter:
             "command": "python script.py",
             "success": False,
             "exit_code": 2,
-            "stderr": "SyntaxError: invalid syntax"
+            "stderr": "SyntaxError: invalid syntax",
         }
 
         result = formatter.format(data)
@@ -105,11 +100,7 @@ class TestShellFormatter:
         """Test formatting command with long output."""
         formatter = ShellFormatter()
         long_output = "\n".join([f"line {i}" for i in range(200)])
-        data = {
-            "command": "cat large_file.txt",
-            "success": True,
-            "stdout": long_output
-        }
+        data = {"command": "cat large_file.txt", "success": True, "stdout": long_output}
 
         result = formatter.format(data, max_output_lines=50)
 
@@ -120,11 +111,7 @@ class TestShellFormatter:
     def test_format_without_command_display(self):
         """Test formatting without showing command."""
         formatter = ShellFormatter()
-        data = {
-            "command": "secret command",
-            "success": True,
-            "stdout": "output"
-        }
+        data = {"command": "secret command", "success": True, "stdout": "output"}
 
         result = formatter.format(data, show_command=False)
 
@@ -135,11 +122,7 @@ class TestShellFormatter:
     def test_format_with_error_message(self):
         """Test formatting with error message."""
         formatter = ShellFormatter()
-        data = {
-            "command": "rm file.txt",
-            "success": False,
-            "error": "No such file or directory"
-        }
+        data = {"command": "rm file.txt", "success": False, "error": "No such file or directory"}
 
         result = formatter.format(data)
 
@@ -150,11 +133,7 @@ class TestShellFormatter:
     def test_summary_extraction_success(self):
         """Test summary extraction for successful command."""
         formatter = ShellFormatter()
-        data = {
-            "command": "ls",
-            "success": True,
-            "exit_code": 0
-        }
+        data = {"command": "ls", "success": True, "exit_code": 0}
 
         result = formatter.format(data)
 
@@ -164,11 +143,7 @@ class TestShellFormatter:
     def test_summary_extraction_failure(self):
         """Test summary extraction for failed command."""
         formatter = ShellFormatter()
-        data = {
-            "command": "false",
-            "success": False,
-            "exit_code": 1
-        }
+        data = {"command": "false", "success": False, "exit_code": 1}
 
         result = formatter.format(data)
 

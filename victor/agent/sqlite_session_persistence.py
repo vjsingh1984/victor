@@ -407,8 +407,10 @@ class SQLiteSessionPersistence:
                         "SELECT COUNT(*) FROM messages WHERE session_id = ?",
                         (row[0],),
                     )
-                    message_count = count_result[0][0] if count_result else session_metadata.get(
-                        "message_count", 0
+                    message_count = (
+                        count_result[0][0]
+                        if count_result
+                        else session_metadata.get("message_count", 0)
                     )
 
                     sessions.append(
@@ -475,10 +477,9 @@ class SQLiteSessionPersistence:
 
                 session_data = self.load_session(session["session_id"])
                 conversation = session_data.get("conversation", {}) if session_data else {}
-                if (
-                    self._contains_query(conversation.get("messages", []), lowered_query)
-                    or self._contains_query(conversation.get("preview_messages", []), lowered_query)
-                ):
+                if self._contains_query(
+                    conversation.get("messages", []), lowered_query
+                ) or self._contains_query(conversation.get("preview_messages", []), lowered_query):
                     sessions.append(session)
 
                 if len(sessions) >= limit:

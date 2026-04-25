@@ -154,4 +154,5 @@ class ShellFormatter(ToolFormatter):
             GenericFormatter instance
         """
         from .generic import GenericFormatter
+
         return GenericFormatter()

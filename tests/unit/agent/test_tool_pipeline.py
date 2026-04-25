@@ -129,11 +129,15 @@ class TestExecuteToolCalls:
         on_complete.assert_called()
 
     async def test_legacy_read_file_uses_exact_dedup_key(self, pipeline):
-        await pipeline.execute_tool_calls([{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}])
+        await pipeline.execute_tool_calls(
+            [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
+        )
         assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
 
     async def test_write_file_invalidates_read_dedup_key(self, pipeline, mock_tool_executor):
-        await pipeline.execute_tool_calls([{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}])
+        await pipeline.execute_tool_calls(
+            [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
+        )
         assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
 
         mock_tool_executor.execute.return_value = ToolExecutionResult(

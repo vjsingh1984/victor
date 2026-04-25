@@ -395,7 +395,7 @@ class TestFormattedOutputPruning:
     def test_formatted_output_canonicalizes_legacy_tool_names(self):
         pruner = ToolOutputPruner(enabled=True)
         body = "\n".join(f"file_{i}.py" for i in range(200))
-        formatted = f"<TOOL_OUTPUT tool=\"list_directory\">\n{body}\n</TOOL_OUTPUT>"
+        formatted = f'<TOOL_OUTPUT tool="list_directory">\n{body}\n</TOOL_OUTPUT>'
 
         pruned, info = pruner.prune(
             tool_output=formatted,

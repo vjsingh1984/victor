@@ -454,7 +454,9 @@ class TestGetToolStatusMessage:
 
     def test_ls_with_path(self):
         """Test canonical ls tool with path."""
-        result = get_tool_status_message("ls", {"path": "/home/user"}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "ls", {"path": "/home/user"}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Listing directory: /home/user"
 
     def test_read_with_path(self):

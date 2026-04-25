@@ -356,7 +356,6 @@ class TestCreateComparisonReport:
         assert report.results[0].framework == Framework.VICTOR
 
 
-
 class TestSavedResultIngestion:
     """Tests for loading saved benchmark result artifacts."""
 

@@ -880,7 +880,9 @@ class VictorTUI(App):
                     return None
 
                 max_lines = tool_settings.tool_output_preview_lines
-                preview = tool_preview_renderer.render(tool_name, arguments, raw_text, max_lines=max_lines)
+                preview = tool_preview_renderer.render(
+                    tool_name, arguments, raw_text, max_lines=max_lines
+                )
                 if preview.contains_rich_markup:
                     return raw_text
 

@@ -202,9 +202,7 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
             categories=categories,
             description=str(metadata.get("description") or catalog.description),
             source_name=str(
-                metadata.get("source_name")
-                or metadata.get("source")
-                or catalog.source_name
+                metadata.get("source_name") or metadata.get("source") or catalog.source_name
             ),
             source_url=str(metadata.get("source_url") or catalog.source_url),
             paper_url=str(metadata.get("paper_url") or catalog.paper_url),
@@ -229,7 +227,9 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
             raise ValueError(f"Task #{index} is missing a prompt or description")
 
         return BenchmarkTask(
-            task_id=str(merged.get("task_id") or merged.get("id") or f"{self._benchmark_type.value}-{index}"),
+            task_id=str(
+                merged.get("task_id") or merged.get("id") or f"{self._benchmark_type.value}-{index}"
+            ),
             benchmark=self._benchmark_type,
             description=description or prompt,
             language=str(merged.get("language") or "python"),
@@ -240,9 +240,7 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
                 self._manifest_defaults.get("seed_files")
                 or self._manifest_defaults.get("workspace_files")
                 or self._manifest_defaults.get("files"),
-                merged.get("seed_files")
-                or merged.get("workspace_files")
-                or merged.get("files"),
+                merged.get("seed_files") or merged.get("workspace_files") or merged.get("files"),
             ),
             repo=merged.get("repo"),
             base_commit=merged.get("base_commit"),

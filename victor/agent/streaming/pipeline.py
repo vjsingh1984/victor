@@ -932,9 +932,9 @@ class StreamingChatPipeline:
                         if _is_write:
                             _plateau_msg = (
                                 "Progress stalled. You have enough context — stop reading "
-                                "and apply the change now with edit(ops=[{\"type\": \"replace\", "
-                                "\"path\": \"file\", \"old_str\": \"exact text\", "
-                                "\"new_str\": \"replacement\"}])."
+                                'and apply the change now with edit(ops=[{"type": "replace", '
+                                '"path": "file", "old_str": "exact text", '
+                                '"new_str": "replacement"}]).'
                             )
                         else:
                             _plateau_msg = (

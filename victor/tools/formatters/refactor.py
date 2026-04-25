@@ -18,14 +18,11 @@ class RefactorFormatter(ToolFormatter):
 
     def validate_input(self, data: Dict) -> bool:
         """Validate refactor result has required fields."""
-        return isinstance(data, dict) and ("operations" in data or "plan" in data or "changes" in data)
+        return isinstance(data, dict) and (
+            "operations" in data or "plan" in data or "changes" in data
+        )
 
-    def format(
-        self,
-        data: Dict[str, Any],
-        max_operations: int = 20,
-        **kwargs
-    ) -> FormattedOutput:
+    def format(self, data: Dict[str, Any], max_operations: int = 20, **kwargs) -> FormattedOutput:
         """Format refactor operations with Rich markup.
 
         Args:

@@ -55,7 +55,7 @@ class TestBuildFormatter:
             "operation": "build",
             "target": "myapp",
             "success": True,
-            "duration_ms": 1250
+            "duration_ms": 1250,
         }
 
         result = formatter.format(data)
@@ -73,9 +73,7 @@ class TestBuildFormatter:
             "tool": "cargo",
             "operation": "build",
             "success": False,
-            "errors": [
-                {"file": "src/main.rs", "line": 42, "message": "expected identifier"}
-            ]
+            "errors": [{"file": "src/main.rs", "line": 42, "message": "expected identifier"}],
         }
 
         result = formatter.format(data)
@@ -88,16 +86,8 @@ class TestBuildFormatter:
     def test_format_with_warnings(self):
         """Test formatting build with warnings."""
         formatter = BuildFormatter()
-        warnings = [
-            {"message": "unused variable: x"},
-            {"message": "dead code"}
-        ]
-        data = {
-            "tool": "cmake",
-            "operation": "configure",
-            "success": True,
-            "warnings": warnings
-        }
+        warnings = [{"message": "unused variable: x"}, {"message": "dead code"}]
+        data = {"tool": "cmake", "operation": "configure", "success": True, "warnings": warnings}
 
         result = formatter.format(data)
 
@@ -109,16 +99,8 @@ class TestBuildFormatter:
     def test_format_with_artifacts(self):
         """Test formatting build with artifacts."""
         formatter = BuildFormatter()
-        artifacts = [
-            {"name": "myapp", "size": "2.5 MB"},
-            {"name": "libmyapp.so", "size": "1.2 MB"}
-        ]
-        data = {
-            "tool": "cargo",
-            "operation": "build",
-            "success": True,
-            "artifacts": artifacts
-        }
+        artifacts = [{"name": "myapp", "size": "2.5 MB"}, {"name": "libmyapp.so", "size": "1.2 MB"}]
+        data = {"tool": "cargo", "operation": "build", "success": True, "artifacts": artifacts}
 
         result = formatter.format(data)
 
@@ -133,14 +115,9 @@ class TestBuildFormatter:
         steps = [
             {"name": "Compiling", "success": True, "duration_ms": 500},
             {"name": "Linking", "success": True, "duration_ms": 200},
-            {"name": "Packaging", "success": False, "duration_ms": 100}
+            {"name": "Packaging", "success": False, "duration_ms": 100},
         ]
-        data = {
-            "tool": "make",
-            "operation": "all",
-            "success": False,
-            "steps": steps
-        }
+        data = {"tool": "make", "operation": "all", "success": False, "steps": steps}
 
         result = formatter.format(data)
 
@@ -153,16 +130,8 @@ class TestBuildFormatter:
     def test_format_with_max_errors(self):
         """Test formatting with max_errors limit."""
         formatter = BuildFormatter()
-        errors = [
-            {"file": f"file{i}.py", "line": i, "message": f"error {i}"}
-            for i in range(20)
-        ]
-        data = {
-            "tool": "python",
-            "operation": "compile",
-            "success": False,
-            "errors": errors
-        }
+        errors = [{"file": f"file{i}.py", "line": i, "message": f"error {i}"} for i in range(20)]
+        data = {"tool": "python", "operation": "compile", "success": False, "errors": errors}
 
         result = formatter.format(data, max_errors=5)
 
@@ -173,16 +142,8 @@ class TestBuildFormatter:
     def test_format_with_max_warnings(self):
         """Test formatting with max_warnings limit."""
         formatter = BuildFormatter()
-        warnings = [
-            {"message": f"warning {i}"}
-            for i in range(30)
-        ]
-        data = {
-            "tool": "gcc",
-            "operation": "compile",
-            "success": True,
-            "warnings": warnings
-        }
+        warnings = [{"message": f"warning {i}"} for i in range(30)]
+        data = {"tool": "gcc", "operation": "compile", "success": True, "warnings": warnings}
 
         result = formatter.format(data, max_warnings=10)
 
@@ -193,12 +154,7 @@ class TestBuildFormatter:
     def test_summary_extraction_with_target(self):
         """Test summary extraction with target."""
         formatter = BuildFormatter()
-        data = {
-            "tool": "make",
-            "operation": "build",
-            "target": "myapp",
-            "success": True
-        }
+        data = {"tool": "make", "operation": "build", "target": "myapp", "success": True}
 
         result = formatter.format(data)
 
@@ -209,11 +165,7 @@ class TestBuildFormatter:
     def test_summary_extraction_without_target(self):
         """Test summary extraction without target."""
         formatter = BuildFormatter()
-        data = {
-            "tool": "cargo",
-            "operation": "test",
-            "success": False
-        }
+        data = {"tool": "cargo", "operation": "test", "success": False}
 
         result = formatter.format(data)
 

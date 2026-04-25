@@ -398,7 +398,9 @@ class TestSessionsCommand:
             "myproj-9Kx8A3B",
         ]
 
-    def test_sessions_export_preserves_preview_messages(self, runner_with_db, temp_db_path, tmp_path):
+    def test_sessions_export_preserves_preview_messages(
+        self, runner_with_db, temp_db_path, tmp_path
+    ):
         """Test 'victor sessions export' preserves replay-only preview sidecar payloads."""
         persistence = SQLiteSessionPersistence(db_path=temp_db_path)
         conversation = MessageHistory()

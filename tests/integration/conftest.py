@@ -39,7 +39,6 @@ def clear_rich_formatting_flag_override():
             pass
 
 
-
 @pytest.fixture(autouse=True)
 def reset_service_container():
     """Reset DI service container between integration tests.

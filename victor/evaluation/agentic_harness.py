@@ -345,7 +345,6 @@ class AgenticMetrics:
             return 0.0
         return self.total_correction_time_seconds / self.total_corrections
 
-
     @property
     def benchmarks_evaluated(self) -> list[str]:
         """Unique benchmark ids covered by this run."""
@@ -357,7 +356,6 @@ class AgenticMetrics:
         return sum(
             1 for result in self.task_results if is_external_agentic_benchmark(result.benchmark)
         )
-
 
     @property
     def failure_categories(self) -> dict[str, int]:
@@ -413,9 +411,7 @@ class AgenticMetrics:
                     "task_id": r.task_id,
                     "benchmark": r.benchmark.value,
                     "status": r.status.value,
-                    "failure_category": (
-                        r.failure_category.value if r.failure_category else None
-                    ),
+                    "failure_category": (r.failure_category.value if r.failure_category else None),
                     "turns": r.trace.turns,
                     "tool_calls": r.trace.total_tool_calls,
                     "duration": round(r.trace.duration_seconds, 2),
@@ -1321,7 +1317,6 @@ class AgenticBenchmarkRunner:
             metrics.timeouts += 1
         else:
             metrics.errors += 1
-
 
     def _classify_failure_category(
         self,

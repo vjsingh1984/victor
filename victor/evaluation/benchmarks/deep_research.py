@@ -86,7 +86,9 @@ class DeepResearchBenchmarkRunner(BaseBenchmarkRunner):
         matched_claims = self._match_requirements(required_claims, report)
         missing_claims = [claim for claim in required_claims if claim not in matched_claims]
         matched_citations = self._match_requirements(required_citations, report)
-        missing_citations = [citation for citation in required_citations if citation not in matched_citations]
+        missing_citations = [
+            citation for citation in required_citations if citation not in matched_citations
+        ]
         forbidden_hits = self._match_requirements(forbidden_claims, report)
 
         claim_coverage = self._coverage(matched_claims, required_claims)
@@ -134,7 +136,9 @@ class DeepResearchBenchmarkRunner(BaseBenchmarkRunner):
             return payload, self._build_manifest_metadata({}, payload)
 
         if not isinstance(payload, dict):
-            raise ValueError("Deep research benchmark dataset payload must be a list or object manifest")
+            raise ValueError(
+                "Deep research benchmark dataset payload must be a list or object manifest"
+            )
 
         records = payload.get("tasks", [])
         if not isinstance(records, list):

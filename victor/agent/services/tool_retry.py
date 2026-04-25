@@ -176,7 +176,12 @@ class ToolRetryExecutor:
                                 effective_cache.invalidate_paths(touched_paths)
                             else:
                                 namespaces_to_clear = [ToolNames.READ, ToolNames.LS]
-                                if canonical_tool_name in {"git", "docker", ToolNames.WRITE, ToolNames.EDIT}:
+                                if canonical_tool_name in {
+                                    "git",
+                                    "docker",
+                                    ToolNames.WRITE,
+                                    ToolNames.EDIT,
+                                }:
                                     namespaces_to_clear.extend(
                                         ["code_search", "semantic_code_search"]
                                     )

@@ -913,7 +913,10 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         """
         canonical_tool_name = get_canonical_name(tool_name)
         # Only check git-related tools
-        if canonical_tool_name not in {ToolNames.GIT, ToolNames.SHELL} and tool_name != "run_command":
+        if (
+            canonical_tool_name not in {ToolNames.GIT, ToolNames.SHELL}
+            and tool_name != "run_command"
+        ):
             return MiddlewareResult()
 
         command = arguments.get("command", "") or arguments.get("args", "")

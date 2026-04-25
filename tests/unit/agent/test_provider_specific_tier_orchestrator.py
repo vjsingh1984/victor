@@ -49,6 +49,7 @@ def mock_orchestrator():
             tier = get_provider_tool_tier(tool.name, provider_category)
         else:
             from victor.config.tool_tiers import get_tool_tier
+
             tier = get_tool_tier(tool.name)
 
         # Token costs by tier
@@ -61,8 +62,7 @@ def mock_orchestrator():
     def mock_demote_tools_to_fit(tools, max_tokens, provider_category=None):
         """Simplified demotion for testing."""
         current_tokens = sum(
-            orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in tools
+            orchestrator._estimate_tool_tokens(t, provider_category) for t in tools
         )
 
         if current_tokens <= max_tokens:
@@ -84,11 +84,13 @@ def mock_orchestrator():
 @pytest.fixture
 def create_mock_tool():
     """Factory for creating mock tools."""
+
     def _create(name):
         tool = Mock()
         tool.name = name
         tool.to_schema = Mock(return_value={"type": "object", "properties": {}})
         return tool
+
     return _create
 
 
@@ -100,8 +102,7 @@ class TestEdgeModelToolSelection:
         # Edge model setup
         mock_orchestrator.model = "qwen3.5:2b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -118,8 +119,7 @@ class TestEdgeModelToolSelection:
 
         # Estimate tokens with edge category
         tool_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in tools
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in tools
         )
 
         # Edge category: only read + shell are FULL (125 each), others STUB (32 each)
@@ -128,16 +128,11 @@ class TestEdgeModelToolSelection:
 
         # Fit within edge budget (25% of 8K = 2048 tokens)
         max_tool_tokens = int(context_window * 0.25)
-        selected = mock_orchestrator._demote_tools_to_fit(
-            tools,
-            max_tool_tokens,
-            provider_category
-        )
+        selected = mock_orchestrator._demote_tools_to_fit(tools, max_tool_tokens, provider_category)
 
         # All tools should fit within budget
         selected_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in selected
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in selected
         )
         assert selected_tokens <= max_tool_tokens
 
@@ -145,29 +140,34 @@ class TestEdgeModelToolSelection:
         """Test edge models achieve 80% token reduction vs global tiers."""
         # Create global tier tool set (10 FULL tools)
         global_tools = [
-            create_mock_tool(name) for name in
-            ["read", "shell", "ls", "code_search", "edit", "write",
-             "_get_directory_summaries", "symbol", "find", "test"]
+            create_mock_tool(name)
+            for name in [
+                "read",
+                "shell",
+                "ls",
+                "code_search",
+                "edit",
+                "write",
+                "_get_directory_summaries",
+                "symbol",
+                "find",
+                "test",
+            ]
         ]
 
         # Edge model setup
         mock_orchestrator.model = "qwen3.5:2b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
         # Global tier cost (no provider category)
-        global_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, None)
-            for t in global_tools
-        )
+        global_tokens = sum(mock_orchestrator._estimate_tool_tokens(t, None) for t in global_tools)
 
         # Edge tier cost (with provider category)
         edge_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in global_tools
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in global_tools
         )
 
         # Edge: 2 FULL (125 each) + 8 STUB (32 each) = 250 + 256 = 506
@@ -187,8 +187,7 @@ class TestStandardModelToolSelection:
         # Standard model setup
         mock_orchestrator.model = "qwen2.5:7b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -208,8 +207,7 @@ class TestStandardModelToolSelection:
 
         # Estimate tokens with standard category
         tool_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in tools
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in tools
         )
 
         # Standard category: 5 FULL (125 each) + 2 COMPACT (70 each) + 1 STUB (32)
@@ -218,16 +216,11 @@ class TestStandardModelToolSelection:
 
         # Fit within standard budget (25% of 32K = 8192 tokens)
         max_tool_tokens = int(context_window * 0.25)
-        selected = mock_orchestrator._demote_tools_to_fit(
-            tools,
-            max_tool_tokens,
-            provider_category
-        )
+        selected = mock_orchestrator._demote_tools_to_fit(tools, max_tool_tokens, provider_category)
 
         # All tools should fit within budget
         selected_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in selected
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in selected
         )
         assert selected_tokens <= max_tool_tokens
 
@@ -235,29 +228,34 @@ class TestStandardModelToolSelection:
         """Test standard models achieve ~40% token reduction vs global tiers."""
         # Create global tier tool set (10 FULL tools)
         global_tools = [
-            create_mock_tool(name) for name in
-            ["read", "shell", "ls", "code_search", "edit", "write",
-             "_get_directory_summaries", "symbol", "find", "test"]
+            create_mock_tool(name)
+            for name in [
+                "read",
+                "shell",
+                "ls",
+                "code_search",
+                "edit",
+                "write",
+                "_get_directory_summaries",
+                "symbol",
+                "find",
+                "test",
+            ]
         ]
 
         # Standard model setup
         mock_orchestrator.model = "qwen2.5:7b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
         # Global tier cost (no provider category)
-        global_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, None)
-            for t in global_tools
-        )
+        global_tokens = sum(mock_orchestrator._estimate_tool_tokens(t, None) for t in global_tools)
 
         # Standard tier cost (with provider category)
         standard_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in global_tools
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in global_tools
         )
 
         # Standard: 5 FULL (125 each) + 2 COMPACT (70 each) + 3 STUB (32 each)
@@ -278,8 +276,7 @@ class TestLargeModelToolSelection:
         # Large model setup
         mock_orchestrator.model = "claude-sonnet-4-20250514"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -301,8 +298,7 @@ class TestLargeModelToolSelection:
 
         # Estimate tokens with large category
         tool_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in tools
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in tools
         )
 
         # Large category: all 10 FULL (125 each) = 1250
@@ -310,16 +306,11 @@ class TestLargeModelToolSelection:
 
         # Fit within large budget (25% of 200K = 50K tokens)
         max_tool_tokens = int(context_window * 0.25)
-        selected = mock_orchestrator._demote_tools_to_fit(
-            tools,
-            max_tool_tokens,
-            provider_category
-        )
+        selected = mock_orchestrator._demote_tools_to_fit(tools, max_tool_tokens, provider_category)
 
         # All tools should fit within budget
         selected_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in selected
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in selected
         )
         assert selected_tokens <= max_tool_tokens
 
@@ -327,29 +318,34 @@ class TestLargeModelToolSelection:
         """Test large models have no token regression vs global tiers."""
         # Create full tool set
         tools = [
-            create_mock_tool(name) for name in
-            ["read", "shell", "ls", "code_search", "edit", "write",
-             "_get_directory_summaries", "symbol", "find", "test"]
+            create_mock_tool(name)
+            for name in [
+                "read",
+                "shell",
+                "ls",
+                "code_search",
+                "edit",
+                "write",
+                "_get_directory_summaries",
+                "symbol",
+                "find",
+                "test",
+            ]
         ]
 
         # Large model setup
         mock_orchestrator.model = "claude-sonnet-4-20250514"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
         # Global tier cost (no provider category)
-        global_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, None)
-            for t in tools
-        )
+        global_tokens = sum(mock_orchestrator._estimate_tool_tokens(t, None) for t in tools)
 
         # Large tier cost (with provider category)
         large_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in tools
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in tools
         )
 
         # Large models should have same cost as global tiers (no regression)
@@ -363,8 +359,7 @@ class TestProviderCategoryDetection:
         """Test edge category detection from small context window."""
         mock_orchestrator.model = "qwen3.5:2b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -375,8 +370,7 @@ class TestProviderCategoryDetection:
         """Test standard category detection from medium context window."""
         mock_orchestrator.model = "qwen2.5:7b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -387,8 +381,7 @@ class TestProviderCategoryDetection:
         """Test large category detection from large context window."""
         mock_orchestrator.model = "claude-sonnet-4-20250514"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -403,8 +396,7 @@ class TestTierEstimationAccuracy:
         """Test edge tier token estimations match expected costs."""
         mock_orchestrator.model = "qwen3.5:2b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -423,8 +415,7 @@ class TestTierEstimationAccuracy:
         """Test standard tier token estimations match expected costs."""
         mock_orchestrator.model = "qwen2.5:7b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -446,14 +437,23 @@ class TestTierEstimationAccuracy:
         """Test large tier token estimations match expected costs."""
         mock_orchestrator.model = "claude-sonnet-4-20250514"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
         # Test FULL tools (all 10 core tools)
-        for tool_name in ["read", "shell", "ls", "code_search", "edit",
-                         "write", "_get_directory_summaries", "symbol", "find", "test"]:
+        for tool_name in [
+            "read",
+            "shell",
+            "ls",
+            "code_search",
+            "edit",
+            "write",
+            "_get_directory_summaries",
+            "symbol",
+            "find",
+            "test",
+        ]:
             tool = create_mock_tool(tool_name)
             assert mock_orchestrator._estimate_tool_tokens(tool, provider_category) == 125
 
@@ -465,8 +465,7 @@ class TestToolDemotionWithProviderCategory:
         """Test edge demotion preserves read + shell first."""
         mock_orchestrator.model = "qwen3.5:2b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -483,11 +482,7 @@ class TestToolDemotionWithProviderCategory:
 
         # Very tight budget (only 200 tokens)
         max_tokens = 200
-        selected = mock_orchestrator._demote_tools_to_fit(
-            tools,
-            max_tokens,
-            provider_category
-        )
+        selected = mock_orchestrator._demote_tools_to_fit(tools, max_tokens, provider_category)
 
         # Should keep read + shell (FULL) first, then drop others
         # With edge tier: read (125) + shell (125) = 250 > 200, so only 1 tool fits
@@ -500,8 +495,7 @@ class TestToolDemotionWithProviderCategory:
         """Test standard demotion balances FULL and COMPACT tools."""
         mock_orchestrator.model = "qwen2.5:7b"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
@@ -518,16 +512,11 @@ class TestToolDemotionWithProviderCategory:
 
         # Tight budget (600 tokens - should fit 5 FULL or mix)
         max_tokens = 600
-        selected = mock_orchestrator._demote_tools_to_fit(
-            tools,
-            max_tokens,
-            provider_category
-        )
+        selected = mock_orchestrator._demote_tools_to_fit(tools, max_tokens, provider_category)
 
         # Should fit some tools within budget
         selected_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in selected
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in selected
         )
         assert selected_tokens <= max_tokens
 
@@ -535,32 +524,36 @@ class TestToolDemotionWithProviderCategory:
         """Test large demotion fits all tools easily."""
         mock_orchestrator.model = "claude-sonnet-4-20250514"
         context_window = mock_orchestrator._get_context_window(
-            mock_orchestrator.provider,
-            mock_orchestrator.model
+            mock_orchestrator.provider, mock_orchestrator.model
         )
         provider_category = get_provider_category(context_window)
 
         # Create all 10 core tools
         tools = [
-            create_mock_tool(name) for name in
-            ["read", "shell", "ls", "code_search", "edit", "write",
-             "_get_directory_summaries", "symbol", "find", "test"]
+            create_mock_tool(name)
+            for name in [
+                "read",
+                "shell",
+                "ls",
+                "code_search",
+                "edit",
+                "write",
+                "_get_directory_summaries",
+                "symbol",
+                "find",
+                "test",
+            ]
         ]
 
         # Generous budget (2000 tokens)
         max_tokens = 2000
-        selected = mock_orchestrator._demote_tools_to_fit(
-            tools,
-            max_tokens,
-            provider_category
-        )
+        selected = mock_orchestrator._demote_tools_to_fit(tools, max_tokens, provider_category)
 
         # Should fit all 10 tools
         assert len(selected) == 10
 
         selected_tokens = sum(
-            mock_orchestrator._estimate_tool_tokens(t, provider_category)
-            for t in selected
+            mock_orchestrator._estimate_tool_tokens(t, provider_category) for t in selected
         )
         assert selected_tokens <= max_tokens
 
@@ -579,7 +572,9 @@ class TestBackwardCompatibility:
         # Global tiers have read as FULL (125 tokens)
         assert tokens == 125
 
-    def test_orchestrator_works_without_provider_category(self, mock_orchestrator, create_mock_tool):
+    def test_orchestrator_works_without_provider_category(
+        self, mock_orchestrator, create_mock_tool
+    ):
         """Test orchestrator methods work without provider_category parameter."""
         tools = [create_mock_tool("read"), create_mock_tool("shell")]
 

@@ -19,12 +19,7 @@ class GitFormatter(ToolFormatter):
         """Validate git result has required fields."""
         return isinstance(data, dict) and ("output" in data or "formatted_output" in data)
 
-    def format(
-        self,
-        data: Dict[str, Any],
-        operation: str = "status",
-        **kwargs
-    ) -> FormattedOutput:
+    def format(self, data: Dict[str, Any], operation: str = "status", **kwargs) -> FormattedOutput:
         """Format git output with Rich markup.
 
         Args:
@@ -146,6 +141,7 @@ class GitFormatter(ToolFormatter):
         try:
             # Import the edit tool's diff formatter
             from victor.tools.file_editor_tool import _format_diff_for_console
+
             return _format_diff_for_console(output)
         except Exception:
             # Fallback to basic diff formatting if import fails

@@ -166,7 +166,9 @@ class TestUpdateFromToolResult:
 
     def test_tool_output_marker_parsing_legacy_alias(self):
         ledger = SessionLedger()
-        result = '<TOOL_OUTPUT tool="read_file" path="/src/legacy_bar.py">content here</TOOL_OUTPUT>'
+        result = (
+            '<TOOL_OUTPUT tool="read_file" path="/src/legacy_bar.py">content here</TOOL_OUTPUT>'
+        )
         ledger.update_from_tool_result("shell", {}, result, turn_index=1)
         assert "/src/legacy_bar.py" in ledger.get_files_read()
 

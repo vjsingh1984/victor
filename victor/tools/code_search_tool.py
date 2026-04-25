@@ -289,7 +289,9 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> IntegrityP
         return IntegrityProbeOutcome(rebuilt=rebuilt, stale=not rebuilt)
 
 
-def _build_codebase_embedding_extra_config(settings: Any, root: Optional[Path] = None) -> Dict[str, Any]:
+def _build_codebase_embedding_extra_config(
+    settings: Any, root: Optional[Path] = None
+) -> Dict[str, Any]:
     """Build provider-specific embedding config from settings.
 
     Existing search settings define dimension and batch size but the code_search
@@ -677,7 +679,10 @@ def _resolve_code_search_root(path: str) -> Tuple[Optional[Path], Optional[str]]
             root_path = parent_path
             logger.debug("Path %r not found, using parent: %s", search_root, root_path)
         else:
-            return None, f"Search root '{search_root}' not found. Please provide a valid directory path."
+            return (
+                None,
+                f"Search root '{search_root}' not found. Please provide a valid directory path.",
+            )
 
     return root_path, None
 
@@ -730,7 +735,9 @@ def _matches_literal_file_pattern(file_path: str, file_pattern: str, *, search_r
         return fnmatch.fnmatch(basename, normalized_pattern)
 
     if "/" in normalized_pattern:
-        return candidate_path == normalized_pattern or candidate_path.endswith(f"/{normalized_pattern}")
+        return candidate_path == normalized_pattern or candidate_path.endswith(
+            f"/{normalized_pattern}"
+        )
 
     return basename == normalized_pattern
 
@@ -753,8 +760,10 @@ def _file_pattern_uses_backend_exact_filter(file_pattern: str) -> bool:
     """Return whether a file pattern is safe to send as an exact backend file_path filter."""
 
     normalized_pattern = _normalize_code_search_path(file_pattern.strip())
-    return bool(normalized_pattern) and "/" in normalized_pattern and not _file_pattern_has_glob(
-        normalized_pattern
+    return (
+        bool(normalized_pattern)
+        and "/" in normalized_pattern
+        and not _file_pattern_has_glob(normalized_pattern)
     )
 
 
@@ -877,7 +886,9 @@ def _result_matches_symbol_filter(result: Any, symbol: str) -> bool:
         if not isinstance(candidate, str):
             continue
         normalized_candidate = candidate.strip()
-        if normalized_candidate == target_symbol or normalized_candidate.endswith(f".{target_symbol}"):
+        if normalized_candidate == target_symbol or normalized_candidate.endswith(
+            f".{target_symbol}"
+        ):
             return True
 
     symbol_pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(target_symbol)}(?![A-Za-z0-9_])")
@@ -1603,7 +1614,9 @@ def _build_search_response(
         snippet = result.get("snippet")
         if not isinstance(snippet, str) or not snippet.strip():
             if isinstance(content, str):
-                snippet = " ".join(line.strip() for line in content.splitlines()[:2] if line.strip())
+                snippet = " ".join(
+                    line.strip() for line in content.splitlines()[:2] if line.strip()
+                )
             else:
                 snippet = ""
 
@@ -1789,9 +1802,13 @@ async def _get_or_build_index(
         # Check if we have a valid cached index (double-check)
         if cached_index and not force_reindex:
             if cache_entry.get("stale", False):
-                logger.info("[code_search] Cache marked stale for %s (inside lock), rebuilding", root)
+                logger.info(
+                    "[code_search] Cache marked stale for %s (inside lock), rebuilding", root
+                )
             elif not _cache_entry_matches_manifest(cache_entry, index_manifest):
-                logger.info("[code_search] Cache manifest mismatch for %s (inside lock), rebuilding", root)
+                logger.info(
+                    "[code_search] Cache manifest mismatch for %s (inside lock), rebuilding", root
+                )
             elif latest <= last_mtime:
                 # Another task built it while we waited for lock
                 logger.info(f"[code_search] Cache hit for {root} (inside lock)")
@@ -1808,7 +1825,9 @@ async def _get_or_build_index(
                     ensure_watcher=True,
                 )
                 if refreshed:
-                    logger.info(f"[code_search] Incremental refresh complete for {root} (inside lock)")
+                    logger.info(
+                        f"[code_search] Incremental refresh complete for {root} (inside lock)"
+                    )
                     return cached_index, False
 
         # Build index with exclusive access to this path
@@ -1831,7 +1850,9 @@ async def _get_or_build_index(
         # Only do full index if forced or no persistent data exists
         persist_path = Path(embedding_config["persist_directory"])
         has_persistent_data = has_persisted_codebase_index_data(persist_path)
-        has_compatible_manifest = has_compatible_codebase_index_manifest(persist_path, index_manifest)
+        has_compatible_manifest = has_compatible_codebase_index_manifest(
+            persist_path, index_manifest
+        )
         if has_persistent_data and not has_compatible_manifest:
             logger.info(
                 "Persistent code_search index manifest mismatch for %s; rebuilding (%s)",
@@ -1860,7 +1881,9 @@ async def _get_or_build_index(
         try:
             write_codebase_index_manifest(persist_path, index_manifest)
         except OSError as exc:
-            logger.warning("Failed to write code_search index manifest to %s: %s", persist_path, exc)
+            logger.warning(
+                "Failed to write code_search index manifest to %s: %s", persist_path, exc
+            )
 
         index_cache[str(root)] = {
             "index": index,
@@ -2382,7 +2405,6 @@ async def code_search(
             return result
     exts: Optional[List[str]] = _build_literal_search_extensions(filters)
     try:
-        search_root = resolved_search_root
         # Check if path is a subdirectory to provide smart hints
         # This helps avoid duplicate embeddings while supporting cross-repo analysis
         try:
@@ -2522,7 +2544,9 @@ async def code_search(
             try:
                 failure_key = _build_index_failure_key(
                     root_path,
-                    build_codebase_index_manifest(_build_codebase_embedding_config(settings, root_path)),
+                    build_codebase_index_manifest(
+                        _build_codebase_embedding_config(settings, root_path)
+                    ),
                 )
 
                 # Get failure cache (same logic as in _get_or_build_index)
@@ -2749,7 +2773,10 @@ async def code_search(
                     ranked_results,
                     root_path=root_path,
                 )
-                extra_metadata = {**backend_metadata, "provider_capability": "analyze_change_impact"}
+                extra_metadata = {
+                    **backend_metadata,
+                    "provider_capability": "analyze_change_impact",
+                }
                 extra_metadata.update(enrichment_metadata)
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters

@@ -62,8 +62,14 @@ class _FormatCache:
         self._misses += 1
         return None
 
-    def put(self, tool_name: str, data: Dict[str, Any], formatted: FormattedOutput,
-            ttl: Optional[int] = None, **kwargs) -> None:
+    def put(
+        self,
+        tool_name: str,
+        data: Dict[str, Any],
+        formatted: FormattedOutput,
+        ttl: Optional[int] = None,
+        **kwargs,
+    ) -> None:
         """Put formatted output into cache.
 
         Args:
@@ -114,8 +120,7 @@ class _FormatCache:
             "hit_rate": hit_rate,
         }
 
-    def _generate_key(self, tool_name: str, data: Dict[str, Any],
-                     kwargs: Dict[str, Any]) -> str:
+    def _generate_key(self, tool_name: str, data: Dict[str, Any], kwargs: Dict[str, Any]) -> str:
         """Generate content-based cache key.
 
         Args:
@@ -138,8 +143,9 @@ class _FormatCache:
         key_parts.append(sorted_data)
 
         # Add relevant kwargs to key (exclude cache-specific options)
-        cacheable_kwargs = {k: v for k, v in kwargs.items()
-                           if k not in ("ttl", "max_size", "max_time_ms")}
+        cacheable_kwargs = {
+            k: v for k, v in kwargs.items() if k not in ("ttl", "max_size", "max_time_ms")
+        }
         if cacheable_kwargs:
             sorted_kwargs = json.dumps(cacheable_kwargs, sort_keys=True)
             key_parts.append(sorted_kwargs)
@@ -176,17 +182,20 @@ def _is_rich_formatting_enabled() -> bool:
 
         # No explicit override, use settings (which defaults to True)
         from victor.config.tool_settings import get_toolSettings
+
         settings = get_toolSettings()
         return settings.rich_formatting_enabled
     except Exception:
         # If checks fail, fall back to settings
         try:
             from victor.config.tool_settings import get_toolSettings
+
             settings = get_toolSettings()
             return settings.rich_formatting_enabled
         except Exception:
             # If that also fails, enable by default for safety
             return True
+
 
 # Global formatter registry
 _FORMATTER_MAP: Dict[str, ToolFormatter] = {}
@@ -199,7 +208,7 @@ class FormatterRegistry:
     fallback behavior when formatters fail.
     """
 
-    _instance: Optional['FormatterRegistry'] = None
+    _instance: Optional["FormatterRegistry"] = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -232,6 +241,7 @@ class FormatterRegistry:
 
         # Fallback to generic formatter
         from .generic import GenericFormatter
+
         logger.debug(f"No formatter found for {tool_name}, using generic fallback")
         return GenericFormatter()
 
@@ -255,11 +265,7 @@ def get_formatter_registry() -> FormatterRegistry:
 
 
 # Module-level convenience function for formatting
-def format_tool_output(
-    tool_name: str,
-    data: Dict[str, Any],
-    **kwargs
-) -> FormattedOutput:
+def format_tool_output(tool_name: str, data: Dict[str, Any], **kwargs) -> FormattedOutput:
     """Format tool output using registered formatter with production guards.
 
     This is the main entry point for tools to format their output.
@@ -287,6 +293,7 @@ def format_tool_output(
     # Get settings for production guards
     try:
         from victor.config.tool_settings import get_tool_settings
+
         settings = get_tool_settings()
         max_size = settings.rich_formatting_max_output_size
         max_time_ms = settings.rich_formatting_max_time_ms
@@ -300,12 +307,22 @@ def format_tool_output(
         validation_enabled = True
         fallback_enabled = True
         allowed_tools = {
-            "test", "pytest", "run_tests",
-            "code_search", "semantic_code_search",
-            "git", "http", "https",
-            "database", "db", "sql",
-            "refactor", "refactoring",
-            "docker", "security", "security_scan",
+            "test",
+            "pytest",
+            "run_tests",
+            "code_search",
+            "semantic_code_search",
+            "git",
+            "http",
+            "https",
+            "database",
+            "db",
+            "sql",
+            "refactor",
+            "refactoring",
+            "docker",
+            "security",
+            "security_scan",
         }
 
     # Check if Rich formatting is enabled for this tool (feature flag + tool whitelist)
@@ -414,8 +431,7 @@ def format_tool_output(
     except Exception as e:
         elapsed_ms = (time.time() - start_time) * 1000
         logger.error(
-            f"Formatter error for {tool_name} after {elapsed_ms:.0f}ms: {e}",
-            exc_info=True
+            f"Formatter error for {tool_name} after {elapsed_ms:.0f}ms: {e}", exc_info=True
         )
 
         # Try fallback if enabled
@@ -425,7 +441,9 @@ def format_tool_output(
                 try:
                     return fallback.format(data, **kwargs)
                 except Exception as fallback_error:
-                    logger.error(f"Fallback formatter also failed for {tool_name}: {fallback_error}")
+                    logger.error(
+                        f"Fallback formatter also failed for {tool_name}: {fallback_error}"
+                    )
 
         # Final fallback: plain text
         return FormattedOutput(
@@ -468,4 +486,3 @@ def clear_format_cache() -> None:
     This is useful for testing or when you want to force re-formatting.
     """
     _format_cache.invalidate()
-

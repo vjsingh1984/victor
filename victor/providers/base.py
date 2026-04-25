@@ -833,39 +833,33 @@ class BaseProvider(ABC):
             "claude-3-5-sonnet-20241022": 200000,
             "claude-3-opus-20240229": 200000,
             "claude-3-haiku-20240307": 200000,
-
             # OpenAI
             "gpt-4o": 128000,
             "gpt-4o-mini": 128000,
             "gpt-4-turbo": 128000,
             "gpt-4": 8192,
             "gpt-3.5-turbo": 16385,
-
             # Google Gemini
             "gemini-2.0-flash-exp": 1000000,
             "gemini-1.5-pro": 280000,
             "gemini-1.5-flash": 280000,
             "gemini-pro": 280000,
-
             # DeepSeek
             "deepseek-coder": 128000,
             "deepseek-chat": 128000,
             "deepseek-coder-v2": 128000,
-
             # Meta Llama (via various providers)
             "llama-3.1-405b-instruct": 128000,
             "llama-3.1-70b-instruct": 128000,
             "llama-3.1-8b-instruct": 128000,
             "llama-3-1-405b-instruct": 128000,
             "llama-3-1-70b-instruct": 128000,
-
             # Qwen (via Ollama, vLLM, etc.)
             "qwen2.5-coder:7b": 32768,
             "qwen2.5-coder:14b": 32768,
             "qwen2.5-72b-instruct": 128000,
             "qwen2.5-7b-instruct": 128000,
             "qwen2.5-14b": 128000,
-
             # Edge models (small models for fast micro-decisions)
             "qwen3.5:2b": 8192,
             "qwen2.5:0.5b": 8192,
@@ -878,17 +872,14 @@ class BaseProvider(ABC):
             "gemma2:2b": 8192,
             "tinyllama:1.1b": 8192,
             "tinyllama:1.1b-chat": 8192,
-
             # CodeLlama
             "codellama:13b": 16384,
             "codellama:34b": 16384,
             "codellama:7b": 16384,
-
             # Mistral
             "mistral:7b": 32768,
             "mixtral:8x7b": 32768,
             "mixtral:8x22b": 65536,
-
             # Common Ollama models
             "phi:2.7b-chat": 128000,
             "gemma:7b": 8192,

@@ -18,19 +18,15 @@ class DockerFormatter(ToolFormatter):
     def validate_input(self, data: Dict) -> bool:
         """Validate Docker result has required fields."""
         return isinstance(data, dict) and (
-            "containers" in data or
-            "images" in data or
-            "volumes" in data or
-            "services" in data or
-            "output" in data
+            "containers" in data
+            or "images" in data
+            or "volumes" in data
+            or "services" in data
+            or "output" in data
         )
 
     def format(
-        self,
-        data: Dict[str, Any],
-        operation: str = "ps",
-        max_items: int = 20,
-        **kwargs
+        self, data: Dict[str, Any], operation: str = "ps", max_items: int = 20, **kwargs
     ) -> FormattedOutput:
         """Format Docker operations output with Rich markup.
 
@@ -71,7 +67,9 @@ class DockerFormatter(ToolFormatter):
             lines.append("[dim]No containers[/]")
         else:
             running_count = sum(1 for c in containers if c.get("state") == "running")
-            lines.append(f"[bold]Containers:[/] [dim]{running_count} running, {len(containers)} total[/]")
+            lines.append(
+                f"[bold]Containers:[/] [dim]{running_count} running, {len(containers)} total[/]"
+            )
             lines.append("")
 
             for container in containers[:max_items]:

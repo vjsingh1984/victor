@@ -13,5 +13,9 @@ def test_tool_priority_uses_canonical_core_names(tmp_path):
         store._determine_priority(MessageRole.TOOL, "list_directory")  # noqa: SLF001
         == MessagePriority.HIGH
     )
-    assert store._determine_priority(MessageRole.TOOL, "read") == MessagePriority.HIGH  # noqa: SLF001
-    assert store._determine_priority(MessageRole.TOOL, "shell") == MessagePriority.MEDIUM  # noqa: SLF001
+    assert (
+        store._determine_priority(MessageRole.TOOL, "read") == MessagePriority.HIGH
+    )  # noqa: SLF001
+    assert (
+        store._determine_priority(MessageRole.TOOL, "shell") == MessagePriority.MEDIUM
+    )  # noqa: SLF001

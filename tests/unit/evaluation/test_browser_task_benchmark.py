@@ -89,9 +89,7 @@ class TestBrowserTaskBenchmarkRunner:
 
         runner = BrowserTaskBenchmarkRunner(BenchmarkType.GUIDE, dataset)
         task = (
-            await runner.load_tasks(
-                EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test")
-            )
+            await runner.load_tasks(EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"))
         )[0]
 
         output = json.dumps(

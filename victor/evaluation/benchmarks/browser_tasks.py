@@ -86,7 +86,9 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
         matched_actions = [action for action in required_actions if action in action_names]
         missing_actions = [action for action in required_actions if action not in matched_actions]
         forbidden_hits = [action for action in forbidden_actions if action in action_names]
-        matched_answer_phrases = self._match_text_requirements(expected_answer_contains, final_answer)
+        matched_answer_phrases = self._match_text_requirements(
+            expected_answer_contains, final_answer
+        )
         missing_answer_phrases = [
             phrase for phrase in expected_answer_contains if phrase not in matched_answer_phrases
         ]
@@ -185,11 +187,15 @@ class BrowserTaskBenchmarkRunner(BaseBenchmarkRunner):
         if not prompt:
             raise ValueError(f"Task #{index} is missing a prompt")
 
-        task_id = str(merged.get("task_id") or merged.get("id") or f"{self._benchmark_type.value}-{index}")
+        task_id = str(
+            merged.get("task_id") or merged.get("id") or f"{self._benchmark_type.value}-{index}"
+        )
         self._task_specs[task_id] = {
             "required_actions": self._normalize_list(merged.get("required_actions")),
             "forbidden_actions": self._normalize_list(merged.get("forbidden_actions")),
-            "expected_answer_contains": self._normalize_list(merged.get("expected_answer_contains")),
+            "expected_answer_contains": self._normalize_list(
+                merged.get("expected_answer_contains")
+            ),
         }
 
         return BenchmarkTask(

@@ -597,7 +597,9 @@ class ProviderPayloadLimiter:
                     ref_id = f"tool_result_{len(seen_tool_payloads) + 1}"
                     seen_tool_payloads[new_content] = ref_id
                 else:
-                    preview = new_content[: self.dictionary_preview_chars].replace("\n", " ").strip()
+                    preview = (
+                        new_content[: self.dictionary_preview_chars].replace("\n", " ").strip()
+                    )
                     new_content = (
                         f"[dictionary-ref:{ref_id}] Repeated tool result omitted; "
                         f"identical content already appeared earlier. Preview: {preview}"
@@ -643,9 +645,7 @@ class ProviderPayloadLimiter:
             run_length = next_index - index
             if run_length >= self.dictionary_min_repeated_lines and line.strip():
                 rewritten.append(line)
-                rewritten.append(
-                    f"[repeated x{run_length - 1} additional identical lines omitted]"
-                )
+                rewritten.append(f"[repeated x{run_length - 1} additional identical lines omitted]")
                 changes += 1
             else:
                 rewritten.extend(lines[index:next_index])

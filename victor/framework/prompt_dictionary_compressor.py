@@ -98,7 +98,7 @@ def compress_prompt_blocks(
         key=lambda block: ((counts[block] - 1) * len(block), counts[block], len(block)),
         reverse=True,
     )
-    selected = candidates[: max_entries]
+    selected = candidates[:max_entries]
 
     dictionary: Dict[str, str] = {}
     alias_by_block: Dict[str, str] = {}

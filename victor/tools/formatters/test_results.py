@@ -20,12 +20,7 @@ class TestResultsFormatter(ToolFormatter):
         """Validate test result has required fields."""
         return isinstance(data, dict) and "summary" in data
 
-    def format(
-        self,
-        data: Dict[str, Any],
-        max_failures: int = 5,
-        **kwargs
-    ) -> FormattedOutput:
+    def format(self, data: Dict[str, Any], max_failures: int = 5, **kwargs) -> FormattedOutput:
         """Format test results with color-coded status.
 
         Args:
@@ -96,7 +91,9 @@ class TestResultsFormatter(ToolFormatter):
 
             # Add indicator if there are more failures
             if len(failures) > max_failures:
-                lines.append(f"  [dim]... and {len(failures) - max_failures} more failure{'s' if len(failures) - max_failures > 1 else ''}[/]")
+                lines.append(
+                    f"  [dim]... and {len(failures) - max_failures} more failure{'s' if len(failures) - max_failures > 1 else ''}[/]"
+                )
 
         content = "\n".join(lines)
 

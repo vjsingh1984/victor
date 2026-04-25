@@ -25,4 +25,3 @@ CORE_TOOL_ALIASES = {
 def canonicalize_core_tool_name(name: str) -> str:
     """Resolve known core-tool aliases to Victor's canonical internal names."""
     return CORE_TOOL_ALIASES.get(name, name)
-

@@ -370,7 +370,5 @@ class MessageHistory:
             manager._messages.append(Message(**msg_data))
         preview_messages = data.get("preview_messages", [])
         if isinstance(preview_messages, list):
-            manager._preview_messages = [
-                msg for msg in preview_messages if isinstance(msg, dict)
-            ]
+            manager._preview_messages = [msg for msg in preview_messages if isinstance(msg, dict)]
         return manager

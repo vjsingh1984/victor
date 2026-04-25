@@ -20,11 +20,7 @@ class SearchResultsFormatter(ToolFormatter):
         return isinstance(data, dict) and ("results" in data or "matches" in data)
 
     def format(
-        self,
-        data: Dict[str, Any],
-        max_files: int = 10,
-        max_matches_per_file: int = 3,
-        **kwargs
+        self, data: Dict[str, Any], max_files: int = 10, max_matches_per_file: int = 3, **kwargs
     ) -> FormattedOutput:
         """Format search results with Rich markup.
 
@@ -63,7 +59,9 @@ class SearchResultsFormatter(ToolFormatter):
         # Header with match count and file count
         file_count = len(by_file)
         match_count = len(results)
-        lines.append(f"[bold cyan]{match_count} match{'es' if match_count != 1 else ''}[/] [dim]in {file_count} file{'s' if file_count != 1 else ''}[/]")
+        lines.append(
+            f"[bold cyan]{match_count} match{'es' if match_count != 1 else ''}[/] [dim]in {file_count} file{'s' if file_count != 1 else ''}[/]"
+        )
         lines.append("")  # Blank line
 
         # Display results grouped by file (max max_files files for preview)
@@ -88,7 +86,9 @@ class SearchResultsFormatter(ToolFormatter):
 
             # Indicator if more matches in this file
             if len(matches) > max_matches_per_file:
-                lines.append(f"  [dim]... and {len(matches) - max_matches_per_file} more match{'es' if len(matches) - max_matches_per_file > 1 else ''} in this file[/]")
+                lines.append(
+                    f"  [dim]... and {len(matches) - max_matches_per_file} more match{'es' if len(matches) - max_matches_per_file > 1 else ''} in this file[/]"
+                )
 
             # Blank line between files (except after last one)
             if i < min(max_files, len(by_file)) - 1:
@@ -96,7 +96,9 @@ class SearchResultsFormatter(ToolFormatter):
 
         # Indicator if more files
         if len(by_file) > max_files:
-            lines.append(f"[dim]... and {len(by_file) - max_files} more file{'s' if len(by_file) - max_files > 1 else ''}[/]")
+            lines.append(
+                f"[dim]... and {len(by_file) - max_files} more file{'s' if len(by_file) - max_files > 1 else ''}[/]"
+            )
 
         content = "\n".join(lines)
 

@@ -68,47 +68,99 @@ class TestBaseProvider:
 @pytest.mark.parametrize(
     "module_name,class_name,known_model,known_cw,unknown_default",
     [
-        ("victor.providers.anthropic_provider", "AnthropicProvider",
-         "claude-sonnet-4-5", 200_000, 200_000),
-        ("victor.providers.openai_provider", "OpenAIProvider",
-         "gpt-4o-2024-11-20", 128_000, 128_000),
-        ("victor.providers.google_provider", "GoogleProvider",
-         "gemini-1.5-pro-002", 2_000_000, 1_000_000),
-        ("victor.providers.bedrock_provider", "BedrockProvider",
-         "claude-3-opus-bedrock", 200_000, 200_000),
-        ("victor.providers.groq_provider", "GroqProvider",
-         "llama-3.1-70b-versatile", 128_000, 32_768),
-        ("victor.providers.deepseek_provider", "DeepSeekProvider",
-         "deepseek-chat", 64_000, 64_000),
-        ("victor.providers.ollama_provider", "OllamaProvider",
-         "qwen2.5-coder:7b", 32_768, 8_192),
-        ("victor.providers.lmstudio_provider", "LMStudioProvider",
-         "llama3.1:70b-fancy-quant", 128_000, 8_192),
-        ("victor.providers.mlx_provider", "MLXProvider",
-         "qwen2.5:32b", 32_768, 32_768),
-        ("victor.providers.llamacpp_provider", "LlamaCppProvider",
-         "phi3-mini.gguf", 4_096, 8_192),
-        ("victor.providers.vllm_provider", "VLLMProvider",
-         "llama3.1:8b-vllm", 128_000, 32_768),
-        ("victor.providers.together_provider", "TogetherProvider",
-         "meta-llama/Llama-3.3-70B-Instruct-Turbo", 128_000, 32_768),
-        ("victor.providers.openrouter_provider", "OpenRouterProvider",
-         "any/model", 128_000, 128_000),  # OpenRouter returns default for all
-        ("victor.providers.xai_provider", "XAIProvider",
-         "grok-3", 131_072, 131_072),
-        ("victor.providers.cerebras_provider", "CerebrasProvider",
-         "llama3.1-70b", 128_000, 128_000),
-        ("victor.providers.fireworks_provider", "FireworksProvider",
-         "accounts/fireworks/models/llama-v3p1-70b-instruct", 128_000, 32_768),
-        ("victor.providers.azure_openai_provider", "AzureOpenAIProvider",
-         "gpt-4o", 128_000, 128_000),
-        ("victor.providers.vertex_provider", "VertexAIProvider",
-         "gemini-2.0-flash-001", 1_000_000, 1_000_000),
+        (
+            "victor.providers.anthropic_provider",
+            "AnthropicProvider",
+            "claude-sonnet-4-5",
+            200_000,
+            200_000,
+        ),
+        (
+            "victor.providers.openai_provider",
+            "OpenAIProvider",
+            "gpt-4o-2024-11-20",
+            128_000,
+            128_000,
+        ),
+        (
+            "victor.providers.google_provider",
+            "GoogleProvider",
+            "gemini-1.5-pro-002",
+            2_000_000,
+            1_000_000,
+        ),
+        (
+            "victor.providers.bedrock_provider",
+            "BedrockProvider",
+            "claude-3-opus-bedrock",
+            200_000,
+            200_000,
+        ),
+        (
+            "victor.providers.groq_provider",
+            "GroqProvider",
+            "llama-3.1-70b-versatile",
+            128_000,
+            32_768,
+        ),
+        ("victor.providers.deepseek_provider", "DeepSeekProvider", "deepseek-chat", 64_000, 64_000),
+        ("victor.providers.ollama_provider", "OllamaProvider", "qwen2.5-coder:7b", 32_768, 8_192),
+        (
+            "victor.providers.lmstudio_provider",
+            "LMStudioProvider",
+            "llama3.1:70b-fancy-quant",
+            128_000,
+            8_192,
+        ),
+        ("victor.providers.mlx_provider", "MLXProvider", "qwen2.5:32b", 32_768, 32_768),
+        ("victor.providers.llamacpp_provider", "LlamaCppProvider", "phi3-mini.gguf", 4_096, 8_192),
+        ("victor.providers.vllm_provider", "VLLMProvider", "llama3.1:8b-vllm", 128_000, 32_768),
+        (
+            "victor.providers.together_provider",
+            "TogetherProvider",
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            128_000,
+            32_768,
+        ),
+        (
+            "victor.providers.openrouter_provider",
+            "OpenRouterProvider",
+            "any/model",
+            128_000,
+            128_000,
+        ),  # OpenRouter returns default for all
+        ("victor.providers.xai_provider", "XAIProvider", "grok-3", 131_072, 131_072),
+        (
+            "victor.providers.cerebras_provider",
+            "CerebrasProvider",
+            "llama3.1-70b",
+            128_000,
+            128_000,
+        ),
+        (
+            "victor.providers.fireworks_provider",
+            "FireworksProvider",
+            "accounts/fireworks/models/llama-v3p1-70b-instruct",
+            128_000,
+            32_768,
+        ),
+        (
+            "victor.providers.azure_openai_provider",
+            "AzureOpenAIProvider",
+            "gpt-4o",
+            128_000,
+            128_000,
+        ),
+        (
+            "victor.providers.vertex_provider",
+            "VertexAIProvider",
+            "gemini-2.0-flash-001",
+            1_000_000,
+            1_000_000,
+        ),
     ],
 )
-def test_provider_context_window(
-    module_name, class_name, known_model, known_cw, unknown_default
-):
+def test_provider_context_window(module_name, class_name, known_model, known_cw, unknown_default):
     """Each provider returns a positive int for known and unknown models."""
     import importlib
 
@@ -119,9 +171,9 @@ def test_provider_context_window(
     instance._current_model = None
 
     # Known model returns documented context window
-    assert cls.context_window(instance, known_model) == known_cw, (
-        f"{class_name}.context_window({known_model!r}) should be {known_cw}"
-    )
+    assert (
+        cls.context_window(instance, known_model) == known_cw
+    ), f"{class_name}.context_window({known_model!r}) should be {known_cw}"
 
     # Unknown model returns provider default
     assert cls.context_window(instance, "totally-unknown-model-xyz-9999") == unknown_default

@@ -1077,7 +1077,9 @@ class ConversationController:
                 for msg, score in relevant_msgs:
                     # Format as context reminder
                     role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
-                    context = f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
+                    context = (
+                        f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
+                    )
                     relevant_context.append(context)
 
             # Get relevant summaries

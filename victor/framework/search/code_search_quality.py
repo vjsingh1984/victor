@@ -128,7 +128,9 @@ def enrich_code_search_results(
             snippet_enriched_hits += 1
             metadata_dict.setdefault("snippet_source", "line_window")
         elif not snippet:
-            fallback_snippet = _snippet_from_text(result.get("content"), quality_config.max_snippet_chars)
+            fallback_snippet = _snippet_from_text(
+                result.get("content"), quality_config.max_snippet_chars
+            )
             if fallback_snippet:
                 result["snippet"] = fallback_snippet
 
@@ -178,7 +180,9 @@ def rerank_code_search_results(
         total_relevance += base_score
         utility_score = base_score
 
-        file_key = _normalize_space(_as_non_empty_str(result.get("file_path", result.get("path"))) or "")
+        file_key = _normalize_space(
+            _as_non_empty_str(result.get("file_path", result.get("path"))) or ""
+        )
         snippet_key = _normalize_snippet_key(result)
 
         if file_key:
@@ -341,7 +345,9 @@ def _snippet_from_text(content: Any, max_chars: int) -> str:
 
 
 def _normalize_snippet_key(result: Dict[str, Any]) -> str:
-    text = _as_non_empty_str(result.get("snippet")) or _snippet_from_text(result.get("content"), 160)
+    text = _as_non_empty_str(result.get("snippet")) or _snippet_from_text(
+        result.get("content"), 160
+    )
     if not text:
         return ""
     return _normalize_space(text)[:160]
@@ -367,9 +373,7 @@ def _extract_query_signals(query: str) -> List[str]:
         if len(normalized) < 3 or normalized in _QUERY_STOPWORDS:
             continue
         is_high_signal = (
-            any(ch in normalized for ch in "._/-:")
-            or "_" in normalized
-            or token[:1].isupper()
+            any(ch in normalized for ch in "._/-:") or "_" in normalized or token[:1].isupper()
         )
         if not is_high_signal or normalized in seen:
             continue

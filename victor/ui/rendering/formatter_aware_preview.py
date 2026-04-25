@@ -111,7 +111,8 @@ class _FormatterAwarePreviewStrategy(_ToolPreviewStrategy):
             first_line = lines[0]
             # Remove Rich markup tags for summary
             import re
-            clean_line = re.sub(r'\[/?[^\]]+\]', '', first_line)
+
+            clean_line = re.sub(r"\[/?[^\]]+\]", "", first_line)
             return clean_line.strip()[:100]
         return "Formatted output"
 

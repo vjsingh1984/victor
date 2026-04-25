@@ -801,7 +801,9 @@ class UnifiedTaskClassifier:
                     and decision.source == "llm"
                     and hasattr(decision.result, "task_type")
                 ):
-                    llm_task_type = getattr(decision.result.task_type, "value", decision.result.task_type)
+                    llm_task_type = getattr(
+                        decision.result.task_type, "value", decision.result.task_type
+                    )
                     type_map = {
                         "analysis": ClassifierTaskType.ANALYSIS,
                         "action": ClassifierTaskType.ACTION,

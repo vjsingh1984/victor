@@ -151,7 +151,9 @@ class TestToolOutputFormatter:
 
     def test_format_generic_tool(self):
         """Test formatting generic tool output with xml style."""
-        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
+        formatter = ToolOutputFormatter(
+            config=ToolOutputFormatterConfig(default_format_style="xml")
+        )
         result = formatter.format_tool_output(
             tool_name="test_tool",
             args={"param": "value"},
@@ -163,7 +165,9 @@ class TestToolOutputFormatter:
 
     def test_format_read_file(self):
         """Test formatting read_file tool output with xml strategy."""
-        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
+        formatter = ToolOutputFormatter(
+            config=ToolOutputFormatterConfig(default_format_style="xml")
+        )
         result = formatter.format_tool_output(
             tool_name="read_file",
             args={"path": "/path/to/file.py"},
@@ -229,7 +233,9 @@ def helper_function():
 
     def test_format_list_directory(self):
         """Test formatting list_directory tool output with xml strategy."""
-        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
+        formatter = ToolOutputFormatter(
+            config=ToolOutputFormatterConfig(default_format_style="xml")
+        )
         result = formatter.format_tool_output(
             tool_name="list_directory",
             args={"path": "/home/user"},
@@ -242,7 +248,9 @@ def helper_function():
 
     def test_format_code_search(self):
         """Test formatting code_search tool output with xml strategy."""
-        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
+        formatter = ToolOutputFormatter(
+            config=ToolOutputFormatterConfig(default_format_style="xml")
+        )
         result = formatter.format_tool_output(
             tool_name="code_search",
             args={"query": "def main"},
@@ -254,7 +262,9 @@ def helper_function():
 
     def test_format_code_search_includes_follow_up_suggestions(self):
         """code_search structured output is serialized inside the xml tag."""
-        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
+        formatter = ToolOutputFormatter(
+            config=ToolOutputFormatterConfig(default_format_style="xml")
+        )
         result = formatter.format_tool_output(
             tool_name="code_search",
             args={"query": "entry point for request processing"},
@@ -279,7 +289,9 @@ def helper_function():
 
     def test_format_semantic_code_search(self):
         """Test formatting semantic_code_search tool output with xml style."""
-        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
+        formatter = ToolOutputFormatter(
+            config=ToolOutputFormatterConfig(default_format_style="xml")
+        )
         result = formatter.format_tool_output(
             tool_name="semantic_code_search",
             args={"query": "find authentication handler"},
@@ -290,7 +302,9 @@ def helper_function():
 
     def test_format_execute_bash(self):
         """Test formatting execute_bash tool output with xml strategy."""
-        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
+        formatter = ToolOutputFormatter(
+            config=ToolOutputFormatterConfig(default_format_style="xml")
+        )
         result = formatter.format_tool_output(
             tool_name="execute_bash",
             args={"command": "ls -la"},

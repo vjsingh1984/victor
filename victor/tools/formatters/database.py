@@ -19,11 +19,7 @@ class DatabaseFormatter(ToolFormatter):
         return isinstance(data, dict) and ("rows" in data or "error" in data or "success" in data)
 
     def format(
-        self,
-        data: Dict[str, Any],
-        max_rows: int = 50,
-        max_columns: int = 10,
-        **kwargs
+        self, data: Dict[str, Any], max_rows: int = 50, max_columns: int = 10, **kwargs
     ) -> FormattedOutput:
         """Format database query results with Rich markup.
 

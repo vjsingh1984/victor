@@ -75,7 +75,7 @@ class ToolFormatter(ABC):
         """
         return True  # Default: accept all data
 
-    def get_fallback(self) -> Optional['ToolFormatter']:
+    def get_fallback(self) -> Optional["ToolFormatter"]:
         """Return fallback formatter if this one fails.
 
         Returns:

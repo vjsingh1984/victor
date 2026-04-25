@@ -102,9 +102,9 @@ class SectionMeasurement:
 
     def record(self, token_cost: int) -> None:
         """Update the rolling average with a newly observed token cost."""
-        self.average_token_cost = (
-            (self.average_token_cost * self.sample_count) + token_cost
-        ) / (self.sample_count + 1)
+        self.average_token_cost = ((self.average_token_cost * self.sample_count) + token_cost) / (
+            self.sample_count + 1
+        )
         self.sample_count += 1
         self.last_measured = time.time()
 

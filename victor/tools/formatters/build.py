@@ -188,4 +188,5 @@ class BuildFormatter(ToolFormatter):
             GenericFormatter instance
         """
         from .generic import GenericFormatter
+
         return GenericFormatter()

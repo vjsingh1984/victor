@@ -260,9 +260,9 @@ class TestPromptSectionBudgetAllocator:
         measurements = allocator.get_section_measurements()
 
         assert measurements[PromptSection.TOOL_GUIDANCE.value]["sample_count"] == 2
-        assert measurements[PromptSection.TOOL_GUIDANCE.value]["average_token_cost"] == pytest.approx(
-            150.0
-        )
+        assert measurements[PromptSection.TOOL_GUIDANCE.value][
+            "average_token_cost"
+        ] == pytest.approx(150.0)
         assert measurements[PromptSection.GROUNDING_RULES.value]["sample_count"] == 1
         assert measurements[PromptSection.GROUNDING_RULES.value]["average_token_cost"] == 80.0
 

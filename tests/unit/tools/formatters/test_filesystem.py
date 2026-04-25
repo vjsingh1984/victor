@@ -50,10 +50,7 @@ class TestFileSystemFormatter:
     def test_format_directory_listing(self):
         """Test formatting directory listing."""
         formatter = FileSystemFormatter()
-        data = {
-            "directories": ["src", "tests"],
-            "files": ["main.py", "config.yaml"]
-        }
+        data = {"directories": ["src", "tests"], "files": ["main.py", "config.yaml"]}
 
         result = formatter.format(data)
 
@@ -67,10 +64,7 @@ class TestFileSystemFormatter:
     def test_format_file_content(self):
         """Test formatting file content."""
         formatter = FileSystemFormatter()
-        data = {
-            "path": "/path/to/file.py",
-            "content": "print('hello world')"
-        }
+        data = {"path": "/path/to/file.py", "content": "print('hello world')"}
 
         result = formatter.format(data)
 
@@ -82,10 +76,7 @@ class TestFileSystemFormatter:
     def test_format_search_results(self):
         """Test formatting search/find results."""
         formatter = FileSystemFormatter()
-        data = {
-            "matches": ["/src/file1.py", "/tests/file2.py"],
-            "path": "."
-        }
+        data = {"matches": ["/src/file1.py", "/tests/file2.py"], "path": "."}
 
         result = formatter.format(data)
 
@@ -97,9 +88,7 @@ class TestFileSystemFormatter:
     def test_format_with_max_items_limit(self):
         """Test formatting with max_items limit."""
         formatter = FileSystemFormatter()
-        data = {
-            "files": [f"file{i}.py" for i in range(100)]
-        }
+        data = {"files": [f"file{i}.py" for i in range(100)]}
 
         result = formatter.format(data, max_items=10)
 
@@ -110,10 +99,7 @@ class TestFileSystemFormatter:
         """Test formatting with max_lines limit for content."""
         formatter = FileSystemFormatter()
         long_content = "\n".join([f"line {i}" for i in range(200)])
-        data = {
-            "path": "/path/to/file.txt",
-            "content": long_content
-        }
+        data = {"path": "/path/to/file.txt", "content": long_content}
 
         result = formatter.format(data, max_lines=50)
 

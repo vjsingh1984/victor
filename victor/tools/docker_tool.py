@@ -194,9 +194,12 @@ async def docker(
             "success": True,
             "result": {"containers": containers, "count": len(containers)},
             "message": f"Found {len(containers)} container(s)",
-            "formatted_output": format_docker_output({
-                "containers": containers,
-            }, operation="ps").content,
+            "formatted_output": format_docker_output(
+                {
+                    "containers": containers,
+                },
+                operation="ps",
+            ).content,
             "contains_markup": True,
         }
 

@@ -292,12 +292,14 @@ def process_tool_results_with_context(
             )
 
         if semantic_success:
-            preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
-                tool_name=tool_name,
-                arguments=normalized_args,
-                output=output,
-                task_type=ctx.task_type,
-                formatter=ctx.format_tool_output,
+            preview_output, llm_output, full_output, was_pruned, pruning_info = (
+                format_and_prune_tool_output(
+                    tool_name=tool_name,
+                    arguments=normalized_args,
+                    output=output,
+                    task_type=ctx.task_type,
+                    formatter=ctx.format_tool_output,
+                )
             )
             if ctx.add_message:
                 # CRITICAL: Send FULL output to LLM for accuracy
@@ -1319,6 +1321,7 @@ class ToolService:
         Returns:
             Tuple of (is_valid, error_message)
         """
+
         def _normalize_tools(tool_names: set[str]) -> set[str]:
             return {canonicalize_core_tool_name(name) for name in tool_names}
 

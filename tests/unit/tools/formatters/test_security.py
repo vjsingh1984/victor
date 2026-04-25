@@ -174,7 +174,7 @@ class TestSecurityFormatter:
                 {
                     "severity": "high",
                     "title": "High issue",
-                }
+                },
             ],
             "summary": {
                 "critical": 1,
@@ -226,10 +226,7 @@ class TestSecurityFormatter:
         """Test max_findings parameter limits output."""
         formatter = SecurityFormatter()
         data = {
-            "vulnerabilities": [
-                {"severity": "low", "title": f"Issue {i}"}
-                for i in range(25)
-            ],
+            "vulnerabilities": [{"severity": "low", "title": f"Issue {i}"} for i in range(25)],
             "summary": {
                 "critical": 0,
                 "high": 0,
@@ -304,15 +301,11 @@ class TestSecurityFormatter:
         formatter = SecurityFormatter()
 
         # Test 'findings' key
-        result1 = formatter.format({
-            "findings": [{"severity": "low", "title": "Test"}]
-        })
+        result1 = formatter.format({"findings": [{"severity": "low", "title": "Test"}]})
         assert result1.contains_markup is True
 
         # Test 'issues' key
-        result2 = formatter.format({
-            "issues": [{"severity": "low", "title": "Test"}]
-        })
+        result2 = formatter.format({"issues": [{"severity": "low", "title": "Test"}]})
         assert result2.contains_markup is True
 
     def test_format_missing_optional_fields(self):

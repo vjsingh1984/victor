@@ -212,8 +212,8 @@ class TestProviderSpecificStrategies:
 
         # Should session-lock all tools
         should_session_lock = (
-            has_cache_discount or  # Cache discount makes locking beneficial
-            context_window >= 128000  # Large context makes locking feasible
+            has_cache_discount  # Cache discount makes locking beneficial
+            or context_window >= 128000  # Large context makes locking feasible
         )
 
         assert should_session_lock is True

@@ -108,9 +108,11 @@ class NetworkFormatter(ToolFormatter):
             lines.append(f"  Loss: [red]{packet_loss:.1f}%[/]")
 
             if "min_latency_ms" in data:
-                lines.append(f"  Latency: min [cyan]{data['min_latency_ms']:.1f}ms[/], "
-                          f"avg [cyan]{data['avg_latency_ms']:.1f}ms[/], "
-                          f"max [cyan]{data['max_latency_ms']:.1f}ms[/]")
+                lines.append(
+                    f"  Latency: min [cyan]{data['min_latency_ms']:.1f}ms[/], "
+                    f"avg [cyan]{data['avg_latency_ms']:.1f}ms[/], "
+                    f"max [cyan]{data['max_latency_ms']:.1f}ms[/]"
+                )
 
         content = "\n".join(lines)
         summary = f"{host}: {latency:.1f}ms, {packet_loss:.1f}% loss"
@@ -278,4 +280,5 @@ class NetworkFormatter(ToolFormatter):
             GenericFormatter instance
         """
         from .generic import GenericFormatter
+
         return GenericFormatter()

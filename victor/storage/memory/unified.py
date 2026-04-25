@@ -939,7 +939,9 @@ class UnifiedMemoryCoordinator:
         for hint in transfer_hints:
             transfer_scope = str(hint.metadata.get("transfer_scope") or "")
             for result_id in hint.preferred_result_ids:
-                result_boosts[result_id] = max(result_boosts.get(result_id, 0.0), self._transfer_boost)
+                result_boosts[result_id] = max(
+                    result_boosts.get(result_id, 0.0), self._transfer_boost
+                )
                 query_map.setdefault(result_id, []).append(hint.matched_query)
                 if transfer_scope and result_id not in scope_map:
                     scope_map[result_id] = transfer_scope
@@ -1098,7 +1100,11 @@ class UnifiedMemoryCoordinator:
                 return "cross_project_explicit"
             return None
 
-        if current_project_path and trace_project_path and current_project_path == trace_project_path:
+        if (
+            current_project_path
+            and trace_project_path
+            and current_project_path == trace_project_path
+        ):
             return "same_project" if cross_session else "same_session"
 
         if cross_session:

@@ -99,7 +99,8 @@ def analyze_tool_usage_from_db(days: int = 30) -> List[Tuple[str, int, int]]:
                 cutoff = (datetime.now() - timedelta(days=days)).isoformat()
 
                 # Query tool usage from messages table
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT
                         tool_name,
                         COUNT(*) as calls,
@@ -109,7 +110,9 @@ def analyze_tool_usage_from_db(days: int = 30) -> List[Tuple[str, int, int]]:
                       AND timestamp > ?
                     GROUP BY tool_name
                     ORDER BY calls DESC
-                """, (cutoff,))
+                """,
+                    (cutoff,),
+                )
 
                 results = cursor.fetchall()
 
@@ -125,7 +128,7 @@ def analyze_tool_usage_from_db(days: int = 30) -> List[Tuple[str, int, int]]:
                         all_results[tool_name] = (
                             tool_name,
                             existing[1] + calls,  # Sum calls
-                            max(existing[2], sessions)  # Max sessions (approximate)
+                            max(existing[2], sessions),  # Max sessions (approximate)
                         )
                     else:
                         all_results[tool_name] = (tool_name, calls, sessions)
@@ -170,7 +173,7 @@ def analyze_jsonl_logs(days: int = 30) -> List[Tuple[str, int, int]]:
             continue
 
         try:
-            with open(jsonl_file, 'r') as f:
+            with open(jsonl_file, "r") as f:
                 for line in f:
                     try:
                         entry = json.loads(line)
@@ -207,8 +210,7 @@ def analyze_jsonl_logs(days: int = 30) -> List[Tuple[str, int, int]]:
 
 
 def merge_usage_data(
-    db_data: List[Tuple[str, int, int]],
-    jsonl_data: List[Tuple[str, int, int]]
+    db_data: List[Tuple[str, int, int]], jsonl_data: List[Tuple[str, int, int]]
 ) -> List[Tuple[str, int, int, float]]:
     """
     Merge usage data from multiple sources.
@@ -237,7 +239,9 @@ def merge_usage_data(
             merged[tool_name]["sessions"].update(range(sessions))  # Approximate
 
     # Calculate frequency
-    total_sessions = max((len(merged.get(tool, {}).get("sessions", set())) for tool in merged), default=1) or 1
+    total_sessions = (
+        max((len(merged.get(tool, {}).get("sessions", set())) for tool in merged), default=1) or 1
+    )
 
     result = []
     for tool_name, data in merged.items():
@@ -252,9 +256,7 @@ def merge_usage_data(
     return result
 
 
-def assign_tiers(
-    usage_data: List[Tuple[str, int, int, float]]
-) -> Dict[str, str]:
+def assign_tiers(usage_data: List[Tuple[str, int, int, float]]) -> Dict[str, str]:
     """
     Assign schema tiers based on usage frequency.
 
@@ -279,10 +281,16 @@ def assign_tiers(
 
     if frequencies:
         # Top decile (>50% frequency or top 10% by rank)
-        high_freq_threshold = max(0.50, frequencies[int(len(frequencies) * 0.1)] if len(frequencies) >= 10 else frequencies[-1])
+        high_freq_threshold = max(
+            0.50,
+            frequencies[int(len(frequencies) * 0.1)] if len(frequencies) >= 10 else frequencies[-1],
+        )
 
         # Top quartile (>20% frequency or top 25% by rank)
-        med_freq_threshold = max(0.20, frequencies[int(len(frequencies) * 0.25)] if len(frequencies) >= 4 else frequencies[-1])
+        med_freq_threshold = max(
+            0.20,
+            frequencies[int(len(frequencies) * 0.25)] if len(frequencies) >= 4 else frequencies[-1],
+        )
 
     for tool_name, calls, sessions, frequency in usage_data:
         if frequency >= high_freq_threshold or frequency >= 0.50:
@@ -299,7 +307,7 @@ def generate_tiers_yaml(
     usage_data: List[Tuple[str, int, int, float]],
     tiers: Dict[str, str],
     days: int,
-    output_path: Path = None
+    output_path: Path = None,
 ) -> str:
     """
     Generate tool_tiers.yaml with provenance metadata.
@@ -351,7 +359,7 @@ def generate_tiers_yaml(
             "calls_last_30d": calls,
             "sessions_last_30d": sessions,
             "frequency": round(frequency, 3),
-            "tier": tier
+            "tier": tier,
         }
 
         if tier == "FULL":
@@ -364,10 +372,7 @@ def generate_tiers_yaml(
     yaml_content["tool_tiers"]["STUB"] = "*"  # Wildcard for all other tools
 
     # Add detailed breakdown
-    yaml_content["tools"] = {
-        "full": full_tools,
-        "compact": compact_tools
-    }
+    yaml_content["tools"] = {"full": full_tools, "compact": compact_tools}
 
     yaml_str = safe_dump(yaml_content, default_flow_style=False)
 
@@ -390,7 +395,7 @@ def print_summary(usage_data: List[Tuple[str, int, int, float]], tiers: Dict[str
 
     print(f"\n{'=' * 80}")
     print("TOOL USAGE ANALYSIS")
-    print('=' * 80)
+    print("=" * 80)
 
     print(f"\nTotal tools analyzed: {len(usage_data)}")
     print(f"Total tool calls: {sum(calls for _, calls, _, _ in usage_data)}")
@@ -408,10 +413,10 @@ def print_summary(usage_data: List[Tuple[str, int, int, float]], tiers: Dict[str
 
     print(f"\n{'=' * 80}")
     print("TOP 20 TOOLS BY USAGE")
-    print('=' * 80)
+    print("=" * 80)
 
     print(f"\n{'Tool':<30} {'Calls':>10} {'Sessions':>10} {'Freq':>10} {'Tier':>10}")
-    print('-' * 80)
+    print("-" * 80)
 
     for tool_name, calls, sessions, frequency in usage_data[:20]:
         tier = tiers.get(tool_name, "STUB")
@@ -425,21 +430,16 @@ def main():
         description="Analyze tool usage and generate data-driven tier assignments"
     )
     parser.add_argument(
-        "--days",
-        type=int,
-        default=30,
-        help="Number of days to analyze (default: 30)"
+        "--days", type=int, default=30, help="Number of days to analyze (default: 30)"
     )
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help="Output YAML file path (default: victor/config/tool_tiers.yaml)"
+        help="Output YAML file path (default: victor/config/tool_tiers.yaml)",
     )
     parser.add_argument(
-        "--print-only",
-        action="store_true",
-        help="Print summary only, don't generate YAML"
+        "--print-only", action="store_true", help="Print summary only, don't generate YAML"
     )
 
     args = parser.parse_args()

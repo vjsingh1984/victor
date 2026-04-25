@@ -668,9 +668,7 @@ class TestEnhancedCompletionEvaluator:
 
         perception = MockPerception(
             confidence=0.9,
-            requirements=[
-                Requirement(type=RequirementType.FUNCTIONAL, description="Write patch")
-            ],
+            requirements=[Requirement(type=RequirementType.FUNCTIONAL, description="Write patch")],
         )
         action_result = MockTurnResult(
             response="Applied the patch and updated tests.",

@@ -424,8 +424,7 @@ class ProfileConfig(BaseSettings):
 
     # Tool broadcasting optimization
     tool_strategy_v2_enabled: bool = Field(
-        default=False,
-        description="Enable context-window-aware, economy-first tool strategy (v2)"
+        default=False, description="Enable context-window-aware, economy-first tool strategy (v2)"
     )
 
     # Timeout and session limits
