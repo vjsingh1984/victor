@@ -35,6 +35,7 @@ from victor.storage.memory.unified import (
     MemoryQuery,
     MemoryEvolutionTrace,
     MemoryTransferHint,
+    ProactiveMemoryHint,
     MemoryProviderProtocol,
     RankingStrategyProtocol,
     RelevanceRankingStrategy,
@@ -466,6 +467,80 @@ class TestMemoryEvolution:
 
         assert ranked[0].id == "ent_competitor"
         assert coordinator.last_transfer_hints == []
+
+    @pytest.mark.asyncio
+    async def test_suggest_proactive_hints_uses_trace_metadata(self):
+        coordinator = create_memory_coordinator(enable_memory_evolution=True)
+        results = [
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Shared auth remediation notes",
+                relevance=0.83,
+                id="msg_auth_notes",
+            )
+        ]
+
+        await coordinator.record_outcome(
+            query="authentication failure remediation",
+            results=results,
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "gaps": ["benchmarks"],
+                "next_steps": ["rerun auth middleware diagnostics"],
+            },
+        )
+
+        hints = coordinator.suggest_proactive_hints(
+            "authentication remediation checklist",
+            session_id="session-b",
+            project_path="/repo-alpha",
+        )
+
+        assert len(hints) == 1
+        assert isinstance(hints[0], ProactiveMemoryHint)
+        assert "benchmarks" in hints[0].hint
+        assert "rerun auth middleware diagnostics" in hints[0].hint
+        assert hints[0].matched_query == "authentication failure remediation"
+
+    @pytest.mark.asyncio
+    async def test_search_all_tracks_last_proactive_hints(self):
+        coordinator = create_memory_coordinator(
+            enable_memory_evolution=True,
+            transfer_boost=0.12,
+        )
+        preferred_result = MemoryResult(
+            source=MemoryType.CONVERSATION,
+            content="authentication login workflow",
+            relevance=0.72,
+            id="msg_preferred",
+            timestamp=time.time(),
+        )
+        conversation_provider = MockMemoryProvider(
+            MemoryType.CONVERSATION,
+            [preferred_result],
+        )
+        coordinator.register_provider(conversation_provider)
+
+        await coordinator.record_outcome(
+            query="authentication bug",
+            results=[preferred_result],
+            success=True,
+            session_id="session-a",
+            metadata={
+                "next_steps": ["inspect auth retry counters"],
+            },
+        )
+
+        await coordinator.search_all(
+            "authentication login",
+            session_id="session-b",
+        )
+
+        assert coordinator.last_proactive_hints
+        assert isinstance(coordinator.last_proactive_hints[0], ProactiveMemoryHint)
+        assert "inspect auth retry counters" in coordinator.last_proactive_hints[0].hint
 
 
 # =============================================================================

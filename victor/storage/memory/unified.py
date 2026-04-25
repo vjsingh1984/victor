@@ -191,6 +191,18 @@ class MemoryTransferHint:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class ProactiveMemoryHint:
+    """Next-turn hint derived from successful memory transfer patterns."""
+
+    hint: str
+    score: float
+    matched_query: str
+    preferred_result_ids: List[str] = field(default_factory=list)
+    preferred_source_types: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
 # =============================================================================
 # Protocols
 # =============================================================================
@@ -505,6 +517,7 @@ class UnifiedMemoryCoordinator:
         self._transfer_boost = max(0.0, transfer_boost)
         self._evolution_traces: List[MemoryEvolutionTrace] = []
         self._last_transfer_hints: List[MemoryTransferHint] = []
+        self._last_proactive_hints: List[ProactiveMemoryHint] = []
         self._memory_reuse_hits = 0
 
     def register_provider(self, provider: MemoryProviderProtocol) -> None:
@@ -569,6 +582,11 @@ class UnifiedMemoryCoordinator:
         """Latest transfer hints applied during search."""
         return list(self._last_transfer_hints)
 
+    @property
+    def last_proactive_hints(self) -> List[ProactiveMemoryHint]:
+        """Latest proactive next-turn hints derived during search."""
+        return list(self._last_proactive_hints)
+
     async def search_all(
         self,
         query: str,
@@ -629,6 +647,10 @@ class UnifiedMemoryCoordinator:
             allow_cross_project=transfer_context["allow_cross_project"],
         )
         self._last_transfer_hints = transfer_hints
+        self._last_proactive_hints = self._derive_proactive_hints_from_transfer_hints(
+            transfer_hints,
+            limit=min(limit, 3),
+        )
 
         # Parallel search
         search_tasks = [
@@ -850,6 +872,58 @@ class UnifiedMemoryCoordinator:
         hints.sort(key=lambda hint: hint.score, reverse=True)
         return hints[:limit]
 
+    def suggest_proactive_hints(
+        self,
+        query: str,
+        session_id: Optional[str] = None,
+        limit: int = 3,
+        *,
+        project_path: Optional[str] = None,
+        vertical_name: Optional[str] = None,
+        transfer_group: Optional[str] = None,
+        allow_cross_project: bool = False,
+    ) -> List[ProactiveMemoryHint]:
+        """Generate bounded next-turn hints from successful memory traces."""
+        transfer_hints = self.suggest_transfer(
+            query,
+            session_id=session_id,
+            limit=limit,
+            project_path=project_path,
+            vertical_name=vertical_name,
+            transfer_group=transfer_group,
+            allow_cross_project=allow_cross_project,
+        )
+        return self._derive_proactive_hints_from_transfer_hints(transfer_hints, limit=limit)
+
+    def _derive_proactive_hints_from_transfer_hints(
+        self,
+        transfer_hints: List[MemoryTransferHint],
+        limit: int,
+    ) -> List[ProactiveMemoryHint]:
+        """Convert transfer hints into bounded next-turn guidance."""
+        proactive_hints: List[ProactiveMemoryHint] = []
+        seen_hints: Set[str] = set()
+
+        for transfer_hint in transfer_hints:
+            hint_text = self._build_proactive_hint_text(transfer_hint)
+            if not hint_text or hint_text in seen_hints:
+                continue
+
+            proactive_hints.append(
+                ProactiveMemoryHint(
+                    hint=hint_text,
+                    score=transfer_hint.score,
+                    matched_query=transfer_hint.matched_query,
+                    preferred_result_ids=list(transfer_hint.preferred_result_ids),
+                    preferred_source_types=list(transfer_hint.preferred_source_types),
+                    metadata=dict(transfer_hint.metadata),
+                )
+            )
+            seen_hints.add(hint_text)
+
+        proactive_hints.sort(key=lambda hint: hint.score, reverse=True)
+        return proactive_hints[:limit]
+
     def _apply_transfer_hints(
         self,
         results: List[MemoryResult],
@@ -902,6 +976,48 @@ class UnifiedMemoryCoordinator:
             )
 
         return boosted_results
+
+    def _build_proactive_hint_text(
+        self,
+        transfer_hint: MemoryTransferHint,
+    ) -> str:
+        """Create a short reusable hint from transfer metadata."""
+        metadata = transfer_hint.metadata
+        fragments: List[str] = []
+
+        gaps = self._normalize_hint_list(metadata.get("gaps"))
+        if gaps:
+            fragments.append(f"Carry forward open gaps: {', '.join(gaps[:2])}.")
+
+        next_steps = self._normalize_hint_list(metadata.get("next_steps"))
+        if next_steps:
+            fragments.append(f"Reuse next steps: {'; '.join(next_steps[:2])}.")
+
+        if not fragments and transfer_hint.preferred_source_types:
+            fragments.append(
+                "Revisit memory sources: "
+                + ", ".join(transfer_hint.preferred_source_types[:2])
+                + "."
+            )
+
+        if not fragments and transfer_hint.preferred_result_ids:
+            fragments.append("Revisit prior successful memory results.")
+
+        if not fragments:
+            return ""
+
+        return f"Matched prior query '{transfer_hint.matched_query}'. " + " ".join(fragments)
+
+    @staticmethod
+    def _normalize_hint_list(value: Any) -> List[str]:
+        """Normalize metadata hint fields to a compact string list."""
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            items = value
+        else:
+            items = [value]
+        return [str(item).strip() for item in items if str(item).strip()]
 
     @staticmethod
     def _normalize_scope_value(value: Any) -> Optional[str]:
@@ -1026,6 +1142,7 @@ class UnifiedMemoryCoordinator:
             "memory_reuse_hits": self._memory_reuse_hits,
             "evolution_trace_count": len(self._evolution_traces),
             "last_transfer_hint_count": len(self._last_transfer_hints),
+            "last_proactive_hint_count": len(self._last_proactive_hints),
             "providers": {
                 t.name: {
                     "available": p.is_available(),
@@ -1093,6 +1210,7 @@ __all__ = [
     "MemoryQuery",
     "MemoryEvolutionTrace",
     "MemoryTransferHint",
+    "ProactiveMemoryHint",
     # Protocols
     "MemoryProviderProtocol",
     "RankingStrategyProtocol",
