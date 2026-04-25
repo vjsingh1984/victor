@@ -267,9 +267,18 @@ Next recommended slice:
     injection remains available only as a compatibility fallback
 
 Next recommended slice:
-- Phase 5.14: centralize runtime error handling and directory/naming policy in
-  the validated session-truth service so callers stop managing those edge cases
-  directly
-  - Keep emitters focused on evidence gating and artifact construction
-  - Move common "prepare directory, persist safely, and degrade without breaking
-    the parent evaluation run" behavior behind the service boundary
+- Phase 5.14 completed: centralize runtime error handling and directory
+  preparation in the validated session-truth service so callers stop managing
+  those edge cases directly
+  - `ValidatedSessionTruthService` now owns directory preparation and safe
+    degradation behavior for emitter and persistence failures
+  - Parent evaluation runs now degrade by skipping session-truth capture rather
+    than failing outright when emitter-specific capture goes wrong
+
+Next recommended slice:
+- Phase 5.15: make artifact naming policy explicit inside the validated
+  session-truth subsystem so future emitters cannot silently diverge in file
+  layout conventions
+  - Keep current filenames backward-compatible by default
+  - Centralize naming decisions behind one small policy/helper instead of
+    leaving them partially distributed across emitters

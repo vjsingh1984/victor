@@ -521,9 +521,7 @@ class TestEvaluationOrchestrator:
             class StubService:
                 def persist_validation_result(self, **kwargs):
                     captured_kwargs.update(kwargs)
-                    artifact_path = kwargs["results_dir"] / "eval_session_stub.json"
-                    artifact_path.write_text("{}")
-                    return artifact_path
+                    return kwargs["results_dir"] / "eval_session_stub.json"
 
             orchestrator = EvaluationOrchestrator(
                 config,

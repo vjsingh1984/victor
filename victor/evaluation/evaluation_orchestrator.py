@@ -774,7 +774,6 @@ class EvaluationOrchestrator:
     ) -> Optional[Path]:
         """Persist validated session-truth feedback from objective SWE-bench validation."""
         evaluations_dir = self.config.output_dir / "evaluations"
-        evaluations_dir.mkdir(parents=True, exist_ok=True)
         return self._validated_session_truth_service.persist_validation_result(
             benchmark=BenchmarkType.SWE_BENCH,
             results_dir=evaluations_dir,

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 """Canonical service for validated session-truth emission and persistence."""
 
+import logging
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
@@ -19,6 +20,8 @@ from victor.evaluation.validated_session_truth_emitters import (
 from victor.evaluation.validated_session_truth_persistence import (
     persist_validated_session_truth_artifacts,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ValidatedSessionTruthService:
@@ -37,6 +40,7 @@ class ValidatedSessionTruthService:
         refresh_when_empty: bool = True,
     ) -> list[Path]:
         """Persist per-task validated session-truth artifacts from an evaluation result."""
+        results_dir.mkdir(parents=True, exist_ok=True)
         emitter = self._emitters.resolve(result.config.benchmark)
         if emitter is None:
             return []
@@ -44,26 +48,43 @@ class ValidatedSessionTruthService:
         summary_payload = dict(summary or result.get_metrics())
         artifacts = []
         for task_result in result.task_results:
-            artifact = emitter.build_artifact(
-                ValidatedSessionTruthEmissionContext(
-                    benchmark=result.config.benchmark,
-                    results_dir=results_dir,
-                    task_id=task_result.task_id,
-                    source_result_path=source_result_path,
-                    task_result=task_result,
-                    config=result.config,
-                    evaluation_result=result,
-                    summary=summary_payload,
+            try:
+                artifact = emitter.build_artifact(
+                    ValidatedSessionTruthEmissionContext(
+                        benchmark=result.config.benchmark,
+                        results_dir=results_dir,
+                        task_id=task_result.task_id,
+                        source_result_path=source_result_path,
+                        task_result=task_result,
+                        config=result.config,
+                        evaluation_result=result,
+                        summary=summary_payload,
+                    )
                 )
-            )
+            except Exception as exc:
+                logger.warning(
+                    "Validated session-truth emission failed for %s/%s: %s",
+                    result.config.benchmark.value,
+                    task_result.task_id,
+                    exc,
+                )
+                continue
             if artifact is not None:
                 artifacts.append(artifact)
 
-        return persist_validated_session_truth_artifacts(
-            artifacts,
-            refresh_dir=results_dir,
-            refresh_when_empty=refresh_when_empty,
-        )
+        try:
+            return persist_validated_session_truth_artifacts(
+                artifacts,
+                refresh_dir=results_dir,
+                refresh_when_empty=refresh_when_empty,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Validated session-truth persistence failed for %s: %s",
+                result.config.benchmark.value,
+                exc,
+            )
+            return []
 
     def persist_validation_result(
         self,
@@ -78,27 +99,46 @@ class ValidatedSessionTruthService:
         refresh_when_empty: bool = False,
     ) -> Optional[Path]:
         """Persist validated session truth from benchmark-specific validation output."""
+        results_dir.mkdir(parents=True, exist_ok=True)
         emitter = self._emitters.resolve(benchmark)
         if emitter is None:
             return None
 
-        artifact = emitter.build_artifact(
-            ValidatedSessionTruthEmissionContext(
-                benchmark=benchmark,
-                results_dir=results_dir,
-                task_id=task_id,
-                source_result_path=source_result_path,
-                validation_result=validation_result,
-                score=score,
-                metadata=dict(metadata or {}),
+        try:
+            artifact = emitter.build_artifact(
+                ValidatedSessionTruthEmissionContext(
+                    benchmark=benchmark,
+                    results_dir=results_dir,
+                    task_id=task_id,
+                    source_result_path=source_result_path,
+                    validation_result=validation_result,
+                    score=score,
+                    metadata=dict(metadata or {}),
+                )
             )
-        )
+        except Exception as exc:
+            logger.warning(
+                "Validated session-truth emission failed for %s/%s: %s",
+                benchmark.value,
+                task_id,
+                exc,
+            )
+            return None
         if artifact is None:
             return None
 
-        saved_paths = persist_validated_session_truth_artifacts(
-            [artifact],
-            refresh_dir=results_dir,
-            refresh_when_empty=refresh_when_empty,
-        )
+        try:
+            saved_paths = persist_validated_session_truth_artifacts(
+                [artifact],
+                refresh_dir=results_dir,
+                refresh_when_empty=refresh_when_empty,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Validated session-truth persistence failed for %s/%s: %s",
+                benchmark.value,
+                task_id,
+                exc,
+            )
+            return None
         return saved_paths[0] if saved_paths else None
