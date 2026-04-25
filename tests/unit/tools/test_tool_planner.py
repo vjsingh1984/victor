@@ -171,23 +171,23 @@ class TestIntentFiltering:
         """Test filtering with READ_ONLY intent."""
         from victor.agent.action_authorizer import ActionIntent
 
-        # Create mocks with name attribute properly set
+        # Use canonical tool names from WRITE_TOOLS (not aliases)
         tool1 = Mock()
-        tool1.name = "read_file"
+        tool1.name = "read"
         tool2 = Mock()
-        tool2.name = "write_file"
+        tool2.name = "write"
         tool3 = Mock()
-        tool3.name = "edit_files"
+        tool3.name = "edit"
         tools = [tool1, tool2, tool3]
 
         result = tool_planner.filter_tools_by_intent(tools, ActionIntent.READ_ONLY)
 
-        # write and edit tools should be filtered out
+        # write and edit tools should be filtered out (they're in WRITE_TOOLS)
         assert len(result) < len(tools)
         tool_names = [t.name for t in result]
-        assert "read_file" in tool_names
-        assert "write_file" not in tool_names
-        assert "edit_files" not in tool_names
+        assert "read" in tool_names
+        assert "write" not in tool_names
+        assert "edit" not in tool_names
 
     def test_filter_tools_write_allowed_intent(self, tool_planner):
         """Test filtering with WRITE_ALLOWED intent."""
@@ -213,18 +213,18 @@ class TestIntentFiltering:
         from victor.agent.action_authorizer import ActionIntent
 
         tools = [
-            {"name": "read_file"},
-            {"name": "write_file"},
-            {"name": "list_directory"},
+            {"name": "read"},
+            {"name": "write"},
+            {"name": "ls"},
         ]
 
         result = tool_planner.filter_tools_by_intent(tools, ActionIntent.DISPLAY_ONLY)
 
-        # write_file should be filtered out
+        # write should be filtered out (in WRITE_TOOLS)
         assert len(result) < len(tools)
         tool_names = [t["name"] for t in result]
-        assert "read_file" in tool_names
-        assert "write_file" not in tool_names
+        assert "read" in tool_names
+        assert "write" not in tool_names
 
     def test_filter_tools_empty_list(self, tool_planner):
         """Test filtering with empty tools list."""

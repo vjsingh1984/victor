@@ -156,7 +156,7 @@ class TestTeamMember:
 
         assert member.is_leader is True
         assert member.max_concurrent_tasks == 5
-        assert member.tool_access == ["read_file", "write_file"]
+        assert member.tool_access == ["read", "write"]
 
     def test_name_property(self, sample_persona):
         """name property should return persona name."""
