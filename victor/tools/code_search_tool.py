@@ -918,9 +918,27 @@ def _build_literal_search_extensions(filters: Optional["SearchFilters"]) -> Opti
     return None
 
 
+def _needs_literal_postfilter_overfetch(filters: Optional["SearchFilters"]) -> bool:
+    """Return whether literal results are narrowed by shared post-filters after retrieval."""
+
+    return bool(filters and (filters.symbol or filters.language or filters.test_only is not None))
+
+
+def _literal_search_fetch_limit(requested_limit: int, filters: Optional["SearchFilters"]) -> int:
+    """Return the candidate count to fetch before applying literal post-filters."""
+
+    if requested_limit <= 0:
+        return requested_limit
+    if _needs_literal_postfilter_overfetch(filters):
+        return requested_limit * 2
+    return requested_limit
+
+
 def _apply_literal_result_filters(
     result: Dict[str, Any],
     filters: Optional["SearchFilters"],
+    *,
+    max_results: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Apply shared post-filters to literal-search results."""
 
@@ -937,6 +955,8 @@ def _apply_literal_result_filters(
         filtered_hits = _filter_search_results_by_language(filtered_hits, filters.language)
     if filters.test_only is not None:
         filtered_hits = _filter_search_results_by_test_only(filtered_hits, filters.test_only)
+    if max_results is not None:
+        filtered_hits = filtered_hits[:max_results]
     filtered_result["results"] = filtered_hits
     filtered_result["count"] = len(filtered_hits)
     return filtered_result
@@ -2324,11 +2344,12 @@ async def code_search(
 
     # Route to literal / filename search for non-semantic modes
     if mode in ("literal", "text", "filename"):
+        literal_fetch_limit = _literal_search_fetch_limit(k, filters)
         exts = _build_literal_search_extensions(filters)
         result = await _literal_search(
             filename_query,
             resolved_search_root,
-            k,
+            literal_fetch_limit,
             exts,
             **_build_literal_search_kwargs(
                 filename_only=(mode == "filename"),
@@ -2336,7 +2357,7 @@ async def code_search(
                 file_pattern=literal_file_pattern,
             ),
         )
-        result = _apply_literal_result_filters(result, filters)
+        result = _apply_literal_result_filters(result, filters, max_results=k)
         result["mode"] = mode
         if result.get("count", 0) > 0:
             return result
@@ -2421,18 +2442,19 @@ async def code_search(
         fallback_search_path = str(root_path)
         if disable_embeddings:
             logger.info("Embeddings disabled for this agent, falling back to literal search")
+            literal_fetch_limit = _literal_search_fetch_limit(k, filters)
             exts = _build_literal_search_extensions(filters)
             result = await _literal_search(
                 query,
                 fallback_search_path,
-                k,
+                literal_fetch_limit,
                 exts,
                 **_build_literal_search_kwargs(
                     allow_filename_autodetect=allow_filename_autodetect,
                     file_pattern=literal_file_pattern,
                 ),
             )
-            result = _apply_literal_result_filters(result, filters)
+            result = _apply_literal_result_filters(result, filters, max_results=k)
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_disabled",
@@ -2518,18 +2540,19 @@ async def code_search(
             except Exception as cache_err:
                 logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
 
+            literal_fetch_limit = _literal_search_fetch_limit(k, filters)
             exts = _build_literal_search_extensions(filters)
             result = await _literal_search(
                 query,
                 fallback_search_path,
-                k,
+                literal_fetch_limit,
                 exts,
                 **_build_literal_search_kwargs(
                     allow_filename_autodetect=allow_filename_autodetect,
                     file_pattern=literal_file_pattern,
                 ),
             )
-            result = _apply_literal_result_filters(result, filters)
+            result = _apply_literal_result_filters(result, filters, max_results=k)
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_index"),
@@ -2549,18 +2572,19 @@ async def code_search(
                 "Semantic index for %s remains stale after integrity recovery; falling back to literal search",
                 root_path,
             )
+            literal_fetch_limit = _literal_search_fetch_limit(k, filters)
             exts = _build_literal_search_extensions(filters)
             result = await _literal_search(
                 query,
                 fallback_search_path,
-                k,
+                literal_fetch_limit,
                 exts,
                 **_build_literal_search_kwargs(
                     allow_filename_autodetect=allow_filename_autodetect,
                     file_pattern=literal_file_pattern,
                 ),
             )
-            result = _apply_literal_result_filters(result, filters)
+            result = _apply_literal_result_filters(result, filters, max_results=k)
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_index_stale",
@@ -2803,17 +2827,18 @@ async def code_search(
             )
         except (asyncio.TimeoutError, Exception) as exc:
             logger.warning("Semantic search failed (%s), falling back to literal search", exc)
+            literal_fetch_limit = _literal_search_fetch_limit(k, filters)
             result = await _literal_search(
                 query,
                 fallback_search_path,
-                k,
+                literal_fetch_limit,
                 exts,
                 **_build_literal_search_kwargs(
                     allow_filename_autodetect=allow_filename_autodetect,
                     file_pattern=literal_file_pattern,
                 ),
             )
-            result = _apply_literal_result_filters(result, filters)
+            result = _apply_literal_result_filters(result, filters, max_results=k)
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_search"),
@@ -2907,17 +2932,20 @@ async def code_search(
                 from victor.framework.search import create_hybrid_search_engine
 
                 # Get keyword search results
+                keyword_fetch_limit = _literal_search_fetch_limit(k * 2, filters)
                 keyword_results = await _literal_search(
                     query,
                     str(root_path),
-                    k * 2,
+                    keyword_fetch_limit,
                     exts=exts,
                     **_build_literal_search_kwargs(
                         allow_filename_autodetect=allow_filename_autodetect,
                         file_pattern=literal_file_pattern,
                     ),
                 )
-                keyword_results = _apply_literal_result_filters(keyword_results, filters)
+                keyword_results = _apply_literal_result_filters(
+                    keyword_results, filters, max_results=k * 2
+                )
 
                 if keyword_results.get("success"):
                     # Convert semantic results to dict format for hybrid engine

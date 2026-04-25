@@ -1071,7 +1071,7 @@ async def test_code_search_text_mode_applies_language_and_test_filters_to_litera
     literal_search.assert_awaited_once_with(
         "parse_json",
         str(tmp_path),
-        5,
+        10,
         [".py", ".pyi", ".pyx"],
         filename_only=False,
         allow_filename_autodetect=False,
@@ -1123,7 +1123,7 @@ async def test_code_search_text_mode_applies_symbol_filter_to_literal_results(tm
     literal_search.assert_awaited_once_with(
         "json parsing",
         str(tmp_path),
-        5,
+        10,
         None,
         filename_only=False,
         allow_filename_autodetect=False,
@@ -2030,7 +2030,7 @@ async def test_code_search_hybrid_mode_applies_symbol_filter_to_keyword_side(tmp
     literal_search.assert_awaited_once_with(
         "json parsing",
         str(tmp_path),
-        6,
+        12,
         exts=None,
         allow_filename_autodetect=True,
     )
