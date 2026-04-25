@@ -379,6 +379,7 @@ async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) 
             "Background index rebuild started (timeout=%ds, index=%s)", rebuild_timeout, index_path
         )
         await asyncio.wait_for(index.index_codebase(), timeout=rebuild_timeout)
+        await _finalize_index_storage(index)
         elapsed = time.time() - start_time
         logger.info(
             "Background index rebuild completed successfully in %.2fs (index=%s)",

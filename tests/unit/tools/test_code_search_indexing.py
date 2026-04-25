@@ -320,6 +320,26 @@ class TestBackgroundRebuildLogging:
     """Tests for background rebuild logging improvements."""
 
     @pytest.mark.asyncio
+    async def test_rebuild_finalizes_structural_provider_writes(self):
+        """Successful rebuilds should flush structural provider buffers."""
+        from victor.tools.code_search_tool import _background_index_rebuild
+
+        provider = SimpleNamespace(
+            config=SimpleNamespace(vector_store="victor_structural_bridge"),
+            get_stats=AsyncMock(return_value={"total_documents": 1}),
+        )
+        mock_index = SimpleNamespace(
+            root=Path("/test/project"),
+            index_codebase=AsyncMock(),
+            embedding_provider=provider,
+        )
+
+        await _background_index_rebuild(mock_index, rebuild_timeout=10.0)
+
+        mock_index.index_codebase.assert_awaited_once()
+        provider.get_stats.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_rebuild_logging_includes_index_path(self, caplog):
         """Test that rebuild logging includes the index path."""
         from victor.tools.code_search_tool import _background_index_rebuild
