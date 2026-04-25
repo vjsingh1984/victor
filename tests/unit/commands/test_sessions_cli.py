@@ -117,15 +117,14 @@ class TestSessionsCommand:
         # Verify table structure
         assert "Session ID" in result.stdout
         assert "Title" in result.stdout
+        assert "Previews" in result.stdout
 
     def test_sessions_list_with_limit(self, runner_with_db, sample_persistence):
         """Test 'victor sessions list --limit 1'."""
         result = runner_with_db.invoke(sessions_app, ["list", "--limit", "1"])
         assert result.exit_code == 0
         # Should show only 1 session (may be either one due to ordering)
-        assert (
-            "CI/CD" in result.stdout and "Pipeline" in result.stdout
-        ) or "Unit Tests" in result.stdout
+        assert ("myproj-9Kx7Z2" in result.stdout) or ("myproj-9Kx8A3B" in result.stdout)
 
     def test_sessions_list_json(self, runner_with_db, sample_persistence):
         """Test 'victor sessions list --json'."""
@@ -150,6 +149,42 @@ class TestSessionsCommand:
             assert "title" in session
             assert "model" in session
             assert "provider" in session
+            assert session["preview_count"] == 0
+
+    def test_sessions_list_json_includes_preview_count(self, runner_with_db, temp_db_path):
+        """Test 'victor sessions list --json' includes preview counts."""
+        persistence = SQLiteSessionPersistence(db_path=temp_db_path)
+        conversation = MessageHistory()
+        conversation.add_user_message("Show app.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: app.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+            },
+        )
+
+        persistence.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+            session_id="myproj-preview-list",
+            title="Preview List Session",
+        )
+
+        result = runner_with_db.invoke(sessions_app, ["list", "--json"])
+        assert result.exit_code == 0
+
+        sessions = json.loads(strip_ansi(result.stdout))
+        preview_session = next(
+            session for session in sessions if session["session_id"] == "myproj-preview-list"
+        )
+        assert preview_session["preview_count"] == 1
 
     def test_sessions_list_empty(self, runner_with_db, temp_db_path):
         """Test 'victor sessions list' with empty database."""
@@ -167,6 +202,7 @@ class TestSessionsCommand:
         # Should find CI/CD session but not Unit Tests
         assert "CI/CD" in result.stdout and "Pipeline" in result.stdout
         assert "Unit Tests" not in result.stdout
+        assert "Previews" in result.stdout
 
     def test_sessions_search_json(self, runner_with_db, sample_persistence):
         """Test 'victor sessions search --json'."""
@@ -179,6 +215,7 @@ class TestSessionsCommand:
         assert isinstance(sessions, list)
         assert len(sessions) == 1
         assert sessions[0]["title"] == "CI/CD Pipeline Setup"
+        assert sessions[0]["preview_count"] == 0
 
     def test_sessions_search_finds_preview_messages(self, runner_with_db, temp_db_path):
         """Test 'victor sessions search' matches replay-only preview content."""
@@ -214,6 +251,7 @@ class TestSessionsCommand:
         assert len(sessions) == 1
         assert sessions[0]["session_id"] == "myproj-preview-search"
         assert sessions[0]["title"] == "Preview Search Session"
+        assert sessions[0]["preview_count"] == 1
 
     def test_sessions_show(self, runner_with_db, sample_persistence):
         """Test 'victor sessions show <session_id>'."""
