@@ -164,6 +164,25 @@ def _get_instance_attr(obj: Any, name: str, default: Any = None) -> Any:
     return default
 
 
+def _get_index_build_failure_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Any:
+    """Resolve the index-build failure cache without triggering mock fallback attrs."""
+
+    cache_manager = None
+    if exec_ctx and isinstance(exec_ctx, dict):
+        cache_manager = exec_ctx.get("cache_manager")
+    elif exec_ctx and hasattr(exec_ctx, "cache_manager"):
+        cache_manager = exec_ctx.cache_manager
+
+    if cache_manager:
+        return cache_manager.get_namespace("index_build_failures")
+
+    failure_cache = _get_instance_attr(_get_or_build_index, "_failure_cache")
+    if failure_cache is None:
+        failure_cache = {}
+        _get_or_build_index._failure_cache = failure_cache
+    return failure_cache
+
+
 async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
     """Validate persistent index integrity with a lightweight check.
 
@@ -490,6 +509,14 @@ def _failure_cache_delete(failure_cache: Any, key: str) -> None:
         return
     if isinstance(failure_cache, dict):
         failure_cache.pop(key, None)
+
+
+def _classify_semantic_fallback(exc: BaseException, *, scope: str) -> str:
+    """Return a precise fallback reason for semantic code-search failures."""
+
+    if isinstance(exc, asyncio.TimeoutError):
+        return f"{scope}_timeout"
+    return f"{scope}_error"
 
 
 # Directories that indicate non-core code (lower importance)
@@ -1152,21 +1179,7 @@ async def _get_or_build_index(
     index_cache = _get_index_cache(exec_ctx)
 
     # Get or create failure cache for index build failures
-    failure_cache = None
-    cache_manager = None
-    if exec_ctx and isinstance(exec_ctx, dict):
-        cache_manager = exec_ctx.get("cache_manager")
-    elif exec_ctx and hasattr(exec_ctx, "cache_manager"):
-        cache_manager = exec_ctx.cache_manager
-
-    if cache_manager:
-        # Use ToolCacheManager if available
-        failure_cache = cache_manager.get_namespace("index_build_failures")
-    else:
-        # Fallback to simple dict cache (not recommended for production)
-        if not hasattr(_get_or_build_index, "_failure_cache"):
-            _get_or_build_index._failure_cache = {}
-        failure_cache = _get_or_build_index._failure_cache
+    failure_cache = _get_index_build_failure_cache(exec_ctx)
 
     # Check for recent build failures before attempting build
     if failure_cache and not force_reindex:
@@ -1321,19 +1334,7 @@ async def _get_or_build_index(
         failure_key = _build_index_failure_key(root, index_manifest)
 
         # Get failure cache (same logic as above)
-        failure_cache = None
-        cache_manager = None
-        if exec_ctx and isinstance(exec_ctx, dict):
-            cache_manager = exec_ctx.get("cache_manager")
-        elif exec_ctx and hasattr(exec_ctx, "cache_manager"):
-            cache_manager = exec_ctx.cache_manager
-
-        if cache_manager:
-            failure_cache = cache_manager.get_namespace("index_build_failures")
-        else:
-            if not hasattr(_get_or_build_index, "_failure_cache"):
-                _get_or_build_index._failure_cache = {}
-            failure_cache = _get_or_build_index._failure_cache
+        failure_cache = _get_index_build_failure_cache(exec_ctx)
 
         if failure_cache and _failure_cache_get(failure_cache, failure_key):
             _failure_cache_delete(failure_cache, failure_key)
@@ -1852,19 +1853,7 @@ async def code_search(
                 )
 
                 # Get failure cache (same logic as in _get_or_build_index)
-                failure_cache = None
-                cache_manager = None
-                if _exec_ctx and isinstance(_exec_ctx, dict):
-                    cache_manager = _exec_ctx.get("cache_manager")
-                elif _exec_ctx and hasattr(_exec_ctx, "cache_manager"):
-                    cache_manager = _exec_ctx.cache_manager
-
-                if cache_manager:
-                    failure_cache = cache_manager.get_namespace("index_build_failures")
-                else:
-                    if not hasattr(_get_or_build_index, "_failure_cache"):
-                        _get_or_build_index._failure_cache = {}
-                    failure_cache = _get_or_build_index._failure_cache
+                failure_cache = _get_index_build_failure_cache(_exec_ctx)
 
                 if failure_cache:
                     from victor.tools.cache_manager import GenericCacheEntry
@@ -1880,7 +1869,7 @@ async def code_search(
 
             exts = filters.extensions if filters else None
             result = await _literal_search(query, path, k, exts)
-            result["fallback"] = "semantic_index_timeout"
+            result["fallback"] = _classify_semantic_fallback(exc, scope="semantic_index")
             return result
 
         backend_metadata = _collect_code_search_backend_metadata(index, settings)
@@ -2103,7 +2092,7 @@ async def code_search(
         except (asyncio.TimeoutError, Exception) as exc:
             logger.warning("Semantic search failed (%s), falling back to literal search", exc)
             result = await _literal_search(query, path, k, exts)
-            result["fallback"] = "semantic_search_timeout"
+            result["fallback"] = _classify_semantic_fallback(exc, scope="semantic_search")
             return result
 
         # Record outcome for RL threshold learning if enabled

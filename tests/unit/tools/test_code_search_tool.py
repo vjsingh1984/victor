@@ -577,3 +577,57 @@ async def test_code_search_semantic_mode_applies_bounded_utility_reranking(tmp_p
     assert "tests/test_parser.py" in ordered_paths[1:]
     assert result["metadata"]["retrieval_utility"]["repeated_file_hits"] == 1
     assert result["metadata"]["retrieval_utility"]["file_diversity"] == 2
+
+
+@pytest.mark.asyncio
+async def test_code_search_reports_non_timeout_index_build_fallback_reason(
+    tmp_path, recwarn
+) -> None:
+    """Index build exceptions should not be mislabeled as timeouts."""
+    exec_ctx = {"settings": _settings()}
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(side_effect=RuntimeError("index build failed")),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parse json entrypoint",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    literal_search.assert_awaited_once()
+    assert result["fallback"] == "semantic_index_error"
+    assert not recwarn
+
+
+@pytest.mark.asyncio
+async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(tmp_path) -> None:
+    """Semantic search exceptions should not be mislabeled as timeouts."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(side_effect=RuntimeError("semantic search failed"))
+    )
+    exec_ctx = {"settings": _settings()}
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parse json entrypoint",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    literal_search.assert_awaited_once()
+    assert result["fallback"] == "semantic_search_error"
