@@ -740,6 +740,15 @@ def _file_pattern_has_glob(file_pattern: str) -> bool:
     return any(token in normalized_pattern for token in "*?[]")
 
 
+def _file_pattern_uses_backend_exact_filter(file_pattern: str) -> bool:
+    """Return whether a file pattern is safe to send as an exact backend file_path filter."""
+
+    normalized_pattern = _normalize_code_search_path(file_pattern.strip())
+    return bool(normalized_pattern) and "/" in normalized_pattern and not _file_pattern_has_glob(
+        normalized_pattern
+    )
+
+
 def _filter_search_results_by_file_pattern(
     results: List[Any],
     file_pattern: str,
@@ -2241,10 +2250,10 @@ async def code_search(
             filter_metadata = {}
             if filters.file_pattern:
                 filters_applied.append(f"file={filters.file_pattern}")
-                if _file_pattern_has_glob(filters.file_pattern):
-                    manual_file_pattern_filter = filters.file_pattern
-                else:
+                if _file_pattern_uses_backend_exact_filter(filters.file_pattern):
                     filter_metadata["file_path"] = filters.file_pattern
+                else:
+                    manual_file_pattern_filter = filters.file_pattern
             if filters.symbol:
                 filter_metadata["symbol_type"] = filters.symbol
                 filters_applied.append(f"symbol={filters.symbol}")
