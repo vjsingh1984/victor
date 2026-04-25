@@ -29,6 +29,7 @@ from victor.framework.search.codebase_embedding_bridge import (
     write_codebase_index_manifest,
 )
 from victor.tools.code_search_tool import (
+    _ensure_file_watcher_subscription,
     _build_codebase_embedding_config,
     _build_index_failure_key,
     _finalize_index_storage,
@@ -620,6 +621,39 @@ class TestStructuralIndexPersistence:
         assert "watcher_subscription_task" not in fake_cache[str(root)]
         factory.assert_not_called()
         cached_index.incremental_reindex.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_watcher_subscription_survives_waiter_cancellation(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        cache_entry: dict[str, object] = {"watcher_subscribed": False}
+
+        async def _delayed_subscribe(*args, **kwargs):
+            await asyncio.sleep(0.02)
+            return True
+
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        subscribe_mock = AsyncMock(side_effect=_delayed_subscribe)
+        monkeypatch.setattr(code_search_tool_module, "_subscribe_to_file_watcher", subscribe_mock)
+
+        first_waiter = asyncio.create_task(_ensure_file_watcher_subscription(cache_entry, root))
+        await asyncio.sleep(0)
+        first_waiter.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await first_waiter
+
+        assert isinstance(cache_entry.get("watcher_subscription_task"), asyncio.Task)
+
+        second_result = await _ensure_file_watcher_subscription(cache_entry, root)
+
+        assert second_result is True
+        assert subscribe_mock.await_count == 1
+        assert cache_entry["watcher_subscribed"] is True
+        assert "watcher_subscription_task" not in cache_entry
 
     @pytest.mark.asyncio
     async def test_get_or_build_index_coalesces_incremental_refresh_under_lock(

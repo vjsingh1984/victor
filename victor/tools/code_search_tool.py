@@ -634,6 +634,8 @@ async def _ensure_file_watcher_subscription(
     if isinstance(pending_task, asyncio.Task) and pending_task.done():
         try:
             subscribed = bool(pending_task.result())
+        except asyncio.CancelledError:
+            subscribed = False
         except Exception:
             subscribed = False
         if cache_entry.get("watcher_subscription_task") is pending_task:
@@ -647,9 +649,13 @@ async def _ensure_file_watcher_subscription(
         cache_entry["watcher_subscription_task"] = pending_task
 
     try:
-        subscribed = bool(await pending_task)
+        subscribed = bool(await asyncio.shield(pending_task))
+    except asyncio.CancelledError:
+        if cache_entry.get("watcher_subscription_task") is pending_task and pending_task.done():
+            cache_entry.pop("watcher_subscription_task", None)
+        raise
     finally:
-        if cache_entry.get("watcher_subscription_task") is pending_task:
+        if cache_entry.get("watcher_subscription_task") is pending_task and pending_task.done():
             cache_entry.pop("watcher_subscription_task", None)
 
     cache_entry["watcher_subscribed"] = subscribed
