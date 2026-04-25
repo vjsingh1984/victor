@@ -611,6 +611,37 @@ async def test_code_search_reports_non_timeout_index_build_fallback_reason(
 
 
 @pytest.mark.asyncio
+async def test_code_search_caches_index_build_failure_in_plain_dict_fallback(
+    tmp_path, monkeypatch
+) -> None:
+    """The default dict-backed failure cache should record build failures."""
+    exec_ctx = {"settings": _settings()}
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+    failure_cache: dict[str, object] = {}
+    failing_build = AsyncMock(side_effect=RuntimeError("index build failed"))
+    failing_build._failure_cache = failure_cache
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=failing_build,
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ):
+        result = await code_search(
+            query="parse json entrypoint",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    assert result["fallback"] == "semantic_index_error"
+    assert len(failure_cache) == 1
+    cached_entry = next(iter(failure_cache.values()))
+    assert cached_entry.value["error"] == "index build failed"
+
+
+@pytest.mark.asyncio
 async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(tmp_path) -> None:
     """Semantic search exceptions should not be mislabeled as timeouts."""
     mock_index = SimpleNamespace(

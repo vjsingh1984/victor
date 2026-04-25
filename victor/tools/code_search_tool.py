@@ -1185,7 +1185,7 @@ async def _get_or_build_index(
     failure_cache = _get_index_build_failure_cache(exec_ctx)
 
     # Check for recent build failures before attempting build
-    if failure_cache and not force_reindex:
+    if failure_cache is not None and not force_reindex:
         failure_key = _build_index_failure_key(root, index_manifest)
         failure_entry = _failure_cache_get(failure_cache, failure_key)
         if failure_entry:
@@ -1339,7 +1339,7 @@ async def _get_or_build_index(
         # Get failure cache (same logic as above)
         failure_cache = _get_index_build_failure_cache(exec_ctx)
 
-        if failure_cache and _failure_cache_get(failure_cache, failure_key):
+        if failure_cache is not None and _failure_cache_get(failure_cache, failure_key):
             _failure_cache_delete(failure_cache, failure_key)
             logger.info("[code_search] Cleared index build failure cache after successful build")
     except Exception as cache_err:
@@ -1858,7 +1858,7 @@ async def code_search(
                 # Get failure cache (same logic as in _get_or_build_index)
                 failure_cache = _get_index_build_failure_cache(_exec_ctx)
 
-                if failure_cache:
+                if failure_cache is not None:
                     from victor.tools.cache_manager import GenericCacheEntry
 
                     failure_entry = GenericCacheEntry(
