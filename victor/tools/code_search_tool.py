@@ -1118,6 +1118,7 @@ async def _get_or_build_index(
         else:
             # Files changed - do incremental update instead of full rebuild
             await cached_index.incremental_reindex()
+            await _finalize_index_storage(cached_index)
             index_cache[str(root)]["latest_mtime"] = latest
 
             # Subscribe to file watcher for auto-invalidation (only once per index)
