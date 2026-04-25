@@ -290,6 +290,58 @@ class TestSessionsCommand:
             "myproj-9Kx8A3B",
         ]
 
+    def test_sessions_export_preserves_preview_messages(self, runner_with_db, temp_db_path, tmp_path):
+        """Test 'victor sessions export' preserves replay-only preview sidecar payloads."""
+        persistence = SQLiteSessionPersistence(db_path=temp_db_path)
+        conversation = MessageHistory()
+        conversation.add_user_message("Show app.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: app.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+            },
+        )
+
+        persistence.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+            session_id="myproj-preview-export",
+            title="Preview Export Session",
+        )
+
+        export_file = tmp_path / "preview_sessions.json"
+        result = runner_with_db.invoke(sessions_app, ["export", "--output", str(export_file)])
+        assert result.exit_code == 0
+        assert export_file.exists()
+
+        exported = json.loads(export_file.read_text())
+        preview_export = next(
+            session
+            for session in exported
+            if session["metadata"]["session_id"] == "myproj-preview-export"
+        )
+
+        assert preview_export["conversation"]["preview_messages"] == [
+            {
+                "role": "system",
+                "content": "FILE PREVIEW: app.py",
+                "metadata": {
+                    "preview_kind": "file_preview",
+                    "preview_path": "app.py",
+                    "preview_language": "python",
+                    "preview_body": "print('hello')\n",
+                },
+                "after_message_index": 2,
+            }
+        ]
+
 
 class TestSessionsChatFlags:
     """Test suite for victor chat --sessions and --sessionid flags."""
