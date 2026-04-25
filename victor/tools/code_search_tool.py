@@ -2912,6 +2912,7 @@ async def code_search(
                         file_pattern=literal_file_pattern,
                     ),
                 )
+                keyword_results = _apply_literal_result_filters(keyword_results, filters)
 
                 if keyword_results.get("success"):
                     # Convert semantic results to dict format for hybrid engine

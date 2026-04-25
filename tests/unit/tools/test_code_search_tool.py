@@ -1913,6 +1913,83 @@ async def test_code_search_hybrid_mode_uses_keyword_results_when_semantic_is_emp
 
 
 @pytest.mark.asyncio
+async def test_code_search_hybrid_mode_applies_symbol_filter_to_keyword_side(tmp_path) -> None:
+    """Hybrid keyword retrieval should honor symbol filters before result fusion."""
+    mock_index = SimpleNamespace(semantic_search=AsyncMock(return_value=[]))
+    exec_ctx = {"settings": _settings(enable_hybrid_search=True)}
+    filters = SearchFilters(symbol="parse_json")
+
+    literal_search = AsyncMock(
+        return_value={
+            "success": True,
+            "results": [
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return data",
+                    "score": 1.0,
+                    "line_number": 1,
+                    "metadata": {},
+                },
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json_or_none(data): return data or None",
+                    "score": 0.9,
+                    "line_number": 4,
+                    "metadata": {},
+                },
+            ],
+        }
+    )
+
+    class _HybridEngine:
+        def combine_results(self, semantic_results, keyword_results, max_results):
+            assert semantic_results == []
+            assert len(keyword_results) == 1
+            assert keyword_results[0]["content"] == "def parse_json(data): return data"
+            return [
+                SimpleNamespace(
+                    file_path="src/parser.py",
+                    content="def parse_json(data): return data",
+                    combined_score=0.4,
+                    semantic_score=0.0,
+                    keyword_score=1.0,
+                    line_number=1,
+                    metadata={},
+                )
+            ]
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=literal_search,
+    ), patch(
+        "victor.framework.search.create_hybrid_search_engine",
+        new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+    ):
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=3,
+            filters=filters,
+            _exec_ctx=exec_ctx,
+        )
+
+    literal_search.assert_awaited_once_with(
+        "json parsing",
+        str(tmp_path),
+        6,
+        exts=None,
+        allow_filename_autodetect=True,
+    )
+    assert result["success"] is True
+    assert result["mode"] == "hybrid"
+    assert result["count"] == 1
+    assert result["results"][0]["file_path"] == "src/parser.py"
+
+
+@pytest.mark.asyncio
 async def test_code_search_semantic_mode_applies_bounded_utility_reranking(tmp_path) -> None:
     """Semantic results should lift implementation code ahead of weaker duplicate/test hits."""
     source_dir = tmp_path / "victor"
