@@ -485,6 +485,89 @@ async def test_code_search_auto_detected_filename_mode_uses_file_pattern_query(t
 
 
 @pytest.mark.asyncio
+async def test_code_search_filename_mode_uses_parent_directory_for_file_path(tmp_path) -> None:
+    """Filename mode should normalize file paths to their parent directory before searching."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    current_file = source_dir / "current.py"
+    current_file.write_text("pass\n", encoding="utf-8")
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "count": 1,
+        "mode": "filename",
+    }
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parser.py",
+            path=str(current_file),
+            k=3,
+            mode="filename",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with(
+        "parser.py",
+        str(source_dir),
+        3,
+        None,
+        filename_only=True,
+    )
+    get_index.assert_not_awaited()
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_code_search_literal_mode_uses_parent_directory_for_missing_child_path(
+    tmp_path,
+) -> None:
+    """Literal mode should normalize a missing child path to its existing parent directory."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    missing_child = source_dir / "missing.py"
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:def main()"}],
+        "count": 1,
+        "mode": "literal",
+    }
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="main",
+            path=str(missing_child),
+            k=3,
+            mode="literal",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with(
+        "main",
+        str(source_dir),
+        3,
+        None,
+        filename_only=False,
+    )
+    get_index.assert_not_awaited()
+    assert result["mode"] == "literal"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
 async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> None:
     """Filename-like semantic queries should bypass semantic indexing."""
     literal_result = {

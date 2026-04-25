@@ -616,6 +616,33 @@ def _normalize_search_filters(filters: Optional[SearchFilters]) -> Optional[Sear
     )
 
 
+def _resolve_code_search_root(path: str) -> Tuple[Optional[Path], Optional[str]]:
+    """Resolve a search root consistently across semantic and literal modes."""
+
+    search_root = path
+    if not search_root or search_root == ".":
+        try:
+            from victor.config.settings import get_project_paths
+
+            search_root = str(get_project_paths().project_root)
+        except Exception:
+            search_root = "."
+
+    root_path = Path(search_root).resolve()
+    if root_path.is_file():
+        root_path = root_path.parent
+        logger.debug("Path %r is a file, using parent: %s", search_root, root_path)
+    elif not root_path.exists():
+        parent_path = root_path.parent
+        if parent_path.exists() and parent_path.is_dir():
+            root_path = parent_path
+            logger.debug("Path %r not found, using parent: %s", search_root, root_path)
+        else:
+            return None, f"Search root '{search_root}' not found. Please provide a valid directory path."
+
+    return root_path, None
+
+
 def _glob_patterns_for_extensions(exts: Optional[List[str]]) -> List[str]:
     """Normalize extension filters into shell globs like ``*.py``."""
 
@@ -1904,6 +1931,15 @@ async def code_search(
         elif _looks_like_filename_query(query) and not (filters and filters.symbol):
             mode = "filename"
 
+    root_path, root_error = _resolve_code_search_root(path)
+    if root_error:
+        return {
+            "success": False,
+            "error": root_error,
+        }
+    assert root_path is not None
+    resolved_search_root = str(root_path)
+
     filename_query = query
     if mode == "filename" and filters and filters.file_pattern:
         filename_query = filters.file_pattern
@@ -1913,7 +1949,7 @@ async def code_search(
         exts = filters.extensions if filters else None
         result = await _literal_search(
             filename_query,
-            path,
+            resolved_search_root,
             k,
             exts,
             filename_only=(mode == "filename"),
@@ -1940,34 +1976,8 @@ async def code_search(
         else:
             return result
     exts: Optional[List[str]] = filters.extensions if filters else None
-    search_root = path
-    # Resolve empty path to project root (benchmark/agent sets this)
-    if not search_root or search_root == ".":
-        try:
-            from victor.config.settings import get_project_paths
-
-            search_root = str(get_project_paths().project_root)
-        except Exception:
-            search_root = "."
     try:
-        root_path = Path(search_root).resolve()
-        # If path is a file, use its parent directory (model passed file path instead of directory)
-        if root_path.is_file():
-            root_path = root_path.parent
-            logger.debug(f"Path '{search_root}' is a file, using parent: {root_path}")
-        # If path doesn't exist, try parent directory (model may have passed path with extra segment)
-        elif not root_path.exists():
-            parent_path = root_path.parent
-            if parent_path.exists() and parent_path.is_dir():
-                root_path = parent_path
-                logger.debug(f"Path '{search_root}' not found, using parent: {root_path}")
-            else:
-                # Path and parent don't exist - return error with helpful message
-                return {
-                    "success": False,
-                    "error": f"Search root '{search_root}' not found. Please provide a valid directory path.",
-                }
-
+        search_root = resolved_search_root
         # Check if path is a subdirectory to provide smart hints
         # This helps avoid duplicate embeddings while supporting cross-repo analysis
         try:
