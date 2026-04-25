@@ -742,6 +742,7 @@ async def _refresh_cached_index_incrementally(
     await index.incremental_reindex()
     await _finalize_index_storage(index)
     cache_entry["latest_mtime"] = _latest_mtime(root)
+    cache_entry["indexed_at"] = time.time()
     cache_entry["stale"] = False
 
     if ensure_watcher:

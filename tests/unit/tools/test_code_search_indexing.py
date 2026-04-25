@@ -1455,6 +1455,7 @@ class TestFileWatcherIncrementalUpdates:
         cache_entry = {
             "index": index,
             "latest_mtime": 0.0,
+            "indexed_at": 0.0,
             "stale": True,
         }
         fake_cache = {str(root): cache_entry}
@@ -1476,6 +1477,7 @@ class TestFileWatcherIncrementalUpdates:
         index.incremental_reindex.assert_awaited_once()
         provider.get_stats.assert_awaited_once()
         assert cache_entry["latest_mtime"] == _latest_mtime(root)
+        assert cache_entry["indexed_at"] > 0.0
         assert cache_entry["stale"] is False
 
     @pytest.mark.asyncio
