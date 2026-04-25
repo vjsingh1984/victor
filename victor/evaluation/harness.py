@@ -46,12 +46,10 @@ from victor.evaluation.runtime_feedback import (
     derive_runtime_evaluation_feedback,
 )
 from victor.evaluation.validated_session_truth_emitters import (
-    ValidatedSessionTruthEmissionContext,
     ValidatedSessionTruthEmitterRegistry,
-    create_default_validated_session_truth_emitter_registry,
 )
-from victor.evaluation.validated_session_truth_persistence import (
-    persist_validated_session_truth_artifacts,
+from victor.evaluation.validated_session_truth_service import (
+    ValidatedSessionTruthService,
 )
 
 logger = logging.getLogger(__name__)
@@ -472,6 +470,7 @@ class EvaluationHarness:
         self,
         runners: Optional[dict[BenchmarkType, BaseBenchmarkRunner]] = None,
         checkpoint_dir: Optional[Path] = None,
+        validated_session_truth_service: Optional[ValidatedSessionTruthService] = None,
         validated_session_truth_emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
     ):
         """Initialize the harness.
@@ -479,12 +478,13 @@ class EvaluationHarness:
         Args:
             runners: Dict mapping benchmark types to runners
             checkpoint_dir: Directory for checkpoint files (defaults to ~/.victor/checkpoints)
+            validated_session_truth_service: Service for validated session-truth orchestration
             validated_session_truth_emitters: Registry for validated session-truth emitters
         """
         self._runners = runners or {}
-        self._validated_session_truth_emitters = (
-            validated_session_truth_emitters
-            or create_default_validated_session_truth_emitter_registry()
+        self._validated_session_truth_service = (
+            validated_session_truth_service
+            or ValidatedSessionTruthService(validated_session_truth_emitters)
         )
         try:
             from victor.config.secure_paths import get_victor_dir
@@ -1317,34 +1317,11 @@ class EvaluationHarness:
         summary: Optional[dict[str, Any]] = None,
     ) -> list[Path]:
         """Persist per-task validated session-truth artifacts for supported workflows."""
-        emitter = self._validated_session_truth_emitters.resolve(result.config.benchmark)
-        if emitter is None:
-            return []
-
-        summary_payload = summary or result.get_metrics()
-        artifacts = []
-
-        for task_result in result.task_results:
-            artifact = emitter.build_artifact(
-                ValidatedSessionTruthEmissionContext(
-                    benchmark=result.config.benchmark,
-                    results_dir=self._results_dir,
-                    task_id=task_result.task_id,
-                    source_result_path=source_result_path,
-                    task_result=task_result,
-                    config=result.config,
-                    evaluation_result=result,
-                    summary=summary_payload,
-                )
-            )
-            if artifact is None:
-                continue
-
-            artifacts.append(artifact)
-
-        return persist_validated_session_truth_artifacts(
-            artifacts,
-            refresh_dir=self._results_dir,
+        return self._validated_session_truth_service.persist_evaluation_result(
+            result,
+            results_dir=self._results_dir,
+            source_result_path=source_result_path,
+            summary=summary,
             refresh_when_empty=True,
         )
 

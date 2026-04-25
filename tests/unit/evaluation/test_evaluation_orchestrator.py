@@ -36,11 +36,6 @@ from victor.evaluation.evaluation_orchestrator import (
 )
 from victor.evaluation.result_correlation import SWEBenchScore
 from victor.evaluation.test_runners import TestRunResults
-from victor.evaluation.validated_session_truth_emitters import (
-    ValidatedSessionTruthArtifact,
-    ValidatedSessionTruthEmissionContext,
-    ValidatedSessionTruthEmitterRegistry,
-)
 
 
 class TestEvaluationStage:
@@ -516,34 +511,23 @@ class TestEvaluationOrchestrator:
             refresh_aggregate.assert_called_once_with(output_dir / "evaluations")
 
     def test_save_validated_session_feedback_uses_emitter_registry(self):
-        """The orchestrator should emit validated session truth via the shared registry."""
+        """The orchestrator should emit validated session truth via the shared service."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             config = OrchestratorConfig(output_dir=output_dir)
 
-            captured_context: dict[str, ValidatedSessionTruthEmissionContext] = {}
+            captured_kwargs = {}
 
-            class StubEmitter:
-                def supports(self, benchmark):
-                    return True
+            class StubService:
+                def persist_validation_result(self, **kwargs):
+                    captured_kwargs.update(kwargs)
+                    artifact_path = kwargs["results_dir"] / "eval_session_stub.json"
+                    artifact_path.write_text("{}")
+                    return artifact_path
 
-                def build_artifact(self, context):
-                    captured_context["value"] = context
-                    artifact_path = context.results_dir / "eval_session_stub.json"
-                    return ValidatedSessionTruthArtifact(
-                        path=artifact_path,
-                        record={
-                            "instance_id": context.task_id,
-                            "runtime_evaluation_feedback": {
-                                "metadata": {"truth_validation_mode": "stub_validation"}
-                            },
-                        },
-                    )
-
-            registry = ValidatedSessionTruthEmitterRegistry([StubEmitter()])
             orchestrator = EvaluationOrchestrator(
                 config,
-                validated_session_truth_emitters=registry,
+                validated_session_truth_service=StubService(),
             )
             validation_result = BaselineValidationResult(
                 instance_id="django__123",
@@ -577,10 +561,11 @@ class TestEvaluationOrchestrator:
                 )
 
             assert feedback_path == output_dir / "evaluations" / "eval_session_stub.json"
-            assert captured_context["value"].benchmark.value == "swe_bench"
-            assert captured_context["value"].task_id == "django__123"
-            assert captured_context["value"].validation_result is validation_result
-            refresh_aggregate.assert_called_once_with(output_dir / "evaluations")
+            assert captured_kwargs["benchmark"].value == "swe_bench"
+            assert captured_kwargs["task_id"] == "django__123"
+            assert captured_kwargs["validation_result"] is validation_result
+            assert captured_kwargs["results_dir"] == output_dir / "evaluations"
+            refresh_aggregate.assert_not_called()
 
 
 class TestProgressCallback:

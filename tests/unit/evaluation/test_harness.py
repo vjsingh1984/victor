@@ -783,6 +783,38 @@ class TestBenchmarkToolUsageMetrics:
             "browser"
         )
 
+    def test_save_validated_session_feedbacks_delegates_to_service(self, tmp_path):
+        """Harness should delegate session-truth orchestration to the shared service."""
+
+        captured = {}
+
+        class StubService:
+            def persist_evaluation_result(self, result, **kwargs):
+                captured["result"] = result
+                captured["kwargs"] = kwargs
+                return [tmp_path / "eval_session_stub.json"]
+
+        harness = EvaluationHarness(
+            checkpoint_dir=tmp_path,
+            validated_session_truth_service=StubService(),
+        )
+        harness._results_dir = tmp_path
+        result = EvaluationResult(
+            config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"),
+            task_results=[],
+        )
+
+        saved_paths = harness._save_validated_session_feedbacks(
+            result,
+            source_result_path=tmp_path / "eval_guide_20260425_010101.json",
+            summary={"total_tasks": 0, "passed": 0, "failed": 0},
+        )
+
+        assert saved_paths == [tmp_path / "eval_session_stub.json"]
+        assert captured["result"] is result
+        assert captured["kwargs"]["results_dir"] == tmp_path
+        assert captured["kwargs"]["refresh_when_empty"] is True
+
 
 class TestSaveAndLoadResults:
     """Tests for saving and loading evaluation results."""

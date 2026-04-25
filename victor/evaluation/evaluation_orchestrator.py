@@ -61,12 +61,10 @@ from victor.evaluation.baseline_validator import (
 )
 from victor.evaluation.env_setup import EnvironmentConfig, EnvironmentSetup, SetupResult
 from victor.evaluation.validated_session_truth_emitters import (
-    ValidatedSessionTruthEmissionContext,
     ValidatedSessionTruthEmitterRegistry,
-    create_default_validated_session_truth_emitter_registry,
 )
-from victor.evaluation.validated_session_truth_persistence import (
-    persist_validated_session_truth_artifacts,
+from victor.evaluation.validated_session_truth_service import (
+    ValidatedSessionTruthService,
 )
 from victor.evaluation.result_correlation import (
     CorrelationReport,
@@ -317,6 +315,7 @@ class EvaluationOrchestrator:
         self,
         config: OrchestratorConfig,
         progress_callback: Optional[ProgressCallback] = None,
+        validated_session_truth_service: Optional[ValidatedSessionTruthService] = None,
         validated_session_truth_emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
     ):
         """Initialize the orchestrator.
@@ -324,13 +323,14 @@ class EvaluationOrchestrator:
         Args:
             config: Orchestrator configuration
             progress_callback: Optional callback for progress updates
+            validated_session_truth_service: Service for validated session-truth orchestration
             validated_session_truth_emitters: Registry for validated session-truth emitters
         """
         self.config = config
         self.progress_callback = progress_callback
-        self._validated_session_truth_emitters = (
-            validated_session_truth_emitters
-            or create_default_validated_session_truth_emitter_registry()
+        self._validated_session_truth_service = (
+            validated_session_truth_service
+            or ValidatedSessionTruthService(validated_session_truth_emitters)
         )
 
         # Initialize components
@@ -775,27 +775,13 @@ class EvaluationOrchestrator:
         """Persist validated session-truth feedback from objective SWE-bench validation."""
         evaluations_dir = self.config.output_dir / "evaluations"
         evaluations_dir.mkdir(parents=True, exist_ok=True)
-        emitter = self._validated_session_truth_emitters.resolve(BenchmarkType.SWE_BENCH)
-        if emitter is None:
-            return None
-
-        artifact = emitter.build_artifact(
-            ValidatedSessionTruthEmissionContext(
-                benchmark=BenchmarkType.SWE_BENCH,
-                results_dir=evaluations_dir,
-                task_id=instance_id,
-                validation_result=validation_result,
-                score=score,
-            )
+        return self._validated_session_truth_service.persist_validation_result(
+            benchmark=BenchmarkType.SWE_BENCH,
+            results_dir=evaluations_dir,
+            task_id=instance_id,
+            validation_result=validation_result,
+            score=score,
         )
-        if artifact is None:
-            return None
-
-        saved_paths = persist_validated_session_truth_artifacts(
-            [artifact],
-            refresh_dir=evaluations_dir,
-        )
-        return saved_paths[0] if saved_paths else None
 
     def get_progress(self, instance_id: str) -> Optional[TaskProgress]:
         """Get progress for a specific task.

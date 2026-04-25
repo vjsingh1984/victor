@@ -256,10 +256,20 @@ Next recommended slice:
     runtime
 
 Next recommended slice:
-- Phase 5.13: extract a small validated session-truth service that owns emitter
-  resolution, context assembly, and persistence so runtimes only provide their
-  native evidence objects and output directories
-  - Keep the current emitter registry and persistence helper as internal pieces
-    of that service rather than introducing another parallel mechanism
-  - Use the service boundary to standardize artifact naming and future runtime
-    error handling across harness/orchestrator call sites
+- Phase 5.13 completed: extract a small validated session-truth service that
+  owns emitter resolution, context assembly, and persistence so runtimes only
+  provide their native evidence objects and output directories
+  - `validated_session_truth_service.py` now owns emitter resolution, context
+    assembly, and persistence orchestration for evaluation results and
+    validation outputs
+  - `EvaluationHarness` and `EvaluationOrchestrator` now delegate to that
+    service instead of building emission contexts themselves, while registry
+    injection remains available only as a compatibility fallback
+
+Next recommended slice:
+- Phase 5.14: centralize runtime error handling and directory/naming policy in
+  the validated session-truth service so callers stop managing those edge cases
+  directly
+  - Keep emitters focused on evidence gating and artifact construction
+  - Move common "prepare directory, persist safely, and degrade without breaking
+    the parent evaluation run" behavior behind the service boundary
