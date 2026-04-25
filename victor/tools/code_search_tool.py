@@ -572,6 +572,14 @@ def _decorate_literal_fallback_result(
     return result
 
 
+def _requested_mode_literal_fallback_metadata(mode: str) -> Dict[str, Any]:
+    """Describe early literal fallbacks for specialized search modes."""
+
+    if mode in {"bugs", "localize", "impact"}:
+        return {"requested_mode": mode, "fallback_mode": "literal"}
+    return {}
+
+
 # Directories that indicate non-core code (lower importance)
 NON_CORE_DIRS = {
     "test",
@@ -1869,7 +1877,12 @@ async def code_search(
         if disable_embeddings:
             logger.info("Embeddings disabled for this agent, falling back to literal search")
             exts = filters.extensions if filters else None
-            return await _literal_search(query, path, k, exts)
+            result = await _literal_search(query, path, k, exts)
+            return _decorate_literal_fallback_result(
+                result,
+                fallback="semantic_disabled",
+                metadata=_requested_mode_literal_fallback_metadata(mode),
+            )
 
         # Build metadata filter from optional parameters
         filter_metadata: Optional[Dict[str, Any]] = None
@@ -1929,6 +1942,7 @@ async def code_search(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_index"),
                 filters_applied=filters_applied,
+                metadata=_requested_mode_literal_fallback_metadata(mode),
             )
 
         if _is_cached_index_stale(root_path, _exec_ctx):
@@ -1942,6 +1956,7 @@ async def code_search(
                 result,
                 fallback="semantic_index_stale",
                 filters_applied=filters_applied,
+                metadata=_requested_mode_literal_fallback_metadata(mode),
             )
 
         backend_metadata = _collect_code_search_backend_metadata(index, settings)
