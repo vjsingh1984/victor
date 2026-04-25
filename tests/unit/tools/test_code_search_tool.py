@@ -408,6 +408,69 @@ async def test_code_search_semantic_mode_adds_graph_follow_up_for_entrypoint(
 
 
 @pytest.mark.asyncio
+async def test_code_search_filename_mode_uses_literal_filename_search(tmp_path) -> None:
+    """Explicit filename mode should bypass semantic indexing."""
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "count": 1,
+        "mode": "filename",
+    }
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parser.py",
+            path=str(tmp_path),
+            k=3,
+            mode="filename",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with("parser.py", str(tmp_path), 3, None)
+    get_index.assert_not_awaited()
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_code_search_auto_detected_filename_mode_uses_file_pattern_query(tmp_path) -> None:
+    """file_pattern-only searches should route through filename search with the pattern."""
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "count": 1,
+        "mode": "filename",
+    }
+    filters = SearchFilters(file_pattern="parser.py")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="ignored semantic query",
+            path=str(tmp_path),
+            k=3,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with("parser.py", str(tmp_path), 3, None)
+    get_index.assert_not_awaited()
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
 async def test_code_search_literal_mode_escalation_preserves_requested_mode_context(
     tmp_path,
 ) -> None:

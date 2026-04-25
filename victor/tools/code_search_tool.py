@@ -1776,11 +1776,17 @@ async def code_search(
         if mode == "semantic":
             mode = "filename"
 
-    # Route to literal search if mode is "literal" or "text" (alias)
-    if mode in ("literal", "text"):
+    filename_query = query
+    if mode == "filename" and filters and filters.file_pattern:
+        filename_query = filters.file_pattern
+
+    # Route to literal / filename search for non-semantic modes
+    if mode in ("literal", "text", "filename"):
         exts = filters.extensions if filters else None
-        result = await _literal_search(query, path, k, exts)
+        result = await _literal_search(filename_query, path, k, exts)
         if result.get("count", 0) > 0:
+            return result
+        if mode == "filename":
             return result
         # Auto-escalate: literal returned 0 results, try semantic if available
         settings = _exec_ctx.get("settings") if _exec_ctx else None
