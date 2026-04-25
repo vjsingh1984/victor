@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.agent.optimization_injector import OptimizationInjector
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
+from victor.evaluation.runtime_feedback import load_runtime_evaluation_feedback
 from victor.framework.perception_integration import PerceptionIntegration
 from victor.framework.runtime_evaluation_policy import (
     ClarificationDecision,
@@ -31,6 +32,11 @@ if TYPE_CHECKING:
     from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
 
 logger = logging.getLogger(__name__)
+_FEEDBACK_OVERRIDE_FIELDS = {
+    "completion_threshold",
+    "enhanced_progress_threshold",
+    "minimum_supported_evidence_score",
+}
 
 
 @dataclass(frozen=True)
@@ -63,6 +69,7 @@ class RuntimeIntelligenceService:
         optimization_injector: Optional[OptimizationInjector] = None,
         decision_service: Optional["LLMDecisionServiceProtocol"] = None,
         evaluation_policy: Optional[RuntimeEvaluationPolicy] = None,
+        evaluation_feedback_path: Optional[Any] = None,
     ) -> None:
         derived_policy = evaluation_policy
         if derived_policy is None and perception_integration is not None:
@@ -70,10 +77,22 @@ class RuntimeIntelligenceService:
         if not isinstance(derived_policy, RuntimeEvaluationPolicy):
             derived_policy = None
         resolved_policy = derived_policy or RuntimeEvaluationPolicy()
+        locked_feedback_fields = self._resolve_locked_feedback_fields(perception_integration)
+        persisted_feedback = self._load_persisted_feedback(evaluation_feedback_path)
+        if persisted_feedback is not None:
+            resolved_policy = self._apply_feedback(
+                resolved_policy,
+                persisted_feedback,
+                locked_fields=locked_feedback_fields,
+            )
         if decision_service is not None:
             feedback = self._resolve_runtime_feedback(decision_service)
             if feedback is not None:
-                resolved_policy = resolved_policy.with_feedback(feedback)
+                resolved_policy = self._apply_feedback(
+                    resolved_policy,
+                    feedback,
+                    locked_fields=locked_feedback_fields,
+                )
         self._evaluation_policy = resolved_policy
         self._task_analyzer = task_analyzer or get_task_analyzer()
         self._perception_integration = perception_integration or PerceptionIntegration(
@@ -96,6 +115,7 @@ class RuntimeIntelligenceService:
         task_analyzer: Optional[TaskAnalyzer] = None,
         perception_integration: Optional[PerceptionIntegration] = None,
         optimization_injector: Optional[OptimizationInjector] = None,
+        evaluation_feedback_path: Optional[Any] = None,
     ) -> "RuntimeIntelligenceService":
         """Create a service instance by resolving the decision service from an orchestrator."""
         container = getattr(orchestrator, "_container", None)
@@ -104,6 +124,7 @@ class RuntimeIntelligenceService:
                 task_analyzer=task_analyzer,
                 perception_integration=perception_integration,
                 optimization_injector=optimization_injector,
+                evaluation_feedback_path=evaluation_feedback_path,
             )
 
         return cls.from_container(
@@ -111,6 +132,7 @@ class RuntimeIntelligenceService:
             task_analyzer=task_analyzer,
             perception_integration=perception_integration,
             optimization_injector=optimization_injector,
+            evaluation_feedback_path=evaluation_feedback_path,
         )
 
     @classmethod
@@ -121,6 +143,7 @@ class RuntimeIntelligenceService:
         task_analyzer: Optional[TaskAnalyzer] = None,
         perception_integration: Optional[PerceptionIntegration] = None,
         optimization_injector: Optional[OptimizationInjector] = None,
+        evaluation_feedback_path: Optional[Any] = None,
     ) -> "RuntimeIntelligenceService":
         """Create a service instance by resolving the decision service from a container."""
         decision_service = cls._resolve_decision_service(container)
@@ -129,6 +152,7 @@ class RuntimeIntelligenceService:
             perception_integration=perception_integration,
             optimization_injector=optimization_injector,
             decision_service=decision_service,
+            evaluation_feedback_path=evaluation_feedback_path,
         )
 
     @staticmethod
@@ -150,7 +174,9 @@ class RuntimeIntelligenceService:
     @staticmethod
     def _resolve_runtime_feedback(decision_service: Any) -> Optional[Any]:
         """Resolve runtime evaluation feedback from a decision service when supported."""
-        if decision_service is None or not hasattr(decision_service, "get_runtime_evaluation_feedback"):
+        if decision_service is None or not hasattr(
+            decision_service, "get_runtime_evaluation_feedback"
+        ):
             return None
         try:
             return decision_service.get_runtime_evaluation_feedback()
@@ -160,6 +186,44 @@ class RuntimeIntelligenceService:
                 exc,
             )
             return None
+
+    @staticmethod
+    def _load_persisted_feedback(path: Optional[Any]) -> Optional[Any]:
+        """Load persisted benchmark-truth feedback when available."""
+        try:
+            return load_runtime_evaluation_feedback(path)
+        except Exception as exc:
+            logger.debug("Runtime intelligence could not load persisted feedback: %s", exc)
+            return None
+
+    @staticmethod
+    def _resolve_locked_feedback_fields(perception_integration: Any) -> set[str]:
+        """Keep explicit runtime config authoritative over persisted calibration overlays."""
+        config = getattr(perception_integration, "config", None)
+        if not isinstance(config, dict):
+            return set()
+        return {key for key in _FEEDBACK_OVERRIDE_FIELDS if config.get(key) is not None}
+
+    @staticmethod
+    def _apply_feedback(
+        policy: RuntimeEvaluationPolicy,
+        feedback: Any,
+        *,
+        locked_fields: Optional[set[str]] = None,
+    ) -> RuntimeEvaluationPolicy:
+        """Apply runtime feedback without overriding explicitly configured thresholds."""
+        if feedback is None:
+            return policy
+
+        locked = locked_fields or set()
+        overrides = {
+            field_name: getattr(feedback, field_name, None)
+            for field_name in _FEEDBACK_OVERRIDE_FIELDS
+            if field_name not in locked and getattr(feedback, field_name, None) is not None
+        }
+        if not overrides:
+            return policy
+        return policy.with_overrides(**overrides)
 
     def _synchronize_perception_policy(self, perception_integration: Any) -> None:
         """Align the underlying perception integration with the shared runtime policy."""

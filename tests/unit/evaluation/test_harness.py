@@ -28,6 +28,7 @@ from victor.evaluation.harness import (
     EvaluationHarness,
     get_harness,
 )
+from victor.evaluation.runtime_feedback import load_runtime_evaluation_feedback
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
     BenchmarkTask,
@@ -224,7 +225,6 @@ class TestTaskEnvironmentInit:
 
 class TestParseTestOutput:
     """Tests for _parse_test_output method."""
-
 
 
 class TestTaskEnvironmentSeedFiles:
@@ -540,7 +540,6 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["tasks"][0]["code_search_calls"] == 2
         assert loaded["tasks"][0]["graph_calls"] == 1
 
-
     def test_save_results_persists_failure_taxonomy(self, tmp_path):
         """Saved results should include normalized failure category fields."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)
@@ -650,6 +649,59 @@ class TestBenchmarkToolUsageMetrics:
             "source_name": "GUIDE Consortium",
             "version": "2026.04",
         }
+
+    def test_save_results_persists_runtime_evaluation_feedback(self, tmp_path):
+        """Saved results should emit canonical runtime-calibration feedback artifacts."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        harness._results_dir = tmp_path
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.DR3_EVAL,
+                model="test",
+                dataset_metadata={"source_name": "DR3-Eval", "version": "2026.04"},
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    tests_passed=3,
+                    tests_total=3,
+                    completion_score=1.0,
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    completion_score=1.0,
+                    failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+                    failure_details={
+                        "claim_coverage": 1.0,
+                        "citation_coverage": 1.0,
+                        "forbidden_claim_hits": ["invented claim"],
+                    },
+                ),
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+        feedback_path = tmp_path / "runtime_evaluation_feedback.json"
+        feedback = load_runtime_evaluation_feedback(feedback_path)
+
+        assert (
+            loaded["runtime_evaluation_feedback"]["metadata"]["source"]
+            == "benchmark_truth_feedback"
+        )
+        assert feedback is not None
+        assert feedback.metadata["benchmark"] == "dr3_eval"
+        assert feedback.metadata["model"] == "test"
+        assert feedback.metadata["dataset_metadata"] == {
+            "source_name": "DR3-Eval",
+            "version": "2026.04",
+        }
+        assert feedback.metadata["source_result_path"] == str(saved_path)
+        assert feedback.completion_threshold == pytest.approx(
+            loaded["runtime_evaluation_feedback"]["completion_threshold"]
+        )
 
 
 class TestSaveAndLoadResults:

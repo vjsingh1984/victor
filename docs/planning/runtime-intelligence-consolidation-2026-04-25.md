@@ -164,8 +164,17 @@ Completed on 2026-04-25:
   - `RuntimeIntelligenceService.from_container(...)` now applies decision-service
     runtime feedback to the shared policy and synchronizes the perception path to
     that calibrated policy
+- Phase 5.5 benchmark-truth feedback persistence:
+  - `EvaluationHarness` now derives runtime-calibration feedback from persisted
+    benchmark truth metrics and saves both per-run snapshots plus the canonical
+    `runtime_evaluation_feedback.json` artifact under the evaluation results path
+  - `RuntimeIntelligenceService` now loads persisted benchmark-truth feedback as
+    a first-class calibration input before live decision-service feedback
+  - Explicit live runtime config remains authoritative, so persisted or live
+    calibration can tune future runs without silently overriding intentionally set
+    thresholds on the active execution path
 
 Next recommended slice:
-- Phase 5.5: persist benchmark-truth feedback back into the runtime calibration
-  path so offline evaluation outcomes can update future live policies without
-  requiring ad hoc threshold wiring
+- Phase 5.6: add freshness and aggregation policy for benchmark-truth feedback so
+  runtime calibration can prefer the most relevant recent benchmark evidence
+  without overfitting to a single stale or narrow evaluation artifact

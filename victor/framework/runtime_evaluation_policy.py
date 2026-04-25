@@ -63,6 +63,37 @@ class RuntimeEvaluationFeedback:
     minimum_supported_evidence_score: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize feedback for persistence."""
+        return {
+            "completion_threshold": self.completion_threshold,
+            "enhanced_progress_threshold": self.enhanced_progress_threshold,
+            "minimum_supported_evidence_score": self.minimum_supported_evidence_score,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "RuntimeEvaluationFeedback":
+        """Reconstruct persisted runtime-evaluation feedback."""
+        return cls(
+            completion_threshold=(
+                float(payload["completion_threshold"])
+                if payload.get("completion_threshold") is not None
+                else None
+            ),
+            enhanced_progress_threshold=(
+                float(payload["enhanced_progress_threshold"])
+                if payload.get("enhanced_progress_threshold") is not None
+                else None
+            ),
+            minimum_supported_evidence_score=(
+                float(payload["minimum_supported_evidence_score"])
+                if payload.get("minimum_supported_evidence_score") is not None
+                else None
+            ),
+            metadata=dict(payload.get("metadata") or {}),
+        )
+
 
 @dataclass(frozen=True)
 class RuntimeEvaluationPolicy:
@@ -102,9 +133,7 @@ class RuntimeEvaluationPolicy:
     completion_success_reason_template: str = (
         "Requirements satisfied: {score:.2f} >= {threshold:.2f}"
     )
-    completion_progress_reason_template: str = (
-        "Progress: {score:.2f} (threshold: {threshold:.2f})"
-    )
+    completion_progress_reason_template: str = "Progress: {score:.2f} (threshold: {threshold:.2f})"
     completion_retry_reason_template: str = "Insufficient progress: {score:.2f}"
     retry_exhausted_reason_template: str = (
         "Low confidence retry budget exhausted after {retry_count} retries"
@@ -131,9 +160,7 @@ class RuntimeEvaluationPolicy:
         """Return a cloned policy with non-None overrides applied."""
         allowed = {field.name for field in fields(self)}
         filtered = {
-            key: value
-            for key, value in overrides.items()
-            if key in allowed and value is not None
+            key: value for key, value in overrides.items() if key in allowed and value is not None
         }
         if not filtered:
             return self
@@ -187,8 +214,12 @@ class RuntimeEvaluationPolicy:
                 confidence=float(getattr(perception, "confidence", 0.0) or 0.0),
             )
 
-        reason = getattr(perception, "clarification_reason", None) or self.fallback_clarification_reason
-        prompt = getattr(perception, "clarification_prompt", None) or self.default_clarification_prompt
+        reason = (
+            getattr(perception, "clarification_reason", None) or self.fallback_clarification_reason
+        )
+        prompt = (
+            getattr(perception, "clarification_prompt", None) or self.default_clarification_prompt
+        )
         confidence = float(getattr(perception, "confidence", 0.0) or 0.0)
         return ClarificationDecision(
             requires_clarification=True,
@@ -348,7 +379,9 @@ class RuntimeEvaluationPolicy:
         if not getattr(evaluation, "should_retry", False) or evaluation.score >= threshold:
             return evaluation
 
-        effective_retry_limit = self.low_confidence_retry_limit if retry_limit is None else retry_limit
+        effective_retry_limit = (
+            self.low_confidence_retry_limit if retry_limit is None else retry_limit
+        )
         effective_retry_limit = max(int(effective_retry_limit), 0)
         retry_count = int(state.get("low_confidence_retries", 0))
         if retry_count >= effective_retry_limit:

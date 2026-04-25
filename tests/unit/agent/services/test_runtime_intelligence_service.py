@@ -9,7 +9,9 @@ from victor.agent.services.runtime_intelligence import (
     PromptOptimizationBundle,
     RuntimeIntelligenceService,
 )
+from victor.evaluation.runtime_feedback import save_runtime_evaluation_feedback
 from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+from victor.framework.perception_integration import PerceptionIntegration
 from victor.framework.runtime_evaluation_policy import (
     RuntimeEvaluationFeedback,
     RuntimeEvaluationPolicy,
@@ -258,8 +260,8 @@ def test_from_container_applies_decision_service_runtime_feedback():
         enhanced_progress_threshold=0.62,
         minimum_supported_evidence_score=0.84,
     )
-    container.get_optional.side_effect = (
-        lambda protocol: decision_service if protocol is LLMDecisionServiceProtocol else None
+    container.get_optional.side_effect = lambda protocol: (
+        decision_service if protocol is LLMDecisionServiceProtocol else None
     )
 
     service = RuntimeIntelligenceService.from_container(container)
@@ -267,4 +269,97 @@ def test_from_container_applies_decision_service_runtime_feedback():
     assert service.evaluation_policy.completion_threshold == pytest.approx(0.77)
     assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.62)
     assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.84)
-    assert service.perception_integration.evaluation_policy.completion_threshold == pytest.approx(0.77)
+    assert service.perception_integration.evaluation_policy.completion_threshold == pytest.approx(
+        0.77
+    )
+
+
+def test_runtime_intelligence_loads_persisted_evaluation_feedback(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.74,
+            enhanced_progress_threshold=0.58,
+            minimum_supported_evidence_score=0.86,
+            metadata={"source": "benchmark_truth_feedback"},
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    assert service.evaluation_policy.completion_threshold == pytest.approx(0.74)
+    assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.58)
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.86)
+    assert (
+        service.perception_integration.evaluation_policy.minimum_supported_evidence_score
+        == pytest.approx(0.86)
+    )
+
+
+def test_from_container_merges_persisted_feedback_before_decision_service_feedback(tmp_path):
+    from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.71,
+            enhanced_progress_threshold=0.56,
+            minimum_supported_evidence_score=0.89,
+            metadata={"source": "benchmark_truth_feedback"},
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+    container = MagicMock()
+    decision_service = MagicMock()
+    decision_service.get_runtime_evaluation_feedback.return_value = RuntimeEvaluationFeedback(
+        completion_threshold=0.79,
+        enhanced_progress_threshold=None,
+        minimum_supported_evidence_score=None,
+        metadata={"source": "decision_service"},
+    )
+    container.get_optional.side_effect = lambda protocol: (
+        decision_service if protocol is LLMDecisionServiceProtocol else None
+    )
+
+    service = RuntimeIntelligenceService.from_container(
+        container,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    assert service.evaluation_policy.completion_threshold == pytest.approx(0.79)
+    assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.56)
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.89)
+
+
+def test_runtime_intelligence_keeps_explicit_config_thresholds_over_persisted_feedback(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.74,
+            enhanced_progress_threshold=0.58,
+            minimum_supported_evidence_score=0.86,
+            metadata={"source": "benchmark_truth_feedback"},
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+    perception_integration = PerceptionIntegration(config={"completion_threshold": 0.93})
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=perception_integration,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_policy=RuntimeEvaluationPolicy.from_config({"completion_threshold": 0.93}),
+        evaluation_feedback_path=feedback_path,
+    )
+
+    assert service.evaluation_policy.completion_threshold == pytest.approx(0.93)
+    assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.58)
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.86)
+    assert service.perception_integration.evaluation_policy.completion_threshold == pytest.approx(
+        0.93
+    )
