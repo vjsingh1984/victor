@@ -306,8 +306,18 @@ Next recommended slice:
     concrete service factory directly
 
 Next recommended slice:
-- Phase 5.18: narrow validated session-truth constructor and factory typing to
-  a protocol so evaluation runtimes depend on the service contract rather than
-  the concrete implementation class
-  - Keep the canonical evaluation-level factory path in `services.py`
-  - Preserve existing runtime behavior while reducing implementation coupling
+- Phase 5.18 completed: narrow validated session-truth constructor and factory
+  typing to a protocol so evaluation runtimes depend on the service contract
+  rather than the concrete implementation class
+  - `services.py` now exposes `ValidatedSessionTruthServiceProtocol` alongside
+    the canonical evaluation-level factory
+  - `EvaluationHarness` and `EvaluationOrchestrator` now type their injected
+    service dependency against the protocol while preserving existing runtime
+    behavior
+
+Next recommended slice:
+- Phase 5.19: centralize validated session-truth service resolution so
+  constructor compatibility shims and default factory fallback are owned by one
+  evaluation-level helper instead of being open-coded in each runtime
+  - Keep explicit service injection authoritative
+  - Preserve the legacy registry keyword only through the shared resolution path

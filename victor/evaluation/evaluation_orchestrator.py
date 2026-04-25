@@ -64,7 +64,7 @@ from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmitterRegistry,
 )
 from victor.evaluation.services import (
-    ValidatedSessionTruthService,
+    ValidatedSessionTruthServiceProtocol,
     create_validated_session_truth_service,
 )
 from victor.evaluation.result_correlation import (
@@ -316,7 +316,7 @@ class EvaluationOrchestrator:
         self,
         config: OrchestratorConfig,
         progress_callback: Optional[ProgressCallback] = None,
-        validated_session_truth_service: Optional[ValidatedSessionTruthService] = None,
+        validated_session_truth_service: Optional[ValidatedSessionTruthServiceProtocol] = None,
         **legacy_kwargs: Any,
     ):
         """Initialize the orchestrator.

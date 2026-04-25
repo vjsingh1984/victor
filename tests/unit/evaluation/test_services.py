@@ -6,6 +6,7 @@
 """Tests for canonical evaluation service exports."""
 
 from victor.evaluation.services import (
+    ValidatedSessionTruthServiceProtocol,
     ValidatedSessionTruthService as exported_service,
     create_validated_session_truth_service,
 )
@@ -29,3 +30,14 @@ def test_create_validated_session_truth_service_uses_supplied_registry():
 
     assert isinstance(service, concrete_service)
     assert service._emitters is registry
+
+
+def test_validated_session_truth_service_protocol_accepts_duck_typed_service():
+    class StubService:
+        def persist_evaluation_result(self, result, **kwargs):
+            return []
+
+        def persist_validation_result(self, **kwargs):
+            return None
+
+    assert isinstance(StubService(), ValidatedSessionTruthServiceProtocol)

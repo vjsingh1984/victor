@@ -49,7 +49,7 @@ from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmitterRegistry,
 )
 from victor.evaluation.services import (
-    ValidatedSessionTruthService,
+    ValidatedSessionTruthServiceProtocol,
     create_validated_session_truth_service,
 )
 
@@ -471,7 +471,7 @@ class EvaluationHarness:
         self,
         runners: Optional[dict[BenchmarkType, BaseBenchmarkRunner]] = None,
         checkpoint_dir: Optional[Path] = None,
-        validated_session_truth_service: Optional[ValidatedSessionTruthService] = None,
+        validated_session_truth_service: Optional[ValidatedSessionTruthServiceProtocol] = None,
         **legacy_kwargs: Any,
     ):
         """Initialize the harness.

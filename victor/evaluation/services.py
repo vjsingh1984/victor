@@ -7,25 +7,59 @@ from __future__ import annotations
 
 """Canonical evaluation-level service factories and exports."""
 
+from pathlib import Path
 from typing import Optional
+from typing import Any, Mapping, Protocol, runtime_checkable
 
-from victor.evaluation.validated_session_truth_emitters import (
-    ValidatedSessionTruthEmitterRegistry,
-)
+from victor.evaluation.protocol import BenchmarkType, EvaluationResult
+from victor.evaluation.validated_session_truth_emitters import ValidatedSessionTruthEmitterRegistry
 from victor.evaluation.validated_session_truth_service import (
     ValidatedSessionTruthService,
     create_default_validated_session_truth_service,
 )
 
 
+@runtime_checkable
+class ValidatedSessionTruthServiceProtocol(Protocol):
+    """Contract for evaluation runtimes that persist validated session truth."""
+
+    def persist_evaluation_result(
+        self,
+        result: EvaluationResult,
+        *,
+        results_dir: Path,
+        source_result_path: Path,
+        summary: Optional[Mapping[str, Any]] = None,
+        refresh_when_empty: bool = True,
+    ) -> list[Path]:
+        """Persist per-task validated session-truth artifacts from an evaluation result."""
+        ...
+
+    def persist_validation_result(
+        self,
+        *,
+        benchmark: BenchmarkType,
+        results_dir: Path,
+        task_id: str,
+        validation_result: Any,
+        score: Any = None,
+        source_result_path: Optional[Path] = None,
+        metadata: Optional[Mapping[str, Any]] = None,
+        refresh_when_empty: bool = False,
+    ) -> Optional[Path]:
+        """Persist validated session-truth artifacts from validation output."""
+        ...
+
+
 def create_validated_session_truth_service(
     emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
-) -> ValidatedSessionTruthService:
+) -> ValidatedSessionTruthServiceProtocol:
     """Return the canonical validated session-truth service for evaluation flows."""
     return create_default_validated_session_truth_service(emitters)
 
 
 __all__ = [
+    "ValidatedSessionTruthServiceProtocol",
     "ValidatedSessionTruthService",
     "create_validated_session_truth_service",
 ]
