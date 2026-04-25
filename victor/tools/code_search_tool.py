@@ -2257,6 +2257,8 @@ async def code_search(
             except Exception as e:
                 logger.debug(f"Failed to record threshold learning outcome: {e}")
 
+        response_mode = "semantic"
+
         # Optionally combine with keyword search using hybrid RRF
         if enable_hybrid:
             try:
@@ -2304,6 +2306,7 @@ async def code_search(
                         }
                         for hr in hybrid_results
                     ]
+                    response_mode = "hybrid"
 
                     logger.info(
                         f"Hybrid search combined semantic + keyword → {len(results)} results"
@@ -2329,7 +2332,7 @@ async def code_search(
 
         return _build_search_response(
             results=ranked_results,
-            mode="semantic",
+            mode=response_mode,
             rebuilt=rebuilt,
             root_path=root_path,
             exec_ctx=_exec_ctx,

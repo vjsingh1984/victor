@@ -629,7 +629,7 @@ async def test_code_search_hybrid_mode_preserves_extension_filter_for_keyword_si
 
     literal_search.assert_awaited_once_with("main entrypoint", str(tmp_path), 6, exts=["py"])
     assert result["success"] is True
-    assert result["mode"] == "semantic"
+    assert result["mode"] == "hybrid"
 
 
 @pytest.mark.asyncio
@@ -690,6 +690,7 @@ async def test_code_search_hybrid_mode_uses_keyword_results_when_semantic_is_emp
 
     literal_search.assert_awaited_once_with("main entrypoint", str(tmp_path), 6, exts=None)
     assert result["success"] is True
+    assert result["mode"] == "hybrid"
     assert result["count"] == 1
     assert result["results"][0]["file_path"] == "src/main.py"
     assert result["results"][0]["search_mode"] == "hybrid"
