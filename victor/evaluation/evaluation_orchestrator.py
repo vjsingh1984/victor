@@ -61,14 +61,19 @@ from victor.evaluation.baseline_validator import (
 )
 from victor.evaluation.env_setup import EnvironmentConfig, EnvironmentSetup, SetupResult
 from victor.evaluation.runtime_feedback import (
-    build_swe_bench_validated_session_feedback_payload,
     refresh_runtime_evaluation_feedback_aggregate,
+)
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthEmissionContext,
+    ValidatedSessionTruthEmitterRegistry,
+    create_default_validated_session_truth_emitter_registry,
 )
 from victor.evaluation.result_correlation import (
     CorrelationReport,
     ResultCorrelator,
     SWEBenchScore,
 )
+from victor.evaluation.protocol import BenchmarkType
 from victor.evaluation.swe_bench_loader import (
     SWEBenchConfig,
     SWEBenchInstance,
@@ -312,15 +317,21 @@ class EvaluationOrchestrator:
         self,
         config: OrchestratorConfig,
         progress_callback: Optional[ProgressCallback] = None,
+        validated_session_truth_emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
     ):
         """Initialize the orchestrator.
 
         Args:
             config: Orchestrator configuration
             progress_callback: Optional callback for progress updates
+            validated_session_truth_emitters: Registry for validated session-truth emitters
         """
         self.config = config
         self.progress_callback = progress_callback
+        self._validated_session_truth_emitters = (
+            validated_session_truth_emitters
+            or create_default_validated_session_truth_emitter_registry()
+        )
 
         # Initialize components
         self._loader: Optional[SWEBenchLoader] = None
@@ -764,33 +775,25 @@ class EvaluationOrchestrator:
         """Persist validated session-truth feedback from objective SWE-bench validation."""
         evaluations_dir = self.config.output_dir / "evaluations"
         evaluations_dir.mkdir(parents=True, exist_ok=True)
-        feedback_file = evaluations_dir / f"eval_session_{instance_id}.json"
-        payload = build_swe_bench_validated_session_feedback_payload(
-            validation_result,
-            score=score,
-            source_result_path=feedback_file,
-        )
-        if payload is None:
+        emitter = self._validated_session_truth_emitters.resolve(BenchmarkType.SWE_BENCH)
+        if emitter is None:
             return None
 
-        record = {
-            "instance_id": instance_id,
-            "repo": getattr(getattr(validation_result, "baseline", None), "repo", None),
-            "runtime_evaluation_feedback": payload,
-            "validation_result": (
-                validation_result.to_dict()
-                if hasattr(validation_result, "to_dict")
-                else {
-                    "success": getattr(validation_result, "success", False),
-                    "partial_success": getattr(validation_result, "partial_success", False),
-                    "score": getattr(validation_result, "score", 0.0),
-                }
-            ),
-            "score": score.to_dict() if score is not None and hasattr(score, "to_dict") else None,
-        }
-        feedback_file.write_text(json.dumps(record, indent=2))
+        artifact = emitter.build_artifact(
+            ValidatedSessionTruthEmissionContext(
+                benchmark=BenchmarkType.SWE_BENCH,
+                results_dir=evaluations_dir,
+                task_id=instance_id,
+                validation_result=validation_result,
+                score=score,
+            )
+        )
+        if artifact is None:
+            return None
+
+        artifact.path.write_text(json.dumps(artifact.record, indent=2))
         refresh_runtime_evaluation_feedback_aggregate(evaluations_dir)
-        return feedback_file
+        return artifact.path
 
     def get_progress(self, instance_id: str) -> Optional[TaskProgress]:
         """Get progress for a specific task.

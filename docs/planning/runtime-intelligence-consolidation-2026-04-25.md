@@ -231,10 +231,23 @@ Next recommended slice:
     the same persistence path without reopening harness orchestration
 
 Next recommended slice:
-- Phase 5.11: migrate coding/SWE-bench validated session-truth emission onto
-  the same emitter contract so `EvaluationOrchestrator` and `EvaluationHarness`
-  share one extensibility model for all benchmark families
-  - Keep the stronger coding evidence gate intact: valid baseline plus actual
-    post-change test evidence must still remain the admission rule
-  - Prefer adapting `EvaluationOrchestrator` to the registry contract over
-    introducing a second parallel abstraction
+- Phase 5.11 completed: migrate coding/SWE-bench validated session-truth
+  emission onto the same emitter contract so `EvaluationOrchestrator` and
+  `EvaluationHarness` share one extensibility model for all benchmark families
+  - `validated_session_truth_emitters.py` now includes the canonical SWE-bench
+    emitter and a shared emission-context contract used by browser, research,
+    and coding workflows
+  - `EvaluationOrchestrator` now resolves the SWE-bench emitter through the
+    same registry contract instead of building coding session-truth artifacts
+    through a direct ad hoc code path
+  - The stronger coding evidence gate remains intact: valid baseline plus actual
+    post-change test evidence is still the admission rule for coding feedback
+
+Next recommended slice:
+- Phase 5.12: extract shared validated session-truth persistence/refresh
+  orchestration so harnesses and orchestrators stop duplicating artifact write
+  and aggregate refresh mechanics after emitter resolution
+  - Keep emitter responsibility limited to evidence gating plus artifact
+    construction
+  - Move file persistence and aggregate refresh into one canonical helper so
+    future runtimes reuse the same failure handling and naming policy

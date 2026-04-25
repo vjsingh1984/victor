@@ -47,6 +47,7 @@ from victor.evaluation.runtime_feedback import (
     refresh_runtime_evaluation_feedback_aggregate,
 )
 from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthEmissionContext,
     ValidatedSessionTruthEmitterRegistry,
     create_default_validated_session_truth_emitter_registry,
 )
@@ -1326,12 +1327,16 @@ class EvaluationHarness:
 
         for task_result in result.task_results:
             artifact = emitter.build_artifact(
-                task_result,
-                config=result.config,
-                evaluation_result=result,
-                summary=summary_payload,
-                results_dir=self._results_dir,
-                source_result_path=source_result_path,
+                ValidatedSessionTruthEmissionContext(
+                    benchmark=result.config.benchmark,
+                    results_dir=self._results_dir,
+                    task_id=task_result.task_id,
+                    source_result_path=source_result_path,
+                    task_result=task_result,
+                    config=result.config,
+                    evaluation_result=result,
+                    summary=summary_payload,
+                )
             )
             if artifact is None:
                 continue

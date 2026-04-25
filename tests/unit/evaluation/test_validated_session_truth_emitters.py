@@ -5,6 +5,11 @@
 
 """Tests for registry-backed validated session-truth emitters."""
 
+from victor.evaluation.baseline_validator import (
+    BaselineStatus,
+    BaselineValidationResult,
+    TestBaseline,
+)
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
     BenchmarkType,
@@ -13,7 +18,10 @@ from victor.evaluation.protocol import (
     TaskResult,
     TaskStatus,
 )
+from victor.evaluation.result_correlation import SWEBenchScore
+from victor.evaluation.test_runners import TestRunResults
 from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthEmissionContext,
     ValidatedSessionTruthEmitterRegistry,
     create_default_validated_session_truth_emitter_registry,
 )
@@ -71,12 +79,16 @@ def test_browser_emitter_builds_artifact_with_canonical_payload(tmp_path):
     evaluation_result = EvaluationResult(config=config, task_results=[task_result])
 
     artifact = emitter.build_artifact(
-        task_result,
-        config=config,
-        evaluation_result=evaluation_result,
-        summary={"total_tasks": 1, "passed": 0, "failed": 1},
-        results_dir=tmp_path,
-        source_result_path=tmp_path / "eval_guide_20260425_010101.json",
+        ValidatedSessionTruthEmissionContext(
+            benchmark=BenchmarkType.GUIDE,
+            results_dir=tmp_path,
+            task_id=task_result.task_id,
+            source_result_path=tmp_path / "eval_guide_20260425_010101.json",
+            task_result=task_result,
+            config=config,
+            evaluation_result=evaluation_result,
+            summary={"total_tasks": 1, "passed": 0, "failed": 1},
+        )
     )
 
     assert artifact is not None
@@ -100,12 +112,78 @@ def test_deep_research_emitter_returns_none_without_posthoc_evidence(tmp_path):
     evaluation_result = EvaluationResult(config=config, task_results=[task_result])
 
     artifact = emitter.build_artifact(
-        task_result,
-        config=config,
-        evaluation_result=evaluation_result,
-        summary={"total_tasks": 1, "passed": 0, "failed": 1},
-        results_dir=tmp_path,
-        source_result_path=tmp_path / "eval_dr3_eval_20260425_010101.json",
+        ValidatedSessionTruthEmissionContext(
+            benchmark=BenchmarkType.DR3_EVAL,
+            results_dir=tmp_path,
+            task_id=task_result.task_id,
+            source_result_path=tmp_path / "eval_dr3_eval_20260425_010101.json",
+            task_result=task_result,
+            config=config,
+            evaluation_result=evaluation_result,
+            summary={"total_tasks": 1, "passed": 0, "failed": 1},
+        )
     )
 
     assert artifact is None
+
+
+def test_default_registry_resolves_swe_bench_emitter():
+    registry = create_default_validated_session_truth_emitter_registry()
+
+    emitter = registry.resolve(BenchmarkType.SWE_BENCH)
+
+    assert emitter is not None
+    assert emitter.supports(BenchmarkType.SWE_BENCH) is True
+
+
+def test_swe_bench_emitter_builds_artifact_from_validation_outputs(tmp_path):
+    registry = create_default_validated_session_truth_emitter_registry()
+    emitter = registry.resolve(BenchmarkType.SWE_BENCH)
+    assert emitter is not None
+
+    validation_result = BaselineValidationResult(
+        instance_id="django__123",
+        baseline=TestBaseline(
+            instance_id="django__123",
+            repo="django/django",
+            base_commit="abc123",
+            fail_to_pass=["test_fix_a", "test_fix_b"],
+            pass_to_pass=["test_keep_green"],
+            status=BaselineStatus.VALID,
+        ),
+        post_change_results=TestRunResults(total=3, passed=2, failed=1, duration_seconds=8.0),
+        fail_to_pass_fixed=["test_fix_a"],
+        pass_to_pass_broken=[],
+        success=False,
+        partial_success=True,
+        score=0.5,
+    )
+    score = SWEBenchScore(
+        instance_id="django__123",
+        resolved=False,
+        partial=True,
+        fail_to_pass_score=0.5,
+        pass_to_pass_score=1.0,
+        overall_score=0.7,
+        tests_fixed=1,
+        tests_broken=0,
+        total_fail_to_pass=2,
+        total_pass_to_pass=1,
+    )
+
+    artifact = emitter.build_artifact(
+        ValidatedSessionTruthEmissionContext(
+            benchmark=BenchmarkType.SWE_BENCH,
+            results_dir=tmp_path,
+            task_id="django__123",
+            validation_result=validation_result,
+            score=score,
+        )
+    )
+
+    assert artifact is not None
+    assert artifact.path.name == "eval_session_django__123.json"
+    assert (
+        artifact.record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
+        == "swe_bench_posthoc_validation"
+    )
