@@ -82,6 +82,16 @@ class _TrackingIndexLockRegistry(_FakeIndexLockRegistry):
         return _TrackingAsyncLock(self)
 
 
+class _SerialIndexLockRegistry(_FakeIndexLockRegistry):
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = asyncio.Lock()
+
+    async def acquire_lock(self, root: Path) -> asyncio.Lock:
+        self.used_paths.append(root)
+        return self._lock
+
+
 class _FakeCapabilityRegistry:
     def __init__(self, factory: object) -> None:
         self._factory = factory
@@ -610,6 +620,90 @@ class TestStructuralIndexPersistence:
         assert "watcher_subscription_task" not in fake_cache[str(root)]
         factory.assert_not_called()
         cached_index.incremental_reindex.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_coalesces_incremental_refresh_under_lock(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(tmp_path / "embeddings"),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        provider = SimpleNamespace(
+            config=SimpleNamespace(vector_store="victor_structural_bridge"),
+            get_stats=AsyncMock(return_value={"total_documents": 1}),
+        )
+
+        async def _delayed_incremental() -> None:
+            await asyncio.sleep(0.01)
+
+        cached_index = SimpleNamespace(
+            incremental_reindex=AsyncMock(side_effect=_delayed_incremental),
+            embedding_provider=provider,
+        )
+        index_manifest = build_codebase_index_manifest(
+            _build_codebase_embedding_config(settings, root)
+        )
+        fake_cache: dict[str, dict[str, object]] = {
+            str(root): {
+                "index": cached_index,
+                "latest_mtime": 0.0,
+                "indexed_at": time.time(),
+                "index_manifest": index_manifest,
+                "watcher_subscribed": True,
+            }
+        }
+
+        factory = MagicMock()
+        fake_factory = SimpleNamespace(create=factory)
+        lock_registry = _SerialIndexLockRegistry()
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: lock_registry),
+        )
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+        monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
+
+        clear_index_cache()
+        first, second = await asyncio.gather(
+            _get_or_build_index(root=root, settings=settings),
+            _get_or_build_index(root=root, settings=settings),
+        )
+
+        assert first == (cached_index, False)
+        assert second == (cached_index, False)
+        cached_index.incremental_reindex.assert_awaited_once()
+        provider.get_stats.assert_awaited_once()
+        factory.assert_not_called()
+        assert fake_cache[str(root)]["latest_mtime"] == _latest_mtime(root)
 
     @pytest.mark.asyncio
     async def test_get_or_build_index_invalidates_cached_index_when_manifest_changes(

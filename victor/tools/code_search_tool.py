@@ -656,6 +656,40 @@ async def _ensure_file_watcher_subscription(
     return subscribed
 
 
+async def _refresh_cached_index_incrementally(
+    cache_entry: Dict[str, Any],
+    root: Path,
+    *,
+    exec_ctx: Optional[Dict[str, Any]] = None,
+    ensure_watcher: bool = False,
+) -> bool:
+    """Incrementally refresh a cached index entry in-place.
+
+    Returns True when the cached index supports incremental refresh and was
+    updated successfully. Returns False when the index cannot be refreshed
+    incrementally, leaving the caller to mark or treat the cache as stale.
+    """
+
+    index = cache_entry.get("index")
+    if not hasattr(index, "incremental_reindex"):
+        logger.warning(
+            "[code_search] Index doesn't support incremental updates, marking stale: %s",
+            root,
+        )
+        cache_entry["stale"] = True
+        return False
+
+    await index.incremental_reindex()
+    await _finalize_index_storage(index)
+    cache_entry["latest_mtime"] = _latest_mtime(root)
+    cache_entry["stale"] = False
+
+    if ensure_watcher:
+        await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
+
+    return True
+
+
 async def _on_file_change(
     event: "FileChangeEvent",
     root: Path,
@@ -697,25 +731,9 @@ async def _on_file_change(
             )
 
             try:
-                index = cache_entry["index"]
-                # Check if index supports incremental updates
-                if hasattr(index, "incremental_reindex"):
-                    await index.incremental_reindex()
-                    await _finalize_index_storage(index)
-
-                    # Update mtime
-                    latest = _latest_mtime(root)
-                    cache_entry["latest_mtime"] = latest
-                    cache_entry["stale"] = False
-
+                refreshed = await _refresh_cached_index_incrementally(cache_entry, root)
+                if refreshed:
                     logger.info(f"[code_search] Incremental update complete for {root}")
-                else:
-                    # Index doesn't support incremental updates - mark as stale
-                    logger.warning(
-                        f"[code_search] Index doesn't support incremental updates, "
-                        f"marking stale: {root}"
-                    )
-                    cache_entry["stale"] = True
             except Exception as e:
                 cache_entry["stale"] = True
                 logger.error(f"[code_search] Incremental update failed: {e}")
@@ -1166,15 +1184,7 @@ async def _get_or_build_index(
 
             return cached_index, False
         else:
-            # Files changed - do incremental update instead of full rebuild
-            await cached_index.incremental_reindex()
-            await _finalize_index_storage(cached_index)
-            index_cache[str(root)]["latest_mtime"] = latest
-
-            # Subscribe to file watcher for auto-invalidation (only once per index)
-            await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
-
-            return cached_index, False  # Not a full rebuild
+            logger.info("[code_search] Cache changed for %s, refreshing under lock", root)
 
     # Acquire lock for this path to prevent concurrent indexing
     lock_registry = IndexLockRegistry.get_instance()
@@ -1202,6 +1212,16 @@ async def _get_or_build_index(
                 await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
 
                 return cached_index, False
+            else:
+                refreshed = await _refresh_cached_index_incrementally(
+                    cache_entry,
+                    root,
+                    exec_ctx=exec_ctx,
+                    ensure_watcher=True,
+                )
+                if refreshed:
+                    logger.info(f"[code_search] Incremental refresh complete for {root} (inside lock)")
+                    return cached_index, False
 
         # Build index with exclusive access to this path
         logger.info(f"[code_search] Building index for {root} (exclusive lock acquired)")
