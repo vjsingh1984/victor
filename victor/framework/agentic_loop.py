@@ -442,7 +442,6 @@ class AgenticLoop:
                 ),
                 enable_completion_scoring=self.config.get("enable_completion_scoring", True),
                 enable_context_keywords=self.config.get("enable_context_keywords", True),
-                completion_threshold=self.config.get("completion_threshold", 0.80),
                 enable_calibrated_completion=self.config.get("enable_calibrated_completion"),
                 evaluation_policy=self._evaluation_policy,
             )

@@ -145,7 +145,15 @@ Completed on 2026-04-25:
   - `PerceptionIntegration`, `RuntimeIntelligenceService`, `StreamingChatPipeline`,
     `AgenticLoop`, and `EnhancedCompletionEvaluator` now share one policy model for
     clarification defaults and confidence-band decisions
+- Phase 5.2 calibrated-completion policy consolidation:
+  - `RuntimeEvaluationPolicy` now owns calibrated completion thresholds, penalties,
+    and enhanced evaluation wording
+  - `EnhancedCompletionEvaluator` now delegates calibrated completion math and
+    enhanced COMPLETE/CONTINUE/RETRY result construction through that shared policy
+  - `AgenticLoop` now relies on the shared policy for completion-threshold
+    configuration instead of threading a separate evaluator-only threshold knob
 
 Next recommended slice:
-- Phase 5.2: move remaining evaluation-policy consumers and future calibration hooks
-  onto the shared `RuntimeEvaluationPolicy` object instead of ad hoc config reads
+- Phase 5.3: connect adaptive calibration inputs and any remaining compatibility
+  wrappers to `RuntimeEvaluationPolicy` so benchmark-truth signals can tune live
+  runtime thresholds without reintroducing scattered policy state

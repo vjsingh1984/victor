@@ -205,6 +205,17 @@ class TestAgenticLoop:
         assert result.success is True
         runtime_intelligence.analyze_turn.assert_awaited_once()
 
+    def test_loop_uses_policy_completion_threshold_from_config(self):
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            max_iterations=1,
+            config={"completion_threshold": 0.93},
+        )
+
+        assert loop._evaluation_policy.completion_threshold == 0.93
+        assert loop.enhanced_completion_evaluator.completion_threshold == 0.93
+        assert loop.enhanced_completion_evaluator.completion_scorer.default_threshold == 0.93
+
     async def test_determine_success_complete(self):
         """Success determined by last evaluation."""
         loop = self._make_loop()

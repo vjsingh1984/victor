@@ -26,6 +26,7 @@ from victor.framework.enhanced_completion_evaluation import (
 from victor.framework.evaluation_nodes import EvaluationDecision
 from victor.framework.perception_integration import RequirementType, Requirement
 from victor.framework.completion_scorer import CompletionScore, TaskType
+from victor.framework.completion_scorer import CompletionSignal
 from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.agent.turn_policy import SpinState
 
@@ -361,6 +362,105 @@ class TestEnhancedCompletionEvaluator:
 
         assert result.decision == EvaluationDecision.RETRY
         assert result.reason == "Confidence too low - retry"
+
+    @pytest.mark.asyncio
+    async def test_calibrated_completion_uses_policy_reason_and_penalty(self):
+        evaluator = EnhancedCompletionEvaluator(
+            enable_requirement_validation=True,
+            enable_completion_scoring=True,
+            enable_context_keywords=True,
+            evaluation_policy=RuntimeEvaluationPolicy(
+                completion_requires_support_reason="Need stronger execution evidence",
+                unsupported_requirement_penalty=0.2,
+                minimum_supported_evidence_score=0.95,
+            ),
+        )
+        evaluator.enable_calibrated_completion = True
+        evaluator.requirement_validator.validate_completion = Mock(
+            return_value=Mock(
+                is_satisfied=False,
+                satisfaction_score=0.75,
+                critical_gaps=[],
+                summary="missing verification",
+            )
+        )
+        evaluator.keyword_detector.detect_completion = Mock(
+            return_value=CompletionSignal(
+                has_completion_indicator=True,
+                has_complete_code=True,
+                has_structure=True,
+                is_continuation_request=False,
+                confidence=0.9,
+                evidence=["completion marker"],
+            )
+        )
+        evaluator.completion_scorer.calculate_completion_score = Mock(
+            return_value=CompletionScore(
+                total_score=0.92,
+                requirement_score=0.75,
+                fulfillment_score=0.8,
+                keyword_score=0.9,
+                confidence_score=0.8,
+                complexity_adjustment=0.0,
+                is_complete=True,
+                threshold=0.85,
+            )
+        )
+
+        perception = MockPerception(
+            confidence=0.9,
+            requirements=[
+                Requirement(type=RequirementType.FUNCTIONAL, description="Modify auth flow")
+            ],
+        )
+        action_result = MockTurnResult(
+            response="Implemented the change.",
+            has_tool_calls=False,
+            successful_tool_count=0,
+        )
+
+        result = await evaluator.evaluate(
+            perception=perception,
+            action_result=action_result,
+            state={},
+        )
+
+        assert result.decision == EvaluationDecision.CONTINUE
+        assert result.reason == "Need stronger execution evidence"
+        assert result.metadata["calibration"]["support_penalty"] == pytest.approx(0.2)
+
+    @pytest.mark.asyncio
+    async def test_evaluate_enhanced_uses_policy_progress_threshold(self):
+        evaluator = EnhancedCompletionEvaluator(
+            enable_requirement_validation=False,
+            enable_completion_scoring=True,
+            enable_context_keywords=False,
+            evaluation_policy=RuntimeEvaluationPolicy(
+                enhanced_progress_threshold=0.65,
+                completion_retry_reason_template="Retry: {score:.2f}",
+            ),
+        )
+        evaluator.completion_scorer.calculate_completion_score = Mock(
+            return_value=CompletionScore(
+                total_score=0.6,
+                requirement_score=0.5,
+                fulfillment_score=0.5,
+                keyword_score=0.5,
+                confidence_score=0.5,
+                complexity_adjustment=0.0,
+                is_complete=False,
+                threshold=0.85,
+            )
+        )
+
+        result = await evaluator.evaluate(
+            perception=MockPerception(task_type="unknown"),
+            action_result=MockTurnResult(response="Partial progress", has_content=True),
+            state={},
+        )
+
+        assert result.decision == EvaluationDecision.RETRY
+        assert result.reason == "Retry: 0.60"
 
     @pytest.mark.asyncio
     async def test_map_to_task_type_from_perception(self, evaluator):

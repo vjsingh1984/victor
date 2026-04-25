@@ -7,8 +7,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, fields
-from typing import Any, Dict, Mapping, Optional
+from dataclasses import asdict, dataclass, field, fields
+from typing import Any, Dict, List, Mapping, Optional
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,31 @@ class ClarificationDecision:
         }
 
 
+@dataclass
+class CompletionCalibration:
+    """Post-processing view of raw completion score grounded in execution support."""
+
+    raw_score: float
+    calibrated_score: float
+    evidence_score: float
+    threshold: float
+    requires_additional_support: bool
+    support_penalty: float = 0.0
+    reasons: List[str] = field(default_factory=list)
+
+    def to_metadata(self) -> Dict[str, Any]:
+        """Serialize for logging and benchmark traces."""
+        return {
+            "raw_score": round(self.raw_score, 4),
+            "calibrated_score": round(self.calibrated_score, 4),
+            "evidence_score": round(self.evidence_score, 4),
+            "threshold": round(self.threshold, 4),
+            "support_penalty": round(self.support_penalty, 4),
+            "requires_additional_support": self.requires_additional_support,
+            "reasons": list(self.reasons),
+        }
+
+
 @dataclass(frozen=True)
 class RuntimeEvaluationPolicy:
     """Shared thresholds and wording for runtime evaluation decisions."""
@@ -36,7 +61,14 @@ class RuntimeEvaluationPolicy:
     clarification_confidence_threshold: float = 0.45
     high_confidence_threshold: float = 0.8
     medium_confidence_threshold: float = 0.5
+    completion_threshold: float = 0.8
+    enhanced_progress_threshold: float = 0.5
     low_confidence_retry_limit: int = 2
+    calibrated_completion_raw_weight: float = 0.75
+    calibrated_completion_evidence_weight: float = 0.25
+    continuation_request_penalty: float = 0.10
+    unsupported_requirement_penalty: float = 0.10
+    minimum_supported_evidence_score: float = 0.75
 
     default_clarification_prompt: str = (
         "Please clarify the target file, component, or bug before I continue."
@@ -54,6 +86,16 @@ class RuntimeEvaluationPolicy:
     high_confidence_reason: str = "High confidence in perception"
     medium_confidence_reason: str = "Medium confidence - continue"
     low_confidence_reason: str = "Low confidence - retry"
+    completion_requires_support_reason: str = (
+        "Completion score is high but needs stronger execution support"
+    )
+    completion_success_reason_template: str = (
+        "Requirements satisfied: {score:.2f} >= {threshold:.2f}"
+    )
+    completion_progress_reason_template: str = (
+        "Progress: {score:.2f} (threshold: {threshold:.2f})"
+    )
+    completion_retry_reason_template: str = "Insufficient progress: {score:.2f}"
     retry_exhausted_reason_template: str = (
         "Low confidence retry budget exhausted after {retry_count} retries"
     )
@@ -142,6 +184,107 @@ class RuntimeEvaluationPolicy:
             decision=EvaluationDecision.RETRY,
             score=confidence,
             reason=self.low_confidence_reason,
+        )
+
+    def calibrate_completion(
+        self,
+        *,
+        raw_score: float,
+        evidence_score: float,
+        threshold: Optional[float] = None,
+        continuation_requested: bool = False,
+        requirements_satisfied: bool = True,
+        reasons: Optional[List[str]] = None,
+    ) -> CompletionCalibration:
+        """Adjust a completion score using shared runtime support heuristics."""
+        support_penalty = 0.0
+        resolved_reasons = list(reasons or [])
+
+        if continuation_requested:
+            support_penalty += self.continuation_request_penalty
+            resolved_reasons.append("continuation_requested")
+
+        if not requirements_satisfied and evidence_score < self.minimum_supported_evidence_score:
+            support_penalty += self.unsupported_requirement_penalty
+            resolved_reasons.append("requirements_not_fully_satisfied")
+
+        raw_weight = max(self.calibrated_completion_raw_weight, 0.0)
+        evidence_weight = max(self.calibrated_completion_evidence_weight, 0.0)
+        total_weight = raw_weight + evidence_weight
+        if total_weight <= 0:
+            raw_weight = 0.75
+            evidence_weight = 0.25
+            total_weight = 1.0
+
+        weighted_score = (
+            (raw_score * raw_weight) + (evidence_score * evidence_weight)
+        ) / total_weight
+        resolved_threshold = self.completion_threshold if threshold is None else threshold
+        calibrated_score = max(0.0, min(1.0, weighted_score - support_penalty))
+        requires_additional_support = (
+            raw_score >= resolved_threshold and calibrated_score < resolved_threshold
+        )
+
+        return CompletionCalibration(
+            raw_score=raw_score,
+            calibrated_score=calibrated_score,
+            evidence_score=evidence_score,
+            threshold=resolved_threshold,
+            requires_additional_support=requires_additional_support,
+            support_penalty=support_penalty,
+            reasons=resolved_reasons,
+        )
+
+    def build_completion_evaluation(
+        self,
+        *,
+        score: float,
+        threshold: float,
+        metadata: Optional[Dict[str, Any]] = None,
+        requires_additional_support: bool = False,
+    ) -> Any:
+        """Create the canonical enhanced-completion evaluation result."""
+        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+
+        evaluation_metadata = dict(metadata or {})
+        if requires_additional_support:
+            return EvaluationResult(
+                decision=EvaluationDecision.CONTINUE,
+                score=score,
+                reason=self.completion_requires_support_reason,
+                metadata=evaluation_metadata,
+            )
+
+        if score >= threshold:
+            return EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=score,
+                reason=self.completion_success_reason_template.format(
+                    score=score,
+                    threshold=threshold,
+                ),
+                metadata=evaluation_metadata,
+            )
+
+        if score >= self.enhanced_progress_threshold:
+            return EvaluationResult(
+                decision=EvaluationDecision.CONTINUE,
+                score=score,
+                reason=self.completion_progress_reason_template.format(
+                    score=score,
+                    threshold=threshold,
+                ),
+                metadata=evaluation_metadata,
+            )
+
+        return EvaluationResult(
+            decision=EvaluationDecision.RETRY,
+            score=score,
+            reason=self.completion_retry_reason_template.format(
+                score=score,
+                threshold=threshold,
+            ),
+            metadata=evaluation_metadata,
         )
 
     def apply_retry_budget(

@@ -57,7 +57,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import replace
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.framework.completion_scorer import (
@@ -70,7 +70,10 @@ from victor.framework.context_aware_keyword_detector import (
     ContextAwareKeywordDetector,
 )
 from victor.framework.evaluation_nodes import EvaluationDecision
-from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
+from victor.framework.runtime_evaluation_policy import (
+    CompletionCalibration,
+    RuntimeEvaluationPolicy,
+)
 from victor.framework.requirement_validator import (
     RequirementValidator,
     ValidationResult,
@@ -83,31 +86,6 @@ if TYPE_CHECKING:
     from victor.framework.agentic_loop import SpinState
     from victor.framework.fulfillment import FulfillmentDetector
     from victor.framework.perception_integration import Perception
-
-
-@dataclass
-class CompletionCalibration:
-    """Post-processing view of raw completion score grounded in execution support."""
-
-    raw_score: float
-    calibrated_score: float
-    evidence_score: float
-    threshold: float
-    requires_additional_support: bool
-    support_penalty: float = 0.0
-    reasons: List[str] = field(default_factory=list)
-
-    def to_metadata(self) -> Dict[str, Any]:
-        """Serialize for logging and benchmark traces."""
-        return {
-            "raw_score": round(self.raw_score, 4),
-            "calibrated_score": round(self.calibrated_score, 4),
-            "evidence_score": round(self.evidence_score, 4),
-            "threshold": round(self.threshold, 4),
-            "support_penalty": round(self.support_penalty, 4),
-            "requires_additional_support": self.requires_additional_support,
-            "reasons": list(self.reasons),
-        }
 
 
 class EnhancedCompletionEvaluator:
@@ -136,7 +114,7 @@ class EnhancedCompletionEvaluator:
         enable_requirement_validation: bool = True,
         enable_completion_scoring: bool = True,
         enable_context_keywords: bool = True,
-        completion_threshold: float = 0.80,
+        completion_threshold: Optional[float] = None,
         enable_calibrated_completion: Optional[bool] = None,
         evaluation_policy: Optional[RuntimeEvaluationPolicy] = None,
     ):
@@ -146,15 +124,19 @@ class EnhancedCompletionEvaluator:
             enable_requirement_validation: Enable requirement-driven validation
             enable_completion_scoring: Enable multi-signal scoring
             enable_context_keywords: Enable context-aware keyword detection
-            completion_threshold: Threshold for completion decision (0.0-1.0)
+            completion_threshold: Threshold for completion decision (0.0-1.0).
+                When omitted, uses the shared runtime evaluation policy threshold.
             enable_calibrated_completion: Whether to require execution support
                 before accepting strong completion scores. Defaults to feature flag.
         """
         self.enable_requirement_validation = enable_requirement_validation
         self.enable_completion_scoring = enable_completion_scoring
         self.enable_context_keywords = enable_context_keywords
-        self.completion_threshold = completion_threshold
-        self._evaluation_policy = evaluation_policy or RuntimeEvaluationPolicy()
+        policy = evaluation_policy or RuntimeEvaluationPolicy()
+        if completion_threshold is not None and completion_threshold != policy.completion_threshold:
+            policy = replace(policy, completion_threshold=completion_threshold)
+        self._evaluation_policy = policy
+        self.completion_threshold = self._evaluation_policy.completion_threshold
         if enable_calibrated_completion is None:
             try:
                 from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
@@ -168,7 +150,7 @@ class EnhancedCompletionEvaluator:
 
         # Initialize components
         self.requirement_validator = RequirementValidator()
-        self.completion_scorer = CompletionScorer()
+        self.completion_scorer = CompletionScorer(default_threshold=self.completion_threshold)
         self.keyword_detector = ContextAwareKeywordDetector()
 
     async def evaluate(
@@ -336,35 +318,19 @@ class EnhancedCompletionEvaluator:
                 score = calibration.calibrated_score
 
                 if calibration.requires_additional_support:
-                    return EvaluationResult(
-                        decision=EvaluationDecision.CONTINUE,
+                    return self._evaluation_policy.build_completion_evaluation(
                         score=score,
-                        reason="Completion score is high but needs stronger execution support",
+                        threshold=threshold,
                         metadata=metadata,
+                        requires_additional_support=True,
                     )
 
             # Step 5: Make decision based on score
-            if score >= threshold:
-                return EvaluationResult(
-                    decision=EvaluationDecision.COMPLETE,
-                    score=score,
-                    reason=f"Requirements satisfied: {score:.2f} >= {threshold:.2f}",
-                    metadata=metadata,
-                )
-            elif score >= 0.5:
-                return EvaluationResult(
-                    decision=EvaluationDecision.CONTINUE,
-                    score=score,
-                    reason=f"Progress: {score:.2f} (threshold: {threshold:.2f})",
-                    metadata=metadata,
-                )
-            else:
-                return EvaluationResult(
-                    decision=EvaluationDecision.RETRY,
-                    score=score,
-                    reason=f"Insufficient progress: {score:.2f}",
-                    metadata=metadata,
-                )
+            return self._evaluation_policy.build_completion_evaluation(
+                score=score,
+                threshold=threshold,
+                metadata=metadata,
+            )
 
         except Exception as e:
             logger.warning(f"Enhanced evaluation failed: {e}, falling back to legacy")
@@ -558,36 +524,16 @@ class EnhancedCompletionEvaluator:
             action_result=action_result,
             state=state,
         )
-        support_penalty = 0.0
-
-        if keyword_result is not None and keyword_result.is_continuation_request:
-            support_penalty += 0.10
-            reasons.append("continuation_requested")
-
-        if (
-            requirement_result is not None
-            and not requirement_result.is_satisfied
-            and evidence_score < 0.75
-        ):
-            support_penalty += 0.10
-            reasons.append("requirements_not_fully_satisfied")
-
-        raw_score = completion_score.total_score
-        threshold = completion_score.threshold
-        calibrated_score = max(
-            0.0,
-            min(1.0, (raw_score * 0.75) + (evidence_score * 0.25) - support_penalty),
-        )
-
-        requires_additional_support = raw_score >= threshold and calibrated_score < threshold
-
-        return CompletionCalibration(
-            raw_score=raw_score,
-            calibrated_score=calibrated_score,
+        return self._evaluation_policy.calibrate_completion(
+            raw_score=completion_score.total_score,
             evidence_score=evidence_score,
-            threshold=threshold,
-            requires_additional_support=requires_additional_support,
-            support_penalty=support_penalty,
+            threshold=completion_score.threshold,
+            continuation_requested=bool(
+                keyword_result is not None and keyword_result.is_continuation_request
+            ),
+            requirements_satisfied=bool(
+                requirement_result is None or requirement_result.is_satisfied
+            ),
             reasons=reasons,
         )
 
