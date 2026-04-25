@@ -44,12 +44,14 @@ from victor.evaluation.protocol import (
 from victor.evaluation.runtime_feedback import (
     build_runtime_evaluation_feedback_payload,
     derive_runtime_evaluation_feedback,
-    refresh_runtime_evaluation_feedback_aggregate,
 )
 from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmissionContext,
     ValidatedSessionTruthEmitterRegistry,
     create_default_validated_session_truth_emitter_registry,
+)
+from victor.evaluation.validated_session_truth_persistence import (
+    persist_validated_session_truth_artifacts,
 )
 
 logger = logging.getLogger(__name__)
@@ -1303,7 +1305,6 @@ class EvaluationHarness:
             source_result_path=output_path,
             summary=summary,
         )
-        refresh_runtime_evaluation_feedback_aggregate(self._results_dir)
 
         logger.info(f"Results saved to: {output_path}")
         return output_path
@@ -1320,10 +1321,8 @@ class EvaluationHarness:
         if emitter is None:
             return []
 
-        import json
-
         summary_payload = summary or result.get_metrics()
-        saved_paths: list[Path] = []
+        artifacts = []
 
         for task_result in result.task_results:
             artifact = emitter.build_artifact(
@@ -1341,10 +1340,13 @@ class EvaluationHarness:
             if artifact is None:
                 continue
 
-            artifact.path.write_text(json.dumps(artifact.record, indent=2))
-            saved_paths.append(artifact.path)
+            artifacts.append(artifact)
 
-        return saved_paths
+        return persist_validated_session_truth_artifacts(
+            artifacts,
+            refresh_dir=self._results_dir,
+            refresh_when_empty=True,
+        )
 
     def load_results(self, path: Path) -> dict:
         """Load evaluation results from disk."""

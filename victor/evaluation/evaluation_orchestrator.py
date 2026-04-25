@@ -60,13 +60,13 @@ from victor.evaluation.baseline_validator import (
     TestBaseline,
 )
 from victor.evaluation.env_setup import EnvironmentConfig, EnvironmentSetup, SetupResult
-from victor.evaluation.runtime_feedback import (
-    refresh_runtime_evaluation_feedback_aggregate,
-)
 from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmissionContext,
     ValidatedSessionTruthEmitterRegistry,
     create_default_validated_session_truth_emitter_registry,
+)
+from victor.evaluation.validated_session_truth_persistence import (
+    persist_validated_session_truth_artifacts,
 )
 from victor.evaluation.result_correlation import (
     CorrelationReport,
@@ -791,9 +791,11 @@ class EvaluationOrchestrator:
         if artifact is None:
             return None
 
-        artifact.path.write_text(json.dumps(artifact.record, indent=2))
-        refresh_runtime_evaluation_feedback_aggregate(evaluations_dir)
-        return artifact.path
+        saved_paths = persist_validated_session_truth_artifacts(
+            [artifact],
+            refresh_dir=evaluations_dir,
+        )
+        return saved_paths[0] if saved_paths else None
 
     def get_progress(self, instance_id: str) -> Optional[TaskProgress]:
         """Get progress for a specific task.

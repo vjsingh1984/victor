@@ -244,10 +244,22 @@ Next recommended slice:
     post-change test evidence is still the admission rule for coding feedback
 
 Next recommended slice:
-- Phase 5.12: extract shared validated session-truth persistence/refresh
-  orchestration so harnesses and orchestrators stop duplicating artifact write
-  and aggregate refresh mechanics after emitter resolution
-  - Keep emitter responsibility limited to evidence gating plus artifact
-    construction
-  - Move file persistence and aggregate refresh into one canonical helper so
-    future runtimes reuse the same failure handling and naming policy
+- Phase 5.12 completed: extract shared validated session-truth
+  persistence/refresh orchestration so harnesses and orchestrators stop
+  duplicating artifact write and aggregate refresh mechanics after emitter
+  resolution
+  - `validated_session_truth_persistence.py` now owns artifact write plus
+    aggregate refresh, while emitters remain responsible only for evidence
+    gating and artifact construction
+  - `EvaluationHarness` and `EvaluationOrchestrator` now share that canonical
+    persistence helper instead of hand-writing JSON and refresh logic in each
+    runtime
+
+Next recommended slice:
+- Phase 5.13: extract a small validated session-truth service that owns emitter
+  resolution, context assembly, and persistence so runtimes only provide their
+  native evidence objects and output directories
+  - Keep the current emitter registry and persistence helper as internal pieces
+    of that service rather than introducing another parallel mechanism
+  - Use the service boundary to standardize artifact naming and future runtime
+    error handling across harness/orchestrator call sites

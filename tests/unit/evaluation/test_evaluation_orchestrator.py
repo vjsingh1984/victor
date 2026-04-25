@@ -496,7 +496,7 @@ class TestEvaluationOrchestrator:
             )
 
             with patch(
-                "victor.evaluation.evaluation_orchestrator.refresh_runtime_evaluation_feedback_aggregate"
+                "victor.evaluation.validated_session_truth_persistence.refresh_runtime_evaluation_feedback_aggregate"
             ) as refresh_aggregate:
                 orchestrator._save_validated_session_feedback(
                     "django__123",
@@ -569,7 +569,7 @@ class TestEvaluationOrchestrator:
             )
 
             with patch(
-                "victor.evaluation.evaluation_orchestrator.refresh_runtime_evaluation_feedback_aggregate"
+                "victor.evaluation.validated_session_truth_persistence.refresh_runtime_evaluation_feedback_aggregate"
             ) as refresh_aggregate:
                 feedback_path = orchestrator._save_validated_session_feedback(
                     "django__123",
