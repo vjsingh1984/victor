@@ -339,6 +339,20 @@ class TestEvaluate:
         result = await loop._evaluate(perception, {}, {})
         assert result.decision == EvaluationDecision.CONTINUE
 
+    async def test_evaluate_uses_configured_medium_confidence_threshold(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+            config={"medium_confidence_threshold": 0.7, "low_confidence_retry_limit": 2},
+        )
+        perception = _make_perception()
+        perception.confidence = 0.6
+
+        state = {}
+        result = await loop._evaluate(perception, {}, state)
+        assert result.decision == EvaluationDecision.RETRY
+        assert state["low_confidence_retries"] == 1
+
     async def test_evaluate_low_confidence(self):
         loop = AgenticLoop(
             orchestrator=MagicMock(),

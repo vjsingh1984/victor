@@ -26,6 +26,7 @@ from victor.framework.enhanced_completion_evaluation import (
 from victor.framework.evaluation_nodes import EvaluationDecision
 from victor.framework.perception_integration import RequirementType, Requirement
 from victor.framework.completion_scorer import CompletionScore, TaskType
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.agent.turn_policy import SpinState
 
 # =============================================================================
@@ -339,6 +340,27 @@ class TestEnhancedCompletionEvaluator:
         assert result.decision == EvaluationDecision.RETRY
         assert result.reason == "Low confidence - retry"
         assert state["low_confidence_retries"] == 1
+
+    @pytest.mark.asyncio
+    async def test_evaluate_uses_injected_runtime_policy(self):
+        evaluator = EnhancedCompletionEvaluator(
+            enable_requirement_validation=False,
+            enable_completion_scoring=False,
+            enable_context_keywords=False,
+            evaluation_policy=RuntimeEvaluationPolicy(
+                low_confidence_reason="Confidence too low - retry",
+            ),
+        )
+        perception = MockPerception(confidence=0.3)
+
+        result = await evaluator.evaluate(
+            perception=perception,
+            action_result=None,
+            state={},
+        )
+
+        assert result.decision == EvaluationDecision.RETRY
+        assert result.reason == "Confidence too low - retry"
 
     @pytest.mark.asyncio
     async def test_map_to_task_type_from_perception(self, evaluator):

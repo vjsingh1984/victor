@@ -57,6 +57,7 @@ from victor.agent.action_authorizer import (
     detect_intent,
 )
 from victor.agent.task_analyzer import TaskAnalysis, TaskAnalyzer
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.framework.task.protocols import TaskComplexity
 
 logger = logging.getLogger(__name__)
@@ -216,6 +217,7 @@ class PerceptionIntegration:
         self.enable_requirement_extraction = enable_requirement_extraction
         self.enable_similarity_search = enable_similarity_search
         self.config = config or {}
+        self._evaluation_policy = RuntimeEvaluationPolicy.from_config(self.config)
 
         logger.info(
             f"PerceptionIntegration initialized "
@@ -316,11 +318,7 @@ class PerceptionIntegration:
         """Detect when execution confidence is too weak to proceed safely."""
         message = query.strip()
         if not message:
-            return {
-                "needs_clarification": True,
-                "clarification_reason": "request is empty",
-                "clarification_prompt": "What would you like me to do?",
-            }
+            return self._evaluation_policy.empty_request_decision().to_dict()
 
         message_lower = message.lower()
         action_markers = (
@@ -358,35 +356,32 @@ class PerceptionIntegration:
         ambiguous_reference = bool(
             re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower)
         )
-        threshold = float(self.config.get("clarification_confidence_threshold", 0.45))
+        threshold = self._evaluation_policy.clarification_confidence_threshold
 
         if ambiguous_reference and not target_present:
             effective_confidence = max(0.0, confidence - 0.35)
             if effective_confidence <= threshold:
-                return {
-                    "needs_clarification": True,
-                    "clarification_reason": "target artifact or scope is underspecified",
-                    "clarification_prompt": (
-                        "Which file, component, or bug should I target first?"
-                    ),
-                }
+                return self._evaluation_policy.underspecified_target_decision(
+                    effective_confidence
+                ).to_dict()
 
         if getattr(task_analysis, "requires_confirmation", False) and not target_present:
             effective_confidence = max(0.0, confidence - 0.2)
             if effective_confidence <= threshold:
-                return {
-                    "needs_clarification": True,
-                    "clarification_reason": "task intent requires confirmation",
-                    "clarification_prompt": (
-                        "Should I modify files directly, or keep this read-only and provide guidance first?"
-                    ),
-                }
+                return self._evaluation_policy.confirmation_required_decision(
+                    effective_confidence
+                ).to_dict()
 
         return {
             "needs_clarification": False,
             "clarification_reason": None,
             "clarification_prompt": None,
         }
+
+    @property
+    def evaluation_policy(self) -> RuntimeEvaluationPolicy:
+        """Expose the canonical runtime evaluation policy."""
+        return self._evaluation_policy
 
     def _extract_required_files(self, query: str) -> List[str]:
         """Extract explicit file paths from the query."""

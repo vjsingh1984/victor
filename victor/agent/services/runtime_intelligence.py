@@ -22,6 +22,10 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from victor.agent.optimization_injector import OptimizationInjector
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
 from victor.framework.perception_integration import PerceptionIntegration
+from victor.framework.runtime_evaluation_policy import (
+    ClarificationDecision,
+    RuntimeEvaluationPolicy,
+)
 
 if TYPE_CHECKING:
     from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
@@ -49,16 +53,6 @@ class RuntimeIntelligenceSnapshot:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(frozen=True)
-class ClarificationDecision:
-    """Typed clarification policy outcome for a perception result."""
-
-    requires_clarification: bool = False
-    reason: Optional[str] = None
-    prompt: Optional[str] = None
-    confidence: float = 0.0
-
-
 class RuntimeIntelligenceService:
     """Service-first boundary for runtime task intelligence."""
 
@@ -68,9 +62,18 @@ class RuntimeIntelligenceService:
         perception_integration: Optional[PerceptionIntegration] = None,
         optimization_injector: Optional[OptimizationInjector] = None,
         decision_service: Optional["LLMDecisionServiceProtocol"] = None,
+        evaluation_policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> None:
+        derived_policy = evaluation_policy
+        if derived_policy is None and perception_integration is not None:
+            derived_policy = getattr(perception_integration, "evaluation_policy", None)
+        if not isinstance(derived_policy, RuntimeEvaluationPolicy):
+            derived_policy = None
+        self._evaluation_policy = derived_policy or RuntimeEvaluationPolicy()
         self._task_analyzer = task_analyzer or get_task_analyzer()
-        self._perception_integration = perception_integration or PerceptionIntegration()
+        self._perception_integration = perception_integration or PerceptionIntegration(
+            config=self._evaluation_policy.to_config()
+        )
         self._optimization_injector = optimization_injector
         self._decision_service = decision_service
         if hasattr(self._task_analyzer, "set_runtime_intelligence"):
@@ -147,6 +150,11 @@ class RuntimeIntelligenceService:
     def task_analyzer(self) -> TaskAnalyzer:
         """Expose the task analyzer for compatibility."""
         return self._task_analyzer
+
+    @property
+    def evaluation_policy(self) -> RuntimeEvaluationPolicy:
+        """Expose the canonical runtime evaluation policy."""
+        return self._evaluation_policy
 
     def has_decision_service(self) -> bool:
         """Return whether the runtime has an attached decision service."""
@@ -249,23 +257,13 @@ class RuntimeIntelligenceService:
         default_prompt: str = (
             "Please clarify the target file, component, or bug before I continue."
         ),
+        policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> ClarificationDecision:
         """Normalize clarification policy into one typed runtime decision."""
-        if not getattr(perception, "needs_clarification", False):
-            return ClarificationDecision(
-                requires_clarification=False,
-                confidence=float(getattr(perception, "confidence", 0.0) or 0.0),
-            )
-
-        reason = getattr(perception, "clarification_reason", None) or "task details are incomplete"
-        prompt = getattr(perception, "clarification_prompt", None) or default_prompt
-        confidence = float(getattr(perception, "confidence", 0.0) or 0.0)
-        return ClarificationDecision(
-            requires_clarification=True,
-            reason=reason,
-            prompt=prompt,
-            confidence=confidence,
+        selected_policy = policy or RuntimeEvaluationPolicy(
+            default_clarification_prompt=default_prompt
         )
+        return selected_policy.get_clarification_decision(perception)
 
     @staticmethod
     def evaluate_confidence_progress(
@@ -275,26 +273,18 @@ class RuntimeIntelligenceService:
         retry_limit: int = 2,
         high_confidence_threshold: float = 0.8,
         medium_confidence_threshold: float = 0.5,
+        policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> Any:
         """Apply the canonical confidence-band policy for live-loop evaluation."""
-        evaluation = RuntimeIntelligenceService.get_confidence_evaluation(
-            confidence,
+        selected_policy = policy or RuntimeEvaluationPolicy(
             high_confidence_threshold=high_confidence_threshold,
             medium_confidence_threshold=medium_confidence_threshold,
+            low_confidence_retry_limit=retry_limit,
         )
-
-        if getattr(evaluation, "should_complete", False) or getattr(
-            evaluation, "should_continue", False
-        ):
-            if "low_confidence_retries" in state:
-                state["low_confidence_retries"] = 0
-            return evaluation
-
-        return RuntimeIntelligenceService.apply_low_confidence_retry_budget(
-            evaluation,
+        return selected_policy.evaluate_confidence_progress(
+            confidence,
             state,
             retry_limit=retry_limit,
-            low_confidence_threshold=medium_confidence_threshold,
         )
 
     @staticmethod
@@ -303,29 +293,14 @@ class RuntimeIntelligenceService:
         *,
         high_confidence_threshold: float = 0.8,
         medium_confidence_threshold: float = 0.5,
+        policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> Any:
         """Emit the canonical confidence-band evaluation without mutating retry state."""
-        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
-
-        if confidence >= high_confidence_threshold:
-            return EvaluationResult(
-                decision=EvaluationDecision.COMPLETE,
-                score=confidence,
-                reason="High confidence in perception",
-            )
-
-        if confidence >= medium_confidence_threshold:
-            return EvaluationResult(
-                decision=EvaluationDecision.CONTINUE,
-                score=confidence,
-                reason="Medium confidence - continue",
-            )
-
-        return EvaluationResult(
-            decision=EvaluationDecision.RETRY,
-            score=confidence,
-            reason="Low confidence - retry",
+        selected_policy = policy or RuntimeEvaluationPolicy(
+            high_confidence_threshold=high_confidence_threshold,
+            medium_confidence_threshold=medium_confidence_threshold,
         )
+        return selected_policy.get_confidence_evaluation(confidence)
 
     @staticmethod
     def apply_low_confidence_retry_budget(
@@ -334,48 +309,18 @@ class RuntimeIntelligenceService:
         *,
         retry_limit: int = 2,
         low_confidence_threshold: float = 0.5,
+        policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> Any:
         """Apply the canonical retry-budget policy to low-confidence retry results."""
-        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
-
-        if getattr(evaluation, "should_complete", False) or getattr(
-            evaluation, "should_continue", False
-        ):
-            if "low_confidence_retries" in state:
-                state["low_confidence_retries"] = 0
-            return evaluation
-
-        if not getattr(evaluation, "should_retry", False) or evaluation.score >= low_confidence_threshold:
-            return evaluation
-
-        retry_limit = max(int(retry_limit), 0)
-        retry_count = int(state.get("low_confidence_retries", 0))
-        if retry_count >= retry_limit:
-            return EvaluationResult(
-                decision=EvaluationDecision.FAIL,
-                score=evaluation.score,
-                reason=f"Low confidence retry budget exhausted after {retry_count} retries",
-                metrics=dict(evaluation.metrics),
-                metadata={
-                    **dict(evaluation.metadata),
-                    "low_confidence_retry_exhausted": True,
-                    "low_confidence_retries": retry_count,
-                    "low_confidence_retry_limit": retry_limit,
-                },
-            )
-
-        retry_count += 1
-        state["low_confidence_retries"] = retry_count
-        return EvaluationResult(
-            decision=EvaluationDecision.RETRY,
-            score=evaluation.score,
-            reason=evaluation.reason,
-            metrics=dict(evaluation.metrics),
-            metadata={
-                **dict(evaluation.metadata),
-                "low_confidence_retries": retry_count,
-                "low_confidence_retry_limit": retry_limit,
-            },
+        selected_policy = policy or RuntimeEvaluationPolicy(
+            low_confidence_retry_limit=retry_limit,
+            medium_confidence_threshold=low_confidence_threshold,
+        )
+        return selected_policy.apply_retry_budget(
+            evaluation,
+            state,
+            retry_limit=retry_limit,
+            low_confidence_threshold=low_confidence_threshold,
         )
 
     def get_prompt_optimization_bundle(

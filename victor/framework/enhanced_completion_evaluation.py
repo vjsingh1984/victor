@@ -66,11 +66,11 @@ from victor.framework.completion_scorer import (
     CompletionSignal,
     TaskType,
 )
-from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.framework.context_aware_keyword_detector import (
     ContextAwareKeywordDetector,
 )
 from victor.framework.evaluation_nodes import EvaluationDecision
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.framework.requirement_validator import (
     RequirementValidator,
     ValidationResult,
@@ -138,6 +138,7 @@ class EnhancedCompletionEvaluator:
         enable_context_keywords: bool = True,
         completion_threshold: float = 0.80,
         enable_calibrated_completion: Optional[bool] = None,
+        evaluation_policy: Optional[RuntimeEvaluationPolicy] = None,
     ):
         """Initialize enhanced evaluator.
 
@@ -153,6 +154,7 @@ class EnhancedCompletionEvaluator:
         self.enable_completion_scoring = enable_completion_scoring
         self.enable_context_keywords = enable_context_keywords
         self.completion_threshold = completion_threshold
+        self._evaluation_policy = evaluation_policy or RuntimeEvaluationPolicy()
         if enable_calibrated_completion is None:
             try:
                 from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
@@ -482,7 +484,7 @@ class EnhancedCompletionEvaluator:
 
         # Legacy: Confidence-based fallback
         if perception is not None and hasattr(perception, "confidence"):
-            return RuntimeIntelligenceService.get_confidence_evaluation(perception.confidence)
+            return self._evaluation_policy.get_confidence_evaluation(perception.confidence)
 
         # Default: continue with low confidence
         return EvaluationResult(

@@ -76,6 +76,7 @@ from victor.framework.evaluation_nodes import (
 )
 from victor.framework.fulfillment import FulfillmentDetector, TaskType
 from victor.framework.perception_integration import Perception, PerceptionIntegration
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
 from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
 from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
@@ -400,6 +401,7 @@ class AgenticLoop:
         self.plateau_window = plateau_window
         self.plateau_tolerance = plateau_tolerance
         self.config = config or {}
+        default_evaluation_policy = RuntimeEvaluationPolicy.from_config(self.config)
 
         # Progress tracking (SubSearch arXiv:2604.07415 intermediate rewards)
         self._progress_scores: List[float] = []
@@ -416,9 +418,15 @@ class AgenticLoop:
             runtime_intelligence = RuntimeIntelligenceService(
                 perception_integration=PerceptionIntegration(
                     memory_coordinator=memory_coordinator,
-                )
+                    config=self.config,
+                ),
+                evaluation_policy=default_evaluation_policy,
             )
         self.runtime_intelligence = runtime_intelligence
+        resolved_policy = getattr(self.runtime_intelligence, "evaluation_policy", None)
+        if not isinstance(resolved_policy, RuntimeEvaluationPolicy):
+            resolved_policy = default_evaluation_policy
+        self._evaluation_policy = resolved_policy
         self.perception = self.runtime_intelligence.perception_integration
 
         self.fulfillment = FulfillmentDetector() if enable_fulfillment_check else None
@@ -436,6 +444,7 @@ class AgenticLoop:
                 enable_context_keywords=self.config.get("enable_context_keywords", True),
                 completion_threshold=self.config.get("completion_threshold", 0.80),
                 enable_calibrated_completion=self.config.get("enable_calibrated_completion"),
+                evaluation_policy=self._evaluation_policy,
             )
             logger.info(
                 "[EnhancedCompletion] ENABLED by default - requirement-driven completion detection active (use disable_enhanced_completion=True to opt-out)"
@@ -1281,7 +1290,7 @@ class AgenticLoop:
         completion detection with multi-signal fusion for more accurate
         and earlier stopping when task requirements are satisfied.
         """
-        clarification = RuntimeIntelligenceService.get_clarification_decision(perception)
+        clarification = self._evaluation_policy.get_clarification_decision(perception)
         if clarification.requires_clarification:
             return EvaluationResult(
                 decision=EvaluationDecision.FAIL,
@@ -1469,10 +1478,9 @@ class AgenticLoop:
                 logger.warning(f"Fulfillment check failed: {e}")
 
         # Confidence-based fallback
-        return RuntimeIntelligenceService.evaluate_confidence_progress(
+        return self._evaluation_policy.evaluate_confidence_progress(
             perception.confidence,
             state,
-            retry_limit=max(int(self.config.get("low_confidence_retry_limit", 2)), 0),
         )
 
     def _apply_low_confidence_retry_budget(
@@ -1481,10 +1489,9 @@ class AgenticLoop:
         state: Dict[str, Any],
     ) -> EvaluationResult:
         """Bound repeated low-confidence retries in the live loop."""
-        return RuntimeIntelligenceService.apply_low_confidence_retry_budget(
+        return self._evaluation_policy.apply_retry_budget(
             evaluation,
             state,
-            retry_limit=max(int(self.config.get("low_confidence_retry_limit", 2)), 0),
         )
 
     def _should_use_enhanced_evaluation(self, action_result: Any) -> bool:

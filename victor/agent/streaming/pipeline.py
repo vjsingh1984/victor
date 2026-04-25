@@ -7,9 +7,9 @@ import logging
 import re
 from typing import Any, AsyncIterator, List, Optional
 
-from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.agent.services.protocols.streaming_runtime import StreamingPipelineRuntimeProtocol
 from victor.core.completion_markers import FILE_DONE_MARKER
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,10 @@ class StreamingChatPipeline:
     ) -> None:
         self._runtime_owner = runtime_owner
         self._runtime_intelligence = runtime_intelligence
+        resolved_policy = getattr(runtime_intelligence, "evaluation_policy", None)
+        if not isinstance(resolved_policy, RuntimeEvaluationPolicy):
+            resolved_policy = RuntimeEvaluationPolicy()
+        self._evaluation_policy = resolved_policy
         # AgenticLoop component integration (streaming parity)
         self._perception = perception  # PerceptionIntegration instance
         self._fulfillment = fulfillment  # FulfillmentDetector instance
@@ -241,13 +245,11 @@ class StreamingChatPipeline:
                         getattr(_perception, "complexity", "unknown"),
                         getattr(_perception, "confidence", 0.0),
                     )
-                    clarification = RuntimeIntelligenceService.get_clarification_decision(
-                        _perception
-                    )
+                    clarification = self._evaluation_policy.get_clarification_decision(_perception)
                     if clarification.requires_clarification:
                         yield orch._chunk_generator.generate_content_chunk(
                             clarification.prompt
-                            or "Please clarify the target file, component, or bug before I continue.",
+                            or self._evaluation_policy.default_clarification_prompt,
                             is_final=True,
                         )
                         return
@@ -271,13 +273,11 @@ class StreamingChatPipeline:
                         getattr(_perception, "complexity", "unknown"),
                         getattr(_perception, "confidence", 0.0),
                     )
-                    clarification = RuntimeIntelligenceService.get_clarification_decision(
-                        _perception
-                    )
+                    clarification = self._evaluation_policy.get_clarification_decision(_perception)
                     if clarification.requires_clarification:
                         yield orch._chunk_generator.generate_content_chunk(
                             clarification.prompt
-                            or "Please clarify the target file, component, or bug before I continue.",
+                            or self._evaluation_policy.default_clarification_prompt,
                             is_final=True,
                         )
                         return

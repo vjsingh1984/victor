@@ -140,7 +140,12 @@ Completed on 2026-04-25:
 - Phase 4.3 enhanced-evaluator policy emission normalization:
   - `RuntimeIntelligenceService` now exposes a budget-free confidence evaluation emitter
   - `EnhancedCompletionEvaluator` now emits the same canonical confidence vocabulary as the live loop without mutating retry state
+- Phase 5.1 runtime evaluation-policy extraction:
+  - Introduced `RuntimeEvaluationPolicy` as the shared threshold/wording object
+  - `PerceptionIntegration`, `RuntimeIntelligenceService`, `StreamingChatPipeline`,
+    `AgenticLoop`, and `EnhancedCompletionEvaluator` now share one policy model for
+    clarification defaults and confidence-band decisions
 
 Next recommended slice:
-- Phase 5: extract a dedicated runtime evaluation-policy object for shared thresholds,
-  wording, and future calibration hooks across perception, evaluator, and loop paths
+- Phase 5.2: move remaining evaluation-policy consumers and future calibration hooks
+  onto the shared `RuntimeEvaluationPolicy` object instead of ad hoc config reads

@@ -347,6 +347,17 @@ class TestPerceive:
         assert result.clarification_prompt is not None
         assert "Which file, component, or bug" in result.clarification_prompt
 
+    async def test_perceive_uses_configured_policy_prompt_for_underspecified_action(self):
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+            config={"underspecified_target_prompt": "Name the exact file to change."},
+        )
+        result = await integration.perceive("Fix it and add tests.")
+
+        assert result.needs_clarification is True
+        assert result.clarification_prompt == "Name the exact file to change."
+
     async def test_perceive_explicit_target_avoids_clarification(self):
         integration = PerceptionIntegration(
             memory_coordinator=None,
