@@ -23,12 +23,72 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.syntax import Syntax
 from rich.table import Table
 
 from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
 sessions_app = typer.Typer(name="session", help="Manage conversation sessions.")
 console = Console()
+
+
+def _truncate_preview_body(
+    preview_body: str,
+    *,
+    max_lines: int = 12,
+    max_chars: int = 1200,
+) -> str:
+    """Keep preview snippets compact in terminal output."""
+    body = preview_body[:max_chars]
+    lines = body.splitlines()
+    rendered = "\n".join(lines[:max_lines])
+
+    if len(lines) > max_lines or len(preview_body) > len(body):
+        return f"{rendered}\n..." if rendered else "..."
+
+    return rendered
+
+
+def _render_preview_messages(preview_messages: list[dict[str, object]]) -> None:
+    """Render replay-only preview sidecars in human-readable session output."""
+    if not preview_messages:
+        return
+
+    console.print("\n[bold]Preview Messages:[/]")
+    for preview in preview_messages[-3:]:
+        if not isinstance(preview, dict):
+            continue
+
+        content = str(preview.get("content", "")).strip()
+        if content:
+            console.print(f"[magenta]Preview:[/] {content}")
+
+        metadata = preview.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        preview_kind = str(metadata.get("preview_kind", "")).replace("_", " ").strip()
+        preview_path = str(metadata.get("preview_path", "")).strip()
+        details = []
+        if preview_kind:
+            details.append(preview_kind.title())
+        if preview_path:
+            details.append(preview_path)
+        if details:
+            console.print(f"[dim]{' | '.join(details)}[/]")
+
+        preview_body = metadata.get("preview_body")
+        if isinstance(preview_body, str) and preview_body:
+            language = str(metadata.get("preview_language") or "text")
+            console.print(
+                Syntax(
+                    _truncate_preview_body(preview_body),
+                    language,
+                    theme="monokai",
+                    line_numbers=False,
+                    word_wrap=True,
+                )
+            )
 
 
 @sessions_app.command("list")
@@ -130,6 +190,7 @@ def sessions_show(
 
             # Get messages
             messages = session_data.get("conversation", {}).get("messages", [])
+            preview_messages = session_data.get("conversation", {}).get("preview_messages", [])
             message_count = len(messages)
 
             panel_content = (
@@ -139,6 +200,7 @@ def sessions_show(
                 f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
                 f"[bold]Profile:[/] {metadata.get('profile', 'N/A')}\n"
                 f"[bold]Messages:[/] {message_count}\n"
+                f"[bold]Previews:[/] {len(preview_messages)}\n"
                 f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}\n"
                 f"[bold]Updated:[/] {metadata.get('updated_at', 'N/A')}\n"
             )
@@ -159,6 +221,8 @@ def sessions_show(
                     if len(content) > 200:
                         content = content[:200] + "..."
                     console.print(f"[{role_style}]{msg.get('role', '').capitalize()}:[/] {content}")
+
+            _render_preview_messages(preview_messages)
 
     except Exception as e:
         console.print(f"[red]Error showing session:[/] {e}")

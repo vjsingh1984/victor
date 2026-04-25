@@ -180,6 +180,41 @@ class TestSessionsCommand:
         assert len(sessions) == 1
         assert sessions[0]["title"] == "CI/CD Pipeline Setup"
 
+    def test_sessions_search_finds_preview_messages(self, runner_with_db, temp_db_path):
+        """Test 'victor sessions search' matches replay-only preview content."""
+        persistence = SQLiteSessionPersistence(db_path=temp_db_path)
+        conversation = MessageHistory()
+        conversation.add_user_message("Show app.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: app.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+            },
+        )
+
+        persistence.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+            session_id="myproj-preview-search",
+            title="Preview Search Session",
+        )
+
+        result = runner_with_db.invoke(sessions_app, ["search", "hello", "--json"])
+        assert result.exit_code == 0
+
+        clean_output = strip_ansi(result.stdout)
+        sessions = json.loads(clean_output)
+        assert len(sessions) == 1
+        assert sessions[0]["session_id"] == "myproj-preview-search"
+        assert sessions[0]["title"] == "Preview Search Session"
+
     def test_sessions_show(self, runner_with_db, sample_persistence):
         """Test 'victor sessions show <session_id>'."""
         result = runner_with_db.invoke(sessions_app, ["show", "myproj-9Kx7Z2"])
@@ -246,6 +281,41 @@ class TestSessionsCommand:
                 "after_message_index": 2,
             }
         ]
+
+    def test_sessions_show_displays_preview_messages(self, runner_with_db, temp_db_path):
+        """Test 'victor sessions show' includes preview sidecars in human output."""
+        persistence = SQLiteSessionPersistence(db_path=temp_db_path)
+        conversation = MessageHistory()
+        conversation.add_user_message("Show app.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: app.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+            },
+        )
+
+        persistence.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+            session_id="myproj-preview-human",
+            title="Preview Human Session",
+        )
+
+        result = runner_with_db.invoke(sessions_app, ["show", "myproj-preview-human"])
+        assert result.exit_code == 0
+
+        clean_output = strip_ansi(result.stdout)
+        assert "Preview Messages:" in clean_output
+        assert "FILE PREVIEW: app.py" in clean_output
+        assert "print('hello')" in clean_output
+        assert "Previews:" in clean_output
 
     def test_sessions_show_not_found(self, runner_with_db, sample_persistence):
         """Test 'victor sessions show' with non-existent session."""

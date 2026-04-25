@@ -467,8 +467,12 @@ class SQLiteSessionPersistence:
                     sessions.append(session)
                     continue
 
-                messages = self.get_session_messages(session["session_id"])
-                if any(lowered_query in msg.get("content", "").lower() for msg in messages):
+                session_data = self.load_session(session["session_id"])
+                conversation = session_data.get("conversation", {}) if session_data else {}
+                if (
+                    self._contains_query(conversation.get("messages", []), lowered_query)
+                    or self._contains_query(conversation.get("preview_messages", []), lowered_query)
+                ):
                     sessions.append(session)
 
                 if len(sessions) >= limit:
@@ -529,6 +533,16 @@ class SQLiteSessionPersistence:
         except Exception as e:
             logger.error(f"Failed to get messages for session {session_id}: {e}")
             return []
+
+    def _contains_query(self, value: Any, lowered_query: str) -> bool:
+        """Recursively search structured session content for a query string."""
+        if isinstance(value, str):
+            return lowered_query in value.lower()
+        if isinstance(value, dict):
+            return any(self._contains_query(item, lowered_query) for item in value.values())
+        if isinstance(value, list):
+            return any(self._contains_query(item, lowered_query) for item in value)
+        return False
 
     def _generate_title(self, conversation_data: Dict[str, Any]) -> str:
         """Generate a title from the first user message.
