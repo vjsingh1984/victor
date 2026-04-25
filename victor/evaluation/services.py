@@ -58,8 +58,18 @@ def create_validated_session_truth_service(
     return create_default_validated_session_truth_service(emitters)
 
 
+def resolve_validated_session_truth_service(
+    *,
+    service: Optional[ValidatedSessionTruthServiceProtocol] = None,
+    emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
+) -> ValidatedSessionTruthServiceProtocol:
+    """Resolve the canonical validated session-truth service for evaluation runtimes."""
+    return service or create_validated_session_truth_service(emitters)
+
+
 __all__ = [
     "ValidatedSessionTruthServiceProtocol",
     "ValidatedSessionTruthService",
     "create_validated_session_truth_service",
+    "resolve_validated_session_truth_service",
 ]

@@ -50,7 +50,7 @@ from victor.evaluation.validated_session_truth_emitters import (
 )
 from victor.evaluation.services import (
     ValidatedSessionTruthServiceProtocol,
-    create_validated_session_truth_service,
+    resolve_validated_session_truth_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -489,9 +489,9 @@ class EvaluationHarness:
             unexpected = ", ".join(sorted(legacy_kwargs))
             raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
         self._runners = runners or {}
-        self._validated_session_truth_service = (
-            validated_session_truth_service
-            or create_validated_session_truth_service(validated_session_truth_emitters)
+        self._validated_session_truth_service = resolve_validated_session_truth_service(
+            service=validated_session_truth_service,
+            emitters=validated_session_truth_emitters,
         )
         try:
             from victor.config.secure_paths import get_victor_dir

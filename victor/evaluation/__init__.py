@@ -109,6 +109,7 @@ from victor.evaluation.services import (
     ValidatedSessionTruthServiceProtocol,
     ValidatedSessionTruthService,
     create_validated_session_truth_service,
+    resolve_validated_session_truth_service,
 )
 
 # Code generation harness (HumanEval, MBPP - provider-only, no tools)
@@ -266,6 +267,7 @@ __all__ = [
     "ValidatedSessionTruthServiceProtocol",
     "ValidatedSessionTruthService",
     "create_validated_session_truth_service",
+    "resolve_validated_session_truth_service",
     # Code generation harness (HumanEval, MBPP - provider-only)
     "CodeGenMetrics",
     "CodeGenResult",

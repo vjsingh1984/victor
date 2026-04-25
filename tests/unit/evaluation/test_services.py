@@ -9,6 +9,7 @@ from victor.evaluation.services import (
     ValidatedSessionTruthServiceProtocol,
     ValidatedSessionTruthService as exported_service,
     create_validated_session_truth_service,
+    resolve_validated_session_truth_service,
 )
 from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmitterRegistry,
@@ -41,3 +42,35 @@ def test_validated_session_truth_service_protocol_accepts_duck_typed_service():
             return None
 
     assert isinstance(StubService(), ValidatedSessionTruthServiceProtocol)
+
+
+def test_resolve_validated_session_truth_service_prefers_explicit_service():
+    class StubService:
+        def persist_evaluation_result(self, result, **kwargs):
+            return []
+
+        def persist_validation_result(self, **kwargs):
+            return None
+
+    service = StubService()
+
+    resolved = resolve_validated_session_truth_service(service=service)
+
+    assert resolved is service
+
+
+def test_resolve_validated_session_truth_service_delegates_to_factory(monkeypatch):
+    captured = {}
+    stub_service = object()
+
+    def fake_factory(emitters=None):
+        captured["emitters"] = emitters
+        return stub_service
+
+    monkeypatch.setattr("victor.evaluation.services.create_validated_session_truth_service", fake_factory)
+    registry = ValidatedSessionTruthEmitterRegistry()
+
+    resolved = resolve_validated_session_truth_service(emitters=registry)
+
+    assert resolved is stub_service
+    assert captured["emitters"] is registry

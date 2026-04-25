@@ -65,7 +65,7 @@ from victor.evaluation.validated_session_truth_emitters import (
 )
 from victor.evaluation.services import (
     ValidatedSessionTruthServiceProtocol,
-    create_validated_session_truth_service,
+    resolve_validated_session_truth_service,
 )
 from victor.evaluation.result_correlation import (
     CorrelationReport,
@@ -335,9 +335,9 @@ class EvaluationOrchestrator:
             raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
         self.config = config
         self.progress_callback = progress_callback
-        self._validated_session_truth_service = (
-            validated_session_truth_service
-            or create_validated_session_truth_service(validated_session_truth_emitters)
+        self._validated_session_truth_service = resolve_validated_session_truth_service(
+            service=validated_session_truth_service,
+            emitters=validated_session_truth_emitters,
         )
 
         # Initialize components

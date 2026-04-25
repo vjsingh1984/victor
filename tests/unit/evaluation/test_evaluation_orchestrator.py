@@ -607,7 +607,7 @@ class TestEvaluationOrchestrator:
             stub_service = object()
 
             with patch(
-                "victor.evaluation.evaluation_orchestrator.create_validated_session_truth_service",
+                "victor.evaluation.services.create_validated_session_truth_service",
                 return_value=stub_service,
             ) as create_service:
                 orchestrator = EvaluationOrchestrator(
@@ -617,6 +617,25 @@ class TestEvaluationOrchestrator:
 
             assert orchestrator._validated_session_truth_service is stub_service
             create_service.assert_called_once_with(registry)
+
+    def test_orchestrator_resolves_service_through_shared_helper(self):
+        """Orchestrator should centralize service resolution through the shared helper."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = OrchestratorConfig(output_dir=Path(tmpdir))
+            registry = ValidatedSessionTruthEmitterRegistry()
+            stub_service = object()
+
+            with patch(
+                "victor.evaluation.evaluation_orchestrator.resolve_validated_session_truth_service",
+                return_value=stub_service,
+            ) as resolve_service:
+                orchestrator = EvaluationOrchestrator(
+                    config,
+                    validated_session_truth_emitters=registry,
+                )
+
+            assert orchestrator._validated_session_truth_service is stub_service
+            resolve_service.assert_called_once_with(service=None, emitters=registry)
 
 
 class TestProgressCallback:

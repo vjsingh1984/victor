@@ -859,7 +859,7 @@ class TestBenchmarkToolUsageMetrics:
         stub_service = object()
 
         with patch(
-            "victor.evaluation.harness.create_validated_session_truth_service",
+            "victor.evaluation.services.create_validated_session_truth_service",
             return_value=stub_service,
         ) as create_service:
             harness = EvaluationHarness(
@@ -869,6 +869,24 @@ class TestBenchmarkToolUsageMetrics:
 
         assert harness._validated_session_truth_service is stub_service
         create_service.assert_called_once_with(registry)
+
+    def test_harness_resolves_service_through_shared_helper(self, tmp_path):
+        """Harness should centralize service resolution through the shared helper."""
+
+        registry = ValidatedSessionTruthEmitterRegistry()
+        stub_service = object()
+
+        with patch(
+            "victor.evaluation.harness.resolve_validated_session_truth_service",
+            return_value=stub_service,
+        ) as resolve_service:
+            harness = EvaluationHarness(
+                checkpoint_dir=tmp_path,
+                validated_session_truth_emitters=registry,
+            )
+
+        assert harness._validated_session_truth_service is stub_service
+        resolve_service.assert_called_once_with(service=None, emitters=registry)
 
 
 class TestSaveAndLoadResults:

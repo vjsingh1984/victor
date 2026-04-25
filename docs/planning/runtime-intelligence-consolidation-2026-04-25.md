@@ -316,8 +316,17 @@ Next recommended slice:
     behavior
 
 Next recommended slice:
-- Phase 5.19: centralize validated session-truth service resolution so
-  constructor compatibility shims and default factory fallback are owned by one
-  evaluation-level helper instead of being open-coded in each runtime
-  - Keep explicit service injection authoritative
-  - Preserve the legacy registry keyword only through the shared resolution path
+- Phase 5.19 completed: centralize validated session-truth service resolution
+  so constructor compatibility shims and default factory fallback are owned by
+  one evaluation-level helper instead of being open-coded in each runtime
+  - `services.py` now owns explicit-service preference plus factory fallback in
+    `resolve_validated_session_truth_service(...)`
+  - `EvaluationHarness` and `EvaluationOrchestrator` now share that helper
+    instead of duplicating the same service-or-registry resolution logic
+
+Next recommended slice:
+- Phase 5.20: centralize legacy validated session-truth compatibility kwarg
+  parsing so runtime constructors stop duplicating `validated_session_truth_emitters`
+  extraction and unexpected-key handling
+  - Keep public compatibility behavior stable
+  - Avoid widening the higher-level constructor surface while the shim remains
