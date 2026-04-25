@@ -728,22 +728,7 @@ def _build_literal_search_kwargs(
     return kwargs
 
 
-_FILENAME_QUERY_EXTENSIONS = (
-    ".py",
-    ".js",
-    ".ts",
-    ".go",
-    ".java",
-    ".c",
-    ".cpp",
-    ".rs",
-    ".yaml",
-    ".yml",
-    ".json",
-    ".toml",
-    ".md",
-    ".txt",
-    ".sh",
+_EXTRA_FILENAME_QUERY_EXTENSIONS = {
     ".rb",
     ".php",
     ".swift",
@@ -751,6 +736,9 @@ _FILENAME_QUERY_EXTENSIONS = (
     ".scala",
     ".r",
     ".sql",
+}
+_FILENAME_QUERY_EXTENSIONS = tuple(
+    sorted(set(DEFAULT_CODE_EXTENSIONS) | _EXTRA_FILENAME_QUERY_EXTENSIONS)
 )
 
 
