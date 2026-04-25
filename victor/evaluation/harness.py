@@ -40,14 +40,15 @@ from victor.evaluation.protocol import (
     EvaluationResult,
     TaskResult,
     TaskStatus,
-    is_browser_task_benchmark,
 )
 from victor.evaluation.runtime_feedback import (
-    build_browser_validated_session_feedback_payload,
-    build_deep_research_validated_session_feedback_payload,
     build_runtime_evaluation_feedback_payload,
     derive_runtime_evaluation_feedback,
     refresh_runtime_evaluation_feedback_aggregate,
+)
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthEmitterRegistry,
+    create_default_validated_session_truth_emitter_registry,
 )
 
 logger = logging.getLogger(__name__)
@@ -468,14 +469,20 @@ class EvaluationHarness:
         self,
         runners: Optional[dict[BenchmarkType, BaseBenchmarkRunner]] = None,
         checkpoint_dir: Optional[Path] = None,
+        validated_session_truth_emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
     ):
         """Initialize the harness.
 
         Args:
             runners: Dict mapping benchmark types to runners
             checkpoint_dir: Directory for checkpoint files (defaults to ~/.victor/checkpoints)
+            validated_session_truth_emitters: Registry for validated session-truth emitters
         """
         self._runners = runners or {}
+        self._validated_session_truth_emitters = (
+            validated_session_truth_emitters
+            or create_default_validated_session_truth_emitter_registry()
+        )
         try:
             from victor.config.secure_paths import get_victor_dir
 
@@ -1308,11 +1315,8 @@ class EvaluationHarness:
         summary: Optional[dict[str, Any]] = None,
     ) -> list[Path]:
         """Persist per-task validated session-truth artifacts for supported workflows."""
-        if is_browser_task_benchmark(result.config.benchmark):
-            builder = build_browser_validated_session_feedback_payload
-        elif result.config.benchmark == BenchmarkType.DR3_EVAL:
-            builder = build_deep_research_validated_session_feedback_payload
-        else:
+        emitter = self._validated_session_truth_emitters.resolve(result.config.benchmark)
+        if emitter is None:
             return []
 
         import json
@@ -1321,55 +1325,19 @@ class EvaluationHarness:
         saved_paths: list[Path] = []
 
         for task_result in result.task_results:
-            safe_task_id = (
-                str(task_result.task_id)
-                .replace("/", "_")
-                .replace("\\", "_")
-                .replace(" ", "_")
+            artifact = emitter.build_artifact(
+                task_result,
+                config=result.config,
+                evaluation_result=result,
+                summary=summary_payload,
+                results_dir=self._results_dir,
+                source_result_path=source_result_path,
             )
-            feedback_file = self._results_dir / (
-                f"eval_session_{result.config.benchmark.value}_{safe_task_id}_{source_result_path.stem}.json"
-            )
-            payload = builder(
-                {
-                    "task_id": task_result.task_id,
-                    "status": task_result.status.value,
-                    "completion_score": task_result.completion_score,
-                    "failure_category": (
-                        task_result.failure_category.value
-                        if task_result.failure_category is not None
-                        else None
-                    ),
-                    "failure_details": dict(task_result.failure_details),
-                    "benchmark": result.config.benchmark.value,
-                    "model": result.config.model,
-                    "dataset_metadata": dict(result.config.dataset_metadata),
-                    "total_tasks": summary_payload.get("total_tasks"),
-                    "passed_tasks": summary_payload.get("passed"),
-                    "failed_tasks": summary_payload.get("failed"),
-                },
-                source_result_path=feedback_file,
-                metadata={"source_evaluation_path": str(source_result_path)},
-            )
-            if payload is None:
+            if artifact is None:
                 continue
 
-            record = {
-                "task_id": task_result.task_id,
-                "benchmark": result.config.benchmark.value,
-                "model": result.config.model,
-                "runtime_evaluation_feedback": payload,
-                "status": task_result.status.value,
-                "completion_score": task_result.completion_score,
-                "failure_category": (
-                    task_result.failure_category.value
-                    if task_result.failure_category is not None
-                    else None
-                ),
-                "failure_details": dict(task_result.failure_details),
-            }
-            feedback_file.write_text(json.dumps(record, indent=2))
-            saved_paths.append(feedback_file)
+            artifact.path.write_text(json.dumps(artifact.record, indent=2))
+            saved_paths.append(artifact.path)
 
         return saved_paths
 

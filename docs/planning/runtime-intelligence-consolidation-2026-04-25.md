@@ -218,10 +218,23 @@ Next recommended slice:
     still remain ineligible
 
 Next recommended slice:
-- Phase 5.10: extract a registry-backed validated session-truth emitter
-  strategy so future benchmark families can register their own evidence gates
-  without growing benchmark-specific conditionals inside `EvaluationHarness`
-  - Keep the trust, freshness, and scope weighting centralized in
+- Phase 5.10 completed: extract a registry-backed validated session-truth
+  emitter strategy so future benchmark families can register their own evidence
+  gates without growing benchmark-specific conditionals inside
+  `EvaluationHarness`
+  - `validated_session_truth_emitters.py` now defines the canonical emitter
+    interface, artifact contract, default registry, and browser/research
+    emitters while keeping trust, freshness, and scope weighting centralized in
     `runtime_feedback.py`
-  - Move benchmark-family routing behind a small canonical emitter interface so
-    later browser/research/coding additions do not reopen the harness design
+  - `EvaluationHarness` now resolves emitters through that registry instead of
+    branching directly on benchmark families, so new evaluators can plug into
+    the same persistence path without reopening harness orchestration
+
+Next recommended slice:
+- Phase 5.11: migrate coding/SWE-bench validated session-truth emission onto
+  the same emitter contract so `EvaluationOrchestrator` and `EvaluationHarness`
+  share one extensibility model for all benchmark families
+  - Keep the stronger coding evidence gate intact: valid baseline plus actual
+    post-change test evidence must still remain the admission rule
+  - Prefer adapting `EvaluationOrchestrator` to the registry contract over
+    introducing a second parallel abstraction
