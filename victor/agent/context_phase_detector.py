@@ -36,6 +36,8 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from victor.core.shared_types import ConversationStage, TaskPhase, STAGE_TO_PHASE_MAP
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.tool_names import ToolNames, get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +70,8 @@ TOOL_PATTERNS: Dict[TaskPhase, List[str]] = {
         "locate",
         "grep",
         "list",
-        "read_file",
-        "read_directory",
+        ToolNames.READ,
+        ToolNames.LS,
     ],
     TaskPhase.PLANNING: [
         "plan",
@@ -80,8 +82,8 @@ TOOL_PATTERNS: Dict[TaskPhase, List[str]] = {
         "architect",
     ],
     TaskPhase.EXECUTION: [
-        "edit",
-        "write",
+        ToolNames.EDIT,
+        ToolNames.WRITE,
         "create",
         "delete",
         "modify",
@@ -90,6 +92,7 @@ TOOL_PATTERNS: Dict[TaskPhase, List[str]] = {
         "test",
         "build",
         "apply",
+        ToolNames.SHELL,
     ],
     TaskPhase.REVIEW: [
         "verify",
@@ -129,6 +132,12 @@ CONTENT_PATTERNS: Dict[TaskPhase, List[str]] = {
         r"\b(test(s|ing)|review(ing)?|inspect(ing)?)\b",
     ],
 }
+
+
+def _canonical_phase_tool_name(tool_name: str) -> str:
+    """Normalize core-tool aliases before phase matching."""
+    lowered = tool_name.lower()
+    return get_canonical_name(canonicalize_core_tool_name(lowered))
 
 
 class PhaseDetector:
@@ -236,8 +245,9 @@ class PhaseDetector:
         phase_counts: Dict[TaskPhase, int] = dict.fromkeys(TaskPhase, 0)
 
         for tool in recent_tools:
+            canonical_tool = _canonical_phase_tool_name(tool)
             for phase, patterns in TOOL_PATTERNS.items():
-                if tool in patterns:
+                if canonical_tool in patterns:
                     phase_counts[phase] += 1
 
         # Find phase with most tool usage

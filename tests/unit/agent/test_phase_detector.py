@@ -121,9 +121,33 @@ class TestPhaseDetectionFromTools:
         """Test exploration phase detection from tools."""
         detector = PhaseDetector()
 
-        phase = detector._detect_from_tools(["search", "find", "read_file"])
+        phase = detector._detect_from_tools(["search", "find", "read"])
 
         assert phase == TaskPhase.EXPLORATION
+
+    def test_detect_exploration_from_legacy_core_tool_aliases(self):
+        """Legacy read/list aliases should still classify as exploration."""
+        detector = PhaseDetector()
+
+        phase = detector._detect_from_tools(["read_file", "list_directory"])
+
+        assert phase == TaskPhase.EXPLORATION
+
+    def test_detect_execution_from_create_file_alias(self):
+        """Create-file aliases should still classify as execution."""
+        detector = PhaseDetector()
+
+        phase = detector._detect_from_tools(["create_file", "edit"])
+
+        assert phase == TaskPhase.EXECUTION
+
+    def test_detect_execution_from_shell_alias(self):
+        """Legacy shell aliases should still classify as execution."""
+        detector = PhaseDetector()
+
+        phase = detector._detect_from_tools(["execute_bash", "test"])
+
+        assert phase == TaskPhase.EXECUTION
 
     def test_detect_planning_from_tools(self):
         """Test planning phase detection from tools."""

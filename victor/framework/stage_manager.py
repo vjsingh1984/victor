@@ -736,7 +736,7 @@ def get_coding_stages() -> Dict[str, StageDefinition]:
             display_name="Execution",
             description="Making changes, running commands",
             keywords=["change", "modify", "create", "fix", "implement"],
-            tools={"write", "edit", "bash", "execute_code"},
+            tools={"write", "edit", "shell", "execute_code"},
             order=4,
         ),
         "verification": StageDefinition(
@@ -744,7 +744,7 @@ def get_coding_stages() -> Dict[str, StageDefinition]:
             display_name="Verification",
             description="Testing, validating changes",
             keywords=["test", "verify", "check", "validate", "run"],
-            tools={"bash", "read", "execute_code"},
+            tools={"shell", "read", "execute_code"},
             order=5,
         ),
         "completion": StageDefinition(
@@ -752,7 +752,7 @@ def get_coding_stages() -> Dict[str, StageDefinition]:
             display_name="Completion",
             description="Summarizing, wrapping up",
             keywords=["done", "finish", "complete", "summarize"],
-            tools={"bash"},
+            tools={"shell"},
             order=6,
         ),
     }
@@ -871,7 +871,7 @@ def get_default_stages() -> Dict[str, StageDefinition]:
 
     Provides a domain-neutral 7-stage pattern that any vertical can inherit
     and customize. Uses generic tool names (no domain-specific tools like
-    ``execute_code`` or ``bash``).
+    ``execute_code`` or ``shell``).
 
     Returns:
         Dictionary of stage definitions suitable for any vertical

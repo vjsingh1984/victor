@@ -377,6 +377,13 @@ class TestStandardStageDefinitions:
         assert stages["planning"].order < stages["reading"].order
         assert stages["execution"].order < stages["verification"].order
 
+        # Coding stage tool metadata should use canonical core names.
+        assert "shell" in stages["execution"].tools
+        assert "shell" in stages["verification"].tools
+        assert stages["completion"].tools == {"shell"}
+        assert "bash" not in stages["execution"].tools
+        assert "bash" not in stages["verification"].tools
+
     def test_get_data_analysis_stages(self):
         """Test data analysis stage definitions."""
         stages = get_data_analysis_stages()
