@@ -331,6 +331,28 @@ class TestEvaluate:
         result = await loop._evaluate(perception, {}, {})
         assert result.decision == EvaluationDecision.RETRY
 
+    async def test_evaluate_requires_clarification_before_retry(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+        )
+        perception = _make_perception()
+        perception.confidence = 0.32
+        perception.needs_clarification = True
+        perception.clarification_reason = "target artifact or scope is underspecified"
+        perception.clarification_prompt = "Which file, component, or bug should I target first?"
+
+        result = await loop._evaluate(perception, {}, {})
+
+        assert result.decision == EvaluationDecision.FAIL
+        assert result.score == 0.32
+        assert "Clarification required" in result.reason
+        assert result.metadata["requires_clarification"] is True
+        assert (
+            result.metadata["clarification_prompt"]
+            == "Which file, component, or bug should I target first?"
+        )
+
 
 # ============================================================================
 # _map_to_task_type tests

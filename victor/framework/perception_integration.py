@@ -46,6 +46,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -117,6 +118,9 @@ class Perception:
     # Metadata
     confidence: float = 0.5
     metadata: Dict[str, Any] = field(default_factory=dict)
+    needs_clarification: bool = False
+    clarification_reason: Optional[str] = None
+    clarification_prompt: Optional[str] = None
 
     @property
     def tool_budget(self) -> Optional[int]:
@@ -174,6 +178,9 @@ class Perception:
             "similar_experiences_count": len(self.similar_experiences),
             "confidence": self.confidence,
             "metadata": self.metadata,
+            "needs_clarification": self.needs_clarification,
+            "clarification_reason": self.clarification_reason,
+            "clarification_prompt": self.clarification_prompt,
         }
 
 
@@ -268,6 +275,12 @@ class PerceptionIntegration:
             similar_experiences,
             intent_confidence=intent_result.confidence,
         )
+        clarification = self._assess_clarification_need(
+            query=query,
+            task_analysis=task_analysis,
+            confidence=confidence,
+            context=context,
+        )
 
         perception = Perception(
             intent=intent,
@@ -280,6 +293,9 @@ class PerceptionIntegration:
                 "query_length": len(query),
                 "has_context": context is not None,
             },
+            needs_clarification=clarification["needs_clarification"],
+            clarification_reason=clarification["clarification_reason"],
+            clarification_prompt=clarification["clarification_prompt"],
         )
 
         logger.debug(
@@ -289,6 +305,109 @@ class PerceptionIntegration:
         )
 
         return perception
+
+    def _assess_clarification_need(
+        self,
+        query: str,
+        task_analysis: TaskAnalysis,
+        confidence: float,
+        context: Optional[Dict[str, Any]],
+    ) -> Dict[str, Optional[str] | bool]:
+        """Detect when execution confidence is too weak to proceed safely."""
+        message = query.strip()
+        if not message:
+            return {
+                "needs_clarification": True,
+                "clarification_reason": "request is empty",
+                "clarification_prompt": "What would you like me to do?",
+            }
+
+        message_lower = message.lower()
+        action_markers = (
+            "fix",
+            "add",
+            "update",
+            "implement",
+            "refactor",
+            "create",
+            "write",
+            "edit",
+            "change",
+            "remove",
+            "delete",
+            "rename",
+            "optimize",
+            "benchmark",
+        )
+        is_action_task = bool(
+            getattr(task_analysis, "is_action_task", False)
+            or any(marker in message_lower for marker in action_markers)
+        )
+        if not is_action_task:
+            return {
+                "needs_clarification": False,
+                "clarification_reason": None,
+                "clarification_prompt": None,
+            }
+
+        target_present = bool(
+            self._extract_required_files(message)
+            or self._extract_scope_hints(message)
+            or self._context_has_explicit_target(context)
+        )
+        ambiguous_reference = bool(
+            re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower)
+        )
+        threshold = float(self.config.get("clarification_confidence_threshold", 0.45))
+
+        if ambiguous_reference and not target_present:
+            effective_confidence = max(0.0, confidence - 0.35)
+            if effective_confidence <= threshold:
+                return {
+                    "needs_clarification": True,
+                    "clarification_reason": "target artifact or scope is underspecified",
+                    "clarification_prompt": (
+                        "Which file, component, or bug should I target first?"
+                    ),
+                }
+
+        if getattr(task_analysis, "requires_confirmation", False) and not target_present:
+            effective_confidence = max(0.0, confidence - 0.2)
+            if effective_confidence <= threshold:
+                return {
+                    "needs_clarification": True,
+                    "clarification_reason": "task intent requires confirmation",
+                    "clarification_prompt": (
+                        "Should I modify files directly, or keep this read-only and provide guidance first?"
+                    ),
+                }
+
+        return {
+            "needs_clarification": False,
+            "clarification_reason": None,
+            "clarification_prompt": None,
+        }
+
+    def _extract_required_files(self, query: str) -> List[str]:
+        """Extract explicit file paths from the query."""
+        matches = re.findall(
+            r"(?:^|\s|[\"'\-])((?:\.{0,2}/)?[\w./-]+/[\w.-]+\.[a-z]{1,10})(?:\s|[\"']|$|[,;:.\)]|\Z)",
+            query,
+            flags=re.IGNORECASE,
+        )
+        return list(dict.fromkeys(matches))
+
+    def _extract_scope_hints(self, query: str) -> List[str]:
+        """Extract bounded scope hints like backticked identifiers."""
+        hints = re.findall(r"`([^`]{3,80})`", query)
+        return list(dict.fromkeys(hints))
+
+    def _context_has_explicit_target(self, context: Optional[Dict[str, Any]]) -> bool:
+        """Check for explicit target artifacts supplied through structured context."""
+        if not context:
+            return False
+        target_keys = ("file", "file_path", "path", "target", "component", "symbol")
+        return any(bool(context.get(key)) for key in target_keys)
 
     def _extract_requirements(
         self,

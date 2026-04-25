@@ -107,6 +107,7 @@ Planned slices:
 | Slice | Status | TDD plan | Notes |
 |---|---|---|---|
 | 6.1 Truth-aligned confidence assessment | Done | Added task/evaluation/harness confidence tests first | `TaskResult` now derives confidence + uncertainty from objective evidence and failure taxonomy, and benchmark summaries persist confidence buckets plus truth-alignment rates |
+| 6.2 Clarification-aware runtime gating | Done | Added perception, streaming-pipeline, and loop-evaluation tests first | `PerceptionIntegration` now flags underspecified action requests, the streaming pipeline exits early with a targeted clarification prompt before provider/tool execution, and `AgenticLoop` fails fast with clarification metadata instead of blind retry |
 
 ## Immediate Execution Order
 
@@ -129,3 +130,4 @@ Planned slices:
 | 2026-04-25 | Phase 3.3 completed via TDD in `codingagent`: read-only tool results now default to pruned user previews while keeping full model-visible output intact and preserving full output for expansion/debug in streaming renderers. |
 | 2026-04-25 | Phase 5.3 completed via TDD in `codingagent`: benchmark results now derive and persist a hierarchical failure diagnosis with stage + subtype paths, and aggregate metrics report both flat categories and taxonomy breakdowns across DR3/browser/external benchmark adapters. |
 | 2026-04-25 | Phase 6.1 completed via TDD in `codingagent`: benchmark results now derive truth-aligned confidence/uncertainty from evidence plus failure taxonomy, and persisted reports include confidence buckets and alignment rates for calibration-aware triage. |
+| 2026-04-25 | Phase 6.2 completed via TDD in `codingagent`: underspecified low-confidence action requests now trigger targeted clarification from `PerceptionIntegration`, the streaming runtime returns that clarification before provider/tool execution, and `AgenticLoop` records clarification-required failure metadata instead of retrying blindly. |

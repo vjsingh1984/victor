@@ -234,6 +234,17 @@ class StreamingChatPipeline:
                         getattr(_perception, "complexity", "unknown"),
                         getattr(_perception, "confidence", 0.0),
                     )
+                    if getattr(_perception, "needs_clarification", False):
+                        clarification_prompt = getattr(
+                            _perception,
+                            "clarification_prompt",
+                            None,
+                        ) or "Please clarify the target file, component, or bug before I continue."
+                        yield orch._chunk_generator.generate_content_chunk(
+                            clarification_prompt,
+                            is_final=True,
+                        )
+                        return
             except Exception as e:
                 logger.debug("Perception phase skipped: %s", e)
 

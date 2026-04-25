@@ -44,6 +44,8 @@ class TestPerception:
         assert d["confidence"] == 0.75
         assert d["similar_experiences_count"] == 0
         assert d["requirements"] == []
+        assert d["needs_clarification"] is False
+        assert d["clarification_prompt"] is None
 
     def test_to_dict_with_requirements(self):
         p = Perception(
@@ -333,6 +335,28 @@ class TestPerceive:
         result = await integration.perceive("Fix the bug")
         assert result.similar_experiences == []
 
+    async def test_perceive_flags_underspecified_action_for_clarification(self):
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        result = await integration.perceive("Fix it and add tests.")
+
+        assert result.needs_clarification is True
+        assert result.clarification_reason == "target artifact or scope is underspecified"
+        assert result.clarification_prompt is not None
+        assert "Which file, component, or bug" in result.clarification_prompt
+
+    async def test_perceive_explicit_target_avoids_clarification(self):
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        result = await integration.perceive("Fix src/auth/login.py and add tests.")
+
+        assert result.needs_clarification is False
+        assert result.clarification_prompt is None
+
 
 # ============================================================================
 # Convenience function tests
@@ -411,6 +435,8 @@ class TestPerceptionEnhancedProperties:
         assert "tool_budget" in d
         assert "should_spawn_team" in d
         assert "coordination_suggestion" in d
+        assert "needs_clarification" in d
+        assert "clarification_prompt" in d
 
 
 # ============================================================================

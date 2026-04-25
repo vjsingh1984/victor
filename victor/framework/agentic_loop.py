@@ -1255,6 +1255,23 @@ class AgenticLoop:
         completion detection with multi-signal fusion for more accurate
         and earlier stopping when task requirements are satisfied.
         """
+        if getattr(perception, "needs_clarification", False):
+            clarification_reason = getattr(
+                perception,
+                "clarification_reason",
+                None,
+            ) or "task details are incomplete"
+            clarification_prompt = getattr(perception, "clarification_prompt", None)
+            return EvaluationResult(
+                decision=EvaluationDecision.FAIL,
+                score=float(getattr(perception, "confidence", 0.0)),
+                reason=f"Clarification required: {clarification_reason}",
+                metadata={
+                    "requires_clarification": True,
+                    "clarification_prompt": clarification_prompt,
+                },
+            )
+
         # ENHANCED: Use EnhancedCompletionEvaluator if enabled
         if self.enhanced_completion_evaluator is not None:
             try:

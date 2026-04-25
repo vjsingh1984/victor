@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -127,6 +128,38 @@ async def test_pipeline_records_pending_grounding_feedback():
         pass
 
     assert coordinator._stream_ctx.pending_grounding_feedback == "cite sources"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_returns_targeted_clarification_before_provider_call():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._stream_provider_response = AsyncMock(
+        return_value=("assistant notes", None, None, False)
+    )
+    mock_perception = SimpleNamespace(
+        perceive=AsyncMock(
+            return_value=SimpleNamespace(
+                needs_clarification=True,
+                clarification_prompt="Which file, component, or bug should I target first?",
+                confidence=0.3,
+                intent="write_allowed",
+                complexity="medium",
+            )
+        )
+    )
+
+    pipeline = StreamingChatPipeline(coordinator, perception=mock_perception)
+
+    chunks = []
+    async for chunk in pipeline.run("Fix it and add tests."):
+        chunks.append(chunk)
+
+    assert [chunk.content for chunk in chunks] == [
+        "Which file, component, or bug should I target first?"
+    ]
+    assert chunks[0].is_final is True
+    assert coordinator._stream_ctx.perception.needs_clarification is True
+    coordinator._stream_provider_response.assert_not_awaited()
 
 
 @pytest.mark.asyncio
