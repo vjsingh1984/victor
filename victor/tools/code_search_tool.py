@@ -709,7 +709,7 @@ def _matches_literal_file_pattern(file_path: str, file_pattern: str, *, search_r
     if "/" in normalized_pattern:
         return candidate_path == normalized_pattern or candidate_path.endswith(f"/{normalized_pattern}")
 
-    return basename == normalized_pattern or normalized_pattern in candidate_path
+    return basename == normalized_pattern
 
 
 def _build_literal_search_kwargs(

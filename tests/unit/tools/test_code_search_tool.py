@@ -988,6 +988,27 @@ async def test_literal_search_respects_file_pattern_filter(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_literal_search_file_pattern_requires_exact_basename_without_glob(tmp_path) -> None:
+    """Plain file_pattern names should not match longer filenames by substring."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    (source_dir / "parser.py").write_text("needle = True\n", encoding="utf-8")
+    (source_dir / "parser.py.bak").write_text("needle = True\n", encoding="utf-8")
+
+    result = await _literal_search(
+        "needle",
+        str(tmp_path),
+        5,
+        file_pattern="parser.py",
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "literal"
+    assert result["count"] == 1
+    assert result["results"][0]["path"].endswith("parser.py")
+
+
+@pytest.mark.asyncio
 async def test_literal_search_timeout_returns_friendly_error(tmp_path) -> None:
     """Async literal-search timeouts should return a stable timeout message."""
 
