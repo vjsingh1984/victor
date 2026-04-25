@@ -111,6 +111,9 @@ class BenchmarkType(Enum):
     LIVE_CODE_BENCH = "live_code_bench"  # Live coding evaluation
     BIG_CODE_BENCH = "big_code_bench"  # Large-scale code tasks
     AIDER_POLYGLOT = "aider_polyglot"  # Multi-language tasks
+    CLAW_BENCH = "claw_bench"  # GUI/web computer-use evaluation
+    GUIDE = "guide"  # Grounded multimodal UI agent evaluation
+    VLAA_GUI = "vlaa_gui"  # Vision-language action benchmark for GUI tasks
     CUSTOM = "custom"  # User-defined benchmark
 
 
@@ -518,8 +521,12 @@ class BenchmarkMetadata:
     languages: list[str]
     categories: list[str]
     description: str = ""
+    source_name: str = ""
     source_url: str = ""
     paper_url: str = ""
+    aliases: tuple[str, ...] = ()
+    evaluation_mode: str = "code"
+    runner_status: str = "implemented"
 
 
 @dataclass
@@ -535,3 +542,143 @@ class LeaderboardEntry:
     avg_tokens: float
     avg_duration: float
     config: dict = field(default_factory=dict)
+
+
+BENCHMARK_CATALOG: tuple[BenchmarkMetadata, ...] = (
+    BenchmarkMetadata(
+        name="swe-bench",
+        type=BenchmarkType.SWE_BENCH,
+        version="1.0",
+        total_tasks=2300,
+        languages=["python"],
+        categories=["software-engineering", "agentic"],
+        description="Real-world GitHub issue resolution benchmark.",
+        source_name="Princeton NLP",
+        aliases=("swe_bench",),
+        evaluation_mode="agentic",
+    ),
+    BenchmarkMetadata(
+        name="swe-bench-lite",
+        type=BenchmarkType.SWE_BENCH,
+        version="1.0",
+        total_tasks=300,
+        languages=["python"],
+        categories=["software-engineering", "agentic"],
+        description="Curated subset of SWE-bench for faster evaluation.",
+        source_name="Princeton NLP",
+        aliases=("swe_bench_lite",),
+        evaluation_mode="agentic",
+    ),
+    BenchmarkMetadata(
+        name="humaneval",
+        type=BenchmarkType.HUMAN_EVAL,
+        version="1.0",
+        total_tasks=164,
+        languages=["python"],
+        categories=["code-generation"],
+        description="Code generation from docstrings.",
+        source_name="OpenAI",
+        aliases=("human-eval", "human_eval"),
+        evaluation_mode="code-generation",
+    ),
+    BenchmarkMetadata(
+        name="mbpp",
+        type=BenchmarkType.MBPP,
+        version="1.0",
+        total_tasks=974,
+        languages=["python"],
+        categories=["code-generation"],
+        description="Mostly Basic Python Problems.",
+        source_name="Google Research",
+        evaluation_mode="code-generation",
+    ),
+    BenchmarkMetadata(
+        name="mbpp-test",
+        type=BenchmarkType.MBPP,
+        version="1.0",
+        total_tasks=500,
+        languages=["python"],
+        categories=["code-generation"],
+        description="MBPP test split.",
+        source_name="Google Research",
+        aliases=("mbpp_test",),
+        evaluation_mode="code-generation",
+    ),
+    BenchmarkMetadata(
+        name="clawbench",
+        type=BenchmarkType.CLAW_BENCH,
+        version="1.0",
+        total_tasks=0,
+        languages=["gui", "web"],
+        categories=["agentic", "perception", "computer-use"],
+        description="External GUI benchmark for computer-use agent evaluation.",
+        source_name="Research",
+        aliases=("claw-bench", "claw_bench"),
+        evaluation_mode="agentic-perception",
+        runner_status="benchmark-only",
+    ),
+    BenchmarkMetadata(
+        name="guide",
+        type=BenchmarkType.GUIDE,
+        version="1.0",
+        total_tasks=0,
+        languages=["gui", "web"],
+        categories=["agentic", "perception", "grounding"],
+        description="External grounded UI agent benchmark coverage.",
+        source_name="Research",
+        evaluation_mode="agentic-perception",
+        runner_status="benchmark-only",
+    ),
+    BenchmarkMetadata(
+        name="vlaa-gui",
+        type=BenchmarkType.VLAA_GUI,
+        version="1.0",
+        total_tasks=0,
+        languages=["gui"],
+        categories=["agentic", "perception", "gui-actions"],
+        description="External GUI action benchmark for vision-language agents.",
+        source_name="Research",
+        aliases=("vlaa_gui",),
+        evaluation_mode="agentic-perception",
+        runner_status="benchmark-only",
+    ),
+)
+
+_BENCHMARK_NAME_INDEX = {
+    alias: metadata
+    for metadata in BENCHMARK_CATALOG
+    for alias in (metadata.name, *metadata.aliases)
+}
+
+EXTERNAL_AGENTIC_BENCHMARK_TYPES = frozenset(
+    {
+        BenchmarkType.CLAW_BENCH,
+        BenchmarkType.GUIDE,
+        BenchmarkType.VLAA_GUI,
+    }
+)
+
+
+def normalize_benchmark_name(name: str) -> str:
+    """Normalize benchmark names for CLI and metadata lookup."""
+    return name.strip().lower().replace("_", "-")
+
+
+def get_benchmark_catalog() -> tuple[BenchmarkMetadata, ...]:
+    """Return benchmark metadata in CLI display order."""
+    return BENCHMARK_CATALOG
+
+
+def get_benchmark_metadata(benchmark: BenchmarkType | str) -> Optional[BenchmarkMetadata]:
+    """Resolve benchmark metadata from enum type or CLI name."""
+    if isinstance(benchmark, BenchmarkType):
+        return next((item for item in BENCHMARK_CATALOG if item.type == benchmark), None)
+    return _BENCHMARK_NAME_INDEX.get(normalize_benchmark_name(benchmark))
+
+
+def is_external_agentic_benchmark(benchmark: BenchmarkType | str) -> bool:
+    """Return True when the benchmark is an external perception-heavy agentic task."""
+    metadata = get_benchmark_metadata(benchmark)
+    if metadata is None:
+        return False
+    return metadata.type in EXTERNAL_AGENTIC_BENCHMARK_TYPES

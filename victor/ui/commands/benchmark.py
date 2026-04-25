@@ -253,24 +253,25 @@ def _configure_log_level(
 @benchmark_app.command("list")
 def list_benchmarks() -> None:
     """List available benchmarks and their descriptions."""
-    from victor.evaluation.protocol import BenchmarkType
+    from victor.evaluation.protocol import get_benchmark_catalog
 
     table = Table(title="Available Benchmarks")
     table.add_column("Benchmark", style="cyan")
     table.add_column("Description", style="white")
     table.add_column("Tasks", style="green")
     table.add_column("Source", style="dim")
+    table.add_column("Status", style="yellow")
 
-    benchmarks = [
-        ("swe-bench", "Real-world GitHub issue resolution", "~2300", "Princeton NLP"),
-        ("swe-bench-lite", "Curated subset of SWE-bench", "~300", "Princeton NLP"),
-        ("humaneval", "Code generation from docstrings", "164", "OpenAI"),
-        ("mbpp", "Mostly Basic Python Problems", "974", "Google Research"),
-        ("mbpp-test", "MBPP test split", "500", "Google Research"),
-    ]
-
-    for name, desc, tasks, source in benchmarks:
-        table.add_row(name, desc, tasks, source)
+    for metadata in get_benchmark_catalog():
+        task_count = str(metadata.total_tasks) if metadata.total_tasks > 0 else "TBD"
+        source_name = metadata.source_name or "Custom"
+        table.add_row(
+            metadata.name,
+            metadata.description,
+            task_count,
+            source_name,
+            metadata.runner_status,
+        )
 
     console.print(table)
     console.print("\n[dim]Run with: victor benchmark run <benchmark-name>[/]")
@@ -396,7 +397,22 @@ def run_benchmark(
         get_feature_flag_manager().disable(FeatureFlag.USE_EDGE_MODEL)
 
     from victor.config.settings import Settings
-    from victor.evaluation.protocol import BenchmarkType, EvaluationConfig
+    from victor.evaluation.protocol import (
+        BenchmarkType,
+        EvaluationConfig,
+        get_benchmark_catalog,
+        get_benchmark_metadata,
+        normalize_benchmark_name,
+    )
+
+    benchmark_lower = normalize_benchmark_name(benchmark)
+    metadata = get_benchmark_metadata(benchmark_lower)
+    if metadata is None:
+        available = ", ".join(item.name for item in get_benchmark_catalog())
+        console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
+        console.print(f"Available: {available}")
+        raise typer.Exit(1)
+
     from victor.evaluation.benchmarks import (
         SWEBenchRunner,
         HumanEvalRunner,
@@ -415,10 +431,11 @@ def run_benchmark(
         "mbpp-test": (BenchmarkType.MBPP, lambda: MBPPRunner(split="test")),
     }
 
-    benchmark_lower = benchmark.lower().replace("_", "-")
     if benchmark_lower not in benchmark_map:
-        console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
-        console.print(f"Available: {', '.join(benchmark_map.keys())}")
+        console.print(
+            f"[yellow]Benchmark '{metadata.name}' is cataloged, but the runner adapter "
+            f"is not wired yet ({metadata.runner_status}).[/]"
+        )
         raise typer.Exit(1)
 
     bench_type, runner_factory = benchmark_map[benchmark_lower]
@@ -993,21 +1010,15 @@ def compare_frameworks(
         FRAMEWORK_CAPABILITIES,
         PUBLISHED_RESULTS,
     )
-    from victor.evaluation.protocol import BenchmarkType
+    from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
-    # Map benchmark name to type
-    benchmark_type_map = {
-        "swe-bench": BenchmarkType.SWE_BENCH,
-        "humaneval": BenchmarkType.HUMAN_EVAL,
-        "mbpp": BenchmarkType.MBPP,
-    }
-
-    benchmark_lower = benchmark.lower().replace("_", "-")
-    if benchmark_lower not in benchmark_type_map:
+    benchmark_lower = normalize_benchmark_name(benchmark)
+    metadata = get_benchmark_metadata(benchmark_lower)
+    if metadata is None:
         console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
         raise typer.Exit(1)
 
-    bench_type = benchmark_type_map[benchmark_lower]
+    bench_type = metadata.type
 
     console.print(f"\n[bold cyan]Framework Comparison: {benchmark}[/]\n")
 
@@ -1070,20 +1081,15 @@ def show_leaderboard(
 ) -> None:
     """Show the leaderboard for a benchmark."""
     from victor.evaluation.benchmarks import PUBLISHED_RESULTS
-    from victor.evaluation.protocol import BenchmarkType
+    from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
-    benchmark_type_map = {
-        "swe-bench": BenchmarkType.SWE_BENCH,
-        "humaneval": BenchmarkType.HUMAN_EVAL,
-        "mbpp": BenchmarkType.MBPP,
-    }
-
-    benchmark_lower = benchmark.lower().replace("_", "-")
-    if benchmark_lower not in benchmark_type_map:
+    benchmark_lower = normalize_benchmark_name(benchmark)
+    metadata = get_benchmark_metadata(benchmark_lower)
+    if metadata is None:
         console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
         raise typer.Exit(1)
 
-    bench_type = benchmark_type_map[benchmark_lower]
+    bench_type = metadata.type
 
     console.print(f"\n[bold cyan]Leaderboard: {benchmark}[/]\n")
 

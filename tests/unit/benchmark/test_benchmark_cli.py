@@ -58,6 +58,15 @@ class TestBenchmarkList:
         assert "164" in result.stdout  # HumanEval
         assert "974" in result.stdout  # MBPP
 
+    def test_list_shows_external_agentic_benchmarks(self):
+        """Test that external perception-heavy benchmarks are listed."""
+        result = runner.invoke(benchmark_app, ["list"])
+        assert result.exit_code == 0
+        assert "clawbench" in result.stdout
+        assert "guide" in result.stdout
+        assert "vlaa-gui" in result.stdout
+        assert "benchmark-only" in result.stdout
+
 
 class TestBenchmarkRun:
     """Tests for benchmark run command."""
@@ -67,6 +76,13 @@ class TestBenchmarkRun:
         result = runner.invoke(benchmark_app, ["run", "unknown-benchmark"])
         assert result.exit_code == 1
         assert "Unknown benchmark" in result.stdout
+
+    def test_run_cataloged_benchmark_without_runner(self):
+        """Test running a benchmark that is cataloged but not yet wired."""
+        result = runner.invoke(benchmark_app, ["run", "guide"])
+        assert result.exit_code == 1
+        assert "runner adapter is not wired yet" in result.stdout
+        assert "benchmark-only" in result.stdout
 
     def test_run_shows_help(self):
         """Test run command help."""
@@ -92,6 +108,12 @@ class TestBenchmarkCompare:
         result = runner.invoke(benchmark_app, ["compare", "--benchmark", "unknown"])
         assert result.exit_code == 1
         assert "Unknown benchmark" in result.stdout
+
+    def test_compare_cataloged_benchmark_without_results(self):
+        """Test comparing a recognized benchmark that lacks published results."""
+        result = runner.invoke(benchmark_app, ["compare", "--benchmark", "guide"])
+        assert result.exit_code == 0
+        assert "No published results available" in result.stdout
 
 
 class TestBenchmarkLeaderboard:

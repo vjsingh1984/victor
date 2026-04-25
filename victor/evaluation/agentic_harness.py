@@ -35,9 +35,12 @@ from typing import Any, Callable, Optional, Awaitable
 
 from victor.evaluation.protocol import (
     BenchmarkTask,
+    BenchmarkType,
     EvaluationConfig,
     TaskStatus,
     TokenUsage,
+    get_benchmark_metadata,
+    is_external_agentic_benchmark,
 )
 from victor.evaluation.test_runners import (
     TestRunnerRegistry,
@@ -92,6 +95,8 @@ class AgenticExecutionTrace:
     task_id: str
     start_time: float
     end_time: float = 0.0
+    benchmark: str = ""
+    benchmark_source: str = ""
 
     # Multi-turn interaction tracking
     turns: int = 0
@@ -173,6 +178,8 @@ class AgenticExecutionTrace:
         """Export trace as dictionary for serialization."""
         return {
             "task_id": self.task_id,
+            "benchmark": self.benchmark,
+            "benchmark_source": self.benchmark_source,
             "start_time": self.start_time,
             "end_time": self.end_time,
             "duration_seconds": self.duration_seconds,
@@ -225,6 +232,7 @@ class AgenticTaskResult:
     task_id: str
     status: TaskStatus
     trace: AgenticExecutionTrace
+    benchmark: BenchmarkType = BenchmarkType.CUSTOM
 
     # Test results
     tests_passed: int = 0
@@ -334,6 +342,19 @@ class AgenticMetrics:
             return 0.0
         return self.total_correction_time_seconds / self.total_corrections
 
+
+    @property
+    def benchmarks_evaluated(self) -> list[str]:
+        """Unique benchmark ids covered by this run."""
+        return sorted({result.benchmark.value for result in self.task_results})
+
+    @property
+    def external_benchmark_task_count(self) -> int:
+        """Number of tasks sourced from external perception benchmarks."""
+        return sum(
+            1 for result in self.task_results if is_external_agentic_benchmark(result.benchmark)
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
         return {
@@ -344,6 +365,8 @@ class AgenticMetrics:
                 "errors": self.errors,
                 "timeouts": self.timeouts,
                 "pass_rate": round(self.pass_rate, 4),
+                "benchmarks_evaluated": self.benchmarks_evaluated,
+                "external_benchmark_tasks": self.external_benchmark_task_count,
             },
             "efficiency": {
                 "total_turns": self.total_turns,
@@ -372,6 +395,7 @@ class AgenticMetrics:
             "tasks": [
                 {
                     "task_id": r.task_id,
+                    "benchmark": r.benchmark.value,
                     "status": r.status.value,
                     "turns": r.trace.turns,
                     "tool_calls": r.trace.total_tool_calls,
@@ -1039,15 +1063,19 @@ class AgenticBenchmarkRunner:
         workspace_dir = self._workspace_base / f"task_{safe_task_id}_{int(time.time())}"
         workspace_dir.mkdir(parents=True, exist_ok=True)
 
+        benchmark_metadata = get_benchmark_metadata(task.benchmark)
         trace = AgenticExecutionTrace(
             task_id=task.task_id,
             start_time=time.time(),
+            benchmark=task.benchmark.value,
+            benchmark_source=benchmark_metadata.source_name if benchmark_metadata else "",
         )
 
         result = AgenticTaskResult(
             task_id=task.task_id,
             status=TaskStatus.RUNNING,
             trace=trace,
+            benchmark=task.benchmark,
         )
 
         try:
@@ -1321,6 +1349,9 @@ def generate_agentic_report(metrics: AgenticMetrics) -> str:
     lines.append(f"  Failed:         {metrics.failed}")
     lines.append(f"  Errors:         {metrics.errors}")
     lines.append(f"  Timeouts:       {metrics.timeouts}")
+    if metrics.benchmarks_evaluated:
+        lines.append(f"  Benchmarks:     {', '.join(metrics.benchmarks_evaluated)}")
+        lines.append(f"  External Tasks: {metrics.external_benchmark_task_count}")
     lines.append("")
 
     lines.append("EFFICIENCY")

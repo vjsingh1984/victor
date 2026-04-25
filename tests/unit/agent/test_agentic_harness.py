@@ -205,6 +205,19 @@ class TestAgenticExecutionTrace:
         assert result["successful_tool_calls"] == 1
         assert result["files_modified"] == ["a.py"]
 
+    def test_to_dict_includes_benchmark_metadata(self):
+        """Test trace export includes benchmark metadata for reporting."""
+        trace = AgenticExecutionTrace(
+            task_id="test-003",
+            start_time=0.0,
+            benchmark=BenchmarkType.CLAW_BENCH.value,
+            benchmark_source="Research",
+        )
+        result = trace.to_dict()
+
+        assert result["benchmark"] == "claw_bench"
+        assert result["benchmark_source"] == "Research"
+
     def test_to_dict_empty_trace(self):
         """Test to_dict with minimal trace."""
         trace = AgenticExecutionTrace(task_id="test-002", start_time=0.0)
@@ -310,6 +323,26 @@ class TestAgenticMetrics:
         assert d["summary"]["pass_rate"] == 0.5
         assert d["quality"]["avg_completion_precision"] == 0.75
         assert d["quality"]["avg_unsupported_claim_rate"] == 0.1
+
+    def test_to_dict_includes_external_benchmark_summary(self):
+        """Test external benchmark coverage is surfaced in metrics export."""
+        trace = AgenticExecutionTrace(
+            task_id="test-004",
+            start_time=0.0,
+            benchmark=BenchmarkType.CLAW_BENCH.value,
+        )
+        result = AgenticTaskResult(
+            task_id="test-004",
+            status=TaskStatus.PASSED,
+            trace=trace,
+            benchmark=BenchmarkType.CLAW_BENCH,
+        )
+        metrics = AgenticMetrics(total_tasks=1, passed=1, task_results=[result])
+
+        exported = metrics.to_dict()
+        assert exported["summary"]["benchmarks_evaluated"] == ["claw_bench"]
+        assert exported["summary"]["external_benchmark_tasks"] == 1
+        assert exported["tasks"][0]["benchmark"] == "claw_bench"
 
 
 class TestPatchApplicationValidator:
