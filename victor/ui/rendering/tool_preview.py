@@ -33,6 +33,7 @@ class RenderedPreview:
     header: Optional[str] = None
     total_line_count: int = 0
     syntax_hint: str = "text"
+    contains_rich_markup: bool = False  # True if lines contain Rich markup tags
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +110,80 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
         return []
 
     def render(self, tool_name, arguments, raw_result, max_lines) -> RenderedPreview:
+        # First, try to use the actual diff from the result (most accurate)
+        parsed = _try_parse(raw_result)
+        if isinstance(parsed, dict):
+            # Check for formatted diff (Rich-formatted with color codes)
+            formatted_diff = parsed.get("diff_formatted")
+            if formatted_diff:
+                # Parse the formatted diff to extract content lines
+                # Strip Rich markup tags for line counting
+                import re
+                clean_lines = []
+                for line in formatted_diff.splitlines():
+                    # Remove Rich markup tags like [green], [red], [dim], [cyan], [/]
+                    clean_line = re.sub(r'\[[a-z0-9_/]+\]', '', line)
+                    clean_lines.append(clean_line)
+
+                # Count additions and removals from clean lines
+                added = sum(1 for l in clean_lines if l.startswith("+") and not l.startswith("+++"))
+                removed = sum(1 for l in clean_lines if l.startswith("-") and not l.startswith("---"))
+
+                # Extract file paths from the formatted diff
+                file_labels = []
+                for line in clean_lines:
+                    if line.startswith("---") or line.startswith("+++"):
+                        # Extract file path (after the marker)
+                        parts = line.split(None, 1)
+                        if len(parts) > 1:
+                            file_labels.append(parts[1])
+
+                file_part = f" {', '.join(set(file_labels))}" if file_labels else ""
+                header = f"+{added} -{removed}{file_part}"
+
+                # Return formatted lines (with Rich markup) for console rendering
+                visible = formatted_diff.splitlines()[:max_lines]
+                return RenderedPreview(
+                    lines=visible,
+                    header=header,
+                    total_line_count=len(clean_lines),
+                    syntax_hint="diff",
+                    contains_rich_markup=True,  # Lines contain Rich markup
+                )
+
+            # Check for raw diff (unified diff format)
+            raw_diff = parsed.get("diff")
+            if raw_diff:
+                diff_lines = raw_diff.splitlines()
+
+                # Count additions and removals
+                added = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+                removed = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+
+                # Extract file paths
+                file_labels = []
+                for line in diff_lines:
+                    if line.startswith("---") or line.startswith("+++"):
+                        parts = line.split(None, 1)
+                        if len(parts) > 1:
+                            file_labels.append(parts[1])
+
+                file_part = f" {', '.join(set(file_labels))}" if file_labels else ""
+                header = f"+{added} -{removed}{file_part}"
+
+                # Return content lines (excluding file headers)
+                content_lines = [
+                    l for l in diff_lines if not l.startswith("---") and not l.startswith("+++")
+                ]
+                visible = content_lines[:max_lines]
+                return RenderedPreview(
+                    lines=visible,
+                    header=header,
+                    total_line_count=len(content_lines),
+                    syntax_hint="diff",
+                )
+
+        # Fallback: extract from arguments (old behavior)
         pairs = self._extract_replace_pairs(arguments)
 
         if pairs:
@@ -144,8 +219,7 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                 syntax_hint="diff",
             )
 
-        # Fallback: parse result for success info
-        parsed = _try_parse(raw_result)
+        # Final fallback: parse result for success info
         if isinstance(parsed, dict):
             applied = parsed.get("operations_applied", parsed.get("ops_applied", "?"))
             file_path = (
@@ -257,6 +331,19 @@ class _SearchPreviewStrategy(_ToolPreviewStrategy):
 
         parsed = _try_parse(raw_result)
 
+        # Check for Rich-formatted results (from code_search tool)
+        if isinstance(parsed, dict) and "formatted_results" in parsed:
+            lines = parsed["formatted_results"].splitlines()
+            count = parsed.get("count", 0)
+            mode = parsed.get("mode", "unknown")
+
+            return RenderedPreview(
+                lines=lines[:max_lines],
+                header=f"{count} match{'es' if count != 1 else ''} ({mode})",
+                total_line_count=len(lines),
+                contains_rich_markup=True,  # Lines contain Rich markup
+            )
+
         # Structured result (glob/code_search style)
         if isinstance(parsed, dict):
             matches = parsed.get("matches") or parsed.get("results") or parsed.get("files") or []
@@ -293,6 +380,49 @@ class _DirectoryPreviewStrategy(_ToolPreviewStrategy):
                 else:
                     names.append(str(item))
             return RenderedPreview(lines=names, header=header, total_line_count=count)
+
+        return _GenericPreviewStrategy().render(tool_name, arguments, raw_result, max_lines)
+
+
+class _TestPreviewStrategy(_ToolPreviewStrategy):
+    """Testing tool — show Rich-formatted test results with color-coded status."""
+
+    def render(self, tool_name, arguments, raw_result, max_lines) -> RenderedPreview:
+        parsed = _try_parse(raw_result)
+        if isinstance(parsed, dict) and "formatted_summary" in parsed:
+            # Use pre-formatted Rich output from testing tool
+            lines = parsed["formatted_summary"].splitlines()
+            summary = parsed.get("summary", {})
+            total = summary.get("total_tests", 0)
+
+            return RenderedPreview(
+                lines=lines[:max_lines],
+                header=f"{total} test{'s' if total != 1 else ''}",
+                total_line_count=len(lines),
+                contains_rich_markup=True,  # Lines contain Rich markup
+            )
+
+        # Fallback: try to show basic summary from parsed data
+        if isinstance(parsed, dict) and "summary" in parsed:
+            summary = parsed["summary"]
+            total = summary.get("total_tests", 0)
+            passed = summary.get("passed", 0)
+            failed = summary.get("failed", 0)
+            skipped = summary.get("skipped", 0)
+
+            parts = []
+            if passed:
+                parts.append(f"✓ {passed} passed")
+            if failed:
+                parts.append(f"✗ {failed} failed")
+            if skipped:
+                parts.append(f"○ {skipped} skipped")
+
+            return RenderedPreview(
+                lines=[" | ".join(parts)] if parts else [],
+                header=f"{total} test{'s' if total != 1 else ''}",
+                total_line_count=1,
+            )
 
         return _GenericPreviewStrategy().render(tool_name, arguments, raw_result, max_lines)
 
@@ -348,6 +478,10 @@ _STRATEGY_MAP: Dict[str, _ToolPreviewStrategy] = {
     "list_dir": _DirectoryPreviewStrategy(),
     "tree": _DirectoryPreviewStrategy(),
     "list_files": _DirectoryPreviewStrategy(),
+    # Testing
+    "test": _TestPreviewStrategy(),
+    "pytest": _TestPreviewStrategy(),
+    "run_tests": _TestPreviewStrategy(),
 }
 
 _GENERIC = _GenericPreviewStrategy()
@@ -392,9 +526,36 @@ class ToolPreviewRenderer:
 
     def __init__(self) -> None:
         self._strategies: Dict[str, _ToolPreviewStrategy] = dict(_STRATEGY_MAP)
+        # Register enhanced formatter-aware strategies
+        self._register_enhanced_strategies()
 
     def register(self, tool_name: str, strategy: _ToolPreviewStrategy) -> None:
         self._strategies[tool_name] = strategy
+
+    def _register_enhanced_strategies(self) -> None:
+        """Register enhanced formatter-aware strategies.
+
+        This replaces the default strategies with enhanced versions that can
+        detect and use pre-formatted Rich markup from tools.
+        """
+        try:
+            from victor.ui.rendering.formatter_aware_preview import (
+                _TestPreviewStrategyEnhanced,
+                _SearchPreviewStrategyEnhanced,
+                _GitPreviewStrategyEnhanced,
+            )
+
+            # Register enhanced strategies (they override defaults)
+            self._strategies["test"] = _TestPreviewStrategyEnhanced()
+            self._strategies["pytest"] = _TestPreviewStrategyEnhanced()
+            self._strategies["run_tests"] = _TestPreviewStrategyEnhanced()
+            self._strategies["code_search"] = _SearchPreviewStrategyEnhanced()
+            self._strategies["semantic_code_search"] = _SearchPreviewStrategyEnhanced()
+            self._strategies["git"] = _GitPreviewStrategyEnhanced()
+
+            logger.debug("Enhanced formatter-aware preview strategies registered")
+        except Exception as exc:
+            logger.debug("Could not register enhanced preview strategies: %s", exc)
 
     def render(
         self,

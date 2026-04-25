@@ -225,12 +225,21 @@ class LiveDisplayRenderer:
                 if preview.header:
                     self.console.print(f"[dim]│ {_markup_escape(preview.header)}[/]")
                 if preview.lines:
+                    # Check if preview contains Rich markup (e.g., formatted diffs)
+                    if preview.contains_rich_markup:
+                        # Don't escape markup - the lines already contain Rich formatting
+                        preview_text = "\n".join(preview.lines)
+                    else:
+                        # Escape markup to prevent rendering issues
+                        preview_text = "\n".join(_markup_escape(l) for l in preview.lines)
+
                     render_tool_preview(
                         self.console,
-                        "\n".join(_markup_escape(l) for l in preview.lines),
+                        preview_text,
                         total_lines=preview.total_line_count,
                         preview_lines=adaptive_lines,
                         hotkey=tool_settings.tool_output_expand_hotkey,
+                        contains_rich_markup=preview.contains_rich_markup,
                     )
 
         # Show pruning transparency

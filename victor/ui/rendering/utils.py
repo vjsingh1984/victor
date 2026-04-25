@@ -316,11 +316,28 @@ def render_tool_preview(
     total_lines: int,
     preview_lines: int,
     hotkey: str,
+    contains_rich_markup: bool = False,
 ) -> None:
-    """Render compact preview lines with an expandable gutter."""
+    """Render compact preview lines with an expandable gutter.
+
+    Args:
+        console: Rich Console instance
+        preview_text: Text to render (may contain Rich markup)
+        total_lines: Total number of lines in the full output
+        preview_lines: Number of lines shown in this preview
+        hotkey: Hotkey string for expanding the preview
+        contains_rich_markup: If True, preview_text contains Rich markup and should
+                             be rendered directly. If False, wrap with [dim] tags.
+    """
     for line in preview_text.split("\n"):
         if line:
-            console.print(f"[dim]│ {line}[/]")
+            if contains_rich_markup:
+                # Line already contains Rich markup (e.g., formatted diffs)
+                # Just add the gutter prefix without wrapping the whole line
+                console.print(f"[dim]│ [/]{line}")
+            else:
+                # Plain text - wrap with dim for subtle preview
+                console.print(f"[dim]│ {line}[/]")
 
     if total_lines > preview_lines:
         remaining = total_lines - preview_lines
