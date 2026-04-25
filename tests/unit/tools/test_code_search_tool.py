@@ -1032,6 +1032,58 @@ async def test_code_search_text_mode_applies_language_and_test_filters_to_litera
 
 
 @pytest.mark.asyncio
+async def test_code_search_text_mode_applies_symbol_filter_to_literal_results(tmp_path) -> None:
+    """Explicit text mode should honor symbol filters on literal results."""
+    literal_result = {
+        "success": True,
+        "results": [
+            {
+                "path": "src/parser.py",
+                "score": 1,
+                "snippet": "src/parser.py:1:def parse_json(data): return data",
+            },
+            {
+                "path": "src/parser.py",
+                "score": 1,
+                "snippet": "src/parser.py:4:def parse_json_or_none(data): return data or None",
+            },
+        ],
+        "count": 2,
+        "mode": "literal",
+    }
+    filters = SearchFilters(symbol="parse_json")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=5,
+            mode="text",
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with(
+        "json parsing",
+        str(tmp_path),
+        5,
+        None,
+        filename_only=False,
+        allow_filename_autodetect=False,
+    )
+    get_index.assert_not_awaited()
+    assert result["mode"] == "text"
+    assert result["count"] == 1
+    assert result["results"][0]["snippet"].startswith("src/parser.py:1:def parse_json")
+
+
+@pytest.mark.asyncio
 async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> None:
     """Filename-like semantic queries should bypass semantic indexing."""
     literal_result = {

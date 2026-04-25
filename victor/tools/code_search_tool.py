@@ -3,6 +3,7 @@ import fnmatch
 import importlib.util
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -856,6 +857,46 @@ def _filter_search_results_by_test_only(
     return filtered_results
 
 
+def _result_matches_symbol_filter(result: Any, symbol: str) -> bool:
+    """Return whether a search result matches the requested symbol filter."""
+
+    target_symbol = symbol.strip()
+    if not target_symbol:
+        return True
+
+    result_dict = _normalize_result_dict(result)
+    metadata = result_dict.get("metadata")
+    metadata_dict = metadata if isinstance(metadata, dict) else {}
+    candidate_names = (
+        result_dict.get("symbol_name"),
+        result_dict.get("name"),
+        metadata_dict.get("symbol_name"),
+        metadata_dict.get("name"),
+    )
+    for candidate in candidate_names:
+        if not isinstance(candidate, str):
+            continue
+        normalized_candidate = candidate.strip()
+        if normalized_candidate == target_symbol or normalized_candidate.endswith(f".{target_symbol}"):
+            return True
+
+    symbol_pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(target_symbol)}(?![A-Za-z0-9_])")
+    for text in (result_dict.get("content"), result_dict.get("snippet")):
+        if isinstance(text, str) and symbol_pattern.search(text):
+            return True
+
+    return False
+
+
+def _filter_search_results_by_symbol(
+    results: List[Any],
+    symbol: str,
+) -> List[Any]:
+    """Filter result objects by symbol name."""
+
+    return [result for result in results if _result_matches_symbol_filter(result, symbol)]
+
+
 def _language_filter_extensions(language: str) -> Optional[List[str]]:
     """Return known file extensions for a language filter."""
 
@@ -890,6 +931,8 @@ def _apply_literal_result_filters(
     filtered_hits: List[Any] = list(result["results"])
     if filters.extensions:
         filtered_hits = _filter_search_results_by_extensions(filtered_hits, filters.extensions)
+    if filters.symbol:
+        filtered_hits = _filter_search_results_by_symbol(filtered_hits, filters.symbol)
     if filters.language:
         filtered_hits = _filter_search_results_by_language(filtered_hits, filters.language)
     if filters.test_only is not None:
