@@ -16,12 +16,58 @@
 
 import asyncio
 import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 
 import pytest
 
-from victor.tools.code_search_tool import _probe_index_integrity
+from victor.framework.search.codebase_embedding_bridge import (
+    build_codebase_index_manifest,
+    write_codebase_index_manifest,
+)
+from victor.tools.code_search_tool import (
+    _build_codebase_embedding_config,
+    _finalize_index_storage,
+    _get_or_build_index,
+    _probe_index_integrity,
+    clear_index_cache,
+)
+
+
+class _NoOpAsyncLock:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeIndexLockRegistry:
+    def __init__(self) -> None:
+        self.used_paths: list[Path] = []
+
+    async def acquire_lock(self, root: Path) -> _NoOpAsyncLock:
+        return _NoOpAsyncLock()
+
+    def mark_lock_used(self, root: Path) -> None:
+        self.used_paths.append(root)
+
+
+class _FakeCapabilityRegistry:
+    def __init__(self, factory: object) -> None:
+        self._factory = factory
+
+    def ensure_bootstrapped(self) -> None:
+        return None
+
+    def get(self, protocol: object) -> object:
+        del protocol
+        return self._factory
+
+    def is_enhanced(self, protocol: object) -> bool:
+        del protocol
+        return True
 
 
 class TestIndexingFlagBehavior:
@@ -309,3 +355,154 @@ class TestBackgroundRebuildLogging:
         log_messages = [record.message for record in caplog.records]
         assert any("Test rebuild error" in msg for msg in log_messages)
         assert any("/test/project" in msg for msg in log_messages)
+
+
+class TestStructuralIndexPersistence:
+    """Tests for manifest-aware persistent index reuse."""
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_rebuilds_when_manifest_mismatch(self, tmp_path, monkeypatch):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        persist_dir = tmp_path / "embeddings"
+        persist_dir.mkdir()
+        (persist_dir / "existing.lance").mkdir()
+        write_codebase_index_manifest(persist_dir, {"schema_version": -1})
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(persist_dir),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        mock_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
+        fake_factory = SimpleNamespace(create=lambda **kwargs: mock_index)
+        fake_cache: dict[str, dict[str, object]] = {}
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+
+        clear_index_cache()
+        index, rebuilt = await _get_or_build_index(root=root, settings=settings)
+
+        expected_manifest = build_codebase_index_manifest(
+            _build_codebase_embedding_config(settings, root)
+        )
+        assert index is mock_index
+        assert rebuilt is True
+        mock_index.index_codebase.assert_awaited_once()
+        assert fake_cache[str(root)]["index"] is mock_index
+        assert build_codebase_index_manifest(_build_codebase_embedding_config(settings, root)) == expected_manifest
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_reuses_persistent_index_when_manifest_matches(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        persist_dir = tmp_path / "embeddings"
+        persist_dir.mkdir()
+        (persist_dir / "existing.lance").mkdir()
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(persist_dir),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        embedding_config = _build_codebase_embedding_config(settings, root)
+        write_codebase_index_manifest(persist_dir, build_codebase_index_manifest(embedding_config))
+
+        mock_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
+        fake_factory = SimpleNamespace(create=lambda **kwargs: mock_index)
+        fake_cache: dict[str, dict[str, object]] = {}
+        probe_mock = AsyncMock(return_value=False)
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+
+        clear_index_cache()
+        index, rebuilt = await _get_or_build_index(root=root, settings=settings)
+
+        assert index is mock_index
+        assert rebuilt is False
+        assert mock_index._is_indexed is True
+        mock_index.index_codebase.assert_not_awaited()
+        probe_mock.assert_awaited_once_with(mock_index)
+
+    @pytest.mark.asyncio
+    async def test_finalize_index_storage_flushes_structural_provider(self):
+        provider = SimpleNamespace(
+            config=SimpleNamespace(vector_store="victor_structural_bridge"),
+            get_stats=AsyncMock(return_value={"total_documents": 1}),
+        )
+        index = SimpleNamespace(embedding_provider=provider)
+
+        await _finalize_index_storage(index)
+
+        provider.get_stats.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_finalize_index_storage_skips_non_structural_provider(self):
+        provider = SimpleNamespace(
+            config=SimpleNamespace(vector_store="lancedb"),
+            get_stats=AsyncMock(return_value={"total_documents": 1}),
+        )
+        index = SimpleNamespace(embedding_provider=provider)
+
+        await _finalize_index_storage(index)
+
+        provider.get_stats.assert_not_awaited()
