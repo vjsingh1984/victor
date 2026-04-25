@@ -618,7 +618,16 @@ class UnifiedMemoryCoordinator:
             logger.warning("No available providers for query")
             return []
 
-        transfer_hints = self.suggest_transfer(query, session_id=session_id, limit=min(limit, 3))
+        transfer_context = self._extract_transfer_context(filters)
+        transfer_hints = self.suggest_transfer(
+            query,
+            session_id=session_id,
+            limit=min(limit, 3),
+            project_path=transfer_context["project_path"],
+            vertical_name=transfer_context["vertical_name"],
+            transfer_group=transfer_context["transfer_group"],
+            allow_cross_project=transfer_context["allow_cross_project"],
+        )
         self._last_transfer_hints = transfer_hints
 
         # Parallel search
@@ -757,7 +766,7 @@ class UnifiedMemoryCoordinator:
             source_types=sorted({result.source.name for result in results}),
             timestamp=time.time(),
             session_id=session_id,
-            metadata=dict(metadata or {}),
+            metadata=self._normalize_transfer_metadata(metadata),
         )
         self._evolution_traces.append(trace)
         if len(self._evolution_traces) > self._max_evolution_traces:
@@ -769,6 +778,11 @@ class UnifiedMemoryCoordinator:
         query: str,
         session_id: Optional[str] = None,
         limit: int = 3,
+        *,
+        project_path: Optional[str] = None,
+        vertical_name: Optional[str] = None,
+        transfer_group: Optional[str] = None,
+        allow_cross_project: bool = False,
     ) -> List[MemoryTransferHint]:
         """Suggest transferable memory hints from prior successful traces."""
         if not self._enable_memory_evolution or not query.strip() or limit <= 0:
@@ -794,10 +808,33 @@ class UnifiedMemoryCoordinator:
 
             similarity = len(overlap) / max(1, len(query_tokens | trace_tokens))
             cross_session = bool(session_id and trace.session_id and session_id != trace.session_id)
+            transfer_scope = self._resolve_transfer_scope(
+                trace,
+                session_id=session_id,
+                project_path=project_path,
+                vertical_name=vertical_name,
+                transfer_group=transfer_group,
+                allow_cross_project=allow_cross_project,
+            )
+            if transfer_scope is None:
+                continue
             if similarity < 0.2 and not cross_session:
                 continue
 
             score = similarity + (0.05 if cross_session else 0.0)
+            hint_metadata = dict(trace.metadata)
+            source_project_path = self._normalize_scope_value(trace.metadata.get("project_path"))
+            source_vertical_name = self._normalize_scope_value(trace.metadata.get("vertical_name"))
+            normalized_transfer_group = self._normalize_scope_value(
+                trace.metadata.get("transfer_group")
+            )
+            if source_project_path:
+                hint_metadata["source_project_path"] = source_project_path
+            if source_vertical_name:
+                hint_metadata["source_vertical_name"] = source_vertical_name
+            if normalized_transfer_group:
+                hint_metadata["transfer_group"] = normalized_transfer_group
+            hint_metadata["transfer_scope"] = transfer_scope
             hints.append(
                 MemoryTransferHint(
                     matched_query=trace.query,
@@ -806,7 +843,7 @@ class UnifiedMemoryCoordinator:
                     preferred_source_types=list(trace.source_types),
                     session_id=trace.session_id,
                     cross_session=cross_session,
-                    metadata=dict(trace.metadata),
+                    metadata=hint_metadata,
                 )
             )
 
@@ -822,15 +859,22 @@ class UnifiedMemoryCoordinator:
         result_boosts: Dict[str, float] = {}
         source_boosts: Dict[str, float] = {}
         query_map: Dict[str, List[str]] = {}
+        scope_map: Dict[str, str] = {}
+        source_scope_map: Dict[str, str] = {}
 
         for hint in transfer_hints:
+            transfer_scope = str(hint.metadata.get("transfer_scope") or "")
             for result_id in hint.preferred_result_ids:
                 result_boosts[result_id] = max(result_boosts.get(result_id, 0.0), self._transfer_boost)
                 query_map.setdefault(result_id, []).append(hint.matched_query)
+                if transfer_scope and result_id not in scope_map:
+                    scope_map[result_id] = transfer_scope
             for source_type in hint.preferred_source_types:
                 source_boosts[source_type] = max(
                     source_boosts.get(source_type, 0.0), self._transfer_boost * 0.5
                 )
+                if transfer_scope and source_type not in source_scope_map:
+                    source_scope_map[source_type] = transfer_scope
 
         boosted_results: List[MemoryResult] = []
         for result in results:
@@ -843,6 +887,9 @@ class UnifiedMemoryCoordinator:
             metadata = dict(result.metadata)
             metadata["memory_transfer_boost"] = round(boost, 4)
             metadata["memory_transfer_queries"] = query_map.get(result.id, [])
+            transfer_scope = scope_map.get(result.id) or source_scope_map.get(result.source.name)
+            if transfer_scope:
+                metadata["memory_transfer_scope"] = transfer_scope
             boosted_results.append(
                 MemoryResult(
                     source=result.source,
@@ -855,6 +902,93 @@ class UnifiedMemoryCoordinator:
             )
 
         return boosted_results
+
+    @staticmethod
+    def _normalize_scope_value(value: Any) -> Optional[str]:
+        """Normalize transfer-scope values for comparisons."""
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    def _normalize_transfer_metadata(
+        self,
+        metadata: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Normalize transfer metadata persisted with evolution traces."""
+        normalized = dict(metadata or {})
+        for key in ("project_path", "vertical_name", "transfer_group"):
+            value = self._normalize_scope_value(normalized.get(key))
+            if value is None:
+                normalized.pop(key, None)
+            else:
+                normalized[key] = value
+        if "allow_cross_project" in normalized:
+            normalized["allow_cross_project"] = bool(normalized["allow_cross_project"])
+        return normalized
+
+    def _extract_transfer_context(
+        self,
+        filters: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Extract transfer-policy context from federated-search filters."""
+        filter_dict = dict(filters or {})
+        return {
+            "project_path": self._normalize_scope_value(filter_dict.get("project_path")),
+            "vertical_name": self._normalize_scope_value(filter_dict.get("vertical_name")),
+            "transfer_group": self._normalize_scope_value(filter_dict.get("transfer_group")),
+            "allow_cross_project": bool(filter_dict.get("allow_cross_project")),
+        }
+
+    def _resolve_transfer_scope(
+        self,
+        trace: MemoryEvolutionTrace,
+        *,
+        session_id: Optional[str],
+        project_path: Optional[str],
+        vertical_name: Optional[str],
+        transfer_group: Optional[str],
+        allow_cross_project: bool,
+    ) -> Optional[str]:
+        """Decide whether a trace may transfer into the current request scope."""
+        trace_project_path = self._normalize_scope_value(trace.metadata.get("project_path"))
+        trace_vertical_name = self._normalize_scope_value(trace.metadata.get("vertical_name"))
+        trace_transfer_group = self._normalize_scope_value(trace.metadata.get("transfer_group"))
+        current_project_path = self._normalize_scope_value(project_path)
+        current_vertical_name = self._normalize_scope_value(vertical_name)
+        current_transfer_group = self._normalize_scope_value(transfer_group)
+        cross_session = bool(session_id and trace.session_id and session_id != trace.session_id)
+
+        if (
+            current_project_path
+            and trace_project_path
+            and current_project_path != trace_project_path
+        ):
+            if not allow_cross_project:
+                return None
+            if (
+                current_transfer_group
+                and trace_transfer_group
+                and current_transfer_group == trace_transfer_group
+            ):
+                return "cross_project_transfer_group"
+            if (
+                current_vertical_name
+                and trace_vertical_name
+                and current_vertical_name == trace_vertical_name
+            ):
+                return "cross_project_same_vertical"
+            if bool(trace.metadata.get("allow_cross_project")):
+                return "cross_project_explicit"
+            return None
+
+        if current_project_path and trace_project_path and current_project_path == trace_project_path:
+            return "same_project" if cross_session else "same_session"
+
+        if cross_session:
+            return "cross_session"
+
+        return "same_session"
 
     def _tokenize_query(self, query: str) -> Set[str]:
         """Extract stable lexical tokens for simple transfer matching."""

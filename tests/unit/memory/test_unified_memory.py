@@ -292,6 +292,77 @@ class TestMemoryEvolution:
         assert hints == []
 
     @pytest.mark.asyncio
+    async def test_suggest_transfer_blocks_cross_project_without_policy(self):
+        coordinator = create_memory_coordinator(enable_memory_evolution=True)
+        results = [
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Shared auth remediation notes",
+                relevance=0.83,
+                id="msg_auth_notes",
+            )
+        ]
+
+        await coordinator.record_outcome(
+            query="authentication failure remediation",
+            results=results,
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "vertical_name": "coding",
+            },
+        )
+
+        hints = coordinator.suggest_transfer(
+            "authentication remediation checklist",
+            session_id="session-b",
+            project_path="/repo-beta",
+            vertical_name="coding",
+        )
+
+        assert hints == []
+
+    @pytest.mark.asyncio
+    async def test_suggest_transfer_allows_shared_transfer_group_across_verticals(self):
+        coordinator = create_memory_coordinator(enable_memory_evolution=True)
+        results = [
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Shared auth remediation notes",
+                relevance=0.83,
+                id="msg_auth_notes",
+            )
+        ]
+
+        await coordinator.record_outcome(
+            query="authentication failure remediation",
+            results=results,
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "vertical_name": "coding",
+                "transfer_group": "victor-core",
+            },
+        )
+
+        hints = coordinator.suggest_transfer(
+            "authentication remediation checklist",
+            session_id="session-b",
+            project_path="/repo-beta",
+            vertical_name="research",
+            transfer_group="victor-core",
+            allow_cross_project=True,
+        )
+
+        assert len(hints) == 1
+        assert hints[0].cross_session is True
+        assert hints[0].metadata["transfer_scope"] == "cross_project_transfer_group"
+        assert hints[0].metadata["source_project_path"] == "/repo-alpha"
+        assert hints[0].metadata["source_vertical_name"] == "coding"
+
+    @pytest.mark.asyncio
     async def test_search_all_boosts_results_with_transfer_hints(self):
         coordinator = create_memory_coordinator(
             enable_memory_evolution=True,
@@ -306,7 +377,7 @@ class TestMemoryEvolution:
         )
         competitor_result = MemoryResult(
             source=MemoryType.ENTITY,
-            content="authentication service",
+            content="authentication login service",
             relevance=0.75,
             id="ent_competitor",
             timestamp=preferred_result.timestamp,
@@ -340,6 +411,61 @@ class TestMemoryEvolution:
         assert coordinator.last_transfer_hints
         assert isinstance(coordinator.last_transfer_hints[0], MemoryTransferHint)
         assert coordinator.last_transfer_hints[0].cross_session is True
+
+    @pytest.mark.asyncio
+    async def test_search_all_skips_cross_project_transfer_without_policy(self):
+        coordinator = create_memory_coordinator(
+            enable_memory_evolution=True,
+            transfer_boost=0.12,
+        )
+        preferred_result = MemoryResult(
+            source=MemoryType.CONVERSATION,
+            content="authentication login workflow",
+            relevance=0.72,
+            id="msg_preferred",
+            timestamp=time.time(),
+        )
+        competitor_result = MemoryResult(
+            source=MemoryType.ENTITY,
+            content="authentication login service",
+            relevance=0.75,
+            id="ent_competitor",
+            timestamp=preferred_result.timestamp,
+        )
+
+        conversation_provider = MockMemoryProvider(
+            MemoryType.CONVERSATION,
+            [preferred_result],
+        )
+        entity_provider = MockMemoryProvider(
+            MemoryType.ENTITY,
+            [competitor_result],
+        )
+        coordinator.register_provider(conversation_provider)
+        coordinator.register_provider(entity_provider)
+
+        await coordinator.record_outcome(
+            query="authentication bug",
+            results=[preferred_result],
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "vertical_name": "coding",
+            },
+        )
+
+        ranked = await coordinator.search_all(
+            "authentication login",
+            session_id="session-b",
+            filters={
+                "project_path": "/repo-beta",
+                "vertical_name": "coding",
+            },
+        )
+
+        assert ranked[0].id == "ent_competitor"
+        assert coordinator.last_transfer_hints == []
 
 
 # =============================================================================

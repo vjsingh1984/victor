@@ -81,7 +81,7 @@ Planned slices:
 | Slice | Status | TDD plan | Notes |
 |---|---|---|---|
 | 4.1 Dual-trace memory encoding | Done | Added store, controller, and adapter tests first | Conversation memory now persists semantic vs execution traces separately and can retrieve both buckets through the store/controller/adapter path |
-| 4.2 Memory transfer hooks across verticals | Not started | Add policy / filter tests | Avoid naive cross-project leakage |
+| 4.2 Memory transfer hooks across verticals | Done | Added policy / filter tests first | Unified memory transfer now accepts project / vertical / transfer-group context, blocks scoped cross-project reuse by default when project scope is known, and allows bounded opt-in reuse across matching transfer groups or verticals |
 | 4.3 Proactive memory hints | Not started | Add next-turn hint generation tests | PRiME-inspired, bounded first version |
 
 ## Phase 5: Benchmark Harnesses
