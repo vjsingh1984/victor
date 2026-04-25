@@ -177,7 +177,7 @@ class TestQueryPerformance:
         """Test schema generation (should use cache)."""
 
         # First call builds cache
-        populated_registry.get_schemas()
+        populated_registry.get_tool_schemas()
 
         # Second call should hit cache
         benchmark(populated_registry.get_schemas)
