@@ -37,6 +37,7 @@ from victor.tools.code_search_tool import (
     _latest_mtime,
     _on_file_change,
     _probe_index_integrity,
+    _schedule_file_change_refresh,
     clear_index_cache,
 )
 
@@ -1302,6 +1303,32 @@ class TestStructuralIndexPersistence:
 
 class TestFileWatcherIncrementalUpdates:
     """Tests for watcher-driven incremental code_search refreshes."""
+
+    @pytest.mark.asyncio
+    async def test_schedule_file_change_refresh_swallows_handler_exceptions(self, tmp_path, monkeypatch):
+        root = tmp_path / "repo"
+        root.mkdir()
+        changed_file = root / "main.py"
+        changed_file.write_text("print('hello')\n", encoding="utf-8")
+
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        async def _raise(*args, **kwargs):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(code_search_tool_module, "_on_file_change", _raise)
+
+        task = _schedule_file_change_refresh(
+            FileChangeEvent(
+                path=changed_file,
+                change_type=FileChangeType.MODIFIED,
+                timestamp=datetime.now(),
+            ),
+            root,
+        )
+
+        await task
+        assert task.exception() is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

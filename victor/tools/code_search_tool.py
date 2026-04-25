@@ -613,13 +613,29 @@ async def _subscribe_to_file_watcher(
         file_watcher = await watcher_registry.get_watcher(root)
 
         # Subscribe to file changes (synchronous method)
-        file_watcher.subscribe(lambda e: asyncio.create_task(_on_file_change(e, root, exec_ctx)))
+        file_watcher.subscribe(lambda e: _schedule_file_change_refresh(e, root, exec_ctx))
 
         logger.info(f"[code_search] Subscribed to file watcher for {root}")
         return True
     except Exception as e:
         logger.error(f"[code_search] Failed to subscribe to file watcher: {e}")
         return False
+
+
+def _schedule_file_change_refresh(
+    event: "FileChangeEvent",
+    root: Path,
+    exec_ctx: Optional[Dict[str, Any]] = None,
+) -> asyncio.Task[Any]:
+    """Schedule watcher-driven cache refresh work with exception containment."""
+
+    async def _runner() -> None:
+        try:
+            await _on_file_change(event, root, exec_ctx)
+        except Exception:
+            logger.exception("[code_search] File change refresh failed for %s", root)
+
+    return asyncio.create_task(_runner())
 
 
 async def _ensure_file_watcher_subscription(
