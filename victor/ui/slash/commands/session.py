@@ -32,6 +32,37 @@ def _preview_count(preview_messages: object) -> int:
     return len(preview_messages) if isinstance(preview_messages, list) else 0
 
 
+def _preview_path_summary(preview_messages: object, *, max_paths: int = 3) -> str | None:
+    """Return a compact summary of preview file paths for session UI."""
+    if not isinstance(preview_messages, list):
+        return None
+
+    paths: list[str] = []
+    seen: set[str] = set()
+    for preview in preview_messages:
+        if not isinstance(preview, dict):
+            continue
+        metadata = preview.get("metadata", {})
+        if not isinstance(metadata, dict):
+            continue
+        preview_path = str(metadata.get("preview_path", "")).strip()
+        if not preview_path or preview_path in seen:
+            continue
+        seen.add(preview_path)
+        paths.append(preview_path)
+
+    if not paths:
+        return None
+
+    visible_paths = paths[:max_paths]
+    summary = ", ".join(visible_paths)
+    remaining = len(paths) - len(visible_paths)
+    if remaining > 0:
+        summary = f"{summary}, +{remaining} more"
+
+    return summary
+
+
 @register_command
 class SaveCommand(BaseSlashCommand):
     """Save current conversation to a session file."""
@@ -64,8 +95,10 @@ class SaveCommand(BaseSlashCommand):
 
         try:
             sqlite_persistence = get_sqlite_session_persistence()
+            preview_messages = getattr(ctx.agent.conversation, "preview_messages", [])
             message_count = ctx.agent.conversation.message_count()
-            preview_count = _preview_count(getattr(ctx.agent.conversation, "preview_messages", []))
+            preview_count = _preview_count(preview_messages)
+            preview_paths = _preview_path_summary(preview_messages)
 
             # Determine session_id to use
             if force_new:
@@ -114,6 +147,9 @@ class SaveCommand(BaseSlashCommand):
             if session_id:
                 # Set active_session_id on agent
                 ctx.agent.active_session_id = session_id
+                preview_paths_line = (
+                    f"[bold]Preview Files:[/] {preview_paths}\n" if preview_paths else ""
+                )
 
                 ctx.console.print(
                     Panel(
@@ -122,7 +158,8 @@ class SaveCommand(BaseSlashCommand):
                         f"[bold]Database:[/] {sqlite_persistence._db_path}\n"
                         f"[bold]Title:[/] {title or 'Auto-generated'}\n\n"
                         f"[bold]Messages:[/] {message_count}\n"
-                        f"[bold]Previews:[/] {preview_count}\n\n"
+                        f"[bold]Previews:[/] {preview_count}\n"
+                        f"{preview_paths_line}\n"
                         f"[dim]Use '/resume {session_id}' to restore[/]\n"
                         f"[dim]Use '/save --new' to create a new session[/]",
                         title="Session Saved",
@@ -177,7 +214,12 @@ class LoadCommand(BaseSlashCommand):
 
             # Restore conversation
             conversation_dict = session.conversation
-            preview_count = _preview_count(conversation_dict.get("preview_messages", []))
+            preview_messages = conversation_dict.get("preview_messages", [])
+            preview_count = _preview_count(preview_messages)
+            preview_paths = _preview_path_summary(preview_messages)
+            preview_paths_line = (
+                f"[bold]Preview Files:[/] {preview_paths}\n" if preview_paths else ""
+            )
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
@@ -201,6 +243,7 @@ class LoadCommand(BaseSlashCommand):
                     f"[bold]Provider:[/] {session.metadata.provider}\n"
                     f"[bold]Messages:[/] {session.metadata.message_count}\n"
                     f"[bold]Previews:[/] {preview_count}\n"
+                    f"{preview_paths_line}"
                     f"[bold]Created:[/] {session.metadata.created_at}",
                     title="Session Loaded",
                     border_style="green",

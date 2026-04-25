@@ -1177,7 +1177,7 @@ class TestSessionCommands:
         agent.conversation = MagicMock()
         agent.conversation.message_count.return_value = 3
         agent.conversation.preview_messages = [
-            {"role": "assistant", "content": "diff", "metadata": {}}
+            {"role": "assistant", "content": "diff", "metadata": {"preview_path": "app.py"}}
         ]
 
         persistence = MagicMock()
@@ -1197,7 +1197,9 @@ class TestSessionCommands:
         assert "test-session-123" in output
         assert "Messages:" in output
         assert "Previews:" in output
+        assert "Preview Files:" in output
         assert "Preview Session" in output
+        assert "app.py" in output
         assert "3" in output
         assert "1" in output
 
@@ -1267,7 +1269,9 @@ class TestSessionCommands:
         session = MagicMock()
         session.conversation = {
             "messages": [{"role": "user", "content": "hello"}],
-            "preview_messages": [{"role": "assistant", "content": "diff", "metadata": {}}],
+            "preview_messages": [
+                {"role": "assistant", "content": "diff", "metadata": {"preview_path": "app.py"}}
+            ],
         }
         session.conversation_state = None
         session.metadata = SimpleNamespace(
@@ -1292,7 +1296,9 @@ class TestSessionCommands:
         output = stdout.getvalue()
         assert "Session Loaded" in output
         assert "Previews:" in output
+        assert "Preview Files:" in output
         assert "Preview Session" in output
+        assert "app.py" in output
         assert "1" in output
 
     def test_resume_command_surfaces_resume_summary(self):
