@@ -856,6 +856,49 @@ def _filter_search_results_by_test_only(
     return filtered_results
 
 
+def _language_filter_extensions(language: str) -> Optional[List[str]]:
+    """Return known file extensions for a language filter."""
+
+    known_extensions = _LANGUAGE_EXTENSION_MAP.get(_canonicalize_language_name(language))
+    if not known_extensions:
+        return None
+    return sorted(known_extensions)
+
+
+def _build_literal_search_extensions(filters: Optional["SearchFilters"]) -> Optional[List[str]]:
+    """Build literal-search extension filters from explicit extensions or language hints."""
+
+    if not filters:
+        return None
+    if filters.extensions:
+        return list(filters.extensions)
+    if filters.language:
+        return _language_filter_extensions(filters.language)
+    return None
+
+
+def _apply_literal_result_filters(
+    result: Dict[str, Any],
+    filters: Optional["SearchFilters"],
+) -> Dict[str, Any]:
+    """Apply shared post-filters to literal-search results."""
+
+    if not filters or not isinstance(result.get("results"), list):
+        return dict(result)
+
+    filtered_result = dict(result)
+    filtered_hits: List[Any] = list(result["results"])
+    if filters.extensions:
+        filtered_hits = _filter_search_results_by_extensions(filtered_hits, filters.extensions)
+    if filters.language:
+        filtered_hits = _filter_search_results_by_language(filtered_hits, filters.language)
+    if filters.test_only is not None:
+        filtered_hits = _filter_search_results_by_test_only(filtered_hits, filters.test_only)
+    filtered_result["results"] = filtered_hits
+    filtered_result["count"] = len(filtered_hits)
+    return filtered_result
+
+
 def _build_literal_search_kwargs(
     *,
     allow_filename_autodetect: bool,
@@ -2238,7 +2281,7 @@ async def code_search(
 
     # Route to literal / filename search for non-semantic modes
     if mode in ("literal", "text", "filename"):
-        exts = filters.extensions if filters else None
+        exts = _build_literal_search_extensions(filters)
         result = await _literal_search(
             filename_query,
             resolved_search_root,
@@ -2250,7 +2293,7 @@ async def code_search(
                 file_pattern=literal_file_pattern,
             ),
         )
-        result = dict(result)
+        result = _apply_literal_result_filters(result, filters)
         result["mode"] = mode
         if result.get("count", 0) > 0:
             return result
@@ -2273,7 +2316,7 @@ async def code_search(
             mode = "semantic"  # Fall through to semantic path below
         else:
             return result
-    exts: Optional[List[str]] = filters.extensions if filters else None
+    exts: Optional[List[str]] = _build_literal_search_extensions(filters)
     try:
         search_root = resolved_search_root
         # Check if path is a subdirectory to provide smart hints
@@ -2335,7 +2378,7 @@ async def code_search(
         fallback_search_path = str(root_path)
         if disable_embeddings:
             logger.info("Embeddings disabled for this agent, falling back to literal search")
-            exts = filters.extensions if filters else None
+            exts = _build_literal_search_extensions(filters)
             result = await _literal_search(
                 query,
                 fallback_search_path,
@@ -2346,6 +2389,7 @@ async def code_search(
                     file_pattern=literal_file_pattern,
                 ),
             )
+            result = _apply_literal_result_filters(result, filters)
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_disabled",
@@ -2429,7 +2473,7 @@ async def code_search(
             except Exception as cache_err:
                 logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
 
-            exts = filters.extensions if filters else None
+            exts = _build_literal_search_extensions(filters)
             result = await _literal_search(
                 query,
                 fallback_search_path,
@@ -2440,6 +2484,7 @@ async def code_search(
                     file_pattern=literal_file_pattern,
                 ),
             )
+            result = _apply_literal_result_filters(result, filters)
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_index"),
@@ -2459,7 +2504,7 @@ async def code_search(
                 "Semantic index for %s remains stale after integrity recovery; falling back to literal search",
                 root_path,
             )
-            exts = filters.extensions if filters else None
+            exts = _build_literal_search_extensions(filters)
             result = await _literal_search(
                 query,
                 fallback_search_path,
@@ -2470,6 +2515,7 @@ async def code_search(
                     file_pattern=literal_file_pattern,
                 ),
             )
+            result = _apply_literal_result_filters(result, filters)
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_index_stale",
@@ -2721,6 +2767,7 @@ async def code_search(
                     file_pattern=literal_file_pattern,
                 ),
             )
+            result = _apply_literal_result_filters(result, filters)
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_search"),

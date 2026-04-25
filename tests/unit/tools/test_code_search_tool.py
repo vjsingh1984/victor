@@ -932,6 +932,61 @@ async def test_code_search_text_mode_passes_file_pattern_to_literal_search(tmp_p
 
 
 @pytest.mark.asyncio
+async def test_code_search_text_mode_applies_language_and_test_filters_to_literal_results(
+    tmp_path,
+) -> None:
+    """Explicit text mode should carry language/test filters through the literal path."""
+    literal_result = {
+        "success": True,
+        "results": [
+            {"path": "src/parser.js", "score": 1, "snippet": "src/parser.js:1:parse_json"},
+            {
+                "path": "tests/test_parser.py",
+                "score": 1,
+                "snippet": "tests/test_parser.py:1:def test_parse_json()",
+            },
+            {
+                "path": "tests/test_parser.js",
+                "score": 1,
+                "snippet": "tests/test_parser.js:1:test('parse_json')",
+            },
+        ],
+        "count": 3,
+        "mode": "literal",
+    }
+    filters = SearchFilters(language="python", test_only=True)
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parse_json",
+            path=str(tmp_path),
+            k=5,
+            mode="text",
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with(
+        "parse_json",
+        str(tmp_path),
+        5,
+        [".py", ".pyi", ".pyx"],
+        filename_only=False,
+        allow_filename_autodetect=False,
+    )
+    get_index.assert_not_awaited()
+    assert result["mode"] == "text"
+    assert result["count"] == 1
+    assert result["results"][0]["path"] == "tests/test_parser.py"
+
+
+@pytest.mark.asyncio
 async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> None:
     """Filename-like semantic queries should bypass semantic indexing."""
     literal_result = {
