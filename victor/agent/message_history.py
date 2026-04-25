@@ -25,6 +25,7 @@ For persistent storage:
 """
 
 import logging
+from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from victor.providers.base import Message
@@ -137,6 +138,7 @@ class MessageHistory:
         self._system_prompt = system_prompt
         self._system_added = False
         self.__actual_messages: List[Message] = _TrackedList()
+        self._preview_messages: List[Dict[str, Any]] = []
         self._max_history = max_history_messages
 
     @property
@@ -277,9 +279,36 @@ class MessageHistory:
         self.ensure_system_prompt()
         return self._messages.copy()
 
+    def add_preview_message(
+        self,
+        role: str,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Store a replay-only preview message outside provider-facing history."""
+        if not content:
+            return
+
+        preview_metadata = deepcopy(metadata or {})
+        self._preview_messages.append(
+            {
+                "role": role,
+                "content": content,
+                "metadata": preview_metadata,
+                # Anchor after the current provider-facing history length.
+                "after_message_index": len(self._messages),
+            }
+        )
+
+    @property
+    def preview_messages(self) -> List[Dict[str, Any]]:
+        """Return replay-only preview messages in insertion order."""
+        return deepcopy(self._preview_messages)
+
     def clear(self) -> None:
         """Clear conversation history."""
         self._messages.clear()
+        self._preview_messages.clear()
         self._system_added = False
 
     def _trim_history(self) -> None:
@@ -324,7 +353,8 @@ class MessageHistory:
         return {
             "system_prompt": self._system_prompt,
             "system_added": self._system_added,
-            "messages": [msg.model_dump() for msg in self._messages],
+            "messages": [msg.to_dict() for msg in self._messages],
+            "preview_messages": self.preview_messages,
             "max_history": self._max_history,
         }
 
@@ -338,4 +368,9 @@ class MessageHistory:
         manager._system_added = data.get("system_added", False)
         for msg_data in data.get("messages", []):
             manager._messages.append(Message(**msg_data))
+        preview_messages = data.get("preview_messages", [])
+        if isinstance(preview_messages, list):
+            manager._preview_messages = [
+                msg for msg in preview_messages if isinstance(msg, dict)
+            ]
         return manager

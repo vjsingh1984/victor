@@ -16,7 +16,7 @@
 
 import time
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.handler import StreamingChatHandler
@@ -1298,6 +1298,14 @@ class TestGenerateToolResultChunks:
         assert len(chunks) == 2
         assert chunks[0].metadata["tool_result"]["name"] == "write"
         assert "file_preview" in chunks[1].metadata
+        handler.message_adder.add_message.assert_called_once_with(
+            "system",
+            "File preview: /test.py",
+            preview_body="line1\nline2\nline3",
+            preview_kind="file",
+            preview_language="py",
+            preview_path="/test.py",
+        )
 
     def test_edit_with_preview(self, handler):
         """Canonical edit generates result and edit preview chunks."""
@@ -1329,6 +1337,24 @@ class TestGenerateToolResultChunks:
         assert chunks[0].metadata["tool_result"]["name"] == "edit"
         assert "edit_preview" in chunks[1].metadata
         assert "edit_preview" in chunks[2].metadata
+        assert handler.message_adder.add_message.call_args_list == [
+            call(
+                "system",
+                "Edit preview: /test.py",
+                preview_body="- old1...\n+ new1...",
+                preview_kind="edit",
+                preview_language="diff",
+                preview_path="/test.py",
+            ),
+            call(
+                "system",
+                "Edit preview: /test.py",
+                preview_body="- old2...\n+ new2...",
+                preview_kind="edit",
+                preview_language="diff",
+                preview_path="/test.py",
+            ),
+        ]
 
     def test_failed_result_no_preview(self, handler):
         """Failed result doesn't generate preview chunks."""

@@ -107,6 +107,36 @@ class StreamingChatHandler:
         else:
             self._presentation = presentation
 
+    @staticmethod
+    def _infer_preview_language(path: str, preview_kind: str) -> str:
+        if preview_kind == "edit":
+            return "diff"
+
+        if "." not in path:
+            return "text"
+        suffix = path.rsplit(".", 1)[-1].lower()
+        return suffix or "text"
+
+    def _record_preview_message(self, kind: str, path: str, body: str) -> None:
+        """Persist preview metadata for session replay without affecting stream output."""
+        if not body:
+            return
+
+        header = f"{kind}: {path}" if path else kind
+        preview_kind = "edit" if kind.lower().startswith("edit") else "file"
+        try:
+            self.message_adder.add_message(
+                "system",
+                header,
+                preview_body=body,
+                preview_kind=preview_kind,
+                preview_language=self._infer_preview_language(path, preview_kind),
+                preview_path=path,
+            )
+        except TypeError:
+            # Older adapters may not accept metadata kwargs.
+            self.message_adder.add_message("system", header)
+
     def check_time_limit(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Check if session idle time limit has been exceeded.
 
@@ -1177,6 +1207,11 @@ class StreamingChatHandler:
                 )
                 if preview_chunk:
                     chunks.append(preview_chunk)
+                    self._record_preview_message(
+                        "File preview",
+                        str(preview_chunk.metadata.get("path", "")),
+                        str(preview_chunk.metadata.get("file_preview", "")),
+                    )
 
             elif canonical_tool_name == "edit":
                 ops = tool_args.get("ops", [])
@@ -1195,6 +1230,11 @@ class StreamingChatHandler:
                             )
                             if edit_chunk:
                                 chunks.append(edit_chunk)
+                                self._record_preview_message(
+                                    "Edit preview",
+                                    str(edit_chunk.metadata.get("path", "")),
+                                    str(edit_chunk.metadata.get("edit_preview", "")),
+                                )
                                 preview_count += 1
                         elif op_type in {"create", "modify"} and op.get("content"):
                             preview_chunk = self.generate_file_preview_chunk(
@@ -1203,6 +1243,11 @@ class StreamingChatHandler:
                             )
                             if preview_chunk:
                                 chunks.append(preview_chunk)
+                                self._record_preview_message(
+                                    "File preview",
+                                    str(preview_chunk.metadata.get("path", "")),
+                                    str(preview_chunk.metadata.get("file_preview", "")),
+                                )
                                 preview_count += 1
                         if preview_count >= max_files * max_edits_per_file:
                             break
@@ -1217,6 +1262,11 @@ class StreamingChatHandler:
                             edit_chunk = self.generate_edit_preview_chunk(old_str, new_str, path)
                             if edit_chunk:
                                 chunks.append(edit_chunk)
+                                self._record_preview_message(
+                                    "Edit preview",
+                                    str(edit_chunk.metadata.get("path", "")),
+                                    str(edit_chunk.metadata.get("edit_preview", "")),
+                                )
 
         return chunks
 

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from victor.agent.message_history import MessageHistory
 from victor.ui.tui.app import VictorTUI
 from victor.ui.tui.session import Message, SessionManager
 
@@ -68,6 +69,40 @@ def test_session_manager_roundtrips_preview_metadata(
         "preview_language": "py",
         "preview_path": "/tmp/test.py",
     }
+
+
+def test_message_history_roundtrips_preview_sidecar() -> None:
+    """Project conversation serialization should preserve preview sidecar messages."""
+    history = MessageHistory(system_prompt="system")
+    history.add_message("user", "hi")
+    history.add_preview_message(
+        "system",
+        "File preview: /tmp/test.py",
+        {
+            "preview_body": "print('hello')",
+            "preview_kind": "file",
+            "preview_language": "py",
+            "preview_path": "/tmp/test.py",
+        },
+    )
+
+    data = history.to_dict()
+    restored = MessageHistory.from_dict(data)
+
+    assert data["preview_messages"] == [
+        {
+            "role": "system",
+            "content": "File preview: /tmp/test.py",
+            "metadata": {
+                "preview_body": "print('hello')",
+                "preview_kind": "file",
+                "preview_language": "py",
+                "preview_path": "/tmp/test.py",
+            },
+            "after_message_index": 1,
+        }
+    ]
+    assert restored.preview_messages == data["preview_messages"]
 
 
 def test_session_manager_export_markdown_includes_preview_code_block(

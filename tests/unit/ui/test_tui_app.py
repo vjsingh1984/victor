@@ -10,6 +10,7 @@ from textual.messages import UpdateScroll
 from victor.ui.tui.app import TUIConsoleAdapter, VictorTUI
 from victor.ui.tui.session import Message
 from victor.ui.tui.widgets import ToolCallWidget
+from victor.providers.base import Message as ProviderMessage
 from victor.providers.base import StreamChunk
 
 
@@ -283,7 +284,7 @@ def test_load_project_session_async_uses_to_thread() -> None:
     app.agent = None
 
     history = MagicMock()
-    history.messages = [MagicMock(role="assistant", content="a1")]
+    history.messages = [ProviderMessage(role="assistant", content="a1")]
     persistence = MagicMock()
     persistence.load_session = MagicMock()
 
@@ -309,10 +310,82 @@ def test_load_project_session_async_uses_to_thread() -> None:
         asyncio.run(app._load_project_session_async("project-session-1"))
 
     to_thread.assert_awaited_once_with(persistence.load_session, "project-session-1")
-    app._replay_transcript_async.assert_awaited_once_with(
-        [("assistant", "a1")],
-        status_label="Loading project session",
-    )
+    assert app._replay_transcript_async.await_count == 1
+    replay_messages = app._replay_transcript_async.await_args.args[0]
+    assert len(replay_messages) == 1
+    assert replay_messages[0].role == "assistant"
+    assert replay_messages[0].content == "a1"
+    assert replay_messages[0].metadata == {}
+    assert app._replay_transcript_async.await_args.kwargs == {
+        "status_label": "Loading project session"
+    }
+
+
+def test_load_project_session_async_replays_preview_sidecar_messages() -> None:
+    """Project async loader should merge persisted preview sidecar messages into replay."""
+    app = VictorTUI()
+    app._replay_transcript_async = AsyncMock()
+    app._add_system_message = MagicMock()
+    app._set_status = MagicMock()
+    app.agent = None
+
+    history = MagicMock()
+    history.messages = [ProviderMessage(role="assistant", content="done")]
+    persistence = MagicMock()
+    persistence.load_session = MagicMock()
+
+    with (
+        patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ),
+        patch(
+            "victor.agent.message_history.MessageHistory.from_dict",
+            return_value=history,
+        ),
+        patch(
+            "victor.ui.tui.app.asyncio.to_thread",
+            AsyncMock(
+                return_value={
+                    "conversation": {
+                        "messages": [],
+                        "preview_messages": [
+                            {
+                                "role": "system",
+                                "content": "File preview: /tmp/test.py",
+                                "metadata": {
+                                    "preview_body": "print('hello')",
+                                    "preview_kind": "file",
+                                    "preview_language": "py",
+                                    "preview_path": "/tmp/test.py",
+                                },
+                                "after_message_index": 1,
+                            }
+                        ],
+                    },
+                    "metadata": {"title": "P"},
+                }
+            ),
+        ),
+    ):
+        asyncio.run(app._load_project_session_async("project-session-1"))
+
+    assert app._replay_transcript_async.await_count == 1
+    replay_messages = app._replay_transcript_async.await_args.args[0]
+    assert [(msg.role, msg.content) for msg in replay_messages] == [
+        ("assistant", "done"),
+        ("system", "File preview: /tmp/test.py"),
+    ]
+    assert replay_messages[0].metadata == {}
+    assert replay_messages[1].metadata == {
+        "preview_body": "print('hello')",
+        "preview_kind": "file",
+        "preview_language": "py",
+        "preview_path": "/tmp/test.py",
+    }
+    assert app._replay_transcript_async.await_args.kwargs == {
+        "status_label": "Loading project session"
+    }
 
 
 def test_load_session_uses_status_and_single_completion_message() -> None:

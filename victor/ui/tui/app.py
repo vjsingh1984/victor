@@ -1463,7 +1463,10 @@ class VictorTUI(App):
 
         conversation = session.get("conversation", {})
         history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
-        messages = history.messages
+        messages = self._build_project_session_messages(
+            history.messages,
+            conversation.get("preview_messages", []),
+        )
 
         message_count = len(messages)
         if message_count > 50:
@@ -1474,20 +1477,8 @@ class VictorTUI(App):
 
         self._session_messages = []
         for i, msg in enumerate(messages):
-            role = msg.role
-            content = msg.content
-            if role == "tool":
-                role = "system"
-                if msg.name:
-                    content = f"Tool result ({msg.name}): {content}"
-                else:
-                    content = f"Tool result: {content}"
-            if not content and getattr(msg, "tool_calls", None):
-                content = "Tool calls requested."
-            if not content:
-                continue
-            self._render_message(role, content)
-            self._session_messages.append(Message(role=role, content=content, metadata={}))
+            self._render_message(msg.role, msg.content, metadata=msg.metadata)
+            self._session_messages.append(msg)
             # Show progress for large sessions
             if message_count > 50 and (i + 1) % 25 == 0:
                 self._add_system_message(f"Loading... {i + 1}/{message_count}")
@@ -1525,6 +1516,71 @@ class VictorTUI(App):
 
         role, content = message
         return Message(role=role, content=content, metadata={})
+
+    def _normalize_project_session_message(self, message: Any) -> Optional[Message]:
+        """Convert a provider message from project persistence into a TUI message."""
+        role = getattr(message, "role", "")
+        content = getattr(message, "content", "")
+        if role == "tool":
+            role = "system"
+            tool_name = getattr(message, "name", None)
+            if tool_name:
+                content = f"Tool result ({tool_name}): {content}"
+            else:
+                content = f"Tool result: {content}"
+        if not content and getattr(message, "tool_calls", None):
+            content = "Tool calls requested."
+        if not content:
+            return None
+
+        metadata = getattr(message, "metadata", None)
+        return Message(
+            role=role,
+            content=content,
+            metadata=dict(metadata) if isinstance(metadata, dict) else {},
+        )
+
+    def _build_project_session_messages(
+        self,
+        history_messages: list[Any],
+        preview_messages: list[dict[str, Any]],
+    ) -> list[Message]:
+        """Merge persisted project history with replay-only preview messages."""
+        preview_map: dict[int, list[Message]] = {}
+        for preview in preview_messages:
+            if not isinstance(preview, dict):
+                continue
+            content = preview.get("content")
+            if not isinstance(content, str) or not content:
+                continue
+            role = preview.get("role", "system")
+            metadata = preview.get("metadata", {})
+            anchor = preview.get("after_message_index", len(history_messages))
+            if not isinstance(anchor, int):
+                anchor = len(history_messages)
+            preview_map.setdefault(anchor, []).append(
+                Message(
+                    role=str(role),
+                    content=content,
+                    metadata=dict(metadata) if isinstance(metadata, dict) else {},
+                )
+            )
+
+        merged: list[Message] = []
+        merged.extend(preview_map.get(0, []))
+        raw_index = 0
+        for raw_message in history_messages:
+            raw_index += 1
+            normalized = self._normalize_project_session_message(raw_message)
+            if normalized is not None:
+                merged.append(normalized)
+            merged.extend(preview_map.get(raw_index, []))
+
+        for anchor, previews in preview_map.items():
+            if anchor > raw_index:
+                merged.extend(previews)
+
+        return merged
 
     def _render_preview_block(self, metadata: dict[str, Any], replay: bool = False) -> None:
         """Render an attached preview code block when metadata provides one."""
@@ -1690,7 +1746,10 @@ class VictorTUI(App):
 
         conversation = session.get("conversation", {})
         history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
-        messages = [(msg.role, msg.content) for msg in history.messages]
+        messages = self._build_project_session_messages(
+            history.messages,
+            conversation.get("preview_messages", []),
+        )
         await self._replay_transcript_async(messages, status_label="Loading project session")
 
         metadata = session.get("metadata", {})

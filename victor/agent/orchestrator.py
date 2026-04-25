@@ -3351,6 +3351,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             content: Message content
             **kwargs: Additional fields (name, tool_call_id, tool_calls)
         """
+        preview_keys = {
+            "preview_body",
+            "preview_kind",
+            "preview_language",
+            "preview_path",
+        }
+        preview_metadata = {key: kwargs[key] for key in preview_keys if key in kwargs}
+        if preview_metadata and hasattr(self.conversation, "add_preview_message"):
+            self.conversation.add_preview_message(role, content, preview_metadata)
+            return
+
         # Intercept dynamic system nudges for cache-friendly injection
         if role == "system" and getattr(self, "_cache_optimization_enabled", False):
             # Check if history already contains a system message (the root prompt)
@@ -4401,7 +4412,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     current_tokens += tool_cost
             return result
 
-        remaining_budget = max_tokens - core_tokens
         selected = core_tools.copy()
 
         # Add tools based on semantic relevance if semantic selector available
