@@ -1766,6 +1766,10 @@ async def code_search(
     - "localize": File-level issue localization using semantic seeds plus graph expansion.
     - "impact": Change-impact / blast-radius analysis using graph expansion when available.
     """
+    requested_mode = mode
+    literal_escalation_metadata: Dict[str, Any] = {}
+    mode_fallback_to_semantic = False
+
     # Auto-detect filename search mode
     if filters and filters.file_pattern and not filters.symbol:
         # If only file_pattern is provided, treat as filename search
@@ -1786,6 +1790,12 @@ async def code_search(
                 "Literal search returned 0 results for '%s', auto-escalating to semantic",
                 query,
             )
+            literal_escalation_metadata = {
+                "requested_mode": requested_mode,
+                "fallback_mode": "semantic",
+                "fallback_reason": "literal_no_results",
+            }
+            mode_fallback_to_semantic = True
             mode = "semantic"  # Fall through to semantic path below
         else:
             return result
@@ -1887,6 +1897,8 @@ async def code_search(
         # Build metadata filter from optional parameters
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []
+        if mode_fallback_to_semantic:
+            filters_applied.append("mode_fallback=semantic")
 
         if filters and any(
             [filters.file_pattern, filters.symbol, filters.language, filters.test_only is not None]
@@ -2137,7 +2149,7 @@ async def code_search(
                     "fallback_reason": str(exc),
                 }
         else:
-            fallback_metadata = dict(backend_metadata)
+            fallback_metadata = {**dict(backend_metadata), **literal_escalation_metadata}
 
         # Get semantic search configuration from settings
         # Default threshold lowered from 0.5 to 0.25 for better recall on technical queries
