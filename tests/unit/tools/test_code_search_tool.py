@@ -566,6 +566,51 @@ async def test_code_search_semantic_path_file_pattern_uses_exact_backend_filter(
 
 
 @pytest.mark.asyncio
+async def test_code_search_semantic_symbol_filter_uses_symbol_name(tmp_path) -> None:
+    """Symbol filters should constrain semantic search by symbol_name, not symbol_type."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return json.loads(data)",
+                    "score": 0.74,
+                    "symbol_name": "parse_json",
+                }
+            ]
+        )
+    )
+    filters = SearchFilters(symbol="parse_json")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(),
+    ) as literal_search:
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=3,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_not_awaited()
+    get_index.assert_awaited_once()
+    mock_index.semantic_search.assert_awaited_once_with(
+        query="json parsing",
+        max_results=3,
+        filter_metadata={"symbol_name": "parse_json"},
+        similarity_threshold=0.25,
+        expand_query=True,
+    )
+    assert result["mode"] == "semantic"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
 async def test_code_search_semantic_glob_file_pattern_filters_results_after_search(tmp_path) -> None:
     """Glob file patterns should filter semantic hits after retrieval instead of exact-matching metadata."""
     mock_index = SimpleNamespace(

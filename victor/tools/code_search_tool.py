@@ -2430,7 +2430,7 @@ async def code_search(
                 else:
                     manual_file_pattern_filter = filters.file_pattern
             if filters.symbol:
-                filter_metadata["symbol_type"] = filters.symbol
+                filter_metadata["symbol_name"] = filters.symbol
                 filters_applied.append(f"symbol={filters.symbol}")
             if filters.language:
                 manual_language_filter = filters.language
