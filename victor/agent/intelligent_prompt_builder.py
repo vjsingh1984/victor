@@ -71,6 +71,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 if TYPE_CHECKING:
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
     from victor.storage.embeddings.service import EmbeddingService
@@ -863,7 +865,7 @@ GROUNDING:
             "create_simple": "[CREATE] Write file immediately. One tool call max.",
             "create": "[CREATE+CONTEXT] Read relevant files, then create.",
             "edit": "[EDIT] Read target file first, then modify.",
-            "search": "[SEARCH] Use code_search/list_directory. Summarize after 2-4 calls.",
+            "search": "[SEARCH] Use code_search/ls. Summarize after 2-4 calls.",
             "action": "[ACTION] Execute git/test/build. Continue until complete.",
             "analysis_deep": "[ANALYSIS] Thorough exploration. Read all modules.",
             "analyze": "[ANALYZE] Examine code carefully. Structured findings.",
@@ -888,19 +890,31 @@ GROUNDING:
         strategy: PromptStrategy,
     ) -> str:
         """Get tool usage guidance based on strategy (concise)."""
+        available_tools = sorted(
+            {
+                canonicalize_core_tool_name(tool)
+                for tool in context.available_tools
+                if isinstance(tool, str) and tool
+            }
+        )
+        browse_guidance = ""
+        if available_tools:
+            browse_guidance = f"\n- Available tools: {', '.join(available_tools[:6])}"
+
         if strategy == PromptStrategy.MINIMAL:
             return (
                 "TOOLS:\n- Use for information gathering\n"
                 f"- Budget: {context.recommended_tool_budget} calls"
+                f"{browse_guidance}"
             )
 
         elif strategy == PromptStrategy.STRUCTURED:
             return (
                 "TOOL RULES:\n"
-                "- Use list_directory/read_file to inspect code\n"
+                "- Use ls/read to inspect code\n"
                 "- Call tools sequentially, waiting for results\n"
                 f"- Budget: {context.recommended_tool_budget} calls\n"
-                "- Ensure each call provides NEW information"
+                f"- Ensure each call provides NEW information{browse_guidance}"
             )
 
         else:  # STRICT
@@ -910,7 +924,7 @@ GROUNDING:
                 f"2. Budget: {context.recommended_tool_budget} calls max.\n"
                 "3. Gather sufficient info before answering.\n"
                 "4. Provide plain English text responses only.\n"
-                "5. Ensure calls are unique and purposeful."
+                f"5. Ensure calls are unique and purposeful.{browse_guidance}"
             )
 
     def _format_context_fragments(self, fragments: List[ContextFragment]) -> str:

@@ -187,6 +187,18 @@ class TestOllamaToolGuidance:
         """Ollama should have lower exploration depth."""
         assert ollama_strategy.get_max_exploration_depth("complex") <= 10
 
+    def test_ollama_guidance_canonicalizes_available_tool_preview(self, ollama_strategy):
+        """Model-facing tool previews should use canonical core tool names."""
+        prompt = ollama_strategy.get_guidance_prompt(
+            task_type="analysis",
+            available_tools=["list_directory", "read_file", "execute_bash", "read"],
+        )
+
+        assert "list_directory" not in prompt
+        assert "read_file" not in prompt
+        assert "execute_bash" not in prompt
+        assert "Available tools: ls, read, shell" in prompt
+
 
 class TestAnthropicToolGuidance:
     """Tests for Anthropic (Claude) tool guidance strategy."""

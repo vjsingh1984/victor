@@ -110,7 +110,7 @@ class TestVerificationResult:
         feedback = result.generate_feedback_prompt()
         assert "GROUNDING CORRECTION REQUIRED" in feedback
         assert "missing.py" in feedback
-        assert "read_file" in feedback or "list_directory" in feedback
+        assert "Use read or ls" in feedback
 
     def test_generate_feedback_prompt_symbol_not_found(self):
         """Should generate feedback for symbol not found issues."""

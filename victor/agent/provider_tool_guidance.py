@@ -31,6 +31,18 @@ def _canonical_tool_name(tool_name: str) -> str:
     return get_canonical_name(tool_name)
 
 
+def _canonicalize_tools_for_prompt(available_tools: List[str]) -> List[str]:
+    """Return a stable, deduplicated tool list for model-facing guidance."""
+    normalized: List[str] = []
+    seen: set[str] = set()
+    for tool_name in available_tools:
+        canonical = _canonical_tool_name(tool_name)
+        if canonical and canonical not in seen:
+            normalized.append(canonical)
+            seen.add(canonical)
+    return normalized
+
+
 class ToolGuidanceStrategy(ABC):
     """
     Abstract strategy interface for provider-specific tool guidance.
@@ -306,7 +318,7 @@ class OllamaToolGuidance(ToolGuidanceStrategy):
     AVOIDED_TOOLS = {"web_search", "web_fetch"}  # Air-gapped environments
 
     def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
-        tools_str = ", ".join(available_tools[:5])  # Limit displayed tools
+        tools_str = ", ".join(_canonicalize_tools_for_prompt(available_tools)[:5])
 
         return f"""
 TOOL USAGE INSTRUCTIONS:
