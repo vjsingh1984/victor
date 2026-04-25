@@ -616,6 +616,23 @@ def _normalize_search_filters(filters: Optional[SearchFilters]) -> Optional[Sear
     )
 
 
+def _glob_patterns_for_extensions(exts: Optional[List[str]]) -> List[str]:
+    """Normalize extension filters into shell globs like ``*.py``."""
+
+    source_exts = exts or sorted(DEFAULT_CODE_EXTENSIONS)
+    patterns: List[str] = []
+    seen: Set[str] = set()
+    for ext in source_exts:
+        if not ext:
+            continue
+        normalized_ext = ext if ext.startswith(".") else f".{ext}"
+        pattern = f"*{normalized_ext}"
+        if pattern not in seen:
+            seen.add(pattern)
+            patterns.append(pattern)
+    return patterns
+
+
 _FILENAME_QUERY_EXTENSIONS = (
     ".py",
     ".js",
@@ -1648,8 +1665,8 @@ async def _literal_search(
                 "--max-columns=200",
             ]
             if exts:
-                for ext in exts:
-                    cmd.extend(["--glob", f"*{ext}"])
+                for pattern in _glob_patterns_for_extensions(exts):
+                    cmd.extend(["--glob", pattern])
             else:
                 # Default: code files only
                 cmd.extend(
@@ -1667,7 +1684,10 @@ async def _literal_search(
                 )
             cmd.extend(["--", search_query, search_path])
         else:
-            cmd = ["grep", "-rn", "--include=*.py", "--", search_query, search_path]
+            cmd = ["grep", "-rn"]
+            for pattern in _glob_patterns_for_extensions(exts):
+                cmd.append(f"--include={pattern}")
+            cmd.extend(["--", search_query, search_path])
 
         # Use asyncio subprocess to avoid blocking event loop
         proc = await asyncio.create_subprocess_exec(

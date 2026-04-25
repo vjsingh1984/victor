@@ -764,6 +764,33 @@ async def test_literal_search_filename_only_matches_path_qualified_query(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_literal_search_grep_fallback_honors_extension_filters_without_dots(tmp_path) -> None:
+    """The grep fallback should honor normalized extension filters when rg is unavailable."""
+
+    proc = SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
+
+    with patch("shutil.which", return_value=None), patch(
+        "asyncio.create_subprocess_exec",
+        new=AsyncMock(return_value=proc),
+    ) as create_proc:
+        result = await _literal_search(
+            "needle",
+            str(tmp_path),
+            3,
+            ["ts", ".js"],
+        )
+
+    invoked = list(create_proc.await_args.args)
+    assert invoked[:2] == ["grep", "-rn"]
+    assert "--include=*.ts" in invoked
+    assert "--include=*.js" in invoked
+    assert invoked[-3:] == ["--", "needle", str(tmp_path)]
+    assert result["success"] is True
+    assert result["mode"] == "literal"
+    assert result["count"] == 0
+
+
+@pytest.mark.asyncio
 async def test_code_search_literal_mode_escalation_preserves_requested_mode_context(
     tmp_path,
 ) -> None:
