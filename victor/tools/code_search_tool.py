@@ -592,6 +592,30 @@ def _early_semantic_fallback_metadata(
     return _requested_mode_literal_fallback_metadata(mode)
 
 
+def _normalize_search_filters(filters: Optional[SearchFilters]) -> Optional[SearchFilters]:
+    """Trim user-provided filter text without mutating the original filter object."""
+
+    if filters is None:
+        return None
+
+    normalized_file_pattern = (
+        filters.file_pattern.strip() if isinstance(filters.file_pattern, str) else filters.file_pattern
+    )
+    if normalized_file_pattern == "":
+        normalized_file_pattern = None
+
+    if normalized_file_pattern == filters.file_pattern:
+        return filters
+
+    return SearchFilters(
+        file_pattern=normalized_file_pattern,
+        symbol=filters.symbol,
+        language=filters.language,
+        test_only=filters.test_only,
+        extensions=filters.extensions,
+    )
+
+
 _FILENAME_QUERY_EXTENSIONS = (
     ".py",
     ".js",
@@ -1821,6 +1845,9 @@ async def code_search(
     - "impact": Change-impact / blast-radius analysis using graph expansion when available.
     """
     query = query.strip()
+    filters = _normalize_search_filters(filters)
+    if not query and filters and filters.file_pattern:
+        query = filters.file_pattern
     if not query:
         return {
             "success": False,
