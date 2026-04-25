@@ -90,7 +90,7 @@ class SystemPromptPolicy:
             )
 
         if self._config.enforce_unique_sections:
-            self._deduplicate_sections(builder)
+            builder.deduplicate_sections()
 
         if self._config.max_section_chars:
             builder.trim_sections_by_priority(
@@ -123,22 +123,6 @@ class SystemPromptPolicy:
             model=model,
             provider=provider,
         )
-
-    def _deduplicate_sections(self, builder: PromptBuilder) -> None:
-        """Remove duplicate or empty sections to keep prompts lean."""
-        seen_content: set[str] = set()
-        for name, section in list(builder.iter_named_sections()):
-            normalized = " ".join(section.content.split())
-            if not normalized:
-                builder.remove_section(name)
-                continue
-
-            key = normalized.lower()
-            if key in seen_content:
-                builder.remove_section(name)
-            else:
-                seen_content.add(key)
-
 
 def create_policy_from_settings(settings: Optional[Any]) -> SystemPromptPolicy:
     """Create a SystemPromptPolicy using VictorSettings or similar config objects."""

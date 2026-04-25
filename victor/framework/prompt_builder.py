@@ -74,6 +74,13 @@ except ImportError:
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol
 
+from victor.framework.prompt_document import (
+    PromptBlock,
+    PromptDeduplicationProcessor,
+    PromptDocument,
+    PromptPriorityTrimProcessor,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -101,7 +108,7 @@ _PromptScopeLiteral = Literal["workspace", "project", "user"]
 
 
 @dataclass
-class PromptSection:
+class PromptSection(PromptBlock):
     """A section of the system prompt.
 
     Sections are composed together to form the final prompt, ordered by priority.
@@ -114,34 +121,7 @@ class PromptSection:
         enabled: Whether this section is included in the final prompt
         header: Optional header format. If None, uses "## {name}". Set to "" to disable.
     """
-
-    name: str
-    content: str
-    priority: int = 50
-    enabled: bool = True
-    header: Optional[str] = None
-
-    def get_formatted_content(self) -> str:
-        """Get the section content with optional header.
-
-        Returns:
-            Formatted section content with header if applicable
-        """
-        if not self.enabled:
-            return ""
-
-        # Determine header
-        if self.header is None:
-            # Default: use section name as header
-            header_text = f"## {self.name.replace('_', ' ').title()}\n"
-        elif self.header == "":
-            # Empty string: no header
-            header_text = ""
-        else:
-            # Custom header
-            header_text = f"{self.header}\n"
-
-        return f"{header_text}{self.content}"
+    pass
 
 
 @dataclass
@@ -200,7 +180,8 @@ class PromptBuilder:
 
     def __init__(self) -> None:
         """Initialize a new PromptBuilder."""
-        self._sections: Dict[str, PromptSection] = {}
+        self._document = PromptDocument()
+        self._sections: Dict[str, PromptSection] = self._document.blocks  # Backward compat
         self._tool_hints: Dict[str, ToolHint] = {}
         self._safety_rules: List[str] = []
         self._context: List[str] = []
@@ -228,12 +209,14 @@ class PromptBuilder:
         Returns:
             Self for method chaining
         """
-        self._sections[name] = PromptSection(
-            name=name,
-            content=content,
-            priority=priority,
-            enabled=True,
-            header=header,
+        self._document.upsert(
+            PromptSection(
+                name=name,
+                content=content,
+                priority=priority,
+                enabled=True,
+                header=header,
+            )
         )
         return self
 
@@ -438,19 +421,19 @@ class PromptBuilder:
 
     def iter_sections(self) -> List[PromptSection]:
         """Return a list of current sections."""
-        return list(self._sections.values())
+        return [section for section in self._document.iter_blocks() if isinstance(section, PromptSection)]
 
     def iter_named_sections(self) -> List[Tuple[str, PromptSection]]:
         """Return (name, section) tuples for all sections."""
-        return list(self._sections.items())
+        return [
+            (name, section)
+            for name, section in self._document.iter_named_blocks()
+            if isinstance(section, PromptSection)
+        ]
 
     def estimate_section_length(self) -> int:
         """Estimate total character length of all sections."""
-        return sum(
-            len(section.get_formatted_content())
-            for section in self._sections.values()
-            if section.enabled
-        )
+        return self._document.estimate_length()
 
     def trim_sections_by_priority(
         self,
@@ -468,28 +451,17 @@ class PromptBuilder:
         if max_total_chars <= 0:
             return
 
-        protected = {name.lower() for name in protected_sections or []}
+        self._document = PromptPriorityTrimProcessor(
+            max_total_chars=max_total_chars,
+            protected_blocks=protected_sections or (),
+            min_priority=min_priority,
+        ).process(self._document)
+        self._sections = self._document.blocks
 
-        def over_budget() -> bool:
-            return self.estimate_section_length() > max_total_chars
-
-        candidates = sorted(
-            self._sections.items(),
-            key=lambda item: item[1].priority,
-            reverse=True,
-        )
-
-        for name, section in candidates:
-            if not over_budget():
-                break
-
-            if section.priority < min_priority:
-                continue
-
-            if name.lower() in protected:
-                continue
-
-            self.remove_section(name)
+    def deduplicate_sections(self) -> None:
+        """Deduplicate or remove empty sections through the canonical processor."""
+        self._document = PromptDeduplicationProcessor().process(self._document)
+        self._sections = self._document.blocks
 
     def clear(self) -> Self:
         """Clear all sections, hints, rules, and context.
@@ -497,7 +469,8 @@ class PromptBuilder:
         Returns:
             Self for method chaining
         """
-        self._sections.clear()
+        self._document = PromptDocument()
+        self._sections = self._document.blocks
         self._tool_hints.clear()
         self._safety_rules.clear()
         self._context.clear()
@@ -592,8 +565,16 @@ class PromptBuilder:
             Self for method chaining
         """
         # Merge sections (other overrides same-named sections)
-        for name, section in other._sections.items():
-            self._sections[name] = section
+        for name, section in other.iter_named_sections():
+            self._document.upsert(
+                PromptSection(
+                    name=name,
+                    content=section.content,
+                    priority=section.priority,
+                    enabled=section.enabled,
+                    header=section.header,
+                )
+            )
 
         # Merge tool hints
         self._tool_hints.update(other._tool_hints)
@@ -637,50 +618,65 @@ class PromptBuilder:
             return GROUNDING_RULES_EXTENDED
         return GROUNDING_RULES_MINIMAL
 
-    def build(self) -> str:
-        """Build the final prompt string.
+    def build_document(self) -> PromptDocument:
+        """Build the canonical prompt document."""
+        document = self._document.clone()
 
-        Assembles all sections, tool hints, safety rules, context, and
-        grounding rules into a single prompt string, ordered by priority.
-
-        Returns:
-            The complete system prompt string
-        """
-        parts: List[str] = []
-
-        # Add sections sorted by priority
-        sorted_sections = sorted(
-            [s for s in self._sections.values() if s.enabled],
-            key=lambda s: s.priority,
-        )
-        for section in sorted_sections:
-            formatted = section.get_formatted_content()
-            if formatted:
-                parts.append(formatted)
-
-        # Add tool hints if any
         if self._tool_hints:
             hints_lines = [f"- {hint.tool_name}: {hint.hint}" for hint in self._tool_hints.values()]
             hints_text = "\n".join(hints_lines)
-            parts.append(f"## Tool Hints\n{hints_text}")
+            document.upsert(
+                PromptBlock(
+                    name="tool_hints",
+                    content=hints_text,
+                    priority=self.PRIORITY_TOOL_GUIDANCE,
+                    header="## Tool Hints",
+                    kind="tool_hints",
+                )
+            )
 
-        # Add safety rules if any
         if self._safety_rules:
             rules_lines = [f"- {rule}" for rule in self._safety_rules]
             rules_text = "\n".join(rules_lines)
-            parts.append(f"## Safety Rules\n{rules_text}")
+            document.upsert(
+                PromptBlock(
+                    name="safety_rules",
+                    content=rules_text,
+                    priority=self.PRIORITY_SAFETY,
+                    header="## Safety Rules",
+                    kind="safety_rules",
+                )
+            )
 
-        # Add context if any
         if self._context:
             context_text = "\n\n".join(self._context)
-            parts.append(f"## Context\n{context_text}")
+            document.upsert(
+                PromptBlock(
+                    name="context",
+                    content=context_text,
+                    priority=self.PRIORITY_CONTEXT,
+                    header="## Context",
+                    kind="context",
+                )
+            )
 
-        # Add grounding rules (always last)
         grounding = self._get_grounding_rules()
         if grounding:
-            parts.append(grounding)
+            document.upsert(
+                PromptBlock(
+                    name="grounding",
+                    content=grounding,
+                    priority=self.PRIORITY_GROUNDING,
+                    header="",
+                    kind="grounding",
+                )
+            )
 
-        return "\n\n".join(parts)
+        return document
+
+    def build(self) -> str:
+        """Build the final prompt string from the canonical document."""
+        return self.build_document().render()
 
     def __repr__(self) -> str:
         """Return a string representation of the builder state."""

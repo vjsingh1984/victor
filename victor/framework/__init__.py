@@ -376,6 +376,13 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "create_devops_prompt_builder",
         "create_research_prompt_builder",
     ],
+    "victor.framework.prompt_document": [
+        "PromptBlock",
+        "PromptDocument",
+        "PromptDocumentProcessor",
+        "PromptDeduplicationProcessor",
+        "PromptPriorityTrimProcessor",
+    ],
     "victor.framework.prompt_sections": [
         "GROUNDING_RULES_EXTENDED",
         "GROUNDING_RULES_MINIMAL",
