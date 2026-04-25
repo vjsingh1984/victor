@@ -300,28 +300,29 @@ class TestConfigurationSettings:
     """Tests for configuration settings in settings.py."""
 
     def test_intelligent_settings_exist(self):
-        """Verify all intelligent pipeline settings exist in Settings."""
+        """Verify all intelligent pipeline settings exist in Settings.pipeline."""
         from victor.config.settings import Settings
 
-        # Get default field values
         settings = Settings()
+        pipeline = settings.pipeline
 
-        # These should all exist with defaults
-        assert hasattr(settings, "intelligent_pipeline_enabled")
-        assert hasattr(settings, "intelligent_quality_scoring")
-        assert hasattr(settings, "intelligent_mode_learning")
-        assert hasattr(settings, "intelligent_prompt_optimization")
-        assert hasattr(settings, "intelligent_grounding_verification")
-        assert hasattr(settings, "intelligent_min_quality_threshold")
-        assert hasattr(settings, "intelligent_grounding_threshold")
+        # These should all exist with defaults under the pipeline group
+        assert hasattr(pipeline, "intelligent_pipeline_enabled")
+        assert hasattr(pipeline, "intelligent_quality_scoring")
+        assert hasattr(pipeline, "intelligent_mode_learning")
+        assert hasattr(pipeline, "intelligent_prompt_optimization")
+        assert hasattr(pipeline, "intelligent_grounding_verification")
+        assert hasattr(pipeline, "intelligent_min_quality_threshold")
+        assert hasattr(pipeline, "intelligent_grounding_threshold")
 
     def test_intelligent_settings_defaults(self):
         """Verify default values for intelligent pipeline settings."""
         from victor.config.settings import Settings
 
         settings = Settings()
+        pipeline = settings.pipeline
 
-        assert settings.intelligent_pipeline_enabled is True
-        assert settings.intelligent_quality_scoring is True
-        assert settings.intelligent_min_quality_threshold == 0.5
-        assert settings.intelligent_grounding_threshold == 0.7
+        assert pipeline.intelligent_pipeline_enabled is True
+        assert pipeline.intelligent_quality_scoring is True
+        assert pipeline.intelligent_min_quality_threshold == 0.5
+        assert pipeline.intelligent_grounding_threshold == 0.7
