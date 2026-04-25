@@ -363,7 +363,9 @@ class TestEvaluationOrchestrator:
 
                             # Run single task
                             orchestrator._tasks = [test_instance]
-                            orchestrator._progress["test-001"] = TaskProgress(instance_id="test-001")
+                            orchestrator._progress["test-001"] = TaskProgress(
+                                instance_id="test-001"
+                            )
 
                             await orchestrator._run_single_task(test_instance)
 

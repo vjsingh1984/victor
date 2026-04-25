@@ -326,7 +326,10 @@ def test_load_runtime_feedback_prefers_project_model_task_adjacent_artifacts(tmp
     assert loaded is not None
     assert loaded.completion_threshold is not None
     assert loaded.completion_threshold > 0.74
-    assert loaded.metadata["scope_selection_strategy"] == "scoped_relevance_recency_reliability_weighted"
+    assert (
+        loaded.metadata["scope_selection_strategy"]
+        == "scoped_relevance_recency_reliability_weighted"
+    )
     assert loaded.metadata["scope_target"] == {
         "project": "codingagent",
         "provider": "openai",
