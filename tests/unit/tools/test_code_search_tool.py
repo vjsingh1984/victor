@@ -14,16 +14,20 @@
 
 """Unit tests for code_search_tool."""
 
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from victor.tools.code_search_tool import (
     SearchFilters,
     _build_codebase_embedding_config,
+    _get_index_build_failure_cache,
+    _get_or_build_index,
     code_search,
 )
+from victor.tools.context import ToolExecutionContext
 
 
 def _settings(**overrides):
@@ -631,3 +635,38 @@ async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(t
 
     literal_search.assert_awaited_once()
     assert result["fallback"] == "semantic_search_error"
+
+
+def test_get_index_build_failure_cache_ignores_mock_cache_manager_fallback(monkeypatch) -> None:
+    """Bare mocks should not fabricate a cache manager for failure-cache resolution."""
+    sentinel_cache = {}
+    monkeypatch.setattr(_get_or_build_index, "_failure_cache", sentinel_cache, raising=False)
+
+    result = _get_index_build_failure_cache(MagicMock())
+
+    assert result is sentinel_cache
+
+
+def test_get_index_build_failure_cache_uses_tool_execution_context_namespace() -> None:
+    """Typed execution contexts should still use their injected cache manager."""
+
+    class _CacheManager:
+        def __init__(self) -> None:
+            self.seen: list[str] = []
+            self.namespace = {}
+
+        def get_namespace(self, name: str) -> dict[str, object]:
+            self.seen.append(name)
+            return self.namespace
+
+    cache_manager = _CacheManager()
+    exec_ctx = ToolExecutionContext(
+        session_id="session-1",
+        workspace_root=Path("/tmp"),
+        cache_manager=cache_manager,
+    )
+
+    result = _get_index_build_failure_cache(exec_ctx)
+
+    assert result is cache_manager.namespace
+    assert cache_manager.seen == ["index_build_failures"]

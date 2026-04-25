@@ -164,14 +164,17 @@ def _get_instance_attr(obj: Any, name: str, default: Any = None) -> Any:
     return default
 
 
-def _get_index_build_failure_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Any:
+def _get_index_build_failure_cache(exec_ctx: Optional[Any] = None) -> Any:
     """Resolve the index-build failure cache without triggering mock fallback attrs."""
 
     cache_manager = None
     if exec_ctx and isinstance(exec_ctx, dict):
         cache_manager = exec_ctx.get("cache_manager")
-    elif exec_ctx and hasattr(exec_ctx, "cache_manager"):
-        cache_manager = exec_ctx.cache_manager
+    elif exec_ctx is not None:
+        from victor.tools.context import ToolExecutionContext
+
+        if isinstance(exec_ctx, ToolExecutionContext):
+            cache_manager = exec_ctx.cache_manager
 
     if cache_manager:
         return cache_manager.get_namespace("index_build_failures")
