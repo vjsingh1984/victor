@@ -273,7 +273,7 @@ class TestSlashCommandHandlerExecute:
     async def test_execute_unknown_command(self):
         """Test executing an unknown command still returns True (handled)."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -323,7 +323,7 @@ class TestSlashCommandHandlerHelp:
     async def test_help_shows_commands(self):
         """Test help command shows available commands."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -336,7 +336,7 @@ class TestSlashCommandHandlerHelp:
     async def test_help_specific_command(self):
         """Test help for specific command."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -350,7 +350,7 @@ class TestSlashCommandHandlerHelp:
     async def test_help_graph_tool_modes(self):
         """Test help can describe graph tool call modes."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
@@ -382,7 +382,7 @@ class TestSlashCommandHandlerClear:
     async def test_clear_without_agent(self):
         """Test clear command without agent shows warning."""
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
 
         handler = SlashCommandHandler(console=console, settings=settings)
@@ -1181,13 +1181,49 @@ class TestSessionCommands:
 
         assert meta.name == "sessions"
 
+    def test_sessions_command_displays_preview_counts(self):
+        """Test SessionsCommand shows preview counts in the listing table."""
+        from victor.ui.slash.commands.session import SessionsCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        persistence = MagicMock()
+        persistence._db_path = "/tmp/test_project.db"
+        persistence.list_sessions.return_value = [
+            {
+                "session_id": "test-session-123",
+                "title": "Preview Session",
+                "model": "claude-sonnet-4-20250514",
+                "provider": "anthropic",
+                "message_count": 2,
+                "preview_count": 1,
+                "created_at": "2026-03-19T10:00:00",
+            }
+        ]
+
+        ctx = CommandContext(console=console, settings=settings, args=[])
+
+        with patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ):
+            SessionsCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Saved Sessions" in output
+        assert "test-session-123" in output
+        assert "Preview Session" in output
+        assert "claude-sonnet-4-20250514" in output
+        assert "1" in output
+
     def test_resume_command_surfaces_resume_summary(self):
         """Test ResumeCommand shows SessionContextLinker resume summary."""
         from victor.agent.session_context_linker import SessionResumeContext
         from victor.ui.slash.commands.session import ResumeCommand
 
         stdout = io.StringIO()
-        console = Console(file=stdout, force_terminal=False)
+        console = Console(file=stdout, force_terminal=False, width=160)
         settings = MagicMock()
         agent = MagicMock()
         agent.conversation_controller = None
@@ -1224,6 +1260,42 @@ class TestSessionCommands:
         assert "Session Resumed" in output
         assert "Resume:" in output
         assert "app.py" in output
+
+    def test_resume_command_selection_displays_preview_counts(self):
+        """Test interactive ResumeCommand listing shows preview counts."""
+        from victor.ui.slash.commands.session import ResumeCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        agent = MagicMock()
+        persistence = MagicMock()
+        persistence.list_sessions.return_value = [
+            {
+                "session_id": "test-session-123",
+                "title": "Preview Session",
+                "model": "claude-sonnet-4-20250514",
+                "provider": "anthropic",
+                "message_count": 2,
+                "preview_count": 1,
+                "created_at": "2026-03-19T10:00:00",
+            }
+        ]
+
+        ctx = CommandContext(console=console, settings=settings, agent=agent, args=[])
+
+        with patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ):
+            ResumeCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Recent Sessions" in output
+        assert "Previews" in output
+        assert "test-session-123" in output
+        assert "Preview Session" in output
+        assert "/resume <session_id>" in output
 
 
 # =============================================================================

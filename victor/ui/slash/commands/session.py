@@ -234,6 +234,7 @@ class SessionsCommand(BaseSlashCommand):
             table.add_column("Model", style="yellow")
             table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Created", style="dim")
 
             for session in sessions:
@@ -256,6 +257,7 @@ class SessionsCommand(BaseSlashCommand):
                     session["model"],
                     session["provider"],
                     str(session["message_count"]),
+                    str(session.get("preview_count", 0)),
                     date_str,
                 )
 
@@ -316,6 +318,7 @@ class ResumeCommand(BaseSlashCommand):
             table.add_column("Title", style="white")
             table.add_column("Model", style="yellow")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Date", style="dim")
 
             for idx, session in enumerate(sessions, 1):
@@ -338,6 +341,7 @@ class ResumeCommand(BaseSlashCommand):
                     title,
                     session["model"],
                     str(session["message_count"]),
+                    str(session.get("preview_count", 0)),
                     date_str,
                 )
 
