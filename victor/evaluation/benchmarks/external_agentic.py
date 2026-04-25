@@ -24,11 +24,13 @@ from typing import Any
 from victor.evaluation.harness import BaseBenchmarkRunner, TaskEnvironment
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
+    BenchmarkMetadata,
     BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
     TaskResult,
     TaskStatus,
+    get_benchmark_metadata,
     is_external_agentic_benchmark,
 )
 
@@ -44,6 +46,8 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
         self._benchmark_type = benchmark_type
         self._dataset_path = dataset_path
         self._tasks_cache: list[BenchmarkTask] | None = None
+        self._manifest_defaults: dict[str, Any] = {}
+        self._records, self.manifest_metadata = self._load_manifest(dataset_path)
 
     @property
     def benchmark_type(self) -> BenchmarkType:
@@ -52,7 +56,10 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
     async def load_tasks(self, config: EvaluationConfig) -> list[BenchmarkTask]:
         """Load tasks from a local dataset manifest."""
         if self._tasks_cache is None:
-            self._tasks_cache = self._load_from_file(self._dataset_path)
+            self._tasks_cache = [
+                self._record_to_task(record, index)
+                for index, record in enumerate(self._records, start=1)
+            ]
         return self._filter_tasks(self._tasks_cache, config)
 
     async def run_task(
@@ -136,60 +143,119 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
         finally:
             await env.cleanup()
 
-    def _load_from_file(self, dataset_path: Path) -> list[BenchmarkTask]:
+    def _load_manifest(self, dataset_path: Path) -> tuple[list[dict[str, Any]], BenchmarkMetadata]:
         if not dataset_path.exists():
             raise FileNotFoundError(f"Benchmark dataset not found: {dataset_path}")
-        records = self._read_records(dataset_path)
-        return [self._record_to_task(record, index) for index, record in enumerate(records, start=1)]
 
-    def _read_records(self, dataset_path: Path) -> list[dict[str, Any]]:
         if dataset_path.suffix == ".jsonl":
             records = []
             for line in dataset_path.read_text().splitlines():
                 if not line.strip():
                     continue
                 records.append(json.loads(line))
-            return records
+            return records, self._build_manifest_metadata({}, records)
 
         payload = json.loads(dataset_path.read_text())
-        if isinstance(payload, dict):
-            payload = payload.get("tasks", [])
-        if not isinstance(payload, list):
-            raise ValueError("Benchmark dataset payload must be a list or {'tasks': [...]} object")
-        return payload
+        if isinstance(payload, list):
+            return payload, self._build_manifest_metadata({}, payload)
+
+        if not isinstance(payload, dict):
+            raise ValueError("Benchmark dataset payload must be a list or object manifest")
+
+        records = payload.get("tasks", [])
+        if not isinstance(records, list):
+            raise ValueError("Benchmark manifest 'tasks' must be a list")
+
+        defaults = payload.get("defaults", {})
+        if defaults is None:
+            defaults = {}
+        if not isinstance(defaults, dict):
+            raise ValueError("Benchmark manifest 'defaults' must be an object")
+        self._manifest_defaults = defaults
+
+        metadata = payload.get("metadata", {})
+        if metadata is None:
+            metadata = {}
+        if not isinstance(metadata, dict):
+            raise ValueError("Benchmark manifest 'metadata' must be an object")
+
+        return records, self._build_manifest_metadata(metadata, records)
+
+    def _build_manifest_metadata(
+        self,
+        metadata: dict[str, Any],
+        records: list[dict[str, Any]],
+    ) -> BenchmarkMetadata:
+        catalog = get_benchmark_metadata(self._benchmark_type)
+        if catalog is None:
+            raise ValueError(f"Unknown benchmark metadata for {self._benchmark_type.value}")
+
+        languages = self._as_list(metadata.get("languages")) or list(catalog.languages)
+        categories = self._as_list(metadata.get("categories")) or list(catalog.categories)
+
+        return BenchmarkMetadata(
+            name=str(metadata.get("name") or catalog.name),
+            type=self._benchmark_type,
+            version=str(metadata.get("version") or catalog.version),
+            total_tasks=int(metadata.get("total_tasks") or len(records)),
+            languages=languages,
+            categories=categories,
+            description=str(metadata.get("description") or catalog.description),
+            source_name=str(
+                metadata.get("source_name")
+                or metadata.get("source")
+                or catalog.source_name
+            ),
+            source_url=str(metadata.get("source_url") or catalog.source_url),
+            paper_url=str(metadata.get("paper_url") or catalog.paper_url),
+            aliases=tuple(self._as_list(metadata.get("aliases")) or list(catalog.aliases)),
+            evaluation_mode=str(metadata.get("evaluation_mode") or catalog.evaluation_mode),
+            runner_status=catalog.runner_status,
+        )
 
     def _record_to_task(self, record: dict[str, Any], index: int) -> BenchmarkTask:
+        merged = dict(self._manifest_defaults)
+        merged.update(record)
+
         description = str(
-            record.get("description")
-            or record.get("instruction")
-            or record.get("prompt")
-            or record.get("issue_text")
+            merged.get("description")
+            or merged.get("instruction")
+            or merged.get("prompt")
+            or merged.get("issue_text")
             or ""
         ).strip()
-        prompt = str(record.get("prompt") or record.get("instruction") or description).strip()
+        prompt = str(merged.get("prompt") or merged.get("instruction") or description).strip()
         if not prompt:
             raise ValueError(f"Task #{index} is missing a prompt or description")
 
         return BenchmarkTask(
-            task_id=str(record.get("task_id") or record.get("id") or f"{self._benchmark_type.value}-{index}"),
+            task_id=str(merged.get("task_id") or merged.get("id") or f"{self._benchmark_type.value}-{index}"),
             benchmark=self._benchmark_type,
             description=description or prompt,
-            language=str(record.get("language") or "python"),
+            language=str(merged.get("language") or "python"),
             prompt=prompt,
-            context_code=str(record.get("context_code") or record.get("context") or ""),
-            test_code=str(record.get("test_code") or record.get("tests") or ""),
-            repo=record.get("repo"),
-            base_commit=record.get("base_commit"),
-            issue_text=record.get("issue_text"),
-            hints=self._as_list(record.get("hints")),
-            solution=record.get("solution"),
-            patch=record.get("patch"),
-            difficulty=str(record.get("difficulty") or "medium"),
-            category=str(record.get("category") or "external_agentic"),
-            tags=self._as_list(record.get("tags")),
-            timeout_seconds=int(record.get("timeout_seconds") or 300),
-            complexity_override=record.get("complexity_override"),
-            task_type_hint=record.get("task_type_hint"),
+            context_code=str(merged.get("context_code") or merged.get("context") or ""),
+            test_code=str(merged.get("test_code") or merged.get("tests") or ""),
+            seed_files=self._merge_seed_files(
+                self._manifest_defaults.get("seed_files")
+                or self._manifest_defaults.get("workspace_files")
+                or self._manifest_defaults.get("files"),
+                merged.get("seed_files")
+                or merged.get("workspace_files")
+                or merged.get("files"),
+            ),
+            repo=merged.get("repo"),
+            base_commit=merged.get("base_commit"),
+            issue_text=merged.get("issue_text"),
+            hints=self._merge_list(self._manifest_defaults.get("hints"), merged.get("hints")),
+            solution=merged.get("solution"),
+            patch=merged.get("patch"),
+            difficulty=str(merged.get("difficulty") or "medium"),
+            category=str(merged.get("category") or "external_agentic"),
+            tags=self._merge_list(self._manifest_defaults.get("tags"), merged.get("tags")),
+            timeout_seconds=int(merged.get("timeout_seconds") or 300),
+            complexity_override=merged.get("complexity_override"),
+            task_type_hint=merged.get("task_type_hint"),
         )
 
     @staticmethod
@@ -199,6 +265,25 @@ class ExternalAgenticBenchmarkRunner(BaseBenchmarkRunner):
         if isinstance(value, list):
             return [str(item) for item in value]
         return [str(value)]
+
+    def _merge_list(self, default_value: Any, record_value: Any) -> list[str]:
+        merged: list[str] = []
+        for item in self._as_list(default_value) + self._as_list(record_value):
+            if item not in merged:
+                merged.append(item)
+        return merged
+
+    @staticmethod
+    def _merge_seed_files(default_value: Any, record_value: Any) -> dict[str, str]:
+        merged: dict[str, str] = {}
+        for candidate in (default_value, record_value):
+            if not candidate:
+                continue
+            if not isinstance(candidate, dict):
+                raise ValueError("seed_files/files/workspace_files must be an object")
+            for path, content in candidate.items():
+                merged[str(path)] = str(content)
+        return merged
 
     @staticmethod
     def _looks_like_patch(output: str) -> bool:

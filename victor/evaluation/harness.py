@@ -165,14 +165,20 @@ class TaskEnvironment:
         if self.task.repo:
             await self._clone_repo()
 
+        target_dir = self._temp_dir / "repo" if (self._temp_dir / "repo").exists() else self._temp_dir
+
+        # Seed arbitrary workspace files before writing canonical solution/test entrypoints.
+        if self.task.seed_files:
+            self._write_seed_files(target_dir, self.task.seed_files)
+
         # Write context code
         if self.task.context_code:
-            code_file = self._temp_dir / "solution.py"
+            code_file = target_dir / "solution.py"
             code_file.write_text(self.task.context_code)
 
         # Write test code
         if self.task.test_code:
-            test_file = self._temp_dir / "test_solution.py"
+            test_file = target_dir / "test_solution.py"
             test_file.write_text(self.task.test_code)
 
         return self._temp_dir
@@ -247,6 +253,18 @@ class TaskEnvironment:
 
         except Exception as e:
             logger.warning(f"Failed to clone repo: {e}")
+
+    def _write_seed_files(self, base_dir: Path, files: dict[str, str]) -> None:
+        """Write manifest-provided seed files into the task workspace."""
+        base_dir = base_dir.resolve()
+        for rel_path, content in files.items():
+            target = (base_dir / rel_path).resolve()
+            try:
+                target.relative_to(base_dir)
+            except ValueError as exc:
+                raise ValueError(f"Unsafe seed file path: {rel_path}") from exc
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content)
 
     async def apply_patch(self, patch: str) -> bool:
         """Apply a patch to the repository.
@@ -511,6 +529,7 @@ class EvaluationHarness:
                 "timeout_per_task": config.timeout_per_task,
                 "max_turns": config.max_turns,
                 "parallel_tasks": config.parallel_tasks,
+                "dataset_metadata": config.dataset_metadata,
             },
             "start_time": start_time.isoformat(),
             "completed_task_ids": [r.task_id for r in completed_results],
@@ -1185,6 +1204,7 @@ class EvaluationHarness:
                 "model": result.config.model,
                 "max_tasks": result.config.max_tasks,
                 "timeout_per_task": result.config.timeout_per_task,
+                "dataset_metadata": result.config.dataset_metadata,
             },
             "summary": result.get_metrics(),
             "start_time": result.start_time.isoformat() if result.start_time else None,

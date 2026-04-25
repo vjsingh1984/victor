@@ -67,6 +67,49 @@ class TestExternalAgenticBenchmarkRunner:
         assert tasks[0].context_code.startswith("def add")
 
     @pytest.mark.asyncio
+    async def test_loads_manifest_metadata_defaults_and_seed_files(self, tmp_path):
+        """Object manifests should expose metadata, defaults, and seed files."""
+        dataset = tmp_path / "tasks.json"
+        dataset.write_text(
+            json.dumps(
+                {
+                    "metadata": {
+                        "version": "2026.04",
+                        "source_name": "GUIDE Consortium",
+                        "languages": ["python", "typescript"],
+                    },
+                    "defaults": {
+                        "language": "python",
+                        "tags": ["external", "agentic"],
+                        "files": {"fixtures/shared.txt": "shared"},
+                    },
+                    "tasks": [
+                        {
+                            "task_id": "guide-3",
+                            "prompt": "Implement helper",
+                            "files": {"app/config.txt": "configured"},
+                        }
+                    ],
+                }
+            )
+        )
+
+        runner = ExternalAgenticBenchmarkRunner(BenchmarkType.GUIDE, dataset)
+        tasks = await runner.load_tasks(
+            EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test")
+        )
+
+        assert runner.manifest_metadata.version == "2026.04"
+        assert runner.manifest_metadata.source_name == "GUIDE Consortium"
+        assert runner.manifest_metadata.languages == ["python", "typescript"]
+        assert tasks[0].language == "python"
+        assert tasks[0].tags == ["external", "agentic"]
+        assert tasks[0].seed_files == {
+            "fixtures/shared.txt": "shared",
+            "app/config.txt": "configured",
+        }
+
+    @pytest.mark.asyncio
     async def test_run_task_with_plain_code_and_tests(self, tmp_path):
         """Non-patch tasks should evaluate against local tests."""
         dataset = tmp_path / "tasks.json"

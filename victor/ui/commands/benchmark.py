@@ -127,6 +127,31 @@ def _summarize_code_intelligence_diagnostics(
     }
 
 
+def _summarize_failure_examples(
+    result: Any,
+    *,
+    sample_limit: int = 3,
+) -> dict[str, dict[str, Any]]:
+    """Group representative benchmark failures by normalized category."""
+    grouped: dict[str, dict[str, Any]] = {}
+    for task in list(getattr(result, "task_results", []) or []):
+        category = getattr(getattr(task, "failure_category", None), "value", None)
+        if not category:
+            continue
+        entry = grouped.setdefault(
+            category,
+            {"count": 0, "sample_task_ids": [], "sample_errors": []},
+        )
+        entry["count"] += 1
+        task_id = str(getattr(task, "task_id", "") or "")
+        error_message = str(getattr(task, "error_message", "") or "")
+        if task_id and len(entry["sample_task_ids"]) < sample_limit:
+            entry["sample_task_ids"].append(task_id)
+        if error_message and len(entry["sample_errors"]) < sample_limit:
+            entry["sample_errors"].append(error_message[:200])
+    return grouped
+
+
 async def _prewarm_code_intelligence_index(
     work_dir: Optional[Path],
     warmed_repos: Dict[str, CodeIntelligencePrewarmResult],
@@ -524,6 +549,9 @@ def run_benchmark(
         max_turns=max_turns,
         parallel_tasks=parallel,
     )
+    manifest_metadata = getattr(runner, "manifest_metadata", None)
+    if manifest_metadata is not None and hasattr(manifest_metadata, "to_dict"):
+        config.dataset_metadata = manifest_metadata.to_dict()
 
     console.print(f"\n[bold cyan]Running {benchmark} benchmark[/]")
     console.print(f"Model: {config.model}")
@@ -531,6 +559,16 @@ def run_benchmark(
         console.print(f"Max tasks: {max_tasks}")
     if dataset_path is not None:
         console.print(f"Dataset: {dataset_path}")
+    if config.dataset_metadata:
+        source = config.dataset_metadata.get("source_name")
+        version = config.dataset_metadata.get("version")
+        languages = config.dataset_metadata.get("languages") or []
+        if source:
+            console.print(f"Source: {source}")
+        if version:
+            console.print(f"Manifest Version: {version}")
+        if languages:
+            console.print(f"Languages: {', '.join(languages)}")
     console.print(f"Timeout: {timeout}s per task")
     console.print()
     result = run_sync(
@@ -593,6 +631,7 @@ def run_benchmark(
     console.print(results_table)
 
     code_intel_diagnostics = _summarize_code_intelligence_diagnostics(result)
+    failure_examples = _summarize_failure_examples(result)
     failed_without_code_intel = code_intel_diagnostics["failed_task_ids_without_code_intelligence"]
     missing_code_intel = code_intel_diagnostics["task_ids_without_code_intelligence"]
     if failed_without_code_intel:
@@ -656,8 +695,10 @@ def run_benchmark(
             "benchmark": benchmark,
             "model": config.model,
             "timestamp": datetime.now().isoformat(),
+            "dataset_metadata": config.dataset_metadata,
             "metrics": metrics,
             "diagnostics": code_intel_diagnostics,
+            "failure_examples": failure_examples,
             "task_results": [
                 {
                     "task_id": r.task_id,

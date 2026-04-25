@@ -18,6 +18,7 @@ Unit tests that don't require Ollama or API keys test CLI structure only.
 Integration tests that run actual benchmarks are skipped when Ollama is unavailable.
 """
 
+import json
 import socket
 from unittest.mock import patch
 
@@ -86,9 +87,29 @@ class TestBenchmarkRun:
 
     def test_run_external_benchmark_with_dataset_path(self, tmp_path):
         """External benchmark adapters should route through the standard runner path."""
-        dataset = tmp_path / "guide.jsonl"
+        dataset = tmp_path / "guide.json"
+        output = tmp_path / "results.json"
         dataset.write_text(
-            '{"task_id":"guide-1","prompt":"Implement add","test_code":"from solution import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n"}\n'
+            json.dumps(
+                {
+                    "metadata": {
+                        "version": "2026.04",
+                        "source_name": "GUIDE Consortium",
+                        "languages": ["python"],
+                    },
+                    "tasks": [
+                        {
+                            "task_id": "guide-1",
+                            "prompt": "Implement add",
+                            "test_code": (
+                                "from solution import add\n\n\n"
+                                "def test_add():\n"
+                                "    assert add(1, 2) == 3\n"
+                            ),
+                        }
+                    ],
+                }
+            )
         )
 
         async def fake_run_benchmark_async(**_kwargs):
@@ -102,7 +123,15 @@ class TestBenchmarkRun:
             )
 
             return EvaluationResult(
-                config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test-model"),
+                config=EvaluationConfig(
+                    benchmark=BenchmarkType.GUIDE,
+                    model="test-model",
+                    dataset_metadata={
+                        "source_name": "GUIDE Consortium",
+                        "version": "2026.04",
+                        "languages": ["python"],
+                    },
+                ),
                 task_results=[
                     TaskResult(
                         task_id="guide-1",
@@ -110,6 +139,7 @@ class TestBenchmarkRun:
                         tests_passed=0,
                         tests_total=1,
                         failure_category=BenchmarkFailureCategory.TEST_FAILURE,
+                        error_message="assertion failed",
                     )
                 ],
             )
@@ -120,12 +150,26 @@ class TestBenchmarkRun:
         ):
             result = runner.invoke(
                 benchmark_app,
-                ["run", "guide", "--dataset-path", str(dataset), "--model", "test-model"],
+                [
+                    "run",
+                    "guide",
+                    "--dataset-path",
+                    str(dataset),
+                    "--model",
+                    "test-model",
+                    "--output",
+                    str(output),
+                ],
             )
 
         assert result.exit_code == 0
         assert "Dataset:" in result.stdout
+        assert "Source: GUIDE Consortium" in result.stdout
+        assert "Manifest Version: 2026.04" in result.stdout
         assert "Failure: test_failure" in result.stdout
+        saved = json.loads(output.read_text())
+        assert saved["dataset_metadata"]["source_name"] == "GUIDE Consortium"
+        assert saved["failure_examples"]["test_failure"]["sample_task_ids"] == ["guide-1"]
 
     def test_run_shows_help(self):
         """Test run command help."""

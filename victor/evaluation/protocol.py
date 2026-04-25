@@ -171,6 +171,7 @@ class BenchmarkTask:
     prompt: str = ""
     context_code: str = ""
     test_code: str = ""
+    seed_files: dict[str, str] = field(default_factory=dict)
 
     # Repository info (for SWE-bench)
     repo: Optional[str] = None
@@ -391,6 +392,7 @@ class EvaluationConfig:
     use_docker: bool = True
     docker_image: str = "python:3.11"
     workspace_dir: Optional[Path] = None
+    dataset_metadata: dict[str, Any] = field(default_factory=dict)
 
     # Self-correction settings (generic iterative refinement)
     enable_self_correction: bool = False
@@ -550,6 +552,25 @@ class BenchmarkMetadata:
     aliases: tuple[str, ...] = ()
     evaluation_mode: str = "code"
     runner_status: str = "implemented"
+
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize benchmark metadata for reporting."""
+        return {
+            "name": self.name,
+            "type": self.type.value,
+            "version": self.version,
+            "total_tasks": self.total_tasks,
+            "languages": list(self.languages),
+            "categories": list(self.categories),
+            "description": self.description,
+            "source_name": self.source_name,
+            "source_url": self.source_url,
+            "paper_url": self.paper_url,
+            "aliases": list(self.aliases),
+            "evaluation_mode": self.evaluation_mode,
+            "runner_status": self.runner_status,
+        }
 
 
 @dataclass

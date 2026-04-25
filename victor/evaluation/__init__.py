@@ -56,6 +56,7 @@ Example usage:
 """
 
 from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
     BenchmarkMetadata,
     BenchmarkTask,
     BenchmarkType,
@@ -75,6 +76,7 @@ from victor.evaluation.harness import (
     get_harness,
 )
 from victor.evaluation.benchmarks import (
+    ExternalAgenticBenchmarkRunner,
     HumanEvalRunner,
     MBPPRunner,
     SWEBenchRunner,
@@ -207,6 +209,7 @@ from victor.evaluation.evaluation_orchestrator import (
 
 __all__ = [
     # Protocol types
+    "BenchmarkFailureCategory",
     "BenchmarkMetadata",
     "BenchmarkTask",
     "BenchmarkType",
@@ -224,6 +227,7 @@ __all__ = [
     "TaskEnvironment",
     "get_harness",
     # Benchmark runners
+    "ExternalAgenticBenchmarkRunner",
     "HumanEvalRunner",
     "MBPPRunner",
     "SWEBenchRunner",

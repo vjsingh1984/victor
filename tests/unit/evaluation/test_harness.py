@@ -225,6 +225,42 @@ class TestTaskEnvironmentInit:
 class TestParseTestOutput:
     """Tests for _parse_test_output method."""
 
+
+
+class TestTaskEnvironmentSeedFiles:
+    """Tests for manifest-provided workspace seed files."""
+
+    @pytest.mark.asyncio
+    async def test_setup_writes_seed_files(self, tmp_path):
+        """Seed files should be materialized into the temporary workspace."""
+        task = BenchmarkTask(
+            task_id="seed-files",
+            benchmark=BenchmarkType.GUIDE,
+            description="Seeded task",
+            seed_files={"fixtures/data.txt": "hello"},
+        )
+
+        env = TaskEnvironment(task, workspace_dir=tmp_path)
+        workspace = await env.setup()
+        try:
+            assert (workspace / "fixtures" / "data.txt").read_text() == "hello"
+        finally:
+            await env.cleanup()
+
+    @pytest.mark.asyncio
+    async def test_setup_rejects_unsafe_seed_paths(self, tmp_path):
+        """Seed files should not be able to escape the task workspace."""
+        task = BenchmarkTask(
+            task_id="seed-paths",
+            benchmark=BenchmarkType.GUIDE,
+            description="Unsafe task",
+            seed_files={"../escape.txt": "bad"},
+        )
+
+        env = TaskEnvironment(task, workspace_dir=tmp_path)
+        with pytest.raises(ValueError, match="Unsafe seed file path"):
+            await env.setup()
+
     @pytest.fixture
     def environment(self):
         """Create a test environment."""
@@ -529,6 +565,26 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["failure_categories"] == {"test_failure": 1}
         assert loaded["tasks"][0]["failure_category"] == "test_failure"
         assert loaded["tasks"][0]["failure_details"] == {"stage": "pytest"}
+
+    def test_save_results_persists_dataset_metadata(self, tmp_path):
+        """Saved results should carry manifest metadata into persisted artifacts."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="test",
+                dataset_metadata={"source_name": "GUIDE Consortium", "version": "2026.04"},
+            ),
+            task_results=[],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["config"]["dataset_metadata"] == {
+            "source_name": "GUIDE Consortium",
+            "version": "2026.04",
+        }
 
 
 class TestSaveAndLoadResults:
