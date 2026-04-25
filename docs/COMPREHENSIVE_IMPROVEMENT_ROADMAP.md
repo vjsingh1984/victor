@@ -81,6 +81,13 @@ This roadmap outlines a systematic improvement plan for Victor. The **P0-P2 phas
 **Effort**: 32 hours
 **File**: `victor/agent/coordinators/chat_coordinator.py` (1,800 LOC)
 
+**Historical note**:
+This extraction direction was completed, but the canonical runtime has since
+moved further to service-first ownership. `SyncChatCoordinator`,
+`StreamingChatCoordinator`, and `UnifiedChatCoordinator` now remain primarily as
+compatibility shims while `ChatService` and `ServiceStreamingRuntime` own the
+live path.
+
 **Actions**:
 1. Create `StreamingChatCoordinator` for streaming-specific logic
    - Location: `victor/agent/coordinators/streaming_chat_coordinator.py`

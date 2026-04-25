@@ -39,6 +39,15 @@ Use the concrete migration surfaces that are already wired into the runtime.
 | State-passed system prompt logic | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` | Prefer over direct shim imports |
 | State-passed safety checks | `victor.agent.coordinators.SafetyStatePassedCoordinator` | Prefer over coordinator shim usage |
 
+Deprecated chat shims are compatibility-only. In particular,
+`ChatCoordinator.stream_chat()` now forwards in this order:
+1. bound `ChatService.stream_chat()`
+2. orchestrator `_get_service_streaming_runtime()`
+3. legacy `_stream_chat_runtime` hook
+
+That legacy hook remains only as a fallback for older integrations and should
+not be used as the primary runtime surface in new code.
+
 ```python
 from victor.agent.coordinators import (
     ExplorationCoordinator,

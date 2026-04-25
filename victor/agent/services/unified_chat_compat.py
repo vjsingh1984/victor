@@ -41,6 +41,10 @@ logger = logging.getLogger(__name__)
 class UnifiedChatCoordinator:
     """Deprecated facade adapter for sync/streaming compatibility.
 
+    This shim preserves the older sync/streaming facade shape while the
+    canonical runtime remains service-first. When a ``ChatService`` is bound,
+    both sync and streaming paths forward directly to that service.
+
     Args:
         sync_coordinator: Deprecated sync coordinator shim
         streaming_coordinator: Deprecated streaming coordinator shim
@@ -90,9 +94,9 @@ class UnifiedChatCoordinator:
     ) -> CompletionResponse:
         """Execute chat in specified mode.
 
-        This method provides a unified interface for both sync and streaming
-        execution. Based on the mode parameter, it delegates to the appropriate
-        coordinator.
+        Compatibility entry point for legacy callers. When a ``ChatService`` is
+        bound, this method delegates there first and uses the deprecated sync or
+        streaming coordinators only as fallback adapters.
 
         Args:
             user_message: User's message
@@ -103,9 +107,9 @@ class UnifiedChatCoordinator:
             CompletionResponse with complete response
 
         Note:
-            - SYNC mode: Direct non-streaming execution (optimized)
-            - STREAMING mode: Streaming execution (for real-time feedback)
-            - AUTO mode: Automatically selects based on message characteristics
+            - SYNC mode: prefers ``ChatService.chat()``
+            - STREAMING mode: prefers ``ChatService.chat(..., stream=True)``
+            - AUTO mode: falls back to the configured compatibility default
         """
         warnings.warn(
             "UnifiedChatCoordinator.chat() is deprecated compatibility surface. "
@@ -159,8 +163,9 @@ class UnifiedChatCoordinator:
     ) -> AsyncIterator[StreamChunk]:
         """Execute chat with streaming response.
 
-        This is a convenience method that always uses streaming execution,
-        regardless of the default mode.
+        Compatibility convenience wrapper that always requests streaming. When a
+        ``ChatService`` is bound, it forwards there first and otherwise falls
+        back to the deprecated streaming coordinator shim.
 
         Args:
             user_message: User's message

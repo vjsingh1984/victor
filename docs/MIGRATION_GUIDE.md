@@ -218,6 +218,15 @@ coordinator shims directly.
 | Tool execution | `ToolService` or `OrchestrationFacade.tool_service` | `ToolCoordinator` shims |
 | Session lifecycle | `SessionService` or `OrchestrationFacade.session_service` | `SessionCoordinator` shims |
 | Read-only exploration | `victor.agent.coordinators.ExplorationCoordinator` | deep submodule imports when package-root works |
+
+For deprecated chat shims, treat `ChatCoordinator.stream_chat()` as a
+compatibility-only forwarding layer. Its resolution order is:
+1. bound `ChatService.stream_chat()`
+2. orchestrator `_get_service_streaming_runtime()`
+3. legacy `_stream_chat_runtime` hook
+
+New runtime code should bind or call the first two surfaces directly and avoid
+wiring the legacy hook unless it is preserving older integration behavior.
 | State-passed exploration | `victor.agent.coordinators.ExplorationStatePassedCoordinator` or `OrchestrationFacade.exploration_state_passed` | direct orchestrator-coupled exploration glue |
 | State-passed system prompt logic | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` or `OrchestrationFacade.system_prompt_state_passed` | `system_prompt_coordinator` compatibility imports |
 | State-passed safety logic | `victor.agent.coordinators.SafetyStatePassedCoordinator` or `OrchestrationFacade.safety_state_passed` | using `SafetyCoordinator` when snapshot/transition flow is intended |

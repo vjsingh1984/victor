@@ -18,6 +18,10 @@ The implementation host now lives in
 `victor.agent.services.streaming_chat_compat`. This module remains only as a
 backward-compatible import path while callers migrate away from
 coordinator-named chat runtime modules.
+
+Preferred streaming surfaces for new code:
+- ``ChatService.stream_chat()``
+- ``OrchestrationFacade.chat_stream_runtime``
 """
 
 from victor.agent.services.streaming_chat_compat import StreamingChatCoordinator

@@ -17,6 +17,11 @@
 The implementation host now lives in `victor.agent.services.unified_chat_compat`.
 This module remains only as a backward-compatible import path while callers
 migrate away from coordinator-named chat runtime modules.
+
+Preferred chat surfaces for new code:
+- ``ChatService``
+- ``OrchestrationFacade.chat_service``
+- ``OrchestrationFacade.chat_stream_runtime`` for streaming runtime access
 """
 
 from victor.agent.services.unified_chat_compat import UnifiedChatCoordinator

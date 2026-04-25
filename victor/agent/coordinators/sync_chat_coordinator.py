@@ -17,6 +17,10 @@
 The implementation host now lives in `victor.agent.services.sync_chat_compat`.
 This module remains only as a backward-compatible import path while callers
 migrate away from coordinator-named chat runtime modules.
+
+Preferred chat surfaces for new code:
+- ``ChatService``
+- ``OrchestrationFacade.chat_service``
 """
 
 from victor.agent.services.sync_chat_compat import SyncChatCoordinator

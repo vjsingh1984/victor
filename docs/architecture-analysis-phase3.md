@@ -89,7 +89,7 @@
 | Location | Issue | Fix |
 |----------|-------|-----|
 | `orchestrator.py` (3,940 LOC) | Thin facade after Phase 3B/3C extraction of 37 properties + callbacks + session state. 21 coordinators + 8 runtime boundaries. | Further extraction possible but diminishing returns; current LOC is acceptable |
-| `ChatCoordinator` (~1,800 LOC) | Manages both streaming and non-streaming chat plus recovery | Split into `StreamingChatCoordinator` and `SyncChatCoordinator` |
+| `ChatCoordinator` (~1,800 LOC, historical) | Legacy shim after extraction; canonical chat runtime is now service-first via `ChatService` and `ServiceStreamingRuntime` | Keep shim coverage minimal; prefer service/runtime surfaces |
 | `VerticalBase.get_config()` (template method) | Assembles tools + prompt + stages + hints + modes in one method | Already mitigated by composition with 3 providers; acceptable |
 
 ### OCP Violations

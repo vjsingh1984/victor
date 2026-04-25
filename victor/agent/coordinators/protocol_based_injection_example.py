@@ -271,7 +271,11 @@ async def example_chat_service_protocol_with_mock():
 
 
 async def example_legacy_chat_coordinator_with_mock_orchestrator():
-    """Legacy example: use the deprecated ChatCoordinator compatibility shim."""
+    """Legacy example: use the deprecated ChatCoordinator compatibility shim.
+
+    This remains useful for shim-specific tests, but new examples should prefer
+    `ChatServiceProtocol` / `ChatService` directly.
+    """
     from victor.agent.services.chat_compat import ChatCoordinator
 
     # Create lightweight mock instead of full AgentOrchestrator
@@ -330,6 +334,10 @@ def print_benefits():
        - ChatServiceProtocol is the canonical contract for new code
        - ChatOrchestratorProtocol remains useful for legacy shim coverage
        - @runtime_checkable keeps both boundaries explicit
+
+    4b. CLEAR RUNTIME OWNERSHIP
+       - ChatService / ServiceStreamingRuntime own the live chat path
+       - ChatCoordinator examples are compatibility-focused only
 
     5. FLEXIBLE MOCKS
        - Override only what you need for the test

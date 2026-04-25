@@ -40,6 +40,11 @@ logger = logging.getLogger(__name__)
 class StreamingChatCoordinator:
     """Deprecated adapter for streaming chat compatibility.
 
+    This shim is not the canonical streaming owner. New runtime code should use
+    ``ChatService.stream_chat()`` or the service-owned streaming runtime
+    directly. When a ``ChatService`` is bound, this adapter simply forwards to
+    that service.
+
     Args:
         chat_context: Protocol providing conversation/message access
         tool_context: Protocol providing tool selection/execution
@@ -91,10 +96,9 @@ class StreamingChatCoordinator:
     ) -> AsyncIterator[StreamChunk]:
         """Execute chat with streaming response.
 
-        Yields StreamChunk objects as they arrive from the provider.
-
-        This method provides the same functionality as ChatCoordinator.stream_chat()
-        but is specifically optimized for streaming execution.
+        Compatibility path for legacy callers. Prefers a bound
+        ``ChatService.stream_chat()`` and only falls back to the older
+        coordinator-owned streaming behavior when no service is bound.
 
         Args:
             user_message: User's message

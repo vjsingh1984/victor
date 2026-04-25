@@ -22,6 +22,7 @@ migration boundary explicit.
 
 Preferred surfaces for new code:
 - ``victor.agent.services`` for service-owned chat, tool, and session flows
+- ``OrchestrationFacade.chat_stream_runtime`` for the canonical streaming runtime
 - ``victor.agent.coordinators.ExplorationCoordinator`` for read-only exploration
 - ``victor.agent.coordinators.ExplorationStatePassedCoordinator``
 - ``victor.agent.coordinators.SystemPromptStatePassedCoordinator``
