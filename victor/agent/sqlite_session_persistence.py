@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import logging
 import warnings
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -72,8 +72,8 @@ class SQLiteSessionPersistence:
     - Full-text search support
 
     Tables Used:
-    - sessions: id, name, provider, model, profile, data, created_at, updated_at
-    - messages: id, session_id, role, content, tool_calls, created_at
+    - sessions: session_id, created_at, last_activity, provider, model, profile, metadata
+    - messages: id, session_id, role, content, timestamp, metadata
     """
 
     def __init__(self, db_path: Optional[Path] = None):
@@ -88,21 +88,20 @@ class SQLiteSessionPersistence:
             DeprecationWarning,
             stacklevel=2,
         )
-        from victor.config.settings import get_project_paths
         from victor.core.database import get_project_database
 
         if db_path:
             self._db_path = db_path
         else:
+            from victor.config.settings import get_project_paths
+
             self._db_path = get_project_paths().project_root / ".victor" / "project.db"
 
-        self._db = get_project_database()
+        self._db = get_project_database(self._db_path)
         self._ensure_tables()
 
     def _ensure_tables(self) -> None:
         """Ensure required tables exist."""
-        # Tables should already be created by DatabaseManager
-        # Just verify connection
         try:
             result = self._db.query(
                 "SELECT name FROM sqlite_master "
@@ -113,9 +112,12 @@ class SQLiteSessionPersistence:
             if "sessions" not in tables or "messages" not in tables:
                 logger.warning("Sessions or messages table missing, initializing...")
                 self._init_tables()
+
+            self._ensure_schema_compatibility()
         except Exception as e:
             logger.error(f"Error checking tables: {e}")
             self._init_tables()
+            self._ensure_schema_compatibility()
 
     def _init_tables(self) -> None:
         """Initialize sessions and messages tables."""
@@ -129,6 +131,34 @@ class SQLiteSessionPersistence:
             logger.info("Initialized sessions and messages tables")
         except Exception as e:
             logger.error(f"Failed to initialize tables: {e}")
+
+    def _table_columns(self, table_name: str) -> set[str]:
+        """Return the current column set for a SQLite table."""
+        result = self._db.query(f"PRAGMA table_info({table_name})")
+        return {row[1] for row in result} if result else set()
+
+    def _ensure_schema_compatibility(self) -> None:
+        """Add compatibility columns expected by the deprecated API."""
+        sessions_columns = self._table_columns("sessions")
+        messages_columns = self._table_columns("messages")
+
+        if "metadata" not in sessions_columns:
+            self._db.execute("ALTER TABLE sessions ADD COLUMN metadata TEXT")
+        if "project_path" not in sessions_columns:
+            self._db.execute("ALTER TABLE sessions ADD COLUMN project_path TEXT")
+
+        if "metadata" not in messages_columns:
+            self._db.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")
+        if "tool_name" not in messages_columns:
+            self._db.execute("ALTER TABLE messages ADD COLUMN tool_name TEXT")
+        if "tool_call_id" not in messages_columns:
+            self._db.execute("ALTER TABLE messages ADD COLUMN tool_call_id TEXT")
+        if "timestamp" not in messages_columns:
+            self._db.execute("ALTER TABLE messages ADD COLUMN timestamp TIMESTAMP")
+        if "token_count" not in messages_columns:
+            self._db.execute("ALTER TABLE messages ADD COLUMN token_count INTEGER DEFAULT 0")
+        if "priority" not in messages_columns:
+            self._db.execute("ALTER TABLE messages ADD COLUMN priority INTEGER DEFAULT 0")
 
     def save_session(
         self,
@@ -221,17 +251,17 @@ class SQLiteSessionPersistence:
             # Insert or replace session
             self._db.execute(
                 """INSERT OR REPLACE INTO sessions
-                   (id, name, provider, model, profile, data, created_at, updated_at)
+                   (session_id, created_at, last_activity, project_path, provider, model, profile, metadata)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     session_id,
-                    title,
+                    now,
+                    now,
+                    str(self._db_path),
                     provider,
                     model,
                     profile,
                     json.dumps(session_data),
-                    now,
-                    now,
                 ),
             )
 
@@ -239,18 +269,35 @@ class SQLiteSessionPersistence:
             self._db.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
 
             # Insert messages
-            for msg in messages:
+            base_time = datetime.now()
+            for index, msg in enumerate(messages):
                 role = msg.get("role", "")
                 content = msg.get("content", "")
-                tool_calls = msg.get("tool_calls")
-
-                # Serialize tool_calls if present
-                tool_calls_json = json.dumps(tool_calls) if tool_calls else None
+                tool_name = msg.get("name")
+                tool_call_id = msg.get("tool_call_id")
+                metadata = {
+                    key: value
+                    for key, value in msg.items()
+                    if key not in {"role", "content", "name", "tool_call_id"}
+                }
+                timestamp = (base_time + timedelta(microseconds=index)).isoformat()
 
                 self._db.execute(
-                    """INSERT INTO messages (session_id, role, content, tool_calls)
-                       VALUES (?, ?, ?, ?)""",
-                    (session_id, role, content, tool_calls_json),
+                    """INSERT INTO messages
+                       (id, session_id, role, content, timestamp, token_count, priority, tool_name, tool_call_id, metadata)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        f"{session_id}:{index:06d}",
+                        session_id,
+                        role,
+                        content,
+                        timestamp,
+                        len(content.split()) if content else 0,
+                        0,
+                        tool_name,
+                        tool_call_id,
+                        json.dumps(metadata) if metadata else None,
+                    ),
                 )
 
             logger.info(f"Saved session {session_id} to SQLite ({message_count} messages)")
@@ -270,10 +317,9 @@ class SQLiteSessionPersistence:
             Session dictionary or None if not found
         """
         try:
-            # Load session metadata
             result = self._db.query(
-                "SELECT id, name, provider, model, profile, data, created_at, updated_at "
-                "FROM sessions WHERE id = ?",
+                """SELECT session_id, created_at, last_activity, provider, model, profile, metadata
+                   FROM sessions WHERE session_id = ?""",
                 (session_id,),
             )
 
@@ -283,9 +329,39 @@ class SQLiteSessionPersistence:
                 return None
 
             row = rows[0]
-            session_data = json.loads(
-                row[5]
-            )  # data column (0-indexed: id=0, name=1, provider=2, model=3, profile=4, data=5)
+            metadata_payload = {}
+            if row[6]:
+                try:
+                    metadata_payload = json.loads(row[6])
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse session metadata for %s", session_id)
+
+            if metadata_payload:
+                return metadata_payload
+
+            messages = self.get_session_messages(session_id)
+            title = self._generate_title({"messages": messages})
+            session_data = {
+                "metadata": {
+                    "session_id": row[0],
+                    "created_at": row[1],
+                    "updated_at": row[2],
+                    "model": row[4],
+                    "provider": row[3],
+                    "profile": row[5],
+                    "message_count": len(messages),
+                    "title": title,
+                    "tags": [],
+                },
+                "conversation": {
+                    "messages": messages,
+                },
+                "conversation_state": None,
+                "tool_selection_stats": None,
+                "execution_state": None,
+                "session_ledger": None,
+                "compaction_hierarchy": None,
+            }
 
             logger.info(f"Loaded session {session_id} from SQLite")
             return session_data
@@ -306,7 +382,7 @@ class SQLiteSessionPersistence:
         """
         try:
             result = self._db.query(
-                """SELECT id, name, provider, model, profile, created_at, updated_at
+                """SELECT session_id, provider, model, profile, created_at, last_activity, metadata
                    FROM sessions
                    ORDER BY created_at DESC
                    LIMIT ? OFFSET ?""",
@@ -316,21 +392,31 @@ class SQLiteSessionPersistence:
             sessions = []
             if result:
                 for row in result:
-                    # Get message count
+                    metadata_payload: Dict[str, Any] = {}
+                    if row[6]:
+                        try:
+                            metadata_payload = json.loads(row[6])
+                        except json.JSONDecodeError:
+                            metadata_payload = {}
+
+                    session_metadata = metadata_payload.get("metadata", {})
                     count_result = self._db.query(
-                        "SELECT COUNT(*) FROM messages WHERE session_id = ?", (row[0],)
+                        "SELECT COUNT(*) FROM messages WHERE session_id = ?",
+                        (row[0],),
                     )
-                    message_count = count_result[0][0] if count_result else 0
+                    message_count = count_result[0][0] if count_result else session_metadata.get(
+                        "message_count", 0
+                    )
 
                     sessions.append(
                         {
                             "session_id": row[0],
-                            "title": row[1],
-                            "provider": row[2],
-                            "model": row[3],
-                            "profile": row[4],
-                            "created_at": row[5],
-                            "updated_at": row[6],
+                            "title": session_metadata.get("title", "Untitled Session"),
+                            "provider": row[1],
+                            "model": row[2],
+                            "profile": row[3],
+                            "created_at": row[4],
+                            "updated_at": session_metadata.get("updated_at", row[5]),
                             "message_count": message_count,
                         }
                     )
@@ -354,7 +440,7 @@ class SQLiteSessionPersistence:
             # Delete messages first (foreign key)
             self._db.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
             # Delete session
-            self._db.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            self._db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
 
             logger.info(f"Deleted session {session_id}")
             return True
@@ -374,40 +460,21 @@ class SQLiteSessionPersistence:
             List of matching sessions
         """
         try:
-            search_pattern = f"%{query}%"
-
-            # Search in session titles
-            result = self._db.query(
-                """SELECT id, name, provider, model, profile, created_at, updated_at
-                   FROM sessions
-                   WHERE name LIKE ?
-                   ORDER BY created_at DESC
-                   LIMIT ?""",
-                (search_pattern, limit),
-            )
-
             sessions = []
-            if result:
-                for row in result:
-                    count_result = self._db.query(
-                        "SELECT COUNT(*) FROM messages WHERE session_id = ?", (row[0],)
-                    )
-                    message_count = count_result[0][0] if count_result else 0
+            lowered_query = query.lower()
+            for session in self.list_sessions(limit=100000, offset=0):
+                if lowered_query in session["title"].lower():
+                    sessions.append(session)
+                    continue
 
-                    sessions.append(
-                        {
-                            "session_id": row[0],
-                            "title": row[1],
-                            "provider": row[2],
-                            "model": row[3],
-                            "profile": row[4],
-                            "created_at": row[5],
-                            "updated_at": row[6],
-                            "message_count": message_count,
-                        }
-                    )
+                messages = self.get_session_messages(session["session_id"])
+                if any(lowered_query in msg.get("content", "").lower() for msg in messages):
+                    sessions.append(session)
 
-            return sessions
+                if len(sessions) >= limit:
+                    break
+
+            return sessions[:limit]
 
         except Exception as e:
             logger.error(f"Failed to search sessions: {e}")
@@ -424,10 +491,10 @@ class SQLiteSessionPersistence:
         """
         try:
             result = self._db.query(
-                """SELECT role, content, tool_calls, created_at
+                """SELECT role, content, tool_name, tool_call_id, metadata, timestamp
                    FROM messages
                    WHERE session_id = ?
-                   ORDER BY created_at ASC""",
+                   ORDER BY timestamp ASC, id ASC""",
                 (session_id,),
             )
 
@@ -437,15 +504,23 @@ class SQLiteSessionPersistence:
                     msg = {
                         "role": row[0],
                         "content": row[1],
-                        "created_at": row[3],
+                        "created_at": row[5],
                     }
 
-                    # Parse tool_calls if present
                     if row[2]:
+                        msg["name"] = row[2]
+                    if row[3]:
+                        msg["tool_call_id"] = row[3]
+                    if row[4]:
                         try:
-                            msg["tool_calls"] = json.loads(row[2])
+                            metadata = json.loads(row[4])
+                            if isinstance(metadata, dict):
+                                msg.update(metadata)
                         except Exception:
-                            msg["tool_calls"] = None
+                            logger.debug(
+                                "Failed to parse message metadata for session %s",
+                                session_id,
+                            )
 
                     messages.append(msg)
 

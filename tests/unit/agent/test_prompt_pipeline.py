@@ -194,7 +194,7 @@ class TestComposeTurnPrefix:
         ctx = self._make_turn_context()
 
         prefix = pipeline.compose_turn_prefix("Fix the bug", ctx)
-        assert "read_file" in prefix
+        assert "Prefer read over cat." in prefix
 
     def test_failure_hint_after_error(self):
         """Failure hints appear when last turn failed."""

@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
@@ -180,6 +180,48 @@ class TurnContext:
     reminder_text: Optional[str] = None
 
 
+@dataclass
+class PromptCompletenessAssessment:
+    """Compact view of whether a prompt is ready for autonomous execution."""
+
+    score: float
+    required_files: List[str] = field(default_factory=list)
+    required_outputs: List[str] = field(default_factory=list)
+    constraints: List[str] = field(default_factory=list)
+    missing_elements: List[str] = field(default_factory=list)
+    ambiguous_reference: bool = False
+    needs_clarification: bool = False
+
+    def to_metadata(self) -> Dict[str, Any]:
+        """Serialize assessment details for testing and observability."""
+        return {
+            "score": round(self.score, 4),
+            "required_files": list(self.required_files),
+            "required_outputs": list(self.required_outputs),
+            "constraints": list(self.constraints),
+            "missing_elements": list(self.missing_elements),
+            "ambiguous_reference": self.ambiguous_reference,
+            "needs_clarification": self.needs_clarification,
+        }
+
+    def render_guidance(self) -> str:
+        """Render a compact execution contract for prompt injection."""
+        lines = ["Prompt execution contract:"]
+        if self.required_files:
+            lines.append(f"- Scope: {', '.join(self.required_files[:3])}")
+        if self.required_outputs:
+            lines.append(f"- Deliverables: {', '.join(self.required_outputs[:3])}")
+        if self.constraints:
+            lines.append(f"- Constraints: {', '.join(self.constraints[:3])}")
+        if self.missing_elements:
+            lines.append(f"- Missing: {', '.join(self.missing_elements[:3])}")
+        if self.needs_clarification:
+            lines.append(
+                "- Ask one targeted clarification before editing files or taking irreversible actions."
+            )
+        return "\n".join(lines)
+
+
 # ============================================================================
 # Unified Prompt Pipeline
 # ============================================================================
@@ -208,6 +250,7 @@ class UnifiedPromptPipeline:
         get_context_window: Optional[Callable[[], int]] = None,
         session_id: str = "",
         edge_sections: Optional[Set[str]] = None,
+        enable_prompt_completeness_guard: Optional[bool] = None,
     ):
         self._tier = detect_provider_tier(provider)
         self._builder = builder
@@ -216,9 +259,20 @@ class UnifiedPromptPipeline:
         self._task_analyzer = task_analyzer
         self._get_context_window = get_context_window or (lambda: 128000)
         self._session_id = session_id
+        if enable_prompt_completeness_guard is None:
+            try:
+                from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+                enable_prompt_completeness_guard = get_feature_flag_manager().is_enabled(
+                    FeatureFlag.USE_PROMPT_COMPLETENESS_GUARD
+                )
+            except Exception:
+                enable_prompt_completeness_guard = False
+        self.enable_prompt_completeness_guard = enable_prompt_completeness_guard
 
         self._router = ContentRouter(self._tier, edge_sections)
         self._frozen_prompt: Optional[str] = None
+        self._last_prompt_completeness_assessment: Optional[PromptCompletenessAssessment] = None
 
         # Extract provider/model names for RL events
         self._provider_name = getattr(builder, "provider_name", "") or ""
@@ -248,6 +302,11 @@ class UnifiedPromptPipeline:
     def builder(self) -> Any:
         """Underlying SystemPromptBuilder (backward compat)."""
         return self._builder
+
+    @property
+    def last_prompt_completeness_assessment(self) -> Optional[PromptCompletenessAssessment]:
+        """Latest prompt completeness assessment for observability/testing."""
+        return self._last_prompt_completeness_assessment
 
     # ----------------------------------------------------------------
     # System Prompt (session-level)
@@ -326,6 +385,12 @@ class UnifiedPromptPipeline:
             Prefix string to prepend to user message, or empty string.
         """
         parts: List[str] = []
+        self._last_prompt_completeness_assessment = None
+
+        if self.enable_prompt_completeness_guard:
+            guidance = self._build_prompt_completeness_guidance(user_message, turn_context)
+            if guidance:
+                parts.append(guidance)
 
         # 1. GEPA/MIPROv2/CoT evolved sections
         if self._optimizer:
@@ -463,6 +528,198 @@ class UnifiedPromptPipeline:
             logger.debug("Parallel read budget unavailable: %s", e)
             return None
 
+    def _build_prompt_completeness_guidance(
+        self,
+        user_message: str,
+        turn_context: TurnContext,
+    ) -> Optional[str]:
+        """Build a compact execution contract when the prompt needs reinforcement."""
+        assessment = self._assess_prompt_completeness(user_message, turn_context)
+        self._last_prompt_completeness_assessment = assessment
+        if assessment is None:
+            return None
+        if not (
+            assessment.required_files
+            or assessment.required_outputs
+            or assessment.constraints
+            or assessment.missing_elements
+        ):
+            return None
+        return assessment.render_guidance()
+
+    def _assess_prompt_completeness(
+        self,
+        user_message: str,
+        turn_context: TurnContext,
+    ) -> Optional[PromptCompletenessAssessment]:
+        """Heuristically assess whether the prompt is specific enough to execute."""
+        message = user_message.strip()
+        if not message:
+            return None
+
+        message_lower = message.lower()
+        required_files = self._extract_required_files(message)
+        required_outputs = self._extract_required_outputs(message)
+        constraints = self._extract_constraints(message)
+
+        action_markers = (
+            "fix",
+            "add",
+            "update",
+            "implement",
+            "refactor",
+            "review",
+            "audit",
+            "analyze",
+            "search",
+            "create",
+            "write",
+            "benchmark",
+            "optimize",
+            "generate",
+            "compare",
+            "tabulate",
+            "distill",
+            "summarize",
+        )
+        report_markers = (
+            "review",
+            "audit",
+            "analyze",
+            "compare",
+            "summarize",
+            "benchmark",
+            "report",
+            "findings",
+            "table",
+            "tabulate",
+        )
+        action_task = turn_context.task_type not in {"", "default", "chat", "help"} or any(
+            marker in message_lower for marker in action_markers
+        )
+        report_task = turn_context.task_type in {"review", "analysis", "benchmark"} or any(
+            marker in message_lower for marker in report_markers
+        )
+        target_present = bool(required_files or self._extract_scope_hints(message))
+        deliverable_present = bool(required_outputs) or (action_task and not report_task)
+        ambiguous_reference = bool(
+            re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower)
+        ) and not target_present
+
+        missing: List[str] = []
+        if action_task and not target_present:
+            missing.append("target artifact or scope")
+        if report_task and not required_outputs:
+            missing.append("expected deliverable")
+        if ambiguous_reference and "target artifact or scope" not in missing:
+            missing.append("target artifact or scope")
+
+        goal_present = action_task or len(message) >= 12
+        score = 0.0
+        if goal_present:
+            score += 0.4
+        if target_present:
+            score += 0.35
+        if deliverable_present:
+            score += 0.15
+        if constraints:
+            score += 0.1
+        if ambiguous_reference:
+            score = max(0.0, score - 0.25)
+
+        needs_clarification = bool(missing) and (
+            ambiguous_reference
+            or "target artifact or scope" in missing
+            or "expected deliverable" in missing
+        )
+
+        if not (required_files or required_outputs or constraints or needs_clarification):
+            return None
+
+        return PromptCompletenessAssessment(
+            score=min(score, 1.0),
+            required_files=required_files,
+            required_outputs=required_outputs,
+            constraints=constraints,
+            missing_elements=missing,
+            ambiguous_reference=ambiguous_reference,
+            needs_clarification=needs_clarification,
+        )
+
+    def _extract_required_files(self, user_message: str) -> List[str]:
+        """Extract file paths from the prompt with task analyzer fallback."""
+        if self._task_analyzer and hasattr(self._task_analyzer, "extract_required_files_from_prompt"):
+            try:
+                paths = self._task_analyzer.extract_required_files_from_prompt(user_message)
+                return self._unique_nonempty(paths)
+            except Exception as e:
+                logger.debug("Task analyzer file extraction failed: %s", e)
+
+        matches = re.findall(
+            r"(?:^|\s|[\"'\-])((?:\.{0,2}/)?[\w./-]+/[\w.-]+\.[a-z]{1,10})(?:\s|[\"']|$|[,;:.\)]|\Z)",
+            user_message,
+            flags=re.IGNORECASE,
+        )
+        return self._unique_nonempty(matches)
+
+    def _extract_required_outputs(self, user_message: str) -> List[str]:
+        """Extract output requirements from the prompt with task analyzer fallback."""
+        if self._task_analyzer and hasattr(self._task_analyzer, "extract_required_outputs_from_prompt"):
+            try:
+                outputs = self._task_analyzer.extract_required_outputs_from_prompt(user_message)
+                return self._unique_nonempty(outputs)
+            except Exception as e:
+                logger.debug("Task analyzer output extraction failed: %s", e)
+
+        message_lower = user_message.lower()
+        outputs: List[str] = []
+        if re.search(r"findings?\s*table|table\s+of\s+findings?", message_lower):
+            outputs.append("findings table")
+        if re.search(r"summary|summarize", message_lower):
+            outputs.append("summary")
+        if re.search(r"\btests?\b", message_lower):
+            outputs.append("tests")
+        if re.search(r"\bbenchmark\b", message_lower):
+            outputs.append("benchmark results")
+        return self._unique_nonempty(outputs)
+
+    def _extract_scope_hints(self, user_message: str) -> List[str]:
+        """Extract scope hints when no explicit file path is present."""
+        hints = re.findall(r"`([^`]{3,80})`", user_message)
+        return self._unique_nonempty(hints)
+
+    def _extract_constraints(self, user_message: str) -> List[str]:
+        """Extract brief execution constraints from the prompt."""
+        patterns = (
+            r"\bwithout\s+[^,.;\n]+",
+            r"\bpreserve\s+[^,.;\n]+",
+            r"\bavoid\s+[^,.;\n]+",
+            r"\bmust\s+[^,.;\n]+",
+            r"\bonly\s+[^,.;\n]+",
+            r"\bexactly\s+[^,.;\n]+",
+            r"\bat\s+least\s+[^,.;\n]+",
+            r"\bdo not\s+[^,.;\n]+",
+            r"\bdon't\s+[^,.;\n]+",
+        )
+        constraints: List[str] = []
+        for pattern in patterns:
+            constraints.extend(
+                match.group(0).strip() for match in re.finditer(pattern, user_message, re.IGNORECASE)
+            )
+        return self._unique_nonempty(constraints)
+
+    def _unique_nonempty(self, values: List[str]) -> List[str]:
+        """Preserve insertion order while removing empty/duplicate values."""
+        deduped: List[str] = []
+        seen: Set[str] = set()
+        for value in values:
+            cleaned = value.strip()
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            deduped.append(cleaned)
+        return deduped
+
     def _emit_prompt_used_event(self, prompt: str) -> None:
         """Emit PROMPT_USED event for RL prompt template learner."""
         try:
@@ -520,5 +777,6 @@ __all__ = [
     "Placement",
     "ContentRouter",
     "TurnContext",
+    "PromptCompletenessAssessment",
     "detect_provider_tier",
 ]

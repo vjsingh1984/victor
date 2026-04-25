@@ -24,8 +24,9 @@ from pathlib import Path
 import tempfile
 import json
 
-from victor.ui.commands.sessions import sessions_app
+from victor.agent.message_history import MessageHistory
 from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
+from victor.ui.commands.sessions import sessions_app
 
 
 def strip_ansi(text: str) -> str:
@@ -200,6 +201,51 @@ class TestSessionsCommand:
         assert session["metadata"]["title"] == "CI/CD Pipeline Setup"
         assert session["metadata"]["model"] == "claude-sonnet-4-20250514"
         assert session["metadata"]["provider"] == "anthropic"
+
+    def test_sessions_show_json_preserves_preview_messages(self, runner_with_db, temp_db_path):
+        """Test 'victor sessions show --json' preserves preview sidecar payloads."""
+        persistence = SQLiteSessionPersistence(db_path=temp_db_path)
+        conversation = MessageHistory()
+        conversation.add_user_message("Show app.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: app.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+            },
+        )
+
+        persistence.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+            session_id="myproj-preview01",
+            title="Preview Session",
+        )
+
+        result = runner_with_db.invoke(sessions_app, ["show", "myproj-preview01", "--json"])
+        assert result.exit_code == 0
+
+        clean_output = strip_ansi(result.stdout)
+        session = json.loads(clean_output)
+        assert session["conversation"]["preview_messages"] == [
+            {
+                "role": "system",
+                "content": "FILE PREVIEW: app.py",
+                "metadata": {
+                    "preview_kind": "file_preview",
+                    "preview_path": "app.py",
+                    "preview_language": "python",
+                    "preview_body": "print('hello')\n",
+                },
+                "after_message_index": 2,
+            }
+        ]
 
     def test_sessions_show_not_found(self, runner_with_db, sample_persistence):
         """Test 'victor sessions show' with non-existent session."""
