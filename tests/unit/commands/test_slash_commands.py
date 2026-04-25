@@ -1162,6 +1162,45 @@ class TestSessionCommands:
         assert meta.name == "save"
         assert meta.category in ["session", "general"]
 
+    def test_save_command_surfaces_preview_counts(self):
+        """Test SaveCommand shows saved message and preview counts."""
+        from victor.ui.slash.commands.session import SaveCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        settings.current_profile = "default"
+        agent = MagicMock()
+        agent.active_session_id = None
+        agent.model = "claude-sonnet-4-20250514"
+        agent.provider_name = "anthropic"
+        agent.conversation = MagicMock()
+        agent.conversation.message_count.return_value = 3
+        agent.conversation.preview_messages = [
+            {"role": "assistant", "content": "diff", "metadata": {}}
+        ]
+
+        persistence = MagicMock()
+        persistence._db_path = "/tmp/test_project.db"
+        persistence.save_session.return_value = "test-session-123"
+
+        ctx = CommandContext(console=console, settings=settings, agent=agent, args=["Preview Session"])
+
+        with patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ):
+            SaveCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Session Saved" in output
+        assert "test-session-123" in output
+        assert "Messages:" in output
+        assert "Previews:" in output
+        assert "Preview Session" in output
+        assert "3" in output
+        assert "1" in output
+
     def test_load_command_metadata(self):
         """Test LoadCommand metadata."""
         from victor.ui.slash.commands.session import LoadCommand

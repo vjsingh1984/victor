@@ -27,6 +27,11 @@ from victor.ui.slash.registry import register_command
 logger = logging.getLogger(__name__)
 
 
+def _preview_count(preview_messages: object) -> int:
+    """Return a stable preview-message count for persisted/session history data."""
+    return len(preview_messages) if isinstance(preview_messages, list) else 0
+
+
 @register_command
 class SaveCommand(BaseSlashCommand):
     """Save current conversation to a session file."""
@@ -59,6 +64,8 @@ class SaveCommand(BaseSlashCommand):
 
         try:
             sqlite_persistence = get_sqlite_session_persistence()
+            message_count = ctx.agent.conversation.message_count()
+            preview_count = _preview_count(getattr(ctx.agent.conversation, "preview_messages", []))
 
             # Determine session_id to use
             if force_new:
@@ -114,6 +121,8 @@ class SaveCommand(BaseSlashCommand):
                         f"[bold]Session ID:[/] {session_id}\n"
                         f"[bold]Database:[/] {sqlite_persistence._db_path}\n"
                         f"[bold]Title:[/] {title or 'Auto-generated'}\n\n"
+                        f"[bold]Messages:[/] {message_count}\n"
+                        f"[bold]Previews:[/] {preview_count}\n\n"
                         f"[dim]Use '/resume {session_id}' to restore[/]\n"
                         f"[dim]Use '/save --new' to create a new session[/]",
                         title="Session Saved",
@@ -168,8 +177,7 @@ class LoadCommand(BaseSlashCommand):
 
             # Restore conversation
             conversation_dict = session.conversation
-            preview_messages = conversation_dict.get("preview_messages", [])
-            preview_count = len(preview_messages) if isinstance(preview_messages, list) else 0
+            preview_count = _preview_count(conversation_dict.get("preview_messages", []))
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
@@ -382,8 +390,7 @@ class ResumeCommand(BaseSlashCommand):
             # Restore conversation
             metadata = session_data.get("metadata", {})
             conversation_dict = session_data.get("conversation", {})
-            preview_messages = conversation_dict.get("preview_messages", [])
-            preview_count = len(preview_messages) if isinstance(preview_messages, list) else 0
+            preview_count = _preview_count(conversation_dict.get("preview_messages", []))
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
