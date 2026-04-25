@@ -9,6 +9,7 @@ from victor.evaluation.services import (
     ValidatedSessionTruthServiceProtocol,
     ValidatedSessionTruthService as exported_service,
     create_validated_session_truth_service,
+    materialize_validated_session_truth_service,
     parse_validated_session_truth_legacy_kwargs,
     resolve_validated_session_truth_service,
 )
@@ -94,3 +95,33 @@ def test_parse_validated_session_truth_legacy_kwargs_rejects_unexpected_keys():
         assert str(exc) == "Unexpected keyword argument(s): unexpected"
     else:
         raise AssertionError("Expected TypeError for unexpected keyword")
+
+
+def test_materialize_validated_session_truth_service_composes_parser_and_resolver(
+    monkeypatch,
+):
+    captured = {}
+    registry = ValidatedSessionTruthEmitterRegistry()
+    stub_service = object()
+
+    def fake_parse(legacy_kwargs):
+        captured["legacy_kwargs"] = legacy_kwargs
+        return registry
+
+    def fake_resolve(*, service=None, emitters=None):
+        captured["service"] = service
+        captured["emitters"] = emitters
+        return stub_service
+
+    monkeypatch.setattr("victor.evaluation.services.parse_validated_session_truth_legacy_kwargs", fake_parse)
+    monkeypatch.setattr("victor.evaluation.services.resolve_validated_session_truth_service", fake_resolve)
+
+    resolved = materialize_validated_session_truth_service(
+        service="explicit-service",
+        legacy_kwargs={"validated_session_truth_emitters": registry},
+    )
+
+    assert resolved is stub_service
+    assert captured["legacy_kwargs"] == {"validated_session_truth_emitters": registry}
+    assert captured["service"] == "explicit-service"
+    assert captured["emitters"] is registry

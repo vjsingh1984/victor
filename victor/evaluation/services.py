@@ -79,10 +79,21 @@ def parse_validated_session_truth_legacy_kwargs(
     return emitters
 
 
+def materialize_validated_session_truth_service(
+    *,
+    service: Optional[ValidatedSessionTruthServiceProtocol] = None,
+    legacy_kwargs: Optional[Mapping[str, Any]] = None,
+) -> ValidatedSessionTruthServiceProtocol:
+    """Materialize the canonical validated session-truth service for a runtime."""
+    emitters = parse_validated_session_truth_legacy_kwargs(legacy_kwargs or {})
+    return resolve_validated_session_truth_service(service=service, emitters=emitters)
+
+
 __all__ = [
     "ValidatedSessionTruthServiceProtocol",
     "ValidatedSessionTruthService",
     "create_validated_session_truth_service",
+    "materialize_validated_session_truth_service",
     "parse_validated_session_truth_legacy_kwargs",
     "resolve_validated_session_truth_service",
 ]

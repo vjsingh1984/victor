@@ -49,9 +49,8 @@ from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmitterRegistry,
 )
 from victor.evaluation.services import (
-    parse_validated_session_truth_legacy_kwargs,
+    materialize_validated_session_truth_service,
     ValidatedSessionTruthServiceProtocol,
-    resolve_validated_session_truth_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -482,13 +481,10 @@ class EvaluationHarness:
             checkpoint_dir: Directory for checkpoint files (defaults to ~/.victor/checkpoints)
             validated_session_truth_service: Service for validated session-truth orchestration
         """
-        validated_session_truth_emitters = parse_validated_session_truth_legacy_kwargs(
-            legacy_kwargs
-        )
         self._runners = runners or {}
-        self._validated_session_truth_service = resolve_validated_session_truth_service(
+        self._validated_session_truth_service = materialize_validated_session_truth_service(
             service=validated_session_truth_service,
-            emitters=validated_session_truth_emitters,
+            legacy_kwargs=legacy_kwargs,
         )
         try:
             from victor.config.secure_paths import get_victor_dir

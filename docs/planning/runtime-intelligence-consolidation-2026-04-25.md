@@ -334,9 +334,16 @@ Next recommended slice:
     instead of hand-rolling the same legacy kwarg handling
 
 Next recommended slice:
-- Phase 5.21: collapse the remaining parse-plus-resolve constructor flow into a
-  single evaluation-level helper so runtimes no longer carry any
+- Phase 5.21 completed: collapse the remaining parse-plus-resolve constructor
+  flow into a single evaluation-level helper so runtimes no longer carry any
   validated-session-truth-specific constructor logic beyond accepting an
   injected service
-  - Keep compatibility behavior stable
-  - Prefer one final materialization helper over stacking more constructor code
+  - `services.py` now owns full constructor-side materialization in
+    `materialize_validated_session_truth_service(...)`
+  - `EvaluationHarness` and `EvaluationOrchestrator` now delegate their entire
+    validated-session-truth constructor seam to that one helper
+
+Current status:
+- The validated session-truth constructor/service-wiring consolidation track is
+  complete enough to stop here. Further changes in this seam would be polish,
+  not an active maintainability blocker.
