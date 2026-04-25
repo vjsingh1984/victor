@@ -35,6 +35,10 @@ from .database import DatabaseFormatter
 from .refactor import RefactorFormatter
 from .docker import DockerFormatter
 from .security import SecurityFormatter
+from .filesystem import FileSystemFormatter
+from .shell import ShellFormatter
+from .network import NetworkFormatter
+from .build import BuildFormatter
 from .generic import GenericFormatter
 
 # Register all formatters with the registry
@@ -67,6 +71,30 @@ def _register_default_formatters() -> None:
 
     registry.register("security", SecurityFormatter())
     registry.register("security_scan", SecurityFormatter())
+
+    # Phase 7 formatters
+    registry.register("filesystem", FileSystemFormatter())
+    registry.register("ls", FileSystemFormatter())
+    registry.register("find", FileSystemFormatter())
+    registry.register("cat", FileSystemFormatter())
+    registry.register("read", FileSystemFormatter())
+    registry.register("overview", FileSystemFormatter())
+
+    registry.register("shell", ShellFormatter())
+    registry.register("bash", ShellFormatter())
+    registry.register("exec", ShellFormatter())
+
+    registry.register("network", NetworkFormatter())
+    registry.register("ping", NetworkFormatter())
+    registry.register("traceroute", NetworkFormatter())
+    registry.register("dns", NetworkFormatter())
+
+    registry.register("build", BuildFormatter())
+    registry.register("make", BuildFormatter())
+    registry.register("cmake", BuildFormatter())
+    registry.register("cargo", BuildFormatter())
+    registry.register("npm", BuildFormatter())
+    registry.register("pip", BuildFormatter())
 
 # Auto-register on import
 _register_default_formatters()
@@ -104,6 +132,23 @@ def format_security_results(data: dict, **kwargs) -> FormattedOutput:
     """Format security scan results with Rich markup."""
     return format_tool_output("security", data, **kwargs)
 
+# Phase 7 convenience functions
+def format_filesystem_output(data: dict, **kwargs) -> FormattedOutput:
+    """Format file system operation results with Rich markup."""
+    return format_tool_output("filesystem", data, **kwargs)
+
+def format_shell_output(data: dict, **kwargs) -> FormattedOutput:
+    """Format shell command execution results with Rich markup."""
+    return format_tool_output("shell", data, **kwargs)
+
+def format_network_output(data: dict, **kwargs) -> FormattedOutput:
+    """Format network operation results with Rich markup."""
+    return format_tool_output("network", data, **kwargs)
+
+def format_build_output(data: dict, **kwargs) -> FormattedOutput:
+    """Format build tool operation results with Rich markup."""
+    return format_tool_output("build", data, **kwargs)
+
 __all__ = [
     # Base classes
     "ToolFormatter",
@@ -121,6 +166,10 @@ __all__ = [
     "RefactorFormatter",
     "DockerFormatter",
     "SecurityFormatter",
+    "FileSystemFormatter",
+    "ShellFormatter",
+    "NetworkFormatter",
+    "BuildFormatter",
     "GenericFormatter",
     # Convenience functions
     "format_test_results",
@@ -131,4 +180,8 @@ __all__ = [
     "format_refactor_operations",
     "format_docker_output",
     "format_security_results",
+    "format_filesystem_output",
+    "format_shell_output",
+    "format_network_output",
+    "format_build_output",
 ]

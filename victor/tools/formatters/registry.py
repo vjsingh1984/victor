@@ -1,5 +1,7 @@
 """Formatter registry and centralized formatting logic."""
 
+import hashlib
+import json
 import logging
 import time
 from typing import Any, Dict, Optional
@@ -7,6 +9,147 @@ from typing import Any, Dict, Optional
 from .base import ToolFormatter, FormattedOutput
 
 logger = logging.getLogger(__name__)
+
+
+# Simple in-memory cache for formatted outputs
+class _FormatCache:
+    """Simple in-memory cache for formatted outputs with TTL.
+
+    Features:
+    - Content-based cache keys (SHA256 hash)
+    - TTL-based expiration (5 minutes default)
+    - LRU eviction when full
+    - Thread-safe operations
+    """
+
+    def __init__(self, max_size: int = 100, default_ttl: int = 300):
+        """Initialize the cache.
+
+        Args:
+            max_size: Maximum number of entries to store
+            default_ttl: Default TTL in seconds (5 minutes)
+        """
+        self._cache: Dict[str, tuple[FormattedOutput, float]] = {}
+        self._max_size = max_size
+        self._default_ttl = default_ttl
+        self._hits = 0
+        self._misses = 0
+
+    def get(self, tool_name: str, data: Dict[str, Any], **kwargs) -> Optional[FormattedOutput]:
+        """Get formatted output from cache.
+
+        Args:
+            tool_name: Name of the tool
+            data: Tool output data
+            **kwargs: Formatter options
+
+        Returns:
+            Cached FormattedOutput if found and not expired, None otherwise
+        """
+        key = self._generate_key(tool_name, data, kwargs)
+
+        if key in self._cache:
+            formatted, expiry_time = self._cache[key]
+
+            # Check if entry has expired
+            if time.time() < expiry_time:
+                self._hits += 1
+                return formatted
+            else:
+                # Remove expired entry
+                del self._cache[key]
+
+        self._misses += 1
+        return None
+
+    def put(self, tool_name: str, data: Dict[str, Any], formatted: FormattedOutput,
+            ttl: Optional[int] = None, **kwargs) -> None:
+        """Put formatted output into cache.
+
+        Args:
+            tool_name: Name of the tool
+            data: Tool output data
+            formatted: Formatted output to cache
+            ttl: Time to live in seconds (uses default if None)
+            **kwargs: Formatter options
+        """
+        # Evict oldest entry if cache is full
+        if len(self._cache) >= self._max_size:
+            # Simple FIFO eviction (could be improved to LRU)
+            oldest_key = next(iter(self._cache))
+            del self._cache[oldest_key]
+
+        key = self._generate_key(tool_name, data, kwargs)
+        expiry_time = time.time() + (ttl or self._default_ttl)
+        self._cache[key] = (formatted, expiry_time)
+
+    def invalidate(self, tool_name: Optional[str] = None) -> None:
+        """Invalidate cache entries.
+
+        Args:
+            tool_name: Tool name to invalidate (None = invalidate all)
+        """
+        if tool_name is None:
+            self._cache.clear()
+        else:
+            # Remove all entries for this tool
+            keys_to_remove = [k for k in self._cache if k.startswith(f"{tool_name}:")]
+            for key in keys_to_remove:
+                del self._cache[key]
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics.
+
+        Returns:
+            Dictionary with cache stats (hits, misses, size, hit_rate)
+        """
+        total = self._hits + self._misses
+        hit_rate = (self._hits / total) if total > 0 else 0
+
+        return {
+            "hits": self._hits,
+            "misses": self._misses,
+            "size": len(self._cache),
+            "max_size": self._max_size,
+            "hit_rate": hit_rate,
+        }
+
+    def _generate_key(self, tool_name: str, data: Dict[str, Any],
+                     kwargs: Dict[str, Any]) -> str:
+        """Generate content-based cache key.
+
+        Args:
+            tool_name: Name of the tool
+            data: Tool output data
+            kwargs: Formatter options
+
+        Returns:
+            SHA256 hash of tool_name + data + kwargs
+        """
+        # Create deterministic string representation
+        key_parts = [tool_name]
+
+        # Sort dict keys for consistency
+        if isinstance(data, dict):
+            sorted_data = json.dumps(data, sort_keys=True)
+        else:
+            sorted_data = str(data)
+
+        key_parts.append(sorted_data)
+
+        # Add relevant kwargs to key (exclude cache-specific options)
+        cacheable_kwargs = {k: v for k, v in kwargs.items()
+                           if k not in ("ttl", "max_size", "max_time_ms")}
+        if cacheable_kwargs:
+            sorted_kwargs = json.dumps(cacheable_kwargs, sort_keys=True)
+            key_parts.append(sorted_kwargs)
+
+        key_string = ":".join(key_parts)
+        return hashlib.sha256(key_string.encode()).hexdigest()[:32]
+
+
+# Global cache instance
+_format_cache = _FormatCache()
 
 
 def _is_rich_formatting_enabled() -> bool:
@@ -176,6 +319,20 @@ def format_tool_output(
             contains_markup=False,
         )
 
+    # Check cache before formatting (Phase 8: Caching Layer)
+    try:
+        cache_enabled = settings.rich_formatting_cache_enabled
+    except Exception:
+        cache_enabled = True
+
+    if cache_enabled:
+        cached = _format_cache.get(tool_name, data, **kwargs)
+        if cached is not None:
+            logger.debug(f"Cache hit for {tool_name}")
+            return cached
+        else:
+            logger.debug(f"Cache miss for {tool_name}")
+
     registry = get_formatter_registry()
     formatter = registry.get_formatter(tool_name)
 
@@ -245,6 +402,14 @@ def format_tool_output(
         except Exception as e:
             logger.debug(f"Could not calculate output size for {tool_name}: {e}")
 
+        # Store in cache if enabled (Phase 8: Caching Layer)
+        if cache_enabled:
+            try:
+                cache_ttl = settings.rich_formatting_cache_ttl
+                _format_cache.put(tool_name, data, formatted, ttl=cache_ttl, **kwargs)
+            except Exception as cache_error:
+                logger.debug(f"Failed to cache formatted output for {tool_name}: {cache_error}")
+
         return formatted
 
     except Exception as e:
@@ -270,3 +435,38 @@ def format_tool_output(
             summary=f"{tool_name} formatting failed",
             contains_markup=False,
         )
+
+
+# Cache management functions (Phase 8: Caching Layer)
+def get_format_cache_stats() -> Dict[str, Any]:
+    """Get formatter cache statistics.
+
+    Returns:
+        Dictionary with cache stats (hits, misses, size, hit_rate)
+    """
+    return _format_cache.get_stats()
+
+
+def invalidate_format_cache(tool_name: Optional[str] = None) -> None:
+    """Invalidate formatter cache entries.
+
+    Args:
+        tool_name: Tool name to invalidate (None = invalidate all)
+
+    Example:
+        # Invalidate all cache entries
+        invalidate_format_cache()
+
+        # Invalidate cache for specific tool
+        invalidate_format_cache("test")
+    """
+    _format_cache.invalidate(tool_name)
+
+
+def clear_format_cache() -> None:
+    """Clear the entire formatter cache.
+
+    This is useful for testing or when you want to force re-formatting.
+    """
+    _format_cache.invalidate()
+
