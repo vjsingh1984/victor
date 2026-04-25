@@ -20,11 +20,15 @@ class ProjectPathsData:
     Mirrors victor.config.settings.ProjectPaths as a plain dataclass.
     Derives standard subdirectory paths from project_root.
 
+    Database Consolidation:
+        conversation_db is now an alias for project.db (consolidated database)
+        Returns path to project-specific database containing conversations, graph, entities
+
     Usage:
         from victor_sdk.verticals.protocols import ProjectPathsData
 
         paths = ProjectPathsData(project_root="/home/user/project")
-        db_path = paths.conversation_db  # "/home/user/project/.victor/conversation.db"
+        db_path = paths.conversation_db  # "/home/user/project/.victor/project.db"
     """
 
     project_root: str
@@ -68,8 +72,12 @@ class ProjectPathsData:
 
     @property
     def conversation_db(self) -> str:
-        """Get project-local conversation database path."""
-        return f"{self.victor_dir}/conversation.db"
+        """Get project-local conversation database path.
+
+        Database consolidation: Now returns path to project.db (consolidated database).
+        This property is an alias for backward compatibility.
+        """
+        return f"{self.victor_dir}/project.db"
 
     @property
     def conversations_export_dir(self) -> str:

@@ -131,7 +131,11 @@ class TestConversationEmbeddingStore:
 
     @pytest.fixture
     def temp_paths(self):
-        """Create temporary directories for SQLite and LanceDB."""
+        """Create temporary directories for SQLite and LanceDB.
+
+        Note: Tests use temporary conversation.db for isolation.
+        In production, embedding store uses a separate database from project.db/victor.db.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             yield {
                 "sqlite_db": Path(tmpdir) / "conversation.db",
@@ -452,7 +456,11 @@ class TestConversationStoreIntegration:
 
     @pytest.fixture
     def temp_paths(self):
-        """Create temporary paths for both stores."""
+        """Create temporary paths for both stores.
+
+        Note: Tests use temporary conversation.db for isolation.
+        In production, ConversationStore uses project.db (consolidated database).
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             yield {
                 "db_path": Path(tmpdir) / "conversation.db",

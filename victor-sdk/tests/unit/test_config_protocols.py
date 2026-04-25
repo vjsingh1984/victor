@@ -51,7 +51,8 @@ class TestProjectPathsData:
 
     def test_conversation_db(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.conversation_db == "/home/user/project/.victor/conversation.db"
+        # Database consolidation: conversation_db is now an alias for project.db
+        assert paths.conversation_db == "/home/user/project/.victor/project.db"
 
     def test_conversations_export_dir(self):
         paths = ProjectPathsData(project_root="/home/user/project")
@@ -82,7 +83,8 @@ class TestProjectPathsData:
             victor_dir_name=".custom_victor",
         )
         assert paths.backups_dir == "/home/user/project/.custom_victor/backups"
-        assert paths.conversation_db == "/home/user/project/.custom_victor/conversation.db"
+        # Database consolidation: conversation_db is now an alias for project.db
+        assert paths.conversation_db == "/home/user/project/.custom_victor/project.db"
 
 
 class TestSettingsProviderProtocol:

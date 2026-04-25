@@ -246,6 +246,8 @@ class TestSemanticRetrievalBoundaries:
 
     @pytest.fixture
     def store(self, tmp_path):
+        # Tests use temporary conversation.db for isolation
+        # In production, this would be project.db (consolidated database)
         return ConversationStore(db_path=tmp_path / "conversation.db")
 
     @pytest.mark.asyncio

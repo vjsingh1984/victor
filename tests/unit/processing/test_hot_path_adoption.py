@@ -59,6 +59,11 @@ def test_project_context_loader_uses_native_tokenizer(monkeypatch):
 
 
 def test_conversation_store_uses_fast_native_tokenizer(monkeypatch, tmp_path):
+    """Test ConversationStore uses fast native tokenizer.
+
+    Note: Tests use temporary conversation.db for isolation.
+    In production, ConversationStore uses project.db (consolidated database).
+    """
     calls: list[str] = []
 
     def fake_count_tokens_fast(text: str) -> int:

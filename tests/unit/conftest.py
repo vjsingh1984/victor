@@ -277,14 +277,15 @@ def reset_feature_flags():
 
 @pytest.fixture(autouse=True)
 def isolate_conversation_database(tmp_path):
-    """Redirect conversation.db to a temp directory during tests.
+    """Redirect conversation database to a temp directory during tests.
 
     Without this, any code path that instantiates ConversationStore
     without an explicit db_path will write to the real project .victor/
     directory, polluting it with test-model sessions (37K+ observed).
 
-    Only patches the conversation_db property — other ProjectPaths
-    properties (MCP config, context files) still resolve normally.
+    Patches project_db (the canonical path after DB consolidation).
+    conversation_db is an alias for project_db, so both are covered.
+    Other ProjectPaths properties (MCP config, context files) still resolve normally.
     """
     from unittest.mock import PropertyMock, patch
 
@@ -292,13 +293,13 @@ def isolate_conversation_database(tmp_path):
 
     temp_victor = tmp_path / ".victor"
     temp_victor.mkdir(exist_ok=True)
-    temp_conv_db = temp_victor / "conversation.db"
+    temp_project_db = temp_victor / "project.db"
 
     with patch.object(
         ProjectPaths,
-        "conversation_db",
+        "project_db",
         new_callable=PropertyMock,
-        return_value=temp_conv_db,
+        return_value=temp_project_db,
     ):
         yield
 

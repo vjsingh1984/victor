@@ -95,7 +95,7 @@ class ProjectPaths:
     Directory structure:
         {project_root}/.victor/
         ├── init.md              # Project context (was .victor.md)
-        ├── conversation.db      # Conversation history
+        ├── project.db           # Project-specific database (conversations, graph, entities)
         ├── embeddings/          # Vector embeddings for semantic search
         ├── index_metadata.json  # Codebase index metadata
         ├── backups/             # File edit backups
@@ -104,11 +104,17 @@ class ProjectPaths:
         └── mcp.yaml             # MCP server configuration
 
         ~/.victor/
+        ├── victor.db            # Global database (RL, prompt opt, sessions, tool usage)
         ├── profiles.yaml        # Global profiles configuration
         ├── plugins/             # Plugins directory
         ├── cache/               # Global cache
         ├── logs/                # Log files
         └── embeddings/          # Global embedding cache (task classifier, etc.)
+
+    **DATABASE CONSOLIDATION**: All conversation data migrated from conversation.db
+    to two consolidated databases:
+    - project.db: Project-specific conversations, graph, entities (local to each project)
+    - victor.db: Global user data, RL learning, prompt optimization, cross-project sessions
     """
 
     def __init__(self, project_root: Optional[Path] = None):
@@ -419,6 +425,12 @@ class ProfileConfig(BaseSettings):
     )
     tool_deduplication_enabled: Optional[bool] = Field(
         None, description="Enable/disable tool call deduplication"
+    )
+
+    # Tool broadcasting optimization
+    tool_strategy_v2_enabled: bool = Field(
+        default=False,
+        description="Enable context-window-aware, economy-first tool strategy (v2)"
     )
 
     # Timeout and session limits

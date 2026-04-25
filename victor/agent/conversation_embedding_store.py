@@ -125,7 +125,8 @@ class ConversationEmbeddingStore:
 
         Args:
             embedding_service: Shared EmbeddingService for generating embeddings
-            sqlite_db_path: Path to SQLite conversation.db (for lazy embedding)
+            sqlite_db_path: Path to SQLite database for lazy embedding
+                          (Note: This is a separate embeddings database, NOT project.db or victor.db)
             lancedb_path: Path to LanceDB directory. Defaults to {project}/.victor/embeddings/conversations/
         """
         if not LANCEDB_AVAILABLE:
