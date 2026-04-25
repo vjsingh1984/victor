@@ -1288,7 +1288,7 @@ class AgenticLoop:
                     f"Score: {enhanced_result.score:.2f}, "
                     f"Reason: {enhanced_result.reason[:100]}"
                 )
-                return enhanced_result
+                return self._apply_low_confidence_retry_budget(enhanced_result, state)
             except Exception as e:
                 # Graceful degradation: fall back to legacy evaluation on error
                 logger.warning(
@@ -1447,23 +1447,94 @@ class AgenticLoop:
 
         # Confidence-based fallback
         if perception.confidence >= 0.8:
+            if "low_confidence_retries" in state:
+                state["low_confidence_retries"] = 0
             return EvaluationResult(
                 decision=EvaluationDecision.COMPLETE,
                 score=perception.confidence,
                 reason="High confidence in perception",
             )
         elif perception.confidence >= 0.5:
+            if "low_confidence_retries" in state:
+                state["low_confidence_retries"] = 0
             return EvaluationResult(
                 decision=EvaluationDecision.CONTINUE,
                 score=perception.confidence,
                 reason="Medium confidence - continue",
             )
         else:
+            retry_limit = max(int(self.config.get("low_confidence_retry_limit", 2)), 0)
+            retry_count = int(state.get("low_confidence_retries", 0))
+            if retry_count >= retry_limit:
+                return EvaluationResult(
+                    decision=EvaluationDecision.FAIL,
+                    score=perception.confidence,
+                    reason=(
+                        "Low confidence retry budget exhausted "
+                        f"after {retry_count} retries"
+                    ),
+                    metadata={
+                        "low_confidence_retry_exhausted": True,
+                        "low_confidence_retries": retry_count,
+                        "low_confidence_retry_limit": retry_limit,
+                    },
+                )
+
+            retry_count += 1
+            state["low_confidence_retries"] = retry_count
             return EvaluationResult(
                 decision=EvaluationDecision.RETRY,
                 score=perception.confidence,
                 reason="Low confidence - retry",
+                metadata={
+                    "low_confidence_retries": retry_count,
+                    "low_confidence_retry_limit": retry_limit,
+                },
             )
+
+    def _apply_low_confidence_retry_budget(
+        self,
+        evaluation: EvaluationResult,
+        state: Dict[str, Any],
+    ) -> EvaluationResult:
+        """Bound repeated low-confidence retries in the live loop."""
+        if evaluation.decision in (EvaluationDecision.COMPLETE, EvaluationDecision.CONTINUE):
+            if "low_confidence_retries" in state:
+                state["low_confidence_retries"] = 0
+            return evaluation
+
+        if evaluation.decision != EvaluationDecision.RETRY or evaluation.score >= 0.5:
+            return evaluation
+
+        retry_limit = max(int(self.config.get("low_confidence_retry_limit", 2)), 0)
+        retry_count = int(state.get("low_confidence_retries", 0))
+        if retry_count >= retry_limit:
+            return EvaluationResult(
+                decision=EvaluationDecision.FAIL,
+                score=evaluation.score,
+                reason=f"Low confidence retry budget exhausted after {retry_count} retries",
+                metrics=dict(evaluation.metrics),
+                metadata={
+                    **dict(evaluation.metadata),
+                    "low_confidence_retry_exhausted": True,
+                    "low_confidence_retries": retry_count,
+                    "low_confidence_retry_limit": retry_limit,
+                },
+            )
+
+        retry_count += 1
+        state["low_confidence_retries"] = retry_count
+        return EvaluationResult(
+            decision=EvaluationDecision.RETRY,
+            score=evaluation.score,
+            reason=evaluation.reason,
+            metrics=dict(evaluation.metrics),
+            metadata={
+                **dict(evaluation.metadata),
+                "low_confidence_retries": retry_count,
+                "low_confidence_retry_limit": retry_limit,
+            },
+        )
 
     async def _check_fulfillment(
         self,

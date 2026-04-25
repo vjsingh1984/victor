@@ -328,8 +328,11 @@ class TestEvaluate:
         perception = _make_perception()
         perception.confidence = 0.3
 
-        result = await loop._evaluate(perception, {}, {})
+        state = {}
+        result = await loop._evaluate(perception, {}, state)
         assert result.decision == EvaluationDecision.RETRY
+        assert state["low_confidence_retries"] == 1
+        assert result.metadata["low_confidence_retries"] == 1
 
     async def test_evaluate_requires_clarification_before_retry(self):
         loop = AgenticLoop(
@@ -352,6 +355,37 @@ class TestEvaluate:
             result.metadata["clarification_prompt"]
             == "Which file, component, or bug should I target first?"
         )
+
+    async def test_evaluate_fails_after_low_confidence_retry_budget_exhausted(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+            config={"low_confidence_retry_limit": 2},
+        )
+        perception = _make_perception()
+        perception.confidence = 0.2
+        state = {"low_confidence_retries": 2}
+
+        result = await loop._evaluate(perception, {}, state)
+
+        assert result.decision == EvaluationDecision.FAIL
+        assert result.metadata["low_confidence_retry_exhausted"] is True
+        assert result.metadata["low_confidence_retries"] == 2
+
+    async def test_evaluate_resets_low_confidence_retry_budget_on_progress(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+            config={"low_confidence_retry_limit": 2},
+        )
+        perception = _make_perception()
+        perception.confidence = 0.6
+        state = {"low_confidence_retries": 1}
+
+        result = await loop._evaluate(perception, {}, state)
+
+        assert result.decision == EvaluationDecision.CONTINUE
+        assert state["low_confidence_retries"] == 0
 
 
 # ============================================================================

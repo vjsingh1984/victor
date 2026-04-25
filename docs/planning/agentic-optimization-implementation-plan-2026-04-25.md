@@ -108,6 +108,7 @@ Planned slices:
 |---|---|---|---|
 | 6.1 Truth-aligned confidence assessment | Done | Added task/evaluation/harness confidence tests first | `TaskResult` now derives confidence + uncertainty from objective evidence and failure taxonomy, and benchmark summaries persist confidence buckets plus truth-alignment rates |
 | 6.2 Clarification-aware runtime gating | Done | Added perception, streaming-pipeline, and loop-evaluation tests first | `PerceptionIntegration` now flags underspecified action requests, the streaming pipeline exits early with a targeted clarification prompt before provider/tool execution, and `AgenticLoop` fails fast with clarification metadata instead of blind retry |
+| 6.3 Low-confidence retry budget | Done | Added loop-evaluation tests first | `AgenticLoop` now bounds repeated low-confidence retries on both enhanced and legacy evaluation paths, resets the budget when progress resumes, and emits structured exhaustion metadata when the retry budget is spent |
 
 ## Immediate Execution Order
 
@@ -131,3 +132,4 @@ Planned slices:
 | 2026-04-25 | Phase 5.3 completed via TDD in `codingagent`: benchmark results now derive and persist a hierarchical failure diagnosis with stage + subtype paths, and aggregate metrics report both flat categories and taxonomy breakdowns across DR3/browser/external benchmark adapters. |
 | 2026-04-25 | Phase 6.1 completed via TDD in `codingagent`: benchmark results now derive truth-aligned confidence/uncertainty from evidence plus failure taxonomy, and persisted reports include confidence buckets and alignment rates for calibration-aware triage. |
 | 2026-04-25 | Phase 6.2 completed via TDD in `codingagent`: underspecified low-confidence action requests now trigger targeted clarification from `PerceptionIntegration`, the streaming runtime returns that clarification before provider/tool execution, and `AgenticLoop` records clarification-required failure metadata instead of retrying blindly. |
+| 2026-04-25 | Phase 6.3 completed via TDD in `codingagent`: repeated low-confidence retries are now budgeted in `AgenticLoop`, including results returned by the enhanced completion evaluator, and the loop resets that budget on renewed progress while surfacing structured exhaustion metadata on failure. |
