@@ -2786,6 +2786,7 @@ async def code_search(
             if (
                 manual_file_pattern_filter
                 or manual_extension_filter
+                or manual_symbol_filter
                 or manual_language_filter
                 or manual_test_only_filter is not None
             ):

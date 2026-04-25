@@ -601,7 +601,7 @@ async def test_code_search_semantic_symbol_filter_uses_symbol_name(tmp_path) -> 
     get_index.assert_awaited_once()
     mock_index.semantic_search.assert_awaited_once_with(
         query="json parsing",
-        max_results=3,
+        max_results=12,
         filter_metadata={"symbol_name": "parse_json"},
         similarity_threshold=0.25,
         expand_query=True,
@@ -651,7 +651,7 @@ async def test_code_search_semantic_symbol_filter_post_filters_backend_results(t
     literal_search.assert_not_awaited()
     mock_index.semantic_search.assert_awaited_once_with(
         query="json parsing",
-        max_results=3,
+        max_results=12,
         filter_metadata={"symbol_name": "parse_json"},
         similarity_threshold=0.25,
         expand_query=True,
