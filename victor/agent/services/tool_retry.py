@@ -40,7 +40,15 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.storage.cache.tool_cache import ToolCache
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.tool_names import ToolNames, get_canonical_name
+
 logger = logging.getLogger(__name__)
+
+
+def _canonical_retry_tool_name(tool_name: str) -> str:
+    """Normalize core-tool aliases before retry-time cache invalidation."""
+    return get_canonical_name(canonicalize_core_tool_name(tool_name.lower()))
 
 
 class ToolRetryConfig(Protocol):
@@ -150,14 +158,15 @@ class ToolRetryExecutor:
                     if effective_cache:
                         effective_cache.set(tool_name, tool_args, result)
                         # Invalidate related cache entries
+                        canonical_tool_name = _canonical_retry_tool_name(tool_name)
                         invalidating_tools = {
-                            "write_file",
-                            "edit_files",
-                            "execute_bash",
+                            ToolNames.WRITE,
+                            ToolNames.EDIT,
+                            ToolNames.SHELL,
                             "git",
                             "docker",
                         }
-                        if tool_name in invalidating_tools:
+                        if canonical_tool_name in invalidating_tools:
                             touched_paths = []
                             if "path" in tool_args:
                                 touched_paths.append(tool_args["path"])
@@ -166,11 +175,11 @@ class ToolRetryExecutor:
                             if touched_paths:
                                 effective_cache.invalidate_paths(touched_paths)
                             else:
-                                namespaces_to_clear = [
-                                    "code_search",
-                                    "semantic_code_search",
-                                    "list_directory",
-                                ]
+                                namespaces_to_clear = [ToolNames.READ, ToolNames.LS]
+                                if canonical_tool_name in {"git", "docker", ToolNames.WRITE, ToolNames.EDIT}:
+                                    namespaces_to_clear.extend(
+                                        ["code_search", "semantic_code_search"]
+                                    )
                                 effective_cache.clear_namespaces(namespaces_to_clear)
 
                     if attempt > 0:
