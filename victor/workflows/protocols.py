@@ -399,6 +399,39 @@ class IWorkflowExecutor(Protocol):
 
 
 @runtime_checkable
+class IWorkflowRuntimeExecutor(Protocol):
+    """Protocol for workflow-definition runtime executors.
+
+    This protocol models the higher-level executor shape used by the legacy
+    workflow runtime and surrounding utility modules: execute a
+    ``WorkflowDefinition``-style object from an initial context dictionary with
+    implementation-specific keyword arguments.
+    """
+
+    async def execute(
+        self,
+        workflow: Any,
+        initial_context: Dict[str, Any],
+        **kwargs: Any,
+    ) -> Any:
+        """Execute a workflow definition from an initial context."""
+        ...
+
+
+@runtime_checkable
+class IWorkflowNodeRuntimeExecutor(Protocol):
+    """Protocol for executors that can run individual workflow nodes."""
+
+    async def execute_node(
+        self,
+        node: Any,
+        context: Dict[str, Any],
+    ) -> Any:
+        """Execute a single workflow node against the provided context."""
+        ...
+
+
+@runtime_checkable
 class IStreamingWorkflowExecutor(Protocol):
     """Protocol for streaming workflow execution.
 

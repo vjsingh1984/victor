@@ -59,7 +59,7 @@ from victor.workflows.definition import (
 
 if TYPE_CHECKING:
     from victor.framework.graph import StateGraph
-    from victor.workflows.executor import WorkflowExecutor
+    from victor.workflows.protocols import IWorkflowNodeRuntimeExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +318,7 @@ class WorkflowToGraphAdapter:
     def adapt_with_execution(
         self,
         workflow: WorkflowDefinition,
-        executor: "WorkflowExecutor",
+        executor: "IWorkflowNodeRuntimeExecutor",
     ) -> "StateGraph":
         """Adapt with real execution handlers.
 
@@ -327,7 +327,7 @@ class WorkflowToGraphAdapter:
 
         Args:
             workflow: WorkflowDefinition to adapt
-            executor: WorkflowExecutor for running agents
+            executor: Node-capable workflow runtime for running agents
 
         Returns:
             StateGraph with real execution handlers
@@ -359,20 +359,17 @@ class WorkflowToGraphAdapter:
     def _create_execution_handler(
         self,
         node: WorkflowNode,
-        executor: "WorkflowExecutor",
+        executor: "IWorkflowNodeRuntimeExecutor",
     ) -> Callable[[AdapterWorkflowState], AdapterWorkflowState]:
         """Create an execution handler that uses the workflow executor.
 
         Args:
             node: WorkflowNode to execute
-            executor: WorkflowExecutor instance
+            executor: Node-capable workflow runtime
 
         Returns:
             Handler function for StateGraph
         """
-        # Import here to avoid circular imports
-        from victor.workflows.executor import WorkflowExecutor
-
         async def async_handler(state: AdapterWorkflowState) -> AdapterWorkflowState:
             """Execute the node using the workflow executor."""
             new_state = dict(state)

@@ -17,6 +17,8 @@ from victor.workflows.protocols import (
     IWorkflowGraph,
     ICheckpointStore,
     IWorkflowExecutor,
+    IWorkflowNodeRuntimeExecutor,
+    IWorkflowRuntimeExecutor,
 )
 
 
@@ -284,3 +286,36 @@ class TestIWorkflowExecutor:
 
         executor = MockExecutor()
         assert isinstance(executor, IWorkflowExecutor)
+
+
+class TestIWorkflowRuntimeExecutor:
+    """Tests for IWorkflowRuntimeExecutor protocol."""
+
+    def test_compliant_class_is_instance(self):
+        class MockRuntimeExecutor:
+            async def execute(
+                self,
+                workflow: Any,
+                initial_context: Dict[str, Any],
+                **kwargs: Any,
+            ) -> Dict[str, Any]:
+                return initial_context
+
+        executor = MockRuntimeExecutor()
+        assert isinstance(executor, IWorkflowRuntimeExecutor)
+
+
+class TestIWorkflowNodeRuntimeExecutor:
+    """Tests for IWorkflowNodeRuntimeExecutor protocol."""
+
+    def test_compliant_class_is_instance(self):
+        class MockNodeRuntimeExecutor:
+            async def execute_node(
+                self,
+                node: Any,
+                context: Dict[str, Any],
+            ) -> Dict[str, Any]:
+                return context
+
+        executor = MockNodeRuntimeExecutor()
+        assert isinstance(executor, IWorkflowNodeRuntimeExecutor)

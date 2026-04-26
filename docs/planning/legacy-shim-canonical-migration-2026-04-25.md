@@ -184,6 +184,16 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     seam so future internal callers cannot regress back to direct legacy
     backend ownership
 
+- Phase 3.8 workflow executor type-seam normalization:
+  - `victor.workflows.protocols` now owns dedicated runtime executor protocol
+    types for workflow-definition execution and single-node execution
+    (`IWorkflowRuntimeExecutor`, `IWorkflowNodeRuntimeExecutor`)
+  - `victor.workflows.batch_executor` and `victor.workflows.adapters` now
+    depend on those workflow-owned protocols instead of importing the legacy
+    `victor.workflows.executor.WorkflowExecutor` class for typing only
+  - boundary tests now pin those two modules away from the legacy executor
+    module import path
+
 - Phase 4.1 canonical team protocol import cleanup:
   - internal tests now import `ITeamMember` from `victor.protocols.team`
     instead of the compatibility shim in `victor.teams.protocols`
@@ -200,6 +210,7 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     of quietly re-entering internal code paths
 
 Next resume point:
-- Continue Phase 4 by auditing whether any remaining compatibility-only docs,
-  examples, or public package-root re-exports should be tightened further, or
-  whether the low-volume shim cleanup is complete enough to close.
+- Continue the remaining `victor.workflows.executor` migration on the higher
+  impact runtime owners (`yaml_coordinator`, `workflow_engine`,
+  `streaming_executor`) or stop here if that larger behavioral seam should be
+  handled as a separate dedicated refactor.

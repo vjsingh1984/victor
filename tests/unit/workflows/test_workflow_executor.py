@@ -362,3 +362,15 @@ class TestWorkflowContextBoundary:
         from victor.workflows import context
         source = inspect.getsource(context.to_workflow_context)
         assert "from victor.workflows.executor import" not in source
+
+
+class TestWorkflowExecutorCompatibilityBoundaries:
+    """Enforce type-only callers stay off the legacy executor module."""
+
+    def test_batch_executor_does_not_import_legacy_workflow_executor(self):
+        source = open("victor/workflows/batch_executor.py").read()
+        assert "from victor.workflows.executor import WorkflowExecutor" not in source
+
+    def test_adapters_do_not_import_legacy_workflow_executor(self):
+        source = open("victor/workflows/adapters.py").read()
+        assert "from victor.workflows.executor import WorkflowExecutor" not in source
