@@ -20,8 +20,15 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from victor.config.settings import get_project_paths
+
 db_app = typer.Typer(name="db", help="Database maintenance and management.")
 console = Console()
+
+
+def _get_default_archive_dir() -> Path:
+    """Resolve the default archive directory through centralized Victor paths."""
+    return get_project_paths().global_victor_dir / "archives"
 
 
 def _parse_duration(duration_str: str) -> int:
@@ -228,7 +235,7 @@ def db_archive(
         raise typer.Exit(1)
 
     if output is None:
-        output = Path.home() / ".victor" / "archives"
+        output = _get_default_archive_dir()
     output.mkdir(parents=True, exist_ok=True)
 
     if not yes:

@@ -17,6 +17,7 @@
 import pytest
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 import yaml
 
@@ -232,6 +233,29 @@ class TestCreateProfile:
         )
 
         assert result.exit_code == 0
+
+    def test_create_profile_uses_global_victor_dir_by_default(self, tmp_path):
+        """Default CLI config dir should come from centralized Victor paths."""
+        global_dir = tmp_path / ".victor"
+
+        with patch(
+            "victor.ui.commands.profiles.get_project_paths",
+            return_value=SimpleNamespace(global_victor_dir=global_dir),
+        ):
+            result = runner.invoke(
+                profiles_app,
+                [
+                    "create",
+                    "default_path_profile",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "llama2",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert (global_dir / "profiles.yaml").exists()
 
 
 class TestEditProfile:

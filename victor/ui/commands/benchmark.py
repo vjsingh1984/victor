@@ -46,6 +46,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from victor.config.settings import get_project_paths
 from victor.core.async_utils import run_sync
 from victor.ui.commands.utils import setup_logging
 
@@ -54,6 +55,16 @@ benchmark_app = typer.Typer(
     help="Run AI coding benchmarks and compare against other frameworks.",
 )
 console = Console()
+
+
+def _get_global_evaluations_dir() -> Path:
+    """Resolve the global benchmark evaluations directory."""
+    return get_project_paths().global_victor_dir / "evaluations"
+
+
+def _get_global_usage_logs_dir() -> Path:
+    """Resolve the global usage-log directory for benchmark analytics."""
+    return get_project_paths().global_logs_dir
 
 
 @dataclass(frozen=True)
@@ -1986,9 +1997,8 @@ def evolve_prompts(
         # aggregate pass rates per provider across all benchmark runs.
         import glob as _glob
         import json as _json
-        from pathlib import Path as _Path
 
-        eval_dir = _Path.home() / ".victor" / "evaluations"
+        eval_dir = _get_global_evaluations_dir()
         provider_agg = {}  # provider → {"pass": N, "fail": N}
         model_to_provider = {
             "gpt": "openai",
@@ -2083,11 +2093,10 @@ def _show_compliance_scorecard() -> None:
     import gzip
     import json
     from collections import defaultdict
-    from pathlib import Path
     from rich.table import Table
 
     events = []
-    logs_dir = Path.home() / ".victor" / "logs"
+    logs_dir = _get_global_usage_logs_dir()
     for path in sorted(logs_dir.glob("usage.*.jsonl.gz")) + [logs_dir / "usage.jsonl"]:
         if not path.exists():
             continue

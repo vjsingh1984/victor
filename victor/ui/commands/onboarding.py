@@ -47,6 +47,7 @@ from victor.config.profiles import (
     get_recommended_profile,
     install_profile,
 )
+from victor.config.settings import get_project_paths
 
 
 class OnboardingWizard:
@@ -59,7 +60,7 @@ class OnboardingWizard:
             console: Optional Rich console instance (creates default if None)
         """
         self.console = console or Console()
-        self.config_dir = Path.home() / ".victor"
+        self.config_dir = get_project_paths().global_victor_dir
         self.state: Dict[str, Any] = {
             "step": 0,
             "selected_profile": None,

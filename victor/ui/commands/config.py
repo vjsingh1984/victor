@@ -2,14 +2,21 @@ import typer
 from rich.console import Console
 from rich.table import Table
 import yaml
+from pathlib import Path
 from typing import Any
 
 from victor.core.async_utils import run_sync
-from victor.config.settings import load_settings
+from victor.config.settings import load_settings, get_project_paths
 from victor.config.validation import validate_configuration, format_validation_result
 
 config_app = typer.Typer(name="config", help="Validate configuration files and profiles.")
 console = Console()
+
+
+def _get_config_dir() -> Path:
+    """Resolve the global Victor config directory through centralized paths."""
+    config_dir = get_project_paths().global_victor_dir
+    return Path(config_dir)
 
 
 def _validation_passed(result: Any) -> bool:
@@ -41,9 +48,13 @@ def config_show(
     - Configuration sources (files, env vars)
     - Tool settings and limits
     """
-    from pathlib import Path
     from rich.table import Table
     from rich.panel import Panel
+
+    config_dir = _get_config_dir()
+    settings_file = config_dir / "settings.yaml"
+    profiles_file = config_dir / "profiles.yaml"
+    api_keys_file = config_dir / "api_keys.yaml"
 
     try:
         settings = load_settings()
@@ -62,12 +73,12 @@ def config_show(
     provider_table.add_row(
         "Default Provider",
         settings.provider.default_provider,
-        "settings.yaml" if (Path.home() / ".victor" / "settings.yaml").exists() else "default",
+        "settings.yaml" if settings_file.exists() else "default",
     )
     provider_table.add_row(
         "Default Model",
         settings.provider.default_model,
-        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default",
+        "profiles.yaml" if profiles_file.exists() else "default",
     )
     provider_table.add_row("Temperature", str(settings.provider.default_temperature), "default")
     provider_table.add_row("Max Tokens", str(settings.provider.default_max_tokens), "default")
@@ -85,7 +96,7 @@ def config_show(
     tools_table.add_row(
         "Tool Budget",
         str(settings.tools.fallback_max_tools),
-        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default",
+        "profiles.yaml" if profiles_file.exists() else "default",
     )
     tools_table.add_row(
         "Cache Enabled", "Yes" if settings.tools.tool_selection_cache_enabled else "No", "default"
@@ -99,26 +110,26 @@ def config_show(
     console.print()
 
     # Configuration Files
-    config_dir = Path.home() / ".victor"
     files_table = Table(show_header=False, box=None, padding=(0, 2))
     files_table.add_column("File", style="cyan")
     files_table.add_column("Status", style="white")
 
     files_table.add_row(
         "profiles.yaml",
-        "[green]Exists[/]" if (config_dir / "profiles.yaml").exists() else "[dim]Not found[/]",
+        "[green]Exists[/]" if profiles_file.exists() else "[dim]Not found[/]",
     )
     files_table.add_row(
         "settings.yaml",
-        "[green]Exists[/]" if (config_dir / "settings.yaml").exists() else "[dim]Not found[/]",
+        "[green]Exists[/]" if settings_file.exists() else "[dim]Not found[/]",
     )
     files_table.add_row(
         "api_keys.yaml",
-        "[yellow]Deprecated[/]" if (config_dir / "api_keys.yaml").exists() else "[dim]Not found[/]",
+        "[yellow]Deprecated[/]" if api_keys_file.exists() else "[dim]Not found[/]",
     )
 
     console.print("[bold]Configuration Files[/]")
     console.print(files_table)
+    console.print(f"[dim]Config directory: {config_dir}[/]")
     console.print()
 
     # Environment Variables

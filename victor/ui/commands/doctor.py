@@ -35,6 +35,8 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 
+from victor.config.settings import get_project_paths
+
 
 class Severity(Enum):
     """Severity level for diagnostic issues."""
@@ -63,6 +65,14 @@ class DoctorChecks:
         self.verbose = verbose
         self.fix = fix
         self.checks: List[DiagnosticCheck] = []
+
+    @staticmethod
+    def _get_effective_config_dir() -> Path:
+        """Resolve the effective Victor config directory."""
+        victor_config = os.getenv("VICTOR_CONFIG_DIR")
+        if victor_config:
+            return Path(victor_config)
+        return get_project_paths().global_victor_dir
 
     def add_check(
         self,
@@ -315,8 +325,8 @@ class DoctorChecks:
     def check_config_directory(self) -> None:
         """Check Victor configuration directory."""
         victor_config = os.getenv("VICTOR_CONFIG_DIR")
+        config_path = self._get_effective_config_dir()
         if victor_config:
-            config_path = Path(victor_config)
             if config_path.exists():
                 self.add_check(
                     name="Configuration Directory",
@@ -332,12 +342,11 @@ class DoctorChecks:
                 )
         else:
             # Check default location
-            default_config = Path.home() / ".victor"
-            if default_config.exists():
+            if config_path.exists():
                 self.add_check(
                     name="Configuration Directory",
                     severity=Severity.SUCCESS,
-                    message=f"Using default config directory: {default_config}",
+                    message=f"Using default config directory: {config_path}",
                 )
             else:
                 self.add_check(
@@ -459,26 +468,29 @@ class DoctorChecks:
         fixes_applied = []
 
         for check in self.checks:
-            if check.severity == Severity.SUCCESS or check.severity == Severity.INFO:
+            if check.severity == Severity.SUCCESS:
+                continue
+            if check.severity == Severity.INFO and check.name != "Configuration Directory":
                 continue
 
             # Attempt fixes for specific checks
-            if check.name == "config_directory" and "not found" in check.message.lower():
+            if check.name == "Configuration Directory" and (
+                "does not exist" in check.message.lower()
+                or "no configuration directory" in check.message.lower()
+            ):
                 # Create config directory if it doesn't exist
                 try:
-                    from pathlib import Path
-
-                    config_dir = Path.home() / ".victor"
-                    config_dir.mkdir(exist_ok=True)
+                    config_dir = self._get_effective_config_dir()
+                    config_dir.mkdir(parents=True, exist_ok=True)
                     (config_dir / "config.yaml").write_text("# Victor configuration\n")
                     fixes_applied.append(f"Created config directory: {config_dir}")
                 except Exception as e:
                     self.checks.append(
                         DiagnosticCheck(
-                            name="config_directory_fix",
+                            name="Configuration Directory Fix",
                             severity=Severity.ERROR,
                             message=f"Failed to create config directory: {e}",
-                            suggestion="Create directory manually: mkdir -p ~/.victor",
+                            suggestion=f"Create directory manually: mkdir -p {config_dir}",
                             passed=False,
                         )
                     )

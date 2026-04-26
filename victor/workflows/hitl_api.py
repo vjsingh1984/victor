@@ -65,11 +65,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
-from contextlib import asynccontextmanager
 
+from victor.config.settings import get_project_paths
 from victor.workflows.hitl import (
     HITLFallback,
     HITLNodeType,
@@ -87,6 +89,11 @@ logger = logging.getLogger(__name__)
 def _utc_now() -> datetime:
     """Return current UTC time (timezone-aware)."""
     return datetime.now(timezone.utc)
+
+
+def get_default_hitl_db_path() -> Path:
+    """Resolve the default persistent HITL database path."""
+    return get_project_paths().global_victor_dir / "hitl.db"
 
 
 # ============================================================================
@@ -429,12 +436,10 @@ class SQLiteHITLStore:
             db_path: Path to SQLite database (default: ~/.victor/hitl.db)
             table_name: Table name for HITL requests
         """
-        from pathlib import Path
-
         if db_path is None:
-            victor_dir = Path.home() / ".victor"
-            victor_dir.mkdir(parents=True, exist_ok=True)
-            db_path = str(victor_dir / "hitl.db")
+            default_db_path = get_default_hitl_db_path()
+            default_db_path.parent.mkdir(parents=True, exist_ok=True)
+            db_path = str(default_db_path)
 
         self.db_path = db_path
         self.table_name = table_name

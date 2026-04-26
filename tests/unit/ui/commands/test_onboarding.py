@@ -15,6 +15,7 @@
 """Tests for interactive onboarding wizard."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -29,6 +30,18 @@ class TestOnboardingWizard:
         wizard = OnboardingWizard()
         assert wizard.config_dir == Path.home() / ".victor"
         assert wizard.state["step"] == 0
+
+    def test_init_uses_global_victor_dir(self, tmp_path):
+        """Wizard should resolve config dir through centralized Victor paths."""
+        global_dir = tmp_path / ".victor"
+
+        with patch(
+            "victor.ui.commands.onboarding.get_project_paths",
+            return_value=SimpleNamespace(global_victor_dir=global_dir),
+        ):
+            wizard = OnboardingWizard()
+
+        assert wizard.config_dir == global_dir
 
     def test_init_with_custom_console(self):
         """Wizard can accept custom console."""

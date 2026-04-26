@@ -3,6 +3,7 @@
 Provides autouse fixtures for test isolation in integration tests.
 """
 
+import sys
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
@@ -43,6 +44,68 @@ def isolate_integration_project_victor_storage(isolated_integration_project_vict
         ),
     ):
         yield
+
+
+@pytest.fixture
+def isolated_integration_home(tmp_path) -> Path:
+    """Provide an isolated HOME directory for integration tests."""
+    home_dir = tmp_path / "home"
+    home_dir.mkdir(exist_ok=True)
+    return home_dir
+
+
+@pytest.fixture
+def isolated_integration_global_victor_dir(isolated_integration_home) -> Path:
+    """Provide an isolated global ~/.victor directory for integration tests."""
+    victor_dir = isolated_integration_home / ".victor"
+    victor_dir.mkdir(parents=True, exist_ok=True)
+    return victor_dir
+
+
+@pytest.fixture(autouse=True)
+def isolate_integration_global_victor_storage(
+    monkeypatch,
+    isolated_integration_home,
+    isolated_integration_global_victor_dir,
+):
+    """Redirect integration-test global Victor storage into a temp HOME/.victor.
+
+    This keeps global test artifacts such as victor.db, profiles, logs, and plan
+    files out of the developer's real ~/.victor directory.
+    """
+    import victor.config.secure_paths as secure_paths_module
+    import victor.config.settings as settings_module
+    from victor.core.database import reset_all_databases
+
+    monkeypatch.setenv("HOME", str(isolated_integration_home))
+    monkeypatch.setenv("USERPROFILE", str(isolated_integration_home))
+    monkeypatch.setattr(
+        secure_paths_module,
+        "get_secure_home",
+        lambda: isolated_integration_home,
+    )
+    monkeypatch.setattr(
+        secure_paths_module,
+        "get_victor_dir",
+        lambda: isolated_integration_global_victor_dir,
+    )
+    monkeypatch.setattr(
+        settings_module,
+        "GLOBAL_VICTOR_DIR",
+        isolated_integration_global_victor_dir,
+    )
+
+    config_loaders_module = sys.modules.get("victor.config.config_loaders")
+    if config_loaders_module is not None:
+        monkeypatch.setattr(
+            config_loaders_module,
+            "USER_CONFIG_DIR",
+            isolated_integration_global_victor_dir,
+        )
+
+    reset_all_databases()
+    yield
+    reset_all_databases()
 
 
 @pytest.fixture(autouse=True)

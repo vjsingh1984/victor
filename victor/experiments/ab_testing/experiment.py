@@ -40,6 +40,7 @@ from victor.experiments.ab_testing.allocator import (
     TrafficAllocator,
     create_allocator,
 )
+from victor.experiments.ab_testing.paths import get_default_ab_test_db_path
 
 
 class ABTestManager:
@@ -83,7 +84,7 @@ class ABTestManager:
             allocation_strategy: Default allocation strategy
         """
         if storage_path is None:
-            storage_path = "~/.victor/ab_tests.db"
+            storage_path = str(get_default_ab_test_db_path())
 
         self.storage_path = Path(storage_path).expanduser()
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)

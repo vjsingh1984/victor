@@ -24,7 +24,9 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 import pytest
+from rich.console import Console
 from typer.testing import CliRunner
+import victor.ui.commands.benchmark as benchmark_cmd
 from victor.ui.commands.benchmark import benchmark_app
 
 
@@ -40,6 +42,70 @@ def is_ollama_available() -> bool:
 
 
 runner = CliRunner()
+
+
+class TestBenchmarkGlobalPaths:
+    """Tests for canonical global benchmark path resolution."""
+
+    def test_global_dirs_resolve_through_project_paths(self, tmp_path):
+        """Benchmark helpers should resolve through centralized Victor paths."""
+        global_dir = tmp_path / ".victor"
+        logs_dir = global_dir / "logs"
+
+        with patch(
+            "victor.ui.commands.benchmark.get_project_paths",
+            return_value=SimpleNamespace(
+                global_victor_dir=global_dir,
+                global_logs_dir=logs_dir,
+            ),
+        ):
+            assert benchmark_cmd._get_global_evaluations_dir() == global_dir / "evaluations"
+            assert benchmark_cmd._get_global_usage_logs_dir() == logs_dir
+
+    def test_show_compliance_scorecard_reads_global_logs_dir(self, tmp_path):
+        """Compliance reporting should read usage logs from centralized Victor paths."""
+        global_dir = tmp_path / ".victor"
+        logs_dir = global_dir / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        usage_file = logs_dir / "usage.jsonl"
+        usage_file.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "session_id": "sess-1",
+                            "event_type": "tool_call",
+                            "data": {"tool_name": "code_search", "tool_args": {"mode": "semantic"}},
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "session_id": "sess-1",
+                            "event_type": "tool_result",
+                            "data": {"tool_name": "code_search"},
+                        }
+                    ),
+                ]
+            )
+            + "\n"
+        )
+
+        record_console = Console(record=True, force_terminal=False, width=160)
+        with (
+            patch(
+                "victor.ui.commands.benchmark.get_project_paths",
+                return_value=SimpleNamespace(
+                    global_victor_dir=global_dir,
+                    global_logs_dir=logs_dir,
+                ),
+            ),
+            patch.object(benchmark_cmd, "console", record_console),
+        ):
+            benchmark_cmd._show_compliance_scorecard()
+
+        output = record_console.export_text()
+        assert "GEPA Compliance Scorecard" in output
+        assert "Based on 2 events across 1 sessions" in output
 
 
 class TestBenchmarkList:

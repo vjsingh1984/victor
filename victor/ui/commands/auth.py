@@ -64,6 +64,7 @@ from victor.config.migration import (
     check_migration_needed,
     run_migration,
 )
+from victor.config.settings import get_project_paths
 
 # =============================================================================
 # Popular provider models (for quick selection)
@@ -127,20 +128,18 @@ auth_app = typer.Typer(name="auth", help="Manage authentication and provider acc
 console = Console()
 
 
+def _get_oauth_tokens_file() -> Path:
+    """Resolve the OAuth token store through centralized Victor paths."""
+    return get_project_paths().global_victor_dir / "oauth_tokens.yaml"
+
+
 def _get_oauth_status(provider: str) -> AuthStatus:
     """Check OAuth token status for a provider without triggering login.
 
     Returns:
         AuthStatus enum: AUTHENTICATED if valid token exists, EXPIRED if token expired, PENDING otherwise.
     """
-    try:
-        from pathlib import Path
-
-        from victor.config.secure_paths import get_victor_dir
-
-        token_file = get_victor_dir() / "oauth_tokens.yaml"
-    except ImportError:
-        token_file = Path.home() / ".victor" / "oauth_tokens.yaml"
+    token_file = _get_oauth_tokens_file()
 
     if not token_file.exists():
         return AuthStatus.PENDING

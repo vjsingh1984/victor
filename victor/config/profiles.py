@@ -543,6 +543,16 @@ def _detect_model_for_provider(provider: str) -> str:
     return model_defaults.get(provider, "qwen2.5-coder:7b")
 
 
+def _resolve_profile_config_dir(config_dir: Optional[Path] = None) -> Path:
+    """Resolve the profile config directory through centralized Victor paths."""
+    if config_dir is not None:
+        return config_dir
+
+    from victor.config.settings import get_project_paths
+
+    return get_project_paths().global_victor_dir
+
+
 # =============================================================================
 # Profile Installation
 # =============================================================================
@@ -565,8 +575,7 @@ def install_profile(
     Returns:
         Path to the generated profiles.yaml file
     """
-    if config_dir is None:
-        config_dir = Path.home() / ".victor"
+    config_dir = _resolve_profile_config_dir(config_dir)
 
     # Ensure directory exists
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -594,8 +603,7 @@ def get_current_profile(config_dir: Optional[Path] = None) -> Optional[str]:
     Returns:
         Profile name if detected, None otherwise
     """
-    if config_dir is None:
-        config_dir = Path.home() / ".victor"
+    config_dir = _resolve_profile_config_dir(config_dir)
 
     profiles_path = config_dir / "profiles.yaml"
     if not profiles_path.exists():

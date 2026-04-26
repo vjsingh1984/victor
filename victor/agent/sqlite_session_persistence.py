@@ -95,7 +95,7 @@ class SQLiteSessionPersistence:
         else:
             from victor.config.settings import get_project_paths
 
-            self._db_path = get_project_paths().project_root / ".victor" / "project.db"
+            self._db_path = get_project_paths().project_db
 
         self._db = get_project_database(self._db_path)
         self._ensure_tables()
@@ -146,6 +146,16 @@ class SQLiteSessionPersistence:
             self._db.execute("ALTER TABLE sessions ADD COLUMN metadata TEXT")
         if "project_path" not in sessions_columns:
             self._db.execute("ALTER TABLE sessions ADD COLUMN project_path TEXT")
+        if "provider" not in sessions_columns:
+            self._db.execute("ALTER TABLE sessions ADD COLUMN provider TEXT")
+        if "model" not in sessions_columns:
+            self._db.execute("ALTER TABLE sessions ADD COLUMN model TEXT")
+        if "profile" not in sessions_columns:
+            self._db.execute("ALTER TABLE sessions ADD COLUMN profile TEXT")
+        if "created_at" not in sessions_columns:
+            self._db.execute("ALTER TABLE sessions ADD COLUMN created_at TIMESTAMP")
+        if "last_activity" not in sessions_columns:
+            self._db.execute("ALTER TABLE sessions ADD COLUMN last_activity TIMESTAMP")
 
         if "metadata" not in messages_columns:
             self._db.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")

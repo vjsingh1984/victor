@@ -70,6 +70,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from victor.config.settings import get_project_paths
+
 scheduler_app = typer.Typer(
     name="scheduler",
     help="Manage the workflow scheduler service.",
@@ -77,8 +79,15 @@ scheduler_app = typer.Typer(
 
 console = Console()
 
-# PID file for daemon mode
-DEFAULT_PID_FILE = Path.home() / ".victor" / "scheduler.pid"
+
+def _get_default_pid_file() -> Path:
+    """Resolve the default scheduler PID file through centralized Victor paths."""
+    return get_project_paths().global_victor_dir / "scheduler.pid"
+
+
+def _resolve_pid_file(pid_file: Optional[Path]) -> Path:
+    """Resolve an explicit or default scheduler PID file path."""
+    return pid_file or _get_default_pid_file()
 
 
 def _get_scheduler():
@@ -96,8 +105,8 @@ def start(
         "-d",
         help="Run as background daemon",
     ),
-    pid_file: Path = typer.Option(
-        DEFAULT_PID_FILE,
+    pid_file: Optional[Path] = typer.Option(
+        None,
         "--pid-file",
         help="PID file for daemon mode",
     ),
@@ -123,10 +132,8 @@ def start(
         victor scheduler start --daemon
         victor scheduler start --config schedules.yaml
     """
-    from victor.workflows.scheduler import WorkflowScheduler, get_scheduler
-
     if daemon:
-        _start_daemon(pid_file, check_interval, config_file)
+        _start_daemon(_resolve_pid_file(pid_file), check_interval, config_file)
     else:
         _start_foreground(check_interval, config_file)
 
@@ -231,8 +238,8 @@ def _start_daemon(
 
 @scheduler_app.command("stop")
 def stop(
-    pid_file: Path = typer.Option(
-        DEFAULT_PID_FILE,
+    pid_file: Optional[Path] = typer.Option(
+        None,
         "--pid-file",
         help="PID file for daemon",
     ),
@@ -242,6 +249,8 @@ def stop(
     Example:
         victor scheduler stop
     """
+    pid_file = _resolve_pid_file(pid_file)
+
     if not pid_file.exists():
         console.print("[yellow]Scheduler is not running (no PID file)[/]")
         raise typer.Exit(0)
@@ -261,8 +270,8 @@ def stop(
 
 @scheduler_app.command("status")
 def status(
-    pid_file: Path = typer.Option(
-        DEFAULT_PID_FILE,
+    pid_file: Optional[Path] = typer.Option(
+        None,
         "--pid-file",
         help="PID file for daemon",
     ),
@@ -272,6 +281,8 @@ def status(
     Example:
         victor scheduler status
     """
+    pid_file = _resolve_pid_file(pid_file)
+
     # Check daemon status
     daemon_running = False
     daemon_pid = None

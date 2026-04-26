@@ -41,6 +41,7 @@ from victor.config.profiles import (
     get_current_profile,
     generate_profile_yaml,
 )
+from victor.config.settings import get_project_paths
 
 profiles_app = typer.Typer(name="profile", help="Manage configuration profiles.")
 console = Console()
@@ -89,6 +90,11 @@ def _save_profiles_yaml(profiles_file: Path, data: Dict[str, Any]) -> None:
     except (IOError, OSError) as e:
         console.print(f"[red]Error writing profiles file: {e}[/]")
         raise typer.Exit(1)
+
+
+def _resolve_config_dir(config_dir: Optional[str]) -> Path:
+    """Resolve the target config directory through centralized Victor paths."""
+    return Path(config_dir) if config_dir else get_project_paths().global_victor_dir
 
 
 @profiles_app.command("list")
@@ -225,7 +231,7 @@ def profile_apply(
         raise typer.Exit(1)
 
     # Resolve config directory
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    config_path = _resolve_config_dir(config_dir)
 
     # Generate YAML content
     yaml_content = generate_profile_yaml(profile, provider_override=provider, model_override=model)
@@ -294,7 +300,7 @@ def profile_current(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
 ) -> None:
     """Show the current active profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    config_path = _resolve_config_dir(config_dir)
     profile_name = get_current_profile(config_path)
 
     if not profile_name:
@@ -327,7 +333,7 @@ def profile_create(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Create a new custom profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    config_path = _resolve_config_dir(config_dir)
     profiles_file = config_path / "profiles.yaml"
 
     data = _load_profiles_yaml(profiles_file)
@@ -366,7 +372,7 @@ def profile_edit(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Edit an existing custom profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    config_path = _resolve_config_dir(config_dir)
     profiles_file = config_path / "profiles.yaml"
 
     data = _load_profiles_yaml(profiles_file)
@@ -408,7 +414,7 @@ def profile_delete(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Delete a custom profile."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    config_path = _resolve_config_dir(config_dir)
     profiles_file = config_path / "profiles.yaml"
 
     data = _load_profiles_yaml(profiles_file)
@@ -439,7 +445,7 @@ def profile_set_default(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Set a profile as the default."""
-    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    config_path = _resolve_config_dir(config_dir)
     profiles_file = config_path / "profiles.yaml"
 
     data = _load_profiles_yaml(profiles_file)

@@ -35,7 +35,7 @@ def strip_ansi(text: str) -> str:
 @pytest.fixture
 def project_db_path():
     """Get project database path."""
-    return get_project_paths().project_root / ".victor" / "project.db"
+    return get_project_paths().project_db
 
 
 @pytest.fixture
@@ -73,6 +73,15 @@ class TestSessionsCLIIntegration:
     """Integration tests for sessions CLI command."""
 
     @pytest.mark.integration
+    def test_project_db_path_uses_isolated_integration_victor_dir(
+        self,
+        project_db_path,
+        isolated_integration_project_victor_dir,
+    ):
+        """Integration tests should not touch the repo-local project database."""
+        assert project_db_path == isolated_integration_project_victor_dir / "project.db"
+
+    @pytest.mark.integration
     def test_sessions_list_command(self, backup_db):
         """Test victor sessions list command with real database."""
         from typer.testing import CliRunner
@@ -82,7 +91,7 @@ class TestSessionsCLIIntegration:
 
         # Create sample sessions
         persistence = SQLiteSessionPersistence()
-        persistence.save_session(
+        session_id = persistence.save_session(
             conversation={"messages": [{"role": "user", "content": "Test"}]},
             model="claude-sonnet-4-20250514",
             provider="anthropic",
@@ -93,11 +102,10 @@ class TestSessionsCLIIntegration:
         # Test list command
         result = runner.invoke(sessions_app, ["list"])
         assert result.exit_code == 0
-        # Rich table rendering may wrap and ellipsize long titles.
         rendered = strip_ansi(result.stdout)
-        assert "Integr" in rendered
-        assert "Test" in rendered
-        assert "Session" in rendered
+        assert session_id in rendered
+        assert "Saved Sessions (last 1)" in rendered
+        assert "Total: 1 session(s)" in rendered
 
     @pytest.mark.integration
     def test_sessions_show_command(self, backup_db):
@@ -396,14 +404,13 @@ class TestChatSessionFlagsIntegration:
         # List with default limit (should show 10)
         result_default = runner.invoke(sessions_app, ["list"])
         assert result_default.exit_code == 0
-        # Count occurrences of session IDs in output
-        session_count = result_default.stdout.count("Session ")
-        # Should show around 10 sessions (default limit)
-        assert session_count <= 15  # At most 15
+        rendered_default = strip_ansi(result_default.stdout)
+        assert "Saved Sessions (last 10)" in rendered_default
+        assert "Total: 10 session(s)" in rendered_default
 
         # List with --all flag (should show all 15)
         result_all = runner.invoke(sessions_app, ["list", "--all"])
         assert result_all.exit_code == 0
-        # Check that it shows more sessions than default
-        all_session_count = result_all.stdout.count("Session ")
-        assert all_session_count >= 15  # All sessions should be shown
+        rendered_all = strip_ansi(result_all.stdout)
+        assert "Saved Sessions (last 15)" in rendered_all
+        assert "Total: 15 session(s)" in rendered_all
