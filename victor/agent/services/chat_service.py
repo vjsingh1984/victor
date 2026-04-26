@@ -231,7 +231,7 @@ class ChatService:
             self._logger.error(f"Chat failed: {e}")
 
             # Attempt recovery
-            recovery_context = self._create_recovery_context(e)
+            recovery_context = self._build_recovery_context(e)
             if await self._recovery.execute_recovery(recovery_context):
                 # Retry after recovery
                 return await self.chat(user_message, stream=stream, **kwargs)
@@ -288,7 +288,7 @@ class ChatService:
             self._logger.error(f"Stream chat failed: {e}")
 
             # Attempt recovery
-            recovery_context = self._create_recovery_context(e)
+            recovery_context = self._build_recovery_context(e)
             if await self._recovery.execute_recovery(recovery_context):
                 # Retry after recovery (preserving iteration if we were preserving)
                 async for chunk in self.stream_chat(
@@ -703,8 +703,8 @@ class ChatService:
             usage={"total_tokens": total_tokens},
         )
 
-    def _create_recovery_context(self, error: Exception) -> Any:
-        """Create recovery context from error.
+    def _build_recovery_context(self, error: Exception) -> Any:
+        """Build recovery context from an error.
 
         Args:
             error: Error that occurred
@@ -1046,7 +1046,7 @@ class ChatService:
         from victor.providers.base import CompletionResponse
 
         # Try recovery service
-        recovery_context = self._create_recovery_context(error)
+        recovery_context = self._build_recovery_context(error)
 
         if context:
             recovery_context.state.update(context)

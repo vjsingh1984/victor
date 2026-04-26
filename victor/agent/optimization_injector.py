@@ -146,6 +146,7 @@ class OptimizationInjector:
         self._section_payload_cache: Dict[str, Optional[Dict[str, Any]]] = {}
         self._few_shot_cache: Dict[str, Optional[str]] = {}
         self._few_shot_payload_cache: Dict[str, Optional[Dict[str, Any]]] = {}
+        self._bound_candidates: Dict[str, Dict[str, Any]] = {}
         self._last_failure_category: Optional[str] = None
         self._last_failure_error: Optional[str] = None
 
@@ -155,6 +156,42 @@ class OptimizationInjector:
         self._section_payload_cache.clear()
         self._few_shot_cache.clear()
         self._few_shot_payload_cache.clear()
+
+    def clear_prompt_bindings(self) -> None:
+        """Remove explicit candidate bindings and clear any cached prompt payloads."""
+        self._bound_candidates.clear()
+        self.clear_session_cache()
+
+    def bind_prompt_candidate(
+        self,
+        *,
+        section_name: str,
+        prompt_candidate_hash: str,
+        provider: Optional[str] = None,
+        strict: bool = True,
+    ) -> None:
+        """Bind one exact prompt candidate for targeted evaluation runs.
+
+        Bound candidates bypass Thompson sampling and active-candidate selection.
+        This keeps the runtime prompt content aligned with benchmark metadata.
+        """
+        normalized_section = str(section_name or "").strip()
+        normalized_hash = str(prompt_candidate_hash or "").strip()
+        normalized_provider = str(provider or "").strip()
+
+        if not normalized_section:
+            raise ValueError("section_name is required for prompt candidate binding")
+        if not normalized_hash:
+            raise ValueError("prompt_candidate_hash is required for prompt candidate binding")
+
+        self._bound_candidates[normalized_section] = {
+            "prompt_candidate_hash": normalized_hash,
+            "provider": normalized_provider,
+            "strict": bool(strict),
+        }
+        self.clear_session_cache()
+        if strict and normalized_provider:
+            self._resolve_bound_candidate_payload(normalized_section, normalized_provider)
 
     def get_evolved_section_payloads(
         self,
@@ -253,6 +290,14 @@ class OptimizationInjector:
         if cache_key in self._few_shot_payload_cache:
             cached_payload = self._few_shot_payload_cache[cache_key]
             return dict(cached_payload) if cached_payload else None
+
+        if "FEW_SHOT_EXAMPLES" in self._bound_candidates:
+            payload = self._sample_evolved_payload("FEW_SHOT_EXAMPLES", provider, model, task_type)
+            self._few_shot_payload_cache[cache_key] = payload
+            self._few_shot_cache[cache_key] = (
+                str(payload.get("text")).strip() if payload and payload.get("text") else None
+            )
+            return dict(payload) if payload else None
 
         try:
             from victor.config.settings import get_settings
@@ -382,6 +427,10 @@ class OptimizationInjector:
         task_type: str,
     ) -> Optional[Dict[str, Any]]:
         """Sample an evolved section and preserve candidate identity when present."""
+        bound_payload = self._resolve_bound_candidate_payload(section_name, provider or "")
+        if bound_payload is not None:
+            return bound_payload
+
         try:
             from victor.config.settings import get_settings
 
@@ -436,3 +485,57 @@ class OptimizationInjector:
             pass
 
         return None
+
+    def _resolve_bound_candidate_payload(
+        self,
+        section_name: str,
+        provider: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Resolve a bound candidate into the canonical prompt payload shape."""
+        binding = self._bound_candidates.get(section_name)
+        if not binding:
+            return None
+
+        resolved_provider = str(binding.get("provider") or provider or "").strip()
+        prompt_candidate_hash = str(binding.get("prompt_candidate_hash") or "").strip()
+        strict = bool(binding.get("strict", True))
+
+        try:
+            from victor.agent.services.rl_runtime import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("prompt_optimizer")
+            if learner is None or not hasattr(learner, "get_candidate"):
+                raise RuntimeError("prompt optimizer learner does not support exact candidate lookup")
+
+            candidate = learner.get_candidate(
+                section_name=section_name,
+                provider=resolved_provider,
+                text_hash=prompt_candidate_hash,
+            )
+            if candidate is None:
+                raise ValueError(
+                    f"bound prompt candidate not found for {section_name}/{resolved_provider}: "
+                    f"{prompt_candidate_hash}"
+                )
+
+            logger.info(
+                "[OptimizationInjector] Using bound '%s' candidate %s for %s",
+                section_name,
+                prompt_candidate_hash,
+                resolved_provider or "default",
+            )
+            return {
+                "text": candidate.text,
+                "provider": candidate.provider or resolved_provider,
+                "prompt_candidate_hash": candidate.text_hash,
+                "section_name": candidate.section_name,
+                "prompt_section_name": candidate.section_name,
+                "strategy_name": candidate.strategy_name,
+                "strategy_chain": candidate.strategy_chain,
+                "source": "bound_candidate",
+            }
+        except Exception:
+            if strict:
+                raise
+            return None

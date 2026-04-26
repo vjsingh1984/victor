@@ -136,13 +136,32 @@ class TestSystemPromptFreezing:
         orch._system_prompt_frozen = True  # Already frozen
         # Add prompt_builder so we can verify it's not called
         orch.prompt_builder = MagicMock()
-        orch._build_system_prompt_with_adapter = MagicMock()
+        orch.build_system_prompt = MagicMock()
 
         # Should return early without rebuilding
         AgentOrchestrator.update_system_prompt_for_query(orch, query_classification=None)
 
-        # _build_system_prompt_with_adapter should NOT have been called
-        orch._build_system_prompt_with_adapter.assert_not_called()
+        orch.build_system_prompt.assert_not_called()
+
+    def test_update_system_prompt_for_query_prefers_canonical_builder(self):
+        """Positive-path prompt rebuild uses build_system_prompt, not the legacy wrapper."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        type(orch)._cache_optimization_enabled = PropertyMock(return_value=False)
+        orch._system_prompt_frozen = False
+        orch.prompt_builder = MagicMock()
+        orch.build_system_prompt = MagicMock(return_value="canonical prompt")
+        orch.project_context = None
+        orch.conversation = MagicMock()
+        orch.conversation._system_added = False
+        orch.conversation._messages = []
+
+        AgentOrchestrator.update_system_prompt_for_query(orch, query_classification=None)
+
+        orch.build_system_prompt.assert_called_once_with()
+        assert orch._system_prompt == "canonical prompt"
 
 
 # =====================================================================
@@ -408,6 +427,33 @@ class TestKVToolSelectionStrategy:
         tool_a.name = "a_tool"
         result = AgentOrchestrator._apply_kv_tool_strategy(orch, [tool_a])
         assert result == [tool_a]  # Pass through unchanged
+
+    def test_context_aware_strategy_emits_service_friendly_tool_strategy_event(self):
+        """Context-aware strategy should pass the provider object without stale kwargs."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        orch.provider = MagicMock()
+        orch.provider.name = "openai"
+        orch.model = "gpt-4.1"
+        orch._get_context_window.return_value = 200000
+        orch._estimate_tool_tokens.side_effect = lambda tool, provider_category: 100
+        orch._should_session_lock_all_tools.return_value = True
+        orch._emit_tool_strategy_event = MagicMock()
+
+        tool_a = MagicMock()
+        tool_a.name = "read"
+        tool_b = MagicMock()
+        tool_b.name = "git_diff"
+        tools = [tool_a, tool_b]
+
+        result = AgentOrchestrator._apply_context_aware_strategy(orch, tools)
+
+        assert result == tools
+        orch._emit_tool_strategy_event.assert_called_once()
+        kwargs = orch._emit_tool_strategy_event.call_args.kwargs
+        assert kwargs["provider"] is orch.provider
+        assert "provider_category" not in kwargs
 
 
 # =====================================================================

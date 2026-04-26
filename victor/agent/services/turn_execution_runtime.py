@@ -163,6 +163,10 @@ class TurnExecutor:
         self._exploration_coordinator = exploration_coordinator
         self._exploration_done = False  # Instance-level: fires once per conversation
 
+    async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Execute tool calls through the canonical tool-context surface."""
+        return await self._tool_context.execute_tool_calls(tool_calls)
+
     # =====================================================================
     # Public API
     # =====================================================================
@@ -284,7 +288,7 @@ class TurnExecutor:
                 turn_tools = {tc.get("name", "") for tc in response.tool_calls}
 
                 # Handle tool calls and track results
-                tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
+                tool_results = await self._execute_tool_calls(response.tool_calls)
 
                 # Update failure context and record for real-time failure hints
                 for result in tool_results:
@@ -504,7 +508,7 @@ class TurnExecutor:
                 except Exception:
                     pass  # Never block execution on ordering failure
 
-            tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
+            tool_results = await self._execute_tool_calls(response.tool_calls)
 
             # Record tool→tool transitions for trajectory learning
             try:

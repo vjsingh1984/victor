@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from victor.evaluation.agent_adapter import (
     AdapterConfig,
+    PromptOptimizationBinding,
     VictorAgentAdapter,
     create_victor_agent_callback,
 )
@@ -124,6 +125,28 @@ class TestVictorAgentAdapter:
 
         assert adapter.config.max_turns == 5
         assert adapter.config.tool_budget == 10
+
+    def test_init_applies_prompt_binding_to_optimization_injector(self, mock_orchestrator):
+        """Prompt-bound benchmark runs should pin the requested candidate at runtime."""
+        mock_orchestrator.provider_name = "anthropic"
+        mock_orchestrator._optimization_injector = MagicMock()
+
+        VictorAgentAdapter(
+            mock_orchestrator,
+            AdapterConfig(
+                prompt_binding=PromptOptimizationBinding(
+                    section_name="GROUNDING_RULES",
+                    prompt_candidate_hash="cand-123",
+                )
+            ),
+        )
+
+        mock_orchestrator._optimization_injector.bind_prompt_candidate.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            prompt_candidate_hash="cand-123",
+            provider="anthropic",
+            strict=True,
+        )
 
     def test_benchmark_tool_allowlist_includes_graph(self):
         """Benchmark sessions should always expose graph navigation."""

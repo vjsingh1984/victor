@@ -44,7 +44,7 @@ Note: Keep orchestrator as a thin facade. New logic should go into
 appropriate extracted components, not added here.
 
 Recent Refactoring (December 2025 - January 2025):
-- Extracted ToolRegistrar from _register_default_tools, _initialize_plugins,
+- Extracted ToolRegistrar to own tool registration, plugin bootstrap,
     _setup_mcp_integration, _plan_tools, and _goal_hints_for_message
 - Added ProviderHealthChecker for proactive health monitoring
 - Added ResilienceMetricsExporter for dashboard integration
@@ -202,7 +202,6 @@ from victor.agent.streaming_controller import (
     StreamingSession,
 )
 from victor.agent.task_analyzer import get_task_analyzer
-from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
 from victor.agent.tool_registrar import ToolRegistrarConfig
 from victor.agent.provider_manager import ProviderManagerConfig, ProviderState
 
@@ -1048,8 +1047,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Load project context from .victor/init.md (via factory - DI with fallback)
         self.project_context = self._factory.create_project_context()
 
-        # Build system prompt using adapter hints
-        base_system_prompt = self._build_system_prompt_with_adapter()
+        # Build system prompt using the canonical prompt runtime surface
+        base_system_prompt = self.build_system_prompt()
 
         # Inject project context if available
         if self.project_context.content:
@@ -1453,7 +1452,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._prompt_pipeline.unfreeze()
         self._system_prompt_frozen = False
 
-        base_prompt = self._build_system_prompt_with_adapter()
+        base_prompt = self.build_system_prompt()
         if self.project_context.content:
             self._system_prompt = (
                 base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
@@ -1852,6 +1851,43 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             List of messages in conversation history
         """
         return self.conversation.messages
+
+    def _get_conversation_message_count(self) -> int:
+        """Return the current conversation length across history implementations."""
+        conversation = getattr(self, "conversation", None)
+        if conversation is None:
+            return 0
+
+        messages = getattr(conversation, "messages", None)
+        if messages is not None:
+            try:
+                return len(messages)
+            except TypeError:
+                pass
+
+        message_count = getattr(conversation, "message_count", None)
+        if callable(message_count):
+            try:
+                return int(message_count())
+            except TypeError:
+                pass
+
+        return 0
+
+    def _get_stream_fallback_iteration(self) -> int:
+        """Return the best-known iteration count for streaming fallback recovery."""
+        stream_context = getattr(self, "_current_stream_context", None)
+        if stream_context is not None:
+            total_iterations = getattr(stream_context, "total_iterations", 0)
+            try:
+                return max(int(total_iterations), 0)
+            except (TypeError, ValueError):
+                pass
+
+        try:
+            return max(int(self.get_iteration_count()), 0)
+        except (TypeError, ValueError):
+            return 0
 
     def _get_model_context_window(self) -> int:
         """Get context window size for the current model.
@@ -2970,7 +3006,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if query_classification is not None:
             self.prompt_builder.query_classification = query_classification
             self.prompt_builder.invalidate_cache()
-        base_system_prompt = self._build_system_prompt_with_adapter()
+        base_system_prompt = self.build_system_prompt()
         if self.project_context and self.project_context.content:
             self._system_prompt = (
                 base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
@@ -3045,11 +3081,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if cache_invalidated:
             builder.invalidate_cache()
 
-    def _build_system_prompt_with_adapter(self) -> str:
-        """Build system prompt using the unified pipeline.
+    def build_system_prompt(self) -> str:
+        """Build the system prompt via the canonical prompt runtime surface.
 
         Delegates to UnifiedPromptPipeline.build_system_prompt() when
-        available. Falls back to SystemPromptCoordinator, then inline logic
+        available. Falls back to PromptRuntimeSupport, then inline logic
         during __init__ before the pipeline is created.
         """
         self._sync_prompt_builder_runtime_state()
@@ -3058,8 +3094,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if pipeline is not None:
             return pipeline.build_system_prompt()
 
-        if hasattr(self, "_system_prompt_coordinator"):
-            return self._system_prompt_coordinator.build_system_prompt()
+        runtime_support = getattr(self, "_prompt_runtime_support", None)
+        if runtime_support is not None:
+            return runtime_support.build_system_prompt()
+
+        legacy_coordinator = getattr(self, "_system_prompt_coordinator", None)
+        if legacy_coordinator is not None:
+            return legacy_coordinator.build_system_prompt()
 
         # Fallback for calls during __init__ before pipeline is created
         base_prompt = self.prompt_builder.build()
@@ -3072,22 +3113,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _emit_prompt_used_event(self, prompt: str) -> None:
         """Emit PROMPT_USED event for RL prompt template learner.
 
-        Delegates to UnifiedPromptPipeline or SystemPromptCoordinator.
+        Delegates to UnifiedPromptPipeline or PromptRuntimeSupport.
         """
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             pipeline._emit_prompt_used_event(prompt)
-        elif hasattr(self, "_system_prompt_coordinator"):
-            self._system_prompt_coordinator._emit_prompt_used_event(prompt)
+            return
+
+        runtime_support = getattr(self, "_prompt_runtime_support", None)
+        if runtime_support is not None:
+            runtime_support._emit_prompt_used_event(prompt)
+            return
+
+        legacy_coordinator = getattr(self, "_system_prompt_coordinator", None)
+        if legacy_coordinator is not None:
+            legacy_coordinator._emit_prompt_used_event(prompt)
 
     def _resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.
 
-        Delegates to UnifiedPromptPipeline or SystemPromptCoordinator.
+        Delegates to UnifiedPromptPipeline or PromptRuntimeSupport.
         """
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             return pipeline.resolve_shell_variant(tool_name)
+
+        runtime_support = getattr(self, "_prompt_runtime_support", None)
+        if runtime_support is not None:
+            return runtime_support.resolve_shell_variant(tool_name)
+
         return self._system_prompt_coordinator.resolve_shell_variant(tool_name)
 
     def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
@@ -3124,7 +3178,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
-        Delegates to SystemPromptCoordinator.classify_task_keywords().
+        Delegates to PromptRuntimeSupport.classify_task_keywords().
 
         Args:
             user_message: The user's input message
@@ -3135,6 +3189,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             return pipeline.classify_task_keywords(user_message)
+
+        runtime_support = getattr(self, "_prompt_runtime_support", None)
+        if runtime_support is not None:
+            return runtime_support.classify_task_keywords(user_message)
+
         return self._system_prompt_coordinator.classify_task_keywords(user_message)
 
     def _classify_task_with_context(
@@ -3142,7 +3201,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
-        Delegates to UnifiedPromptPipeline or SystemPromptCoordinator.
+        Delegates to UnifiedPromptPipeline or PromptRuntimeSupport.
 
         Args:
             user_message: The user's input message
@@ -3154,6 +3213,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             return pipeline.classify_task_with_context(user_message, history)
+
+        runtime_support = getattr(self, "_prompt_runtime_support", None)
+        if runtime_support is not None:
+            return runtime_support.classify_task_with_context(user_message, history)
+
         return self._system_prompt_coordinator.classify_task_with_context(user_message, history)
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
@@ -3199,46 +3263,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         count = register_builtin_workflows(self.workflow_registry)
         logger.debug(f"Dynamically registered {count} workflows")
-
-    def _register_default_tools(self) -> None:
-        """Dynamically discovers and registers all tools.
-
-        Delegates to ToolRegistrar for:
-        - Pre-registration provider setup
-        - Dynamic tool discovery from victor/tools directory
-        - MCP integration (if enabled)
-
-        Note: This is a thin wrapper that delegates to ToolRegistrar.
-        The method is kept for backwards compatibility.
-        """
-        # Delegate to ToolRegistrar for provider setup
-        self.tool_registrar._setup_providers()
-
-        # Delegate to ToolRegistrar for dynamic tool registration
-        registered_count = self.tool_registrar._register_dynamic_tools()
-        logger.debug(f"Dynamically registered {registered_count} tools via ToolRegistrar")
-
-        # MCP integration - delegate to ToolRegistrar
-        if getattr(self.settings, "use_mcp_tools", False):
-            mcp_tools_count = self.tool_registrar._setup_mcp_integration()
-            # Copy mcp_registry reference for backwards compatibility
-            self.mcp_registry = getattr(self.tool_registrar, "mcp_registry", None)
-            if mcp_tools_count > 0:
-                logger.debug(
-                    f"MCP integration registered {mcp_tools_count} tools via ToolRegistrar"
-                )
-
-    def _initialize_plugins(self) -> None:
-        """Initialize and load tool plugins from configured directories.
-
-        Delegates to ToolRegistrar for plugin discovery and loading.
-        The method is kept for backwards compatibility.
-        """
-        tool_count = self.tool_registrar._initialize_plugins()
-        # Store reference to plugin_manager for backwards compatibility
-        self.plugin_manager = self.tool_registrar.plugin_manager
-        if tool_count > 0:
-            logger.info(f"Plugins initialized via ToolRegistrar: {tool_count} tools")
 
     def _should_use_tools(self) -> bool:
         """Always return True - tool selection is handled by _select_relevant_tools()."""
@@ -3520,10 +3544,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._service_planning_coordinator = planning_coordinator
 
         task_analysis = self.task_analyzer.analyze(user_message)
+        initial_message_count = self._get_conversation_message_count()
         response = await planning_coordinator.chat_with_planning(
             user_message,
             task_analysis=task_analysis,
         )
+
+        if self._get_conversation_message_count() > initial_message_count:
+            return response
 
         if not self._system_added:
             self.conversation.ensure_system_prompt()
@@ -4158,10 +4186,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 tool_count=len(tools),
                 tool_tokens=tool_tokens,
                 context_window=context_window,
-                provider=provider.name,
+                provider=provider,
                 reason="cache_discount_or_large_context",
                 tools=tools,
-                provider_category=provider_category,
             )
             return tools
 
@@ -4187,10 +4214,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_count=len(result),
             tool_tokens=sum(self._estimate_tool_tokens(t, provider_category) for t in result),
             context_window=context_window,
-            provider=provider.name,
+            provider=provider,
             reason="small_context_window",
             tools=result,
-            provider_category=provider_category,
         )
 
         return result
@@ -4427,154 +4453,41 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         tool_count: int,
         tool_tokens: int,
         context_window: int,
-        provider: str,
+        provider: Any,
         reason: str,
         tools=None,
     ):
-        """Emit tool strategy selection event for observability.
+        """Emit tool strategy selection event via MetricsCoordinator.
 
         Args:
             strategy: Strategy name (session_lock, semantic_selection, etc.)
             tool_count: Number of tools selected
             tool_tokens: Total tool tokens
             context_window: Context window size
-            provider: Provider name
+            provider: Provider instance or provider name
             reason: Reason for strategy selection
             tools: Optional list of tools for detailed metrics
         """
-        from victor.config.tool_tiers import get_tool_tier
-
         try:
-            # Calculate context utilization
-            context_utilization = (
-                (tool_tokens / max_tool_tokens)
-                if (max_tool_tokens := int(context_window * 0.25)) > 0
-                else 0
+            self._metrics_coordinator.emit_tool_strategy_event(
+                strategy=strategy,
+                tool_count=tool_count,
+                tool_tokens=tool_tokens,
+                context_window=context_window,
+                provider=provider,
+                model=self.model,
+                reason=reason,
+                tools=tools,
+                v2_enabled=self._is_tool_strategy_v2_enabled(),
             )
-
-            # Determine provider category
-            provider_category = self._get_provider_category(provider)
-
-            # Calculate tier distribution if tools provided
-            tier_distribution = {}
-            if tools:
-                for tool in tools:
-                    tier = get_tool_tier(tool.name)
-                    tier_distribution[tier] = tier_distribution.get(tier, 0) + 1
-
-            # Build comprehensive event data
-            event_data = {
-                "event_type": "tool.strategy_chosen",
-                "strategy": strategy,
-                "tool_count": tool_count,
-                "tool_tokens": tool_tokens,
-                "context_window": context_window,
-                "max_tool_tokens": max_tool_tokens,
-                "context_utilization": round(context_utilization, 3),
-                "provider": provider,
-                "provider_category": provider_category,
-                "model": self.model,
-                "reason": reason,
-                "tier_distribution": tier_distribution,
-                "v2_enabled": self._is_tool_strategy_v2_enabled(),
-            }
-
-            # Log structured event (parseable for metrics)
-            logger.info(
-                f"Tool strategy v2={event_data['v2_enabled']}: "
-                f"{strategy} ({tool_count} tools, {tool_tokens} tokens, "
-                f"{context_utilization:.1%} context utilization, "
-                f"provider={provider}, category={provider_category}, "
-                f"reason={reason})"
-            )
-
-            # Log detailed tier distribution
-            if tier_distribution:
-                tier_summary = ", ".join(f"{k}:{v}" for k, v in sorted(tier_distribution.items()))
-                logger.debug(f"Tool tier distribution: {tier_summary}")
-
-            # Emit to metrics system for dashboard integration
-            self._emit_tool_strategy_metrics(event_data)
-
         except Exception as e:
             logger.debug(f"Failed to emit tool strategy event: {e}")
-
-    def _get_provider_category(self, provider) -> str:
-        """Get provider category for metrics.
-
-        Args:
-            provider: Provider instance or name
-
-        Returns:
-            Provider category: 'caching' or 'local'
-        """
-        provider_name = provider if isinstance(provider, str) else provider.name
-
-        # Caching providers (90% API discount)
-        caching_providers = {
-            "anthropic",
-            "openai",
-            "deepseek",
-            "google",
-            "azure_openai",
-            "bedrock",
-            "cerebras",
-            "fireworks",
-            "groq",
-        }
-
-        return "caching" if provider_name.lower() in caching_providers else "local"
-
-    def _emit_tool_strategy_metrics(self, event_data: dict):
-        """Emit metrics in Prometheus-compatible format.
-
-        Args:
-            event_data: Event data dictionary from _emit_tool_strategy_event
-        """
-        try:
-            # These log lines can be parsed by metrics collectors
-            # Format: METRIC_NAME{label1="value1",label2="value2"} value
-
-            labels = (
-                f'provider="{event_data["provider"]}",'
-                f'category="{event_data["provider_category"]}",'
-                f'strategy="{event_data["strategy"]}",'
-                f'model="{event_data["model"]}"'
-            )
-
-            # Counter: tool strategy decisions
-            logger.debug(f"METRIC: victor_tool_strategy decisions{{{labels}}} 1")
-
-            # Gauge: tool count
-            logger.debug(f'METRIC: victor_tool_count{{{labels}}} {event_data["tool_count"]}')
-
-            # Gauge: tool tokens
-            logger.debug(f'METRIC: victor_tool_tokens{{{labels}}} {event_data["tool_tokens"]}')
-
-            # Gauge: context utilization
-            logger.debug(
-                f'METRIC: victor_context_utilization{{{labels}}} {event_data["context_utilization"]:.3f}'
-            )
-
-            # Gauge: v2 enabled status
-            v2_labels = f'provider="{event_data["provider"]}"'
-            logger.debug(
-                f'METRIC: victor_tool_strategy_v2_enabled{{{v2_labels}}} {int(event_data["v2_enabled"])}'
-            )
-
-            # Emit tier distribution if available
-            for tier, count in event_data.get("tier_distribution", {}).items():
-                tier_labels = f'provider="{event_data["provider"]}",' f'tier="{tier}"'
-                logger.debug(f"METRIC: victor_tool_tier_count{{{tier_labels}}} {count}")
-
-        except Exception as e:
-            logger.debug(f"Failed to emit tool strategy metrics: {e}")
 
     # =====================================================================
     # Recovery Coordination Helper
     # =====================================================================
 
-    def _create_recovery_context(
+    def create_recovery_context(
         self,
         stream_ctx: "StreamingChatContext",
     ) -> Any:
@@ -4646,7 +4559,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             RecoveryAction with action to take (continue, retry, abort, force_summary)
         """
         # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        recovery_ctx = self.create_recovery_context(stream_ctx)
 
         # Delegate to RecoveryService (canonical runtime path)
         return await self._recovery_service.handle_recovery_with_integration(
@@ -4675,7 +4588,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             StreamChunk if action requires immediate yield, None otherwise
         """
         # Create recovery context from current state
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        recovery_ctx = self.create_recovery_context(stream_ctx)
 
         # Delegate to RecoveryService (canonical runtime path)
         return self._recovery_service.apply_recovery_action(
@@ -4734,6 +4647,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "[Fallback] Conversation history preserved (%d messages)",
                 len(self.conversation.messages),
             )
+            logger.info(
+                "[Fallback] Preserving iteration count at %d",
+                self._get_stream_fallback_iteration(),
+            )
 
         # Fallback: ChatService streaming with conversation state preserved.
         # _preserve_iteration=True signals chat_service to maintain context continuity
@@ -4741,14 +4658,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         async for chunk in self._chat_service.stream_chat(
             user_message,
             _preserve_iteration=True,
-            _current_iteration=0,
+            _current_iteration=self._get_stream_fallback_iteration(),
         ):
             yield chunk
 
-    async def _execute_tool_with_retry(
+    async def execute_tool_with_retry(
         self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
     ) -> tuple[Any, bool, Optional[str]]:
-        """Execute a tool with retry logic and exponential backoff.
+        """Execute a tool with retry logic via the canonical tool runtime surface.
 
         Delegates to ToolService.
 
@@ -4762,14 +4679,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return await self._tool_service.execute_tool_with_retry(tool_name, tool_args, context)
 
-    async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """[LEGACY/BRIDGE] Handle tool calls from the model.
+    async def execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Execute tool calls through the canonical tool runtime path.
 
-        This method is a legacy integration point. Prefer using
-        ToolService.process_tool_results() in new code.
-
-        Delegates execution to ToolPipeline, then post-processes results
-        via the canonical tool service path.
+        Delegates execution to ToolPipeline, then post-processes results via
+        the canonical tool service path.
 
         Args:
             tool_calls: List of tool call requests

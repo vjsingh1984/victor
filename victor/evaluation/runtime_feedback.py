@@ -385,6 +385,14 @@ def build_swe_bench_validated_session_feedback_payload(
     if baseline is None:
         return None
 
+    metadata_payload = dict(metadata or {})
+    provider = _coerce_optional_text(metadata_payload.get("provider"))
+    model = _coerce_optional_text(metadata_payload.get("model"))
+    prompt_candidate_hash = _coerce_optional_text(metadata_payload.get("prompt_candidate_hash"))
+    section_name = _coerce_optional_text(
+        metadata_payload.get("section_name") or metadata_payload.get("prompt_section_name")
+    )
+
     baseline_status = str(getattr(getattr(baseline, "status", None), "value", "") or "").lower()
     fail_to_pass = list(getattr(baseline, "fail_to_pass", []) or [])
     pass_to_pass = list(getattr(baseline, "pass_to_pass", []) or [])
@@ -438,10 +446,15 @@ def build_swe_bench_validated_session_feedback_payload(
     truth_alignment_rate = _clamp(0.55 + (overall_score * 0.4) - (regression_rate * 0.1), 0.4, 0.99)
 
     post_change_results = getattr(validation_result, "post_change_results", None)
-    payload_metadata = dict(metadata or {})
+    payload_metadata = dict(metadata_payload)
     payload_metadata.update(
         {
             "benchmark": "swe_bench",
+            "provider": provider,
+            "model": model,
+            "prompt_candidate_hash": prompt_candidate_hash,
+            "section_name": section_name,
+            "prompt_section_name": section_name,
             "vertical": "coding",
             "truth_alignment_rate": round(truth_alignment_rate, 4),
             "task_count": total_validated_tests,
@@ -473,6 +486,8 @@ def build_swe_bench_validated_session_feedback_payload(
         ),
         scope=RuntimeEvaluationFeedbackScope(
             project=_coerce_optional_text(getattr(baseline, "repo", None)),
+            provider=provider,
+            model=model,
             task_type="edit",
             benchmark="swe_bench",
             vertical="coding",

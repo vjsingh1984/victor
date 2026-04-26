@@ -39,6 +39,25 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_PROMPT_CACHING_PROVIDER_NAMES = frozenset(
+    {
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+        "deepseek",
+        "groq",
+        "bedrock",
+        "vertex",
+        "azure_openai",
+        "openrouter",
+        "fireworks",
+        "together",
+        "cerebras",
+        "moonshot",
+    }
+)
+
 
 class MetricsCoordinator:
     """Coordinates all metrics collection and tracking for the orchestrator.
@@ -248,6 +267,133 @@ class MetricsCoordinator:
         return self._metrics_collector.get_tool_usage_stats(
             conversation_state_summary=conversation_state_summary
         )
+
+    # ========================================================================
+    # Tool Strategy Observability
+    # ========================================================================
+
+    def emit_tool_strategy_event(
+        self,
+        *,
+        strategy: str,
+        tool_count: int,
+        tool_tokens: int,
+        context_window: int,
+        provider: Any,
+        model: str,
+        reason: str,
+        tools: Optional[List[Any]] = None,
+        v2_enabled: bool = False,
+    ) -> None:
+        """Emit tool-strategy observability logs and metrics.
+
+        Args:
+            strategy: Strategy name (session_lock, semantic_selection, etc.)
+            tool_count: Number of tools selected
+            tool_tokens: Total tool tokens
+            context_window: Context window size
+            provider: Provider instance or provider name string
+            model: Active model name
+            reason: Reason for strategy selection
+            tools: Optional list of selected tools
+            v2_enabled: Whether tool strategy v2 is active
+        """
+        from victor.config.tool_tiers import get_tool_tier
+
+        provider_name = self._normalize_provider_name(provider)
+        max_tool_tokens = int(context_window * 0.25)
+        context_utilization = (tool_tokens / max_tool_tokens) if max_tool_tokens > 0 else 0
+        provider_category = self.get_provider_category(provider)
+
+        tier_distribution: Dict[str, int] = {}
+        if tools:
+            for tool in tools:
+                tool_name = getattr(tool, "name", None)
+                if not tool_name:
+                    continue
+                tier = get_tool_tier(tool_name)
+                tier_distribution[tier] = tier_distribution.get(tier, 0) + 1
+
+        event_data = {
+            "event_type": "tool.strategy_chosen",
+            "strategy": strategy,
+            "tool_count": tool_count,
+            "tool_tokens": tool_tokens,
+            "context_window": context_window,
+            "max_tool_tokens": max_tool_tokens,
+            "context_utilization": round(context_utilization, 3),
+            "provider": provider_name,
+            "provider_category": provider_category,
+            "model": model,
+            "reason": reason,
+            "tier_distribution": tier_distribution,
+            "v2_enabled": v2_enabled,
+        }
+
+        logger.info(
+            f"Tool strategy v2={event_data['v2_enabled']}: "
+            f"{strategy} ({tool_count} tools, {tool_tokens} tokens, "
+            f"{context_utilization:.1%} context utilization, "
+            f"provider={provider_name}, category={provider_category}, "
+            f"reason={reason})"
+        )
+
+        if tier_distribution:
+            tier_summary = ", ".join(f"{k}:{v}" for k, v in sorted(tier_distribution.items()))
+            logger.debug(f"Tool tier distribution: {tier_summary}")
+
+        self.emit_tool_strategy_metrics(event_data)
+
+    def get_provider_category(self, provider: Any) -> str:
+        """Classify provider for tool-strategy metrics."""
+        from victor.providers.base import is_caching_provider
+
+        if is_caching_provider(provider):
+            return "caching"
+
+        provider_name = self._normalize_provider_name(provider)
+        return "caching" if provider_name.lower() in _PROMPT_CACHING_PROVIDER_NAMES else "local"
+
+    def emit_tool_strategy_metrics(self, event_data: Dict[str, Any]) -> None:
+        """Emit tool-strategy metrics in Prometheus-compatible log format."""
+        try:
+            labels = (
+                f'provider="{event_data["provider"]}",'
+                f'category="{event_data["provider_category"]}",'
+                f'strategy="{event_data["strategy"]}",'
+                f'model="{event_data["model"]}"'
+            )
+
+            logger.debug(f"METRIC: victor_tool_strategy decisions{{{labels}}} 1")
+            logger.debug(f'METRIC: victor_tool_count{{{labels}}} {event_data["tool_count"]}')
+            logger.debug(f'METRIC: victor_tool_tokens{{{labels}}} {event_data["tool_tokens"]}')
+            logger.debug(
+                f'METRIC: victor_context_utilization{{{labels}}} {event_data["context_utilization"]:.3f}'
+            )
+
+            v2_labels = f'provider="{event_data["provider"]}"'
+            logger.debug(
+                f'METRIC: victor_tool_strategy_v2_enabled{{{v2_labels}}} {int(event_data["v2_enabled"])}'
+            )
+
+            for tier, count in event_data.get("tier_distribution", {}).items():
+                tier_labels = f'provider="{event_data["provider"]}",' f'tier="{tier}"'
+                logger.debug(f"METRIC: victor_tool_tier_count{{{tier_labels}}} {count}")
+
+        except Exception as e:
+            logger.debug(f"Failed to emit tool strategy metrics: {e}")
+
+    @staticmethod
+    def _normalize_provider_name(provider: Any) -> str:
+        """Normalize provider object/string to a stable provider name."""
+        if isinstance(provider, str):
+            return provider
+
+        provider_name = getattr(provider, "name", None)
+        if isinstance(provider_name, str) and provider_name:
+            return provider_name
+
+        return "unknown"
 
     # ========================================================================
     # Metrics Collector Delegation

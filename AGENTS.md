@@ -72,6 +72,9 @@ Use the smallest layer that fits the change:
 - Put framework-wide abstractions in `victor/framework/` only when they are truly reusable.
 - Keep domain-specific behavior in verticals, tools, providers, or integrations instead of expanding core APIs.
 - Update docs when user-facing commands, config, providers, workflows, or public APIs change.
+- Before adding new logic, first verify whether similar behavior already exists in the repo and prefer enhancing or reusing it instead of duplicating it.
+- If the existing implementation is close but not sufficient, refactor toward the smallest clear abstraction that improves reuse, maintainability, and scalability without widening scope unnecessarily.
+- When refactoring is required, favor well-bounded class and protocol design, explicit ownership, and composition-oriented patterns that keep the solution extensible for future features.
 
 Large framework-level changes usually need more than code:
 - Changes to `victor/framework/` public APIs, protocol definitions, workflow DSL structure, or major architecture patterns likely need a FEP and docs updates.

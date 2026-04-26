@@ -2044,6 +2044,86 @@ class TestBenchmarkSyncBridge:
         )
         mock_run_sync.assert_called_once_with(coro)
 
+    def test_run_prompt_suite_uses_shared_sync_bridge(self) -> None:
+        runner = object()
+        base_config = SimpleNamespace(
+            model="model-x",
+            provider="anthropic",
+            dataset_metadata={},
+        )
+        coro = object()
+        mock_async = Mock(return_value=coro)
+        suite = MagicMock()
+
+        with (
+            patch.object(benchmark_cmd, "_configure_log_level"),
+            patch.object(
+                benchmark_cmd,
+                "_resolve_benchmark_target",
+                return_value=(object(), "bench-type", runner),
+            ),
+            patch.object(
+                benchmark_cmd,
+                "_resolve_account_selection",
+                return_value=("anthropic", "model-x", None),
+            ),
+            patch.object(benchmark_cmd, "_resolve_effective_model", return_value="model-x"),
+            patch("victor.evaluation.EvaluationConfig", return_value=base_config),
+            patch.object(benchmark_cmd, "_attach_manifest_metadata"),
+            patch.object(benchmark_cmd, "_print_benchmark_header"),
+            patch.object(benchmark_cmd, "_run_prompt_candidate_suite_async", mock_async),
+            patch.object(benchmark_cmd, "run_sync", return_value=suite) as mock_run_sync,
+            patch.object(benchmark_cmd, "_print_prompt_candidate_suite_summary"),
+            patch.object(benchmark_cmd.console, "print"),
+        ):
+            benchmark_cmd.run_prompt_suite(
+                benchmark="humaneval",
+                prompt_section="GROUNDING_RULES",
+                candidate_hashes=["cand-123", "cand-456"],
+                max_tasks=2,
+                start_task=0,
+                model="model-x",
+                profile="default",
+                output=None,
+                dataset_path=None,
+                timeout=30,
+                max_turns=4,
+                parallel=1,
+                resume=False,
+                provider="anthropic",
+                log_level=None,
+                debug_modules=None,
+                no_edge_model=False,
+                account=None,
+                record_benchmark_results=False,
+                promote_best=False,
+                create_rollout=False,
+                rollout_control_hash=None,
+                rollout_traffic_split=0.1,
+                rollout_min_samples_per_variant=100,
+                analyze_rollout=False,
+                apply_rollout_decision=False,
+                rollout_decision_dry_run=False,
+                min_approval_pass_rate=0.5,
+            )
+
+        mock_async.assert_called_once()
+        call_kwargs = mock_async.call_args.kwargs
+        assert call_kwargs["runner"] is runner
+        assert call_kwargs["base_config"] is base_config
+        assert call_kwargs["profile"] == "default"
+        assert call_kwargs["model"] == "model-x"
+        assert call_kwargs["timeout"] == 30
+        assert call_kwargs["max_turns"] == 4
+        assert call_kwargs["resume"] is False
+        assert call_kwargs["provider_override"] == "anthropic"
+        assert call_kwargs["start_task"] == 0
+        specs = call_kwargs["candidate_specs"]
+        assert [spec.section_name for spec in specs] == ["GROUNDING_RULES", "GROUNDING_RULES"]
+        assert [spec.prompt_candidate_hash for spec in specs] == ["cand-123", "cand-456"]
+        assert [spec.provider for spec in specs] == ["anthropic", "anthropic"]
+        mock_run_sync.assert_called_once_with(coro)
+
     def test_run_benchmark_uses_shared_sync_bridge(self) -> None:
         runner = object()
         config = SimpleNamespace(model="model-x")

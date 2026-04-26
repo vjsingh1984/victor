@@ -72,6 +72,13 @@ DEFAULT_VALIDATED_SESSION_TRUTH_ARTIFACT_NAMING_POLICY = (
 )
 
 
+def _optional_metadata_text(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def _session_feedback_input(
     context: ValidatedSessionTruthEmissionContext,
 ) -> Optional[dict[str, Any]]:
@@ -252,11 +259,23 @@ class SWEBenchValidatedSessionTruthEmitter:
         if payload is None:
             return None
 
+        provider = _optional_metadata_text(context.metadata.get("provider"))
+        model = _optional_metadata_text(context.metadata.get("model"))
+        section_name = _optional_metadata_text(
+            context.metadata.get("section_name") or context.metadata.get("prompt_section_name")
+        )
+        prompt_candidate_hash = _optional_metadata_text(context.metadata.get("prompt_candidate_hash"))
+
         return ValidatedSessionTruthArtifact(
             path=artifact_path,
             record={
                 "instance_id": context.task_id,
                 "repo": getattr(getattr(validation_result, "baseline", None), "repo", None),
+                "provider": provider,
+                "model": model,
+                "prompt_candidate_hash": prompt_candidate_hash,
+                "section_name": section_name,
+                "prompt_section_name": section_name,
                 "runtime_evaluation_feedback": payload,
                 "validation_result": (
                     validation_result.to_dict()

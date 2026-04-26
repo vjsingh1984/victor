@@ -55,7 +55,7 @@ class ComponentAssembler:
         orchestrator.tool_registrar._register_tool_dependencies()
 
         # Tool registration and plugins
-        orchestrator._register_default_tools()
+        orchestrator.tool_registrar.register_default_tools()
         orchestrator.tool_registrar._load_tool_configurations()
         orchestrator.tools.register_before_hook(orchestrator._log_tool_call)
 
@@ -225,11 +225,11 @@ class ComponentAssembler:
 
         orchestrator._iteration_coordinator: Optional[IterationCoordinator] = None
 
-        # Task analyzer and system prompt coordinator
+        # Task analyzer and canonical prompt runtime support
         from victor.agent.task_analyzer import get_task_analyzer
 
         orchestrator._task_analyzer = get_task_analyzer()
-        orchestrator._system_prompt_coordinator = factory.create_system_prompt_coordinator(
+        orchestrator._prompt_runtime_support = factory.create_prompt_runtime_support(
             prompt_builder=orchestrator.prompt_builder,
             get_context_window=orchestrator._get_model_context_window,
             provider_name=orchestrator.provider_name,

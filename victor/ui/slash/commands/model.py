@@ -39,6 +39,14 @@ def _parse_provider_model(target: str) -> tuple[str | None, str]:
     return None, target
 
 
+def _provider_info_value(info: dict, preferred: str, legacy: str, default: str = "N/A") -> str:
+    """Read provider info across old/new key names used by command surfaces."""
+    value = info.get(preferred)
+    if value is None:
+        value = info.get(legacy, default)
+    return str(value)
+
+
 def _show_resume_selection(ctx: CommandContext) -> None:
     """Show session selection for resume."""
     from victor.agent.sqlite_session_persistence import (
@@ -373,13 +381,15 @@ class ProfileCommand(BaseSlashCommand):
                 model=profile_config.model,
             ):
                 info = ctx.agent.get_current_provider_info()
+                provider_label = _provider_info_value(info, "provider_name", "provider")
+                model_label = _provider_info_value(info, "model_name", "model")
                 ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
                 ctx.console.print(
-                    f"  [dim]Provider: {info['provider_name']}, Model: {info['model_name']}[/]"
+                    f"  [dim]Provider: {provider_label}, Model: {model_label}[/]"
                 )
                 ctx.console.print(
-                    f"  [dim]Native tools: {info['supports_tool_calling']}, "
-                    f"Streaming: {info['supports_streaming']}[/]"
+                    f"  [dim]Native tools: {info.get('supports_tool_calling', 'N/A')}, "
+                    f"Streaming: {info.get('supports_streaming', 'N/A')}[/]"
                 )
             else:
                 ctx.console.print(f"[red]Failed to switch to profile {profile_name}[/]")
@@ -519,12 +529,14 @@ class ProviderCommand(BaseSlashCommand):
 
         if await ctx.agent.switch_provider(provider_name=provider_name, model=model):
             info = ctx.agent.get_current_provider_info()
+            provider_label = _provider_info_value(info, "provider_name", "provider")
+            model_label = _provider_info_value(info, "model_name", "model")
             ctx.console.print(
-                f"[green]Switched to:[/] {info['provider_name']}:{info['model_name']}"
+                f"[green]Switched to:[/] {provider_label}:{model_label}"
             )
             ctx.console.print(
-                f"  [dim]Native tools: {info['supports_tool_calling']}, "
-                f"Streaming: {info['supports_streaming']}[/]"
+                f"  [dim]Native tools: {info.get('supports_tool_calling', 'N/A')}, "
+                f"Streaming: {info.get('supports_streaming', 'N/A')}[/]"
             )
         else:
             ctx.console.print(f"[red]Failed to switch to {provider_name}[/]")

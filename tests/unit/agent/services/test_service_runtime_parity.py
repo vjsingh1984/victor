@@ -183,18 +183,74 @@ async def test_service_rl_runtime_prompt_rollout_async_helper_uses_global_coordi
     )
 
 
+def test_service_rl_runtime_rollout_analysis_helper_uses_global_coordinator():
+    from victor.agent.services.rl_runtime import analyze_prompt_rollout_experiment
+
+    coordinator = MagicMock()
+    coordinator.analyze_prompt_rollout_experiment.return_value = {"auto_action": "rollout"}
+
+    with patch("victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator):
+        report = analyze_prompt_rollout_experiment(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            treatment_hash="candidate_hash",
+        )
+
+    assert report == {"auto_action": "rollout"}
+    coordinator.analyze_prompt_rollout_experiment.assert_called_once_with(
+        section_name="GROUNDING_RULES",
+        provider="anthropic",
+        treatment_hash="candidate_hash",
+    )
+
+
+@pytest.mark.asyncio
+async def test_service_rl_runtime_rollout_apply_async_helper_uses_global_coordinator():
+    from victor.agent.services.rl_runtime import apply_prompt_rollout_recommendation_async
+
+    coordinator = MagicMock()
+    coordinator.apply_prompt_rollout_recommendation_async = AsyncMock(
+        return_value={"action": "rollout", "applied": True}
+    )
+
+    with patch(
+        "victor.agent.services.rl_runtime.get_rl_coordinator_async",
+        new=AsyncMock(return_value=coordinator),
+    ):
+        decision = await apply_prompt_rollout_recommendation_async(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            treatment_hash="candidate_hash",
+            dry_run=True,
+        )
+
+    assert decision == {"action": "rollout", "applied": True}
+    coordinator.apply_prompt_rollout_recommendation_async.assert_called_once_with(
+        section_name="GROUNDING_RULES",
+        provider="anthropic",
+        treatment_hash="candidate_hash",
+        dry_run=True,
+    )
+
+
 def test_agent_services_package_exports_prompt_rollout_helpers():
     from victor.agent.services import (
+        analyze_prompt_rollout_experiment as package_rollout_analysis_helper,
+        apply_prompt_rollout_recommendation_async as package_rollout_apply_helper_async,
         create_prompt_rollout_experiment as package_rollout_helper,
         create_prompt_rollout_experiment_async as package_rollout_helper_async,
     )
     from victor.agent.services.rl_runtime import (
+        analyze_prompt_rollout_experiment as runtime_rollout_analysis_helper,
+        apply_prompt_rollout_recommendation_async as runtime_rollout_apply_helper_async,
         create_prompt_rollout_experiment as runtime_rollout_helper,
         create_prompt_rollout_experiment_async as runtime_rollout_helper_async,
     )
 
     assert package_rollout_helper is runtime_rollout_helper
     assert package_rollout_helper_async is runtime_rollout_helper_async
+    assert package_rollout_analysis_helper is runtime_rollout_analysis_helper
+    assert package_rollout_apply_helper_async is runtime_rollout_apply_helper_async
 
 
 def test_tool_service_normalize_arguments_full_matches_legacy_contract():

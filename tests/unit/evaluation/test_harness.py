@@ -25,8 +25,10 @@ from typing import Optional
 
 from victor.evaluation.harness import (
     BaseBenchmarkRunner,
-    TaskEnvironment,
     EvaluationHarness,
+    PromptCandidateEvaluationSpec,
+    TaskEnvironment,
+    bind_prompt_candidate_evaluation_config,
     get_harness,
 )
 from victor.evaluation.runtime_feedback import load_runtime_evaluation_feedback
@@ -396,6 +398,117 @@ class TestCheckpointPaths:
         path = harness._get_checkpoint_path(config)
 
         assert path.parent == tmp_path
+
+    def test_get_checkpoint_path_includes_prompt_candidate_identity(self, tmp_path):
+        """Targeted prompt candidate runs should not collide in checkpoint identity."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        first = EvaluationConfig(
+            benchmark=BenchmarkType.SWE_BENCH,
+            model="gpt-4",
+            provider="anthropic",
+            prompt_candidate_hash="cand-123",
+            prompt_section_name="GROUNDING_RULES",
+        )
+        second = EvaluationConfig(
+            benchmark=BenchmarkType.SWE_BENCH,
+            model="gpt-4",
+            provider="anthropic",
+            prompt_candidate_hash="cand-456",
+            prompt_section_name="GROUNDING_RULES",
+        )
+
+        assert harness._get_checkpoint_path(first) != harness._get_checkpoint_path(second)
+
+
+class TestPromptCandidateEvaluationSuite:
+    """Tests for candidate-bound benchmark suite fanout."""
+
+    def test_bind_prompt_candidate_evaluation_config(self):
+        base = EvaluationConfig(
+            benchmark=BenchmarkType.GUIDE,
+            model="claude-sonnet",
+            provider="anthropic",
+            max_tasks=5,
+        )
+        spec = PromptCandidateEvaluationSpec(
+            section_name="GROUNDING_RULES",
+            prompt_candidate_hash="cand-123",
+            provider="openai",
+        )
+
+        bound = bind_prompt_candidate_evaluation_config(base, spec)
+
+        assert bound is not base
+        assert bound.provider == "openai"
+        assert bound.prompt_candidate_hash == "cand-123"
+        assert bound.prompt_section_name == "GROUNDING_RULES"
+        assert bound.max_tasks == 5
+
+    @pytest.mark.asyncio
+    async def test_run_prompt_candidate_evaluation_suite_runs_one_eval_per_binding(self):
+        harness = EvaluationHarness()
+        base_config = EvaluationConfig(
+            benchmark=BenchmarkType.GUIDE,
+            model="claude-sonnet",
+            provider="anthropic",
+        )
+        specs = [
+            PromptCandidateEvaluationSpec(
+                section_name="GROUNDING_RULES",
+                prompt_candidate_hash="cand-123",
+            ),
+            PromptCandidateEvaluationSpec(
+                section_name="COMPLETION_GUIDANCE",
+                prompt_candidate_hash="cand-456",
+                provider="openai",
+                label="completion-openai",
+            ),
+        ]
+        captured_callbacks = []
+
+        async def fake_run_evaluation(*, config, agent_callback, **kwargs):
+            del kwargs
+            captured_callbacks.append(agent_callback)
+            if config.prompt_candidate_hash == "cand-123":
+                return EvaluationResult(
+                    config=config,
+                    task_results=[
+                        TaskResult(task_id="task-1", status=TaskStatus.PASSED),
+                    ],
+                )
+            return EvaluationResult(
+                config=config,
+                task_results=[
+                    TaskResult(task_id="task-2", status=TaskStatus.FAILED),
+                ],
+            )
+
+        harness.run_evaluation = AsyncMock(side_effect=fake_run_evaluation)
+
+        def callback_factory(spec, config):
+            return {"label": spec.resolved_label(config.provider)}
+
+        suite = await harness.run_prompt_candidate_evaluation_suite(
+            base_config=base_config,
+            candidate_specs=specs,
+            agent_callback_factory=callback_factory,
+        )
+
+        assert len(suite.runs) == 2
+        assert suite.runs[0].config.prompt_candidate_hash == "cand-123"
+        assert suite.runs[0].config.prompt_section_name == "GROUNDING_RULES"
+        assert suite.runs[0].config.provider == "anthropic"
+        assert suite.runs[0].label == "GROUNDING_RULES:anthropic:cand-123"
+        assert suite.runs[1].config.prompt_candidate_hash == "cand-456"
+        assert suite.runs[1].config.prompt_section_name == "COMPLETION_GUIDANCE"
+        assert suite.runs[1].config.provider == "openai"
+        assert suite.runs[1].label == "completion-openai"
+        assert suite.best_run() is suite.runs[0]
+        assert captured_callbacks == [
+            {"label": "GROUNDING_RULES:anthropic:cand-123"},
+            {"label": "completion-openai"},
+        ]
+        assert suite.to_dict()["best_label"] == "GROUNDING_RULES:anthropic:cand-123"
 
 
 class TestClearCheckpoint:

@@ -53,6 +53,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
+from victor.framework.request_scope_heuristics import (
+    contains_keyword_marker,
+    has_ambiguous_target_reference,
+)
 from victor.tools.core_tool_aliases import CORE_TOOL_ALIASES
 
 if TYPE_CHECKING:
@@ -696,16 +700,16 @@ class UnifiedPromptPipeline:
             "table",
             "tabulate",
         )
-        action_task = turn_context.task_type not in {"", "default", "chat", "help"} or any(
-            marker in message_lower for marker in action_markers
+        action_task = turn_context.task_type not in {"", "default", "chat", "help"} or (
+            contains_keyword_marker(message_lower, action_markers)
         )
-        report_task = turn_context.task_type in {"review", "analysis", "benchmark"} or any(
-            marker in message_lower for marker in report_markers
+        report_task = turn_context.task_type in {"review", "analysis", "benchmark"} or (
+            contains_keyword_marker(message_lower, report_markers)
         )
         target_present = bool(required_files or scope_hints)
         deliverable_present = bool(required_outputs) or (action_task and not report_task)
         ambiguous_reference = (
-            bool(re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower))
+            has_ambiguous_target_reference(message_lower)
             and not target_present
         )
         search_first = bool(

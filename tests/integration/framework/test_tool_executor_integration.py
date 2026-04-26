@@ -70,8 +70,8 @@ class TestToolExecutorIntegration:
         assert orchestrator.tool_executor.normalizer is orchestrator.argument_normalizer
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_uses_pipeline(self, orchestrator):
-        """Test that _handle_tool_calls routes through ToolPipeline."""
+    async def test_execute_tool_calls_uses_pipeline(self, orchestrator):
+        """Test that execute_tool_calls routes through ToolPipeline."""
         from unittest.mock import AsyncMock
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
 
@@ -92,7 +92,7 @@ class TestToolExecutorIntegration:
             return_value=mock_pipeline_result,
         ) as mock_exec:
             tool_calls = [{"name": "read_file", "arguments": {"path": "/tmp/test.txt"}}]
-            results = await orchestrator._handle_tool_calls(tool_calls)
+            results = await orchestrator.execute_tool_calls(tool_calls)
 
             # Verify pipeline was called
             mock_exec.assert_called_once()
@@ -124,7 +124,7 @@ class TestToolExecutorIntegration:
             return_value=mock_pipeline_result,
         ):
             tool_calls = [{"name": "read_file", "arguments": {"path": "/nonexistent"}}]
-            results = await orchestrator._handle_tool_calls(tool_calls)
+            results = await orchestrator.execute_tool_calls(tool_calls)
 
             assert len(results) == 1
             assert results[0]["success"] is False
@@ -153,7 +153,7 @@ class TestToolExecutorIntegration:
             return_value=mock_pipeline_result,
         ) as mock_exec:
             tool_calls = [{"name": "list_directory", "arguments": {"root": "."}}]
-            await orchestrator._handle_tool_calls(tool_calls)
+            await orchestrator.execute_tool_calls(tool_calls)
 
             # Verify pipeline was called with context
             mock_exec.assert_called_once()

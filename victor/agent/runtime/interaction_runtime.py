@@ -91,6 +91,7 @@ def create_tool_coordinator_shim(
             tool_registry=tool_registry,
             tool_selector=tool_selector,
             tool_access_controller=tool_access_controller,
+            warn_on_init=False,
         )
         coordinator.set_mode_controller(mode_controller)
         if tool_service is not None:
@@ -136,6 +137,7 @@ def create_session_coordinator_shim(
             memory_manager=memory_manager,
             checkpoint_manager=checkpoint_manager,
             cost_tracker=cost_tracker,
+            warn_on_init=False,
         )
         if session_service is not None and hasattr(coordinator, "bind_session_service"):
             coordinator.bind_session_service(session_service)

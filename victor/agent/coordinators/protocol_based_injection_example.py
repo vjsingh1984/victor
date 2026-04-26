@@ -175,7 +175,7 @@ class MockChatOrchestrator(ChatOrchestratorProtocol):
     use_semantic_selection: bool = False
     observed_files: set = field(default_factory=set)
 
-    async def _handle_tool_calls(self, tool_calls: Any) -> List[Dict[str, Any]]:
+    async def execute_tool_calls(self, tool_calls: Any) -> List[Dict[str, Any]]:
         return [{"result": "mock_tool_result"}]
 
     def _model_supports_tool_calls(self) -> bool:
@@ -205,7 +205,7 @@ class MockChatOrchestrator(ChatOrchestratorProtocol):
     _recovery_coordinator: Any = None
     _recovery_integration: Any = None
 
-    async def _create_recovery_context(self, stream_ctx: Any) -> Any:
+    def create_recovery_context(self, stream_ctx: Any) -> Any:
         return {"mock": "recovery_context"}
 
     async def _handle_recovery_with_integration(

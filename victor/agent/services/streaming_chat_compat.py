@@ -285,16 +285,15 @@ class StreamingChatCoordinator:
 
         # Handle tool calls if present
         if tool_calls:
-            await self._handle_tool_calls_during_stream(tool_calls)
+            await self._execute_tool_calls_during_stream(tool_calls)
 
-    async def _handle_tool_calls_during_stream(self, tool_calls: Any) -> None:
-        """Handle tool calls during streaming.
+    async def _execute_tool_calls_during_stream(self, tool_calls: Any) -> None:
+        """Execute tool calls during streaming.
 
         Args:
             tool_calls: Tool calls from streaming response
         """
-        # Execute tool calls
-        tool_results = await self._tool_context._handle_tool_calls(tool_calls)
+        tool_results = await self._tool_context.execute_tool_calls(tool_calls)
 
         # Add tool results to conversation with tool_call_id for OpenAI spec compliance
         for result in tool_results:

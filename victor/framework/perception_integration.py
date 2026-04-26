@@ -57,6 +57,11 @@ from victor.agent.action_authorizer import (
     detect_intent,
 )
 from victor.agent.task_analyzer import TaskAnalysis, TaskAnalyzer
+from victor.framework.request_scope_heuristics import (
+    contains_keyword_marker,
+    conversation_history_has_explicit_target,
+    has_ambiguous_target_reference,
+)
 from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.framework.task.protocols import TaskComplexity
 
@@ -282,6 +287,7 @@ class PerceptionIntegration:
             task_analysis=task_analysis,
             confidence=confidence,
             context=context,
+            conversation_history=conversation_history,
         )
 
         perception = Perception(
@@ -314,6 +320,7 @@ class PerceptionIntegration:
         task_analysis: TaskAnalysis,
         confidence: float,
         context: Optional[Dict[str, Any]],
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Optional[str] | bool]:
         """Detect when execution confidence is too weak to proceed safely."""
         message = query.strip()
@@ -339,7 +346,7 @@ class PerceptionIntegration:
         )
         is_action_task = bool(
             getattr(task_analysis, "is_action_task", False)
-            or any(marker in message_lower for marker in action_markers)
+            or contains_keyword_marker(message_lower, action_markers)
         )
         if not is_action_task:
             return {
@@ -352,10 +359,9 @@ class PerceptionIntegration:
             self._extract_required_files(message)
             or self._extract_scope_hints(message)
             or self._context_has_explicit_target(context)
+            or conversation_history_has_explicit_target(conversation_history)
         )
-        ambiguous_reference = bool(
-            re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower)
-        )
+        ambiguous_reference = has_ambiguous_target_reference(message_lower)
         threshold = self._evaluation_policy.clarification_confidence_threshold
 
         if ambiguous_reference and not target_present:

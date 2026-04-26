@@ -116,3 +116,50 @@ async def test_parallel_exploration_lazily_materializes_shared_coordinator():
     create_explorer.assert_called_once_with()
     explorer.explore_parallel.assert_awaited_once()
     assert executor._exploration_coordinator is explorer
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_calls_prefers_canonical_tool_context_method():
+    executor = _make_executor()
+    executor._tool_context.execute_tool_calls = AsyncMock(
+        return_value=[{"name": "read", "success": True}]
+    )
+    executor._tool_context._handle_tool_calls = AsyncMock(
+        side_effect=AssertionError("legacy _handle_tool_calls bridge should not be used")
+    )
+
+    result = await executor._execute_tool_calls([{"name": "read", "arguments": {}}])
+
+    assert result == [{"name": "read", "success": True}]
+    executor._tool_context.execute_tool_calls.assert_awaited_once_with(
+        [{"name": "read", "arguments": {}}]
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_calls_requires_canonical_tool_context_method():
+    chat_context = MagicMock()
+    chat_context.settings = MagicMock()
+    chat_context.add_message = MagicMock()
+    chat_context.conversation = MagicMock()
+
+    legacy_handle_tool_calls = AsyncMock(return_value=[{"name": "read", "success": True}])
+    tool_context = SimpleNamespace(
+        tool_calls_used=0,
+        tool_budget=10,
+        tool_selector=MagicMock(),
+        use_semantic_selection=False,
+        _handle_tool_calls=legacy_handle_tool_calls,
+    )
+
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=MagicMock(provider_name="ollama", model="test-model"),
+        execution_provider=MagicMock(),
+    )
+
+    with pytest.raises(AttributeError, match="execute_tool_calls"):
+        await executor._execute_tool_calls([{"name": "read", "arguments": {}}])
+
+    legacy_handle_tool_calls.assert_not_awaited()

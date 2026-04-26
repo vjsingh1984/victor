@@ -130,7 +130,7 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     async for chunk in provider.stream(messages=[], model="dummy-model"):
         chunks.append(chunk)
         if chunk.tool_calls:
-            await orch._handle_tool_calls(chunk.tool_calls)
+            await orch.execute_tool_calls(chunk.tool_calls)
 
     assert dummy_tool.calls == [{"echo": "hi"}]
     assert orch.tool_calls_used == 1

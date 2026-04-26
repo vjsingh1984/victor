@@ -71,6 +71,15 @@ BENCHMARK_TOOL_ALLOWLIST = frozenset(
 )
 
 
+@dataclass(frozen=True)
+class PromptOptimizationBinding:
+    """Pin one exact prompt candidate into the live runtime for targeted evaluation."""
+
+    section_name: str
+    prompt_candidate_hash: str
+    provider: Optional[str] = None
+
+
 @dataclass
 class AdapterConfig:
     """Configuration for the Victor agent adapter.
@@ -93,6 +102,9 @@ class AdapterConfig:
     # Correction metrics tracking
     track_corrections: bool = True  # Enable correction metrics collection
     keep_correction_attempts: bool = False  # Store individual correction records
+
+    # Optional prompt candidate binding for targeted benchmark/eval runs.
+    prompt_binding: Optional[PromptOptimizationBinding] = None
 
     @property
     def timeout_per_turn(self) -> int:
@@ -184,6 +196,36 @@ class VictorAgentAdapter:
             logger.info("[AgentAdapter] Registered ToolRegistry hooks for tool call tracking")
         else:
             logger.warning("[AgentAdapter] Could not register hooks - ToolRegistry not found")
+
+        self._apply_prompt_binding()
+
+    def _apply_prompt_binding(self) -> None:
+        """Apply any explicit prompt binding to the live optimization injector.
+
+        Targeted evaluations must bind the runtime candidate up front so the
+        executed prompt content matches the prompt identity saved in artifacts.
+        """
+        binding = self.config.prompt_binding
+        if binding is None:
+            return
+
+        injector = getattr(self.orchestrator, "_optimization_injector", None)
+        if injector is None or not hasattr(injector, "bind_prompt_candidate"):
+            raise RuntimeError(
+                "Prompt optimization binding requires an orchestrator optimization injector"
+            )
+
+        provider = (
+            binding.provider
+            or getattr(self.orchestrator, "provider_name", None)
+            or getattr(getattr(self.orchestrator, "provider", None), "name", None)
+        )
+        injector.bind_prompt_candidate(
+            section_name=binding.section_name,
+            prompt_candidate_hash=binding.prompt_candidate_hash,
+            provider=str(provider or "").strip(),
+            strict=True,
+        )
 
     def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Hook called by ToolRegistry before tool execution."""

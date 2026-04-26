@@ -1,4 +1,5 @@
 import typer
+from typer.models import ArgumentInfo, OptionInfo
 import os
 import sys
 import time
@@ -74,6 +75,50 @@ chat_app = typer.Typer(
     """,
 )
 console = Console()
+
+
+def _resolve_typer_default(value: Any) -> Any:
+    """Unwrap Typer metadata objects when callback functions are invoked directly."""
+    if isinstance(value, (OptionInfo, ArgumentInfo)):
+        return value.default
+    return value
+
+
+def _collect_runtime_override_kwargs(
+    *,
+    compaction_threshold: Optional[float],
+    adaptive_threshold: Optional[bool],
+    compaction_min_threshold: Optional[float],
+    compaction_max_threshold: Optional[float],
+    enable_smart_routing: bool,
+    routing_profile: str,
+    fallback_chain: Optional[str],
+    tool_preview: bool,
+    enable_pruning: bool,
+) -> dict[str, Any]:
+    """Return only non-default runtime override kwargs for chat execution helpers."""
+    kwargs: dict[str, Any] = {}
+
+    if compaction_threshold is not None:
+        kwargs["compaction_threshold"] = compaction_threshold
+    if adaptive_threshold is not None:
+        kwargs["adaptive_threshold"] = adaptive_threshold
+    if compaction_min_threshold is not None:
+        kwargs["compaction_min_threshold"] = compaction_min_threshold
+    if compaction_max_threshold is not None:
+        kwargs["compaction_max_threshold"] = compaction_max_threshold
+    if enable_smart_routing:
+        kwargs["enable_smart_routing"] = enable_smart_routing
+    if routing_profile != "balanced":
+        kwargs["routing_profile"] = routing_profile
+    if fallback_chain is not None:
+        kwargs["fallback_chain"] = fallback_chain
+    if not tool_preview:
+        kwargs["tool_preview"] = tool_preview
+    if enable_pruning:
+        kwargs["enable_pruning"] = enable_pruning
+
+    return kwargs
 
 
 def _display_skill_preview(con: Console, agent: Any, message: str) -> None:
@@ -647,6 +692,19 @@ def chat(
     **For advanced options and examples:**
         victor chat --help-full
     """
+    help_full = _resolve_typer_default(help_full)
+    debug_modules = _resolve_typer_default(debug_modules)
+    auto_skill = _resolve_typer_default(auto_skill)
+    compaction_threshold = _resolve_typer_default(compaction_threshold)
+    adaptive_threshold = _resolve_typer_default(adaptive_threshold)
+    compaction_min_threshold = _resolve_typer_default(compaction_min_threshold)
+    compaction_max_threshold = _resolve_typer_default(compaction_max_threshold)
+    enable_smart_routing = _resolve_typer_default(enable_smart_routing)
+    routing_profile = _resolve_typer_default(routing_profile)
+    fallback_chain = _resolve_typer_default(fallback_chain)
+    tool_preview = _resolve_typer_default(tool_preview)
+    enable_pruning = _resolve_typer_default(enable_pruning)
+
     # Handle --help-full flag for comprehensive help
     if help_full:
         from rich.markdown import Markdown
@@ -984,6 +1042,17 @@ victor chat --sessionid abc123            # Resume session
             settings.skill_auto_select_enabled = auto_skill
 
         if actual_message:
+            runtime_override_kwargs = _collect_runtime_override_kwargs(
+                compaction_threshold=compaction_threshold,
+                adaptive_threshold=adaptive_threshold,
+                compaction_min_threshold=compaction_min_threshold,
+                compaction_max_threshold=compaction_max_threshold,
+                enable_smart_routing=enable_smart_routing,
+                routing_profile=routing_profile,
+                fallback_chain=fallback_chain,
+                tool_preview=tool_preview,
+                enable_pruning=enable_pruning,
+            )
             run_sync(
                 run_oneshot(
                     actual_message,
@@ -1003,23 +1072,24 @@ victor chat --sessionid abc123            # Resume session
                     planning_model=planning_model,
                     legacy_mode=legacy_mode,
                     show_reasoning=show_reasoning,
-                    compaction_threshold=compaction_threshold,
-                    adaptive_threshold=adaptive_threshold,
-                    compaction_min_threshold=compaction_min_threshold,
-                    compaction_max_threshold=compaction_max_threshold,
-                    # Smart routing
-                    enable_smart_routing=enable_smart_routing,
-                    routing_profile=routing_profile,
-                    fallback_chain=fallback_chain,
-                    # Tool output preview
-                    tool_preview=tool_preview,
-                    enable_pruning=enable_pruning,
+                    **runtime_override_kwargs,
                 )
             )
         elif stdin or input_file:
             formatter.error("No input received from stdin or file")
             raise typer.Exit(1)
         else:
+            runtime_override_kwargs = _collect_runtime_override_kwargs(
+                compaction_threshold=compaction_threshold,
+                adaptive_threshold=adaptive_threshold,
+                compaction_min_threshold=compaction_min_threshold,
+                compaction_max_threshold=compaction_max_threshold,
+                enable_smart_routing=enable_smart_routing,
+                routing_profile=routing_profile,
+                fallback_chain=fallback_chain,
+                tool_preview=tool_preview,
+                enable_pruning=enable_pruning,
+            )
             run_sync(
                 run_interactive(
                     settings,
@@ -1039,17 +1109,7 @@ victor chat --sessionid abc123            # Resume session
                     use_tui=use_tui,
                     resume_session_id=session_id,
                     show_reasoning=show_reasoning,
-                    compaction_threshold=compaction_threshold,
-                    adaptive_threshold=adaptive_threshold,
-                    compaction_min_threshold=compaction_min_threshold,
-                    compaction_max_threshold=compaction_max_threshold,
-                    # Smart routing
-                    enable_smart_routing=enable_smart_routing,
-                    routing_profile=routing_profile,
-                    fallback_chain=fallback_chain,
-                    # Tool output preview
-                    tool_preview=tool_preview,
-                    enable_pruning=enable_pruning,
+                    **runtime_override_kwargs,
                 )
             )
             return

@@ -163,12 +163,13 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(SessionContextLinkerProtocol, "_create_session_context_linker"),
     ServiceSpec(
         StateRuntimeProtocol,
-        "_create_state_coordinator",
+        "_create_state_runtime",
         ServiceLifetime.SCOPED,
+        pass_container=True,
     ),
     ServiceSpec(
         PromptRuntimeProtocol,
-        "_create_prompt_coordinator",
+        "_create_prompt_runtime",
         ServiceLifetime.SCOPED,
     ),
 ]

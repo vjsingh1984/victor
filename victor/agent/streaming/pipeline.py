@@ -121,6 +121,62 @@ class StreamingChatPipeline:
         self._prev_visible_content = normalized_key
         return display_content
 
+    @staticmethod
+    def _serialize_conversation_message(message: Any) -> dict[str, Any] | None:
+        """Normalize a conversation message into a mapping for perception services."""
+        if isinstance(message, dict):
+            payload = dict(message)
+        elif hasattr(message, "model_dump"):
+            payload = message.model_dump()
+        else:
+            role = getattr(message, "role", None)
+            content = getattr(message, "content", None)
+            if role is None and content is None:
+                return None
+            payload = {"role": role, "content": content}
+
+        if not isinstance(payload, dict):
+            return None
+        if payload.get("role") is None and payload.get("content") is None:
+            return None
+        return payload
+
+    def _get_conversation_history(
+        self,
+        runtime_owner: Any,
+        orch: Any,
+        user_message: str,
+    ) -> Optional[List[dict[str, Any]]]:
+        """Return serialized conversation history excluding the current user turn."""
+        messages = None
+        assembled_getter = getattr(orch, "get_assembled_messages", None)
+        if callable(assembled_getter):
+            try:
+                messages = assembled_getter(current_query=user_message)
+            except Exception as exc:
+                logger.debug("Falling back to raw conversation history: %s", exc)
+
+        if messages is None:
+            chat_context = getattr(runtime_owner, "_chat_context", None)
+            messages = getattr(chat_context, "messages", None)
+        if messages is None:
+            messages = getattr(orch, "messages", None)
+        if not messages:
+            return None
+
+        history = [
+            payload
+            for message in messages
+            if (payload := self._serialize_conversation_message(message)) is not None
+        ]
+        if (
+            history
+            and history[-1].get("role") == "user"
+            and history[-1].get("content") == user_message
+        ):
+            history = history[:-1]
+        return history or None
+
     async def _get_tools_cached(self, orch: Any, context_msg: str, goals: Any) -> Any:
         """Select tools with per-turn caching.
 
@@ -142,6 +198,7 @@ class StreamingChatPipeline:
         runtime_owner = self._runtime_owner
         orch = runtime_owner._orchestrator
         recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
+        create_recovery_context = orch.create_recovery_context
 
         # Initialize and prepare using StreamingChatContext
         stream_ctx = await runtime_owner._create_stream_context(user_message, **kwargs)
@@ -265,6 +322,7 @@ class StreamingChatPipeline:
         # Structured task understanding before iteration begins. Reuses
         # PerceptionIntegration from the AgenticLoop's PERCEIVE phase.
         _perception = None
+        conversation_history = self._get_conversation_history(runtime_owner, orch, user_message)
         if self._runtime_intelligence is not None:
             try:
                 snapshot = await self._runtime_intelligence.analyze_turn(
@@ -274,6 +332,7 @@ class StreamingChatPipeline:
                         "is_analysis_task": stream_ctx.is_analysis_task,
                         "is_action_task": stream_ctx.is_action_task,
                     },
+                    conversation_history=conversation_history,
                 )
                 _perception = snapshot.perception
                 if _perception:
@@ -303,6 +362,7 @@ class StreamingChatPipeline:
                         "is_analysis_task": stream_ctx.is_analysis_task,
                         "is_action_task": stream_ctx.is_action_task,
                     },
+                    conversation_history=conversation_history,
                 )
                 if _perception:
                     stream_ctx.perception = _perception
@@ -652,7 +712,7 @@ class StreamingChatPipeline:
                 orch.add_message("assistant", "", tool_calls=tool_calls)
             else:
                 # No content and no tool calls - check for natural completion
-                recovery_ctx = orch._create_recovery_context(stream_ctx)
+                recovery_ctx = create_recovery_context(stream_ctx)
                 final_chunk = recovery.check_natural_completion(
                     recovery_ctx, has_tool_calls=False, content_length=0
                 )
@@ -663,7 +723,7 @@ class StreamingChatPipeline:
                 # No substantial content yet - attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                recovery_ctx = orch._create_recovery_context(stream_ctx)
+                recovery_ctx = create_recovery_context(stream_ctx)
                 recovery_chunk, should_force = recovery.handle_empty_response(recovery_ctx)
                 if recovery_chunk:
                     yield recovery_chunk
@@ -684,7 +744,7 @@ class StreamingChatPipeline:
                             f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
                         )
                 else:
-                    recovery_ctx = orch._create_recovery_context(stream_ctx)
+                    recovery_ctx = create_recovery_context(stream_ctx)
                     fallback_msg = recovery.get_recovery_fallback_message(recovery_ctx)
                     orch._record_intelligent_outcome(
                         success=False,
@@ -800,7 +860,7 @@ class StreamingChatPipeline:
                 yield loop_warning_chunk
             else:
                 # Check UnifiedTaskTracker for stop decision via recovery coordinator
-                recovery_ctx = orch._create_recovery_context(stream_ctx)
+                recovery_ctx = create_recovery_context(stream_ctx)
                 was_triggered, hint = recovery.check_force_action(recovery_ctx)
                 if was_triggered:
                     logger.info(

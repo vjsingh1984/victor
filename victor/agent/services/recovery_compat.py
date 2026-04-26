@@ -15,7 +15,8 @@
 """Service-owned compatibility runtime for deprecated streaming recovery.
 
 This module hosts the deprecated StreamingRecoveryCoordinator compatibility shim
-while the canonical active runtime remains RecoveryService.
+while the canonical active runtime remains RecoveryService and the
+service-owned streaming runtime.
 
 The legacy ``victor.agent.recovery_coordinator`` module now re-exports this
 implementation for compatibility.
@@ -23,6 +24,7 @@ implementation for compatibility.
 
 import asyncio
 import logging
+import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
@@ -42,6 +44,12 @@ from victor.providers.base import StreamChunk
 from victor.core.events import ObservabilityBus
 
 logger = logging.getLogger(__name__)
+
+_STREAMING_RECOVERY_COORDINATOR_DEPRECATION_MESSAGE = (
+    "StreamingRecoveryCoordinator is deprecated. Use RecoveryService from "
+    "victor.agent.services.recovery_service instead. "
+    "This adapter will be removed in a future release."
+)
 
 
 @dataclass
@@ -125,6 +133,7 @@ class StreamingRecoveryCoordinator:
         settings: "Settings",
         event_bus: Optional[ObservabilityBus] = None,
         presentation: Optional["PresentationProtocol"] = None,
+        warn_on_init: bool = True,
     ):
         """Initialize StreamingRecoveryCoordinator.
 
@@ -137,7 +146,15 @@ class StreamingRecoveryCoordinator:
             settings: Application settings
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
             presentation: Optional presentation adapter for icons (creates default if None)
+            warn_on_init: Emit a deprecation warning for direct compatibility use
         """
+        if warn_on_init:
+            warnings.warn(
+                _STREAMING_RECOVERY_COORDINATOR_DEPRECATION_MESSAGE,
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self.recovery_handler = recovery_handler
         self.recovery_integration = recovery_integration
         self.streaming_handler = streaming_handler

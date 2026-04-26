@@ -116,7 +116,7 @@ class OrchestratorStub:
     def _apply_recovery_action(self, *args, **kwargs):
         return None
 
-    def _create_recovery_context(self, *_):
+    def create_recovery_context(self, *_):
         return object()
 
     async def _validate_intelligent_response(self, *args, **kwargs):

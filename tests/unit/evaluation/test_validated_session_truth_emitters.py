@@ -190,12 +190,39 @@ def test_swe_bench_emitter_builds_artifact_from_validation_outputs(tmp_path):
             task_id="django__123",
             validation_result=validation_result,
             score=score,
+            metadata={
+                "provider": "anthropic",
+                "model": "claude-sonnet",
+                "prompt_candidate_hash": "cand-123",
+                "section_name": "GROUNDING_RULES",
+                "prompt_section_name": "GROUNDING_RULES",
+            },
         )
     )
 
     assert artifact is not None
     assert artifact.path.name == "eval_session_django__123.json"
+    assert artifact.record["provider"] == "anthropic"
+    assert artifact.record["model"] == "claude-sonnet"
+    assert artifact.record["prompt_candidate_hash"] == "cand-123"
+    assert artifact.record["section_name"] == "GROUNDING_RULES"
     assert (
         artifact.record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
         == "swe_bench_posthoc_validation"
+    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["provider"] == "anthropic"
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["model"] == "claude-sonnet"
+    assert (
+        artifact.record["runtime_evaluation_feedback"]["metadata"]["prompt_candidate_hash"]
+        == "cand-123"
+    )
+    assert (
+        artifact.record["runtime_evaluation_feedback"]["metadata"]["section_name"]
+        == "GROUNDING_RULES"
+    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["provider"] == (
+        "anthropic"
+    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["model"] == (
+        "claude-sonnet"
     )

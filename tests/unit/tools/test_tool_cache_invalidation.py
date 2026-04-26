@@ -38,10 +38,10 @@ async def _run_with_invalidation(tmpdir: str) -> int:
     settings = Settings(
         analytics_enabled=False,
         tool_selection_strategy="keyword",
-        tool_cache_enabled=True,
-        tool_cache_allowlist=["code_search"],
-        tool_cache_dir=tmpdir,  # Use correct setting name
+        tool_cache_dir_override=tmpdir,
     )
+    settings.tools.tool_cache_enabled = True
+    settings.tools.tool_cache_allowlist = ["code_search"]
     with patch("victor.core.bootstrap_services.bootstrap_new_services"):
         orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
@@ -83,17 +83,17 @@ async def _run_with_invalidation(tmpdir: str) -> int:
     args = {"query": "test", "root": ".", "k": 1}
 
     # First call caches
-    await orch._execute_tool_with_retry("code_search", args, context={})
+    await orch.execute_tool_with_retry("code_search", args, context={})
     # Invalidate via write
-    await orch._execute_tool_with_retry(
+    await orch.execute_tool_with_retry(
         "write_file", {"path": "file_a", "content": "y"}, context={}
     )
     # Simulate another write to a different path to ensure path tracking works
-    await orch._execute_tool_with_retry(
+    await orch.execute_tool_with_retry(
         "write_file", {"path": "file_b", "content": "z"}, context={}
     )
     # Second call should be a miss after invalidation
-    await orch._execute_tool_with_retry("code_search", args, context={})
+    await orch.execute_tool_with_retry("code_search", args, context={})
 
     await orch.shutdown()
     return call_count["count"]

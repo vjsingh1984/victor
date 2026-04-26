@@ -167,6 +167,8 @@ class TestOrchestratorConfig:
         assert config.use_baseline_cache is True
         assert config.test_timeout == 300
         assert config.test_verbose is False
+        assert config.prompt_candidate_hash is None
+        assert config.prompt_section_name is None
 
     def test_custom_values(self):
         """Test custom config values."""
@@ -509,6 +511,8 @@ class TestEvaluationOrchestrator:
             assert payload["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"] == (
                 "swe_bench_posthoc_validation"
             )
+            assert payload["provider"] is None
+            assert payload["prompt_candidate_hash"] is None
             assert payload["runtime_evaluation_feedback"]["metadata"]["scope"]["project"] == (
                 "django/django"
             )
@@ -567,7 +571,130 @@ class TestEvaluationOrchestrator:
             assert captured_kwargs["task_id"] == "django__123"
             assert captured_kwargs["validation_result"] is validation_result
             assert captured_kwargs["results_dir"] == output_dir / "evaluations"
+            assert captured_kwargs["metadata"] is None
             refresh_aggregate.assert_not_called()
+
+    def test_save_validated_session_feedback_passes_runtime_metadata(self):
+        """Explicit runtime metadata should flow through the shared service boundary."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            config = OrchestratorConfig(output_dir=output_dir)
+
+            captured_kwargs = {}
+
+            class StubService:
+                def persist_validation_result(self, **kwargs):
+                    captured_kwargs.update(kwargs)
+                    return kwargs["results_dir"] / "eval_session_stub.json"
+
+            orchestrator = EvaluationOrchestrator(
+                config,
+                validated_session_truth_service=StubService(),
+            )
+
+            feedback_path = orchestrator._save_validated_session_feedback(
+                "django__123",
+                validation_result=object(),
+                metadata={
+                    "provider": "anthropic",
+                    "model": "claude-sonnet",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                },
+            )
+
+            assert feedback_path == output_dir / "evaluations" / "eval_session_stub.json"
+            assert captured_kwargs["metadata"] == {
+                "provider": "anthropic",
+                "model": "claude-sonnet",
+                "prompt_candidate_hash": "cand-123",
+                "section_name": "GROUNDING_RULES",
+            }
+
+    def test_build_validation_runtime_metadata_uses_single_active_prompt_candidate(self):
+        """Single active prompt identities should map into canonical validation metadata."""
+        orchestrator = EvaluationOrchestrator(OrchestratorConfig())
+        inner = MagicMock()
+        inner.provider_name = "anthropic"
+        inner.model = "claude-sonnet"
+        inner.get_active_prompt_optimization_metadata.return_value = {
+            "entries": [
+                {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "prompt_section_name": "GROUNDING_RULES",
+                    "strategy_name": "gepa",
+                }
+            ],
+            "by_section": {
+                "GROUNDING_RULES": {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "prompt_section_name": "GROUNDING_RULES",
+                    "strategy_name": "gepa",
+                }
+            },
+        }
+        adapter = MagicMock()
+        adapter.orchestrator = inner
+
+        metadata = orchestrator._build_validation_runtime_metadata(adapter)
+
+        assert metadata["provider"] == "anthropic"
+        assert metadata["model"] == "claude-sonnet"
+        assert metadata["prompt_candidate_hash"] == "cand-123"
+        assert metadata["section_name"] == "GROUNDING_RULES"
+        assert metadata["prompt_section_name"] == "GROUNDING_RULES"
+        assert metadata["prompt_optimization"]["entries"][0]["strategy_name"] == "gepa"
+
+    def test_build_validation_runtime_metadata_omits_ambiguous_prompt_candidate(self):
+        """Multiple active prompt candidates should keep singular identity fields unset."""
+        orchestrator = EvaluationOrchestrator(OrchestratorConfig())
+        inner = MagicMock()
+        inner.provider_name = "anthropic"
+        inner.model = "claude-sonnet"
+        inner.get_active_prompt_optimization_metadata.return_value = {
+            "entries": [
+                {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                },
+                {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-456",
+                    "section_name": "COMPLETION_GUIDANCE",
+                },
+            ],
+            "by_section": {},
+        }
+        adapter = MagicMock()
+        adapter.orchestrator = inner
+
+        metadata = orchestrator._build_validation_runtime_metadata(adapter)
+
+        assert metadata["provider"] == "anthropic"
+        assert metadata["model"] == "claude-sonnet"
+        assert "prompt_candidate_hash" not in metadata
+        assert "section_name" not in metadata
+        assert len(metadata["prompt_optimization"]["entries"]) == 2
+
+    def test_build_adapter_config_binds_requested_prompt_candidate(self):
+        """Orchestrator-level prompt identity should become a runtime binding."""
+        orchestrator = EvaluationOrchestrator(
+            OrchestratorConfig(
+                prompt_candidate_hash="cand-123",
+                prompt_section_name="GROUNDING_RULES",
+            )
+        )
+
+        adapter_config = orchestrator._build_adapter_config()
+
+        assert adapter_config.prompt_binding is not None
+        assert adapter_config.prompt_binding.prompt_candidate_hash == "cand-123"
+        assert adapter_config.prompt_binding.section_name == "GROUNDING_RULES"
 
     def test_orchestrator_accepts_legacy_emitter_registry_keyword(self):
         """Legacy emitter-registry wiring should still resolve through the service factory."""

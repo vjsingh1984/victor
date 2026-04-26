@@ -189,10 +189,15 @@ class TestProtocolCompleteness:
         assert "tool_calls_used" in annotations
         assert "use_semantic_selection" in annotations
 
-    def test_tool_context_declares_handle_tool_calls(self):
+    def test_tool_context_declares_execute_tool_calls(self):
         from victor.agent.services.protocols.chat_runtime import ToolContextProtocol
 
-        assert hasattr(ToolContextProtocol, "_handle_tool_calls")
+        assert hasattr(ToolContextProtocol, "execute_tool_calls")
+
+    def test_composite_protocol_declares_create_recovery_context(self):
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
+
+        assert hasattr(ChatOrchestratorProtocol, "create_recovery_context")
 
     def test_provider_context_declares_provider_members(self):
         from victor.agent.services.protocols.chat_runtime import ProviderContextProtocol

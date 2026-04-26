@@ -103,7 +103,7 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch,
     ]
 
     # Execute tool calls
-    results = await orch._handle_tool_calls(tool_calls)
+    results = await orch.execute_tool_calls(tool_calls)
 
     # First call executed once (no retries for explicit ToolResult failures)
     # Second call skipped due to repeat signature (silent skip, no result added)

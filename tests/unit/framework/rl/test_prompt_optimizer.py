@@ -509,6 +509,235 @@ class TestPromptOptimizerLearner:
         assert updated.benchmark_score == pytest.approx(0.9)
         assert updated.benchmark_passed is True
 
+    def test_sync_evaluation_suite_records_scores_and_only_approves_best_candidate(self, db):
+        from victor.evaluation import (
+            PromptCandidateEvaluationRun,
+            PromptCandidateEvaluationSpec,
+            PromptCandidateEvaluationSuiteResult,
+        )
+        from victor.evaluation.protocol import (
+            BenchmarkType,
+            EvaluationConfig,
+            EvaluationResult,
+            TaskResult,
+            TaskStatus,
+        )
+
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        first = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            text="Prompt A",
+            text_hash="cand-a",
+            generation=1,
+            parent_hash="parent",
+            requires_benchmark=True,
+        )
+        second = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            text="Prompt B",
+            text_hash="cand-b",
+            generation=2,
+            parent_hash="cand-a",
+            requires_benchmark=True,
+        )
+        key = learner._candidate_key("GROUNDING_RULES", "anthropic")
+        learner._candidates[key] = [first, second]
+
+        base_config = EvaluationConfig(
+            benchmark=BenchmarkType.HUMAN_EVAL,
+            model="claude-sonnet",
+            provider="anthropic",
+        )
+        suite = PromptCandidateEvaluationSuiteResult(
+            base_config=base_config,
+            runs=[
+                PromptCandidateEvaluationRun(
+                    spec=PromptCandidateEvaluationSpec(
+                        section_name="GROUNDING_RULES",
+                        prompt_candidate_hash="cand-a",
+                        provider="anthropic",
+                    ),
+                    config=EvaluationConfig(
+                        benchmark=BenchmarkType.HUMAN_EVAL,
+                        model="claude-sonnet",
+                        provider="anthropic",
+                        prompt_candidate_hash="cand-a",
+                        prompt_section_name="GROUNDING_RULES",
+                    ),
+                    result=EvaluationResult(
+                        config=base_config,
+                        task_results=[
+                            TaskResult(task_id="task-1", status=TaskStatus.PASSED),
+                            TaskResult(task_id="task-2", status=TaskStatus.PASSED),
+                        ],
+                    ),
+                    label="GROUNDING_RULES:anthropic:cand-a",
+                ),
+                PromptCandidateEvaluationRun(
+                    spec=PromptCandidateEvaluationSpec(
+                        section_name="GROUNDING_RULES",
+                        prompt_candidate_hash="cand-b",
+                        provider="anthropic",
+                    ),
+                    config=EvaluationConfig(
+                        benchmark=BenchmarkType.HUMAN_EVAL,
+                        model="claude-sonnet",
+                        provider="anthropic",
+                        prompt_candidate_hash="cand-b",
+                        prompt_section_name="GROUNDING_RULES",
+                    ),
+                    result=EvaluationResult(
+                        config=base_config,
+                        task_results=[
+                            TaskResult(task_id="task-3", status=TaskStatus.PASSED),
+                            TaskResult(task_id="task-4", status=TaskStatus.FAILED),
+                        ],
+                    ),
+                    label="GROUNDING_RULES:anthropic:cand-b",
+                ),
+            ],
+        )
+
+        sync_result = learner.sync_evaluation_suite(suite, min_pass_rate=0.5)
+
+        assert sync_result.best_prompt_candidate_hash == "cand-a"
+        assert sync_result.approved_prompt_candidate_hash == "cand-a"
+        assert sync_result.promoted_prompt_candidate_hash is None
+        assert [decision.prompt_candidate_hash for decision in sync_result.decisions] == [
+            "cand-a",
+            "cand-b",
+        ]
+        assert sync_result.decisions[0].passed is True
+        assert sync_result.decisions[1].passed is False
+        assert first.benchmark_runs == 1
+        assert first.benchmark_score == pytest.approx(1.0)
+        assert first.benchmark_passed is True
+        assert second.benchmark_runs == 1
+        assert second.benchmark_score == pytest.approx(0.5)
+        assert second.benchmark_passed is False
+
+    def test_sync_evaluation_suite_can_promote_best_candidate(self, db):
+        from victor.evaluation import (
+            PromptCandidateEvaluationRun,
+            PromptCandidateEvaluationSpec,
+            PromptCandidateEvaluationSuiteResult,
+        )
+        from victor.evaluation.protocol import (
+            BenchmarkType,
+            EvaluationConfig,
+            EvaluationResult,
+            TaskResult,
+            TaskStatus,
+        )
+
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        control = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            text="Stable control",
+            text_hash="control",
+            generation=1,
+            parent_hash="parent",
+            benchmark_score=0.85,
+            benchmark_runs=2,
+            benchmark_passed=True,
+            is_active=True,
+        )
+        treatment = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            text="Candidate treatment",
+            text_hash="treat",
+            generation=2,
+            parent_hash="control",
+            requires_benchmark=True,
+        )
+        key = learner._candidate_key("GROUNDING_RULES", "anthropic")
+        learner._candidates[key] = [control, treatment]
+
+        base_config = EvaluationConfig(
+            benchmark=BenchmarkType.HUMAN_EVAL,
+            model="claude-sonnet",
+            provider="anthropic",
+        )
+        suite = PromptCandidateEvaluationSuiteResult(
+            base_config=base_config,
+            runs=[
+                PromptCandidateEvaluationRun(
+                    spec=PromptCandidateEvaluationSpec(
+                        section_name="GROUNDING_RULES",
+                        prompt_candidate_hash="treat",
+                        provider="anthropic",
+                    ),
+                    config=EvaluationConfig(
+                        benchmark=BenchmarkType.HUMAN_EVAL,
+                        model="claude-sonnet",
+                        provider="anthropic",
+                        prompt_candidate_hash="treat",
+                        prompt_section_name="GROUNDING_RULES",
+                    ),
+                    result=EvaluationResult(
+                        config=base_config,
+                        task_results=[TaskResult(task_id="task-1", status=TaskStatus.PASSED)],
+                    ),
+                    label="GROUNDING_RULES:anthropic:treat",
+                ),
+                PromptCandidateEvaluationRun(
+                    spec=PromptCandidateEvaluationSpec(
+                        section_name="GROUNDING_RULES",
+                        prompt_candidate_hash="control",
+                        provider="anthropic",
+                    ),
+                    config=EvaluationConfig(
+                        benchmark=BenchmarkType.HUMAN_EVAL,
+                        model="claude-sonnet",
+                        provider="anthropic",
+                        prompt_candidate_hash="control",
+                        prompt_section_name="GROUNDING_RULES",
+                    ),
+                    result=EvaluationResult(
+                        config=base_config,
+                        task_results=[TaskResult(task_id="task-2", status=TaskStatus.FAILED)],
+                    ),
+                    label="GROUNDING_RULES:anthropic:control",
+                ),
+            ],
+        )
+
+        sync_result = learner.sync_evaluation_suite(
+            suite,
+            min_pass_rate=0.5,
+            promote_best=True,
+        )
+
+        assert sync_result.best_prompt_candidate_hash == "treat"
+        assert sync_result.approved_prompt_candidate_hash == "treat"
+        assert sync_result.promoted_prompt_candidate_hash == "treat"
+        assert treatment.is_active is True
+        assert control.is_active is False
+
+    def test_get_candidate_returns_specific_provider_scoped_candidate(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Bound prompt",
+            text_hash="bound-123",
+            generation=2,
+            parent_hash="parent",
+        )
+        learner._candidates[learner._candidate_key("TEST", "ollama")] = [candidate]
+
+        loaded = learner.get_candidate(
+            section_name="TEST",
+            provider="ollama",
+            text_hash="bound-123",
+        )
+
+        assert loaded is candidate
+
     def test_promote_candidate_marks_only_target_active(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)
         first = PromptCandidate(
@@ -853,6 +1082,133 @@ class TestPromptOptimizerLearner:
         entry_b = next(e for e in frontier.get_frontier() if e.text_hash == "hashb")
         assert entry_a.instance_scores == {"task-1::qwen": 1.0, "task-2::qwen": 0.0}
         assert entry_b.instance_scores == {}
+
+    def test_seed_from_evaluations_reads_non_swe_eval_artifacts(self, db, tmp_path):
+        learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
+        key = learner._candidate_key("GROUNDING_RULES", "anthropic")
+        candidate = PromptCandidate(
+            "GROUNDING_RULES",
+            "Prompt A",
+            "cand-123",
+            1,
+            "p",
+            provider="anthropic",
+        )
+        learner._candidates[key] = [candidate]
+        frontier = ParetoFrontier()
+        frontier.add_candidate("cand-123", "Prompt A", 1)
+        learner._pareto_frontiers[key] = frontier
+
+        eval_payload = {
+            "config": {
+                "model": "claude-sonnet",
+                "prompt_candidate_hash": "cand-123",
+                "section_name": "GROUNDING_RULES",
+                "provider": "anthropic",
+            },
+            "tasks": [
+                {"task_id": "dr3-1", "status": "passed"},
+                {"task_id": "dr3-2", "status": "failed"},
+            ],
+        }
+        eval_path = tmp_path / "eval_dr3_eval_test.json"
+        eval_path.write_text(json.dumps(eval_payload))
+
+        updated = learner.seed_from_evaluations(tmp_path)
+
+        assert updated == 2
+        entry = next(e for e in frontier.get_frontier() if e.text_hash == "cand-123")
+        assert entry.instance_scores == {
+            "dr3-1::claude-sonnet": 1.0,
+            "dr3-2::claude-sonnet": 0.0,
+        }
+
+    def test_seed_from_evaluations_reads_validated_session_truth_artifacts(self, db, tmp_path):
+        learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
+        key = learner._candidate_key("GROUNDING_RULES", "openai")
+        candidate = PromptCandidate(
+            "GROUNDING_RULES",
+            "Prompt A",
+            "cand-456",
+            1,
+            "p",
+            provider="openai",
+        )
+        learner._candidates[key] = [candidate]
+        frontier = ParetoFrontier()
+        frontier.add_candidate("cand-456", "Prompt A", 1)
+        learner._pareto_frontiers[key] = frontier
+
+        session_payload = {
+            "task_id": "guide-1",
+            "provider": "openai",
+            "model": "gpt-5",
+            "prompt_candidate_hash": "cand-456",
+            "section_name": "GROUNDING_RULES",
+            "status": "failed",
+            "completion_score": 0.45,
+            "runtime_evaluation_feedback": {
+                "metadata": {
+                    "source": "validated_session_truth_feedback",
+                    "provider": "openai",
+                    "model": "gpt-5",
+                    "prompt_candidate_hash": "cand-456",
+                    "section_name": "GROUNDING_RULES",
+                    "truth_validation_mode": "browser_posthoc_validation",
+                }
+            },
+        }
+        session_path = tmp_path / "eval_session_guide_guide-1_20260425_010101.json"
+        session_path.write_text(json.dumps(session_payload))
+
+        updated = learner.seed_from_evaluations(tmp_path)
+
+        assert updated == 1
+        entry = next(e for e in frontier.get_frontier() if e.text_hash == "cand-456")
+        assert entry.instance_scores == {"guide-1::gpt-5": 0.0}
+
+    def test_seed_from_evaluations_uses_validated_session_score_when_available(self, db, tmp_path):
+        learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
+        key = learner._candidate_key("GROUNDING_RULES", "anthropic")
+        candidate = PromptCandidate(
+            "GROUNDING_RULES",
+            "Prompt A",
+            "cand-789",
+            1,
+            "p",
+            provider="anthropic",
+        )
+        learner._candidates[key] = [candidate]
+        frontier = ParetoFrontier()
+        frontier.add_candidate("cand-789", "Prompt A", 1)
+        learner._pareto_frontiers[key] = frontier
+
+        session_payload = {
+            "instance_id": "django__123",
+            "provider": "anthropic",
+            "model": "claude-sonnet",
+            "prompt_candidate_hash": "cand-789",
+            "section_name": "GROUNDING_RULES",
+            "runtime_evaluation_feedback": {
+                "metadata": {
+                    "source": "validated_session_truth_feedback",
+                    "provider": "anthropic",
+                    "model": "claude-sonnet",
+                    "prompt_candidate_hash": "cand-789",
+                    "section_name": "GROUNDING_RULES",
+                    "truth_validation_mode": "swe_bench_posthoc_validation",
+                }
+            },
+            "score": {"overall_score": 0.7},
+        }
+        session_path = tmp_path / "eval_session_django__123.json"
+        session_path.write_text(json.dumps(session_payload))
+
+        updated = learner.seed_from_evaluations(tmp_path)
+
+        assert updated == 1
+        entry = next(e for e in frontier.get_frontier() if e.text_hash == "cand-789")
+        assert entry.instance_scores == {"django__123::claude-sonnet": 0.7}
 
     def test_build_rollout_experiment_config_uses_existing_ab_primitives(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)

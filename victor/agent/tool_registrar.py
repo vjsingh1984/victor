@@ -462,6 +462,27 @@ class ToolRegistrar:
         logger.debug(f"Registered {registered_count} tools from shared registry")
         return registered_count
 
+    def register_default_tools(self) -> int:
+        """Register default tool surfaces via the canonical registrar API.
+
+        Performs the split-phase bootstrap used by the orchestrator/runtime:
+        provider setup, dynamic tool registration, and optional MCP
+        integration. This preserves the current initialization order while
+        moving bootstrap callers off private registrar methods.
+
+        Returns:
+            Total number of tools registered by this phase
+        """
+        self._setup_providers()
+
+        registered_count = self._register_dynamic_tools()
+        total_registered = registered_count
+
+        if self.config.enable_mcp or getattr(self.settings, "use_mcp_tools", False):
+            total_registered += self._setup_mcp_integration()
+
+        return total_registered
+
     def _load_tool_configurations(self) -> None:
         """Load tool configurations from profiles.yaml.
 
@@ -583,8 +604,8 @@ class ToolRegistrar:
         except Exception as e:
             logger.warning(f"Failed to load tool configurations: {e}")
 
-    def _initialize_plugins(self) -> int:
-        """Initialize and load tool plugins.
+    def _load_plugin_tools(self) -> int:
+        """Discover, load, and register plugin tools.
 
         Returns:
             Number of plugin tools registered
@@ -632,6 +653,10 @@ class ToolRegistrar:
             logger.warning(f"Failed to initialize plugin system: {e}")
             self.plugin_manager = None
             return 0
+
+    def initialize_plugins(self) -> int:
+        """Initialize plugin tools via the canonical registrar API."""
+        return self._load_plugin_tools()
 
     def _setup_mcp_integration(self) -> int:
         """Set up MCP integration using registry or legacy client.

@@ -137,12 +137,22 @@ def test_service_persists_validation_result_via_registry_and_persistence_helper(
         task_id="django__123",
         validation_result=validation_result,
         score=score,
+        metadata={
+            "provider": "anthropic",
+            "model": "claude-sonnet",
+            "prompt_candidate_hash": "cand-123",
+            "section_name": "GROUNDING_RULES",
+        },
     )
 
     assert saved_path == tmp_path / "eval_session_swe_stub.json"
     assert captured["context"].benchmark == BenchmarkType.SWE_BENCH
     assert captured["context"].validation_result is validation_result
     assert captured["context"].score is score
+    assert captured["context"].metadata["provider"] == "anthropic"
+    assert captured["context"].metadata["model"] == "claude-sonnet"
+    assert captured["context"].metadata["prompt_candidate_hash"] == "cand-123"
+    assert captured["context"].metadata["section_name"] == "GROUNDING_RULES"
     assert captured["refresh_dir"] == tmp_path
     assert captured["refresh_when_empty"] is False
 

@@ -67,6 +67,495 @@ class CodeIntelligencePrewarmResult:
     graph_edges: int = 0
 
 
+def _resolve_benchmark_target(benchmark: str, dataset_path: Optional[Path]):
+    """Resolve a catalog benchmark into metadata, type, and runner instance."""
+    from victor.evaluation.protocol import (
+        BenchmarkType,
+        get_benchmark_catalog,
+        get_benchmark_metadata,
+        normalize_benchmark_name,
+        requires_local_manifest_benchmark,
+    )
+
+    benchmark_lower = normalize_benchmark_name(benchmark)
+    metadata = get_benchmark_metadata(benchmark_lower)
+    if metadata is None:
+        available = ", ".join(item.name for item in get_benchmark_catalog())
+        console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
+        console.print(f"Available: {available}")
+        raise typer.Exit(1)
+
+    from victor.evaluation.benchmarks import (
+        BrowserTaskBenchmarkRunner,
+        DeepResearchBenchmarkRunner,
+        SWEBenchRunner,
+        HumanEvalRunner,
+        MBPPRunner,
+    )
+
+    if requires_local_manifest_benchmark(metadata.type) and dataset_path is None:
+        console.print(
+            f"[bold red]Error:[/] Benchmark '{metadata.name}' requires --dataset-path "
+            "to load a local adapter manifest."
+        )
+        raise typer.Exit(1)
+
+    benchmark_key = metadata.name
+    benchmark_map = {
+        "swe-bench": (BenchmarkType.SWE_BENCH, SWEBenchRunner),
+        "swe-bench-lite": (
+            BenchmarkType.SWE_BENCH,
+            lambda: SWEBenchRunner(split="lite"),
+        ),
+        "humaneval": (BenchmarkType.HUMAN_EVAL, HumanEvalRunner),
+        "mbpp": (BenchmarkType.MBPP, MBPPRunner),
+        "mbpp-test": (BenchmarkType.MBPP, lambda: MBPPRunner(split="test")),
+        "dr3-eval": (
+            BenchmarkType.DR3_EVAL,
+            lambda: DeepResearchBenchmarkRunner(dataset_path),
+        ),
+        "clawbench": (
+            BenchmarkType.CLAW_BENCH,
+            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.CLAW_BENCH, dataset_path),
+        ),
+        "guide": (
+            BenchmarkType.GUIDE,
+            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.GUIDE, dataset_path),
+        ),
+        "vlaa-gui": (
+            BenchmarkType.VLAA_GUI,
+            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.VLAA_GUI, dataset_path),
+        ),
+    }
+
+    if benchmark_key not in benchmark_map:
+        console.print(
+            f"[yellow]Benchmark '{metadata.name}' is cataloged, but the runner adapter "
+            f"is not wired yet ({metadata.runner_status}).[/]"
+        )
+        raise typer.Exit(1)
+
+    bench_type, runner_factory = benchmark_map[benchmark_key]
+    runner = runner_factory() if callable(runner_factory) else runner_factory
+    return metadata, bench_type, runner
+
+
+def _resolve_account_selection(
+    account: Optional[str],
+    provider: Optional[str],
+    model: Optional[str],
+) -> tuple[Optional[str], Optional[str], Any]:
+    """Resolve an account override into provider/model selection."""
+    resolved_account = None
+    if not account:
+        return provider, model, resolved_account
+
+    from victor.config.accounts import get_account_manager
+
+    mgr = get_account_manager()
+    resolved_account = mgr.get_account(account)
+    if not resolved_account:
+        console.print(f"[bold red]Error:[/] Account '{account}' not found")
+        console.print("[dim]Run 'victor auth list' to see available accounts[/]")
+        raise typer.Exit(1)
+
+    provider = resolved_account.provider
+    if not model:
+        model = resolved_account.model
+    console.print(f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]")
+    return provider, model, resolved_account
+
+
+def _resolve_effective_model(profile: str, model: Optional[str]) -> str:
+    """Resolve the effective benchmark model from CLI override or profile."""
+    if model:
+        return model
+
+    from victor.config.settings import Settings
+
+    settings = Settings()
+    try:
+        profiles = settings.load_profiles()
+        profile_config = profiles.get(profile)
+        if profile_config:
+            return profile_config.model
+        console.print(f"[yellow]Warning:[/] Profile '{profile}' not found, using default model")
+        return "claude-3-sonnet"
+    except Exception as e:
+        console.print(f"[yellow]Warning:[/] Could not load profile: {e}")
+        return "claude-3-sonnet"
+
+
+def _attach_manifest_metadata(config, runner) -> None:
+    """Copy dataset manifest metadata from the runner into the evaluation config."""
+    manifest_metadata = getattr(runner, "manifest_metadata", None)
+    if manifest_metadata is not None and hasattr(manifest_metadata, "to_dict"):
+        config.dataset_metadata = manifest_metadata.to_dict()
+
+
+def _print_benchmark_header(
+    *,
+    title: str,
+    benchmark: str,
+    config,
+    max_tasks: Optional[int],
+    dataset_path: Optional[Path],
+    timeout: int,
+) -> None:
+    """Print the standard benchmark run header."""
+    provider = getattr(config, "provider", None)
+    prompt_section_name = getattr(config, "prompt_section_name", None)
+    prompt_candidate_hash = getattr(config, "prompt_candidate_hash", None)
+    dataset_metadata = getattr(config, "dataset_metadata", None) or {}
+
+    console.print(f"\n[bold cyan]{title}[/]")
+    console.print(f"Benchmark: {benchmark}")
+    console.print(f"Model: {config.model}")
+    if provider:
+        console.print(f"Provider: {provider}")
+    if prompt_section_name:
+        console.print(f"Prompt Section: {prompt_section_name}")
+    if prompt_candidate_hash:
+        console.print(f"Prompt Candidate: {prompt_candidate_hash}")
+    if max_tasks:
+        console.print(f"Max tasks: {max_tasks}")
+    if dataset_path is not None:
+        console.print(f"Dataset: {dataset_path}")
+    if dataset_metadata:
+        source = dataset_metadata.get("source_name")
+        version = dataset_metadata.get("version")
+        languages = dataset_metadata.get("languages") or []
+        if source:
+            console.print(f"Source: {source}")
+        if version:
+            console.print(f"Manifest Version: {version}")
+        if languages:
+            console.print(f"Languages: {', '.join(languages)}")
+    console.print(f"Timeout: {timeout}s per task")
+    console.print()
+
+
+def _print_prompt_candidate_suite_summary(suite) -> None:
+    """Print a compact comparison table for a prompt candidate suite."""
+    table = Table(title="Prompt Candidate Suite Summary")
+    table.add_column("Candidate", style="cyan")
+    table.add_column("Pass Rate", style="white")
+    table.add_column("Passed", style="green")
+    table.add_column("Failed", style="red")
+    table.add_column("Duration", style="white")
+
+    for run in suite.runs:
+        metrics = run.result.get_metrics()
+        table.add_row(
+            run.label,
+            f"{metrics['pass_rate']:.1%}",
+            str(metrics["passed"]),
+            str(metrics["failed"] + metrics["errors"] + metrics["timeouts"]),
+            f"{metrics['duration_seconds']:.1f}s",
+        )
+
+    console.print(table)
+    best = suite.best_run()
+    if best is not None:
+        console.print(
+            f"[bold green]Best candidate:[/] {best.label} "
+            f"({best.result.pass_rate:.1%} pass rate)"
+        )
+
+
+def _serialize_prompt_candidate_suite(
+    benchmark: str,
+    prompt_section: str,
+    suite,
+    prompt_optimizer_sync: Optional[object] = None,
+    prompt_rollout: Optional[dict[str, Any]] = None,
+    prompt_rollout_analysis: Optional[dict[str, Any]] = None,
+    prompt_rollout_decision: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Serialize suite results to a stable JSON-friendly structure."""
+    best = suite.best_run()
+    payload = {
+        "benchmark": benchmark,
+        "model": suite.base_config.model,
+        "provider": suite.base_config.provider,
+        "section_name": prompt_section,
+        "prompt_section_name": prompt_section,
+        "config": suite.base_config.to_artifact_config(),
+        "best_label": best.label if best is not None else None,
+        "best_prompt_candidate_hash": (
+            best.config.prompt_candidate_hash if best is not None else None
+        ),
+        "runs": [
+            {
+                "label": run.label,
+                "provider": run.config.provider,
+                "prompt_candidate_hash": run.config.prompt_candidate_hash,
+                "section_name": run.config.prompt_section_name,
+                "metrics": run.result.get_metrics(),
+                "task_results": [
+                    {
+                        "task_id": task_result.task_id,
+                        "status": task_result.status.value,
+                        "tests_passed": task_result.tests_passed,
+                        "tests_total": task_result.tests_total,
+                        "duration": task_result.duration_seconds,
+                        "tool_calls": task_result.tool_calls,
+                        "code_search_calls": task_result.code_search_calls,
+                        "graph_calls": task_result.graph_calls,
+                        "failure_category": (
+                            task_result.failure_category.value
+                            if task_result.failure_category
+                            else None
+                        ),
+                        "failure_details": task_result.failure_details,
+                    }
+                    for task_result in run.result.task_results
+                ],
+            }
+            for run in suite.runs
+        ],
+    }
+    if prompt_optimizer_sync is not None and hasattr(prompt_optimizer_sync, "to_dict"):
+        payload["prompt_optimizer_sync"] = prompt_optimizer_sync.to_dict()
+    if prompt_rollout is not None:
+        payload["prompt_rollout"] = prompt_rollout
+    if prompt_rollout_analysis is not None:
+        payload["prompt_rollout_analysis"] = prompt_rollout_analysis
+    if prompt_rollout_decision is not None:
+        payload["prompt_rollout_decision"] = prompt_rollout_decision
+    return payload
+
+
+def _sync_prompt_candidate_suite_to_optimizer(
+    suite,
+    *,
+    min_pass_rate: float = 0.5,
+    promote_best: bool = False,
+):
+    """Record prompt-candidate suite scores into prompt-optimizer benchmark state."""
+    from victor.framework.rl.coordinator import get_rl_coordinator
+
+    coordinator = get_rl_coordinator()
+    learner = coordinator.get_learner("prompt_optimizer")
+    if learner is None or not hasattr(learner, "sync_evaluation_suite"):
+        raise ValueError("prompt optimizer not available")
+    return learner.sync_evaluation_suite(
+        suite,
+        min_pass_rate=min_pass_rate,
+        promote_best=promote_best,
+    )
+
+
+def _create_prompt_rollout_from_suite_sync(
+    sync_result,
+    suite,
+    *,
+    control_hash: Optional[str] = None,
+    traffic_split: float = 0.1,
+    min_samples_per_variant: int = 100,
+) -> str:
+    """Create a rollout experiment for the benchmark-approved suite winner."""
+    context = _resolve_prompt_rollout_context(sync_result, suite)
+
+    from victor.framework.rl import create_prompt_rollout_experiment
+
+    experiment_id = create_prompt_rollout_experiment(
+        section_name=context["section_name"],
+        provider=context["provider"],
+        treatment_hash=context["prompt_candidate_hash"],
+        control_hash=control_hash,
+        traffic_split=traffic_split,
+        min_samples_per_variant=min_samples_per_variant,
+    )
+    if not experiment_id:
+        raise ValueError("unable to start prompt rollout experiment")
+    return experiment_id
+
+
+def _get_prompt_rollout_auto_action(result: object) -> Optional[str]:
+    """Infer the safe rollout action from experiment analysis."""
+    recommendation = getattr(result, "recommendation", "")
+    is_significant = bool(getattr(result, "is_significant", False))
+    treatment_better = bool(getattr(result, "treatment_better", False))
+
+    if recommendation.startswith("Roll out treatment") and is_significant and treatment_better:
+        return "rollout"
+    if recommendation.startswith("Keep control") and is_significant and not treatment_better:
+        return "rollback"
+    return None
+
+
+def _resolve_prompt_rollout_context(sync_result, suite) -> dict[str, str]:
+    """Resolve approved candidate rollout identity from suite sync state."""
+    approved_hash = getattr(sync_result, "approved_prompt_candidate_hash", None)
+    if not approved_hash:
+        raise ValueError("no benchmark-approved candidate available for rollout")
+
+    section_name = None
+    provider = None
+
+    for decision in getattr(sync_result, "decisions", []) or []:
+        if getattr(decision, "prompt_candidate_hash", None) != approved_hash:
+            continue
+        section_name = getattr(decision, "section_name", None)
+        provider = getattr(decision, "provider", None)
+        if section_name and provider:
+            break
+
+    if not section_name or not provider:
+        for run in getattr(suite, "runs", []) or []:
+            config = getattr(run, "config", None)
+            if getattr(config, "prompt_candidate_hash", None) != approved_hash:
+                continue
+            section_name = getattr(config, "prompt_section_name", None)
+            provider = getattr(config, "provider", None)
+            if section_name and provider:
+                break
+
+    if not section_name or not provider:
+        raise ValueError("approved candidate metadata unavailable for rollout")
+
+    experiment_id = f"prompt_optimizer_{section_name.lower()}_{provider}_{approved_hash}"
+    return {
+        "experiment_id": experiment_id,
+        "section_name": section_name,
+        "provider": provider,
+        "prompt_candidate_hash": approved_hash,
+    }
+
+
+def _analyze_prompt_rollout_for_suite_sync(sync_result, suite) -> dict[str, Any]:
+    """Analyze the rollout experiment associated with the approved suite winner."""
+    from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
+
+    context = _resolve_prompt_rollout_context(sync_result, suite)
+    coordinator = get_experiment_coordinator()
+    status = coordinator.get_experiment_status(context["experiment_id"])
+    if status is None:
+        raise ValueError(f"prompt rollout experiment not found: {context['experiment_id']}")
+
+    result = coordinator.analyze_experiment(context["experiment_id"])
+    if result is None:
+        return {
+            **context,
+            "status": status.get("status"),
+            "analysis_available": False,
+            "recommendation": "Prompt rollout analysis unavailable",
+            "auto_action": None,
+            "details": {},
+        }
+
+    return {
+        **context,
+        "status": status.get("status"),
+        "analysis_available": True,
+        "recommendation": result.recommendation,
+        "auto_action": _get_prompt_rollout_auto_action(result),
+        "is_significant": result.is_significant,
+        "treatment_better": result.treatment_better,
+        "effect_size": result.effect_size,
+        "p_value": result.p_value,
+        "confidence_interval": result.confidence_interval,
+        "details": result.details,
+    }
+
+
+def _print_prompt_rollout_analysis_summary(report: dict[str, Any]) -> None:
+    """Print rollout analysis for the approved suite winner."""
+    console.print("\n[bold cyan]Prompt rollout analysis[/]")
+    console.print(f"Experiment: {report.get('experiment_id', '-')}")
+    console.print(f"Status: {report.get('status', '-')}")
+    if not report.get("analysis_available", False):
+        console.print(f"[yellow]{report.get('recommendation', 'Analysis unavailable')}[/]")
+        return
+
+    console.print(f"Recommendation: {report.get('recommendation', '-')}")
+    console.print(f"Auto-apply action: {report.get('auto_action') or 'none'}")
+    console.print(f"Significant: {'yes' if report.get('is_significant') else 'no'}")
+    console.print(f"Treatment better: {'yes' if report.get('treatment_better') else 'no'}")
+    console.print(f"Effect size: {float(report.get('effect_size', 0.0)):.1%}")
+    console.print(f"P-value: {float(report.get('p_value', 1.0)):.4f}")
+
+
+def _apply_prompt_rollout_analysis_sync(
+    report: dict[str, Any],
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Apply the rollout analysis recommendation when it is actionable."""
+    if not report.get("analysis_available", False):
+        raise ValueError("prompt rollout analysis unavailable")
+
+    action = report.get("auto_action")
+    if not action:
+        return {
+            "experiment_id": report.get("experiment_id"),
+            "action": None,
+            "applied": False,
+            "dry_run": dry_run,
+            "reason": report.get("recommendation"),
+        }
+
+    if dry_run:
+        return {
+            "experiment_id": report.get("experiment_id"),
+            "action": action,
+            "applied": False,
+            "dry_run": True,
+        }
+
+    from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
+
+    coordinator = get_experiment_coordinator()
+    if action == "rollout":
+        updated = coordinator.rollout_treatment(report["experiment_id"])
+    else:
+        updated = coordinator.rollback_experiment(report["experiment_id"])
+
+    if not updated:
+        raise ValueError(f"unable to apply prompt rollout decision for {report['experiment_id']}")
+
+    return {
+        "experiment_id": report.get("experiment_id"),
+        "action": action,
+        "applied": True,
+        "dry_run": False,
+    }
+
+
+def _print_prompt_optimizer_sync_summary(sync_result) -> None:
+    """Print the outcome of syncing a prompt suite into the optimizer state."""
+    console.print("\n[bold cyan]Prompt optimizer benchmark sync[/]")
+    if not getattr(sync_result, "decisions", None):
+        console.print("[yellow]No prompt candidates were updated.[/]")
+        return
+
+    for decision in sync_result.decisions:
+        status_parts = []
+        if getattr(decision, "recorded", False):
+            status_parts.append("recorded")
+        else:
+            status_parts.append("missing")
+        if getattr(decision, "passed", False):
+            status_parts.append("approved")
+        if getattr(decision, "promoted", False):
+            status_parts.append("promoted")
+        console.print(
+            "  "
+            f"#{decision.rank} {decision.section_name}:{decision.provider}:{decision.prompt_candidate_hash} "
+            f"pass_rate={decision.score:.1%} [{', '.join(status_parts)}]"
+        )
+
+    promoted_hash = getattr(sync_result, "promoted_prompt_candidate_hash", None)
+    approved_hash = getattr(sync_result, "approved_prompt_candidate_hash", None)
+    if promoted_hash:
+        console.print(f"[bold green]Promoted best candidate:[/] {promoted_hash}")
+    elif approved_hash:
+        console.print(f"[bold green]Approved best candidate:[/] {approved_hash}")
+    else:
+        console.print("[yellow]No candidate met the benchmark approval threshold.[/]")
+
+
 def _ensure_benchmark_runtime_tools(adapter) -> object:
     """Fail fast when the benchmark session is missing required core tools."""
     readiness = adapter.get_benchmark_tool_readiness()
@@ -418,12 +907,18 @@ def run_benchmark(
     prompt_candidate_hash: Optional[str] = typer.Option(
         None,
         "--prompt-candidate-hash",
-        help="Attach an evaluated prompt candidate hash to saved benchmark artifacts.",
+        help=(
+            "Bind one exact prompt candidate hash into the live benchmark run and persist it "
+            "in saved artifacts."
+        ),
     ),
     prompt_section: Optional[str] = typer.Option(
         None,
         "--prompt-section",
-        help="Attach the evaluated prompt section name to saved benchmark artifacts.",
+        help=(
+            "Bind one exact prompt section into the live benchmark run and persist it in "
+            "saved artifacts."
+        ),
     ),
     log_level: Optional[str] = typer.Option(
         None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
@@ -454,114 +949,11 @@ def run_benchmark(
 
         get_feature_flag_manager().disable(FeatureFlag.USE_EDGE_MODEL)
 
-    from victor.config.settings import Settings
-    from victor.evaluation.protocol import (
-        BenchmarkType,
-        EvaluationConfig,
-        get_benchmark_catalog,
-        get_benchmark_metadata,
-        requires_local_manifest_benchmark,
-        normalize_benchmark_name,
-    )
+    from victor.evaluation.protocol import EvaluationConfig
 
-    benchmark_lower = normalize_benchmark_name(benchmark)
-    metadata = get_benchmark_metadata(benchmark_lower)
-    if metadata is None:
-        available = ", ".join(item.name for item in get_benchmark_catalog())
-        console.print(f"[bold red]Error:[/] Unknown benchmark: {benchmark}")
-        console.print(f"Available: {available}")
-        raise typer.Exit(1)
-
-    from victor.evaluation.benchmarks import (
-        BrowserTaskBenchmarkRunner,
-        DeepResearchBenchmarkRunner,
-        SWEBenchRunner,
-        HumanEvalRunner,
-        MBPPRunner,
-    )
-
-    if requires_local_manifest_benchmark(metadata.type) and dataset_path is None:
-        console.print(
-            f"[bold red]Error:[/] Benchmark '{metadata.name}' requires --dataset-path "
-            "to load a local adapter manifest."
-        )
-        raise typer.Exit(1)
-
-    benchmark_key = metadata.name
-
-    # Map benchmark name to type and runner
-    benchmark_map = {
-        "swe-bench": (BenchmarkType.SWE_BENCH, SWEBenchRunner),
-        "swe-bench-lite": (
-            BenchmarkType.SWE_BENCH,
-            lambda: SWEBenchRunner(split="lite"),
-        ),
-        "humaneval": (BenchmarkType.HUMAN_EVAL, HumanEvalRunner),
-        "mbpp": (BenchmarkType.MBPP, MBPPRunner),
-        "mbpp-test": (BenchmarkType.MBPP, lambda: MBPPRunner(split="test")),
-        "dr3-eval": (
-            BenchmarkType.DR3_EVAL,
-            lambda: DeepResearchBenchmarkRunner(dataset_path),
-        ),
-        "clawbench": (
-            BenchmarkType.CLAW_BENCH,
-            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.CLAW_BENCH, dataset_path),
-        ),
-        "guide": (
-            BenchmarkType.GUIDE,
-            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.GUIDE, dataset_path),
-        ),
-        "vlaa-gui": (
-            BenchmarkType.VLAA_GUI,
-            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.VLAA_GUI, dataset_path),
-        ),
-    }
-
-    if benchmark_key not in benchmark_map:
-        console.print(
-            f"[yellow]Benchmark '{metadata.name}' is cataloged, but the runner adapter "
-            f"is not wired yet ({metadata.runner_status}).[/]"
-        )
-        raise typer.Exit(1)
-
-    bench_type, runner_factory = benchmark_map[benchmark_key]
-    runner = runner_factory() if callable(runner_factory) else runner_factory
-
-    # Resolve account if specified (overrides --profile and --provider)
-    resolved_account = None
-    if account:
-        from victor.config.accounts import get_account_manager
-
-        mgr = get_account_manager()
-        resolved_account = mgr.get_account(account)
-        if not resolved_account:
-            console.print(f"[bold red]Error:[/] Account '{account}' not found")
-            console.print("[dim]Run 'victor auth list' to see available accounts[/]")
-            raise typer.Exit(1)
-        # Account overrides provider and model (unless --model explicitly given)
-        provider = resolved_account.provider
-        if not model:
-            model = resolved_account.model
-        console.print(f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]")
-
-    # Load profile to get model if not specified
-    effective_model = model
-    if not effective_model:
-        settings = Settings()
-        try:
-            profiles = settings.load_profiles()
-            profile_config = profiles.get(profile)
-            if profile_config:
-                # ProfileConfig is a Pydantic model with .model attribute
-                effective_model = profile_config.model
-            else:
-                console.print(
-                    f"[yellow]Warning:[/] Profile '{profile}' not found, using default model"
-                )
-                effective_model = "claude-3-sonnet"
-        except Exception as e:
-            console.print(f"[yellow]Warning:[/] Could not load profile: {e}")
-            effective_model = "claude-3-sonnet"
+    _metadata, bench_type, runner = _resolve_benchmark_target(benchmark, dataset_path)
+    provider, model, resolved_account = _resolve_account_selection(account, provider, model)
+    effective_model = _resolve_effective_model(profile, model)
 
     # Build config — account for start_task offset in max_tasks
     effective_max_tasks = max_tasks
@@ -583,34 +975,15 @@ def run_benchmark(
         max_turns=max_turns,
         parallel_tasks=parallel,
     )
-    manifest_metadata = getattr(runner, "manifest_metadata", None)
-    if manifest_metadata is not None and hasattr(manifest_metadata, "to_dict"):
-        config.dataset_metadata = manifest_metadata.to_dict()
-
-    console.print(f"\n[bold cyan]Running {benchmark} benchmark[/]")
-    console.print(f"Model: {config.model}")
-    if config.provider:
-        console.print(f"Provider: {config.provider}")
-    if config.prompt_section_name:
-        console.print(f"Prompt Section: {config.prompt_section_name}")
-    if config.prompt_candidate_hash:
-        console.print(f"Prompt Candidate: {config.prompt_candidate_hash}")
-    if max_tasks:
-        console.print(f"Max tasks: {max_tasks}")
-    if dataset_path is not None:
-        console.print(f"Dataset: {dataset_path}")
-    if config.dataset_metadata:
-        source = config.dataset_metadata.get("source_name")
-        version = config.dataset_metadata.get("version")
-        languages = config.dataset_metadata.get("languages") or []
-        if source:
-            console.print(f"Source: {source}")
-        if version:
-            console.print(f"Manifest Version: {version}")
-        if languages:
-            console.print(f"Languages: {', '.join(languages)}")
-    console.print(f"Timeout: {timeout}s per task")
-    console.print()
+    _attach_manifest_metadata(config, runner)
+    _print_benchmark_header(
+        title=f"Running {benchmark} benchmark",
+        benchmark=benchmark,
+        config=config,
+        max_tasks=max_tasks,
+        dataset_path=dataset_path,
+        timeout=timeout,
+    )
     result = run_sync(
         _run_benchmark_async(
             runner=runner,
@@ -765,6 +1138,311 @@ def run_benchmark(
         console.print(f"\n[dim]Results saved to {output}[/]")
 
 
+@benchmark_app.command("run-prompt-suite")
+def run_prompt_suite(
+    benchmark: str = typer.Argument(
+        ...,
+        help="Benchmark to run: swe-bench, humaneval, mbpp, clawbench, guide, vlaa-gui",
+    ),
+    prompt_section: str = typer.Option(
+        ...,
+        "--prompt-section",
+        help="Prompt section shared by all candidates in this suite.",
+    ),
+    candidate_hashes: list[str] = typer.Option(
+        ...,
+        "--candidate-hash",
+        help="Prompt candidate hash to evaluate. Repeat once per candidate.",
+    ),
+    max_tasks: Optional[int] = typer.Option(
+        None, "--max-tasks", "-n", help="Maximum number of tasks to run"
+    ),
+    start_task: int = typer.Option(
+        0, "--start-task", help="Skip first N tasks (0-indexed, for targeting specific tasks)"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m", help="Model to use (default: from profile)"
+    ),
+    profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to use"),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Output file for suite summary (JSON)"
+    ),
+    dataset_path: Optional[Path] = typer.Option(
+        None,
+        "--dataset-path",
+        help="Local JSON/JSONL dataset manifest for external benchmark adapters",
+    ),
+    timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
+    max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
+    parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        "-r",
+        help="Resume from checkpoint if previous run was interrupted",
+    ),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="Override provider (e.g., deepseek, openai, xai)"
+    ),
+    log_level: Optional[str] = typer.Option(
+        None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
+    ),
+    debug_modules: Optional[str] = typer.Option(
+        None,
+        "--debug-modules",
+        help="Comma-separated modules for DEBUG logging (e.g. code_search,agent_adapter)",
+    ),
+    no_edge_model: bool = typer.Option(
+        False,
+        "--no-edge-model",
+        help="Disable edge model micro-decisions during benchmark",
+    ),
+    account: Optional[str] = typer.Option(
+        None,
+        "--account",
+        "-a",
+        help="Use a configured account (e.g., openai-oauth). Overrides --profile/--provider.",
+    ),
+    record_benchmark_results: bool = typer.Option(
+        False,
+        "--record-benchmark-results",
+        help="Record suite pass-rate evidence back into prompt-optimizer benchmark state.",
+    ),
+    promote_best: bool = typer.Option(
+        False,
+        "--promote-best",
+        help="Promote the best benchmark-approved candidate after recording suite results.",
+    ),
+    create_rollout: bool = typer.Option(
+        False,
+        "--create-rollout",
+        help="Create a prompt rollout experiment for the benchmark-approved suite winner.",
+    ),
+    rollout_control_hash: Optional[str] = typer.Option(
+        None,
+        "--rollout-control-hash",
+        help="Optional control candidate hash to use for the rollout experiment.",
+    ),
+    rollout_traffic_split: float = typer.Option(
+        0.1,
+        "--rollout-traffic-split",
+        help="Traffic split to use when creating a prompt rollout experiment.",
+    ),
+    rollout_min_samples_per_variant: int = typer.Option(
+        100,
+        "--rollout-min-samples-per-variant",
+        help="Minimum samples per variant for the created prompt rollout experiment.",
+    ),
+    analyze_rollout: bool = typer.Option(
+        False,
+        "--analyze-rollout",
+        help="Analyze the approved winner's prompt rollout experiment, if one exists.",
+    ),
+    apply_rollout_decision: bool = typer.Option(
+        False,
+        "--apply-rollout-decision",
+        help="Apply the rollout analysis recommendation when it is clearly actionable.",
+    ),
+    rollout_decision_dry_run: bool = typer.Option(
+        False,
+        "--rollout-decision-dry-run",
+        help="Report the rollout decision that would be applied without changing experiment state.",
+    ),
+    min_approval_pass_rate: float = typer.Option(
+        0.5,
+        "--min-approval-pass-rate",
+        min=0.0,
+        max=1.0,
+        help="Minimum pass rate the suite winner must reach before benchmark approval.",
+    ),
+) -> None:
+    """Run one benchmark evaluation per prompt candidate and drive rollout decisions safely."""
+    _configure_log_level(log_level, debug_modules=debug_modules)
+
+    if promote_best and not record_benchmark_results:
+        console.print("[bold red]Error:[/] --promote-best requires --record-benchmark-results")
+        raise typer.Exit(1)
+    if create_rollout and not record_benchmark_results:
+        console.print("[bold red]Error:[/] --create-rollout requires --record-benchmark-results")
+        raise typer.Exit(1)
+    if create_rollout and promote_best:
+        console.print("[bold red]Error:[/] --create-rollout cannot be combined with --promote-best")
+        raise typer.Exit(1)
+    if analyze_rollout and not record_benchmark_results:
+        console.print("[bold red]Error:[/] --analyze-rollout requires --record-benchmark-results")
+        raise typer.Exit(1)
+    if apply_rollout_decision and not analyze_rollout:
+        console.print("[bold red]Error:[/] --apply-rollout-decision requires --analyze-rollout")
+        raise typer.Exit(1)
+    if apply_rollout_decision and promote_best:
+        console.print("[bold red]Error:[/] --apply-rollout-decision cannot be combined with --promote-best")
+        raise typer.Exit(1)
+    if create_rollout and not 0.0 < rollout_traffic_split < 1.0:
+        console.print("[bold red]Error:[/] --rollout-traffic-split must be between 0 and 1")
+        raise typer.Exit(1)
+    if create_rollout and rollout_min_samples_per_variant <= 0:
+        console.print(
+            "[bold red]Error:[/] --rollout-min-samples-per-variant must be greater than 0"
+        )
+        raise typer.Exit(1)
+
+    if no_edge_model:
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        get_feature_flag_manager().disable(FeatureFlag.USE_EDGE_MODEL)
+
+    from victor.evaluation import EvaluationConfig, PromptCandidateEvaluationSpec
+
+    _metadata, bench_type, runner = _resolve_benchmark_target(benchmark, dataset_path)
+    provider, model, resolved_account = _resolve_account_selection(account, provider, model)
+    effective_model = _resolve_effective_model(profile, model)
+
+    effective_max_tasks = max_tasks
+    if not isinstance(start_task, int):
+        start_task = 0
+    if start_task > 0 and max_tasks is not None:
+        effective_max_tasks = max_tasks + start_task
+
+    base_config = EvaluationConfig(
+        benchmark=bench_type,
+        model=effective_model,
+        provider=provider,
+        max_tasks=effective_max_tasks,
+        timeout_per_task=timeout,
+        max_turns=max_turns,
+        parallel_tasks=parallel,
+    )
+    _attach_manifest_metadata(base_config, runner)
+
+    _print_benchmark_header(
+        title=f"Running {benchmark} prompt candidate suite",
+        benchmark=benchmark,
+        config=base_config,
+        max_tasks=max_tasks,
+        dataset_path=dataset_path,
+        timeout=timeout,
+    )
+    console.print(f"Prompt Section: {prompt_section}")
+    console.print(f"Candidate Count: {len(candidate_hashes)}")
+    for candidate_hash in candidate_hashes:
+        console.print(f"  - {candidate_hash}")
+    console.print()
+
+    candidate_specs = [
+        PromptCandidateEvaluationSpec(
+            section_name=prompt_section,
+            prompt_candidate_hash=candidate_hash,
+            provider=provider,
+        )
+        for candidate_hash in candidate_hashes
+    ]
+
+    suite = run_sync(
+        _run_prompt_candidate_suite_async(
+            runner=runner,
+            base_config=base_config,
+            candidate_specs=candidate_specs,
+            profile=profile,
+            model=model,
+            timeout=timeout,
+            max_turns=max_turns,
+            resume=resume,
+            provider_override=provider,
+            start_task=start_task,
+            resolved_account=resolved_account,
+        )
+    )
+
+    if suite is None:
+        raise typer.Exit(1)
+
+    _print_prompt_candidate_suite_summary(suite)
+    prompt_optimizer_sync = None
+    prompt_rollout: Optional[dict[str, Any]] = None
+    prompt_rollout_analysis: Optional[dict[str, Any]] = None
+    prompt_rollout_decision: Optional[dict[str, Any]] = None
+    if record_benchmark_results:
+        try:
+            prompt_optimizer_sync = _sync_prompt_candidate_suite_to_optimizer(
+                suite,
+                min_pass_rate=min_approval_pass_rate,
+                promote_best=promote_best,
+            )
+        except ValueError as exc:
+            console.print(f"[bold red]Error:[/] {exc}")
+            raise typer.Exit(1) from exc
+        _print_prompt_optimizer_sync_summary(prompt_optimizer_sync)
+        if create_rollout:
+            try:
+                experiment_id = _create_prompt_rollout_from_suite_sync(
+                    prompt_optimizer_sync,
+                    suite,
+                    control_hash=rollout_control_hash,
+                    traffic_split=rollout_traffic_split,
+                    min_samples_per_variant=rollout_min_samples_per_variant,
+                )
+            except ValueError as exc:
+                prompt_rollout = {"created": False, "error": str(exc)}
+                console.print(f"[yellow]Prompt rollout not created:[/] {exc}")
+            else:
+                prompt_rollout = {"created": True, "experiment_id": experiment_id}
+                console.print(f"[bold green]Prompt rollout experiment started:[/] {experiment_id}")
+        if analyze_rollout:
+            try:
+                prompt_rollout_analysis = _analyze_prompt_rollout_for_suite_sync(
+                    prompt_optimizer_sync,
+                    suite,
+                )
+            except ValueError as exc:
+                prompt_rollout_analysis = {
+                    "analysis_available": False,
+                    "recommendation": str(exc),
+                }
+                console.print(f"[yellow]Prompt rollout analysis unavailable:[/] {exc}")
+            else:
+                _print_prompt_rollout_analysis_summary(prompt_rollout_analysis)
+            if apply_rollout_decision and prompt_rollout_analysis is not None:
+                try:
+                    prompt_rollout_decision = _apply_prompt_rollout_analysis_sync(
+                        prompt_rollout_analysis,
+                        dry_run=rollout_decision_dry_run,
+                    )
+                except ValueError as exc:
+                    prompt_rollout_decision = {
+                        "applied": False,
+                        "dry_run": rollout_decision_dry_run,
+                        "error": str(exc),
+                    }
+                    console.print(f"[yellow]Prompt rollout decision not applied:[/] {exc}")
+                else:
+                    action = prompt_rollout_decision.get("action")
+                    if action and prompt_rollout_decision.get("applied"):
+                        console.print(f"[bold green]Prompt rollout decision applied:[/] {action}")
+                    elif action and prompt_rollout_decision.get("dry_run"):
+                        console.print(
+                            f"[cyan]Prompt rollout decision dry-run:[/] would apply {action}"
+                        )
+                    else:
+                        console.print(
+                            "[yellow]Prompt rollout decision not applied:[/] "
+                            f"{prompt_rollout_decision.get('reason', 'no actionable recommendation')}"
+                        )
+
+    if output:
+        output_data = _serialize_prompt_candidate_suite(
+            benchmark,
+            prompt_section,
+            suite,
+            prompt_optimizer_sync=prompt_optimizer_sync,
+            prompt_rollout=prompt_rollout,
+            prompt_rollout_analysis=prompt_rollout_analysis,
+            prompt_rollout_decision=prompt_rollout_decision,
+        )
+        output_data["timestamp"] = datetime.now().isoformat()
+        output.write_text(json.dumps(output_data, indent=2))
+        console.print(f"\n[dim]Suite summary saved to {output}[/]")
+
+
 async def _setup_benchmark_async(
     *,
     benchmark: str,
@@ -880,12 +1558,20 @@ async def _run_benchmark_async(
 
         progress.update(task, description="Initializing agent...")
         try:
-            from victor.evaluation.agent_adapter import AdapterConfig
+            from victor.evaluation.agent_adapter import AdapterConfig, PromptOptimizationBinding
 
             adapter_config = AdapterConfig(
                 total_timeout=timeout,
                 max_turns=max_turns,
                 min_turn_timeout=max(240, timeout // max(max_turns, 1)),
+                prompt_binding=(
+                    PromptOptimizationBinding(
+                        section_name=config.prompt_section_name,
+                        prompt_candidate_hash=config.prompt_candidate_hash,
+                    )
+                    if config.prompt_candidate_hash and config.prompt_section_name
+                    else None
+                ),
             )
             # Bootstrap edge model decision service into the container
             # so tool selection, prompt focus, and stage detection can use it.
@@ -1138,6 +1824,60 @@ async def _run_benchmark_async(
             progress_callback=on_progress,
             resume=resume,
         )
+
+
+async def _run_prompt_candidate_suite_async(
+    *,
+    runner,
+    base_config,
+    candidate_specs,
+    profile: str,
+    model: Optional[str],
+    timeout: int,
+    max_turns: int,
+    resume: bool,
+    provider_override: Optional[str] = None,
+    start_task: int = 0,
+    resolved_account=None,
+):
+    """Run one benchmark evaluation per prompt candidate and return the suite result."""
+    from victor.evaluation import (
+        PromptCandidateEvaluationRun,
+        PromptCandidateEvaluationSuiteResult,
+        bind_prompt_candidate_evaluation_config,
+    )
+
+    runs = []
+    total_candidates = len(candidate_specs)
+
+    for idx, spec in enumerate(candidate_specs, start=1):
+        bound_config = bind_prompt_candidate_evaluation_config(base_config, spec)
+        label = spec.resolved_label(bound_config.provider)
+        console.print(f"[bold cyan]Candidate {idx}/{total_candidates}:[/] {label}")
+        result = await _run_benchmark_async(
+            runner=runner,
+            config=bound_config,
+            profile=profile,
+            model=model,
+            timeout=timeout,
+            max_turns=max_turns,
+            resume=resume,
+            provider_override=provider_override or spec.provider,
+            start_task=start_task,
+            resolved_account=resolved_account,
+        )
+        if result is None:
+            return None
+        runs.append(
+            PromptCandidateEvaluationRun(
+                spec=spec,
+                config=bound_config,
+                result=result,
+                label=label,
+            )
+        )
+
+    return PromptCandidateEvaluationSuiteResult(base_config=base_config, runs=runs)
 
 
 @benchmark_app.command("compare")

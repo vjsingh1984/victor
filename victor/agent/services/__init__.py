@@ -28,6 +28,18 @@ Services:
         prompt rollout helpers for benchmark-gated prompt optimization
     SessionService: Session lifecycle management
     LLMDecisionService: LLM-assisted decision making fallback
+
+Deprecated compatibility exports retained here:
+    PromptRuntimeAdapter: Canonical DI/runtime adapter for PromptRuntimeProtocol
+    PromptRuntimeSupport: Canonical internal fallback support for orchestrator
+        prompt helper seams when UnifiedPromptPipeline is unavailable
+    PromptCoordinator: Deprecated shim; canonical target is UnifiedPromptPipeline
+    SessionCoordinator: Deprecated shim; canonical target is SessionService
+    StateCoordinator: Deprecated shim; live state belongs to ConversationController
+        and ConversationStateMachine, while StateService persists vertical state
+    StreamingRecoveryCoordinator: Deprecated shim; canonical target is RecoveryService
+    ToolCoordinator: Deprecated shim; canonical target is ToolService
+    SystemPromptCoordinator: Deprecated wrapper over UnifiedPromptPipeline
 """
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
@@ -56,6 +68,12 @@ from victor.agent.services.rl_runtime import (
     reset_rl_coordinator,
 )
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.services.prompt_runtime import (
+    PromptRuntimeAdapter,
+    PromptRuntimeConfig,
+    PromptRuntimeContext,
+)
+from victor.agent.services.prompt_runtime_support import PromptRuntimeSupport
 from victor.agent.services.prompt_compat import (
     IPromptCoordinator,
     PromptCoordinator,
@@ -125,6 +143,10 @@ __all__ = [
     "PlanningCoordinator",
     "PlanningMode",
     "PlanningResult",
+    "PromptRuntimeAdapter",
+    "PromptRuntimeConfig",
+    "PromptRuntimeContext",
+    "PromptRuntimeSupport",
     "PromptCoordinator",
     "PromptCoordinatorConfig",
     "PromptTaskContext",

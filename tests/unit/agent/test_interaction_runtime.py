@@ -120,6 +120,7 @@ def test_create_session_coordinator_shim_lazy_materialization():
             memory_manager=memory_manager,
             checkpoint_manager=checkpoint_manager,
             cost_tracker=cost_tracker,
+            warn_on_init=False,
         )
         session_coordinator.bind_session_service.assert_called_once_with(session_service)
 
@@ -184,6 +185,7 @@ def test_create_tool_coordinator_shim_lazy_materialization():
             tool_registry=tool_registry,
             tool_selector=tool_selector,
             tool_access_controller=tool_access_controller,
+            warn_on_init=False,
         )
         tool_coordinator.set_mode_controller.assert_called_once_with(mode_controller)
         tool_coordinator.bind_tool_service.assert_called_once_with(tool_service)

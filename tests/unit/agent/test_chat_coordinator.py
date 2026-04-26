@@ -99,7 +99,7 @@ def mock_orchestrator():
     )
 
     # Tool calls handler
-    orch._handle_tool_calls = AsyncMock(return_value=[])
+    orch.execute_tool_calls = AsyncMock(return_value=[])
 
     # Task coordinator
     orch.task_coordinator = MagicMock()

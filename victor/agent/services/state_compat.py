@@ -16,7 +16,10 @@
 
 This module hosts the deprecated StateCoordinator compatibility shim while
 service-first orchestration keeps state management outside the orchestrator
-facade path.
+facade path. Live conversation-stage state is now owned by
+``ConversationController`` and ``ConversationStateMachine`` boundaries.
+Persisted vertical state lives in ``victor.agent.state_service.StateService``;
+that persistence service is not a drop-in replacement for this coordinator.
 
 The legacy ``victor.agent.state_coordinator`` module now re-exports this
 implementation for compatibility.
@@ -25,6 +28,7 @@ implementation for compatibility.
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -50,6 +54,13 @@ if TYPE_CHECKING:
     from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)
+
+_STATE_COORDINATOR_DEPRECATION_MESSAGE = (
+    "StateCoordinator is deprecated. Use ConversationController / "
+    "ConversationStateMachine for active conversation stage state, and use "
+    "victor.agent.state_service.StateService only for persisted vertical state. "
+    "This adapter will be removed in a future release."
+)
 
 
 @dataclass
@@ -135,6 +146,7 @@ class StateCoordinator:
         state_machine: Optional["ConversationStateMachine"] = None,
         config: Optional[StateCoordinatorConfig] = None,
         on_stage_change: Optional[Callable[[ConversationStage, ConversationStage], None]] = None,
+        warn_on_init: bool = True,
     ) -> None:
         """Initialize the StateCoordinator.
 
@@ -143,7 +155,15 @@ class StateCoordinator:
             state_machine: Optional state machine for stage detection
             config: Configuration options
             on_stage_change: Callback when stage changes (old, new)
+            warn_on_init: Emit a deprecation warning for direct compatibility use
         """
+        if warn_on_init:
+            warnings.warn(
+                _STATE_COORDINATOR_DEPRECATION_MESSAGE,
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self._controller = conversation_controller
         self._state_machine = state_machine
         self._config = config or StateCoordinatorConfig()
@@ -435,6 +455,7 @@ def create_state_coordinator(
     conversation_controller: "ConversationController",
     state_machine: Optional["ConversationStateMachine"] = None,
     config: Optional[StateCoordinatorConfig] = None,
+    warn_on_init: bool = True,
 ) -> StateCoordinator:
     """Factory function to create a StateCoordinator.
 
@@ -446,10 +467,20 @@ def create_state_coordinator(
     Returns:
         Configured StateCoordinator instance
     """
+    if warn_on_init:
+        warnings.warn(
+            "create_state_coordinator() builds a deprecated StateCoordinator shim. "
+            "Prefer ConversationController / ConversationStateMachine for live state "
+            "and StateService only for persisted vertical state.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     return StateCoordinator(
         conversation_controller=conversation_controller,
         state_machine=state_machine,
         config=config,
+        warn_on_init=False,
     )
 
 

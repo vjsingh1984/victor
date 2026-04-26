@@ -53,6 +53,7 @@ Usage:
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass, field
 from typing import (
@@ -153,14 +154,14 @@ class ToolExecutionHandler:
         reminder_manager: StreamingReminderRuntimeProtocol,
         unified_tracker: StreamingTrackerRuntimeProtocol,
         settings: "Settings",
-        create_recovery_context: Callable[[StreamingChatContext], Any],
+        recovery_context_factory: Callable[[StreamingChatContext], Any],
         check_progress_with_handler: Callable[[StreamingChatContext], None],
         handle_force_completion_with_handler: Callable[
             [StreamingChatContext], Optional[StreamChunk]
         ],
         handle_budget_exhausted: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
         handle_force_final_response: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
-        handle_tool_calls: Callable[[List[Dict]], Any],
+        execute_tool_calls: Callable[[List[Dict]], Any],
         get_tool_status_message: Callable[[str, Dict], str],
         observed_files: Optional[Set[str]] = None,
     ):
@@ -173,12 +174,12 @@ class ToolExecutionHandler:
             reminder_manager: Manager for context reminders.
             unified_tracker: Unified task tracker.
             settings: Application settings.
-            create_recovery_context: Factory for recovery context.
+            recovery_context_factory: Factory for recovery context.
             check_progress_with_handler: Callback for progress checking.
             handle_force_completion_with_handler: Callback for force completion.
             handle_budget_exhausted: Async generator for budget exhausted handling.
             handle_force_final_response: Async generator for force final response.
-            handle_tool_calls: Callback to execute tool calls.
+            execute_tool_calls: Callback to execute tool calls.
             get_tool_status_message: Function to generate tool status messages.
             observed_files: Set of observed files (for reminder tracking).
         """
@@ -188,12 +189,12 @@ class ToolExecutionHandler:
         self._reminder_manager = reminder_manager
         self._unified_tracker = unified_tracker
         self._settings = settings
-        self._create_recovery_context = create_recovery_context
+        self._recovery_context_factory = recovery_context_factory
         self._check_progress_with_handler = check_progress_with_handler
         self._handle_force_completion_with_handler = handle_force_completion_with_handler
         self._handle_budget_exhausted = handle_budget_exhausted
         self._handle_force_final_response = handle_force_final_response
-        self._handle_tool_calls = handle_tool_calls
+        self._execute_tool_calls_callback = execute_tool_calls
         self._get_tool_status_message = get_tool_status_message
         self._observed_files = observed_files or set()
 
@@ -268,7 +269,7 @@ class ToolExecutionHandler:
 
         # Execute tools if any remain
         if tool_calls:
-            await self._execute_tool_calls(stream_ctx, tool_calls, result)
+            await self._execute_filtered_tool_calls(stream_ctx, tool_calls, result)
 
         # Update context for next iteration
         stream_ctx.update_context_message(full_content or user_message)
@@ -279,9 +280,12 @@ class ToolExecutionHandler:
         self, stream_ctx: StreamingChatContext
     ) -> Optional[StreamChunk]:
         """Check if budget warning should be shown."""
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        recovery_ctx = self._recovery_context_factory(stream_ctx)
         warning_threshold = getattr(self._settings, "tool_call_budget_warning_threshold", 250)
-        return self._recovery_runtime.check_tool_budget(recovery_ctx, warning_threshold)
+        budget_warning = self._recovery_runtime.check_tool_budget(recovery_ctx, warning_threshold)
+        if inspect.isawaitable(budget_warning):
+            return await budget_warning
+        return budget_warning
 
     async def _handle_budget_exhausted_phase(
         self, stream_ctx: StreamingChatContext
@@ -316,7 +320,7 @@ class ToolExecutionHandler:
             return []
 
         # Truncate to remaining budget
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        recovery_ctx = self._recovery_context_factory(stream_ctx)
         remaining = stream_ctx.get_remaining_budget()
         tool_calls, _ = self._recovery_runtime.truncate_tool_calls(
             recovery_ctx,
@@ -332,7 +336,7 @@ class ToolExecutionHandler:
 
         # Check blocked threshold
         all_blocked = blocked_count > 0 and not filtered_calls
-        recovery_ctx = self._create_recovery_context(stream_ctx)
+        recovery_ctx = self._recovery_context_factory(stream_ctx)
         threshold_result = self._recovery_runtime.check_blocked_threshold(
             recovery_ctx,
             all_blocked,
@@ -345,7 +349,7 @@ class ToolExecutionHandler:
 
         return filtered_calls
 
-    async def _execute_tool_calls(
+    async def _execute_filtered_tool_calls(
         self,
         stream_ctx: StreamingChatContext,
         tool_calls: List[Dict[str, Any]],
@@ -365,7 +369,7 @@ class ToolExecutionHandler:
             last_tool_name = tool_name
 
         # Execute all tool calls
-        tool_results = await self._handle_tool_calls(tool_calls)
+        tool_results = await self._execute_tool_calls_callback(tool_calls)
         result.tool_results = tool_results
         result.tool_calls_executed = len(tool_calls)
         result.last_tool_name = last_tool_name
@@ -428,6 +432,8 @@ def create_tool_execution_handler(
     """
     from victor.agent.orchestrator_utils import get_tool_status_message
 
+    recovery_context_factory = orchestrator.create_recovery_context
+
     return ToolExecutionHandler(
         recovery_runtime=(
             getattr(orchestrator, "_recovery_service", None) or orchestrator._recovery_coordinator
@@ -437,7 +443,7 @@ def create_tool_execution_handler(
         reminder_manager=orchestrator.reminder_manager,
         unified_tracker=orchestrator.unified_tracker,
         settings=orchestrator.settings,
-        create_recovery_context=orchestrator._create_recovery_context,
+        recovery_context_factory=recovery_context_factory,
         check_progress_with_handler=getattr(
             orchestrator, "_check_progress_with_handler", _noop_check_progress
         ),
@@ -452,7 +458,7 @@ def create_tool_execution_handler(
         handle_force_final_response=getattr(
             orchestrator, "_handle_force_final_response", _noop_async_generator
         ),
-        handle_tool_calls=orchestrator._handle_tool_calls,
+        execute_tool_calls=orchestrator.execute_tool_calls,
         get_tool_status_message=get_tool_status_message,
         observed_files=(set(orchestrator.observed_files) if orchestrator.observed_files else set()),
     )

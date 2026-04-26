@@ -237,6 +237,44 @@ class TestProtocolImplementation:
             ):
                 return "prompt_exp_123"
 
+            def analyze_prompt_rollout_experiment(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+            ):
+                return {"auto_action": "rollout"}
+
+            async def analyze_prompt_rollout_experiment_async(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+            ):
+                return {"auto_action": "rollout"}
+
+            def apply_prompt_rollout_recommendation(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                dry_run: bool = False,
+            ):
+                return {"action": "rollout", "applied": not dry_run}
+
+            async def apply_prompt_rollout_recommendation_async(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                dry_run: bool = False,
+            ):
+                return {"action": "rollout", "applied": not dry_run}
+
         assert not isinstance(LegacyOnlyRLRuntime(), RLLearningRuntimeProtocol)
         assert isinstance(RolloutCapableRLRuntime(), RLLearningRuntimeProtocol)
 

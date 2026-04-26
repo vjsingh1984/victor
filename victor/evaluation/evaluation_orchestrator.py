@@ -45,13 +45,17 @@ Example usage:
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from victor.evaluation.agent_adapter import AdapterConfig, VictorAgentAdapter
+from victor.evaluation.agent_adapter import (
+    AdapterConfig,
+    PromptOptimizationBinding,
+    VictorAgentAdapter,
+)
 from victor.evaluation.agentic_harness import AgenticExecutionTrace
 from victor.evaluation.baseline_validator import (
     BaselineCache,
@@ -162,6 +166,8 @@ class OrchestratorConfig:
     # Agent configuration
     agent_profile: str = "default"
     adapter_config: Optional[AdapterConfig] = None
+    prompt_candidate_hash: Optional[str] = None
+    prompt_section_name: Optional[str] = None
 
     # Output configuration
     output_dir: Path = field(default_factory=lambda: Path("./swe_bench_results"))
@@ -537,7 +543,7 @@ class EvaluationOrchestrator:
             self._notify_progress(progress)
 
             # Create agent adapter
-            adapter_config = self.config.adapter_config or AdapterConfig()
+            adapter_config = self._build_adapter_config()
             adapter = VictorAgentAdapter.from_profile(
                 profile=self.config.agent_profile,
                 config=adapter_config,
@@ -583,10 +589,12 @@ class EvaluationOrchestrator:
                 instance_metadata={"instance_id": task.instance_id, "repo": task.repo},
             )
             progress.score = score
+            validation_metadata = self._build_validation_runtime_metadata(adapter)
             self._save_validated_session_feedback(
                 task.instance_id,
                 validation_result,
                 score=score,
+                metadata=validation_metadata,
             )
 
             # Complete
@@ -771,6 +779,7 @@ class EvaluationOrchestrator:
         validation_result: BaselineValidationResult,
         *,
         score: Optional[SWEBenchScore] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> Optional[Path]:
         """Persist validated session-truth feedback from objective SWE-bench validation."""
         evaluations_dir = self.config.output_dir / "evaluations"
@@ -780,6 +789,81 @@ class EvaluationOrchestrator:
             task_id=instance_id,
             validation_result=validation_result,
             score=score,
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _canonical_prompt_optimization_identity(metadata: Any) -> dict[str, Any]:
+        """Normalize live prompt-optimization metadata for persisted artifacts."""
+        if not isinstance(metadata, dict):
+            return {"entries": [], "by_section": {}}
+        return {
+            "entries": list(metadata.get("entries") or []),
+            "by_section": dict(metadata.get("by_section") or {}),
+        }
+
+    @staticmethod
+    def _optional_text(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    def _build_validation_runtime_metadata(
+        self,
+        adapter: Optional[VictorAgentAdapter] = None,
+    ) -> dict[str, Any]:
+        """Build canonical runtime metadata for validated session-truth artifacts."""
+        if adapter is None:
+            return {}
+
+        orchestrator = getattr(adapter, "orchestrator", None)
+        if orchestrator is None:
+            return {}
+
+        metadata: dict[str, Any] = {
+            "provider": self._optional_text(getattr(orchestrator, "provider_name", None)),
+            "model": self._optional_text(getattr(orchestrator, "model", None)),
+        }
+
+        prompt_metadata_getter = getattr(orchestrator, "get_active_prompt_optimization_metadata", None)
+        if callable(prompt_metadata_getter):
+            prompt_metadata = self._canonical_prompt_optimization_identity(prompt_metadata_getter())
+            metadata["prompt_optimization"] = prompt_metadata
+
+            candidate_entries = []
+            for entry in prompt_metadata["entries"]:
+                if not isinstance(entry, dict):
+                    continue
+                section_name = self._optional_text(
+                    entry.get("section_name") or entry.get("prompt_section_name")
+                )
+                candidate_hash = self._optional_text(entry.get("prompt_candidate_hash"))
+                if section_name and candidate_hash:
+                    candidate_entries.append((section_name, candidate_hash, entry))
+
+            if len(candidate_entries) == 1:
+                section_name, candidate_hash, entry = candidate_entries[0]
+                metadata["section_name"] = section_name
+                metadata["prompt_section_name"] = section_name
+                metadata["prompt_candidate_hash"] = candidate_hash
+                metadata["provider"] = self._optional_text(entry.get("provider")) or metadata.get(
+                    "provider"
+                )
+
+        return {key: value for key, value in metadata.items() if value is not None}
+
+    def _build_adapter_config(self) -> AdapterConfig:
+        """Resolve the adapter config, including any explicit prompt binding."""
+        adapter_config = self.config.adapter_config or AdapterConfig()
+        if not self.config.prompt_candidate_hash or not self.config.prompt_section_name:
+            return adapter_config
+        return replace(
+            adapter_config,
+            prompt_binding=PromptOptimizationBinding(
+                section_name=self.config.prompt_section_name,
+                prompt_candidate_hash=self.config.prompt_candidate_hash,
+            ),
         )
 
     def get_progress(self, instance_id: str) -> Optional[TaskProgress]:

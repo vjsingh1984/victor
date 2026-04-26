@@ -28,6 +28,7 @@ import logging
 import threading
 import time
 import uuid
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
@@ -38,6 +39,12 @@ if TYPE_CHECKING:
     from victor.agent.lifecycle_manager import LifecycleManager
 
 logger = logging.getLogger(__name__)
+
+_SESSION_COORDINATOR_DEPRECATION_MESSAGE = (
+    "SessionCoordinator is deprecated. Use SessionService from "
+    "victor.agent.services.session_service instead. "
+    "This adapter will be removed in a future release."
+)
 
 
 @dataclass
@@ -143,6 +150,7 @@ class SessionCoordinator:
         memory_manager: Optional[Any] = None,
         checkpoint_manager: Optional[Any] = None,
         cost_tracker: Optional[Any] = None,
+        warn_on_init: bool = True,
     ):
         """Initialize the session coordinator.
 
@@ -152,7 +160,15 @@ class SessionCoordinator:
             memory_manager: Optional manager for persistent session storage
             checkpoint_manager: Optional manager for checkpoint save/restore
             cost_tracker: Optional tracker for session costs
+            warn_on_init: Emit a deprecation warning for direct compatibility use
         """
+        if warn_on_init:
+            warnings.warn(
+                _SESSION_COORDINATOR_DEPRECATION_MESSAGE,
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self._session_state = session_state_manager
         self._lifecycle_manager = lifecycle_manager
         self._memory_manager = memory_manager
@@ -867,6 +883,7 @@ def create_session_coordinator(
     memory_manager: Optional[Any] = None,
     checkpoint_manager: Optional[Any] = None,
     cost_tracker: Optional[Any] = None,
+    warn_on_init: bool = True,
 ) -> SessionCoordinator:
     """Factory function to create a SessionCoordinator.
 
@@ -880,12 +897,21 @@ def create_session_coordinator(
     Returns:
         Configured SessionCoordinator instance
     """
+    if warn_on_init:
+        warnings.warn(
+            "create_session_coordinator() builds a deprecated SessionCoordinator shim. "
+            "Prefer SessionService or create_session_coordinator_shim() for runtime wiring.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     return SessionCoordinator(
         session_state_manager=session_state_manager,
         lifecycle_manager=lifecycle_manager,
         memory_manager=memory_manager,
         checkpoint_manager=checkpoint_manager,
         cost_tracker=cost_tracker,
+        warn_on_init=False,
     )
 
 

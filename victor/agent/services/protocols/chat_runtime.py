@@ -85,7 +85,7 @@ class ChatContextProtocol(Protocol):
 
 
 class ToolContextProtocol(Protocol):
-    """Legacy tool runtime boundary for the chat shim path."""
+    """Tool runtime boundary for the chat shim path."""
 
     tool_selector: Any
     tool_adapter: Any
@@ -95,8 +95,8 @@ class ToolContextProtocol(Protocol):
     use_semantic_selection: bool
     observed_files: Any
 
-    async def _handle_tool_calls(self, tool_calls: Any) -> List[Dict[str, Any]]:
-        """Execute tool calls and return results."""
+    async def execute_tool_calls(self, tool_calls: Any) -> List[Dict[str, Any]]:
+        """Execute tool calls via the canonical tool runtime surface."""
         ...
 
     def _model_supports_tool_calls(self) -> bool:
@@ -139,8 +139,8 @@ class ChatOrchestratorProtocol(
     _recovery_coordinator: Any
     _recovery_integration: Any
 
-    async def _create_recovery_context(self, stream_ctx: Any) -> Any:
-        """Create StreamingRecoveryContext from current state."""
+    def create_recovery_context(self, stream_ctx: Any) -> Any:
+        """Create StreamingRecoveryContext via the canonical runtime surface."""
         ...
 
     async def _handle_recovery_with_integration(

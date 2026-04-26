@@ -1,5 +1,6 @@
 """Tests for prompt rollout helpers on RLCoordinator."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 
@@ -8,6 +9,19 @@ class TestPromptRolloutCoordinator:
         from victor.framework.rl.coordinator import RLCoordinator
 
         assert hasattr(RLCoordinator, "create_prompt_rollout_experiment")
+        assert hasattr(RLCoordinator, "analyze_prompt_rollout_experiment")
+        assert hasattr(RLCoordinator, "apply_prompt_rollout_recommendation")
+
+    def test_get_prompt_rollout_experiment_id_matches_convention(self):
+        from victor.framework.rl.coordinator import RLCoordinator
+
+        experiment_id = RLCoordinator.get_prompt_rollout_experiment_id(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            treatment_hash="candidate123",
+        )
+
+        assert experiment_id == "prompt_optimizer_grounding_rules_anthropic_candidate123"
 
     def test_create_prompt_rollout_experiment_delegates_to_prompt_optimizer(self):
         from victor.framework.rl.coordinator import RLCoordinator
@@ -81,3 +95,126 @@ class TestPromptRolloutCoordinator:
             )
 
         assert result is None
+
+    def test_analyze_prompt_rollout_experiment_returns_structured_report(self):
+        from victor.framework.rl.coordinator import RLCoordinator
+
+        coord = MagicMock(spec=RLCoordinator)
+        coord.db = object()
+        fake_exp_coordinator = MagicMock()
+        fake_exp_coordinator.get_experiment_status.return_value = {
+            "experiment_id": "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            "status": "running",
+            "section_name": "GROUNDING_RULES",
+            "provider": "anthropic",
+        }
+        fake_exp_coordinator.analyze_experiment.return_value = SimpleNamespace(
+            recommendation="Roll out treatment - significant improvement detected",
+            is_significant=True,
+            treatment_better=True,
+            effect_size=0.2,
+            p_value=0.01,
+            confidence_interval=(0.05, 0.3),
+            details={
+                "control": {"samples": 120, "success_rate": 0.55},
+                "treatment": {"samples": 120, "success_rate": 0.66},
+            },
+        )
+
+        with patch(
+            "victor.framework.rl.coordinator.get_experiment_coordinator",
+            return_value=fake_exp_coordinator,
+        ):
+            report = RLCoordinator.analyze_prompt_rollout_experiment(
+                coord,
+                section_name="GROUNDING_RULES",
+                provider="anthropic",
+                treatment_hash="candidate123",
+            )
+
+        assert report is not None
+        assert report["experiment_id"] == "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        assert report["analysis_available"] is True
+        assert report["auto_action"] == "rollout"
+        assert report["recommendation"].startswith("Roll out treatment")
+
+    def test_apply_prompt_rollout_recommendation_rolls_out_treatment(self):
+        from victor.framework.rl.coordinator import RLCoordinator
+
+        coord = MagicMock(spec=RLCoordinator)
+        coord.db = object()
+        fake_exp_coordinator = MagicMock()
+        fake_exp_coordinator.get_experiment_status.return_value = {
+            "experiment_id": "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            "status": "running",
+            "section_name": "GROUNDING_RULES",
+            "provider": "anthropic",
+        }
+        fake_exp_coordinator.analyze_experiment.return_value = SimpleNamespace(
+            recommendation="Roll out treatment - significant improvement detected",
+            is_significant=True,
+            treatment_better=True,
+            effect_size=0.2,
+            p_value=0.01,
+            confidence_interval=(0.05, 0.3),
+            details={},
+        )
+        fake_exp_coordinator.rollout_treatment.return_value = True
+
+        with patch(
+            "victor.framework.rl.coordinator.get_experiment_coordinator",
+            return_value=fake_exp_coordinator,
+        ):
+            decision = RLCoordinator.apply_prompt_rollout_recommendation(
+                coord,
+                section_name="GROUNDING_RULES",
+                provider="anthropic",
+                treatment_hash="candidate123",
+            )
+
+        assert decision is not None
+        assert decision["action"] == "rollout"
+        assert decision["applied"] is True
+        fake_exp_coordinator.rollout_treatment.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+
+    def test_apply_prompt_rollout_recommendation_supports_dry_run(self):
+        from victor.framework.rl.coordinator import RLCoordinator
+
+        coord = MagicMock(spec=RLCoordinator)
+        coord.db = object()
+        fake_exp_coordinator = MagicMock()
+        fake_exp_coordinator.get_experiment_status.return_value = {
+            "experiment_id": "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            "status": "running",
+            "section_name": "GROUNDING_RULES",
+            "provider": "anthropic",
+        }
+        fake_exp_coordinator.analyze_experiment.return_value = SimpleNamespace(
+            recommendation="Keep control - treatment performed worse",
+            is_significant=True,
+            treatment_better=False,
+            effect_size=-0.1,
+            p_value=0.02,
+            confidence_interval=(-0.2, -0.01),
+            details={},
+        )
+
+        with patch(
+            "victor.framework.rl.coordinator.get_experiment_coordinator",
+            return_value=fake_exp_coordinator,
+        ):
+            decision = RLCoordinator.apply_prompt_rollout_recommendation(
+                coord,
+                section_name="GROUNDING_RULES",
+                provider="anthropic",
+                treatment_hash="candidate123",
+                dry_run=True,
+            )
+
+        assert decision is not None
+        assert decision["action"] == "rollback"
+        assert decision["applied"] is False
+        assert decision["dry_run"] is True
+        fake_exp_coordinator.rollback_experiment.assert_not_called()

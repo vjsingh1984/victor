@@ -26,9 +26,10 @@ import os
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
@@ -54,6 +55,85 @@ from victor.evaluation.services import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PromptCandidateEvaluationSpec:
+    """One exact prompt candidate to evaluate in isolation."""
+
+    section_name: str
+    prompt_candidate_hash: str
+    provider: Optional[str] = None
+    label: Optional[str] = None
+
+    def resolved_label(self, default_provider: Optional[str] = None) -> str:
+        """Return a stable human-readable label for reports and logs."""
+        provider = (self.provider or default_provider or "").strip() or "default"
+        return self.label or f"{self.section_name}:{provider}:{self.prompt_candidate_hash}"
+
+
+@dataclass(frozen=True)
+class PromptCandidateEvaluationRun:
+    """One executed candidate-bound evaluation run."""
+
+    spec: PromptCandidateEvaluationSpec
+    config: EvaluationConfig
+    result: EvaluationResult
+    label: str
+
+
+@dataclass
+class PromptCandidateEvaluationSuiteResult:
+    """Collected results from evaluating multiple prompt candidates separately."""
+
+    base_config: EvaluationConfig
+    runs: list[PromptCandidateEvaluationRun]
+
+    def best_run(self) -> Optional[PromptCandidateEvaluationRun]:
+        """Return the strongest run by pass rate, then task count, then shortest duration."""
+        if not self.runs:
+            return None
+        return max(
+            self.runs,
+            key=lambda run: (
+                run.result.pass_rate,
+                run.result.total_tasks,
+                -run.result.duration_seconds,
+            ),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the suite summary for reporting or persistence."""
+        best = self.best_run()
+        return {
+            "benchmark": self.base_config.benchmark.value,
+            "model": self.base_config.model,
+            "provider": self.base_config.provider,
+            "best_label": best.label if best is not None else None,
+            "runs": [
+                {
+                    "label": run.label,
+                    "provider": run.config.provider,
+                    "prompt_candidate_hash": run.config.prompt_candidate_hash,
+                    "section_name": run.config.prompt_section_name,
+                    "metrics": run.result.get_metrics(),
+                }
+                for run in self.runs
+            ],
+        }
+
+
+def bind_prompt_candidate_evaluation_config(
+    base_config: EvaluationConfig,
+    spec: PromptCandidateEvaluationSpec,
+) -> EvaluationConfig:
+    """Create a candidate-bound config from a benchmark base config."""
+    return replace(
+        base_config,
+        provider=(spec.provider or base_config.provider),
+        prompt_candidate_hash=spec.prompt_candidate_hash,
+        prompt_section_name=spec.section_name,
+    )
 
 
 @runtime_checkable
@@ -526,6 +606,12 @@ class EvaluationHarness:
 
         # Build unique ID from config
         config_str = f"{config.benchmark.value}_{config.model}_{config.max_tasks}"
+        if config.provider:
+            config_str += f"_{config.provider}"
+        if config.prompt_section_name:
+            config_str += f"_{config.prompt_section_name}"
+        if config.prompt_candidate_hash:
+            config_str += f"_{config.prompt_candidate_hash}"
         if config.task_ids:
             config_str += "_" + "_".join(sorted(config.task_ids))
         checkpoint_id = hashlib.md5(config_str.encode()).hexdigest()[:12]
@@ -782,6 +868,43 @@ class EvaluationHarness:
         self._save_results(result)
 
         return result
+
+    async def run_prompt_candidate_evaluation_suite(
+        self,
+        *,
+        base_config: EvaluationConfig,
+        candidate_specs: list[PromptCandidateEvaluationSpec],
+        agent_callback_factory: Callable[[PromptCandidateEvaluationSpec, EvaluationConfig], Any],
+        progress_callback: Optional[Any] = None,
+        retry_callback: Optional[Any] = None,
+        resume: bool = False,
+    ) -> PromptCandidateEvaluationSuiteResult:
+        """Run one benchmark evaluation per bound prompt candidate.
+
+        Each candidate gets its own `EvaluationConfig`, which keeps checkpoints,
+        saved artifacts, and reported metrics attributable to one exact prompt
+        section/candidate pair.
+        """
+        runs: list[PromptCandidateEvaluationRun] = []
+        for spec in candidate_specs:
+            config = bind_prompt_candidate_evaluation_config(base_config, spec)
+            callback = agent_callback_factory(spec, config)
+            result = await self.run_evaluation(
+                config=config,
+                agent_callback=callback,
+                progress_callback=progress_callback,
+                retry_callback=retry_callback,
+                resume=resume,
+            )
+            runs.append(
+                PromptCandidateEvaluationRun(
+                    spec=spec,
+                    config=config,
+                    result=result,
+                    label=spec.resolved_label(config.provider),
+                )
+            )
+        return PromptCandidateEvaluationSuiteResult(base_config=base_config, runs=runs)
 
     async def _run_sequential(
         self,

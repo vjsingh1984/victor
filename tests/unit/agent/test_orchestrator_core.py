@@ -358,9 +358,9 @@ class TestProviderChecks:
 class TestSystemPrompt:
     """Tests for system prompt building."""
 
-    def test_build_system_prompt_with_adapter(self, orchestrator):
-        """Test _build_system_prompt_with_adapter (covers line 540)."""
-        result = orchestrator._build_system_prompt_with_adapter()
+    def test_build_system_prompt(self, orchestrator):
+        """Test canonical build_system_prompt returns a prompt string."""
+        result = orchestrator.build_system_prompt()
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -398,6 +398,26 @@ class TestToolCallLogging:
 
 class TestToolExecution:
     """Tests for tool execution tracking."""
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_with_retry_delegates_to_tool_service(self, orchestrator):
+        """Canonical retry surface should delegate to ToolService."""
+        orchestrator._tool_service.execute_tool_with_retry = AsyncMock(
+            return_value=("result", True, None)
+        )
+
+        result = await orchestrator.execute_tool_with_retry(
+            "read",
+            {"path": "a.py"},
+            {"task_type": "read"},
+        )
+
+        assert result == ("result", True, None)
+        orchestrator._tool_service.execute_tool_with_retry.assert_awaited_once_with(
+            "read",
+            {"path": "a.py"},
+            {"task_type": "read"},
+        )
 
     def test_record_tool_execution_success(self, orchestrator):
         """Test _record_tool_execution with success (covers lines 400-444)."""
@@ -939,22 +959,22 @@ class TestToolConfiguration:
             assert orch is not None
 
 
-class TestHandleToolCalls:
-    """Tests for _handle_tool_calls method."""
+class TestExecuteToolCalls:
+    """Tests for execute_tool_calls method."""
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_empty_list(self, orchestrator):
-        """Test _handle_tool_calls with empty list (covers line 1782)."""
-        result = await orchestrator._handle_tool_calls([])
+    async def test_execute_tool_calls_empty_list(self, orchestrator):
+        """Test execute_tool_calls with empty list."""
+        result = await orchestrator.execute_tool_calls([])
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_not_a_dict(self, orchestrator):
-        """Test _handle_tool_calls with non-dict tool call (covers lines 1788-1792)."""
-        result = await orchestrator._handle_tool_calls(["not a dict"])
+    async def test_execute_tool_calls_not_a_dict(self, orchestrator):
+        """Test execute_tool_calls with non-dict tool call."""
+        result = await orchestrator.execute_tool_calls(["not a dict"])
         assert result == []
 
-    def test_handle_tool_calls_uses_tool_service_post_processing(self, orchestrator):
+    def test_execute_tool_calls_uses_tool_service_post_processing(self, orchestrator):
         """The canonical post-processing path should go through ToolService."""
         import asyncio
         from unittest.mock import AsyncMock
@@ -979,13 +999,13 @@ class TestHandleToolCalls:
             side_effect=AssertionError("coordinator path should not be used")
         )
 
-        result = asyncio.run(orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}]))
+        result = asyncio.run(orchestrator.execute_tool_calls([{"name": "read", "arguments": {}}]))
 
         orchestrator._tool_service.process_tool_results.assert_called_once()
         assert result == [{"name": "read", "success": True}]
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_no_name(self, orchestrator):
+    async def test_execute_tool_calls_no_name(self, orchestrator):
         """Tool calls without name are handled by ToolPipeline (returns error result)."""
         from unittest.mock import AsyncMock
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
@@ -1003,7 +1023,7 @@ class TestHandleToolCalls:
             new_callable=AsyncMock,
             return_value=mock_pipeline_result,
         ):
-            result = await orchestrator._handle_tool_calls([{"arguments": {}}])
+            result = await orchestrator.execute_tool_calls([{"arguments": {}}])
         assert len(result) == 1
         assert result[0]["success"] is False
 
@@ -1070,7 +1090,7 @@ class TestServiceFirstDelegation:
         assert result is sentinel
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_invalid_name(self, orchestrator):
+    async def test_execute_tool_calls_invalid_name(self, orchestrator):
         """Invalid tool names are handled by ToolPipeline (returns error result)."""
         from unittest.mock import AsyncMock
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
@@ -1088,12 +1108,12 @@ class TestServiceFirstDelegation:
             new_callable=AsyncMock,
             return_value=mock_pipeline_result,
         ):
-            result = await orchestrator._handle_tool_calls([{"name": "123invalid"}])
+            result = await orchestrator.execute_tool_calls([{"name": "123invalid"}])
         assert len(result) == 1
         assert result[0]["success"] is False
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_disabled_tool(self, orchestrator):
+    async def test_execute_tool_calls_disabled_tool(self, orchestrator):
         """Disabled tools are handled by ToolPipeline (returns error result)."""
         from unittest.mock import AsyncMock
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
@@ -1111,12 +1131,12 @@ class TestServiceFirstDelegation:
             new_callable=AsyncMock,
             return_value=mock_pipeline_result,
         ):
-            result = await orchestrator._handle_tool_calls([{"name": "nonexistent_tool"}])
+            result = await orchestrator.execute_tool_calls([{"name": "nonexistent_tool"}])
         assert len(result) == 1
         assert result[0]["success"] is False
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_budget_reached(self, orchestrator):
+    async def test_execute_tool_calls_budget_reached(self, orchestrator):
         """Budget enforcement handled by ToolPipeline (returns budget_exhausted)."""
         from unittest.mock import AsyncMock
         from victor.agent.tool_pipeline import PipelineExecutionResult
@@ -1131,14 +1151,14 @@ class TestServiceFirstDelegation:
             new_callable=AsyncMock,
             return_value=mock_pipeline_result,
         ):
-            result = await orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}])
+            result = await orchestrator.execute_tool_calls([{"name": "read", "arguments": {}}])
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_json_string_arguments(
+    async def test_execute_tool_calls_json_string_arguments(
         self, mock_provider, orchestrator_settings
     ):
-        """Test _handle_tool_calls with JSON string arguments (covers lines 1820-1827)."""
+        """Test execute_tool_calls with JSON string arguments."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
             patch("victor.core.bootstrap_services.bootstrap_new_services"),
@@ -1155,7 +1175,7 @@ class TestServiceFirstDelegation:
             )
 
             # Use string JSON arguments
-            result = await orch._handle_tool_calls(
+            result = await orch.execute_tool_calls(
                 [{"name": "read", "arguments": '{"path": "/test.py"}'}]
             )
 
@@ -1163,8 +1183,8 @@ class TestServiceFirstDelegation:
             assert result[0]["success"] is True
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_none_arguments(self, mock_provider, orchestrator_settings):
-        """Test _handle_tool_calls with None arguments defaults gracefully."""
+    async def test_execute_tool_calls_none_arguments(self, mock_provider, orchestrator_settings):
+        """Test execute_tool_calls with None arguments defaults gracefully."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
             patch("victor.core.bootstrap_services.bootstrap_new_services"),
@@ -1177,16 +1197,16 @@ class TestServiceFirstDelegation:
 
             # Call with None arguments — tool should handle gracefully
             # (read defaults path="" which resolves to CWD via fuzzy resolution)
-            result = await orch._handle_tool_calls([{"name": "read", "arguments": None}])
+            result = await orch.execute_tool_calls([{"name": "read", "arguments": None}])
 
             assert len(result) == 1
             assert result[0]["name"] == "read"
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_repeated_failure_skip(
+    async def test_execute_tool_calls_repeated_failure_skip(
         self, mock_provider, orchestrator_settings
     ):
-        """Test _handle_tool_calls skips repeated failing calls (covers deduplication)."""
+        """Test execute_tool_calls skips repeated failing calls."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
             patch("victor.core.bootstrap_services.bootstrap_new_services"),
@@ -1205,21 +1225,21 @@ class TestServiceFirstDelegation:
             args = {"path": "/test.py"}
 
             # First call fails and records the signature
-            result1 = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
+            result1 = await orch.execute_tool_calls([{"name": "read", "arguments": args}])
             assert len(result1) == 1
             assert result1[0]["success"] is False
             # Signature should now be recorded in orchestrator's failed set
             assert len(orch.failed_tool_signatures) == 1
 
             # Second call must remain non-successful and should not crash.
-            result2 = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
+            result2 = await orch.execute_tool_calls([{"name": "read", "arguments": args}])
             assert len(result2) <= 1
             if result2:
                 assert result2[0]["success"] is False
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_success(self, mock_provider, orchestrator_settings):
-        """Test _handle_tool_calls successful execution (covers lines 1912-1927)."""
+    async def test_execute_tool_calls_success(self, mock_provider, orchestrator_settings):
+        """Test execute_tool_calls successful execution."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
             patch("victor.core.bootstrap_services.bootstrap_new_services"),
@@ -1235,7 +1255,7 @@ class TestServiceFirstDelegation:
                 return_value=MagicMock(success=True, result="File contents", error=None)
             )
 
-            result = await orch._handle_tool_calls(
+            result = await orch.execute_tool_calls(
                 [{"name": "read", "arguments": {"path": "/test.py"}}]
             )
 
@@ -1246,8 +1266,8 @@ class TestServiceFirstDelegation:
             assert "read" in orch.executed_tools
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_failure(self, mock_provider, orchestrator_settings):
-        """Test _handle_tool_calls failed execution (covers pipeline failure tracking)."""
+    async def test_execute_tool_calls_failure(self, mock_provider, orchestrator_settings):
+        """Test execute_tool_calls failed execution."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
             patch("victor.core.bootstrap_services.bootstrap_new_services"),
@@ -1263,7 +1283,7 @@ class TestServiceFirstDelegation:
                 return_value=MagicMock(success=False, result=None, error="File not found")
             )
 
-            result = await orch._handle_tool_calls(
+            result = await orch.execute_tool_calls(
                 [{"name": "read", "arguments": {"path": "/nonexistent.py"}}]
             )
 
@@ -1274,8 +1294,10 @@ class TestServiceFirstDelegation:
             assert len(orch.failed_tool_signatures) == 1
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_read_file_tracking(self, mock_provider, orchestrator_settings):
-        """Test _handle_tool_calls tracks read_file paths (covers lines 1885-1886)."""
+    async def test_execute_tool_calls_read_file_tracking(
+        self, mock_provider, orchestrator_settings
+    ):
+        """Test execute_tool_calls tracks read_file paths."""
         with (
             patch("victor.agent.orchestrator.UsageLogger"),
             patch("victor.core.bootstrap_services.bootstrap_new_services"),
@@ -1291,7 +1313,7 @@ class TestServiceFirstDelegation:
                 return_value=MagicMock(success=True, result="File contents", error=None)
             )
 
-            await orch._handle_tool_calls([{"name": "read", "arguments": {"path": "/test.py"}}])
+            await orch.execute_tool_calls([{"name": "read", "arguments": {"path": "/test.py"}}])
 
             assert "/test.py" in orch.observed_files
 
@@ -4004,12 +4026,12 @@ class TestParseToolCallsWithAdapter:
         assert result is not None
 
 
-class TestBuildSystemPromptWithAdapter:
-    """Tests for _build_system_prompt_with_adapter method."""
+class TestBuildSystemPrompt:
+    """Tests for build_system_prompt method."""
 
     def test_returns_string(self, orchestrator):
-        """Test _build_system_prompt_with_adapter returns string."""
-        prompt = orchestrator._build_system_prompt_with_adapter()
+        """Test build_system_prompt returns string."""
+        prompt = orchestrator.build_system_prompt()
         assert isinstance(prompt, str)
         assert len(prompt) > 0
 
@@ -4601,12 +4623,12 @@ class TestPromptBuilderAttr:
         assert builder is not None
 
 
-class TestBuildSystemPromptWithAdapter:
-    """Tests for _build_system_prompt_with_adapter method."""
+class TestBuildSystemPromptSecondary:
+    """Additional tests for build_system_prompt method."""
 
     def test_returns_string(self, orchestrator):
-        """Test _build_system_prompt_with_adapter returns string."""
-        prompt = orchestrator._build_system_prompt_with_adapter()
+        """Test build_system_prompt returns string."""
+        prompt = orchestrator.build_system_prompt()
         assert isinstance(prompt, str)
         assert len(prompt) > 0
 

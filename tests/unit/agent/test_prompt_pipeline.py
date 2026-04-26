@@ -502,6 +502,22 @@ class TestPromptCompletenessGuard:
         assert assessment.needs_clarification is True
         assert "target artifact or scope" in assessment.missing_elements
 
+    def test_guard_ignores_relative_clause_report_request(self):
+        """Report-style prose should not trigger action clarification from substring matches."""
+        pipeline = _make_pipeline(enable_prompt_completeness_guard=True)
+        ctx = self._make_turn_context(task_type="default")
+
+        prefix = pipeline.compose_turn_prefix(
+            "Identify all dead code or deprecated call sites that should be modified first "
+            "to enable clean code principle based implementations.",
+            ctx,
+        )
+
+        assert "Prompt execution contract" not in prefix
+
+        assessment = pipeline.last_prompt_completeness_assessment
+        assert assessment is None or assessment.needs_clarification is False
+
     def test_guard_adds_search_first_guidance_for_symbol_scoped_request(self):
         """Symbol-scoped work without file paths should prefer search-first execution."""
         pipeline = _make_pipeline(enable_prompt_completeness_guard=True)

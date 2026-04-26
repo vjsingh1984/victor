@@ -229,10 +229,163 @@ async def test_pipeline_uses_runtime_intelligence_for_budget_reset_and_analysis(
 
 
 @pytest.mark.asyncio
+async def test_pipeline_passes_history_to_runtime_intelligence():
+    cancel_chunk = StreamChunk(content="", is_final=True)
+    coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
+    coordinator._orchestrator.messages = [
+        SimpleNamespace(
+            role="assistant",
+            content="Start with victor/agent/services/tool_compat.py first.",
+            model_dump=lambda: {
+                "role": "assistant",
+                "content": "Start with victor/agent/services/tool_compat.py first.",
+            },
+        )
+    ]
+    runtime_intelligence = SimpleNamespace(
+        reset_decision_budget=MagicMock(),
+        analyze_turn=AsyncMock(
+            return_value=SimpleNamespace(
+                perception=SimpleNamespace(
+                    needs_clarification=False,
+                    confidence=0.7,
+                    intent="write_allowed",
+                    complexity="medium",
+                )
+            )
+        ),
+    )
+
+    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+
+    async for _ in pipeline.run("Fix that first."):
+        pass
+
+    assert runtime_intelligence.analyze_turn.await_args.kwargs["conversation_history"] == [
+        {
+            "role": "assistant",
+            "content": "Start with victor/agent/services/tool_compat.py first.",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_prefers_assembled_history_for_runtime_intelligence():
+    cancel_chunk = StreamChunk(content="", is_final=True)
+    coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
+    coordinator._orchestrator.messages = [
+        SimpleNamespace(
+            role="assistant",
+            content="raw message should not be used",
+            model_dump=lambda: {
+                "role": "assistant",
+                "content": "raw message should not be used",
+            },
+        )
+    ]
+    coordinator._orchestrator.get_assembled_messages = lambda current_query=None: [
+        SimpleNamespace(
+            role="assistant",
+            content="assembled history should be used",
+            model_dump=lambda: {
+                "role": "assistant",
+                "content": "assembled history should be used",
+            },
+        ),
+        SimpleNamespace(
+            role="user",
+            content=current_query,
+            model_dump=lambda: {
+                "role": "user",
+                "content": current_query,
+            },
+        ),
+    ]
+    runtime_intelligence = SimpleNamespace(
+        reset_decision_budget=MagicMock(),
+        analyze_turn=AsyncMock(
+            return_value=SimpleNamespace(
+                perception=SimpleNamespace(
+                    needs_clarification=False,
+                    confidence=0.7,
+                    intent="write_allowed",
+                    complexity="medium",
+                )
+            )
+        ),
+    )
+
+    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+
+    async for _ in pipeline.run("Fix that first."):
+        pass
+
+    assert runtime_intelligence.analyze_turn.await_args.kwargs["conversation_history"] == [
+        {
+            "role": "assistant",
+            "content": "assembled history should be used",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_passes_history_to_perception_fallback():
+    cancel_chunk = StreamChunk(content="", is_final=True)
+    coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
+    coordinator._orchestrator.messages = [
+        SimpleNamespace(
+            role="assistant",
+            content="Start with victor/agent/services/tool_compat.py first.",
+            model_dump=lambda: {
+                "role": "assistant",
+                "content": "Start with victor/agent/services/tool_compat.py first.",
+            },
+        )
+    ]
+    mock_perception = SimpleNamespace(
+        perceive=AsyncMock(
+            return_value=SimpleNamespace(
+                needs_clarification=False,
+                confidence=0.7,
+                intent="write_allowed",
+                complexity="medium",
+            )
+        )
+    )
+
+    pipeline = StreamingChatPipeline(coordinator, perception=mock_perception)
+
+    async for _ in pipeline.run("Fix that first."):
+        pass
+
+    assert mock_perception.perceive.await_args.kwargs["conversation_history"] == [
+        {
+            "role": "assistant",
+            "content": "Start with victor/agent/services/tool_compat.py first.",
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_pipeline_yields_recovery_fallback_when_empty():
     coordinator = DummyCoordinator(limit_result=(False, None))
     coordinator._provider_response = ("", None, None, False)
     coordinator._empty_recovery = (False, None, None)
+
+    pipeline = StreamingChatPipeline(coordinator)
+    chunks = []
+    async for chunk in pipeline.run("empty response"):
+        chunks.append(chunk.content)
+
+    assert any("fallback" in chunk for chunk in chunks)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_prefers_canonical_recovery_context_factory():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._provider_response = ("", None, None, False)
+    coordinator._empty_recovery = (False, None, None)
+    coordinator._orchestrator.create_recovery_context = lambda *_: object()
 
     pipeline = StreamingChatPipeline(coordinator)
     chunks = []

@@ -125,6 +125,77 @@ def test_streaming_chat_coordinator_constructor_warns_without_chat_service():
 
 
 @pytest.mark.asyncio
+async def test_streaming_chat_coordinator_tool_calls_use_canonical_tool_context_surface():
+    chat_context = MagicMock()
+    tool_context = MagicMock()
+    tool_context.execute_tool_calls = AsyncMock(
+        return_value=[
+            {
+                "name": "read",
+                "content": "file contents",
+                "tool_call_id": "call_123",
+            }
+        ]
+    )
+    tool_context._handle_tool_calls = AsyncMock(
+        side_effect=AssertionError("legacy _handle_tool_calls bridge should not be used")
+    )
+    provider_context = MagicMock()
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="StreamingChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = StreamingChatCoordinator(
+            chat_context=chat_context,
+            tool_context=tool_context,
+            provider_context=provider_context,
+        )
+
+    await coordinator._execute_tool_calls_during_stream([{"name": "read", "arguments": {}}])
+
+    tool_context.execute_tool_calls.assert_awaited_once_with([{"name": "read", "arguments": {}}])
+    chat_context.add_message.assert_called_once_with(
+        "tool",
+        "file contents",
+        name="read",
+        tool_call_id="call_123",
+    )
+
+
+@pytest.mark.asyncio
+async def test_streaming_chat_coordinator_tool_calls_require_canonical_tool_context_surface():
+    from types import SimpleNamespace
+
+    chat_context = MagicMock()
+    provider_context = MagicMock()
+    legacy_handle_tool_calls = AsyncMock(return_value=[{"name": "read", "content": "ignored"}])
+    tool_context = SimpleNamespace(
+        tool_calls_used=0,
+        tool_budget=10,
+        tool_selector=MagicMock(),
+        use_semantic_selection=False,
+        observed_files=set(),
+        _handle_tool_calls=legacy_handle_tool_calls,
+    )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="StreamingChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = StreamingChatCoordinator(
+            chat_context=chat_context,
+            tool_context=tool_context,
+            provider_context=provider_context,
+        )
+
+    with pytest.raises(AttributeError, match="execute_tool_calls"):
+        await coordinator._execute_tool_calls_during_stream([{"name": "read", "arguments": {}}])
+
+    legacy_handle_tool_calls.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_unified_chat_coordinator_delegates_to_bound_chat_service():
     sync = MagicMock()
     streaming = MagicMock()

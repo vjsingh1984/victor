@@ -71,9 +71,35 @@ This document outlines the design for Priority 4 (Learning from Execution), whic
    - Per-instance frontier evidence now comes from runtime outcomes and from
      evaluation artifacts that serialize canonical prompt identity metadata:
      `provider`, `prompt_candidate_hash`, and `section_name`
+   - `seed_from_evaluations()` now consumes canonical `eval_*.json` artifacts
+     across benchmark results and per-task validated session truth, rather than
+     only SWE-bench summary files
+   - Validated session-truth artifacts only contribute fractional scores when
+     they carry explicit validation scores (for example SWE-bench
+     `overall_score`); otherwise they fall back to conservative pass/fail
+     evidence
    - The same identity schema should be reused by benchmark/session truth
      artifacts, with null values when a normal session is not evaluating a
      specific prompt candidate
+   - Targeted benchmark/eval runs can now bind one exact
+     `(section_name, prompt_candidate_hash)` into the live optimization
+     injector, so the runtime prompt content matches the prompt identity saved
+     in artifacts instead of relying on posthoc inference
+   - The evaluation harness now has a candidate-suite fanout path for running
+     one benchmark evaluation per bound candidate, and checkpoint identity now
+     includes provider/section/candidate fields so targeted runs do not resume
+     or overwrite each other incorrectly
+   - The benchmark CLI can now sync a candidate suite back into
+     `prompt_optimizer` benchmark state; this path records score history for
+     every evaluated candidate but only approves the suite winner by default,
+     with optional explicit promotion of that approved winner
+   - Candidate-suite benchmarking can also hand off the approved winner into
+     the existing prompt rollout experiment path, keeping benchmark approval
+     and safe traffic rollout as separate steps instead of collapsing them
+     into one direct activation
+   - The same benchmark suite entry point can now inspect rollout analysis for
+     that approved winner and optionally apply the rollout or rollback decision
+     when the existing experiment analysis already makes the decision clear
    - Semantic trace zones inspired by PRiME
    - 13 failure categories with corrective hints
    - Session-aligned credit enrichment from runtime tool execution
@@ -95,7 +121,7 @@ This document outlines the design for Priority 4 (Learning from Execution), whic
 
 **Note**: PRiME is referenced as inspiration for semantic trace zoning and memory organization, but is not implemented here as a standalone strategy.
 
-**Maintainer note**: Keep this section synchronized with the tests around `prompt_optimizer.py`, `miprov2_strategy.py`, and `cot_distillation_strategy.py`. If a paper-inspired feature is only partially adapted, describe the adaptation explicitly instead of naming the full paper method.
+**Maintainer note**: Keep this section synchronized with the tests around `prompt_optimizer.py`, `optimization_injector.py`, `agent_adapter.py`, `harness.py`, `benchmark.py`, `miprov2_strategy.py`, and `cot_distillation_strategy.py`. If a paper-inspired feature is only partially adapted, describe the adaptation explicitly instead of naming the full paper method. When changing benchmark CLI or evaluation wiring, review the bound-candidate, candidate-suite, benchmark-sync, rollout-handoff, and rollout-analysis tests as part of the change so runtime behavior, checkpoint identity, promotion gates, rollout creation, rollout decisions, and persisted metadata do not drift apart.
 
 **Evolvable Sections** (5):
 - `ASI_TOOL_EFFECTIVENESS_GUIDANCE`

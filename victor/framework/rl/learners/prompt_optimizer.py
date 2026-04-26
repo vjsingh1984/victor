@@ -21,6 +21,8 @@ Current implementation notes:
 - Pareto instance scores come from real runtime outcomes or evaluation artifacts that
   name a specific prompt candidate hash; aggregate section scores are not reused as
   fake per-instance evidence.
+- Candidate-bound benchmark suites can be synced back into prompt candidates as
+  benchmark evidence; by default only the suite winner can satisfy benchmark gating.
 - When reflection/mutation yields no novel text, Pareto merge can synthesize a new
   candidate from complementary frontier members.
 - Credit enrichment is session-aligned when runtime credit metadata is available.
@@ -370,6 +372,55 @@ class PromptCandidate:
     def mean(self) -> float:
         """Posterior mean."""
         return self.alpha / (self.alpha + self.beta_val)
+
+
+@dataclass
+class PromptCandidateBenchmarkDecision:
+    """One benchmark-suite update applied to a prompt candidate."""
+
+    prompt_candidate_hash: str
+    section_name: str
+    provider: str
+    score: float
+    passed: bool
+    recorded: bool
+    rank: int
+    benchmark_score: float = 0.0
+    benchmark_runs: int = 0
+    promoted: bool = False
+
+
+@dataclass
+class PromptCandidateBenchmarkSyncResult:
+    """Summary of syncing a prompt-candidate benchmark suite into learner state."""
+
+    decisions: List[PromptCandidateBenchmarkDecision] = field(default_factory=list)
+    best_prompt_candidate_hash: Optional[str] = None
+    approved_prompt_candidate_hash: Optional[str] = None
+    promoted_prompt_candidate_hash: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize sync results for CLI output and saved artifacts."""
+        return {
+            "best_prompt_candidate_hash": self.best_prompt_candidate_hash,
+            "approved_prompt_candidate_hash": self.approved_prompt_candidate_hash,
+            "promoted_prompt_candidate_hash": self.promoted_prompt_candidate_hash,
+            "decisions": [
+                {
+                    "prompt_candidate_hash": decision.prompt_candidate_hash,
+                    "section_name": decision.section_name,
+                    "provider": decision.provider,
+                    "score": decision.score,
+                    "passed": decision.passed,
+                    "recorded": decision.recorded,
+                    "rank": decision.rank,
+                    "benchmark_score": decision.benchmark_score,
+                    "benchmark_runs": decision.benchmark_runs,
+                    "promoted": decision.promoted,
+                }
+                for decision in self.decisions
+            ],
+        }
 
 
 @dataclass
@@ -1317,6 +1368,16 @@ class PromptOptimizerLearner(BaseLearner):
                 return candidate
         return None
 
+    def get_candidate(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        text_hash: str,
+    ) -> Optional[PromptCandidate]:
+        """Return one exact prompt candidate for targeted evaluation/runtime binding."""
+        return self._find_candidate(section_name, provider, text_hash)
+
     def record_benchmark_result(
         self,
         section_name: str,
@@ -1341,6 +1402,110 @@ class PromptOptimizerLearner(BaseLearner):
         candidate.benchmark_passed = candidate.benchmark_passed or bool(passed)
         self._save_candidate(candidate)
         return candidate
+
+    def sync_evaluation_suite(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+    ) -> PromptCandidateBenchmarkSyncResult:
+        """Write a candidate-bound benchmark suite back into prompt-candidate state.
+
+        This path is intentionally conservative:
+        - every suite run contributes benchmark score history
+        - only the suite winner can satisfy benchmark gating by default
+        - promotion remains opt-in and only happens after the winner passes the gate
+        """
+        if min_pass_rate < 0.0 or min_pass_rate > 1.0:
+            raise ValueError("min_pass_rate must be between 0.0 and 1.0")
+
+        runs = list(getattr(suite, "runs", []) or [])
+        if not runs:
+            return PromptCandidateBenchmarkSyncResult()
+
+        def _run_sort_key(run: Any) -> tuple[float, int, float]:
+            result = getattr(run, "result", None)
+            pass_rate = float(getattr(result, "pass_rate", 0.0) or 0.0)
+            total_tasks = int(getattr(result, "total_tasks", 0) or 0)
+            duration_seconds = float(getattr(result, "duration_seconds", 0.0) or 0.0)
+            return (pass_rate, total_tasks, -duration_seconds)
+
+        ranked_runs = sorted(runs, key=_run_sort_key, reverse=True)
+        best_run = ranked_runs[0]
+        best_hash = getattr(getattr(best_run, "config", None), "prompt_candidate_hash", None)
+
+        sync_result = PromptCandidateBenchmarkSyncResult(best_prompt_candidate_hash=best_hash)
+        best_decision: Optional[PromptCandidateBenchmarkDecision] = None
+
+        for rank, run in enumerate(ranked_runs, start=1):
+            config = getattr(run, "config", None)
+            spec = getattr(run, "spec", None)
+            result = getattr(run, "result", None)
+
+            section_name = (
+                getattr(config, "prompt_section_name", None)
+                or getattr(spec, "section_name", None)
+                or ""
+            )
+            provider = (
+                getattr(config, "provider", None)
+                or getattr(spec, "provider", None)
+                or getattr(getattr(suite, "base_config", None), "provider", None)
+                or "default"
+            )
+            prompt_candidate_hash = (
+                getattr(config, "prompt_candidate_hash", None)
+                or getattr(spec, "prompt_candidate_hash", None)
+                or ""
+            )
+            score = float(getattr(result, "pass_rate", 0.0) or 0.0)
+            passed = (
+                prompt_candidate_hash == best_hash
+                and score > 0.0
+                and score >= min_pass_rate
+            )
+
+            candidate = None
+            recorded = bool(section_name and prompt_candidate_hash)
+            if recorded:
+                candidate = self.record_benchmark_result(
+                    section_name=section_name,
+                    provider=provider,
+                    text_hash=prompt_candidate_hash,
+                    score=score,
+                    passed=passed,
+                )
+                recorded = candidate is not None
+
+            decision = PromptCandidateBenchmarkDecision(
+                prompt_candidate_hash=prompt_candidate_hash,
+                section_name=section_name,
+                provider=provider,
+                score=score,
+                passed=passed and recorded,
+                recorded=recorded,
+                rank=rank,
+                benchmark_score=(candidate.benchmark_score if candidate is not None else 0.0),
+                benchmark_runs=(candidate.benchmark_runs if candidate is not None else 0),
+            )
+            sync_result.decisions.append(decision)
+
+            if decision.passed:
+                sync_result.approved_prompt_candidate_hash = prompt_candidate_hash
+                best_decision = decision
+
+        if promote_best and best_decision is not None:
+            promoted = self.promote_candidate(
+                section_name=best_decision.section_name,
+                provider=best_decision.provider,
+                text_hash=best_decision.prompt_candidate_hash,
+            )
+            if promoted is not None:
+                best_decision.promoted = True
+                sync_result.promoted_prompt_candidate_hash = promoted.text_hash
+
+        return sync_result
 
     def promote_candidate(
         self,
@@ -1685,11 +1850,131 @@ class PromptOptimizerLearner(BaseLearner):
         self._sync_pareto_state(key)
         return candidate
 
+    @staticmethod
+    def _artifact_text_value(value: Any) -> Optional[str]:
+        """Normalize serialized evaluation artifact identity values."""
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @classmethod
+    def _artifact_feedback_metadata(cls, payload: Any) -> Dict[str, Any]:
+        """Extract nested runtime-feedback metadata from a saved artifact."""
+        if not isinstance(payload, dict):
+            return {}
+        runtime_feedback = payload.get("runtime_evaluation_feedback")
+        if not isinstance(runtime_feedback, dict):
+            return {}
+        metadata = runtime_feedback.get("metadata")
+        return dict(metadata) if isinstance(metadata, dict) else {}
+
+    @classmethod
+    def _artifact_identity(
+        cls,
+        payload: Dict[str, Any],
+    ) -> tuple[Optional[str], Optional[str], str, str]:
+        """Return canonical prompt identity for a benchmark/session artifact."""
+        config = payload.get("config")
+        config_dict = dict(config) if isinstance(config, dict) else {}
+        feedback_metadata = cls._artifact_feedback_metadata(payload)
+        feedback_scope = feedback_metadata.get("scope")
+        scope_dict = dict(feedback_scope) if isinstance(feedback_scope, dict) else {}
+
+        candidate_hash = (
+            cls._artifact_text_value(payload.get("prompt_candidate_hash"))
+            or cls._artifact_text_value(config_dict.get("prompt_candidate_hash"))
+            or cls._artifact_text_value(config_dict.get("text_hash"))
+            or cls._artifact_text_value(config_dict.get("candidate_hash"))
+            or cls._artifact_text_value(feedback_metadata.get("prompt_candidate_hash"))
+        )
+        section_name = (
+            cls._artifact_text_value(payload.get("section_name") or payload.get("prompt_section_name"))
+            or cls._artifact_text_value(
+                config_dict.get("section_name") or config_dict.get("prompt_section_name")
+            )
+            or cls._artifact_text_value(
+                feedback_metadata.get("section_name")
+                or feedback_metadata.get("prompt_section_name")
+            )
+        )
+        provider = (
+            cls._artifact_text_value(payload.get("provider"))
+            or cls._artifact_text_value(config_dict.get("provider"))
+            or cls._artifact_text_value(feedback_metadata.get("provider"))
+            or cls._artifact_text_value(scope_dict.get("provider"))
+            or "default"
+        )
+        model = (
+            cls._artifact_text_value(payload.get("model"))
+            or cls._artifact_text_value(config_dict.get("model"))
+            or cls._artifact_text_value(feedback_metadata.get("model"))
+            or cls._artifact_text_value(scope_dict.get("model"))
+            or "unknown"
+        )
+        return candidate_hash, section_name, provider, model
+
+    @classmethod
+    def _validated_artifact_score(cls, payload: Dict[str, Any]) -> Optional[float]:
+        """Return a conservative per-instance score for validated session artifacts."""
+        score_payload = payload.get("score")
+        if isinstance(score_payload, dict):
+            overall_score = score_payload.get("overall_score")
+            if isinstance(overall_score, (int, float)):
+                return max(0.0, min(1.0, float(overall_score)))
+        elif isinstance(score_payload, (int, float)):
+            return max(0.0, min(1.0, float(score_payload)))
+
+        validation_result = payload.get("validation_result")
+        if isinstance(validation_result, dict):
+            validation_score = validation_result.get("score")
+            if isinstance(validation_score, (int, float)):
+                return max(0.0, min(1.0, float(validation_score)))
+
+        status = cls._artifact_text_value(payload.get("status"))
+        if status is None:
+            return None
+        return 1.0 if status.lower() == "passed" else 0.0
+
+    @classmethod
+    def _artifact_instance_scores(
+        cls,
+        payload: Dict[str, Any],
+        *,
+        model: str,
+    ) -> List[tuple[str, float]]:
+        """Extract concrete per-instance outcome scores from saved artifacts."""
+        tasks = payload.get("tasks")
+        if isinstance(tasks, list):
+            scored_instances: List[tuple[str, float]] = []
+            for task in tasks:
+                if not isinstance(task, dict):
+                    continue
+                task_id = cls._artifact_text_value(task.get("task_id") or task.get("instance_id"))
+                status = cls._artifact_text_value(task.get("status"))
+                if task_id is None or status is None:
+                    continue
+                score = 1.0 if status.lower() == "passed" else 0.0
+                scored_instances.append((f"{task_id}::{model}", score))
+            return scored_instances
+
+        task_id = cls._artifact_text_value(payload.get("task_id") or payload.get("instance_id"))
+        if task_id is None:
+            return []
+
+        score = cls._validated_artifact_score(payload)
+        if score is None:
+            return []
+        return [(f"{task_id}::{model}", score)]
+
     def seed_from_evaluations(self, eval_dir: Optional[Path] = None) -> int:
         """Load evaluation results and update Pareto instance scores.
 
-        Reads eval_swe_bench_*.json files and updates each frontier
-        candidate's per-instance scores for multi-objective selection.
+        Reads canonical ``eval_*.json`` benchmark/session artifacts and updates
+        each frontier candidate's per-instance scores for multi-objective
+        selection. Full benchmark result files contribute pass/fail evidence,
+        while validated session-truth artifacts can contribute richer explicit
+        validation scores when available.
 
         Returns:
             Number of instance scores updated
@@ -1700,22 +1985,12 @@ class PromptOptimizerLearner(BaseLearner):
         if eval_dir is None:
             eval_dir = Path.home() / ".victor" / "evaluations"
 
-        import glob as _glob
-
         updated = 0
-        for eval_file in sorted(_glob.glob(str(eval_dir / "eval_swe_bench_*.json"))):
+        for eval_file in sorted(Path(eval_dir).glob("eval_*.json")):
             try:
                 with open(eval_file) as f:
                     data = json.load(f)
-                config = data.get("config", {})
-                model = config.get("model", "unknown")
-                candidate_hash = (
-                    config.get("prompt_candidate_hash")
-                    or config.get("text_hash")
-                    or config.get("candidate_hash")
-                )
-                section_name = config.get("section_name")
-                provider = config.get("provider", "default")
+                candidate_hash, section_name, provider, model = self._artifact_identity(data)
                 if not candidate_hash or not section_name:
                     continue
 
@@ -1724,9 +1999,7 @@ class PromptOptimizerLearner(BaseLearner):
                 if frontier is None:
                     continue
 
-                for task in data.get("tasks", []):
-                    instance_id = f"{task['task_id']}::{model}"
-                    score = 1.0 if task.get("status") == "passed" else 0.0
+                for instance_id, score in self._artifact_instance_scores(data, model=model):
                     frontier.update_instance_score(candidate_hash, instance_id, score)
                     updated += 1
                 self._sync_pareto_state(key)

@@ -26,6 +26,7 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import warnings
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -71,6 +72,12 @@ if TYPE_CHECKING:
 from victor.agent.tool_executor import ToolExecutionResult
 
 logger = logging.getLogger(__name__)
+
+_TOOL_COORDINATOR_DEPRECATION_MESSAGE = (
+    "ToolCoordinator is deprecated. Use ToolService from "
+    "victor.agent.services.tool_service instead. "
+    "This adapter will be removed in a future release."
+)
 
 
 @dataclass
@@ -221,6 +228,7 @@ class ToolCoordinator:
         on_selection_complete: Optional[Callable[[str, int], None]] = None,  # method, count
         on_budget_warning: Optional[Callable[[int, int], None]] = None,  # remaining, total
         on_tool_complete: Optional[Callable[[ToolExecutionResult], None]] = None,
+        warn_on_init: bool = True,
     ) -> None:
         """Initialize the ToolCoordinator.
 
@@ -237,7 +245,15 @@ class ToolCoordinator:
             on_selection_complete: Callback when tool selection completes
             on_budget_warning: Callback when budget is running low
             on_tool_complete: Callback when tool execution completes
+            warn_on_init: Emit a deprecation warning for direct compatibility use
         """
+        if warn_on_init:
+            warnings.warn(
+                _TOOL_COORDINATOR_DEPRECATION_MESSAGE,
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self._pipeline = tool_pipeline
         self._registry = tool_registry
         self._selector = tool_selector
@@ -1351,6 +1367,7 @@ def create_tool_coordinator(
         tool_adapter=tool_adapter,
         tool_access_controller=tool_access_controller,
         config=config,
+        warn_on_init=False,
     )
     if mode_controller is not None:
         coordinator.set_mode_controller(mode_controller)

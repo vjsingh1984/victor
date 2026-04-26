@@ -39,10 +39,10 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
     settings = Settings(
         analytics_enabled=False,
         tool_selection_strategy="keyword",
-        tool_cache_enabled=True,
-        tool_cache_allowlist=["code_search"],
-        tool_cache_dir=tmpdir,  # Use correct setting name
+        tool_cache_dir_override=tmpdir,
     )
+    settings.tools.tool_cache_enabled = True
+    settings.tools.tool_cache_allowlist = ["code_search"]
     with patch("victor.core.bootstrap_services.bootstrap_new_services"):
         orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
@@ -77,9 +77,9 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
     args = {"query": "test", "root": ".", "k": 1}
 
     # First call populates cache
-    await orch._execute_tool_with_retry("code_search", args, context={})
+    await orch.execute_tool_with_retry("code_search", args, context={})
     # Second call should hit cache, not invoke fake_execute again
-    await orch._execute_tool_with_retry("code_search", args, context={})
+    await orch.execute_tool_with_retry("code_search", args, context={})
 
     await orch.shutdown()
     return call_count["count"]

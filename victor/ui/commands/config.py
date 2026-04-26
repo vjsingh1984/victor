@@ -12,6 +12,18 @@ config_app = typer.Typer(name="config", help="Validate configuration files and p
 console = Console()
 
 
+def _validation_passed(result: Any) -> bool:
+    """Return whether a validation result represents success.
+
+    Supports both legacy property-style `is_valid` values and the newer
+    callable `is_valid()` API exposed by some validators.
+    """
+    validator = getattr(result, "is_valid", None)
+    if callable(validator):
+        return bool(validator())
+    return bool(validator)
+
+
 @config_app.command("show")
 def config_show(
     verbose: bool = typer.Option(
@@ -193,7 +205,7 @@ def config_validate(
         # Display validation results
         print(format_validation_result(result))
 
-        if not result.is_valid():
+        if not _validation_passed(result):
             raise typer.Exit(1)
 
     except Exception as e:

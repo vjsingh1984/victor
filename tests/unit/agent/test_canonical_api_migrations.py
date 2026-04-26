@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from victor.agent.factory.coordination_builders import CoordinationBuildersMixin
 from victor.agent.factory.tool_builders import ToolBuildersMixin
@@ -73,6 +73,45 @@ def test_coordination_builders_prefers_canonical_nested_semantic_selection_setti
 
     assert use_semantic is False
     assert preload_task is None
+
+
+def test_tool_builders_initialize_plugin_system_prefers_canonical_registrar_method():
+    settings = SimpleNamespace(plugin_enabled=True)
+    harness = _ToolBuilderHarness(settings)
+    initialize_plugins = MagicMock(return_value=2)
+    registrar = SimpleNamespace(
+        initialize_plugins=initialize_plugins,
+        plugin_manager="plugin-manager",
+    )
+
+    def _legacy_load_plugin_tools():
+        raise AssertionError("ToolBuilders should not call ToolRegistrar private plugin helpers")
+
+    registrar._load_plugin_tools = _legacy_load_plugin_tools
+
+    plugin_manager = harness.initialize_plugin_system(registrar)
+
+    initialize_plugins.assert_called_once_with()
+    assert plugin_manager == "plugin-manager"
+
+
+def test_tool_builders_prefers_canonical_nested_tool_cache_settings():
+    settings = SimpleNamespace(
+        tools=SimpleNamespace(
+            tool_cache_enabled=False,
+            tool_cache_ttl=123,
+            tool_cache_allowlist=["code_search"],
+        ),
+        tool_cache_dir_override="/tmp/canonical-cache",
+        tool_cache_enabled=True,
+        tool_cache_ttl=999,
+        tool_cache_allowlist=["legacy"],
+    )
+    harness = _ToolBuilderHarness(settings)
+
+    cache = harness.create_tool_cache()
+
+    assert cache is None
 
 
 def test_internal_modules_use_sdk_tool_dependency_types_directly():

@@ -1151,6 +1151,7 @@ class OrchestratorServiceProvider:
             context_compactor=context_compactor,
             unified_tracker=unified_tracker,
             settings=self._settings,
+            warn_on_init=False,
         )
 
     def _create_chunk_generator(self) -> "ChunkRuntimeProtocol":
@@ -1257,65 +1258,37 @@ class OrchestratorServiceProvider:
             logger.debug("ToolPipeline or ToolRegistry not available for ToolCoordinator")
         return coordinator
 
-    def _create_state_coordinator(self) -> "StateRuntimeProtocol | None":
-        """Create StateCoordinator instance.
-
-        The StateCoordinator provides a centralized interface for conversation
-        state and stage transition management.
-
-        Returns:
-            StateCoordinator instance
-        """
-        from victor.agent.services.state_compat import (
-            StateCoordinator,
-            StateCoordinatorConfig,
-        )
+    def _create_state_runtime(
+        self,
+        container: ServiceContainer,
+    ) -> "StateRuntimeProtocol | None":
+        """Create the canonical live state runtime adapter."""
+        from victor.agent.services.state_runtime import StateRuntimeAdapter
         from victor.agent.protocols import (
             ConversationControllerProtocol,
             ConversationStateMachineProtocol,
         )
 
         # Get dependencies from DI container
-        conversation_controller = self.container.get_optional(ConversationControllerProtocol)
-        state_machine = self.container.get_optional(ConversationStateMachineProtocol)
+        conversation_controller = container.get_optional(ConversationControllerProtocol)
+        state_machine = container.get_optional(ConversationStateMachineProtocol)
 
-        # Build config from settings
-        config = StateCoordinatorConfig(
-            enable_auto_transitions=getattr(self._settings, "enable_auto_stage_transitions", True),
-            enable_history_tracking=True,
-            max_history_length=100,
-            emit_events=getattr(self._settings, "enable_observability", True),
-        )
-
-        # Note: conversation_controller may be None if not yet registered
         if conversation_controller is None:
-            logger.debug("ConversationController not available for StateCoordinator")
+            logger.debug("ConversationController not available for StateRuntimeAdapter")
             return None
 
-        return StateCoordinator(
+        return StateRuntimeAdapter(
             conversation_controller=conversation_controller,
             state_machine=state_machine,
-            config=config,
         )
 
-    def _create_prompt_coordinator(self) -> "PromptRuntimeProtocol":
-        """Create PromptCoordinator instance.
-
-        The PromptCoordinator provides a centralized interface for system
-        prompt assembly using PromptBuilder and vertical context.
-
-        Returns:
-            PromptCoordinator instance
-        """
-        from victor.agent.services.prompt_compat import (
-            PromptCoordinator,
-            PromptCoordinatorConfig,
-        )
+    def _create_prompt_runtime(self) -> "PromptRuntimeProtocol":
+        """Create the canonical prompt runtime adapter."""
+        from victor.agent.services.prompt_runtime import PromptRuntimeAdapter, PromptRuntimeConfig
         from victor.agent.system_prompt_policy import create_policy_from_settings
         from victor.framework.prompt_builder import PromptBuilder
 
-        # Build config from settings
-        config = PromptCoordinatorConfig(
+        config = PromptRuntimeConfig(
             default_grounding_mode=getattr(self._settings, "grounding_mode", "minimal"),
             enable_task_hints=getattr(self._settings, "enable_task_hints", True),
             enable_vertical_sections=True,
@@ -1323,12 +1296,10 @@ class OrchestratorServiceProvider:
             max_context_tokens=getattr(self._settings, "max_context_tokens", 2000),
         )
 
-        # Get base identity from settings or use default
         base_identity = getattr(self._settings, "base_identity", None)
-
         policy = create_policy_from_settings(self._settings)
 
-        return PromptCoordinator(
+        return PromptRuntimeAdapter(
             prompt_builder=PromptBuilder(),
             config=config,
             base_identity=base_identity,

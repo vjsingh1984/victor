@@ -290,6 +290,59 @@ class TestPromptOptimizationSettings:
 
 
 class TestOptimizationInjectorFewShots:
+    def test_bound_prompt_candidate_bypasses_recommendation_sampling(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+
+        candidate = SimpleNamespace(
+            text="BOUND GROUNDING",
+            text_hash="cand-bound",
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            strategy_name="gepa",
+            strategy_chain="gepa,cot_distillation",
+        )
+        mock_learner = MagicMock()
+        mock_learner.get_candidate.return_value = candidate
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=False)
+
+        with (
+            patch("victor.config.settings.get_settings", return_value=mock_settings),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            injector.bind_prompt_candidate(
+                section_name="GROUNDING_RULES",
+                prompt_candidate_hash="cand-bound",
+                provider="anthropic",
+            )
+            payloads = injector.get_evolved_section_payloads(
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="edit",
+            )
+
+        grounding = next(
+            payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES"
+        )
+        assert grounding["text"] == "BOUND GROUNDING"
+        assert grounding["provider"] == "anthropic"
+        assert grounding["prompt_candidate_hash"] == "cand-bound"
+        assert grounding["strategy_name"] == "gepa"
+        assert grounding["strategy_chain"] == "gepa,cot_distillation"
+        assert grounding["source"] == "bound_candidate"
+        mock_learner.get_recommendation.assert_not_called()
+
     def test_evolved_section_payloads_include_prompt_identity(self):
         from unittest.mock import MagicMock, patch
 

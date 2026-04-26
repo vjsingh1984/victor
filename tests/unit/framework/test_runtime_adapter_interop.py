@@ -11,6 +11,10 @@ from victor_sdk.processing_runtime import FileEditor
 from victor_sdk.provider_runtime import ProviderRegistry
 from victor_sdk.rl_runtime import (
     RLManager,
+    analyze_prompt_rollout_experiment,
+    analyze_prompt_rollout_experiment_async,
+    apply_prompt_rollout_recommendation,
+    apply_prompt_rollout_recommendation_async,
     create_prompt_rollout_experiment,
     create_prompt_rollout_experiment_async,
     get_rl_coordinator_async,
@@ -28,6 +32,10 @@ def test_sdk_runtime_adapters_resolve_host_types() -> None:
     assert RLManager.__name__ == "RLManager"
     assert callable(create_prompt_rollout_experiment)
     assert callable(create_prompt_rollout_experiment_async)
+    assert callable(analyze_prompt_rollout_experiment)
+    assert callable(analyze_prompt_rollout_experiment_async)
+    assert callable(apply_prompt_rollout_recommendation)
+    assert callable(apply_prompt_rollout_recommendation_async)
     assert callable(get_rl_coordinator_async)
     assert CodebaseIndexFactoryProtocol.__name__ == "CodebaseIndexFactoryProtocol"
     assert callable(create_lazy_capability_proxy)

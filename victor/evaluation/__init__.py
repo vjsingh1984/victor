@@ -76,7 +76,11 @@ from victor.evaluation.harness import (
     BaseBenchmarkRunner,
     BenchmarkRunner,
     EvaluationHarness,
+    PromptCandidateEvaluationRun,
+    PromptCandidateEvaluationSpec,
+    PromptCandidateEvaluationSuiteResult,
     TaskEnvironment,
+    bind_prompt_candidate_evaluation_config,
     get_harness,
 )
 from victor.evaluation.benchmarks import (
@@ -242,7 +246,11 @@ __all__ = [
     "BaseBenchmarkRunner",
     "BenchmarkRunner",
     "EvaluationHarness",
+    "PromptCandidateEvaluationRun",
+    "PromptCandidateEvaluationSpec",
+    "PromptCandidateEvaluationSuiteResult",
     "TaskEnvironment",
+    "bind_prompt_candidate_evaluation_config",
     "get_harness",
     # Benchmark runners
     "BrowserTaskBenchmarkRunner",

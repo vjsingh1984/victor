@@ -350,22 +350,31 @@ class ToolBuildersMixin:
         Returns:
             ToolCache instance or None if disabled
         """
-        if not getattr(self.settings, "tool_cache_enabled", True):
+        tool_settings = getattr(self.settings, "tools", None)
+
+        def _tool_setting(name: str, default: Any) -> Any:
+            if tool_settings is not None and hasattr(tool_settings, name):
+                return getattr(tool_settings, name)
+            return getattr(self.settings, name, default)
+
+        if not _tool_setting("tool_cache_enabled", True):
             return None
 
         from victor.storage.cache.config import CacheConfig
         from victor.config.settings import get_project_paths
         from victor.storage.cache.tool_cache import ToolCache
 
-        cache_dir = getattr(self.settings, "tool_cache_dir", None)
+        cache_dir = getattr(self.settings, "tool_cache_dir_override", None)
+        if not cache_dir:
+            cache_dir = getattr(self.settings, "tool_cache_dir", None)
         if cache_dir:
             cache_dir = Path(cache_dir).expanduser()
         else:
             cache_dir = get_project_paths().global_cache_dir
 
         cache = ToolCache(
-            ttl=getattr(self.settings, "tool_cache_ttl", 600),
-            allowlist=getattr(self.settings, "tool_cache_allowlist", []),
+            ttl=_tool_setting("tool_cache_ttl", 600),
+            allowlist=_tool_setting("tool_cache_allowlist", []),
             cache_config=CacheConfig(disk_path=cache_dir),
         )
         logger.debug(f"ToolCache created with TTL={cache.ttl}s")
@@ -604,7 +613,7 @@ class ToolBuildersMixin:
             logger.debug("Plugin system disabled")
             return None
 
-        tool_count = tool_registrar._initialize_plugins()
+        tool_count = tool_registrar.initialize_plugins()
         plugin_manager = tool_registrar.plugin_manager
 
         if tool_count > 0:

@@ -368,6 +368,40 @@ class TestPerceive:
         assert result.needs_clarification is False
         assert result.clarification_prompt is None
 
+    async def test_perceive_does_not_flag_relative_clause_report_request(self):
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        result = await integration.perceive(
+            "Identify all dead code or deprecated call sites that should be modified first "
+            "to enable clean code principle based implementations."
+        )
+
+        assert result.needs_clarification is False
+        assert result.clarification_prompt is None
+
+    async def test_perceive_uses_history_to_resolve_ambiguous_follow_up_target(self):
+        integration = PerceptionIntegration(
+            memory_coordinator=None,
+            enable_similarity_search=False,
+        )
+        history = [
+            {
+                "role": "assistant",
+                "content": "Start with victor/agent/services/tool_compat.py and migrate its "
+                "deprecated call sites first.",
+            }
+        ]
+
+        result = await integration.perceive(
+            "Fix that first and add tests.",
+            conversation_history=history,
+        )
+
+        assert result.needs_clarification is False
+        assert result.clarification_prompt is None
+
 
 # ============================================================================
 # Convenience function tests

@@ -75,7 +75,7 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     use_semantic_selection: bool = False
     observed_files: set = field(default_factory=set)
 
-    async def _handle_tool_calls(self, tool_calls: Any) -> List[dict]:
+    async def execute_tool_calls(self, tool_calls: Any) -> List[dict]:
         return [{"result": "mock_result"}]
 
     def _model_supports_tool_calls(self) -> bool:
@@ -107,7 +107,7 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     _recovery_coordinator: Any = MagicMock()
     _recovery_integration: Any = MagicMock()
 
-    async def _create_recovery_context(self, stream_ctx: Any) -> Any:
+    def create_recovery_context(self, stream_ctx: Any) -> Any:
         return {}
 
     async def _handle_recovery_with_integration(
@@ -204,6 +204,21 @@ class TestChatCoordinatorProtocolInjection:
         assert coordinator._orchestrator.tool_budget == 10
         assert coordinator._orchestrator._model_supports_tool_calls() is True
 
+    @pytest.mark.asyncio
+    async def test_mock_orchestrator_exposes_canonical_execute_tool_calls(self):
+        """Protocol mock should expose execute_tool_calls as the tool-call surface."""
+        mock_orchestrator = MockOrchestrator()
+        mock_orchestrator.execute_tool_calls = AsyncMock(
+            return_value=[{"result": "canonical_tool_result"}]
+        )
+
+        result = await mock_orchestrator.execute_tool_calls([{"name": "read", "arguments": {}}])
+
+        assert result == [{"result": "canonical_tool_result"}]
+        mock_orchestrator.execute_tool_calls.assert_awaited_once_with(
+            [{"name": "read", "arguments": {}}]
+        )
+
     def test_chat_coordinator_delegates_to_provider_methods(self):
         """ChatCoordinator should use orchestrator's provider methods."""
         mock_orchestrator = MockOrchestrator()
@@ -240,7 +255,7 @@ class TestChatCoordinatorProtocolInjection:
         mock_orchestrator.provider.supports_tools = lambda: True
 
         # Mock tool execution (no tools in this simple case)
-        mock_orchestrator._handle_tool_calls = lambda *args, **kwargs: []
+        mock_orchestrator.execute_tool_calls = AsyncMock(return_value=[])
 
         coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
