@@ -1310,6 +1310,7 @@ class ChatService:
         tool_name: Optional[str] = None,
         tool_call_id: Optional[str] = None,
         tool_calls: Optional[list] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Persist a message to memory and emit usage analytics.
 
@@ -1343,6 +1344,8 @@ class ChatService:
                     add_kwargs["tool_call_id"] = tool_call_id
                 if tool_calls:
                     add_kwargs["tool_calls"] = tool_calls
+                if metadata:
+                    add_kwargs["metadata"] = metadata
 
                 try:
                     loop = asyncio.get_running_loop()

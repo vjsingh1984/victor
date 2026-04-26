@@ -174,14 +174,14 @@ class OrchestratorProtocolAdapter:
         """Get current message history."""
         return self._orchestrator.messages
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add message to history.
 
         Args:
             role: Message role (user, assistant, system, tool)
             content: Message content
         """
-        self._orchestrator.add_message(role, content)
+        self._orchestrator.add_message(role, content, **metadata)
 
     def get_messages(self, limit: Optional[int] = None) -> List[Message]:
         """Get messages from history.

@@ -11,6 +11,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Optional
 
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.core.errors import (
@@ -172,6 +173,7 @@ class ChatStreamHelperMixin:
                 orch.add_message(
                     "user",
                     f"[SYSTEM-REMINDER: {intelligent_context['system_prompt_addition']}]",
+                    metadata=build_internal_history_metadata("system_reminder"),
                 )
                 logger.debug("Injected intelligent pipeline optimized prompt")
 
@@ -323,7 +325,9 @@ class ChatStreamHelperMixin:
         if stream_ctx.pending_grounding_feedback:
             logger.info("Injecting pending grounding feedback as system message")
             orch.add_message(
-                "user", f"[GROUNDING-FEEDBACK: {stream_ctx.pending_grounding_feedback}]"
+                "user",
+                f"[GROUNDING-FEEDBACK: {stream_ctx.pending_grounding_feedback}]",
+                metadata=build_internal_history_metadata("grounding_feedback"),
             )
             stream_ctx.pending_grounding_feedback = ""
 

@@ -46,9 +46,9 @@ class ContextServiceAdapter:
         result = await self._context_compactor.check_and_compact()
         return result if isinstance(result, int) else 0
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add a message to the conversation."""
-        self._conversation_controller.add_message(role, content)
+        self._conversation_controller.add_message(role, content, **metadata)
 
     def get_messages(
         self,

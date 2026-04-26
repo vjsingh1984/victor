@@ -69,7 +69,7 @@ class StreamingConversationStateProtocol(Protocol):
 class StreamingMessageAdderProtocol(Protocol):
     """Minimal message-writing contract for streaming helper modules."""
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add a message to the active conversation history."""
         ...
 

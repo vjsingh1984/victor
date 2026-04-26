@@ -32,6 +32,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.iteration import (
     IterationAction,
@@ -56,7 +57,7 @@ logger = logging.getLogger(__name__)
 class MessageAdder(Protocol):
     """Protocol for adding messages to conversation."""
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add a message to the conversation."""
         ...
 
@@ -620,7 +621,11 @@ class StreamingChatHandler:
                 "mentioning tools you cannot use."
             )
 
-        self.message_adder.add_message("user", message)
+        self.message_adder.add_message(
+            "user",
+            message,
+            metadata=build_internal_history_metadata("force_tool_execution"),
+        )
         return create_continue_result()
 
     def check_tool_budget(
@@ -786,7 +791,11 @@ class StreamingChatHandler:
         warning_chunk, system_message = self.get_force_completion_chunks(ctx, is_research)
 
         # Add system message to force summary
-        self.message_adder.add_message("user", f"[SYSTEM: {system_message}]")
+        self.message_adder.add_message(
+            "user",
+            f"[SYSTEM: {system_message}]",
+            metadata=build_internal_history_metadata("force_completion"),
+        )
 
         result = IterationResult(action=IterationAction.YIELD_AND_BREAK)
         result.add_chunk(warning_chunk)
@@ -1319,7 +1328,11 @@ class StreamingChatHandler:
             return None
 
         warning_chunk, system_message = self.get_loop_warning_chunks(warning_message)
-        self.message_adder.add_message("user", f"[SYSTEM: {system_message}]")
+        self.message_adder.add_message(
+            "user",
+            f"[SYSTEM: {system_message}]",
+            metadata=build_internal_history_metadata("force_completion"),
+        )
         return warning_chunk
 
     def generate_thinking_status_chunk(self) -> StreamChunk:

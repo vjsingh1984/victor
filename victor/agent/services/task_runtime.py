@@ -24,6 +24,7 @@ implementation for compatibility.
 import logging
 from typing import Any, Optional, TYPE_CHECKING
 
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.core.events import ObservabilityBus
 from victor.core.events.emit_helper import emit_event_sync
 
@@ -164,7 +165,11 @@ class TaskCoordinator:
                 hint_source = unified_task_type.value
 
         if task_hint:
-            conversation_controller.add_message("user", f"[TASK-HINT: {task_hint.strip()}]")
+            conversation_controller.add_message(
+                "user",
+                f"[TASK-HINT: {task_hint.strip()}]",
+                metadata=build_internal_history_metadata("task_hint"),
+            )
             logger.debug(f"Injected task hint for task type: {hint_source}")
 
         # Classify task complexity and adjust tool budget

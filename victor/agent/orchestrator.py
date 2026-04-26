@@ -3548,6 +3548,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_name=kwargs.get("name"),
             tool_call_id=kwargs.get("tool_call_id"),
             tool_calls=kwargs.get("tool_calls"),
+            metadata=kwargs.get("metadata"),
         )
 
     async def chat(

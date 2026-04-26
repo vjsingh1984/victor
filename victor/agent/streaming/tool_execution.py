@@ -68,6 +68,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.services.protocols.streaming_runtime import (
     StreamingChunkRuntimeProtocol,
     StreamingMessageAdderProtocol,
@@ -395,7 +396,11 @@ class ToolExecutionHandler:
         # Get and inject consolidated reminder
         reminder = self._reminder_manager.get_consolidated_reminder()
         if reminder:
-            self._message_adder.add_message("user", f"[SYSTEM-REMINDER: {reminder}]")
+            self._message_adder.add_message(
+                "user",
+                f"[SYSTEM-REMINDER: {reminder}]",
+                metadata=build_internal_history_metadata("system_reminder"),
+            )
 
 
 # =============================================================================

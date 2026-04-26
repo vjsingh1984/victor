@@ -510,6 +510,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
         tool_name: Optional[str] = None,
         tool_call_id: Optional[str] = None,
         tool_calls: Optional[list] = None,
+        metadata: Optional[dict] = None,
     ) -> None:
         """Deprecated compatibility delegate to ``ChatService.persist_message``."""
         warnings.warn(
@@ -529,4 +530,5 @@ class ChatCoordinator(ChatStreamHelperMixin):
             tool_name=tool_name,
             tool_call_id=tool_call_id,
             tool_calls=tool_calls,
+            metadata=metadata,
         )

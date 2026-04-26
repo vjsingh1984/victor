@@ -67,6 +67,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.services.protocols.streaming_runtime import (
     StreamingChunkRuntimeProtocol,
     StreamingMessageAdderProtocol,
@@ -82,6 +83,11 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def _internal_prompt_metadata(kind: str) -> dict[str, Any]:
+    """Build metadata for internal user-role continuation prompts."""
+    return build_internal_history_metadata(kind)
 
 
 # =============================================================================
@@ -283,7 +289,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("continue_asking_input"),
+            )
         return result
 
     async def _handle_return_to_user(
@@ -313,7 +323,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("prompt_tool_call"),
+            )
 
         # Increment turn in tracker
         if self._unified_tracker:
@@ -340,7 +354,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("synthesis_hint"),
+            )
 
         # Update synthesis nudge count in tracker
         updates = action_result.get("updates", {})
@@ -369,7 +387,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("request_summary"),
+            )
 
         return result
 
@@ -455,7 +477,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("request_completion"),
+            )
         return result
 
     async def _handle_execute_extracted_tool(
@@ -508,10 +534,15 @@ class ContinuationHandler:
                 "user",
                 "You are unable to make tool calls. Please provide your response "
                 "NOW based on what you know. Do not mention any tools.",
+                metadata=_internal_prompt_metadata("force_tool_execution_give_up"),
             )
             stream_ctx.reset_force_tool_attempts()
         elif force_message:
-            self._message_adder.add_message("user", force_message)
+            self._message_adder.add_message(
+                "user",
+                force_message,
+                metadata=_internal_prompt_metadata("force_tool_execution"),
+            )
         else:
             # Default message
             tools_str = ", ".join(mentioned_tools)
@@ -520,7 +551,11 @@ class ContinuationHandler:
                 "Please make the actual tool call now, or provide your final answer without "
                 "mentioning tools you cannot use."
             )
-            self._message_adder.add_message("user", default_message)
+            self._message_adder.add_message(
+                "user",
+                default_message,
+                metadata=_internal_prompt_metadata("force_tool_execution"),
+            )
 
         # Increment turn in tracker (mirrors _handle_force_tool_execution_with_handler)
         if self._unified_tracker:

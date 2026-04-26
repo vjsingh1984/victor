@@ -163,6 +163,7 @@ class ChatServiceProtocol(Protocol):
         memory_manager: Optional[Any] = None,
         memory_session_id: Optional[str] = None,
         usage_logger: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Persist a message to memory and log usage events.
 
@@ -175,6 +176,7 @@ class ChatServiceProtocol(Protocol):
             memory_manager: Optional memory manager for persistence
             memory_session_id: Optional session ID for memory
             usage_logger: Optional logger for usage events
+            metadata: Optional message metadata for persistence
         """
         ...
 

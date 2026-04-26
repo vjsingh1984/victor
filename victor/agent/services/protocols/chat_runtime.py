@@ -57,7 +57,7 @@ class ChatContextProtocol(Protocol):
     conversation: Any
     messages: Any
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add a message to conversation history."""
         ...
 
