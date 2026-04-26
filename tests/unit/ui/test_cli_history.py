@@ -1,6 +1,7 @@
 """Tests for CLI chat history and planning wiring."""
 
 import sqlite3
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch, AsyncMock
 
@@ -24,6 +25,15 @@ class TestCliPromptSession:
         from prompt_toolkit.history import FileHistory
 
         assert isinstance(session.history, FileHistory)
+
+    def test_default_history_file_uses_isolated_unit_test_victor_dir(
+        self, isolated_project_victor_dir
+    ):
+        from victor.ui.commands.chat import _create_cli_prompt_session
+
+        session = _create_cli_prompt_session()
+
+        assert Path(session.history.filename) == isolated_project_victor_dir / "chat_history"
 
     def test_fallback_to_in_memory_on_error(self):
         from victor.ui.commands.chat import _create_cli_prompt_session

@@ -275,30 +275,45 @@ def reset_feature_flags():
             pass
 
 
+@pytest.fixture
+def isolated_project_victor_dir(tmp_path) -> Path:
+    """Provide an isolated project-local .victor directory for unit tests."""
+    temp_victor = tmp_path / ".victor"
+    temp_victor.mkdir(exist_ok=True)
+    return temp_victor
+
+
 @pytest.fixture(autouse=True)
-def isolate_conversation_database(tmp_path):
-    """Redirect conversation database to a temp directory during tests.
+def isolate_project_victor_storage(isolated_project_victor_dir):
+    """Redirect unit-test project-local persistence into a temp .victor directory.
 
-    Without this, any code path that instantiates ConversationStore
-    without an explicit db_path will write to the real project .victor/
-    directory, polluting it with test-model sessions (37K+ observed).
+    Without this, code paths that rely on get_project_paths() can write to the
+    real repo .victor/ directory during tests. That leaks session data into the
+    shared project database and chat history files.
 
-    Patches project_db, the canonical path after DB consolidation.
-    Other ProjectPaths properties (MCP config, context files) still resolve normally.
+    Patch both project_victor_dir and project_db so history files and database
+    traffic stay inside the test sandbox while other project-path behavior keeps
+    using the normal cwd-based project root.
     """
     from unittest.mock import PropertyMock, patch
 
     from victor.config.settings import ProjectPaths
 
-    temp_victor = tmp_path / ".victor"
-    temp_victor.mkdir(exist_ok=True)
-    temp_project_db = temp_victor / "project.db"
+    temp_project_db = isolated_project_victor_dir / "project.db"
 
-    with patch.object(
-        ProjectPaths,
-        "project_db",
-        new_callable=PropertyMock,
-        return_value=temp_project_db,
+    with (
+        patch.object(
+            ProjectPaths,
+            "project_victor_dir",
+            new_callable=PropertyMock,
+            return_value=isolated_project_victor_dir,
+        ),
+        patch.object(
+            ProjectPaths,
+            "project_db",
+            new_callable=PropertyMock,
+            return_value=temp_project_db,
+        ),
     ):
         yield
 
