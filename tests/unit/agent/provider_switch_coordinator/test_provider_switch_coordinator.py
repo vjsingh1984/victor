@@ -47,7 +47,7 @@ class TestProviderSwitchCoordinator:
     @pytest.fixture
     def coordinator(self, provider_switcher, health_monitor):
         """Create ProviderSwitchCoordinator with mocks."""
-        from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+        from victor.agent.provider.switch_coordinator import ProviderSwitchCoordinator
 
         return ProviderSwitchCoordinator(
             provider_switcher=provider_switcher,
@@ -311,7 +311,7 @@ class TestProviderSwitchCoordinator:
         from unittest.mock import patch
 
         with patch(
-            "victor.agent.provider_switch_coordinator.run_sync",
+            "victor.agent.provider.switch_coordinator.run_sync",
             wraps=real_run_sync,
         ) as run_sync_mock:
             coordinator._execute_post_switch_hooks()
@@ -338,10 +338,10 @@ class TestProviderSwitchCoordinator:
 
         with (
             patch(
-                "victor.agent.provider_switch_coordinator.asyncio.get_running_loop",
+                "victor.agent.provider.switch_coordinator.asyncio.get_running_loop",
                 return_value=loop,
             ),
-            patch("victor.agent.provider_switch_coordinator.run_sync") as run_sync_mock,
+            patch("victor.agent.provider.switch_coordinator.run_sync") as run_sync_mock,
         ):
             coordinator._execute_post_switch_hooks()
 
@@ -356,7 +356,7 @@ class TestProviderSwitchCoordinatorIntegration:
     @pytest.fixture
     def coordinator(self):
         """Create coordinator with real dependencies."""
-        from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+        from victor.agent.provider.switch_coordinator import ProviderSwitchCoordinator
 
         # Use real ProviderSwitcher but with mocked dependencies
         switcher = MagicMock(spec=ProviderSwitcher)
@@ -422,7 +422,7 @@ class TestProviderSwitchCoordinatorErrorHandling:
     @pytest.fixture
     def coordinator(self):
         """Create coordinator."""
-        from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+        from victor.agent.provider.switch_coordinator import ProviderSwitchCoordinator
 
         switcher = MagicMock(spec=ProviderSwitcher)
         health_monitor = MagicMock(spec=ProviderHealthMonitor)

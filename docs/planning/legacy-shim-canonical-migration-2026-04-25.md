@@ -83,6 +83,7 @@ Phase 1 is complete. Phase 2.1 and Phase 2.2 are now complete:
   module instead of being sourced from the legacy switch coordinator
 
 Next resume point:
-- move remaining runtime/factory/provider package imports off
-  `victor.agent.provider_switch_coordinator` where they only need canonical
-  contracts or a builder-owned construction seam
+- `ProviderSwitchCoordinator` behavior now lives in the canonical provider
+  package; the next analogous migration seam is the root
+  `victor.agent.provider_coordinator` behavior owner so the root module can
+  become a thin public shim as well

@@ -25,12 +25,12 @@ from victor.agent.provider.switch_contracts import (
     PostSwitchHook,
     SwitchContext,
 )
+from victor.agent.provider.switch_coordinator import ProviderSwitchCoordinator
 from victor.agent.provider.switcher import (
     ProviderSwitcher,
     ProviderSwitcherState,
 )
 from victor.agent.provider.tool_adapter_coordinator import ToolAdapterCoordinator
-from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
 
 __all__ = [
     "ProviderHealthMonitor",
