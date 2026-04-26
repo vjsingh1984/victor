@@ -24,9 +24,8 @@ from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoord
 from victor.agent.coordinators.system_prompt_state_passed import (
     SystemPromptStatePassedCoordinator,
 )
+from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.facades.chat_facade import ChatFacade
-from victor.agent.facades.tool_facade import ToolFacade
 from victor.config.settings import Settings
 
 
@@ -69,14 +68,16 @@ class TestFacadeCreation:
     """Tests that orchestrator creates facade instances."""
 
     def test_chat_facade_created(self, orchestrator):
-        """Orchestrator creates a ChatFacade instance."""
+        """Orchestrator creates a lazy chat-facade compatibility proxy."""
         assert hasattr(orchestrator, "_chat_facade")
-        assert isinstance(orchestrator._chat_facade, ChatFacade)
+        assert isinstance(orchestrator._chat_facade, LazyRuntimeProxy)
+        assert orchestrator._chat_facade.initialized is False
 
     def test_tool_facade_created(self, orchestrator):
-        """Orchestrator creates a ToolFacade instance."""
+        """Orchestrator creates a lazy tool-facade compatibility proxy."""
         assert hasattr(orchestrator, "_tool_facade")
-        assert isinstance(orchestrator._tool_facade, ToolFacade)
+        assert isinstance(orchestrator._tool_facade, LazyRuntimeProxy)
+        assert orchestrator._tool_facade.initialized is False
 
     def test_orchestration_facade_has_state_passed_handles(self, orchestrator):
         """OrchestrationFacade should expose state-passed coordinator surfaces."""

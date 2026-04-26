@@ -105,9 +105,12 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 - `OrchestrationFacade` now also bootstraps lazily via `LazyRuntimeProxy`,
   so state-passed compatibility surfaces and deprecated coordinator getters
   are materialized only on demand instead of during orchestrator startup
-- remaining eager `ChatFacade` and `ToolFacade` construction is now isolated
-  to compatibility-only objects; internal runtime code no longer depends on
-  those facades as behavior owners
+- `ChatFacade` and `ToolFacade` now also bootstrap lazily via
+  `LazyRuntimeProxy`, so every orchestrator facade is now a compatibility-only
+  object that materializes on demand rather than at orchestrator startup
+- internal runtime code no longer depends on any facade as a behavior owner;
+  facades are now reduced to thin compatibility groupings over canonical
+  service/runtime/state-passed seams
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -130,7 +133,7 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - boundary and workflow regression tests enforce the canonical import paths
 
 Next resume point:
-- continue the broader compatibility cleanup around orchestrator and facade
-  shims by evaluating whether the remaining eager `chat` and `tool` facades
-  can now be reduced safely, or whether they should remain as thin
-  compatibility-only objects with no further runtime ownership
+- Phase 2 facade/bootstrap compatibility cleanup is in a good stop state.
+- Continue Phase 3 by migrating internal workflow compiler consumers off
+  `victor.workflows.graph_compiler` and onto the compiler boundary / unified
+  compiler entrypoints.
