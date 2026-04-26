@@ -138,6 +138,17 @@ class GEPAServiceStrategy:
         service = self._tier_manager.get_service()
         return service.mutate(current_text, reflection, section_name)
 
+    def merge(
+        self,
+        candidate_a: str,
+        candidate_b: str,
+        section_name: str,
+        max_chars: int = 1500,
+    ) -> str:
+        """Call GEPA merge via the current tier service."""
+        service = self._tier_manager.get_service()
+        return service.merge(candidate_a, candidate_b, section_name, max_chars=max_chars)
+
     @staticmethod
     def _format_single_trace(trace) -> List[str]:
         """Format a single execution trace into ASI text lines."""

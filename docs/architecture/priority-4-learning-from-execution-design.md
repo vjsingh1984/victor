@@ -68,9 +68,13 @@ This document outlines the design for Priority 4 (Learning from Execution), whic
 1. **GEPA (GEPAStrategy - Default)**: Trace-reflection prompt evolution
    - Thompson Sampling for candidate serving
    - Provider-scoped Pareto frontier bookkeeping
+   - Per-instance frontier evidence now comes from runtime outcomes and only from
+     benchmark artifacts that explicitly identify the evaluated prompt candidate
    - Semantic trace zones inspired by PRiME
    - 13 failure categories with corrective hints
    - Session-aligned credit enrichment from runtime tool execution
+   - Pareto merge fallback can synthesize a new candidate when reflection/mutation
+     produces no novel variant
    - Used for: ASI_TOOL_EFFECTIVENESS_GUIDANCE, GROUNDING_RULES, COMPLETION_GUIDANCE, INIT_SYNTHESIS_RULES
 
 2. **MIPROv2-inspired (MIPROv2Strategy)**: Query-aware few-shot retrieval adaptation

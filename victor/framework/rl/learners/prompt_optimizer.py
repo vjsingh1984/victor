@@ -18,6 +18,11 @@ swapped for alternatives (random mutation, manual, etc.).
 Current implementation notes:
 - Candidates are provider-scoped and persist full layered strategy-chain metadata.
 - Pareto frontiers are tracked per `(section, provider)` key.
+- Pareto instance scores come from real runtime outcomes or evaluation artifacts that
+  name a specific prompt candidate hash; aggregate section scores are not reused as
+  fake per-instance evidence.
+- When reflection/mutation yields no novel text, Pareto merge can synthesize a new
+  candidate from complementary frontier members.
 - Credit enrichment is session-aligned when runtime credit metadata is available.
 
 Usage:
@@ -334,6 +339,10 @@ class PromptCandidate:
     is_active: bool = False
     strategy_name: str = "gepa"
     strategy_chain: str = "gepa"
+    instance_scores: Dict[str, float] = field(default_factory=dict)
+    coverage_count: int = 0
+    is_on_frontier: bool = True
+    char_length: int = 0
     requires_benchmark: bool = False
 
     def sample(self) -> float:
@@ -623,6 +632,37 @@ class GEPAStrategy:
             return current_text + "\n" + "\n".join(mutations)
         return current_text
 
+    def merge(
+        self,
+        candidate_a: str,
+        candidate_b: str,
+        section_name: str,
+        max_chars: int = 1500,
+    ) -> str:
+        """Combine complementary prompt variants when Pareto merge is requested."""
+        merge_prompt = (
+            f"Merge these two prompt variants for '{section_name}'.\n\n"
+            f"Candidate A:\n{candidate_a}\n\n"
+            f"Candidate B:\n{candidate_b}\n\n"
+            f"Preserve the strongest guidance from both, remove duplication, "
+            f"and keep the result under {max_chars} characters.\n"
+            f"Output only the merged prompt text."
+        )
+        llm_result = self._call_llm(merge_prompt, max_tokens=800)
+        if llm_result:
+            return llm_result[:max_chars]
+
+        merged_lines: List[str] = []
+        seen = set()
+        for line in (candidate_a.splitlines() + candidate_b.splitlines()):
+            normalized = line.strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            merged_lines.append(line)
+        merged = "\n".join(merged_lines).strip()
+        return merged[:max_chars] if merged else candidate_a[:max_chars]
+
 
 # ---------------------------------------------------------------------------
 # Core Learner
@@ -840,12 +880,17 @@ class PromptOptimizerLearner(BaseLearner):
             cursor = self.db.execute(
                 f"SELECT section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
-                f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
+                f"alpha, beta, sample_count, instance_scores, coverage_count, "
+                f"is_on_frontier, char_length, benchmark_score, benchmark_runs, "
                 f"benchmark_passed, is_active, strategy_name, strategy_chain, "
                 f"requires_benchmark "
                 f"FROM {Tables.AGENT_PROMPT_CANDIDATE}"
             )
             for row in cursor.fetchall():
+                try:
+                    instance_scores = json.loads(row[12] or "{}")
+                except Exception:
+                    instance_scores = {}
                 candidate = PromptCandidate(
                     section_name=row[0],
                     provider=row[1] or "default",
@@ -861,13 +906,17 @@ class PromptOptimizerLearner(BaseLearner):
                     alpha=row[9],
                     beta_val=row[10],
                     sample_count=row[11],
-                    benchmark_score=row[12] or 0.0,
-                    benchmark_runs=row[13] or 0,
-                    benchmark_passed=bool(row[14]),
-                    is_active=bool(row[15]),
-                    strategy_name=row[16] or "gepa",
-                    strategy_chain=row[17] or row[16] or "gepa",
-                    requires_benchmark=bool(row[18]),
+                    instance_scores=instance_scores,
+                    coverage_count=row[13] or 0,
+                    is_on_frontier=bool(row[14]),
+                    char_length=row[15] or 0,
+                    benchmark_score=row[16] or 0.0,
+                    benchmark_runs=row[17] or 0,
+                    benchmark_passed=bool(row[18]),
+                    is_active=bool(row[19]),
+                    strategy_name=row[20] or "gepa",
+                    strategy_chain=row[21] or row[20] or "gepa",
+                    requires_benchmark=bool(row[22]),
                 )
                 key = self._candidate_key(row[0], row[1] or "default")
                 self._candidates.setdefault(key, []).append(candidate)
@@ -951,6 +1000,11 @@ class PromptOptimizerLearner(BaseLearner):
                     candidate.scores.get("completion_score", 0.0) * 0.9
                     + outcome.quality_score * 0.1
                 )
+                self._record_pareto_outcome(
+                    key=key,
+                    candidate=candidate,
+                    outcome=outcome,
+                )
                 self._save_candidate(candidate)
                 return
 
@@ -997,7 +1051,9 @@ class PromptOptimizerLearner(BaseLearner):
             )
             frontier = self._pareto_frontiers.get(frontier_key)
             if frontier:
-                frontier_hashes = {e.text_hash for e in frontier.get_frontier()}
+                frontier_hashes = {
+                    e.text_hash for e in frontier.get_frontier() if getattr(e, "instance_scores", {})
+                }
                 if frontier_hashes:
                     frontier_candidates = [c for c in candidates if c.text_hash in frontier_hashes]
                     if frontier_candidates:
@@ -1086,6 +1142,13 @@ class PromptOptimizerLearner(BaseLearner):
             query=query,
         )
         if new_text == current_text:
+            merged_candidate = self._attempt_pareto_merge_candidate(
+                section_name=section_name,
+                provider=provider,
+                current_text=current_text,
+            )
+            if merged_candidate is not None:
+                return merged_candidate
             logger.info("Mutation produced no change for '%s'", section_name)
             return None
 
@@ -1123,6 +1186,7 @@ class PromptOptimizerLearner(BaseLearner):
             parent_hash=parent_hash,
             strategy_name=self._strategy_name_for_candidate(strategies),
             strategy_chain=self._strategy_chain_for_candidate(strategies),
+            char_length=len(new_text),
             requires_benchmark=self._requires_benchmark_for_candidate(strategies),
         )
 
@@ -1167,6 +1231,7 @@ class PromptOptimizerLearner(BaseLearner):
                 text=new_text,
                 generation=generation,
             )
+            self._sync_pareto_state(key)
 
         logger.info(
             "GEPA evolved '%s' to gen-%d (hash=%s, %d chars%s)",
@@ -1194,10 +1259,11 @@ class PromptOptimizerLearner(BaseLearner):
                 f"INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_CANDIDATE} "
                 f"(section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
-                f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
+                f"alpha, beta, sample_count, instance_scores, coverage_count, "
+                f"is_on_frontier, char_length, benchmark_score, benchmark_runs, "
                 f"benchmark_passed, is_active, strategy_name, strategy_chain, "
                 f"requires_benchmark) "
-                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     candidate.section_name,
                     candidate.provider,
@@ -1211,6 +1277,10 @@ class PromptOptimizerLearner(BaseLearner):
                     candidate.alpha,
                     candidate.beta_val,
                     candidate.sample_count,
+                    json.dumps(candidate.instance_scores or {}),
+                    candidate.coverage_count,
+                    int(candidate.is_on_frontier),
+                    candidate.char_length or len(candidate.text),
                     candidate.benchmark_score,
                     candidate.benchmark_runs,
                     int(candidate.benchmark_passed),
@@ -1442,6 +1512,160 @@ class PromptOptimizerLearner(BaseLearner):
             self._save_candidate(candidate)
         return fallback
 
+    def _record_pareto_outcome(
+        self,
+        *,
+        key: str,
+        candidate: PromptCandidate,
+        outcome: RLOutcome,
+    ) -> None:
+        """Update provider-scoped Pareto evidence from a concrete runtime outcome."""
+        if not self._use_pareto:
+            return
+
+        instance_id = self._runtime_instance_id(outcome)
+        if not instance_id:
+            return
+
+        frontier = self._pareto_frontiers.get(key)
+        if frontier is None:
+            from victor.framework.rl.pareto import ParetoFrontier
+
+            frontier = ParetoFrontier(max_candidates=20)
+            self._pareto_frontiers[key] = frontier
+
+        frontier.add_candidate(
+            text_hash=candidate.text_hash,
+            text=candidate.text,
+            generation=candidate.generation,
+            instance_scores=candidate.instance_scores,
+        )
+        frontier.update_instance_score(candidate.text_hash, instance_id, self._compute_reward(outcome))
+        self._sync_pareto_state(key)
+
+    @staticmethod
+    def _runtime_instance_id(outcome: RLOutcome) -> Optional[str]:
+        """Build a stable runtime instance identifier for Pareto tracking."""
+        metadata = outcome.metadata or {}
+        raw_instance = (
+            metadata.get("task_id")
+            or metadata.get("instance_id")
+            or metadata.get("session_id")
+        )
+        if not raw_instance:
+            return None
+        return f"{raw_instance}::{outcome.provider or 'default'}"
+
+    def _sync_pareto_state(self, key: str) -> None:
+        """Persist frontier-derived metadata back onto candidates and instance table."""
+        if not self._use_pareto:
+            return
+
+        from victor.core.schema import Tables
+
+        frontier = self._pareto_frontiers.get(key)
+        if frontier is None:
+            return
+
+        candidates = self._candidates.get(key, [])
+        entry_by_hash = {entry.text_hash: entry for entry in frontier.get_frontier()}
+        frontier_hashes = set(entry_by_hash)
+
+        for candidate in candidates:
+            entry = entry_by_hash.get(candidate.text_hash)
+            if entry is not None:
+                candidate.instance_scores = dict(entry.instance_scores)
+                candidate.coverage_count = entry.coverage_count
+                candidate.is_on_frontier = True
+                candidate.char_length = entry.char_length or len(candidate.text)
+            else:
+                candidate.coverage_count = 0
+                candidate.is_on_frontier = candidate.text_hash in frontier_hashes
+                candidate.char_length = candidate.char_length or len(candidate.text)
+            self._save_candidate(candidate)
+
+        section_name, provider = key.split("::", 1)
+        try:
+            self.db.execute(
+                f"DELETE FROM {Tables.AGENT_PROMPT_PARETO_INSTANCE} "
+                f"WHERE section_name = ? AND provider = ?",
+                (section_name, provider),
+            )
+            for instance_id, (best_hash, best_score) in frontier.get_instance_winners().items():
+                winner = next((c for c in candidates if c.text_hash == best_hash), None)
+                sample_count = winner.sample_count if winner is not None else 0
+                self.db.execute(
+                    f"INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_PARETO_INSTANCE} "
+                    f"(section_name, provider, instance_id, best_candidate_hash, best_score, sample_count) "
+                    f"VALUES (?, ?, ?, ?, ?, ?)",
+                    (section_name, provider, instance_id, best_hash, best_score, sample_count),
+                )
+            self.db.commit()
+        except Exception as e:
+            logger.debug("Failed to persist Pareto instance state for %s: %s", key, e)
+
+    def _attempt_pareto_merge_candidate(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        current_text: str,
+    ) -> Optional[PromptCandidate]:
+        """Fallback to GEPA merge when reflection/mutation yields no novel candidate."""
+        if not self._use_pareto:
+            return None
+
+        key = self._candidate_key(section_name, provider)
+        frontier = self._pareto_frontiers.get(key)
+        if frontier is None or frontier.size < 2:
+            return None
+
+        merge_strategy = next(
+            (
+                strategy
+                for strategy in self._strategies_for_section(section_name)
+                if callable(getattr(strategy, "merge", None))
+            ),
+            None,
+        )
+        if merge_strategy is None:
+            return None
+
+        merged_entry = frontier.attempt_merge(merge_strategy, section_name=section_name)
+        if merged_entry is None:
+            return None
+
+        existing = self._find_candidate(section_name, provider, merged_entry.text_hash)
+        if existing is not None:
+            return existing
+
+        strategies = self._strategies_for_section(section_name)
+        candidate = PromptCandidate(
+            section_name=section_name,
+            provider=provider,
+            text=merged_entry.text,
+            text_hash=merged_entry.text_hash,
+            generation=max(merged_entry.generation, self._get_max_generation(key) + 1),
+            parent_hash=hashlib.md5(current_text.encode()).hexdigest()[:12],
+            strategy_name=self._strategy_name_for_candidate(strategies),
+            strategy_chain=f"{self._strategy_chain_for_candidate(strategies)}+merge",
+            instance_scores=dict(merged_entry.instance_scores),
+            coverage_count=merged_entry.coverage_count,
+            is_on_frontier=True,
+            char_length=merged_entry.char_length or len(merged_entry.text),
+            requires_benchmark=self._requires_benchmark_for_candidate(strategies),
+        )
+
+        self._candidates.setdefault(key, []).append(candidate)
+        frontier.add_candidate(
+            text_hash=merged_entry.text_hash,
+            text=merged_entry.text,
+            generation=candidate.generation,
+            instance_scores=merged_entry.instance_scores,
+        )
+        self._sync_pareto_state(key)
+        return candidate
+
     def seed_from_evaluations(self, eval_dir: Optional[Path] = None) -> int:
         """Load evaluation results and update Pareto instance scores.
 
@@ -1464,14 +1688,29 @@ class PromptOptimizerLearner(BaseLearner):
             try:
                 with open(eval_file) as f:
                     data = json.load(f)
-                model = data.get("config", {}).get("model", "unknown")
+                config = data.get("config", {})
+                model = config.get("model", "unknown")
+                candidate_hash = (
+                    config.get("prompt_candidate_hash")
+                    or config.get("text_hash")
+                    or config.get("candidate_hash")
+                )
+                section_name = config.get("section_name")
+                provider = config.get("provider", "default")
+                if not candidate_hash or not section_name:
+                    continue
+
+                key = self._candidate_key(section_name, provider)
+                frontier = self._pareto_frontiers.get(key)
+                if frontier is None:
+                    continue
+
                 for task in data.get("tasks", []):
                     instance_id = f"{task['task_id']}::{model}"
                     score = 1.0 if task.get("status") == "passed" else 0.0
-                    for frontier in self._pareto_frontiers.values():
-                        for entry in frontier.get_frontier():
-                            frontier.update_instance_score(entry.text_hash, instance_id, score)
-                            updated += 1
+                    frontier.update_instance_score(candidate_hash, instance_id, score)
+                    updated += 1
+                self._sync_pareto_state(key)
             except Exception:
                 continue
 
@@ -1669,8 +1908,9 @@ class PromptOptimizerLearner(BaseLearner):
                     text_hash=c.text_hash,
                     text=c.text,
                     generation=c.generation,
-                    instance_scores=c.scores,
+                    instance_scores=c.instance_scores,
                 )
+            self._sync_pareto_state(key)
 
     def get_pareto_frontier(self, section_name: str, provider: str = "default") -> Optional[Any]:
         """Get the provider-scoped Pareto frontier for a section."""

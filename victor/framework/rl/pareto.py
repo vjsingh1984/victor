@@ -9,6 +9,13 @@ better on at least one. A candidate is non-dominated (on the frontier)
 if no other candidate dominates it.
 
 Reference: GEPA (ICLR 2026) — arxiv:2507.19457
+
+Current repo behavior:
+- per-instance scores are updated from runtime RL outcomes and from benchmark
+  artifacts only when those artifacts identify the evaluated prompt candidate
+  hash explicitly
+- merge is used as a fallback path when normal mutation fails to produce a
+  novel candidate
 """
 
 from __future__ import annotations
@@ -195,7 +202,12 @@ class ParetoFrontier:
             return None
         return max(self._candidates, key=lambda c: self._avg_score(c))
 
-    def attempt_merge(self, gepa_service: Any) -> Optional[ParetoEntry]:
+    def attempt_merge(
+        self,
+        gepa_service: Any,
+        *,
+        section_name: str = "merged",
+    ) -> Optional[ParetoEntry]:
         """Pick two random frontier members and merge via LLM.
 
         Paper: merge combines complementary strengths from candidates
@@ -206,7 +218,7 @@ class ParetoFrontier:
 
         a, b = random.sample(self._candidates, 2)
         try:
-            merged_text = gepa_service.merge(a.text, b.text, section_name="merged")
+            merged_text = gepa_service.merge(a.text, b.text, section_name=section_name)
             if merged_text and merged_text != a.text and merged_text != b.text:
                 import hashlib
 
@@ -237,6 +249,23 @@ class ParetoFrontier:
         except Exception as e:
             logger.debug("GEPA merge failed: %s", e)
         return None
+
+    def get_instance_winners(self) -> Dict[str, tuple[str, float]]:
+        """Return the best candidate hash and score for each known instance."""
+        winners: Dict[str, tuple[str, float]] = {}
+        for inst in sorted(self._instances):
+            best_hash: Optional[str] = None
+            best_score = -1.0
+            for candidate in self._candidates:
+                if inst not in candidate.instance_scores:
+                    continue
+                score = candidate.instance_scores[inst]
+                if score > best_score:
+                    best_hash = candidate.text_hash
+                    best_score = score
+            if best_hash is not None:
+                winners[inst] = (best_hash, best_score)
+        return winners
 
     def _dominates(self, a: ParetoEntry, b: ParetoEntry) -> bool:
         """Check if candidate A Pareto-dominates candidate B.

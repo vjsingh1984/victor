@@ -5,6 +5,7 @@
 
 """Tests for GEPA-inspired prompt optimizer."""
 
+import json
 import sqlite3
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -20,6 +21,7 @@ from victor.framework.rl.experiment_coordinator import (
     ExperimentStatus,
     VariantType,
 )
+from victor.framework.rl.pareto import ParetoEntry, ParetoFrontier
 from victor.framework.rl.learners.prompt_optimizer import (
     ExecutionTrace,
     GEPAStrategy,
@@ -265,6 +267,47 @@ class TestPromptOptimizerLearner:
         learner.record_outcome(outcome)
         assert candidate.alpha > 1.0  # Updated
 
+    def test_record_outcome_updates_pareto_instance_scores(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
+        candidate = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Prompt",
+            text_hash="paretohash",
+            generation=1,
+            parent_hash="p",
+            is_active=True,
+            sample_count=1,
+        )
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [candidate]
+        frontier = ParetoFrontier()
+        frontier.add_candidate(candidate.text_hash, candidate.text, candidate.generation)
+        learner._pareto_frontiers[key] = frontier
+
+        outcome = RLOutcome(
+            provider="ollama",
+            model="qwen",
+            task_type="action",
+            success=True,
+            quality_score=0.8,
+            metadata={"prompt_section": "TEST", "task_id": "task-123"},
+        )
+        learner.record_outcome(outcome)
+
+        frontier_entry = learner.get_pareto_frontier("TEST", "ollama").get_frontier()[0]
+        assert frontier_entry.instance_scores["task-123::ollama"] == pytest.approx(0.82)
+        assert candidate.instance_scores["task-123::ollama"] == pytest.approx(0.82)
+        assert candidate.coverage_count == 1
+
+        row = learner.db.execute(
+            "SELECT best_candidate_hash, best_score, sample_count "
+            "FROM agent_prompt_pareto_instance "
+            "WHERE section_name = ? AND provider = ? AND instance_id = ?",
+            ("TEST", "ollama", "task-123::ollama"),
+        ).fetchone()
+        assert row == ("paretohash", pytest.approx(0.82), 2)
+
     def test_evolve_records_full_strategy_chain_metadata(self, db):
         settings = SimpleNamespace(
             prompt_optimization=PromptOptimizationSettings(
@@ -406,6 +449,31 @@ class TestPromptOptimizerLearner:
         assert loaded.is_active is True
         assert loaded.strategy_name == "prefpo"
         assert loaded.requires_benchmark is True
+
+    def test_save_and_load_candidate_persists_frontier_metadata(self, db):
+        learner1 = PromptOptimizerLearner(name="test1", db_connection=db, use_pareto=True)
+        candidate = PromptCandidate(
+            section_name="TEST_SECTION",
+            provider="ollama",
+            text="Evolved prompt text",
+            text_hash="front123",
+            generation=2,
+            parent_hash="parent",
+        )
+        candidate.instance_scores = {"task-1::qwen": 1.0, "task-2::qwen": 0.0}
+        candidate.coverage_count = 1
+        candidate.is_on_frontier = False
+        candidate.char_length = 18
+        key = learner1._candidate_key("TEST_SECTION", "ollama")
+        learner1._candidates[key] = [candidate]
+        learner1._save_candidate(candidate)
+
+        learner2 = PromptOptimizerLearner(name="test2", db_connection=db, use_pareto=True)
+        loaded = learner2._candidates[key][0]
+        assert loaded.instance_scores == {"task-1::qwen": 1.0, "task-2::qwen": 0.0}
+        assert loaded.coverage_count == 2
+        assert loaded.is_on_frontier is True
+        assert loaded.char_length == len("Evolved prompt text")
 
     def test_record_benchmark_result_updates_running_average(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)
@@ -706,6 +774,83 @@ class TestPromptOptimizerLearner:
         assert candidate.requires_benchmark is True
         assert "Verify file paths with ls()" in candidate.text
         enrich_mock.assert_called_once()
+
+    def test_evolve_falls_back_to_pareto_merge_when_mutation_noops(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
+        key = learner._candidate_key("TEST", "ollama")
+        frontier = ParetoFrontier()
+        frontier.add_candidate("h1", "Prompt A", 1, {"task-a": 1.0})
+        frontier.add_candidate("h2", "Prompt B", 2, {"task-b": 1.0})
+        learner._pareto_frontiers[key] = frontier
+
+        traces = [
+            ExecutionTrace(
+                session_id=f"s{i}",
+                task_type="action",
+                provider="ollama",
+                model="qwen",
+                tool_calls=3,
+                tool_failures={},
+                success=True,
+                completion_score=0.9,
+                tokens_used=300,
+            )
+            for i in range(5)
+        ]
+        merged_entry = ParetoEntry(
+            text_hash="merged123",
+            text="Merged prompt",
+            generation=3,
+            instance_scores={"task-a": 0.8, "task-b": 0.8},
+        )
+
+        with (
+            patch.object(learner, "_collect_learning_traces", return_value=traces),
+            patch.object(learner, "_enrich_traces_with_credit"),
+            patch.object(learner, "_apply_section_strategies", return_value="base prompt"),
+            patch.object(frontier, "attempt_merge", return_value=merged_entry) as merge_mock,
+        ):
+            candidate = learner.evolve("TEST", "base prompt", provider="ollama")
+
+        assert candidate is not None
+        assert candidate.text == "Merged prompt"
+        assert candidate.text_hash == "merged123"
+        assert candidate.strategy_chain.endswith("+merge")
+        merge_mock.assert_called_once()
+
+    def test_seed_from_evaluations_updates_only_matching_candidate_hash(self, db, tmp_path):
+        learner = PromptOptimizerLearner(name="test", db_connection=db, use_pareto=True)
+        key = learner._candidate_key("TEST", "ollama")
+        candidate_a = PromptCandidate("TEST", "Prompt A", "hasha", 1, "p", provider="ollama")
+        candidate_b = PromptCandidate("TEST", "Prompt B", "hashb", 1, "p", provider="ollama")
+        learner._candidates[key] = [candidate_a, candidate_b]
+        frontier = ParetoFrontier()
+        frontier.add_candidate("hasha", "Prompt A", 1)
+        frontier.add_candidate("hashb", "Prompt B", 1)
+        learner._pareto_frontiers[key] = frontier
+
+        eval_payload = {
+            "config": {
+                "model": "qwen",
+                "prompt_candidate_hash": "hasha",
+                "section_name": "TEST",
+                "provider": "ollama",
+            },
+            "tasks": [
+                {"task_id": "task-1", "status": "passed"},
+                {"task_id": "task-2", "status": "failed"},
+            ],
+        }
+        eval_path = tmp_path / "eval_swe_bench_test.json"
+        eval_path.write_text(json.dumps(eval_payload))
+
+        updated = learner.seed_from_evaluations(tmp_path)
+
+        assert updated == 2
+        entry_a = next(e for e in frontier.get_frontier() if e.text_hash == "hasha")
+        entry_b = next(e for e in frontier.get_frontier() if e.text_hash == "hashb")
+        assert entry_a.instance_scores == {"task-1::qwen": 1.0, "task-2::qwen": 0.0}
+        assert entry_b.instance_scores == {}
 
     def test_build_rollout_experiment_config_uses_existing_ab_primitives(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)
