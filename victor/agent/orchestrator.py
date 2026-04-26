@@ -4934,6 +4934,38 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             memory_session_id=self._memory_session_id,
         )
 
+    def _record_prompt_optimization_metadata(self, turn_context: Any) -> None:
+        """Persist the active live prompt-optimization identity for the session."""
+        metadata = getattr(turn_context, "prompt_optimization_metadata", None)
+        if not isinstance(metadata, dict):
+            return
+
+        normalized = {
+            "entries": list(metadata.get("entries") or []),
+            "by_section": dict(metadata.get("by_section") or {}),
+        }
+        self._active_prompt_optimization_metadata = normalized
+
+        if self._session_service is None or not hasattr(
+            self._session_service, "update_session_metadata"
+        ):
+            return
+
+        try:
+            self._session_service.update_session_metadata({"prompt_optimization": normalized})
+        except Exception as exc:
+            logger.debug("Failed to update session prompt-optimization metadata: %s", exc)
+
+    def get_active_prompt_optimization_metadata(self) -> Dict[str, Any]:
+        """Return the canonical prompt-optimization metadata for the live session."""
+        payload = getattr(self, "_active_prompt_optimization_metadata", None)
+        if not isinstance(payload, dict):
+            return {"entries": [], "by_section": {}}
+        return {
+            "entries": list(payload.get("entries") or []),
+            "by_section": dict(payload.get("by_section") or {}),
+        }
+
     def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 

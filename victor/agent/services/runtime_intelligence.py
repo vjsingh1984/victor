@@ -505,13 +505,17 @@ class RuntimeIntelligenceService:
         evolved_sections: List[str] = []
         identities: List[PromptOptimizationIdentity] = []
 
+        payloads: Optional[Any] = None
         if hasattr(self._optimization_injector, "get_evolved_section_payloads"):
             payloads = self._optimization_injector.get_evolved_section_payloads(
                 provider=provider_name,
                 model=model_name,
                 task_type=task_type,
             )
-            for payload in payloads or []:
+        if isinstance(payloads, (list, tuple)):
+            for payload in payloads:
+                if not isinstance(payload, dict):
+                    continue
                 text = str(payload.get("text", "")).strip()
                 if text:
                     evolved_sections.append(text)
@@ -526,6 +530,7 @@ class RuntimeIntelligenceService:
             )
 
         few_shots = None
+        few_shot_payload: Optional[Any] = None
         if hasattr(self._optimization_injector, "get_few_shot_payload"):
             few_shot_payload = self._optimization_injector.get_few_shot_payload(
                 user_message,
@@ -533,6 +538,7 @@ class RuntimeIntelligenceService:
                 model=model_name,
                 task_type=task_type,
             )
+        if isinstance(few_shot_payload, dict):
             if few_shot_payload:
                 few_shots = str(few_shot_payload.get("text", "")).strip() or None
                 identity = self._build_prompt_identity(few_shot_payload)

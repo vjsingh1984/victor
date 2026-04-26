@@ -237,8 +237,7 @@ class OptimizationInjector:
         model: str = "",
         task_type: str = "default",
     ) -> Optional[Dict[str, Any]]:
-        """Get few-shot text plus canonical prompt-identity metadata."""
-        """Get MIPROv2 KNN-selected few-shot examples.
+        """Get MIPROv2 few-shot examples plus canonical prompt-identity metadata.
 
         Unlike evolved sections (per-session), few-shots can be
         per-query to match the current task context.
@@ -247,7 +246,7 @@ class OptimizationInjector:
             query: Current user message for KNN similarity matching.
 
         Returns:
-            Few-shot examples text or None.
+            Few-shot payload dictionary or None.
         """
         normalized_query = (query or "").strip()
         cache_key = normalized_query or "__empty_query__"
