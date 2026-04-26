@@ -73,6 +73,7 @@ These require the full `victor-ai` runtime and cannot be promoted to the zero-de
 | `BaseLearner` | `victor.framework.rl.base` | ABC with framework method contracts |
 | `get_team_registry` | `victor.framework.team_registry` | Global singleton accessor |
 | `get_rl_coordinator` | `victor.framework.rl.coordinator` | Runtime RL system |
+| `get_rl_coordinator_async` | `victor_sdk.rl_runtime` | Async runtime adapter for the global RL coordinator |
 | `create_prompt_rollout_experiment` | `victor_sdk.rl_runtime` | Runtime adapter for benchmark-gated prompt rollout experiments |
 | `create_prompt_rollout_experiment_async` | `victor_sdk.rl_runtime` | Async runtime adapter for benchmark-gated prompt rollout experiments |
 
@@ -89,7 +90,10 @@ For RL runtime helpers that depend on the full host framework, prefer the SDK
 runtime adapter instead of importing host modules directly:
 
 ```python
-from victor_sdk.rl_runtime import create_prompt_rollout_experiment
+from victor_sdk.rl_runtime import (
+    create_prompt_rollout_experiment,
+    get_rl_coordinator_async,
+)
 
 experiment_id = create_prompt_rollout_experiment(
     section_name="GROUNDING_RULES",
@@ -98,6 +102,8 @@ experiment_id = create_prompt_rollout_experiment(
     traffic_split=0.1,
     min_samples_per_variant=50,
 )
+
+coordinator = await get_rl_coordinator_async()
 ```
 
 ### Dependency Configuration

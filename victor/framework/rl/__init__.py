@@ -54,6 +54,7 @@ Usage:
         LearnerType,
         create_prompt_rollout_experiment,
         get_rl_coordinator,
+        get_rl_coordinator_async,
     )
 
     # Option 1: Use high-level RLManager
@@ -87,6 +88,9 @@ Usage:
         traffic_split=0.1,
         min_samples_per_variant=50,
     )
+
+    # Option 4: Async callers can access the singleton without blocking
+    async_coordinator = await get_rl_coordinator_async()
 """
 
 from __future__ import annotations
