@@ -241,10 +241,13 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     `victor.core.types`, so the compatibility shim stays public-only instead
     of quietly re-entering internal code paths
 
+- Phase 4.3 executor test-only cleanup:
+  - `victor/tests/workflows/test_isolation.py` no longer imports
+    `WorkflowExecutor` just to assert isolation defaults; the checks now
+    depend directly on `IsolationMapper`, which is the real subject under test
+
 Next resume point:
-- Remaining `victor.workflows.executor` imports are now effectively
+- Remaining `victor.workflows.executor` imports are now intentional
   compatibility/public-test surface (`victor/workflows/__init__.py`,
-  `victor/tests/workflows/test_isolation.py`, and the legacy executor module
-  itself). If we continue, the next small slice is test-only cleanup for
-  `victor/tests/workflows/test_isolation.py`; otherwise this executor
+  integration coverage, and the legacy executor module itself). This
   migration track is in a clean stop state.
