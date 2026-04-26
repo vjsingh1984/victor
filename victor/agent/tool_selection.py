@@ -39,6 +39,10 @@ from victor.core.yaml_utils import safe_load as yaml_safe_load
 from victor.core import get_container
 
 from victor.agent.conversation.state_machine import ConversationStage
+from victor.agent.tool_selection_policy import (
+    StageToolSelectionContext,
+    ToolSelectionStagePolicy,
+)
 from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
@@ -871,6 +875,7 @@ class ToolSelector(ModeAwareMixin):
 
         # Selection statistics
         self.stats = ToolSelectionStats()
+        self._stage_policy = ToolSelectionStagePolicy(fallback_max_tools=fallback_max_tools)
 
         # Tool selection result cache (for expensive semantic selection)
         self._tool_selection_cache: Optional["GenericResultCache"] = None
@@ -2355,59 +2360,26 @@ class ToolSelector(ModeAwareMixin):
 
         logger.debug(f"Stage detection: {current_stage.name}, recommended tools: {stage_tools}")
 
-        # Core tools always included (stage-aware, read-only for explore/analysis)
-        core = self._get_stage_core_tools(current_stage)
-
-        # Web tools check (dynamic discovery)
-        web_tools = self._get_web_tools_cached() if needs_web_tools(user_message) else set()
-
-        # Combine stage-specific tools with core and web tools
-        keep = stage_tools | core | web_tools
-
-        # Always include vertical_core tools from tiered config (GAP-4 fix)
-        # These are essential tools for the vertical (e.g., docker for DevOps, web_search for Research)
         tiered_config = getattr(self, "_tiered_config", None)
-        if tiered_config:
-            keep.update(tiered_config.mandatory)
-            keep.update(tiered_config.vertical_core)
+        pruned = self._stage_policy.prioritize_by_stage(
+            tools,
+            context=StageToolSelectionContext(
+                current_stage=current_stage,
+                stage_tools=stage_tools,
+                core_tools=self._get_stage_core_tools(current_stage),
+                web_tools=self._get_web_tools_cached() if needs_web_tools(user_message) else set(),
+                mandatory_tools=set(getattr(tiered_config, "mandatory", set())),
+                vertical_core_tools=set(getattr(tiered_config, "vertical_core", set())),
+            ),
+            should_include_tool=self.conversation_state.should_include_tool,
+            get_tool_priority_boost=self.conversation_state.get_tool_priority_boost,
+        )
 
-        # Also get tools from adjacent stages for flexibility
-        for tool in tools:
-            if self.conversation_state.should_include_tool(tool.name):
-                keep.add(tool.name)
-
-        # Apply priority boost based on stage
-        boosted_tools: List[Tuple["ToolDefinition", float]] = []
-        for tool in tools:
-            boost = self.conversation_state.get_tool_priority_boost(tool.name)
-            if tool.name in keep or boost > 0:
-                boosted_tools.append((tool, boost))
-
-        # Sort by boost (descending) and filter
-        boosted_tools.sort(key=lambda x: x[1], reverse=True)
-        pruned = [t for t, _ in boosted_tools if t.name in keep]
-
-        if pruned:
-            logger.debug(
-                f"Stage-pruned tools ({current_stage.name}): "
-                f"{len(pruned)} tools kept from {len(tools)}"
-            )
-            return pruned
-
-        # Fallback to core tools (stage-aware) + vertical_core tools
-        core_fallback = self._get_stage_core_tools(current_stage)
-        # Also include vertical_core tools in fallback (GAP-4 fix)
-        if tiered_config:
-            core_fallback = core_fallback | tiered_config.mandatory | tiered_config.vertical_core
-        fallback_tools = [t for t in tools if t.name in core_fallback]
-
-        if fallback_tools:
-            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core+vertical tools")
-            return fallback_tools
-
-        # Last resort: return a small prefix
-        logger.warning(f"Stage pruning: last resort fallback to {self.fallback_max_tools} tools")
-        return tools[: self.fallback_max_tools]
+        logger.debug(
+            f"Stage-pruned tools ({current_stage.name}): "
+            f"{len(pruned)} tools kept from {len(tools)}"
+        )
+        return pruned
 
     def get_task_aware_tools(
         self,
@@ -2576,34 +2548,12 @@ class ToolSelector(ModeAwareMixin):
         Returns:
             List of core + keyword-selected tools
         """
-        from victor.providers.base import ToolDefinition
-
-        all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
-        tools: List[ToolDefinition] = []
-
         stage = self.conversation_state.get_stage() if self.conversation_state else None
-        # Add core tools first (dynamic discovery)
-        for tool_name in self._get_stage_core_tools(stage):
-            if tool_name in all_tools_map:
-                tool = all_tools_map[tool_name]
-                tools.append(
-                    ToolDefinition(
-                        name=tool.name,
-                        description=tool.description,
-                        parameters=tool.parameters,
-                    )
-                )
-
-        # Add keyword-selected tools (avoiding duplicates)
-        keyword_tools = self.select_keywords(user_message)
-        existing_names = {t.name for t in tools}
-        for keyword_tool in keyword_tools:
-            if keyword_tool.name not in existing_names:
-                tools.append(keyword_tool)
-
-        # Cap to fallback_max_tools to avoid broadcasting too many
-        if len(tools) > self.fallback_max_tools:
-            tools = tools[: self.fallback_max_tools]
+        tools = self._stage_policy.build_semantic_fallback_tools(
+            all_tools=self.tools.list_tools(),
+            core_tools=self._get_stage_core_tools(stage),
+            keyword_tools=self.select_keywords(user_message),
+        )
 
         logger.info(
             f"Smart fallback selected {len(tools)} tools: {', '.join(t.name for t in tools)}"

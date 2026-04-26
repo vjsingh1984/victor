@@ -422,18 +422,44 @@ class TestOptimizationSyncBridge:
     def test_prompt_rollout_auto_apply_uses_auto_apply_helper(self) -> None:
         with patch.object(optimization_cmd, "_auto_apply_prompt_rollout_decision") as mock_apply:
             optimization_cmd.prompt_rollout_auto_apply.callback(
-                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                False,
             )
 
         mock_apply.assert_called_once_with(
-            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            False,
+        )
+
+    def test_prompt_rollout_auto_apply_supports_dry_run(self) -> None:
+        with patch.object(optimization_cmd, "_auto_apply_prompt_rollout_decision") as mock_apply:
+            optimization_cmd.prompt_rollout_auto_apply.callback(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                True,
+            )
+
+        mock_apply.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            True,
         )
 
     def test_prompt_rollout_auto_apply_all_uses_bulk_helper(self) -> None:
         with patch.object(optimization_cmd, "_auto_apply_all_prompt_rollouts") as mock_apply:
-            optimization_cmd.prompt_rollout_auto_apply_all.callback(status_filter="completed")
+            optimization_cmd.prompt_rollout_auto_apply_all.callback(
+                status_filter="completed",
+                dry_run=False,
+            )
 
-        mock_apply.assert_called_once_with("completed")
+        mock_apply.assert_called_once_with("completed", False)
+
+    def test_prompt_rollout_auto_apply_all_supports_dry_run(self) -> None:
+        with patch.object(optimization_cmd, "_auto_apply_all_prompt_rollouts") as mock_apply:
+            optimization_cmd.prompt_rollout_auto_apply_all.callback(
+                status_filter="completed",
+                dry_run=True,
+            )
+
+        mock_apply.assert_called_once_with("completed", True)
 
     @pytest.mark.asyncio
     async def test_prompt_rollout_async_reports_started_experiment(self) -> None:
@@ -860,7 +886,8 @@ class TestOptimizationSyncBridge:
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
             optimization_cmd._auto_apply_prompt_rollout_decision(
-                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                False,
             )
 
         coordinator.analyze_experiment.assert_called_once_with(
@@ -897,7 +924,8 @@ class TestOptimizationSyncBridge:
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
             optimization_cmd._auto_apply_prompt_rollout_decision(
-                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                False,
             )
 
         coordinator.analyze_experiment.assert_called_once_with(
@@ -908,6 +936,39 @@ class TestOptimizationSyncBridge:
         )
         mock_echo.assert_called_once_with(
             "Prompt rollout auto-applied: kept control for "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+
+    def test_auto_apply_prompt_rollout_decision_dry_run_reports_planned_action(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = SimpleNamespace(
+            experiment_id="prompt_optimizer_grounding_rules_anthropic_candidate123",
+            is_significant=True,
+            treatment_better=True,
+            effect_size=0.12,
+            p_value=0.03,
+            confidence_interval=(0.02, 0.18),
+            recommendation="Roll out treatment - significant improvement detected",
+            details={},
+        )
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._auto_apply_prompt_rollout_decision(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                True,
+            )
+
+        coordinator.rollout_treatment.assert_not_called()
+        coordinator.rollback_experiment.assert_not_called()
+        mock_echo.assert_called_once_with(
+            "Prompt rollout dry-run: would roll out treatment for "
             "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
 
@@ -933,7 +994,8 @@ class TestOptimizationSyncBridge:
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
             optimization_cmd._auto_apply_prompt_rollout_decision(
-                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                False,
             )
 
         coordinator.analyze_experiment.assert_called_once_with(
@@ -949,7 +1011,7 @@ class TestOptimizationSyncBridge:
 
     def test_auto_apply_prompt_rollout_decision_rejects_non_prompt_rollout_id(self) -> None:
         with patch.object(optimization_cmd.click, "echo") as mock_echo:
-            optimization_cmd._auto_apply_prompt_rollout_decision("other_experiment")
+            optimization_cmd._auto_apply_prompt_rollout_decision("other_experiment", False)
 
         mock_echo.assert_called_once_with(
             "Experiment is not a prompt rollout: other_experiment",
@@ -969,7 +1031,8 @@ class TestOptimizationSyncBridge:
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
             optimization_cmd._auto_apply_prompt_rollout_decision(
-                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                False,
             )
 
         mock_echo.assert_called_once_with(
@@ -1001,7 +1064,8 @@ class TestOptimizationSyncBridge:
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
             optimization_cmd._auto_apply_prompt_rollout_decision(
-                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+                "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                False,
             )
 
         mock_echo.assert_called_once_with(
@@ -1076,7 +1140,7 @@ class TestOptimizationSyncBridge:
             ),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._auto_apply_all_prompt_rollouts("completed")
+            optimization_cmd._auto_apply_all_prompt_rollouts("completed", False)
 
         coordinator.list_experiments.assert_called_once_with()
         coordinator.analyze_experiment.assert_any_call(
@@ -1129,7 +1193,7 @@ class TestOptimizationSyncBridge:
             ),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._auto_apply_all_prompt_rollouts(None)
+            optimization_cmd._auto_apply_all_prompt_rollouts(None, False)
 
         coordinator.analyze_experiment.assert_called_once_with(
             "prompt_optimizer_grounding_rules_anthropic_candidate123"
@@ -1145,6 +1209,56 @@ class TestOptimizationSyncBridge:
             "Prompt rollout bulk auto-apply summary: considered=1 applied=0 skipped=1 failed=0"
         )
 
+    def test_auto_apply_all_prompt_rollouts_dry_run_reports_planned_actions(self) -> None:
+        coordinator = MagicMock()
+        coordinator.list_experiments.return_value = [
+            {
+                "experiment_id": "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                "status": "completed",
+            },
+            {
+                "experiment_id": "prompt_optimizer_completion_guidance_openai_candidate456",
+                "status": "completed",
+            },
+        ]
+        coordinator.analyze_experiment.side_effect = [
+            SimpleNamespace(
+                is_significant=True,
+                treatment_better=True,
+                recommendation="Roll out treatment - significant improvement detected",
+            ),
+            SimpleNamespace(
+                is_significant=True,
+                treatment_better=False,
+                recommendation="Keep control - treatment performed worse",
+            ),
+        ]
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._auto_apply_all_prompt_rollouts("completed", True)
+
+        coordinator.rollout_treatment.assert_not_called()
+        coordinator.rollback_experiment.assert_not_called()
+        mock_echo.assert_any_call(
+            "Prompt rollout dry-run: would roll out treatment for "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_any_call(
+            "Prompt rollout dry-run: would keep control for "
+            "prompt_optimizer_completion_guidance_openai_candidate456"
+        )
+        mock_echo.assert_any_call(
+            "Prompt rollout bulk auto-apply dry-run summary: "
+            "considered=2 planned=2 skipped=0 failed=0"
+        )
+
     def test_auto_apply_all_prompt_rollouts_reports_none_found(self) -> None:
         coordinator = MagicMock()
         coordinator.list_experiments.return_value = [{"experiment_id": "other_experiment"}]
@@ -1157,7 +1271,7 @@ class TestOptimizationSyncBridge:
             ),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._auto_apply_all_prompt_rollouts("completed")
+            optimization_cmd._auto_apply_all_prompt_rollouts("completed", False)
 
         mock_echo.assert_called_once_with(
             "No prompt rollout experiments found for auto-apply."
@@ -1186,7 +1300,7 @@ class TestOptimizationSyncBridge:
             ),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._auto_apply_all_prompt_rollouts("completed")
+            optimization_cmd._auto_apply_all_prompt_rollouts("completed", False)
 
         mock_echo.assert_any_call(
             "Unable to auto-apply prompt rollout decision for "

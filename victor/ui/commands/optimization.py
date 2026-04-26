@@ -288,9 +288,14 @@ def prompt_rollout_apply(experiment_id: str, action: str) -> None:
 
 @opt.command("prompt-rollout-auto-apply")
 @click.argument("experiment_id")
-def prompt_rollout_auto_apply(experiment_id: str) -> None:
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview the auto-apply action without changing experiment state.",
+)
+def prompt_rollout_auto_apply(experiment_id: str, dry_run: bool) -> None:
     """Apply rollout or rollback only when analysis clearly supports it."""
-    _auto_apply_prompt_rollout_decision(experiment_id)
+    _auto_apply_prompt_rollout_decision(experiment_id, dry_run)
 
 
 @opt.command("prompt-rollout-auto-apply-all")
@@ -300,9 +305,14 @@ def prompt_rollout_auto_apply(experiment_id: str) -> None:
     default=None,
     help="Optional status filter for the prompt rollouts to analyze before auto-apply.",
 )
-def prompt_rollout_auto_apply_all(status_filter: Optional[str]) -> None:
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview all eligible auto-apply actions without changing experiment state.",
+)
+def prompt_rollout_auto_apply_all(status_filter: Optional[str], dry_run: bool) -> None:
     """Apply eligible rollout decisions across prompt rollout experiments."""
-    _auto_apply_all_prompt_rollouts(status_filter)
+    _auto_apply_all_prompt_rollouts(status_filter, dry_run)
 
 
 async def _profile_async(
@@ -706,7 +716,19 @@ def _get_prompt_rollout_auto_action(result: object) -> Optional[str]:
     return None
 
 
-def _auto_apply_prompt_rollout_decision(experiment_id: str) -> None:
+def _describe_prompt_rollout_auto_action(action: str, experiment_id: str, dry_run: bool) -> str:
+    if action == "rollout":
+        return (
+            f"Prompt rollout {'dry-run: would roll out' if dry_run else 'auto-applied: rolled out'} "
+            f"treatment for {experiment_id}"
+        )
+    return (
+        f"Prompt rollout {'dry-run: would keep' if dry_run else 'auto-applied: kept'} "
+        f"control for {experiment_id}"
+    )
+
+
+def _auto_apply_prompt_rollout_decision(experiment_id: str, dry_run: bool = False) -> None:
     if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
         click.echo(f"Experiment is not a prompt rollout: {experiment_id}", err=True)
         return
@@ -718,15 +740,18 @@ def _auto_apply_prompt_rollout_decision(experiment_id: str) -> None:
         return
 
     action = _get_prompt_rollout_auto_action(result)
-    if action == "rollout":
-        updated = coordinator.rollout_treatment(experiment_id)
-        success_message = f"Prompt rollout auto-applied: rolled out treatment for {experiment_id}"
-    elif action == "rollback":
-        updated = coordinator.rollback_experiment(experiment_id)
-        success_message = f"Prompt rollout auto-applied: kept control for {experiment_id}"
-    else:
+    if action is None:
         click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}")
         return
+
+    if dry_run:
+        click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=True))
+        return
+
+    if action == "rollout":
+        updated = coordinator.rollout_treatment(experiment_id)
+    else:
+        updated = coordinator.rollback_experiment(experiment_id)
 
     if not updated:
         click.echo(
@@ -735,10 +760,10 @@ def _auto_apply_prompt_rollout_decision(experiment_id: str) -> None:
         )
         return
 
-    click.echo(success_message)
+    click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False))
 
 
-def _auto_apply_all_prompt_rollouts(status_filter: Optional[str]) -> None:
+def _auto_apply_all_prompt_rollouts(status_filter: Optional[str], dry_run: bool = False) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
     for experiment in coordinator.list_experiments():
@@ -756,6 +781,7 @@ def _auto_apply_all_prompt_rollouts(status_filter: Optional[str]) -> None:
         return
 
     considered = 0
+    planned = 0
     applied = 0
     skipped = 0
     failed = 0
@@ -775,14 +801,15 @@ def _auto_apply_all_prompt_rollouts(status_filter: Optional[str]) -> None:
             skipped += 1
             continue
 
+        if dry_run:
+            click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=True))
+            planned += 1
+            continue
+
         if action == "rollout":
             updated = coordinator.rollout_treatment(experiment_id)
-            success_message = (
-                f"Prompt rollout auto-applied: rolled out treatment for {experiment_id}"
-            )
         else:
             updated = coordinator.rollback_experiment(experiment_id)
-            success_message = f"Prompt rollout auto-applied: kept control for {experiment_id}"
 
         if not updated:
             click.echo(
@@ -792,8 +819,15 @@ def _auto_apply_all_prompt_rollouts(status_filter: Optional[str]) -> None:
             failed += 1
             continue
 
-        click.echo(success_message)
+        click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False))
         applied += 1
+
+    if dry_run:
+        click.echo(
+            "Prompt rollout bulk auto-apply dry-run summary: "
+            f"considered={considered} planned={planned} skipped={skipped} failed={failed}"
+        )
+        return
 
     click.echo(
         "Prompt rollout bulk auto-apply summary: "
