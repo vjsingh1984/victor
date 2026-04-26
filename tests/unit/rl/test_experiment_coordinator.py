@@ -46,11 +46,13 @@ def sample_config() -> ExperimentConfig:
         control=Variant(
             name="baseline",
             type=VariantType.CONTROL,
+            config={"section_name": "GROUNDING_RULES", "provider": "anthropic"},
             description="Baseline selector",
         ),
         treatment=Variant(
             name="rl_selector",
             type=VariantType.TREATMENT,
+            config={"section_name": "GROUNDING_RULES", "provider": "anthropic"},
             description="RL-based selector",
         ),
         traffic_split=0.5,  # 50% for easier testing
@@ -300,6 +302,8 @@ class TestExperimentCoordinator:
         assert status is not None
         assert status["experiment_id"] == sample_config.experiment_id
         assert status["status"] == ExperimentStatus.DRAFT.value
+        assert status["section_name"] == "GROUNDING_RULES"
+        assert status["provider"] == "anthropic"
         assert "control" in status
         assert "treatment" in status
 
@@ -327,6 +331,8 @@ class TestExperimentCoordinator:
         experiments = coordinator.list_experiments()
 
         assert len(experiments) == 2
+        assert experiments[0]["section_name"] == "GROUNDING_RULES"
+        assert experiments[0]["provider"] == "anthropic"
 
     def test_export_metrics(
         self, coordinator: ExperimentCoordinator, sample_config: ExperimentConfig

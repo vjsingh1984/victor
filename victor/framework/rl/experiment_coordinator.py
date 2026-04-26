@@ -696,11 +696,19 @@ class ExperimentCoordinator:
         config = self._experiments[experiment_id]
         status = self._status[experiment_id]
         metrics = self._metrics.get(experiment_id, {})
+        control_config = config.control.config if isinstance(config.control.config, dict) else {}
+        treatment_config = (
+            config.treatment.config if isinstance(config.treatment.config, dict) else {}
+        )
+        section_name = control_config.get("section_name") or treatment_config.get("section_name")
+        provider = control_config.get("provider") or treatment_config.get("provider")
 
         return {
             "experiment_id": experiment_id,
             "name": config.name,
             "status": status.value,
+            "section_name": section_name,
+            "provider": provider,
             "traffic_split": config.traffic_split,
             "control": {
                 "name": config.control.name,

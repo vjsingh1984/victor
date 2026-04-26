@@ -259,9 +259,25 @@ def prompt_rollout(
     default=None,
     help="Optional status filter (draft, running, paused, completed, rolled_out, rolled_back).",
 )
-def prompt_rollouts(status_filter: Optional[str]) -> None:
+@click.option(
+    "--section",
+    "section_filter",
+    default=None,
+    help="Optional prompt section filter.",
+)
+@click.option(
+    "--provider",
+    "provider_filter",
+    default=None,
+    help="Optional provider filter.",
+)
+def prompt_rollouts(
+    status_filter: Optional[str],
+    section_filter: Optional[str],
+    provider_filter: Optional[str],
+) -> None:
     """List prompt rollout experiments."""
-    _list_prompt_rollouts(status_filter)
+    _list_prompt_rollouts(status_filter, section_filter, provider_filter)
 
 
 @opt.command("prompt-rollout-status")
@@ -327,12 +343,26 @@ def prompt_rollout_auto_apply(experiment_id: str, dry_run: bool) -> None:
     is_flag=True,
     help="Stop the batch after the first analysis or transition failure.",
 )
+@click.option(
+    "--section",
+    "section_filter",
+    default=None,
+    help="Optional prompt section filter.",
+)
+@click.option(
+    "--provider",
+    "provider_filter",
+    default=None,
+    help="Optional provider filter.",
+)
 def prompt_rollout_auto_apply_all(
     status_filter: Optional[str],
     dry_run: bool,
     action_filter: Optional[str],
     limit: Optional[int],
     stop_on_failure: bool,
+    section_filter: Optional[str],
+    provider_filter: Optional[str],
 ) -> None:
     """Apply eligible rollout decisions across prompt rollout experiments."""
     _auto_apply_all_prompt_rollouts(
@@ -341,6 +371,8 @@ def prompt_rollout_auto_apply_all(
         action_filter,
         limit,
         stop_on_failure,
+        section_filter,
+        provider_filter,
     )
 
 
@@ -608,7 +640,25 @@ async def _prompt_rollout_async(
     click.echo(f"Prompt rollout experiment started: {experiment_id}")
 
 
-def _list_prompt_rollouts(status_filter: Optional[str]) -> None:
+def _matches_prompt_rollout_scope(
+    experiment: dict[str, object],
+    section_filter: Optional[str],
+    provider_filter: Optional[str],
+) -> bool:
+    section_name = str(experiment.get("section_name") or "")
+    provider = str(experiment.get("provider") or "")
+    if section_filter and section_name.casefold() != section_filter.casefold():
+        return False
+    if provider_filter and provider.casefold() != provider_filter.casefold():
+        return False
+    return True
+
+
+def _list_prompt_rollouts(
+    status_filter: Optional[str],
+    section_filter: Optional[str],
+    provider_filter: Optional[str],
+) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
     for experiment in coordinator.list_experiments():
@@ -616,6 +666,8 @@ def _list_prompt_rollouts(status_filter: Optional[str]) -> None:
         if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
             continue
         if status_filter and experiment.get("status") != status_filter:
+            continue
+        if not _matches_prompt_rollout_scope(experiment, section_filter, provider_filter):
             continue
         experiments.append(experiment)
 
@@ -629,6 +681,10 @@ def _list_prompt_rollouts(status_filter: Optional[str]) -> None:
         treatment = experiment.get("treatment", {})
         click.echo(f"  {experiment['experiment_id']}")
         click.echo(f"    Status: {experiment['status']}")
+        if experiment.get("section_name"):
+            click.echo(f"    Section: {experiment['section_name']}")
+        if experiment.get("provider"):
+            click.echo(f"    Provider: {experiment['provider']}")
         click.echo(f"    Traffic split: {experiment['traffic_split']:.1%}")
         click.echo(
             "    Control: "
@@ -658,6 +714,10 @@ def _show_prompt_rollout_status(experiment_id: str) -> None:
     click.echo(f"Prompt rollout experiment: {experiment_id}")
     click.echo(f"  Name: {experiment.get('name', '-')}")
     click.echo(f"  Status: {experiment.get('status', '-')}")
+    if experiment.get("section_name"):
+        click.echo(f"  Section: {experiment['section_name']}")
+    if experiment.get("provider"):
+        click.echo(f"  Provider: {experiment['provider']}")
     click.echo(f"  Traffic split: {experiment.get('traffic_split', 0.0):.1%}")
     click.echo(
         "  Control: "
@@ -798,6 +858,8 @@ def _auto_apply_all_prompt_rollouts(
     action_filter: Optional[str] = None,
     limit: Optional[int] = None,
     stop_on_failure: bool = False,
+    section_filter: Optional[str] = None,
+    provider_filter: Optional[str] = None,
 ) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
@@ -808,6 +870,8 @@ def _auto_apply_all_prompt_rollouts(
         if status_filter and experiment.get("status") != status_filter:
             continue
         if not status_filter and experiment.get("status") in {"rolled_out", "rolled_back"}:
+            continue
+        if not _matches_prompt_rollout_scope(experiment, section_filter, provider_filter):
             continue
         experiments.append(experiment)
 
