@@ -271,6 +271,88 @@ class TestCanonicalProtocolImports:
             pytest.fail("\n".join(errors))
 
 
+class TestCanonicalTypeImports:
+    """Verify low-volume type shims stay out of internal imports."""
+
+    def test_core_types_from_canonical_location(self) -> None:
+        """victor.core.types should re-export from victor.core.vertical_types."""
+        import victor.core.types as core_types
+        import victor.core.vertical_types as canonical
+
+        if hasattr(core_types, "__all__"):
+            for name in core_types.__all__:
+                canonical_attr = getattr(canonical, name, None)
+                shim_attr = getattr(core_types, name, None)
+
+                assert (
+                    canonical_attr is shim_attr or shim_attr is None
+                ), f"{name} in victor.core.types should come from victor.core.vertical_types"
+
+    def test_no_direct_imports_from_core_types(self) -> None:
+        """Production code should not import the compatibility-only core type shim."""
+        victor_path = Path("victor")
+        if not victor_path.exists():
+            pytest.skip("victor directory not found")
+
+        py_files = [f for f in victor_path.rglob("*.py") if "__pycache__" not in str(f)]
+
+        errors = []
+        for py_file in py_files:
+            if py_file.as_posix().endswith("victor/core/types.py"):
+                continue
+
+            content = py_file.read_text()
+            lines = content.split("\n")
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if (
+                    "from victor.core.types import" in line
+                    or "import victor.core.types" in line
+                ):
+                    errors.append(
+                        f"{py_file.relative_to(victor_path)}:{i} imports from "
+                        "victor.core.types, should use victor.core.vertical_types "
+                        "(canonical location)"
+                    )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
+    def test_no_test_imports_from_core_types(self) -> None:
+        """Tests should also import from victor.core.vertical_types directly."""
+        tests_path = Path("tests")
+        if not tests_path.exists():
+            pytest.skip("tests directory not found")
+
+        py_files = [f for f in tests_path.rglob("*.py") if "__pycache__" not in str(f)]
+
+        errors = []
+        for py_file in py_files:
+            if py_file.as_posix().endswith("tests/unit/architecture/test_import_boundaries.py"):
+                continue
+
+            content = py_file.read_text()
+            lines = content.split("\n")
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if (
+                    "from victor.core.types import" in line
+                    or "import victor.core.types" in line
+                ):
+                    errors.append(
+                        f"{py_file.relative_to(tests_path)}:{i} imports from "
+                        "victor.core.types, should use victor.core.vertical_types "
+                        "(canonical location)"
+                    )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
+
 class TestNoCircularImports:
     """Verify there are no circular import chains.
 

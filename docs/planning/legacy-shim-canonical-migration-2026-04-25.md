@@ -192,7 +192,14 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - the team consolidation guide now points its canonical import example at
     `victor.protocols.team`
 
+- Phase 4.2 core type shim guardrails:
+  - architecture tests now verify `victor.core.types` remains a pure
+    re-export of `victor.core.vertical_types`
+  - production and test trees are now scanned for direct imports from
+    `victor.core.types`, so the compatibility shim stays public-only instead
+    of quietly re-entering internal code paths
+
 Next resume point:
-- Continue Phase 4 by codifying the same "canonical import only" rule for
-  `victor.core.types`, which is already unused internally but not yet guarded
-  by architecture tests.
+- Continue Phase 4 by auditing whether any remaining compatibility-only docs,
+  examples, or public package-root re-exports should be tightened further, or
+  whether the low-volume shim cleanup is complete enough to close.
