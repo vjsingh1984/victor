@@ -77,7 +77,7 @@ For each batch:
 
 ## Current Batch
 
-Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phase 2.6, and Phase 2.7 are now complete:
+Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phase 2.6, Phase 2.7, and Phase 2.8 are now complete:
 - internal provider switching is service-first in `AgentOrchestrator`
 - provider-switch hook contracts now live in a canonical provider contract
   module instead of being sourced from the legacy switch coordinator
@@ -98,6 +98,10 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 - lazy deprecated chat/tool/session coordinator access in bootstrapper now
   binds directly to the backing compatibility slots, removing the remaining
   internal wrapper methods from `AgentOrchestrator` for those shims
+- secondary compatibility facades (`provider`, `session`, `metrics`,
+  `resilience`, `workflow`) now bootstrap lazily via `LazyRuntimeProxy`,
+  reducing eager runtime compatibility construction while keeping the public
+  facade attributes available
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -121,5 +125,6 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 
 Next resume point:
 - continue the broader compatibility cleanup around orchestrator and facade
-  shims by evaluating whether eager facade bootstrap can be reduced further
-  without weakening the remaining public compatibility surface
+  shims by evaluating whether the remaining eager facades (`chat`, `tool`,
+  `orchestration`) can be reduced further without weakening their stronger
+  direct compatibility expectations

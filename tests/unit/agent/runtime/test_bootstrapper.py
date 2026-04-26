@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch, sentinel
 
 from victor.agent.runtime.bootstrapper import AgentRuntimeBootstrapper
+from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
 
 class TestAgentRuntimeBootstrapper:
@@ -30,6 +31,38 @@ class TestAgentRuntimeBootstrapper:
         assert hasattr(orch, "_resilience_facade")
         assert hasattr(orch, "_workflow_facade")
         assert hasattr(orch, "_orchestration_facade")
+
+    def test_create_facades_lazifies_secondary_compatibility_facades(self):
+        orch = self._make_mock_orchestrator()
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        assert isinstance(orch._provider_facade, LazyRuntimeProxy)
+        assert isinstance(orch._session_facade, LazyRuntimeProxy)
+        assert isinstance(orch._metrics_facade, LazyRuntimeProxy)
+        assert isinstance(orch._resilience_facade, LazyRuntimeProxy)
+        assert isinstance(orch._workflow_facade, LazyRuntimeProxy)
+        assert orch._provider_facade.initialized is False
+        assert orch._session_facade.initialized is False
+        assert orch._metrics_facade.initialized is False
+        assert orch._resilience_facade.initialized is False
+        assert orch._workflow_facade.initialized is False
+
+    def test_lazy_secondary_facades_materialize_from_current_orchestrator_state(self):
+        orch = self._make_mock_orchestrator()
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        assert orch._provider_facade.provider_manager is orch._provider_manager
+        assert orch._session_facade.session_ledger is orch._session_ledger
+        assert orch._metrics_facade.metrics_runtime is orch._metrics_runtime
+        assert orch._resilience_facade.recovery_coordinator is orch._recovery_coordinator
+        assert orch._workflow_facade.workflow_registry is orch._workflow_registry
+        assert orch._provider_facade.initialized is True
+        assert orch._session_facade.initialized is True
+        assert orch._metrics_facade.initialized is True
+        assert orch._resilience_facade.initialized is True
+        assert orch._workflow_facade.initialized is True
 
     def test_create_facades_uses_explicit_tool_coordinator_compat_getter(self):
         orch = self._make_mock_orchestrator()

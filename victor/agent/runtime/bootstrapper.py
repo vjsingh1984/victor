@@ -14,6 +14,7 @@ from victor.agent.orchestrator_properties import (
     _ensure_sync_chat_coordinator,
     _ensure_unified_chat_coordinator,
 )
+from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -86,61 +87,76 @@ class AgentRuntimeBootstrapper:
             plugin_manager=orchestrator.plugin_manager,
         )
 
-        orchestrator._provider_facade = ProviderFacade(
-            provider=orchestrator.provider,
-            model=orchestrator.model,
-            provider_name=orchestrator.provider_name,
-            temperature=orchestrator.temperature,
-            max_tokens=orchestrator.max_tokens,
-            thinking=orchestrator.thinking,
-            provider_manager=orchestrator._provider_manager,
-            provider_runtime=orchestrator._provider_runtime,
-            provider_coordinator=orchestrator._provider_coordinator,
-            provider_switch_coordinator=(orchestrator._provider_switch_coordinator),
+        orchestrator._provider_facade = LazyRuntimeProxy(
+            factory=lambda: ProviderFacade(
+                provider=orchestrator.provider,
+                model=orchestrator.model,
+                provider_name=orchestrator.provider_name,
+                temperature=orchestrator.temperature,
+                max_tokens=orchestrator.max_tokens,
+                thinking=orchestrator.thinking,
+                provider_manager=orchestrator._provider_manager,
+                provider_runtime=orchestrator._provider_runtime,
+                provider_coordinator=orchestrator._provider_coordinator,
+                provider_switch_coordinator=(orchestrator._provider_switch_coordinator),
+            ),
+            name="provider_facade",
         )
 
-        orchestrator._session_facade = SessionFacade(
-            session_state=orchestrator._session_state,
-            session_accessor=orchestrator._session_accessor,
-            session_ledger=orchestrator._session_ledger,
-            lifecycle_manager=orchestrator._lifecycle_manager,
-            active_session_id=orchestrator.active_session_id,
-            memory_session_id=orchestrator._memory_session_id,
-            profile_name=orchestrator._profile_name,
-            checkpoint_manager=orchestrator._checkpoint_manager,
+        orchestrator._session_facade = LazyRuntimeProxy(
+            factory=lambda: SessionFacade(
+                session_state=orchestrator._session_state,
+                session_accessor=orchestrator._session_accessor,
+                session_ledger=orchestrator._session_ledger,
+                lifecycle_manager=orchestrator._lifecycle_manager,
+                active_session_id=orchestrator.active_session_id,
+                memory_session_id=orchestrator._memory_session_id,
+                profile_name=orchestrator._profile_name,
+                checkpoint_manager=orchestrator._checkpoint_manager,
+            ),
+            name="session_facade",
         )
 
-        orchestrator._metrics_facade = MetricsFacade(
-            metrics_runtime=orchestrator._metrics_runtime,
-            metrics_collector=orchestrator._metrics_collector,
-            usage_analytics=orchestrator._usage_analytics,
-            usage_logger=orchestrator.usage_logger,
-            streaming_metrics_collector=(orchestrator.streaming_metrics_collector),
-            session_cost_tracker=orchestrator._session_cost_tracker,
-            metrics_coordinator=orchestrator._metrics_coordinator,
-            debug_logger=orchestrator.debug_logger,
-            callback_coordinator=orchestrator._callback_coordinator,
+        orchestrator._metrics_facade = LazyRuntimeProxy(
+            factory=lambda: MetricsFacade(
+                metrics_runtime=orchestrator._metrics_runtime,
+                metrics_collector=orchestrator._metrics_collector,
+                usage_analytics=orchestrator._usage_analytics,
+                usage_logger=orchestrator.usage_logger,
+                streaming_metrics_collector=(orchestrator.streaming_metrics_collector),
+                session_cost_tracker=orchestrator._session_cost_tracker,
+                metrics_coordinator=orchestrator._metrics_coordinator,
+                debug_logger=orchestrator.debug_logger,
+                callback_coordinator=orchestrator._callback_coordinator,
+            ),
+            name="metrics_facade",
         )
 
-        orchestrator._resilience_facade = ResilienceFacade(
-            resilience_runtime=orchestrator._resilience_runtime,
-            recovery_handler=orchestrator._recovery_handler,
-            recovery_integration=orchestrator._recovery_integration,
-            recovery_coordinator=orchestrator._recovery_coordinator,
-            chunk_generator=orchestrator._chunk_generator,
-            context_manager=orchestrator._context_manager,
-            rl_coordinator=orchestrator._rl_coordinator,
-            code_manager=orchestrator.code_manager,
-            background_tasks=orchestrator._background_tasks,
-            cancel_event=orchestrator._cancel_event,
-            is_streaming=orchestrator._is_streaming,
+        orchestrator._resilience_facade = LazyRuntimeProxy(
+            factory=lambda: ResilienceFacade(
+                resilience_runtime=orchestrator._resilience_runtime,
+                recovery_handler=orchestrator._recovery_handler,
+                recovery_integration=orchestrator._recovery_integration,
+                recovery_coordinator=orchestrator._recovery_coordinator,
+                chunk_generator=orchestrator._chunk_generator,
+                context_manager=orchestrator._context_manager,
+                rl_coordinator=orchestrator._rl_coordinator,
+                code_manager=orchestrator.code_manager,
+                background_tasks=orchestrator._background_tasks,
+                cancel_event=orchestrator._cancel_event,
+                is_streaming=orchestrator._is_streaming,
+            ),
+            name="resilience_facade",
         )
 
-        orchestrator._workflow_facade = WorkflowFacade(
-            workflow_registry=orchestrator._workflow_registry,
-            workflow_runtime=orchestrator._workflow_runtime,
-            workflow_optimization=orchestrator._workflow_optimization,
-            mode_workflow_team_coordinator=(orchestrator._mode_workflow_team_coordinator),
+        orchestrator._workflow_facade = LazyRuntimeProxy(
+            factory=lambda: WorkflowFacade(
+                workflow_registry=orchestrator._workflow_registry,
+                workflow_runtime=orchestrator._workflow_runtime,
+                workflow_optimization=orchestrator._workflow_optimization,
+                mode_workflow_team_coordinator=(orchestrator._mode_workflow_team_coordinator),
+            ),
+            name="workflow_facade",
         )
 
         exploration_state_passed = (
