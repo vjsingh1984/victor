@@ -1927,6 +1927,169 @@ class ToolSelector(ModeAwareMixin):
         else:
             return self.select_keywords(user_message, planned_tools=planned_tools)
 
+    def _load_semantic_cached_selection(
+        self,
+        *,
+        user_message: str,
+        conversation_history: Optional[List[Dict[str, Any]]],
+        conversation_depth: int,
+        stage: Optional[ConversationStage],
+    ) -> Tuple[Optional[List["ToolDefinition"]], Optional[str], Optional[Any]]:
+        """Load cached semantic selection when cache is enabled.
+
+        Returns:
+            Tuple of (cached_tools, cache_key, cache_instance)
+        """
+        if not self._tool_selection_cache_enabled:
+            return None, None, None
+
+        cache = self._init_tool_selection_cache()
+        if cache is None:
+            return None, None, None
+
+        cache_key = self._semantic_cache_key_builder.build(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            conversation_depth=conversation_depth,
+            stage=stage,
+        )
+
+        try:
+            cached_tools = self._semantic_cache_adapter.load_cached_tools(cache, cache_key)
+            if cached_tools:
+                logger.debug(f"Tool selection cache HIT: {len(cached_tools)} tools")
+                return cached_tools, cache_key, cache
+        except Exception as e:
+            logger.warning(f"Failed to reconstruct cached tools: {e}")
+
+        return None, cache_key, cache
+
+    async def _ensure_semantic_embeddings_initialized(self) -> None:
+        """Initialize tool embeddings lazily on first semantic selection."""
+        if self._embeddings_initialized:
+            return
+
+        logger.info("Initializing tool embeddings (one-time operation)...")
+        await self.semantic_selector.initialize_tool_embeddings(self.tools)
+        self._embeddings_initialized = True
+
+    async def _build_semantic_candidates(
+        self,
+        *,
+        user_message: str,
+        conversation_history: Optional[List[Dict[str, Any]]],
+        conversation_depth: int,
+        planned_tools: Optional[List["ToolDefinition"]],
+    ) -> Tuple[List["ToolDefinition"], Optional[ConversationStage]]:
+        """Run semantic selection and assemble blended candidates."""
+        await self._ensure_semantic_embeddings_initialized()
+
+        threshold, max_tools = self.get_adaptive_threshold(user_message, conversation_depth)
+        tools = await self.semantic_selector.select_relevant_tools_with_context(
+            user_message=user_message,
+            tools=self.tools,
+            conversation_history=conversation_history,
+            max_tools=max_tools,
+            similarity_threshold=threshold,
+        )
+
+        tools = self._semantic_assembler.assemble(
+            tools,
+            keyword_tools=self.select_keywords(
+                user_message,
+                planned_tools=planned_tools,
+                _record=False,
+            ),
+            all_tools=self.tools.list_tools(),
+            context=SemanticToolSelectionAssemblyContext(
+                max_tools=max_tools,
+                include_web_tools=any(kw in user_message.lower() for kw in WEB_KEYWORDS),
+                web_tool_names=self._get_web_tools_cached(),
+            ),
+        )
+
+        stage = self.conversation_state.get_stage() if self.conversation_state else None
+        tools = self._filter_tools_for_stage(tools, stage)
+
+        logger.debug(
+            f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}"
+        )
+        return tools, stage
+
+    def _build_semantic_postprocess_context(
+        self,
+        *,
+        user_message: str,
+        stage: Optional[ConversationStage],
+    ) -> ToolSelectionPostProcessContext:
+        return ToolSelectionPostProcessContext(
+            user_message=user_message,
+            stage=stage,
+            fallback_max_tools=self.fallback_max_tools,
+            max_mcp_tools=self.tool_selection_config.get("max_mcp_tools_per_turn", 12),
+            schema_promotion_threshold=self.tool_selection_config.get(
+                "schema_promotion_threshold", 0.8
+            ),
+            max_schema_tokens=self.tool_selection_config.get("max_tool_schema_tokens", 0),
+        )
+
+    def _finalize_semantic_selection(
+        self,
+        *,
+        user_message: str,
+        tools: List["ToolDefinition"],
+        stage: Optional[ConversationStage],
+        cache: Optional[Any],
+        cache_key: Optional[str],
+    ) -> List["ToolDefinition"]:
+        """Apply fallback, post-processing, recording, persistence, and final filtering."""
+        is_fallback = False
+        if not tools:
+            logger.warning(
+                "Semantic selection returned 0 tools. "
+                "Using smart fallback: core tools + keyword matching."
+            )
+            tools = self._get_fallback_tools(user_message)
+            is_fallback = True
+
+        tools = self._post_processor.apply(
+            tools,
+            context=self._build_semantic_postprocess_context(
+                user_message=user_message,
+                stage=stage,
+            ),
+            should_use_edge_filter=self._should_use_edge_for_tools(),
+            apply_edge_filter=self._apply_edge_model_filter,
+            cap_mcp_tools=self._cap_mcp_tools,
+            selection_scores=(
+                self.semantic_selector.get_last_selection_scores()
+                if self.semantic_selector is not None
+                else None
+            ),
+            promote_schema_stubs=promote_high_confidence_stubs,
+            enforce_token_budget=_enforce_token_budget,
+        )
+
+        self._selection_recorder.record_result(
+            is_fallback=is_fallback,
+            num_tools=len(tools),
+        )
+        tools = self._apply_vertical_strategy(tools, user_message)
+
+        if cache_key and cache is not None and self._tool_selection_cache_enabled:
+            try:
+                if self._semantic_cache_adapter.store_cached_tools(
+                    cache,
+                    cache_key,
+                    tools,
+                    ttl=self._tool_selection_cache_ttl,
+                ):
+                    logger.debug(f"Tool selection cached: {len(tools)} tools")
+            except Exception as e:
+                logger.warning(f"Failed to cache tool selection: {e}")
+
+        return self._filter_by_enabled(tools)
+
     async def select_semantic(
         self,
         user_message: str,
@@ -1951,131 +2114,29 @@ class ToolSelector(ModeAwareMixin):
         if not self.semantic_selector:
             return self.select_keywords(user_message, planned_tools=planned_tools)
 
-        # Check cache for tool selection results
-        # Cache key depends on: message, conversation context, stage, depth
         stage = self.conversation_state.get_stage() if self.conversation_state else None
-        cache_key = None
-        cache = None
-        if self._tool_selection_cache_enabled:
-            cache = self._init_tool_selection_cache()
-            if cache:
-                cache_key = self._semantic_cache_key_builder.build(
-                    user_message=user_message,
-                    conversation_history=conversation_history,
-                    conversation_depth=conversation_depth,
-                    stage=stage,
-                )
-
-                try:
-                    cached_tools = self._semantic_cache_adapter.load_cached_tools(cache, cache_key)
-                    if cached_tools:
-                        logger.debug(f"Tool selection cache HIT: {len(cached_tools)} tools")
-                        return cached_tools
-                except Exception as e:
-                    logger.warning(f"Failed to reconstruct cached tools: {e}")
-
-        # Initialize embeddings on first call
-        if not self._embeddings_initialized:
-            logger.info("Initializing tool embeddings (one-time operation)...")
-            await self.semantic_selector.initialize_tool_embeddings(self.tools)
-            self._embeddings_initialized = True
-
-        # Get adaptive threshold and max_tools
-        threshold, max_tools = self.get_adaptive_threshold(user_message, conversation_depth)
-
-        # Select tools with context awareness
-        tools = await self.semantic_selector.select_relevant_tools_with_context(
+        cached_tools, cache_key, cache = self._load_semantic_cached_selection(
             user_message=user_message,
-            tools=self.tools,
             conversation_history=conversation_history,
-            max_tools=max_tools,
-            similarity_threshold=threshold,
+            conversation_depth=conversation_depth,
+            stage=stage,
         )
+        if cached_tools:
+            return cached_tools
 
-        tools = self._semantic_assembler.assemble(
-            tools,
-            keyword_tools=self.select_keywords(
-                user_message,
-                planned_tools=planned_tools,
-                _record=False,
-            ),
-            all_tools=self.tools.list_tools(),
-            context=SemanticToolSelectionAssemblyContext(
-                max_tools=max_tools,
-                include_web_tools=any(kw in user_message.lower() for kw in WEB_KEYWORDS),
-                web_tool_names=self._get_web_tools_cached(),
-            ),
+        tools, stage = await self._build_semantic_candidates(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            conversation_depth=conversation_depth,
+            planned_tools=planned_tools,
         )
-
-        # Stage-aware filtering (keep read-only tools for exploration/analysis)
-        stage = self.conversation_state.get_stage() if self.conversation_state else None
-        tools = self._filter_tools_for_stage(tools, stage)
-
-        logger.debug(
-            f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}"
+        return self._finalize_semantic_selection(
+            user_message=user_message,
+            tools=tools,
+            stage=stage,
+            cache=cache,
+            cache_key=cache_key,
         )
-
-        # Smart fallback if 0 tools
-        is_fallback = False
-        if not tools:
-            logger.warning(
-                "Semantic selection returned 0 tools. "
-                "Using smart fallback: core tools + keyword matching."
-            )
-            tools = self._get_fallback_tools(user_message)
-            is_fallback = True
-
-        tools = self._post_processor.apply(
-            tools,
-            context=ToolSelectionPostProcessContext(
-                user_message=user_message,
-                stage=stage,
-                fallback_max_tools=self.fallback_max_tools,
-                max_mcp_tools=self.tool_selection_config.get("max_mcp_tools_per_turn", 12),
-                schema_promotion_threshold=self.tool_selection_config.get(
-                    "schema_promotion_threshold", 0.8
-                ),
-                max_schema_tokens=self.tool_selection_config.get("max_tool_schema_tokens", 0),
-            ),
-            should_use_edge_filter=self._should_use_edge_for_tools(),
-            apply_edge_filter=self._apply_edge_model_filter,
-            cap_mcp_tools=self._cap_mcp_tools,
-            selection_scores=(
-                self.semantic_selector.get_last_selection_scores()
-                if self.semantic_selector is not None
-                else None
-            ),
-            promote_schema_stubs=promote_high_confidence_stubs,
-            enforce_token_budget=_enforce_token_budget,
-        )
-
-        # Record selection AFTER final cap to reflect actual tool count
-        self._selection_recorder.record_result(
-            is_fallback=is_fallback,
-            num_tools=len(tools),
-        )
-
-        # Apply vertical-specific tool selection strategy (DIP/OCP)
-        # This allows verticals to prioritize/reorder tools based on domain knowledge
-        tools = self._apply_vertical_strategy(tools, user_message)
-
-        # Cache tool selection results for future lookups
-        if cache_key and cache is not None and self._tool_selection_cache_enabled:
-            try:
-                if self._semantic_cache_adapter.store_cached_tools(
-                    cache,
-                    cache_key,
-                    tools,
-                    ttl=self._tool_selection_cache_ttl,
-                ):
-                    logger.debug(f"Tool selection cached: {len(tools)} tools")
-            except Exception as e:
-                logger.warning(f"Failed to cache tool selection: {e}")
-
-        # Final gate: enforce enabled_tools restriction (framework-wide)
-        tools = self._filter_by_enabled(tools)
-
-        return tools
 
     def select_keywords(
         self,

@@ -69,12 +69,21 @@ Target state:
     construction and off inline semantic-vs-fallback result recording
   - added focused TDD for cache payload normalization and bounded keyword/web
     assembly while retaining surrounding selector/runtime regression
+- Phase 4 completed as an internal-only readability cleanup:
+  - kept orchestration ownership in `ToolSelector` rather than introducing a
+    new runtime coordinator
+  - split `select_semantic(...)` into private helper methods for cache
+    loading, one-time embedding initialization, semantic candidate building,
+    post-process context construction, and finalization
+  - added focused helper tests plus surrounding selector/runtime regression to
+    confirm no behavioral change while improving local readability
 
 ## Next Resume Point
 
-- Phase 3 is complete. The next optional seam is Phase 4:
-  - decide whether `select_semantic(...)` should keep orchestration ownership
-    or whether cache initialization, semantic selection execution, and final
-    enabled-tool filtering should move into a dedicated runtime coordinator
-  - only take that step if the extra indirection is justified by new behavior,
-    because the remaining body is now materially smaller and mostly orchestration
+- Phase 4 is complete. The next optional seam is Phase 5:
+  - revisit a dedicated semantic-selection runtime coordinator only if new
+    behavior arrives that justifies another DI/runtime surface, such as
+    multiple backend strategies, richer telemetry/retry orchestration, or
+    asynchronous warmup/prefetch flows
+  - otherwise treat the current `ToolSelector` orchestration split as the stop
+    point for this decomposition track
