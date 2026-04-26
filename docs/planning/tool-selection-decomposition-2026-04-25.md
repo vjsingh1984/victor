@@ -58,6 +58,9 @@ Target state:
     explicit web-tool assembly and stable deduplication
   - migrated `ToolSelector.select_semantic(...)` off inline cache payload
     reconstruction/serialization and off inline semantic-keyword-web assembly
+  - moved semantic cache read/write control flow onto
+    `SemanticToolSelectionCacheAdapter`, so `ToolSelector` no longer performs
+    direct cache payload `get` / `set` choreography
   - added focused TDD for cache payload normalization and bounded keyword/web
     assembly while retaining surrounding selector/runtime regression
 
@@ -70,5 +73,5 @@ Target state:
   3. decorate / budget
   4. cache / record
 - Remaining active seams:
-  - cache lookup/store control flow still lives in `ToolSelector`
   - final selection recording still lives in `ToolSelector`
+  - selection cache-key construction still lives in `ToolSelector`

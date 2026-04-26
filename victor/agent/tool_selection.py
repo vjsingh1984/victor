@@ -1950,12 +1950,12 @@ class ToolSelector(ModeAwareMixin):
         # Cache key depends on: message, conversation context, stage, depth
         stage = self.conversation_state.get_stage() if self.conversation_state else None
         cache_key = None
+        cache = None
         if self._tool_selection_cache_enabled:
             cache = self._init_tool_selection_cache()
             if cache:
                 from victor.storage.cache.generic_result_cache import (
                     _create_tool_selection_cache_key,
-                    ResultType,
                 )
 
                 cache_key = _create_tool_selection_cache_key(
@@ -1966,19 +1966,13 @@ class ToolSelector(ModeAwareMixin):
                     use_semantic=True,
                 )
 
-                cached_result = cache.get(ResultType.TOOL_SELECTION, cache_key)
-                if cached_result is not None:
-                    try:
-                        reconstructed_tools = self._semantic_cache_adapter.restore_tools(
-                            cached_result
-                        )
-                        if reconstructed_tools:
-                            logger.debug(
-                                f"Tool selection cache HIT: {len(reconstructed_tools)} tools"
-                            )
-                            return reconstructed_tools
-                    except Exception as e:
-                        logger.warning(f"Failed to reconstruct cached tools: {e}")
+                try:
+                    cached_tools = self._semantic_cache_adapter.load_cached_tools(cache, cache_key)
+                    if cached_tools:
+                        logger.debug(f"Tool selection cache HIT: {len(cached_tools)} tools")
+                        return cached_tools
+                except Exception as e:
+                    logger.warning(f"Failed to reconstruct cached tools: {e}")
 
         # Initialize embeddings on first call
         if not self._embeddings_initialized:
@@ -2066,21 +2060,17 @@ class ToolSelector(ModeAwareMixin):
         tools = self._apply_vertical_strategy(tools, user_message)
 
         # Cache tool selection results for future lookups
-        if cache_key and self._tool_selection_cache_enabled:
-            cache = self._init_tool_selection_cache()
-            if cache:
-                try:
-                    from victor.storage.cache.generic_result_cache import ResultType
-
-                    cache.set(
-                        ResultType.TOOL_SELECTION,
-                        cache_key,
-                        self._semantic_cache_adapter.serialize_tools(tools),
-                        ttl=self._tool_selection_cache_ttl,
-                    )
+        if cache_key and cache is not None and self._tool_selection_cache_enabled:
+            try:
+                if self._semantic_cache_adapter.store_cached_tools(
+                    cache,
+                    cache_key,
+                    tools,
+                    ttl=self._tool_selection_cache_ttl,
+                ):
                     logger.debug(f"Tool selection cached: {len(tools)} tools")
-                except Exception as e:
-                    logger.warning(f"Failed to cache tool selection: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to cache tool selection: {e}")
 
         # Final gate: enforce enabled_tools restriction (framework-wide)
         tools = self._filter_by_enabled(tools)
