@@ -159,55 +159,62 @@ class AgentRuntimeBootstrapper:
             name="workflow_facade",
         )
 
-        exploration_state_passed = (
-            orchestrator._factory.create_exploration_state_passed_coordinator()
-        )
-        system_prompt_state_passed = (
-            orchestrator._factory.create_system_prompt_state_passed_coordinator(
+        orchestrator._orchestration_facade = LazyRuntimeProxy(
+            factory=lambda: OrchestrationFacade(
+                interaction_runtime=orchestrator._interaction_runtime,
+                chat_service=getattr(orchestrator, "_chat_service", None),
+                get_chat_stream_runtime=orchestrator._get_service_streaming_runtime,
+                tool_service=getattr(orchestrator, "_tool_service", None),
+                session_service=getattr(orchestrator, "_session_service", None),
+                context_service=getattr(orchestrator, "_context_service", None),
+                provider_service=getattr(orchestrator, "_provider_service", None),
+                recovery_service=getattr(orchestrator, "_recovery_service", None),
+                get_chat_coordinator=lambda: getattr(
+                    orchestrator, "_deprecated_chat_coordinator", None
+                ),
+                get_tool_coordinator=lambda: getattr(
+                    orchestrator, "_deprecated_tool_coordinator", None
+                ),
+                get_session_coordinator=lambda: getattr(
+                    orchestrator, "_deprecated_session_coordinator", None
+                ),
+                turn_executor=orchestrator._turn_executor,
+                get_sync_chat_coordinator=lambda: _ensure_sync_chat_coordinator(
+                    orchestrator
+                ),
+                get_streaming_chat_coordinator=(
+                    lambda: _ensure_streaming_chat_coordinator(orchestrator)
+                ),
+                get_unified_chat_coordinator=lambda: _ensure_unified_chat_coordinator(
+                    orchestrator
+                ),
+                protocol_adapter=orchestrator._protocol_adapter,
+                streaming_handler=orchestrator._streaming_handler,
+                streaming_controller=orchestrator._streaming_controller,
+                streaming_coordinator=orchestrator._streaming_coordinator,
+                iteration_coordinator=getattr(orchestrator, "_iteration_coordinator", None),
                 task_analyzer=orchestrator._task_analyzer,
-            )
-        )
-        safety_state_passed = orchestrator._factory.create_safety_state_passed_coordinator()
-
-        orchestrator._orchestration_facade = OrchestrationFacade(
-            interaction_runtime=orchestrator._interaction_runtime,
-            chat_service=getattr(orchestrator, "_chat_service", None),
-            get_chat_stream_runtime=orchestrator._get_service_streaming_runtime,
-            tool_service=getattr(orchestrator, "_tool_service", None),
-            session_service=getattr(orchestrator, "_session_service", None),
-            context_service=getattr(orchestrator, "_context_service", None),
-            provider_service=getattr(orchestrator, "_provider_service", None),
-            recovery_service=getattr(orchestrator, "_recovery_service", None),
-            get_chat_coordinator=lambda: getattr(orchestrator, "_deprecated_chat_coordinator", None),
-            get_tool_coordinator=lambda: getattr(orchestrator, "_deprecated_tool_coordinator", None),
-            get_session_coordinator=lambda: getattr(
-                orchestrator, "_deprecated_session_coordinator", None
+                exploration_state_passed=(
+                    orchestrator._factory.create_exploration_state_passed_coordinator()
+                ),
+                system_prompt_state_passed=(
+                    orchestrator._factory.create_system_prompt_state_passed_coordinator(
+                        task_analyzer=orchestrator._task_analyzer,
+                    )
+                ),
+                safety_state_passed=(
+                    orchestrator._factory.create_safety_state_passed_coordinator()
+                ),
+                presentation=orchestrator._presentation,
+                vertical_integration_adapter=(orchestrator._vertical_integration_adapter),
+                vertical_context=orchestrator._vertical_context,
+                observability=orchestrator._observability,
+                execution_tracer=getattr(orchestrator, "_execution_tracer", None),
+                tool_call_tracer=getattr(orchestrator, "_tool_call_tracer", None),
+                intelligent_integration=orchestrator._intelligent_integration,
+                subagent_orchestrator=orchestrator._subagent_orchestrator,
             ),
-            turn_executor=orchestrator._turn_executor,
-            get_sync_chat_coordinator=lambda: _ensure_sync_chat_coordinator(orchestrator),
-            get_streaming_chat_coordinator=(
-                lambda: _ensure_streaming_chat_coordinator(orchestrator)
-            ),
-            get_unified_chat_coordinator=lambda: _ensure_unified_chat_coordinator(
-                orchestrator
-            ),
-            protocol_adapter=orchestrator._protocol_adapter,
-            streaming_handler=orchestrator._streaming_handler,
-            streaming_controller=orchestrator._streaming_controller,
-            streaming_coordinator=orchestrator._streaming_coordinator,
-            iteration_coordinator=getattr(orchestrator, "_iteration_coordinator", None),
-            task_analyzer=orchestrator._task_analyzer,
-            exploration_state_passed=exploration_state_passed,
-            system_prompt_state_passed=system_prompt_state_passed,
-            safety_state_passed=safety_state_passed,
-            presentation=orchestrator._presentation,
-            vertical_integration_adapter=(orchestrator._vertical_integration_adapter),
-            vertical_context=orchestrator._vertical_context,
-            observability=orchestrator._observability,
-            execution_tracer=getattr(orchestrator, "_execution_tracer", None),
-            tool_call_tracer=getattr(orchestrator, "_tool_call_tracer", None),
-            intelligent_integration=orchestrator._intelligent_integration,
-            subagent_orchestrator=orchestrator._subagent_orchestrator,
+            name="orchestration_facade",
         )
 
         logger.debug(

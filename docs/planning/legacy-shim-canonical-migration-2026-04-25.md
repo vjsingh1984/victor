@@ -102,6 +102,12 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   `resilience`, `workflow`) now bootstrap lazily via `LazyRuntimeProxy`,
   reducing eager runtime compatibility construction while keeping the public
   facade attributes available
+- `OrchestrationFacade` now also bootstraps lazily via `LazyRuntimeProxy`,
+  so state-passed compatibility surfaces and deprecated coordinator getters
+  are materialized only on demand instead of during orchestrator startup
+- remaining eager `ChatFacade` and `ToolFacade` construction is now isolated
+  to compatibility-only objects; internal runtime code no longer depends on
+  those facades as behavior owners
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -125,6 +131,6 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 
 Next resume point:
 - continue the broader compatibility cleanup around orchestrator and facade
-  shims by evaluating whether the remaining eager facades (`chat`, `tool`,
-  `orchestration`) can be reduced further without weakening their stronger
-  direct compatibility expectations
+  shims by evaluating whether the remaining eager `chat` and `tool` facades
+  can now be reduced safely, or whether they should remain as thin
+  compatibility-only objects with no further runtime ownership

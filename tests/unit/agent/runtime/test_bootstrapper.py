@@ -42,11 +42,13 @@ class TestAgentRuntimeBootstrapper:
         assert isinstance(orch._metrics_facade, LazyRuntimeProxy)
         assert isinstance(orch._resilience_facade, LazyRuntimeProxy)
         assert isinstance(orch._workflow_facade, LazyRuntimeProxy)
+        assert isinstance(orch._orchestration_facade, LazyRuntimeProxy)
         assert orch._provider_facade.initialized is False
         assert orch._session_facade.initialized is False
         assert orch._metrics_facade.initialized is False
         assert orch._resilience_facade.initialized is False
         assert orch._workflow_facade.initialized is False
+        assert orch._orchestration_facade.initialized is False
 
     def test_lazy_secondary_facades_materialize_from_current_orchestrator_state(self):
         orch = self._make_mock_orchestrator()
@@ -64,7 +66,7 @@ class TestAgentRuntimeBootstrapper:
         assert orch._resilience_facade.initialized is True
         assert orch._workflow_facade.initialized is True
 
-    def test_create_facades_uses_explicit_tool_coordinator_compat_getter(self):
+    def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(self):
         orch = self._make_mock_orchestrator()
         exploration_state_passed = MagicMock(name="exploration_state_passed")
         system_prompt_state_passed = MagicMock(name="system_prompt_state_passed")
@@ -79,6 +81,10 @@ class TestAgentRuntimeBootstrapper:
 
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
+
+            facade_cls.assert_not_called()
+
+            assert orch._orchestration_facade.streaming_handler is facade_cls.return_value.streaming_handler
 
         facade_cls.assert_called_once()
         kwargs = facade_cls.call_args.kwargs
@@ -129,6 +135,7 @@ class TestAgentRuntimeBootstrapper:
 
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
+            assert orch._orchestration_facade.chat_service is facade_cls.return_value.chat_service
 
             kwargs = facade_cls.call_args.kwargs
 
@@ -155,6 +162,7 @@ class TestAgentRuntimeBootstrapper:
             ) as ensure_unified,
         ):
             AgentRuntimeBootstrapper.create_facades(orch)
+            assert orch._orchestration_facade.chat_service is facade_cls.return_value.chat_service
 
             kwargs = facade_cls.call_args.kwargs
 
