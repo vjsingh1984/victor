@@ -544,15 +544,7 @@ class EvaluationHarness:
         import json
 
         checkpoint_data = {
-            "config": {
-                "benchmark": config.benchmark.value,
-                "model": config.model,
-                "max_tasks": config.max_tasks,
-                "timeout_per_task": config.timeout_per_task,
-                "max_turns": config.max_turns,
-                "parallel_tasks": config.parallel_tasks,
-                "dataset_metadata": config.dataset_metadata,
-            },
+            "config": config.to_artifact_config(),
             "start_time": start_time.isoformat(),
             "completed_task_ids": [r.task_id for r in completed_results],
             "remaining_task_ids": remaining_task_ids,
@@ -1243,13 +1235,7 @@ class EvaluationHarness:
 
         # Serialize result
         data = {
-            "config": {
-                "benchmark": result.config.benchmark.value,
-                "model": result.config.model,
-                "max_tasks": result.config.max_tasks,
-                "timeout_per_task": result.config.timeout_per_task,
-                "dataset_metadata": result.config.dataset_metadata,
-            },
+            "config": result.config.to_artifact_config(),
             "summary": summary,
             "runtime_evaluation_feedback": runtime_feedback_payload,
             "start_time": result.start_time.isoformat() if result.start_time else None,

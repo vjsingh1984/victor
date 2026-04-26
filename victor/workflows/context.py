@@ -183,9 +183,7 @@ class WorkflowResult:
             "total_tool_calls": self.total_tool_calls,
             "error": self.error,
             "outputs": self.context.get_outputs(),
-            "node_results": {
-                nid: r.to_dict() for nid, r in self.context.node_results.items()
-            },
+            "node_results": {nid: r.to_dict() for nid, r in self.context.node_results.items()},
         }
 
     def get_output(self, node_id: str) -> Optional[Any]:

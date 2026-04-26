@@ -157,6 +157,7 @@ class SelfBenchmarkRunner:
         eval_config = EvaluationConfig(
             benchmark=config.benchmark_types[0],
             model=config.model,
+            provider=config.provider,
             max_tasks=config.max_tasks,
             timeout_per_task=config.timeout_per_task,
             parallel_tasks=config.parallel,

@@ -549,7 +549,9 @@ class CreditTrackingService:
                 f"over {calls} calls). Tighten tool-choice and handoff discipline."
             )
 
-        high_value = [(agent, stats) for agent, stats in reversed(ranked) if stats["avg_credit"] > 0.0]
+        high_value = [
+            (agent, stats) for agent, stats in reversed(ranked) if stats["avg_credit"] > 0.0
+        ]
         for agent_id, stats in high_value[:max_agents]:
             calls = int(stats["call_count"])
             lines.append(

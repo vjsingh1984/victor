@@ -137,9 +137,7 @@ class TestAsyncWrappers:
         assert "learner_count" in stats
 
     @pytest.mark.asyncio
-    async def test_create_prompt_rollout_experiment_async(
-        self, coordinator: RLCoordinator
-    ) -> None:
+    async def test_create_prompt_rollout_experiment_async(self, coordinator: RLCoordinator) -> None:
         """Test async prompt rollout creation offloads to thread pool."""
         with patch.object(
             coordinator,

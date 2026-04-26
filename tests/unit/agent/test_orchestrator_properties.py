@@ -294,9 +294,19 @@ class TestOrchestratorPropertyInstallation:
     @pytest.mark.parametrize(
         ("property_name", "backing_attr", "facade_attr", "facade_value_attr"),
         [
-            ("conversation_controller", "_conversation_controller", "_chat_facade", "conversation_controller"),
+            (
+                "conversation_controller",
+                "_conversation_controller",
+                "_chat_facade",
+                "conversation_controller",
+            ),
             ("tool_pipeline", "_tool_pipeline", "_tool_facade", "tool_pipeline"),
-            ("streaming_handler", "_streaming_handler", "_orchestration_facade", "streaming_handler"),
+            (
+                "streaming_handler",
+                "_streaming_handler",
+                "_orchestration_facade",
+                "streaming_handler",
+            ),
             ("provider_manager", "_provider_manager", "_provider_facade", "provider_manager"),
             ("vertical_context", "_vertical_context", "_orchestration_facade", "vertical_context"),
         ],
@@ -337,7 +347,9 @@ class TestOrchestratorPropertyInstallation:
 
         orchestrator = object.__new__(AgentOrchestrator)
         orchestrator._session_ledger = MagicMock(name="old_ledger")
-        orchestrator._session_facade = SimpleNamespace(session_ledger=MagicMock(name="facade_ledger"))
+        orchestrator._session_facade = SimpleNamespace(
+            session_ledger=MagicMock(name="facade_ledger")
+        )
         new_value = MagicMock(name="new_ledger")
 
         orchestrator.session_ledger = new_value

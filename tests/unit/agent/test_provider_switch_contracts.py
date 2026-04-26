@@ -53,7 +53,9 @@ def test_factory_code_uses_provider_package_instead_of_root_switch_module():
         "from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator"
         not in orchestrator_factory_source
     )
-    assert "from victor.agent.provider import ProviderSwitchCoordinator" in orchestrator_factory_source
+    assert (
+        "from victor.agent.provider import ProviderSwitchCoordinator" in orchestrator_factory_source
+    )
 
 
 def test_provider_package_uses_canonical_switch_coordinator_module():

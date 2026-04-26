@@ -423,7 +423,4 @@ class TestFrameworkExports:
             create_prompt_rollout_experiment_async as ExportedCreatePromptRolloutExperimentAsync,
         )
 
-        assert (
-            ExportedCreatePromptRolloutExperimentAsync
-            is create_prompt_rollout_experiment_async
-        )
+        assert ExportedCreatePromptRolloutExperimentAsync is create_prompt_rollout_experiment_async

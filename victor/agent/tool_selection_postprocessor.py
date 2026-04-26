@@ -28,19 +28,24 @@ class ToolSelectionPostProcessor:
         context: ToolSelectionPostProcessContext,
         should_use_edge_filter: bool,
         cap_mcp_tools: Callable[[list[ToolDefinition], int], list[ToolDefinition]],
-        apply_edge_filter: Callable[
-            [list[ToolDefinition], str, ConversationStage | None],
-            list[ToolDefinition],
-        ]
-        | None = None,
+        apply_edge_filter: (
+            Callable[
+                [list[ToolDefinition], str, ConversationStage | None],
+                list[ToolDefinition],
+            ]
+            | None
+        ) = None,
         selection_scores: Mapping[str, float] | None = None,
-        promote_schema_stubs: Callable[
-            [list[ToolDefinition], Mapping[str, float], float],
-            list[ToolDefinition],
-        ]
-        | None = None,
-        enforce_token_budget: Callable[[list[ToolDefinition], int], list[ToolDefinition]]
-        | None = None,
+        promote_schema_stubs: (
+            Callable[
+                [list[ToolDefinition], Mapping[str, float], float],
+                list[ToolDefinition],
+            ]
+            | None
+        ) = None,
+        enforce_token_budget: (
+            Callable[[list[ToolDefinition], int], list[ToolDefinition]] | None
+        ) = None,
     ) -> list[ToolDefinition]:
         result = list(tools)
 

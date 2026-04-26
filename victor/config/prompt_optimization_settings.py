@@ -25,7 +25,6 @@ from pydantic import BaseModel, Field
 
 from victor.config.gepa_settings import GEPASettings
 
-
 # Preserve current behavior while making strategy resolution config-driven.
 BUILTIN_SECTION_STRATEGIES: Dict[str, List[str]] = {
     "FEW_SHOT_EXAMPLES": ["miprov2"],

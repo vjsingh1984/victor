@@ -143,9 +143,7 @@ class PrefPOStrategy:
             return ("current", "Existing prompt already covers dominant failures.")
 
         feedback_lines = [
-            line
-            for line in dominant_lines
-            if line.strip() and line.strip() not in current_text
+            line for line in dominant_lines if line.strip() and line.strip() not in current_text
         ]
         feedback = "Prefer challenger because it adds:\n" + "\n".join(feedback_lines)
         return ("challenger", feedback)
@@ -153,7 +151,9 @@ class PrefPOStrategy:
     def _rewrite_loser(self, losing_text: str, feedback: str, section_name: str) -> str:
         """Rewrite the losing prompt by merging the judge's missing guidance."""
         del section_name
-        additions = [line.strip() for line in feedback.splitlines() if line.strip().startswith("- ")]
+        additions = [
+            line.strip() for line in feedback.splitlines() if line.strip().startswith("- ")
+        ]
         if not additions:
             return losing_text
 

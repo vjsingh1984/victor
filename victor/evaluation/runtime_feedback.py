@@ -171,6 +171,10 @@ def _extract_task_entries(
         config = {
             "benchmark": result_or_payload.config.benchmark.value,
             "model": result_or_payload.config.model,
+            "provider": result_or_payload.config.provider,
+            "prompt_candidate_hash": result_or_payload.config.prompt_candidate_hash,
+            "section_name": result_or_payload.config.prompt_section_name,
+            "prompt_section_name": result_or_payload.config.prompt_section_name,
             "dataset_metadata": dict(result_or_payload.config.dataset_metadata),
         }
         return tasks, result_or_payload.get_metrics(), config
@@ -250,9 +254,13 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             "validated_evaluation_truth": True,
             "truth_validation_mode": "benchmark",
             "benchmark": config.get("benchmark"),
+            "provider": config.get("provider"),
             "model": config.get("model"),
+            "prompt_candidate_hash": config.get("prompt_candidate_hash"),
+            "section_name": config.get("section_name") or config.get("prompt_section_name"),
             "scope": RuntimeEvaluationFeedbackScope(
                 benchmark=_coerce_optional_text(config.get("benchmark")),
+                provider=_coerce_optional_text(config.get("provider")),
                 model=_coerce_optional_text(config.get("model")),
             ).to_dict(),
             "dataset_metadata": dict(config.get("dataset_metadata") or {}),
@@ -638,6 +646,13 @@ def _build_coverage_validated_session_feedback_payload(
     )
     provider = _coerce_optional_text(_extract_value(evaluation_result, "provider"))
     model = _coerce_optional_text(_extract_value(evaluation_result, "model"))
+    prompt_candidate_hash = _coerce_optional_text(
+        _extract_value(evaluation_result, "prompt_candidate_hash")
+    )
+    section_name = _coerce_optional_text(
+        _extract_value(evaluation_result, "section_name")
+        or _extract_value(evaluation_result, "prompt_section_name")
+    )
     project = _coerce_optional_text(_extract_value(evaluation_result, "project"))
     task_id = _coerce_optional_text(_extract_value(evaluation_result, "task_id"))
     failure_category = _extract_value(evaluation_result, "failure_category")
@@ -666,7 +681,10 @@ def _build_coverage_validated_session_feedback_payload(
     payload_metadata.update(
         {
             "benchmark": benchmark,
+            "provider": provider,
             "model": model,
+            "prompt_candidate_hash": prompt_candidate_hash,
+            "section_name": section_name,
             "dataset_metadata": dict(dataset_metadata),
             "truth_alignment_rate": round(truth_alignment_rate, 4),
             "task_count": task_count,

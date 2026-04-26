@@ -2,7 +2,9 @@ from victor.providers.base import ToolDefinition
 
 
 def _tool(name: str, description: str = "") -> ToolDefinition:
-    return ToolDefinition(name=name, description=description or f"{name} description", parameters={})
+    return ToolDefinition(
+        name=name, description=description or f"{name} description", parameters={}
+    )
 
 
 def test_cache_adapter_restores_tools_from_cached_payload():

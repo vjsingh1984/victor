@@ -68,8 +68,12 @@ This document outlines the design for Priority 4 (Learning from Execution), whic
 1. **GEPA (GEPAStrategy - Default)**: Trace-reflection prompt evolution
    - Thompson Sampling for candidate serving
    - Provider-scoped Pareto frontier bookkeeping
-   - Per-instance frontier evidence now comes from runtime outcomes and only from
-     benchmark artifacts that explicitly identify the evaluated prompt candidate
+   - Per-instance frontier evidence now comes from runtime outcomes and from
+     evaluation artifacts that serialize canonical prompt identity metadata:
+     `provider`, `prompt_candidate_hash`, and `section_name`
+   - The same identity schema should be reused by benchmark/session truth
+     artifacts, with null values when a normal session is not evaluating a
+     specific prompt candidate
    - Semantic trace zones inspired by PRiME
    - 13 failure categories with corrective hints
    - Session-aligned credit enrichment from runtime tool execution

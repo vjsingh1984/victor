@@ -655,6 +655,28 @@ class TestBenchmarkToolUsageMetrics:
             "version": "2026.04",
         }
 
+    def test_save_results_persists_prompt_optimization_identity(self, tmp_path):
+        """Saved results should preserve prompt candidate identity for frontier seeding."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="test",
+                provider="anthropic",
+                prompt_candidate_hash="cand-123",
+                prompt_section_name="GROUNDING_RULES",
+            ),
+            task_results=[],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["config"]["provider"] == "anthropic"
+        assert loaded["config"]["prompt_candidate_hash"] == "cand-123"
+        assert loaded["config"]["section_name"] == "GROUNDING_RULES"
+        assert loaded["config"]["prompt_section_name"] == "GROUNDING_RULES"
+
     def test_save_results_persists_runtime_evaluation_feedback(self, tmp_path):
         """Saved results should emit canonical runtime-calibration feedback artifacts."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)

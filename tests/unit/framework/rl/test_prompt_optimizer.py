@@ -675,7 +675,9 @@ class TestPromptOptimizerLearner:
         with patch("victor.config.settings.get_settings", return_value=settings):
             learner = PromptOptimizerLearner(name="test", db_connection=db)
 
-        few_shot_names = [type(s).__name__ for s in learner._strategies_for_section("FEW_SHOT_EXAMPLES")]
+        few_shot_names = [
+            type(s).__name__ for s in learner._strategies_for_section("FEW_SHOT_EXAMPLES")
+        ]
         asi_names = [
             type(s).__name__
             for s in learner._strategies_for_section("ASI_TOOL_EFFECTIVENESS_GUIDANCE")
@@ -981,7 +983,9 @@ class TestPromptOptimizerLearner:
         service = CreditTrackingService()
         service.record_tool_result("grep", True, 50.0, session_id="session-target")
         service.assign_turn_credit(agent_id="researcher_1")
-        service.record_tool_result("edit", False, 100.0, error="Mismatch", session_id="session-other")
+        service.record_tool_result(
+            "edit", False, 100.0, error="Mismatch", session_id="session-other"
+        )
         service.assign_turn_credit(agent_id="executor_1")
 
         container = ServiceContainer()

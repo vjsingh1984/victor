@@ -7,6 +7,7 @@ import pytest
 from victor.agent.decisions.schemas import DecisionType
 from victor.agent.services.runtime_intelligence import (
     ClarificationDecision,
+    PromptOptimizationIdentity,
     PromptOptimizationBundle,
     RuntimeIntelligenceService,
 )
@@ -79,6 +80,107 @@ def test_get_prompt_optimization_bundle_collects_optimizer_outputs():
         few_shots="Example few shot",
         failure_hint="Check the file path before editing.",
     )
+
+
+def test_get_prompt_optimization_bundle_tracks_canonical_prompt_identity():
+    optimizer = MagicMock()
+    optimizer.get_evolved_section_payloads.return_value = [
+        {
+            "text": "Prefer read over cat.",
+            "provider": "anthropic",
+            "prompt_candidate_hash": "cand-123",
+            "section_name": "GROUNDING_RULES",
+            "prompt_section_name": "GROUNDING_RULES",
+            "strategy_name": "gepa",
+            "source": "candidate",
+        }
+    ]
+    optimizer.get_few_shot_payload.return_value = {
+        "text": "Example few shot",
+        "provider": "anthropic",
+        "prompt_candidate_hash": None,
+        "section_name": "FEW_SHOT_EXAMPLES",
+        "prompt_section_name": "FEW_SHOT_EXAMPLES",
+        "strategy_name": "miprov2",
+        "source": "query_aware_strategy",
+    }
+    optimizer.get_failure_hint.return_value = None
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=optimizer,
+        decision_service=None,
+    )
+    turn_context = SimpleNamespace(
+        provider_name="anthropic",
+        model="claude-sonnet",
+        task_type="edit",
+        last_turn_failed=False,
+    )
+
+    bundle = service.get_prompt_optimization_bundle("Fix the bug", turn_context)
+
+    assert bundle == PromptOptimizationBundle(
+        evolved_sections=["Prefer read over cat."],
+        few_shots="Example few shot",
+        failure_hint=None,
+        identities=[
+            PromptOptimizationIdentity(
+                provider="anthropic",
+                prompt_candidate_hash="cand-123",
+                section_name="GROUNDING_RULES",
+                prompt_section_name="GROUNDING_RULES",
+                strategy_name="gepa",
+                source="candidate",
+            ),
+            PromptOptimizationIdentity(
+                provider="anthropic",
+                prompt_candidate_hash=None,
+                section_name="FEW_SHOT_EXAMPLES",
+                prompt_section_name="FEW_SHOT_EXAMPLES",
+                strategy_name="miprov2",
+                source="query_aware_strategy",
+            ),
+        ],
+    )
+    assert bundle.to_session_metadata() == {
+        "entries": [
+            {
+                "provider": "anthropic",
+                "prompt_candidate_hash": "cand-123",
+                "section_name": "GROUNDING_RULES",
+                "prompt_section_name": "GROUNDING_RULES",
+                "strategy_name": "gepa",
+                "source": "candidate",
+            },
+            {
+                "provider": "anthropic",
+                "prompt_candidate_hash": None,
+                "section_name": "FEW_SHOT_EXAMPLES",
+                "prompt_section_name": "FEW_SHOT_EXAMPLES",
+                "strategy_name": "miprov2",
+                "source": "query_aware_strategy",
+            },
+        ],
+        "by_section": {
+            "GROUNDING_RULES": {
+                "provider": "anthropic",
+                "prompt_candidate_hash": "cand-123",
+                "section_name": "GROUNDING_RULES",
+                "prompt_section_name": "GROUNDING_RULES",
+                "strategy_name": "gepa",
+                "source": "candidate",
+            },
+            "FEW_SHOT_EXAMPLES": {
+                "provider": "anthropic",
+                "prompt_candidate_hash": None,
+                "section_name": "FEW_SHOT_EXAMPLES",
+                "prompt_section_name": "FEW_SHOT_EXAMPLES",
+                "strategy_name": "miprov2",
+                "source": "query_aware_strategy",
+            },
+        },
+    }
 
 
 def test_reset_decision_budget_delegates_to_service():

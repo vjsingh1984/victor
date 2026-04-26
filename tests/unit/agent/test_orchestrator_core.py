@@ -2528,9 +2528,7 @@ class TestGetCurrentProviderInfo:
         """Canonical provider info should not consult the deprecated coordinator."""
         orchestrator._deprecated_provider_coordinator = MagicMock()
         orchestrator._deprecated_provider_coordinator.get_rate_limit_stats.side_effect = (
-            AssertionError(
-            "legacy coordinator stats path should not be used"
-            )
+            AssertionError("legacy coordinator stats path should not be used")
         )
         orchestrator._provider_service.get_rate_limit_stats.return_value = {
             "rate_limits_hit": 7,
@@ -4480,7 +4478,9 @@ class TestHealthMonitoring:
         orchestrator._deprecated_provider_coordinator.stop_health_monitoring.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_start_health_monitoring_returns_false_without_provider_service(self, orchestrator):
+    async def test_start_health_monitoring_returns_false_without_provider_service(
+        self, orchestrator
+    ):
         """Unavailable canonical service should report failure instead of silent success."""
         orchestrator._provider_service = None
 
@@ -4489,7 +4489,9 @@ class TestHealthMonitoring:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_stop_health_monitoring_returns_false_without_provider_service(self, orchestrator):
+    async def test_stop_health_monitoring_returns_false_without_provider_service(
+        self, orchestrator
+    ):
         """Unavailable canonical service should report failure instead of silent success."""
         orchestrator._provider_service = None
 

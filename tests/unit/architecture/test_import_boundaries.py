@@ -307,10 +307,7 @@ class TestCanonicalTypeImports:
                 stripped = line.strip()
                 if stripped.startswith("#"):
                     continue
-                if (
-                    "from victor.core.types import" in line
-                    or "import victor.core.types" in line
-                ):
+                if "from victor.core.types import" in line or "import victor.core.types" in line:
                     errors.append(
                         f"{py_file.relative_to(victor_path)}:{i} imports from "
                         "victor.core.types, should use victor.core.vertical_types "
@@ -339,10 +336,7 @@ class TestCanonicalTypeImports:
                 stripped = line.strip()
                 if stripped.startswith("#"):
                     continue
-                if (
-                    "from victor.core.types import" in line
-                    or "import victor.core.types" in line
-                ):
+                if "from victor.core.types import" in line or "import victor.core.types" in line:
                     errors.append(
                         f"{py_file.relative_to(tests_path)}:{i} imports from "
                         "victor.core.types, should use victor.core.vertical_types "

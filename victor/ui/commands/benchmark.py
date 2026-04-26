@@ -415,6 +415,16 @@ def run_benchmark(
     provider: Optional[str] = typer.Option(
         None, "--provider", help="Override provider (e.g., deepseek, openai, xai)"
     ),
+    prompt_candidate_hash: Optional[str] = typer.Option(
+        None,
+        "--prompt-candidate-hash",
+        help="Attach an evaluated prompt candidate hash to saved benchmark artifacts.",
+    ),
+    prompt_section: Optional[str] = typer.Option(
+        None,
+        "--prompt-section",
+        help="Attach the evaluated prompt section name to saved benchmark artifacts.",
+    ),
     log_level: Optional[str] = typer.Option(
         None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
     ),
@@ -565,6 +575,9 @@ def run_benchmark(
     config = EvaluationConfig(
         benchmark=bench_type,
         model=effective_model,
+        provider=provider,
+        prompt_candidate_hash=prompt_candidate_hash,
+        prompt_section_name=prompt_section,
         max_tasks=effective_max_tasks,
         timeout_per_task=timeout,
         max_turns=max_turns,
@@ -576,6 +589,12 @@ def run_benchmark(
 
     console.print(f"\n[bold cyan]Running {benchmark} benchmark[/]")
     console.print(f"Model: {config.model}")
+    if config.provider:
+        console.print(f"Provider: {config.provider}")
+    if config.prompt_section_name:
+        console.print(f"Prompt Section: {config.prompt_section_name}")
+    if config.prompt_candidate_hash:
+        console.print(f"Prompt Candidate: {config.prompt_candidate_hash}")
     if max_tasks:
         console.print(f"Max tasks: {max_tasks}")
     if dataset_path is not None:
@@ -712,9 +731,15 @@ def run_benchmark(
 
     # Save results if output specified
     if output:
+        artifact_config = config.to_artifact_config()
         output_data = {
             "benchmark": benchmark,
             "model": config.model,
+            "provider": config.provider,
+            "prompt_candidate_hash": config.prompt_candidate_hash,
+            "section_name": config.prompt_section_name,
+            "prompt_section_name": config.prompt_section_name,
+            "config": artifact_config,
             "timestamp": datetime.now().isoformat(),
             "dataset_metadata": config.dataset_metadata,
             "metrics": metrics,
@@ -956,6 +981,12 @@ async def _run_benchmark_async(
                     timeout=timeout,
                     config=adapter_config,
                 )
+
+            actual_provider = getattr(adapter.orchestrator, "provider_name", None) or getattr(
+                getattr(adapter.orchestrator, "provider", None), "name", None
+            )
+            if actual_provider:
+                config.provider = actual_provider
             readiness = _ensure_benchmark_runtime_tools(adapter)
             console.print(
                 "  [dim]Benchmark tools ready: " + ", ".join(readiness.enabled_tools) + "[/]"

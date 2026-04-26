@@ -123,16 +123,13 @@ class TestBenchmarkRun:
                 TaskStatus,
             )
 
+            config = _kwargs["config"]
+            assert config.provider == "anthropic"
+            assert config.prompt_candidate_hash == "cand-123"
+            assert config.prompt_section_name == "GROUNDING_RULES"
+
             return EvaluationResult(
-                config=EvaluationConfig(
-                    benchmark=BenchmarkType.GUIDE,
-                    model="test-model",
-                    dataset_metadata={
-                        "source_name": "GUIDE Consortium",
-                        "version": "2026.04",
-                        "languages": ["python"],
-                    },
-                ),
+                config=config,
                 task_results=[
                     TaskResult(
                         task_id="guide-1",
@@ -158,6 +155,12 @@ class TestBenchmarkRun:
                     str(dataset),
                     "--model",
                     "test-model",
+                    "--provider",
+                    "anthropic",
+                    "--prompt-candidate-hash",
+                    "cand-123",
+                    "--prompt-section",
+                    "GROUNDING_RULES",
                     "--output",
                     str(output),
                 ],
@@ -170,6 +173,9 @@ class TestBenchmarkRun:
         assert "Failure: test_failure" in result.stdout
         saved = json.loads(output.read_text())
         assert saved["dataset_metadata"]["source_name"] == "GUIDE Consortium"
+        assert saved["provider"] == "anthropic"
+        assert saved["prompt_candidate_hash"] == "cand-123"
+        assert saved["section_name"] == "GROUNDING_RULES"
         assert saved["failure_examples"]["test_failure"]["sample_task_ids"] == ["guide-1"]
 
     def test_run_shows_help(self):

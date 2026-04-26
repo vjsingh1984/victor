@@ -183,15 +183,11 @@ class AgentRuntimeBootstrapper:
                     orchestrator, "_deprecated_session_coordinator", None
                 ),
                 turn_executor=orchestrator._turn_executor,
-                get_sync_chat_coordinator=lambda: _ensure_sync_chat_coordinator(
-                    orchestrator
-                ),
+                get_sync_chat_coordinator=lambda: _ensure_sync_chat_coordinator(orchestrator),
                 get_streaming_chat_coordinator=(
                     lambda: _ensure_streaming_chat_coordinator(orchestrator)
                 ),
-                get_unified_chat_coordinator=lambda: _ensure_unified_chat_coordinator(
-                    orchestrator
-                ),
+                get_unified_chat_coordinator=lambda: _ensure_unified_chat_coordinator(orchestrator),
                 protocol_adapter=orchestrator._protocol_adapter,
                 streaming_handler=orchestrator._streaming_handler,
                 streaming_controller=orchestrator._streaming_controller,

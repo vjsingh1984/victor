@@ -86,7 +86,9 @@ class TestAgentRuntimeBootstrapper:
 
         with patch("victor.agent.facades.ProviderFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
-            assert orch._provider_facade.provider_manager is facade_cls.return_value.provider_manager
+            assert (
+                orch._provider_facade.provider_manager is facade_cls.return_value.provider_manager
+            )
 
         kwargs = facade_cls.call_args.kwargs
         assert kwargs["provider_runtime"] is orch._provider_runtime
@@ -111,7 +113,10 @@ class TestAgentRuntimeBootstrapper:
 
             facade_cls.assert_not_called()
 
-            assert orch._orchestration_facade.streaming_handler is facade_cls.return_value.streaming_handler
+            assert (
+                orch._orchestration_facade.streaming_handler
+                is facade_cls.return_value.streaming_handler
+            )
 
         facade_cls.assert_called_once()
         kwargs = facade_cls.call_args.kwargs

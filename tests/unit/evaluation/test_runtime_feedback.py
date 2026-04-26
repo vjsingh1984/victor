@@ -27,7 +27,13 @@ from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
     payload = {
-        "config": {"benchmark": "dr3_eval", "model": "test-model"},
+        "config": {
+            "benchmark": "dr3_eval",
+            "model": "test-model",
+            "provider": "anthropic",
+            "prompt_candidate_hash": "cand-123",
+            "section_name": "GROUNDING_RULES",
+        },
         "summary": {
             "truth_alignment_rate": 0.8,
             "overconfidence_rate": 0.4,
@@ -64,10 +70,13 @@ def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
     assert feedback.metadata["source"] == "benchmark_truth_feedback"
     assert feedback.metadata["benchmark"] == "dr3_eval"
     assert feedback.metadata["model"] == "test-model"
+    assert feedback.metadata["prompt_candidate_hash"] == "cand-123"
+    assert feedback.metadata["section_name"] == "GROUNDING_RULES"
     assert feedback.metadata["truth_alignment_rate"] == pytest.approx(0.8)
     assert feedback.metadata["overconfidence_rate"] == pytest.approx(0.4)
     assert feedback.metadata["underconfidence_rate"] == pytest.approx(0.0)
     assert feedback.metadata["task_count"] == 2
+    assert feedback.metadata["scope"]["provider"] == "anthropic"
 
 
 def test_save_and_load_runtime_feedback_round_trip(tmp_path):

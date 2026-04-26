@@ -654,7 +654,7 @@ class GEPAStrategy:
 
         merged_lines: List[str] = []
         seen = set()
-        for line in (candidate_a.splitlines() + candidate_b.splitlines()):
+        for line in candidate_a.splitlines() + candidate_b.splitlines():
             normalized = line.strip()
             if not normalized or normalized in seen:
                 continue
@@ -959,13 +959,18 @@ class PromptOptimizerLearner(BaseLearner):
         """Derive a stable layered strategy-chain label for observability."""
         if not strategies:
             return "gepa"
-        parts = [PromptOptimizerLearner._normalize_strategy_class_name(strategy) for strategy in strategies]
+        parts = [
+            PromptOptimizerLearner._normalize_strategy_class_name(strategy)
+            for strategy in strategies
+        ]
         return "+".join(parts) or "gepa"
 
     @staticmethod
     def _requires_benchmark_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> bool:
         """Whether a strategy chain should remain shadow-only until benchmark approval."""
-        return any(bool(getattr(strategy, "requires_benchmark_gate", False)) for strategy in strategies)
+        return any(
+            bool(getattr(strategy, "requires_benchmark_gate", False)) for strategy in strategies
+        )
 
     @staticmethod
     def _servable_candidates(candidates: List[PromptCandidate]) -> List[PromptCandidate]:
@@ -1052,7 +1057,9 @@ class PromptOptimizerLearner(BaseLearner):
             frontier = self._pareto_frontiers.get(frontier_key)
             if frontier:
                 frontier_hashes = {
-                    e.text_hash for e in frontier.get_frontier() if getattr(e, "instance_scores", {})
+                    e.text_hash
+                    for e in frontier.get_frontier()
+                    if getattr(e, "instance_scores", {})
                 }
                 if frontier_hashes:
                     frontier_candidates = [c for c in candidates if c.text_hash in frontier_hashes]
@@ -1392,7 +1399,11 @@ class PromptOptimizerLearner(BaseLearner):
 
         if control_hash:
             control = next(
-                (c for c in candidates if c.text_hash == control_hash and c.text_hash != treatment_hash),
+                (
+                    c
+                    for c in candidates
+                    if c.text_hash == control_hash and c.text_hash != treatment_hash
+                ),
                 None,
             )
         else:
@@ -1406,7 +1417,12 @@ class PromptOptimizerLearner(BaseLearner):
             if control is None and approved_controls:
                 control = max(
                     approved_controls,
-                    key=lambda c: (c.benchmark_score, c.benchmark_runs, c.sample_count, c.generation),
+                    key=lambda c: (
+                        c.benchmark_score,
+                        c.benchmark_runs,
+                        c.sample_count,
+                        c.generation,
+                    ),
                 )
         if control is None:
             raise ValueError("no approved control candidate available for rollout")
@@ -1540,7 +1556,9 @@ class PromptOptimizerLearner(BaseLearner):
             generation=candidate.generation,
             instance_scores=candidate.instance_scores,
         )
-        frontier.update_instance_score(candidate.text_hash, instance_id, self._compute_reward(outcome))
+        frontier.update_instance_score(
+            candidate.text_hash, instance_id, self._compute_reward(outcome)
+        )
         self._sync_pareto_state(key)
 
     @staticmethod
@@ -1548,9 +1566,7 @@ class PromptOptimizerLearner(BaseLearner):
         """Build a stable runtime instance identifier for Pareto tracking."""
         metadata = outcome.metadata or {}
         raw_instance = (
-            metadata.get("task_id")
-            or metadata.get("instance_id")
-            or metadata.get("session_id")
+            metadata.get("task_id") or metadata.get("instance_id") or metadata.get("session_id")
         )
         if not raw_instance:
             return None

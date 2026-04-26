@@ -96,15 +96,18 @@ async def test_switch_model_delegates_to_canonical_async_delegate(
 async def test_legacy_helpers_delegate_to_canonical_methods(mock_manager, mock_settings):
     coordinator = ProviderCoordinator(mock_manager, mock_settings)
 
-    with patch.object(
-        CanonicalProviderCoordinator,
-        "get_current_info",
-        return_value={"provider": "openai", "model": "gpt-4.1"},
-    ) as get_current_info, patch.object(
-        CanonicalProviderCoordinator,
-        "get_health",
-        new=AsyncMock(return_value={"healthy": True, "provider": "openai"}),
-    ) as get_health:
+    with (
+        patch.object(
+            CanonicalProviderCoordinator,
+            "get_current_info",
+            return_value={"provider": "openai", "model": "gpt-4.1"},
+        ) as get_current_info,
+        patch.object(
+            CanonicalProviderCoordinator,
+            "get_health",
+            new=AsyncMock(return_value={"healthy": True, "provider": "openai"}),
+        ) as get_health,
+    ):
         info = coordinator.get_current_provider_info()
         health = await coordinator.get_provider_health()
 

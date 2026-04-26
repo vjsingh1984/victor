@@ -234,6 +234,7 @@ class TestComputeRegistryBoundary:
             get_compute_handler,
             list_compute_handlers,
         )
+
         assert callable(register_compute_handler)
         assert callable(get_compute_handler)
         assert callable(list_compute_handlers)
@@ -241,6 +242,7 @@ class TestComputeRegistryBoundary:
 
     def test_executor_reexports_from_compute_registry(self):
         from victor.workflows import compute_registry, executor
+
         assert executor.register_compute_handler is compute_registry.register_compute_handler
         assert executor.get_compute_handler is compute_registry.get_compute_handler
         assert executor.list_compute_handlers is compute_registry.list_compute_handlers
@@ -248,6 +250,7 @@ class TestComputeRegistryBoundary:
 
     def test_shared_registry_dict(self):
         from victor.workflows import compute_registry, executor
+
         assert executor._compute_handlers is compute_registry._compute_handlers
 
     def test_register_via_registry_visible_in_executor(self):
@@ -283,15 +286,9 @@ class TestComputeRegistryBoundary:
         assert "from victor.workflows.executor import register_compute_handler" not in source
 
     def test_framework_integration_uses_compute_registry(self):
-        source = open(
-            "victor/framework/framework_integration_registry_service.py"
-        ).read()
-        assert (
-            "from victor.workflows.compute_registry import register_compute_handler" in source
-        )
-        assert (
-            "from victor.workflows.executor import register_compute_handler" not in source
-        )
+        source = open("victor/framework/framework_integration_registry_service.py").read()
+        assert "from victor.workflows.compute_registry import register_compute_handler" in source
+        assert "from victor.workflows.executor import register_compute_handler" not in source
 
     def test_workflow_handlers_use_compute_registry(self):
         source = open("victor/workflows/handlers.py").read()
@@ -309,12 +306,14 @@ class TestWorkflowContextBoundary:
 
     def test_context_module_is_canonical_source(self):
         from victor.workflows.context import WorkflowContext, WorkflowResult, TemporalContext
+
         assert WorkflowContext is not None
         assert WorkflowResult is not None
         assert TemporalContext is not None
 
     def test_executor_reexports_from_context(self):
         from victor.workflows import context, executor
+
         assert executor.WorkflowContext is context.WorkflowContext
         assert executor.WorkflowResult is context.WorkflowResult
         assert executor.TemporalContext is context.TemporalContext
@@ -324,6 +323,7 @@ class TestWorkflowContextBoundary:
         import inspect
 
         import victor.workflows.executor as mod
+
         source = inspect.getsource(mod)
         tree = ast.parse(source)
         defined_classes = {node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}
@@ -347,6 +347,7 @@ class TestWorkflowContextBoundary:
 
     def test_context_module_exports_all_three(self):
         from victor.workflows.context import __all__
+
         assert "WorkflowContext" in __all__
         assert "WorkflowResult" in __all__
         assert "TemporalContext" in __all__
@@ -354,12 +355,14 @@ class TestWorkflowContextBoundary:
     def test_from_workflow_context_no_executor_import(self):
         import inspect
         from victor.workflows import context
+
         source = inspect.getsource(context.from_workflow_context)
         assert "from victor.workflows.executor import" not in source
 
     def test_to_workflow_context_no_executor_import(self):
         import inspect
         from victor.workflows import context
+
         source = inspect.getsource(context.to_workflow_context)
         assert "from victor.workflows.executor import" not in source
 
@@ -378,12 +381,18 @@ class TestWorkflowExecutorCompatibilityBoundaries:
     def test_yaml_coordinator_does_not_directly_import_legacy_executors(self):
         source = open("victor/framework/coordinators/yaml_coordinator.py").read()
         assert "from victor.workflows.executor import WorkflowExecutor" not in source
-        assert "from victor.workflows.streaming_executor import StreamingWorkflowExecutor" not in source
+        assert (
+            "from victor.workflows.streaming_executor import StreamingWorkflowExecutor"
+            not in source
+        )
 
     def test_workflow_engine_does_not_directly_import_legacy_executors(self):
         source = open("victor/framework/workflow_engine.py").read()
         assert "from victor.workflows.executor import WorkflowExecutor" not in source
-        assert "from victor.workflows.streaming_executor import StreamingWorkflowExecutor" not in source
+        assert (
+            "from victor.workflows.streaming_executor import StreamingWorkflowExecutor"
+            not in source
+        )
 
     def test_streaming_executor_does_not_subclass_legacy_workflow_executor(self):
         source = open("victor/workflows/streaming_executor.py").read()

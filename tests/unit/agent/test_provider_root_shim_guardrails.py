@@ -1,7 +1,6 @@
 import ast
 from pathlib import Path
 
-
 ALLOWED_IMPORT_FILES = {
     Path("tests/unit/agent/test_provider_coordinator_shim.py"),
     Path("tests/unit/agent/test_provider_switch_contracts.py"),
@@ -37,18 +36,16 @@ def _find_import_violations(module_name: str) -> list[str]:
 
 
 def test_root_provider_shim_modules_remain_compatibility_only():
-    provider_coordinator_violations = _find_import_violations(
-        "victor.agent.provider_coordinator"
-    )
-    provider_switch_violations = _find_import_violations(
-        "victor.agent.provider_switch_coordinator"
-    )
+    provider_coordinator_violations = _find_import_violations("victor.agent.provider_coordinator")
+    provider_switch_violations = _find_import_violations("victor.agent.provider_switch_coordinator")
 
-    assert not provider_coordinator_violations, (
-        "root provider coordinator shim should remain compatibility-only:\n"
-        + "\n".join(provider_coordinator_violations)
+    assert (
+        not provider_coordinator_violations
+    ), "root provider coordinator shim should remain compatibility-only:\n" + "\n".join(
+        provider_coordinator_violations
     )
-    assert not provider_switch_violations, (
-        "root provider switch shim should remain compatibility-only:\n"
-        + "\n".join(provider_switch_violations)
+    assert (
+        not provider_switch_violations
+    ), "root provider switch shim should remain compatibility-only:\n" + "\n".join(
+        provider_switch_violations
     )

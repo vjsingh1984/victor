@@ -291,7 +291,9 @@ def prompt_rollouts(
     auto_action_filter: Optional[str],
 ) -> None:
     """List prompt rollout experiments."""
-    _list_prompt_rollouts(status_filter, section_filter, provider_filter, strategy_filter, auto_action_filter)
+    _list_prompt_rollouts(
+        status_filter, section_filter, provider_filter, strategy_filter, auto_action_filter
+    )
 
 
 @opt.command("prompt-rollout-status")
@@ -879,7 +881,9 @@ def _auto_apply_prompt_rollout_decision(experiment_id: str, dry_run: bool = Fals
 
     action = _get_prompt_rollout_auto_action(result)
     if action is None:
-        click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}")
+        click.echo(
+            f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}"
+        )
         return
 
     if dry_run:
@@ -957,7 +961,9 @@ def _auto_apply_all_prompt_rollouts(
 
         action = _get_prompt_rollout_auto_action(result)
         if action is None:
-            click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}")
+            click.echo(
+                f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}"
+            )
             skipped += 1
             continue
         if action_filter and action != action_filter:

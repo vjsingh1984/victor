@@ -71,6 +71,5 @@ def test_internal_code_uses_canonical_provider_coordinator_module():
         not in orchestrator_source
     )
     assert (
-        "from victor.agent.provider.coordinator import ProviderCoordinator"
-        in orchestrator_source
+        "from victor.agent.provider.coordinator import ProviderCoordinator" in orchestrator_source
     )

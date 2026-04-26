@@ -704,7 +704,9 @@ class TestOptimizationSyncBridge:
                 min_samples_per_variant=50,
             )
 
-        mock_echo.assert_any_call("Cannot start prompt rollout: benchmark gating required", err=True)
+        mock_echo.assert_any_call(
+            "Cannot start prompt rollout: benchmark gating required", err=True
+        )
 
     def test_list_prompt_rollouts_shows_filtered_prompt_experiments(self) -> None:
         coordinator = MagicMock()
@@ -753,9 +755,7 @@ class TestOptimizationSyncBridge:
 
         coordinator.list_experiments.assert_called_once_with()
         mock_echo.assert_any_call("Prompt rollout experiments:")
-        mock_echo.assert_any_call(
-            "  prompt_optimizer_grounding_rules_anthropic_candidate123"
-        )
+        mock_echo.assert_any_call("  prompt_optimizer_grounding_rules_anthropic_candidate123")
         mock_echo.assert_any_call("    Status: running")
         mock_echo.assert_any_call("    Section: GROUNDING_RULES")
         mock_echo.assert_any_call("    Provider: anthropic")
@@ -847,9 +847,7 @@ class TestOptimizationSyncBridge:
                 None,
             )
 
-        mock_echo.assert_any_call(
-            "  prompt_optimizer_grounding_rules_anthropic_candidate123"
-        )
+        mock_echo.assert_any_call("  prompt_optimizer_grounding_rules_anthropic_candidate123")
         assert all(
             call.args != ("  prompt_optimizer_completion_guidance_openai_candidate456",)
             for call in mock_echo.call_args_list
@@ -865,8 +863,18 @@ class TestOptimizationSyncBridge:
                 "section_name": "GROUNDING_RULES",
                 "provider": "anthropic",
                 "traffic_split": 0.1,
-                "control": {"name": "control456", "strategy_name": "gepa", "samples": 12, "success_rate": 0.75},
-                "treatment": {"name": "candidate123", "strategy_name": "prefpo", "samples": 9, "success_rate": 0.89},
+                "control": {
+                    "name": "control456",
+                    "strategy_name": "gepa",
+                    "samples": 12,
+                    "success_rate": 0.75,
+                },
+                "treatment": {
+                    "name": "candidate123",
+                    "strategy_name": "prefpo",
+                    "samples": 9,
+                    "success_rate": 0.89,
+                },
             },
             {
                 "experiment_id": "prompt_optimizer_completion_guidance_openai_candidate456",
@@ -875,8 +883,18 @@ class TestOptimizationSyncBridge:
                 "section_name": "COMPLETION_GUIDANCE",
                 "provider": "openai",
                 "traffic_split": 0.1,
-                "control": {"name": "control789", "strategy_name": "gepa", "samples": 10, "success_rate": 0.70},
-                "treatment": {"name": "candidate456", "strategy_name": "miprov2", "samples": 10, "success_rate": 0.80},
+                "control": {
+                    "name": "control789",
+                    "strategy_name": "gepa",
+                    "samples": 10,
+                    "success_rate": 0.70,
+                },
+                "treatment": {
+                    "name": "candidate456",
+                    "strategy_name": "miprov2",
+                    "samples": 10,
+                    "success_rate": 0.80,
+                },
             },
         ]
 
@@ -886,9 +904,7 @@ class TestOptimizationSyncBridge:
         ):
             optimization_cmd._list_prompt_rollouts("running", None, None, "prefpo", None)
 
-        mock_echo.assert_any_call(
-            "  prompt_optimizer_grounding_rules_anthropic_candidate123"
-        )
+        mock_echo.assert_any_call("  prompt_optimizer_grounding_rules_anthropic_candidate123")
         assert all(
             call.args != ("  prompt_optimizer_completion_guidance_openai_candidate456",)
             for call in mock_echo.call_args_list
@@ -904,8 +920,18 @@ class TestOptimizationSyncBridge:
                 "section_name": "GROUNDING_RULES",
                 "provider": "anthropic",
                 "traffic_split": 0.1,
-                "control": {"name": "control456", "strategy_name": "gepa", "samples": 12, "success_rate": 0.75},
-                "treatment": {"name": "candidate123", "strategy_name": "prefpo", "samples": 9, "success_rate": 0.89},
+                "control": {
+                    "name": "control456",
+                    "strategy_name": "gepa",
+                    "samples": 12,
+                    "success_rate": 0.75,
+                },
+                "treatment": {
+                    "name": "candidate123",
+                    "strategy_name": "prefpo",
+                    "samples": 9,
+                    "success_rate": 0.89,
+                },
             },
             {
                 "experiment_id": "prompt_optimizer_completion_guidance_openai_candidate456",
@@ -914,8 +940,18 @@ class TestOptimizationSyncBridge:
                 "section_name": "COMPLETION_GUIDANCE",
                 "provider": "openai",
                 "traffic_split": 0.1,
-                "control": {"name": "control789", "strategy_name": "gepa", "samples": 10, "success_rate": 0.70},
-                "treatment": {"name": "candidate456", "strategy_name": "miprov2", "samples": 10, "success_rate": 0.80},
+                "control": {
+                    "name": "control789",
+                    "strategy_name": "gepa",
+                    "samples": 10,
+                    "success_rate": 0.70,
+                },
+                "treatment": {
+                    "name": "candidate456",
+                    "strategy_name": "miprov2",
+                    "samples": 10,
+                    "success_rate": 0.80,
+                },
             },
         ]
         coordinator.analyze_experiment.side_effect = [
@@ -943,9 +979,7 @@ class TestOptimizationSyncBridge:
         coordinator.analyze_experiment.assert_any_call(
             "prompt_optimizer_completion_guidance_openai_candidate456"
         )
-        mock_echo.assert_any_call(
-            "  prompt_optimizer_grounding_rules_anthropic_candidate123"
-        )
+        mock_echo.assert_any_call("  prompt_optimizer_grounding_rules_anthropic_candidate123")
         assert all(
             call.args != ("  prompt_optimizer_completion_guidance_openai_candidate456",)
             for call in mock_echo.call_args_list
@@ -990,8 +1024,7 @@ class TestOptimizationSyncBridge:
             "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
         mock_echo.assert_any_call(
-            "Prompt rollout experiment: "
-            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            "Prompt rollout experiment: " "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
         mock_echo.assert_any_call("  Name: Prompt rollout for GROUNDING_RULES")
         mock_echo.assert_any_call("  Status: running")
@@ -1075,8 +1108,7 @@ class TestOptimizationSyncBridge:
             "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
         mock_echo.assert_any_call(
-            "Prompt rollout analysis: "
-            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            "Prompt rollout analysis: " "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
         mock_echo.assert_any_call("  Significant: yes")
         mock_echo.assert_any_call("  Treatment better: yes")
@@ -1087,12 +1119,8 @@ class TestOptimizationSyncBridge:
             "  Recommendation: Roll out treatment - significant improvement detected"
         )
         mock_echo.assert_any_call("  Auto-apply action: rollout")
-        mock_echo.assert_any_call(
-            "  Control: samples=24 success_rate=75.0% avg_quality=0.810"
-        )
-        mock_echo.assert_any_call(
-            "  Treatment: samples=25 success_rate=84.0% avg_quality=0.880"
-        )
+        mock_echo.assert_any_call("  Control: samples=24 success_rate=75.0% avg_quality=0.810")
+        mock_echo.assert_any_call("  Treatment: samples=25 success_rate=84.0% avg_quality=0.880")
 
     def test_show_prompt_rollout_results_rejects_non_prompt_rollout_id(self) -> None:
         with patch.object(optimization_cmd.click, "echo") as mock_echo:
@@ -1786,9 +1814,7 @@ class TestOptimizationSyncBridge:
         coordinator.analyze_experiment.assert_called_once_with(
             "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
-        mock_echo.assert_any_call(
-            "Stopping prompt rollout bulk auto-apply after failure."
-        )
+        mock_echo.assert_any_call("Stopping prompt rollout bulk auto-apply after failure.")
         mock_echo.assert_any_call(
             "Prompt rollout bulk auto-apply summary: considered=1 applied=0 skipped=0 failed=1"
         )
@@ -1862,9 +1888,7 @@ class TestOptimizationSyncBridge:
                 None,
             )
 
-        mock_echo.assert_called_once_with(
-            "No prompt rollout experiments found for auto-apply."
-        )
+        mock_echo.assert_called_once_with("No prompt rollout experiments found for auto-apply.")
 
     def test_auto_apply_all_prompt_rollouts_reports_failed_transition(self) -> None:
         coordinator = MagicMock()

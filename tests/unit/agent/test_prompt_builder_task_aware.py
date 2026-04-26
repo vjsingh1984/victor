@@ -290,6 +290,54 @@ class TestPromptOptimizationSettings:
 
 
 class TestOptimizationInjectorFewShots:
+    def test_evolved_section_payloads_include_prompt_identity(self):
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+        from victor.framework.rl.base import RLRecommendation
+
+        mock_rec = RLRecommendation(
+            value="EVOLVED GROUNDING",
+            confidence=0.9,
+            reason="GEPA gen-4",
+            sample_size=12,
+            is_baseline=False,
+            metadata={
+                "provider": "anthropic",
+                "prompt_candidate_hash": "cand-123",
+                "section_name": "GROUNDING_RULES",
+                "strategy_name": "gepa",
+            },
+        )
+        mock_learner = MagicMock()
+        mock_learner.get_recommendation.return_value = mock_rec
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=True)
+
+        with (
+            patch("victor.config.settings.get_settings", return_value=mock_settings),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            payloads = injector.get_evolved_section_payloads(
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="edit",
+            )
+
+        grounding = next(payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES")
+        assert grounding["text"] == "EVOLVED GROUNDING"
+        assert grounding["provider"] == "anthropic"
+        assert grounding["prompt_candidate_hash"] == "cand-123"
+        assert grounding["prompt_section_name"] == "GROUNDING_RULES"
+
     def test_query_aware_few_shots_are_cached_per_query(self):
         from unittest.mock import MagicMock, patch
 
@@ -297,9 +345,7 @@ class TestOptimizationInjectorFewShots:
         from victor.config.prompt_optimization_settings import PromptOptimizationSettings
 
         mock_learner = MagicMock()
-        mock_learner.get_query_aware_few_shots.side_effect = (
-            lambda query: f"few-shot for {query}"
-        )
+        mock_learner.get_query_aware_few_shots.side_effect = lambda query: f"few-shot for {query}"
         mock_coordinator = MagicMock()
         mock_coordinator.get_learner.return_value = mock_learner
 
@@ -325,3 +371,38 @@ class TestOptimizationInjectorFewShots:
         assert second == "few-shot for fix billing bug"
         assert third == "few-shot for fix auth bug"
         assert mock_learner.get_query_aware_few_shots.call_count == 2
+
+    def test_few_shot_payload_uses_canonical_identity_shape(self):
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+
+        mock_learner = MagicMock()
+        mock_learner.get_query_aware_few_shots.return_value = "few-shot for fix auth bug"
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=True)
+
+        with (
+            patch("victor.config.settings.get_settings", return_value=mock_settings),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            payload = injector.get_few_shot_payload(
+                "fix auth bug",
+                provider="anthropic",
+                model="claude-sonnet",
+                task_type="edit",
+            )
+
+        assert payload is not None
+        assert payload["text"] == "few-shot for fix auth bug"
+        assert payload["provider"] == "anthropic"
+        assert payload["prompt_candidate_hash"] is None
+        assert payload["section_name"] == "FEW_SHOT_EXAMPLES"

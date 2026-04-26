@@ -487,10 +487,19 @@ class TaskResult:
 
 @dataclass
 class EvaluationConfig:
-    """Configuration for an evaluation run."""
+    """Configuration for an evaluation run.
+
+    The optional prompt-optimization fields let benchmark artifacts identify the
+    exact prompt candidate and section under evaluation. That keeps offline
+    evaluation output reusable by frontier seeding instead of relying solely on
+    runtime traces.
+    """
 
     benchmark: BenchmarkType
     model: str
+    provider: Optional[str] = None
+    prompt_candidate_hash: Optional[str] = None
+    prompt_section_name: Optional[str] = None
     max_tasks: Optional[int] = None
     timeout_per_task: int = 300
     max_retries: int = 1
@@ -517,6 +526,22 @@ class EvaluationConfig:
     enable_self_correction: bool = False
     self_correction_max_iterations: int = 3
     auto_fix_imports: bool = True
+
+    def to_artifact_config(self) -> dict[str, Any]:
+        """Serialize stable evaluation identity for saved benchmark artifacts."""
+        return {
+            "benchmark": self.benchmark.value,
+            "model": self.model,
+            "provider": self.provider,
+            "prompt_candidate_hash": self.prompt_candidate_hash,
+            "section_name": self.prompt_section_name,
+            "prompt_section_name": self.prompt_section_name,
+            "max_tasks": self.max_tasks,
+            "timeout_per_task": self.timeout_per_task,
+            "max_turns": self.max_turns,
+            "parallel_tasks": self.parallel_tasks,
+            "dataset_metadata": dict(self.dataset_metadata),
+        }
 
 
 @dataclass

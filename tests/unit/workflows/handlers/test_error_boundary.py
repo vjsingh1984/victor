@@ -325,6 +325,7 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_wraps_handler(self):
         """Decorator should wrap handler with error boundary."""
+
         @with_error_boundary("decorated_handler")
         async def my_handler(node, context, tool_registry):
             return NodeResult(
@@ -344,6 +345,7 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_catches_errors(self):
         """Decorator should catch and wrap errors."""
+
         @with_error_boundary("failing_handler")
         async def failing_handler(node, context, tool_registry):
             raise RuntimeError("Decorated handler failed")
@@ -370,6 +372,7 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_timeout_handling(self):
         """Decorator should handle timeout errors."""
+
         @with_error_boundary("timeout_decorated")
         async def timeout_handler(node, context, tool_registry):
             raise asyncio.TimeoutError("Timeout!")

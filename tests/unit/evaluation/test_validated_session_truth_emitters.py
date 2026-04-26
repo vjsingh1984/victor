@@ -59,6 +59,9 @@ def test_browser_emitter_builds_artifact_with_canonical_payload(tmp_path):
     config = EvaluationConfig(
         benchmark=BenchmarkType.GUIDE,
         model="test",
+        provider="openai",
+        prompt_candidate_hash="cand-123",
+        prompt_section_name="GROUNDING_RULES",
         dataset_metadata={"source_name": "GUIDE"},
     )
     task_result = TaskResult(
@@ -96,6 +99,15 @@ def test_browser_emitter_builds_artifact_with_canonical_payload(tmp_path):
     assert (
         artifact.record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
         == "browser_posthoc_validation"
+    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["prompt_candidate_hash"] == (
+        "cand-123"
+    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["section_name"] == (
+        "GROUNDING_RULES"
+    )
+    assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["provider"] == (
+        "openai"
     )
     assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
         "browser"

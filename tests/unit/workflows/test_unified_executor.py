@@ -160,7 +160,9 @@ class TestStateGraphExecutor:
         )
 
         with (
-            patch("victor.workflows.unified_executor.CompatibilityNodeExecutorFactory") as factory_cls,
+            patch(
+                "victor.workflows.unified_executor.CompatibilityNodeExecutorFactory"
+            ) as factory_cls,
             patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as compiler_cls,
         ):
             compiler = executor._get_compiler()

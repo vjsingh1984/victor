@@ -370,6 +370,7 @@ class WorkflowToGraphAdapter:
         Returns:
             Handler function for StateGraph
         """
+
         async def async_handler(state: AdapterWorkflowState) -> AdapterWorkflowState:
             """Execute the node using the workflow executor."""
             new_state = dict(state)
