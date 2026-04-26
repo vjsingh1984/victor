@@ -274,6 +274,7 @@ class TestABTestingSyncBridge:
 class TestOptimizationSyncBridge:
     def test_optimization_group_exposes_prompt_rollout_command(self) -> None:
         assert "prompt-rollout" in optimization_cmd.opt.commands
+        assert "prompt-rollouts" in optimization_cmd.opt.commands
 
     def test_profile_uses_shared_sync_bridge(self) -> None:
         coro = object()
@@ -375,6 +376,12 @@ class TestOptimizationSyncBridge:
         )
         mock_run_sync.assert_called_once_with(coro)
 
+    def test_prompt_rollouts_uses_listing_helper(self) -> None:
+        with patch.object(optimization_cmd, "_list_prompt_rollouts") as mock_list:
+            optimization_cmd.prompt_rollouts.callback(status_filter="running")
+
+        mock_list.assert_called_once_with("running")
+
     @pytest.mark.asyncio
     async def test_prompt_rollout_async_reports_started_experiment(self) -> None:
         with (
@@ -454,6 +461,80 @@ class TestOptimizationSyncBridge:
             )
 
         mock_echo.assert_any_call("Cannot start prompt rollout: benchmark gating required", err=True)
+
+    def test_list_prompt_rollouts_shows_filtered_prompt_experiments(self) -> None:
+        coordinator = MagicMock()
+        coordinator.list_experiments.return_value = [
+            {
+                "experiment_id": "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                "name": "Prompt rollout for GROUNDING_RULES",
+                "status": "running",
+                "traffic_split": 0.1,
+                "control": {
+                    "name": "control456",
+                    "samples": 12,
+                    "success_rate": 0.75,
+                },
+                "treatment": {
+                    "name": "candidate123",
+                    "samples": 9,
+                    "success_rate": 0.89,
+                },
+            },
+            {
+                "experiment_id": "other_experiment",
+                "name": "Other experiment",
+                "status": "running",
+                "traffic_split": 0.5,
+                "control": {"name": "a", "samples": 1, "success_rate": 1.0},
+                "treatment": {"name": "b", "samples": 1, "success_rate": 1.0},
+            },
+        ]
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._list_prompt_rollouts("running")
+
+        coordinator.list_experiments.assert_called_once_with()
+        mock_echo.assert_any_call("Prompt rollout experiments:")
+        mock_echo.assert_any_call(
+            "  prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_any_call("    Status: running")
+        mock_echo.assert_any_call("    Traffic split: 10.0%")
+        mock_echo.assert_any_call("    Control: control456 samples=12 success_rate=75.0%")
+        mock_echo.assert_any_call("    Treatment: candidate123 samples=9 success_rate=89.0%")
+
+    def test_list_prompt_rollouts_reports_none_found(self) -> None:
+        coordinator = MagicMock()
+        coordinator.list_experiments.return_value = [
+            {
+                "experiment_id": "other_experiment",
+                "name": "Other experiment",
+                "status": "running",
+                "traffic_split": 0.5,
+                "control": {"name": "a", "samples": 1, "success_rate": 1.0},
+                "treatment": {"name": "b", "samples": 1, "success_rate": 1.0},
+            }
+        ]
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._list_prompt_rollouts("paused")
+
+        mock_echo.assert_called_once_with("No prompt rollout experiments found.")
 
     def test_prompt_rollout_rejects_invalid_traffic_split_before_bridge(self) -> None:
         with (

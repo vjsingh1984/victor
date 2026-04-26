@@ -29,6 +29,7 @@ import click
 
 from victor.core.async_utils import run_sync
 from victor.framework.rl import create_prompt_rollout_experiment_async
+from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
 from victor.optimization import (
     WorkflowOptimizer,
     OptimizationConfig,
@@ -36,6 +37,7 @@ from victor.optimization import (
 from victor.experiments.tracking import ExperimentTracker
 
 logger = logging.getLogger(__name__)
+PROMPT_ROLLOUT_EXPERIMENT_PREFIX = "prompt_optimizer_"
 
 
 @click.group()
@@ -248,6 +250,18 @@ def prompt_rollout(
             min_samples_per_variant=min_samples_per_variant,
         )
     )
+
+
+@opt.command("prompt-rollouts")
+@click.option(
+    "--status",
+    "status_filter",
+    default=None,
+    help="Optional status filter (draft, running, paused, completed, rolled_out, rolled_back).",
+)
+def prompt_rollouts(status_filter: Optional[str]) -> None:
+    """List prompt rollout experiments."""
+    _list_prompt_rollouts(status_filter)
 
 
 async def _profile_async(
@@ -512,6 +526,40 @@ async def _prompt_rollout_async(
         return
 
     click.echo(f"Prompt rollout experiment started: {experiment_id}")
+
+
+def _list_prompt_rollouts(status_filter: Optional[str]) -> None:
+    coordinator = get_experiment_coordinator()
+    experiments = []
+    for experiment in coordinator.list_experiments():
+        experiment_id = experiment.get("experiment_id", "")
+        if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
+            continue
+        if status_filter and experiment.get("status") != status_filter:
+            continue
+        experiments.append(experiment)
+
+    if not experiments:
+        click.echo("No prompt rollout experiments found.")
+        return
+
+    click.echo("Prompt rollout experiments:")
+    for experiment in experiments:
+        control = experiment.get("control", {})
+        treatment = experiment.get("treatment", {})
+        click.echo(f"  {experiment['experiment_id']}")
+        click.echo(f"    Status: {experiment['status']}")
+        click.echo(f"    Traffic split: {experiment['traffic_split']:.1%}")
+        click.echo(
+            "    Control: "
+            f"{control.get('name', '-')} samples={control.get('samples', 0)} "
+            f"success_rate={control.get('success_rate', 0.0):.1%}"
+        )
+        click.echo(
+            "    Treatment: "
+            f"{treatment.get('name', '-')} samples={treatment.get('samples', 0)} "
+            f"success_rate={treatment.get('success_rate', 0.0):.1%}"
+        )
 
 
 # Register commands with CLI
