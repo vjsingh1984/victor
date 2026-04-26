@@ -157,8 +157,17 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     preserved by overlaying executor config onto the definition before
     canonical compilation
 
+- Phase 3.5 workflow UI compile-only canonicalization:
+  - `victor.ui.commands.workflow` validation and dry-run paths now compile
+    already-loaded `WorkflowDefinition` objects through a small canonical
+    `UnifiedWorkflowCompiler` helper instead of instantiating
+    `YAMLToStateGraphCompiler` directly
+  - focused command tests now assert those CLI compile-only paths use the
+    canonical helper and fail cleanly on canonical compilation errors
+
 Next resume point:
 - Continue Phase 3 by migrating remaining internal
   `victor.workflows.yaml_to_graph_compiler` callers onto compiler boundary /
-  unified compiler entrypoints, starting with the workflow UI command
-  validation and dry-run call sites rather than public compatibility exports.
+  unified compiler entrypoints, starting with the remaining workflow/chat UI
+  execution-mode call sites and any non-public runtime callers rather than
+  public compatibility exports.

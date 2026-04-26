@@ -58,6 +58,13 @@ workflow_app = typer.Typer(
 console = Console()
 
 
+def _create_compile_only_compiler() -> Any:
+    """Create the canonical compile-only workflow compiler for CLI checks."""
+    from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+    return UnifiedWorkflowCompiler(enable_caching=False)
+
+
 def _load_workflow_file(workflow_path: Path) -> dict:
     """Load and parse a workflow YAML file.
 
@@ -426,8 +433,6 @@ def validate_workflow(
         victor workflow validate ./workflows/analysis.yaml --check-handlers
         victor workflow validate ./workflows/analysis.yaml --vertical coding
     """
-    from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
-
     path = Path(workflow_path)
     console.print(f"\n[bold blue]Validating:[/] {path.name}")
     console.print("[dim]" + "─" * 50 + "[/]")
@@ -439,7 +444,7 @@ def validate_workflow(
 
     workflows = _load_workflow_file(path)
 
-    compiler = YAMLToStateGraphCompiler()
+    compiler = _create_compile_only_compiler()
     all_valid = True
     total_warnings = 0
 
@@ -466,7 +471,7 @@ def validate_workflow(
 
         # Try to compile to state graph
         try:
-            _compiled = compiler.compile(workflow)
+            _compiled = compiler.compile_definition(workflow)
             if is_valid:
                 console.print("[bold green]✓[/] Validation passed")
             else:
@@ -946,8 +951,6 @@ def run_workflow(
         victor workflow run ./workflows/analysis.yaml --dry-run
         victor workflow run ./workflows/analysis.yaml --log-level DEBUG
     """
-    from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
-
     # Set log level if specified
     if log_level:
         import logging
@@ -1013,9 +1016,9 @@ def run_workflow(
         console.print("\n[bold yellow]Dry run mode[/] - showing execution plan:")
 
         # Show execution order
-        compiler = YAMLToStateGraphCompiler()
+        compiler = _create_compile_only_compiler()
         try:
-            compiler.compile(workflow)  # Validate compilation
+            compiler.compile_definition(workflow)  # Validate compilation
             console.print("[bold green]✓[/] Workflow can be compiled")
             console.print(f"[dim]Start node: {workflow.start_node}[/]")
         except Exception as e:
