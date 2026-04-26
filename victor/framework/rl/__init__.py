@@ -430,6 +430,46 @@ class RLManager:
             return int(rec.value)
         return None
 
+    def create_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Create and start a prompt rollout experiment via the coordinator."""
+        return self._coordinator.create_prompt_rollout_experiment(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+
+    async def create_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Async version of create_prompt_rollout_experiment."""
+        return await self._coordinator.create_prompt_rollout_experiment_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+
     # =========================================================================
     # Statistics
     # =========================================================================
