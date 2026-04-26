@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Set
 
 from victor.config.settings import get_project_paths, load_settings
@@ -465,27 +466,13 @@ def _resolve_root_path(path: str) -> Path:
     return root_path
 
 
-async def _load_graph(
-    path: str = ".",
+async def _materialize_loaded_graph(
+    root_path: Path,
     *,
-    reindex: bool = False,
-    exec_ctx: Optional[Dict[str, Any]] = None,
+    index: Any,
+    graph_store: GraphStoreProtocol,
+    rebuilt: bool,
 ) -> LoadedGraph:
-    root_path = _resolve_root_path(path)
-    settings = _ctx_value(exec_ctx, "settings")
-    if settings is None:
-        settings = load_settings()
-
-    index, rebuilt = await _get_or_build_index(
-        root_path,
-        settings,
-        force_reindex=reindex,
-        exec_ctx=exec_ctx,
-    )
-    graph_store = getattr(index, "graph_store", None)
-    if graph_store is None:
-        raise ValueError("Index does not provide graph_store support")
-
     get_all_nodes = getattr(graph_store, "get_all_nodes", None)
     if callable(get_all_nodes):
         nodes = await get_all_nodes()
@@ -504,6 +491,76 @@ async def _load_graph(
         index=index,
         graph_store=graph_store,
         analyzer=analyzer,
+        rebuilt=rebuilt,
+    )
+
+
+async def _load_graph_from_project_store(root_path: Path) -> LoadedGraph:
+    from victor.core.database import get_project_database
+    from victor.storage.graph.sqlite_store import SqliteGraphStore
+
+    project_db = get_project_database(root_path)
+    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+        raise RuntimeError("Project graph tables are unavailable")
+
+    node_row = project_db.query_one("SELECT COUNT(*) FROM graph_node")
+    edge_row = project_db.query_one("SELECT COUNT(*) FROM graph_edge")
+    node_count = int(node_row[0]) if node_row is not None else 0
+    edge_count = int(edge_row[0]) if edge_row is not None else 0
+    if node_count == 0 and edge_count == 0:
+        raise RuntimeError("Project graph database is empty")
+
+    graph_store = SqliteGraphStore(root_path)
+    fallback_index = SimpleNamespace(graph_store=graph_store, files={})
+    return await _materialize_loaded_graph(
+        root_path,
+        index=fallback_index,
+        graph_store=graph_store,
+        rebuilt=False,
+    )
+
+
+async def _load_graph(
+    path: str = ".",
+    *,
+    reindex: bool = False,
+    exec_ctx: Optional[Dict[str, Any]] = None,
+) -> LoadedGraph:
+    root_path = _resolve_root_path(path)
+    settings = _ctx_value(exec_ctx, "settings")
+    if settings is None:
+        settings = load_settings()
+
+    try:
+        index, rebuilt = await _get_or_build_index(
+            root_path,
+            settings,
+            force_reindex=reindex,
+            exec_ctx=exec_ctx,
+        )
+    except (ImportError, RuntimeError, ValueError) as exc:
+        try:
+            loaded = await _load_graph_from_project_store(root_path)
+            logger.info(
+                "[graph] Loaded persisted project graph for %s after index bootstrap failure: %s",
+                root_path,
+                exc,
+            )
+            return loaded
+        except Exception:
+            raise exc
+
+    graph_store = getattr(index, "graph_store", None)
+    if graph_store is None:
+        try:
+            return await _load_graph_from_project_store(root_path)
+        except Exception:
+            raise ValueError("Index does not provide graph_store support")
+
+    return await _materialize_loaded_graph(
+        root_path,
+        index=index,
+        graph_store=graph_store,
         rebuilt=rebuilt,
     )
 

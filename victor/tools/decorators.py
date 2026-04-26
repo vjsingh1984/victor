@@ -905,17 +905,26 @@ def _create_tool_class(
                 # to proper ToolResult failures. This bridges legacy patterns.
                 if isinstance(result, dict):
                     if result.get("success") is False and "error" in result:
+                        metadata = result.get("metadata")
+                        if not isinstance(metadata, dict):
+                            metadata = {}
+                        else:
+                            metadata = dict(metadata)
+                        for key, value in result.items():
+                            if key in {"success", "error", "output", "metadata"}:
+                                continue
+                            metadata.setdefault(key, value)
                         return ToolResult(
                             success=False,
-                            output=result.get("output"),
+                            output=result,
                             error=result.get("error"),
-                            metadata=result.get("metadata"),
+                            metadata=metadata or None,
                         )
                     # Some tools return {"error": "..."} without success field
                     if "error" in result and "success" not in result and len(result) <= 2:
                         return ToolResult(
                             success=False,
-                            output=None,
+                            output=result,
                             error=result.get("error"),
                         )
 

@@ -7,6 +7,7 @@ import pytest
 
 from victor.storage.graph.memory_store import MemoryGraphStore
 from victor.storage.graph.protocol import GraphEdge, GraphNode
+from victor.storage.graph.sqlite_store import SqliteGraphStore
 
 
 async def _seed_graph(store: MemoryGraphStore) -> None:
@@ -141,3 +142,29 @@ async def test_graph_tool_requires_graph_support(monkeypatch, tmp_path: Path):
 
     assert result["success"] is False
     assert "graph_store" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_falls_back_to_project_graph_store(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = SqliteGraphStore(tmp_path)
+    await _seed_graph(store)
+
+    async def _missing_index(*args, **kwargs):
+        raise ImportError("CodebaseIndex requires a codebase indexing provider")
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _missing_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="sqlite")}
+
+    stats = await graph_tool_module.graph(
+        mode="stats",
+        path=str(tmp_path),
+        _exec_ctx=exec_ctx,
+    )
+
+    assert stats["success"] is True
+    assert stats["mode"] == "stats"
+    assert stats["result"]["nodes"] == 7
+    assert stats["result"]["edges"] == 7

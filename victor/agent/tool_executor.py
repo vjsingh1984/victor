@@ -825,6 +825,11 @@ class ToolExecutor:
         # Extract correlation ID from error_info if available
         correlation_id = error_info.correlation_id if error_info else None
 
+        is_unavailable_result = isinstance(result, dict) and result.get("unavailable")
+        if is_unavailable_result:
+            self._session_disabled_tools.add(tool_name)
+            logger.info("Tool '%s' session-disabled: returned unavailable=True", tool_name)
+
         if success:
             self._stats[tool_name]["successes"] += 1
 
@@ -836,10 +841,6 @@ class ToolExecutor:
             if self.cache and self.is_cache_invalidating_tool(tool_name):
                 self._invalidate_cache_for_write_tool(tool_name, normalized_args)
 
-            # Issue 3: Session-disable tools that declare themselves permanently unavailable.
-            if isinstance(result, dict) and result.get("unavailable"):
-                self._session_disabled_tools.add(tool_name)
-                logger.info("Tool '%s' session-disabled: returned unavailable=True", tool_name)
         else:
             self._stats[tool_name]["failures"] += 1
             # Track failed signature to avoid retrying same failure

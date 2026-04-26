@@ -23,6 +23,7 @@ from victor.agent.tool_executor import (
     ToolExecutor,
 )
 from victor.tools.base import BaseTool, ToolResult
+from victor.tools.decorators import tool
 from victor.tools.registry import ToolRegistry
 
 # Import safety module at collection time so it is cached in sys.modules before
@@ -1879,6 +1880,34 @@ class TestSessionDisabledTools:
         # Simulate post-execution unavailable detection
         executor._session_disabled_tools.add("graph_search")
         assert "graph_search" in executor.session_disabled_tools
+
+    @pytest.mark.asyncio
+    async def test_failed_legacy_dict_unavailable_result_disables_tool(self):
+        """Legacy dict failures should preserve unavailable metadata and trip the circuit breaker."""
+
+        @tool
+        async def graph_search(_exec_ctx=None):
+            return {
+                "success": False,
+                "error": "victor-coding not installed",
+                "unavailable": True,
+                "suggestion": "Install victor-coding",
+            }
+
+        registry = ToolRegistry()
+        registry.register(graph_search)
+        executor = ToolExecutor(tool_registry=registry)
+
+        first = await executor.execute("graph_search", {})
+        second = await executor.execute("graph_search", {})
+
+        assert first.success is False
+        assert isinstance(first.result, dict)
+        assert first.result["unavailable"] is True
+        assert first.result["suggestion"] == "Install victor-coding"
+        assert "graph_search" in executor.session_disabled_tools
+        assert second.success is False
+        assert "unavailable this session" in (second.error or "")
 
     def test_session_disabled_tools_property_is_frozenset(self):
         """session_disabled_tools property returns an immutable frozenset."""
