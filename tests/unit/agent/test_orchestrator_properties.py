@@ -5,6 +5,7 @@ definitions onto the AgentOrchestrator class.
 """
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 
@@ -202,3 +203,56 @@ class TestOrchestratorPropertyInstallation:
             ),
         ):
             assert orchestrator.unified_chat_coordinator._mock_name == "unified"
+
+    @pytest.mark.parametrize(
+        ("property_name", "backing_attr", "facade_attr", "facade_value_attr"),
+        [
+            ("conversation_controller", "_conversation_controller", "_chat_facade", "conversation_controller"),
+            ("tool_pipeline", "_tool_pipeline", "_tool_facade", "tool_pipeline"),
+            ("streaming_handler", "_streaming_handler", "_orchestration_facade", "streaming_handler"),
+            ("provider_manager", "_provider_manager", "_provider_facade", "provider_manager"),
+            ("vertical_context", "_vertical_context", "_orchestration_facade", "vertical_context"),
+        ],
+    )
+    def test_simple_properties_prefer_direct_canonical_attributes(
+        self,
+        property_name,
+        backing_attr,
+        facade_attr,
+        facade_value_attr,
+    ):
+        """Compatibility facades must not become the behavior owner for simple properties."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        direct_value = MagicMock(name=f"{property_name}_direct")
+        facade_value = MagicMock(name=f"{property_name}_facade")
+        setattr(orchestrator, backing_attr, direct_value)
+        setattr(orchestrator, facade_attr, SimpleNamespace(**{facade_value_attr: facade_value}))
+
+        assert getattr(orchestrator, property_name) is direct_value
+
+    def test_session_ledger_property_prefers_direct_canonical_attribute(self):
+        """session_ledger should read from the canonical backing attribute, not the facade copy."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        direct_value = MagicMock(name="ledger_direct")
+        facade_value = MagicMock(name="ledger_facade")
+        orchestrator._session_ledger = direct_value
+        orchestrator._session_facade = SimpleNamespace(session_ledger=facade_value)
+
+        assert orchestrator.session_ledger is direct_value
+
+    def test_session_ledger_setter_updates_canonical_backing_attribute(self):
+        """session_ledger setter should update the direct canonical slot."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        orchestrator._session_ledger = MagicMock(name="old_ledger")
+        orchestrator._session_facade = SimpleNamespace(session_ledger=MagicMock(name="facade_ledger"))
+        new_value = MagicMock(name="new_ledger")
+
+        orchestrator.session_ledger = new_value
+
+        assert orchestrator._session_ledger is new_value

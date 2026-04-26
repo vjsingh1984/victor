@@ -77,7 +77,7 @@ For each batch:
 
 ## Current Batch
 
-Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, and Phase 2.4 are now complete:
+Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, and Phase 2.5 are now complete:
 - internal provider switching is service-first in `AgentOrchestrator`
 - provider-switch hook contracts now live in a canonical provider contract
   module instead of being sourced from the legacy switch coordinator
@@ -89,8 +89,11 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, and Phase 2.4 are now comp
 - `victor.agent.coordinators.provider_coordinator` is now a thin
   compatibility adapter over the canonical provider coordinator rather than a
   second behavior owner
+- simple `AgentOrchestrator` compatibility properties now resolve from direct
+  canonical backing attributes instead of facades, so facades are no longer
+  behavior owners for those runtime accessors
 
 Next resume point:
 - continue the broader compatibility cleanup around orchestrator and facade
-  shims, starting with any remaining internal dependence on orchestrator
-  compatibility properties and facade-owned runtime accessors
+  shims by auditing the remaining lazy compatibility coordinators and facade
+  bootstrap wiring for any internal runtime dependence

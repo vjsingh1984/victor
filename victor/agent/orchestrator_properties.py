@@ -61,86 +61,62 @@ logger = logging.getLogger(__name__)
 
 
 def _conversation_controller(self: "AgentOrchestrator") -> "ConversationController":
-    """Get the conversation controller component (delegates to ChatFacade)."""
-    if hasattr(self, "_chat_facade"):
-        return self._chat_facade.conversation_controller
+    """Get the canonical conversation controller component."""
     return self._conversation_controller
 
 
 def _tool_pipeline(self: "AgentOrchestrator") -> "ToolPipeline":
-    """Get the tool pipeline component (delegates to ToolFacade)."""
-    if hasattr(self, "_tool_facade"):
-        return self._tool_facade.tool_pipeline
+    """Get the canonical tool pipeline component."""
     return self._tool_pipeline
 
 
 def _streaming_controller(self: "AgentOrchestrator") -> "StreamingController":
-    """Get the streaming controller component (delegates to OrchestrationFacade)."""
-    if hasattr(self, "_orchestration_facade"):
-        return self._orchestration_facade.streaming_controller
+    """Get the canonical streaming controller component."""
     return self._streaming_controller
 
 
 def _streaming_handler(self: "AgentOrchestrator") -> "StreamingChatHandler":
-    """Get the streaming chat handler component (delegates to OrchestrationFacade)."""
-    if hasattr(self, "_orchestration_facade"):
-        return self._orchestration_facade.streaming_handler
+    """Get the canonical streaming chat handler component."""
     return self._streaming_handler
 
 
 def _task_analyzer(self: "AgentOrchestrator") -> "TaskAnalyzer":
-    """Get the task analyzer component (delegates to OrchestrationFacade)."""
-    if hasattr(self, "_orchestration_facade"):
-        return self._orchestration_facade.task_analyzer
+    """Get the canonical task analyzer component."""
     return self._task_analyzer
 
 
 def _provider_manager(self: "AgentOrchestrator") -> "ProviderManager":
-    """Get the provider manager component (delegates to ProviderFacade)."""
-    if hasattr(self, "_provider_facade"):
-        return self._provider_facade.provider_manager
+    """Get the canonical provider manager component."""
     return self._provider_manager
 
 
 def _context_compactor(self: "AgentOrchestrator") -> "ContextCompactor":
-    """Get the context compactor component (delegates to ChatFacade)."""
-    if hasattr(self, "_chat_facade"):
-        return self._chat_facade.context_compactor
+    """Get the canonical context compactor component."""
     return self._context_compactor
 
 
 def _tool_output_formatter(self: "AgentOrchestrator") -> "ToolOutputFormatter":
-    """Get the tool output formatter (delegates to ToolFacade)."""
-    if hasattr(self, "_tool_facade"):
-        return self._tool_facade.tool_output_formatter
+    """Get the canonical tool output formatter component."""
     return self._tool_output_formatter
 
 
 def _usage_analytics(self: "AgentOrchestrator") -> "UsageAnalytics":
-    """Get the usage analytics singleton (delegates to MetricsFacade)."""
-    if hasattr(self, "_metrics_facade"):
-        return self._metrics_facade.usage_analytics
+    """Get the canonical usage analytics singleton."""
     return self._usage_analytics
 
 
 def _sequence_tracker(self: "AgentOrchestrator") -> "ToolSequenceTracker":
-    """Get the tool sequence tracker (delegates to ToolFacade)."""
-    if hasattr(self, "_tool_facade"):
-        return self._tool_facade.sequence_tracker
+    """Get the canonical tool sequence tracker."""
     return self._sequence_tracker
 
 
 def _recovery_coordinator(self: "AgentOrchestrator") -> "StreamingRecoveryCoordinator":
-    """Get the recovery coordinator for centralized recovery logic (delegates to ResilienceFacade)."""
-    if hasattr(self, "_resilience_facade"):
-        return self._resilience_facade.recovery_coordinator
+    """Get the canonical recovery coordinator for centralized recovery logic."""
     return self._recovery_coordinator
 
 
 def _chunk_generator(self: "AgentOrchestrator") -> "ChunkGenerator":
-    """Get the chunk generator for streaming output (delegates to ResilienceFacade)."""
-    if hasattr(self, "_resilience_facade"):
-        return self._resilience_facade.chunk_generator
+    """Get the canonical chunk generator for streaming output."""
     return self._chunk_generator
 
 
@@ -155,9 +131,7 @@ def _task_coordinator(self: "AgentOrchestrator") -> "TaskCoordinator":
 
 
 def _session_ledger_get(self: "AgentOrchestrator") -> Any:
-    """Get the session ledger for structured state tracking (delegates to SessionFacade)."""
-    if hasattr(self, "_session_facade"):
-        return self._session_facade.session_ledger
+    """Get the canonical session ledger for structured state tracking."""
     return self._session_ledger
 
 
@@ -166,23 +140,17 @@ def _session_ledger_set(self: "AgentOrchestrator", value: Any) -> None:
 
 
 def _code_correction_middleware(self: "AgentOrchestrator") -> Optional[Any]:
-    """Get the code correction middleware (delegates to ToolFacade)."""
-    if hasattr(self, "_tool_facade"):
-        return self._tool_facade.code_correction_middleware
+    """Get the canonical code correction middleware."""
     return self._code_correction_middleware
 
 
 def _checkpoint_manager(self: "AgentOrchestrator") -> Optional[Any]:
-    """Get the checkpoint manager for time-travel debugging (delegates to SessionFacade)."""
-    if hasattr(self, "_session_facade"):
-        return self._session_facade.checkpoint_manager
+    """Get the canonical checkpoint manager for time-travel debugging."""
     return self._checkpoint_manager
 
 
 def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
-    """Get the vertical context for unified vertical state access (delegates to OrchestrationFacade)."""
-    if hasattr(self, "_orchestration_facade"):
-        return self._orchestration_facade.vertical_context
+    """Get the canonical vertical context for unified vertical state access."""
     return self._vertical_context
 
 
