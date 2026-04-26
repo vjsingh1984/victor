@@ -44,11 +44,12 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Callable,
     Dict,
     List,
     Optional,
@@ -59,10 +60,13 @@ if TYPE_CHECKING:
     from victor.framework.graph import CheckpointerProtocol
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import WorkflowDefinition
-from victor.workflows.yaml_to_graph_compiler import (
-    CompilerConfig,
-    YAMLToStateGraphCompiler,
+from victor.framework.graph import MemoryCheckpointer
+from victor.workflows.compiler.boundary import (
+    NativeWorkflowGraphCompiler,
+    ParsedWorkflowDefinition,
+    WorkflowCompilationRequest,
 )
+from victor.workflows.executors.compatibility import CompatibilityNodeExecutorFactory
 from victor.workflows.runtime_types import WorkflowState, create_initial_workflow_state
 
 logger = logging.getLogger(__name__)
@@ -202,7 +206,7 @@ class StateGraphExecutor:
 
         self.tool_registry = tool_registry or self._get_default_tool_registry()
         self.config = config or ExecutorConfig()
-        self._compiler: Optional["YAMLToStateGraphCompiler"] = None
+        self._compiler: Optional[NativeWorkflowGraphCompiler] = None
 
     def _get_default_tool_registry(self) -> Optional["ToolRegistry"]:
         """Get the default tool registry if available."""
@@ -213,27 +217,70 @@ class StateGraphExecutor:
         except Exception:
             return None
 
-    def _get_compiler(self) -> "YAMLToStateGraphCompiler":
-        """Get or create the StateGraph compiler."""
-        if self._compiler is None:
-            from victor.workflows.yaml_to_graph_compiler import (
-                CompilerConfig,
-                YAMLToStateGraphCompiler,
-            )
+    def _create_executor_factory(self) -> CompatibilityNodeExecutorFactory:
+        """Create the canonical node executor factory for workflow compilation."""
+        return CompatibilityNodeExecutorFactory(
+            orchestrator=self.orchestrator,
+            orchestrators=self.orchestrators,
+            tool_registry=self.tool_registry,
+        )
 
-            compiler_config = CompilerConfig(
-                max_iterations=self.config.max_iterations,
-                timeout=self.config.timeout,
+    def _build_checkpointer_factory(
+        self,
+        checkpointer: Optional["CheckpointerProtocol"] = None,
+    ) -> Callable[[], Optional["CheckpointerProtocol"]]:
+        """Create the checkpointer factory expected by the boundary compiler."""
+
+        def create_checkpointer() -> Optional["CheckpointerProtocol"]:
+            return checkpointer or MemoryCheckpointer()
+
+        return create_checkpointer
+
+    def _get_compiler(self) -> NativeWorkflowGraphCompiler:
+        """Get or create the canonical StateGraph compiler."""
+        if self._compiler is None:
+            self._compiler = NativeWorkflowGraphCompiler(
+                node_executor_factory=self._create_executor_factory(),
                 enable_checkpointing=self.config.enable_checkpointing,
                 interrupt_on_hitl=bool(self.config.interrupt_nodes),
             )
-            self._compiler = YAMLToStateGraphCompiler(
-                orchestrator=self.orchestrator,
-                orchestrators=self.orchestrators,
-                tool_registry=self.tool_registry,
-                config=compiler_config,
-            )
         return self._compiler
+
+    def _compile_workflow(
+        self,
+        workflow: "WorkflowDefinition",
+        *,
+        checkpointer: Optional["CheckpointerProtocol"] = None,
+    ) -> Any:
+        """Compile a workflow definition through the canonical boundary compiler."""
+        errors = workflow.validate()
+        if errors:
+            raise ValueError(f"Invalid workflow: {'; '.join(errors)}")
+
+        compiled_workflow = replace(
+            workflow,
+            max_iterations=self.config.max_iterations,
+            max_execution_timeout_seconds=self.config.timeout,
+        )
+        parsed = ParsedWorkflowDefinition(
+            request=WorkflowCompilationRequest(
+                source=f"workflow://{workflow.name}",
+                workflow_name=workflow.name,
+                validate=True,
+            ),
+            workflow=compiled_workflow,
+        )
+
+        if checkpointer is None:
+            compiler = self._get_compiler()
+        else:
+            compiler = NativeWorkflowGraphCompiler(
+                node_executor_factory=self._create_executor_factory(),
+                checkpointer_factory=self._build_checkpointer_factory(checkpointer),
+                enable_checkpointing=True,
+                interrupt_on_hitl=bool(self.config.interrupt_nodes),
+            )
+        return compiler.compile(parsed)
 
     async def execute(
         self,
@@ -259,21 +306,7 @@ class StateGraphExecutor:
         logger.info(f"Executing workflow '{workflow.name}'")
 
         try:
-            compiler = self._get_compiler()
-
-            # Override checkpointer if provided
-            if checkpointer:
-                from victor.workflows.yaml_to_graph_compiler import CompilerConfig
-
-                compiler.config = CompilerConfig(
-                    max_iterations=self.config.max_iterations,
-                    timeout=self.config.timeout,
-                    enable_checkpointing=True,
-                    checkpointer=checkpointer,
-                )
-
-            # Compile workflow to StateGraph
-            compiled = compiler.compile(workflow)
+            compiled = self._compile_workflow(workflow, checkpointer=checkpointer)
 
             state = create_initial_workflow_state(
                 workflow_id=thread_id,
@@ -326,8 +359,7 @@ class StateGraphExecutor:
         Yields:
             Tuple of (node_id, current_state) after each node execution
         """
-        compiler = self._get_compiler()
-        compiled = compiler.compile(workflow)
+        compiled = self._compile_workflow(workflow)
 
         state = create_initial_workflow_state(
             workflow_id=thread_id,

@@ -145,8 +145,20 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     imports; the workflow engine now treats `UnifiedWorkflowCompiler` as the
     only compiler boundary it owns directly
 
+- Phase 3.4 workflow executor canonical boundary migration:
+  - `victor.workflows.unified_executor.StateGraphExecutor` now compiles
+    `WorkflowDefinition` execution through `NativeWorkflowGraphCompiler` from
+    `victor.workflows.compiler.boundary` instead of routing through
+    `victor.workflows.yaml_to_graph_compiler`
+  - executor-local compiler caching is preserved for the default path, while
+    per-call custom checkpointers now flow through a temporary canonical
+    boundary compiler instead of mutating a legacy compiler config object
+  - runtime behavior for iteration/timeout overlays and HITL interruption is
+    preserved by overlaying executor config onto the definition before
+    canonical compilation
+
 Next resume point:
 - Continue Phase 3 by migrating remaining internal
   `victor.workflows.yaml_to_graph_compiler` callers onto compiler boundary /
-  unified compiler entrypoints, starting with framework and UI command
-  call sites rather than public compatibility exports.
+  unified compiler entrypoints, starting with the workflow UI command
+  validation and dry-run call sites rather than public compatibility exports.

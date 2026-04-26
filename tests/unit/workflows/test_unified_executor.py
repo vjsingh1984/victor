@@ -146,6 +146,74 @@ class TestStateGraphExecutor:
         assert executor.config.max_iterations == 50
         assert executor.config.timeout == 120.0
 
+    def test_get_compiler_uses_canonical_native_boundary(self):
+        """Default compiler path should use the native boundary compiler."""
+        executor = StateGraphExecutor(
+            orchestrators={"default": MagicMock(name="default_orchestrator")},
+            tool_registry=MagicMock(name="tool_registry"),
+            config=ExecutorConfig(
+                max_iterations=77,
+                timeout=12.0,
+                enable_checkpointing=False,
+                interrupt_nodes=["approval"],
+            ),
+        )
+
+        with (
+            patch("victor.workflows.unified_executor.CompatibilityNodeExecutorFactory") as factory_cls,
+            patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as compiler_cls,
+        ):
+            compiler = executor._get_compiler()
+
+        assert compiler is compiler_cls.return_value
+        factory_cls.assert_called_once_with(
+            orchestrator=executor.orchestrator,
+            orchestrators=executor.orchestrators,
+            tool_registry=executor.tool_registry,
+        )
+        compiler_cls.assert_called_once()
+        kwargs = compiler_cls.call_args.kwargs
+        assert kwargs["node_executor_factory"] is factory_cls.return_value
+        assert kwargs["enable_checkpointing"] is False
+        assert kwargs["interrupt_on_hitl"] is True
+
+    @pytest.mark.asyncio
+    async def test_execute_with_custom_checkpointer_uses_canonical_boundary_override(self):
+        """Per-call checkpointers should be applied through the canonical compiler path."""
+        executor = StateGraphExecutor(config=ExecutorConfig(enable_checkpointing=True))
+        workflow = WorkflowBuilder("checkpointer").add_transform("step", lambda ctx: ctx).build()
+        checkpointer = MagicMock(name="checkpointer")
+        compiled = MagicMock(name="compiled_graph")
+        compiled.invoke = AsyncMock(
+            return_value=MagicMock(
+                success=True,
+                state={"_workflow_id": "session-123", "result": "ok"},
+                error=None,
+                node_history=["step"],
+                iterations=1,
+            )
+        )
+        cached_compiler = MagicMock(name="cached_compiler")
+        executor._compiler = cached_compiler
+
+        with patch("victor.workflows.unified_executor.NativeWorkflowGraphCompiler") as compiler_cls:
+            compiler_cls.return_value.compile.return_value = compiled
+
+            result = await executor.execute(
+                workflow,
+                {"input": "data"},
+                thread_id="session-123",
+                checkpointer=checkpointer,
+            )
+
+        assert result.success is True
+        assert executor._compiler is cached_compiler
+        compiler_cls.assert_called_once()
+        kwargs = compiler_cls.call_args.kwargs
+        assert kwargs["enable_checkpointing"] is True
+        assert kwargs["interrupt_on_hitl"] is False
+        assert kwargs["checkpointer_factory"]() is checkpointer
+
     @pytest.mark.asyncio
     async def test_execute_simple_workflow(self):
         """Test execution of simple workflow."""
