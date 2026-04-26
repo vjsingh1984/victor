@@ -43,6 +43,10 @@ from victor.agent.tool_selection_policy import (
     StageToolSelectionContext,
     ToolSelectionStagePolicy,
 )
+from victor.agent.tool_selection_postprocessor import (
+    ToolSelectionPostProcessContext,
+    ToolSelectionPostProcessor,
+)
 from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
@@ -876,6 +880,7 @@ class ToolSelector(ModeAwareMixin):
         # Selection statistics
         self.stats = ToolSelectionStats()
         self._stage_policy = ToolSelectionStagePolicy(fallback_max_tools=fallback_max_tools)
+        self._post_processor = ToolSelectionPostProcessor()
 
         # Tool selection result cache (for expensive semantic selection)
         self._tool_selection_cache: Optional["GenericResultCache"] = None
@@ -2058,32 +2063,29 @@ class ToolSelector(ModeAwareMixin):
             tools = self._get_fallback_tools(user_message)
             is_fallback = True
 
-        # Edge model tool filter — only when edge model is the primary decision maker.
-        # With heuristic-first (default), the semantic+keyword+stage pipeline is
-        # sufficient and the cap below handles excess tools without edge model overhead.
-        if len(tools) > 8 and self._should_use_edge_for_tools():
-            tools = self._apply_edge_model_filter(tools, user_message, stage)
-
-        # --- MCP tool cap: limit MCP tools to avoid crowding native tools ---
-        max_mcp = self.tool_selection_config.get("max_mcp_tools_per_turn", 12)
-        tools = self._cap_mcp_tools(tools, max_mcp)
-
-        # Cap to fallback_max_tools to avoid broadcasting too many tools
-        if len(tools) > self.fallback_max_tools:
-            logger.debug(f"Capping tools from {len(tools)} to {self.fallback_max_tools}")
-            tools = tools[: self.fallback_max_tools]
-
-        # --- Schema promotion: STUB→COMPACT for high-confidence matches ---
-        promotion_threshold = self.tool_selection_config.get("schema_promotion_threshold", 0.8)
-        if self.semantic_selector and promotion_threshold > 0:
-            scores = self.semantic_selector.get_last_selection_scores()
-            if scores:
-                tools = promote_high_confidence_stubs(tools, scores, threshold=promotion_threshold)
-
-        # --- Token budget enforcement (after promotion, before caching) ---
-        max_schema_tokens = self.tool_selection_config.get("max_tool_schema_tokens", 0)
-        if max_schema_tokens > 0:
-            tools = _enforce_token_budget(tools, max_schema_tokens)
+        tools = self._post_processor.apply(
+            tools,
+            context=ToolSelectionPostProcessContext(
+                user_message=user_message,
+                stage=stage,
+                fallback_max_tools=self.fallback_max_tools,
+                max_mcp_tools=self.tool_selection_config.get("max_mcp_tools_per_turn", 12),
+                schema_promotion_threshold=self.tool_selection_config.get(
+                    "schema_promotion_threshold", 0.8
+                ),
+                max_schema_tokens=self.tool_selection_config.get("max_tool_schema_tokens", 0),
+            ),
+            should_use_edge_filter=self._should_use_edge_for_tools(),
+            apply_edge_filter=self._apply_edge_model_filter,
+            cap_mcp_tools=self._cap_mcp_tools,
+            selection_scores=(
+                self.semantic_selector.get_last_selection_scores()
+                if self.semantic_selector is not None
+                else None
+            ),
+            promote_schema_stubs=promote_high_confidence_stubs,
+            enforce_token_budget=_enforce_token_budget,
+        )
 
         # Record selection AFTER final cap to reflect actual tool count
         if is_fallback:

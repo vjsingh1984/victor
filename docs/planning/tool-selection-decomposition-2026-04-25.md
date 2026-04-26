@@ -42,11 +42,20 @@ Target state:
     the existing selector API
   - added focused TDD for the extracted policy and retained surrounding
     regression on the existing selector-facing tests
+- Phase 2 completed:
+  - added `victor.agent.tool_selection_postprocessor` as the canonical
+    post-selection transform chain for semantic tool selection
+  - migrated `ToolSelector.select_semantic(...)` to delegate edge filtering,
+    MCP capping, schema promotion, and token-budget enforcement through that
+    postprocessor
+  - added focused TDD for transform ordering and optional-step gating while
+    retaining surrounding regression on the existing optimization and selector
+    tests
 
 ## Next Resume Point
 
-- Phase 2: extract post-selection transforms out of `ToolSelector.select_semantic(...)`
-  so the selection flow becomes:
+- Phase 3: split semantic-selection orchestration concerns out of
+  `ToolSelector.select_semantic(...)` so the remaining flow becomes:
   1. select
   2. prune / fallback
   3. decorate / budget
