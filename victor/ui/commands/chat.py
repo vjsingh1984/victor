@@ -2127,7 +2127,7 @@ def cleanup_history_command(
     removed = original_lines - new_lines
     size_kb = history_file.stat().st_size / 1024
 
-    console.print(f"[green]✓[/] Cleaned up history file:")
+    console.print("[green]✓[/] Cleaned up history file:")
     console.print(f"  Entries: {original_lines:,} → {new_lines:,} (removed {removed:,})")
     console.print(f"  File size: {size_kb:.1f} KB")
     console.print()
@@ -2403,6 +2403,13 @@ async def _run_cli_repl(
                     _active_renderer = None
 
 
+def _create_compile_only_compiler() -> Any:
+    """Create the canonical compile-only workflow compiler for CLI validation."""
+    from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+    return UnifiedWorkflowCompiler(enable_caching=False)
+
+
 async def run_workflow_mode(
     workflow_path: str,
     validate_only: bool = False,
@@ -2426,7 +2433,6 @@ async def run_workflow_mode(
     import json
     from pathlib import Path
     from rich.table import Table
-    from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
 
     # Setup logging
     if log_level:
@@ -2463,7 +2469,7 @@ async def run_workflow_mode(
             console.print("[bold red]Error:[/] No workflows found in file")
             raise typer.Exit(1)
 
-        compiler = YAMLToStateGraphCompiler()
+        compiler = _create_compile_only_compiler()
         all_validated = True
 
         for wf_name, workflow in workflows.items():
@@ -2491,7 +2497,7 @@ async def run_workflow_mode(
 
             try:
                 # Validate using compiler
-                _compiled = compiler.compile(workflow)
+                _compiled = compiler.compile_definition(workflow)
                 console.print("[bold green]✓[/] Validation passed")
             except Exception as e:
                 console.print(f"[bold red]✗[/] Validation failed: {e}")

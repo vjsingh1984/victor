@@ -165,9 +165,15 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - focused command tests now assert those CLI compile-only paths use the
     canonical helper and fail cleanly on canonical compilation errors
 
+- Phase 3.6 chat workflow-mode compile-only canonicalization:
+  - `victor.ui.commands.chat.run_workflow_mode` now validates already-loaded
+    `WorkflowDefinition` objects through a canonical `UnifiedWorkflowCompiler`
+    helper instead of instantiating `YAMLToStateGraphCompiler` directly
+  - focused async chat workflow-mode tests now pin the canonical helper path
+    and failure behavior for validation-only runs
+
 Next resume point:
 - Continue Phase 3 by migrating remaining internal
-  `victor.workflows.yaml_to_graph_compiler` callers onto compiler boundary /
-  unified compiler entrypoints, starting with the remaining workflow/chat UI
-  execution-mode call sites and any non-public runtime callers rather than
-  public compatibility exports.
+  legacy workflow compiler consumers (`graph_compiler.py` / YAML adapter
+  compatibility layers) onto boundary/unified entrypoints where safe, while
+  leaving public compatibility exports and explicit legacy adapters intact.
