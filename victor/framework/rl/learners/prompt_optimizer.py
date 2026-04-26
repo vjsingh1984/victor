@@ -299,6 +299,8 @@ class ExecutionTrace:
     # Credit assignment signals (FEP-0001 Phase 3)
     # Per-tool credit values from CreditTrackingService
     credit_signals: List[Dict[str, Any]] = field(default_factory=list)
+    # Optional agent-level summary for multi-agent team runs
+    agent_guidance: Optional[str] = None
 
 
 @dataclass
@@ -530,6 +532,15 @@ class GEPAStrategy:
                 )[:5]:
                     avg = sum(credits) / len(credits)
                     lines.append(f"  - {tool}: avg_credit={avg:+.2f} ({len(credits)} calls)")
+
+        agent_guidance_blocks = []
+        for trace in traces:
+            guidance = getattr(trace, "agent_guidance", None)
+            if guidance and guidance not in agent_guidance_blocks:
+                agent_guidance_blocks.append(guidance)
+        if agent_guidance_blocks:
+            lines.append("- Agent execution credit:")
+            lines.extend(agent_guidance_blocks[:2])
 
         reflection = "\n".join(lines)
 
@@ -1847,7 +1858,8 @@ class PromptOptimizerLearner(BaseLearner):
                 return
 
             tool_summary = service.get_tool_credit_summary()
-            if not tool_summary:
+            agent_guidance = service.generate_agent_guidance()
+            if not tool_summary and not agent_guidance:
                 return
 
             # For each trace, attach credit data for its tools
@@ -1866,6 +1878,8 @@ class PromptOptimizerLearner(BaseLearner):
                         )
                 if credit_data:
                     trace.credit_signals = credit_data
+                if agent_guidance:
+                    trace.agent_guidance = agent_guidance
         except Exception:
             pass  # Credit enrichment is best-effort
 

@@ -125,6 +125,33 @@ class TestCreditTrackingService:
             assert signal.metadata.turn_index == 1
             assert signal.metadata.tool_name is not None
 
+    def test_assign_turn_credit_preserves_per_signal_agent_ids(self):
+        service = CreditTrackingService()
+
+        service.record_tool_result(
+            "search",
+            True,
+            40.0,
+            agent_id="researcher_1",
+            team_id="team_debug",
+        )
+        service.record_tool_result(
+            "edit",
+            False,
+            120.0,
+            error="Mismatch",
+            agent_id="executor_1",
+            team_id="team_debug",
+        )
+
+        signals = service.assign_turn_credit(agent_id="manager", team_id="team_debug")
+
+        assert len(signals) == 2
+        agent_ids = [signal.metadata.agent_id for signal in signals if signal.metadata]
+        team_ids = [signal.metadata.team_id for signal in signals if signal.metadata]
+        assert agent_ids == ["researcher_1", "executor_1"]
+        assert team_ids == ["team_debug", "team_debug"]
+
     def test_assign_turn_credit_uses_gae_by_default(self):
         service = CreditTrackingService(methodology=CreditMethodology.GAE)
 
@@ -173,6 +200,58 @@ class TestCreditTrackingService:
         assert "read" in summary or "edit" in summary
         # At least one tool should appear in summary
         assert len(summary) > 0
+
+    def test_get_agent_credit_summary(self):
+        service = CreditTrackingService()
+
+        service.record_tool_result("search", True, 40.0, agent_id="researcher_1", team_id="team_1")
+        service.record_tool_result("read", True, 50.0, agent_id="researcher_1", team_id="team_1")
+        service.record_tool_result(
+            "edit",
+            False,
+            140.0,
+            error="Mismatch",
+            agent_id="executor_1",
+            team_id="team_1",
+        )
+        service.assign_turn_credit()
+
+        summary = service.get_agent_credit_summary()
+
+        assert summary["researcher_1"]["call_count"] == 2.0
+        assert summary["researcher_1"]["team_id"] == "team_1"
+        assert summary["executor_1"]["call_count"] == 1.0
+        assert summary["executor_1"]["avg_credit"] < summary["researcher_1"]["avg_credit"]
+
+    def test_generate_agent_guidance(self):
+        service = CreditTrackingService()
+
+        service.record_tool_result("search", True, 40.0, agent_id="researcher_1", team_id="team_1")
+        service.record_tool_result(
+            "edit",
+            False,
+            140.0,
+            error="Mismatch",
+            agent_id="executor_1",
+            team_id="team_1",
+        )
+        service.record_tool_result("read", True, 50.0, agent_id="researcher_1", team_id="team_1")
+        service.record_tool_result(
+            "shell",
+            False,
+            1000.0,
+            error="Command failed",
+            agent_id="executor_1",
+            team_id="team_1",
+        )
+        service.assign_turn_credit()
+
+        guidance = service.generate_agent_guidance()
+
+        assert guidance is not None
+        assert "Agent execution credit" in guidance
+        assert "researcher_1" in guidance
+        assert "executor_1" in guidance
 
     def test_reset(self):
         service = CreditTrackingService()

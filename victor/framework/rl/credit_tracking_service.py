@@ -53,6 +53,8 @@ class ToolRewardSignal:
     success: bool
     reward: float
     execution_time_ms: float
+    agent_id: str = "default"
+    team_id: Optional[str] = None
     error: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
     arguments_summary: str = ""
@@ -203,6 +205,7 @@ class CreditTrackingService:
         error: Optional[str] = None,
         arguments: Optional[Dict[str, Any]] = None,
         agent_id: str = "default",
+        team_id: Optional[str] = None,
     ) -> ToolRewardSignal:
         """Record a tool execution result for the current turn.
 
@@ -216,6 +219,7 @@ class CreditTrackingService:
             error: Optional error message
             arguments: Optional tool arguments (for context)
             agent_id: Agent that initiated the call
+            team_id: Optional team identifier for multi-agent runs
 
         Returns:
             The extracted ToolRewardSignal
@@ -225,6 +229,8 @@ class CreditTrackingService:
 
         signal = ToolRewardSignal(
             tool_name=tool_name,
+            agent_id=agent_id,
+            team_id=team_id,
             success=success,
             reward=reward,
             execution_time_ms=execution_time_ms,
@@ -251,6 +257,7 @@ class CreditTrackingService:
         self,
         agent_id: str = "default",
         methodology: Optional[CreditMethodology] = None,
+        team_id: Optional[str] = None,
     ) -> List[CreditSignal]:
         """Assign credit for all tool executions in the current turn.
 
@@ -261,6 +268,7 @@ class CreditTrackingService:
         Args:
             agent_id: Agent ID for this turn
             methodology: Override methodology for this turn
+            team_id: Optional team ID for this turn
 
         Returns:
             List of CreditSignal for this turn's tools
@@ -280,8 +288,10 @@ class CreditTrackingService:
         rewards: List[float] = []
 
         for i, signal in enumerate(self._current_turn_signals):
+            signal_agent_id = signal.agent_id if signal.agent_id != "default" else agent_id
             metadata = ActionMetadata(
-                agent_id=agent_id,
+                agent_id=signal_agent_id,
+                team_id=signal.team_id or team_id,
                 action_id=f"turn{self._turn_count}_tool{i}_{signal.tool_name}",
                 turn_index=self._turn_count,
                 step_index=i,
@@ -372,8 +382,46 @@ class CreditTrackingService:
 
         return result
 
+    def get_agent_credit_summary(self) -> Dict[str, Dict[str, Any]]:
+        """Get aggregate credit summary by agent ID.
+
+        Returns:
+            Dict mapping agent_id → {total_credit, avg_credit, call_count, success_rate, team_id}
+        """
+        agent_stats: Dict[str, Dict[str, Any]] = defaultdict(
+            lambda: {
+                "total_credit": 0.0,
+                "call_count": 0,
+                "successes": 0,
+                "team_id": None,
+            }
+        )
+
+        for signal in self._recent_credit_signals:
+            if signal.metadata and signal.metadata.agent_id:
+                agent_id = signal.metadata.agent_id
+                agent_stats[agent_id]["total_credit"] += signal.credit
+                agent_stats[agent_id]["call_count"] += 1
+                if signal.credit > 0:
+                    agent_stats[agent_id]["successes"] += 1
+                if signal.metadata.team_id:
+                    agent_stats[agent_id]["team_id"] = signal.metadata.team_id
+
+        result: Dict[str, Dict[str, Any]] = {}
+        for agent_id, stats in agent_stats.items():
+            count = stats["call_count"]
+            result[agent_id] = {
+                "total_credit": stats["total_credit"],
+                "avg_credit": stats["total_credit"] / count if count > 0 else 0.0,
+                "call_count": float(count),
+                "success_rate": stats["successes"] / count if count > 0 else 0.0,
+                "team_id": stats["team_id"],
+            }
+
+        return result
+
     # ----------------------------------------------------------------
-    # Feedback loop: credit-driven tool guidance for prompt injection
+    # Feedback loop: credit-driven guidance for prompt injection
     # ----------------------------------------------------------------
 
     def generate_tool_guidance(self, max_hints: int = 5) -> Optional[str]:
@@ -427,6 +475,44 @@ class CreditTrackingService:
 
         if len(lines) == 1:
             return None  # No actionable hints
+
+        return "\n".join(lines)
+
+    def generate_agent_guidance(self, max_agents: int = 4) -> Optional[str]:
+        """Generate concise agent-specific guidance from recent team credit.
+
+        Returns a short textual summary that can be fed into prompt optimization
+        for offline reflection in multi-agent scenarios.
+        """
+        summary = self.get_agent_credit_summary()
+        if not summary:
+            return None
+
+        total_calls = sum(int(stats["call_count"]) for stats in summary.values())
+        if total_calls < 4:
+            return None
+
+        ranked = sorted(summary.items(), key=lambda item: item[1]["avg_credit"])
+        lines = ["Agent execution credit (from recent team runs):"]
+
+        underperforming = [(agent, stats) for agent, stats in ranked if stats["avg_credit"] < -0.3]
+        for agent_id, stats in underperforming[:max_agents]:
+            calls = int(stats["call_count"])
+            lines.append(
+                f"- {agent_id}: low effectiveness (avg credit {stats['avg_credit']:+.1f} "
+                f"over {calls} calls). Tighten tool-choice and handoff discipline."
+            )
+
+        high_value = [(agent, stats) for agent, stats in reversed(ranked) if stats["avg_credit"] > 0.0]
+        for agent_id, stats in high_value[:max_agents]:
+            calls = int(stats["call_count"])
+            lines.append(
+                f"- {agent_id}: high effectiveness (avg credit {stats['avg_credit']:+.1f} "
+                f"over {calls} calls). Preserve this execution pattern."
+            )
+
+        if len(lines) == 1:
+            return None
 
         return "\n".join(lines)
 

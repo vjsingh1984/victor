@@ -103,6 +103,33 @@ class TestGEPAStrategyHeuristic:
         result = strategy.mutate("Original.", reflection, "TEST")
         assert result == "Original."
 
+    def test_reflect_includes_agent_credit_guidance(self):
+        strategy = GEPAStrategy()
+        strategy._provider = None
+        strategy._provider_name = None
+        traces = [
+            ExecutionTrace(
+                session_id="s1",
+                task_type="action",
+                provider="ollama",
+                model="qwen",
+                tool_calls=2,
+                tool_failures={"edit_mismatch": 1},
+                success=False,
+                completion_score=0.4,
+                tokens_used=200,
+                agent_guidance=(
+                    "Agent execution credit (from recent team runs):\n"
+                    "- executor_1: low effectiveness."
+                ),
+            )
+        ]
+
+        reflection = strategy.reflect(traces, "GROUNDING_RULES", "Base prompt.")
+
+        assert "Agent execution credit" in reflection
+        assert "executor_1" in reflection
+
 
 class TestPromptOptimizerLearner:
     """Tests for PromptOptimizerLearner."""
@@ -693,6 +720,10 @@ class TestPromptOptimizerLearner:
         service.get_tool_credit_summary = lambda: {
             "grep": {"avg_credit": 0.8, "total_credit": 1.6, "call_count": 2}
         }
+        service.generate_agent_guidance = lambda: (
+            "Agent execution credit (from recent team runs):\n"
+            "- researcher_1: high effectiveness."
+        )
 
         container = ServiceContainer()
         container.register_instance(CreditTrackingService, service)
@@ -713,5 +744,6 @@ class TestPromptOptimizerLearner:
             learner._enrich_traces_with_credit([trace])
             assert trace.credit_signals[0]["tool_name"] == "grep"
             assert trace.credit_signals[0]["credit"] == 0.8
+            assert "researcher_1" in (trace.agent_guidance or "")
         finally:
             reset_container()
