@@ -49,7 +49,12 @@ Key Components:
 - LearnerType: Enum of available learner types
 
 Usage:
-    from victor.framework.rl import RLManager, LearnerType, get_rl_coordinator
+    from victor.framework.rl import (
+        RLManager,
+        LearnerType,
+        create_prompt_rollout_experiment,
+        get_rl_coordinator,
+    )
 
     # Option 1: Use high-level RLManager
     rl = RLManager()
@@ -72,6 +77,15 @@ Usage:
         learner_name="continuation_patience",
         outcome=RLOutcome(...),
         vertical="coding",
+    )
+
+    # Option 3: Start a prompt rollout for an approved candidate
+    experiment_id = create_prompt_rollout_experiment(
+        section_name="GROUNDING_RULES",
+        provider="anthropic",
+        treatment_hash="candidate_hash",
+        traffic_split=0.1,
+        min_samples_per_variant=50,
     )
 """
 

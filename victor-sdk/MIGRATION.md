@@ -73,6 +73,8 @@ These require the full `victor-ai` runtime and cannot be promoted to the zero-de
 | `BaseLearner` | `victor.framework.rl.base` | ABC with framework method contracts |
 | `get_team_registry` | `victor.framework.team_registry` | Global singleton accessor |
 | `get_rl_coordinator` | `victor.framework.rl.coordinator` | Runtime RL system |
+| `create_prompt_rollout_experiment` | `victor_sdk.rl_runtime` | Runtime adapter for benchmark-gated prompt rollout experiments |
+| `create_prompt_rollout_experiment_async` | `victor_sdk.rl_runtime` | Async runtime adapter for benchmark-gated prompt rollout experiments |
 
 **Best practice**: Import these inside method bodies (lazy), not at module level:
 ```python
@@ -81,6 +83,21 @@ class MyVertical(VerticalBase):
         # Lazy import — only when victor-ai is installed
         from victor.framework.config import SafetyEnforcer
         return VerticalExtensions(safety=SafetyEnforcer(...))
+```
+
+For RL runtime helpers that depend on the full host framework, prefer the SDK
+runtime adapter instead of importing host modules directly:
+
+```python
+from victor_sdk.rl_runtime import create_prompt_rollout_experiment
+
+experiment_id = create_prompt_rollout_experiment(
+    section_name="GROUNDING_RULES",
+    provider="anthropic",
+    treatment_hash="candidate_hash",
+    traffic_split=0.1,
+    min_samples_per_variant=50,
+)
 ```
 
 ### Dependency Configuration
