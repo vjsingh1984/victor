@@ -164,6 +164,13 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - this locks in the current state where internal runtime and test code
     depends on canonical provider package modules instead of re-entering the
     root shim modules
+- Phase 2.15 explicit root provider shim warnings:
+  - `victor.agent.provider_coordinator` and
+    `victor.agent.provider_switch_coordinator` now emit explicit
+    `DeprecationWarning`s on import while preserving symbol re-exports
+  - the dedicated shim tests now reload those modules under warning capture,
+    so the deprecation behavior is covered intentionally instead of surfacing
+    as incidental collection-time noise
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -311,8 +318,7 @@ Next resume point:
   surface (`victor/workflows/__init__.py`, integration coverage, and the
   legacy executor module itself).
 - The next active compatibility seam is provider runtime exposure through
-  public provider shim exports, public docs, and compatibility-only tests.
-  If continued, the next step is to decide whether the root provider shim
-  modules should stay as permanent public re-export surfaces or move to
-  explicit deprecated-import warning wrappers while preserving external
-  compatibility.
+  public docs and eventual retirement policy only. The runtime and internal
+  import migration work for root provider shims is complete; any further work
+  here is a deprecation-policy decision rather than an active canonicalization
+  gap.

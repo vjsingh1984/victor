@@ -18,6 +18,10 @@ The canonical implementation now lives under ``victor.agent.provider``.
 This module remains as a public compatibility surface for legacy imports.
 """
 
+from __future__ import annotations
+
+import warnings
+
 from victor.agent.provider.switch_coordinator import (
     HookPriority,
     PostSwitchHook,
@@ -25,6 +29,13 @@ from victor.agent.provider.switch_coordinator import (
     RegisteredHook,
     SwitchContext,
     create_provider_switch_coordinator,
+)
+
+warnings.warn(
+    "victor.agent.provider_switch_coordinator is deprecated. "
+    "Import provider switch APIs from victor.agent.provider.switch_coordinator instead.",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 __all__ = [

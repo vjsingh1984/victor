@@ -18,11 +18,22 @@ The canonical implementation now lives under ``victor.agent.provider``.
 This module remains as a public compatibility surface for legacy imports.
 """
 
+from __future__ import annotations
+
+import warnings
+
 from victor.agent.provider.coordinator import (
     ProviderCoordinator,
     ProviderCoordinatorConfig,
     RateLimitInfo,
     create_provider_coordinator,
+)
+
+warnings.warn(
+    "victor.agent.provider_coordinator is deprecated. "
+    "Import provider coordination APIs from victor.agent.provider.coordinator instead.",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 __all__ = [

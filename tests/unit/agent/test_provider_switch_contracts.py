@@ -1,4 +1,7 @@
+from importlib import import_module, reload
 from pathlib import Path
+
+import pytest
 
 from victor.agent.provider.switch_contracts import (
     HookPriority,
@@ -8,25 +11,24 @@ from victor.agent.provider.switch_contracts import (
 from victor.agent.provider.switch_coordinator import (
     ProviderSwitchCoordinator as CanonicalProviderSwitchCoordinator,
 )
-from victor.agent.provider_switch_coordinator import (
-    ProviderSwitchCoordinator as LegacyProviderSwitchCoordinator,
-)
-from victor.agent.provider_switch_coordinator import (
-    HookPriority as LegacyHookPriority,
-)
-from victor.agent.provider_switch_coordinator import (
-    PostSwitchHook as LegacyPostSwitchHook,
-)
-from victor.agent.provider_switch_coordinator import (
-    SwitchContext as LegacySwitchContext,
-)
 
 
-def test_legacy_provider_switch_coordinator_reexports_canonical_contracts():
-    assert LegacyProviderSwitchCoordinator is CanonicalProviderSwitchCoordinator
-    assert LegacyHookPriority is HookPriority
-    assert LegacySwitchContext is SwitchContext
-    assert LegacyPostSwitchHook is PostSwitchHook
+def _reload_legacy_provider_switch_module():
+    module = import_module("victor.agent.provider_switch_coordinator")
+    return reload(module)
+
+
+def test_legacy_provider_switch_coordinator_reexports_canonical_contracts_with_warning():
+    with pytest.warns(
+        DeprecationWarning,
+        match="victor\\.agent\\.provider_switch_coordinator is deprecated",
+    ):
+        legacy_module = _reload_legacy_provider_switch_module()
+
+    assert legacy_module.ProviderSwitchCoordinator is CanonicalProviderSwitchCoordinator
+    assert legacy_module.HookPriority is HookPriority
+    assert legacy_module.SwitchContext is SwitchContext
+    assert legacy_module.PostSwitchHook is PostSwitchHook
 
 
 def test_post_switch_hooks_use_canonical_switch_contract_imports():
@@ -51,14 +53,17 @@ def test_factory_code_uses_provider_package_instead_of_root_switch_module():
         "from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator"
         not in orchestrator_factory_source
     )
-    assert "from victor.agent.provider import ProviderSwitchCoordinator" in runtime_builders_source
-    assert (
-        "from victor.agent.provider import ProviderSwitchCoordinator" in orchestrator_factory_source
-    )
+    assert "from victor.agent.provider import ProviderSwitchCoordinator" in orchestrator_factory_source
 
 
 def test_provider_package_uses_canonical_switch_coordinator_module():
     provider_package_source = Path("victor/agent/provider/__init__.py").read_text()
 
-    assert "from victor.agent.provider.switch_coordinator import ProviderSwitchCoordinator" in provider_package_source
-    assert "from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator" not in provider_package_source
+    assert (
+        "from victor.agent.provider.switch_coordinator import ProviderSwitchCoordinator"
+        in provider_package_source
+    )
+    assert (
+        "from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator"
+        not in provider_package_source
+    )
