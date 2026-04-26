@@ -55,18 +55,10 @@ jobs:
             --benchmark-sort=mean \
             -v
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        continue-on-error: true
-        with:
-          tool: 'pytest'
-          output-file-path: output.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: false  # Don't push to gh-pages automatically
-          alert-threshold: '150%'  # Alert if 150% of baseline
-          comment-on-alert: true
-          fail-on-alert: false
-          alert-comment-cc-users: '@vijaysingh'
+      - name: Store benchmark result (skipped - gh-pages restricted)
+        run: |
+          echo "Benchmark results will be stored as workflow artifacts instead of gh-pages"
+          echo "This works around repository branch creation restrictions"
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
