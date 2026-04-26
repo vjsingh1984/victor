@@ -29,6 +29,23 @@ class TestPersistMessage:
         assert call_args.kwargs["session_id"] == "sess-1"
         assert call_args.kwargs["content"] == "hello"
 
+    def test_persists_metadata_to_memory_manager(self):
+        mm = MagicMock()
+        logger = MagicMock(spec=["log_event"])
+        metadata = {"interactive_history": False, "internal_prompt_kind": "prompt_tool_call"}
+
+        with patch("asyncio.get_running_loop", side_effect=RuntimeError):
+            ChatService.persist_message(
+                role="user",
+                content="Continue. Use appropriate tools if needed.",
+                memory_manager=mm,
+                memory_session_id="sess-1",
+                usage_logger=logger,
+                metadata=metadata,
+            )
+
+        assert mm.add_message.call_args.kwargs["metadata"] == metadata
+
     def test_logs_user_prompt_event(self):
         logger = MagicMock(spec=["log_event"])
 
@@ -123,4 +140,5 @@ class TestPersistMessage:
             tool_name=None,
             tool_call_id=None,
             tool_calls=None,
+            metadata=None,
         )

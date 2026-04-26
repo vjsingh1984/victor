@@ -658,7 +658,7 @@ class MessageStore(Protocol):
         """Get current message history."""
         ...
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add message to history.
 
         Args:

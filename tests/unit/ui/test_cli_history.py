@@ -50,16 +50,23 @@ class TestCliPromptSession:
                 CREATE TABLE messages (
                     role TEXT,
                     content TEXT,
-                    timestamp TEXT
+                    timestamp TEXT,
+                    metadata TEXT
                 )
                 """)
             conn.executemany(
-                "INSERT INTO messages(role, content, timestamp) VALUES (?, ?, ?)",
+                "INSERT INTO messages(role, content, timestamp, metadata) VALUES (?, ?, ?, ?)",
                 [
-                    ("user", "real prompt", "2026-04-26 10:00:00"),
-                    ("user", "[SYSTEM-REMINDER: hidden]", "2026-04-26 10:01:00"),
-                    ("user", "Continue. Use appropriate tools if needed.", "2026-04-26 10:02:00"),
-                    ("user", "follow-up prompt", "2026-04-26 10:03:00"),
+                    ("user", "real prompt", "2026-04-26 10:00:00", None),
+                    ("user", "[SYSTEM-REMINDER: hidden]", "2026-04-26 10:01:00", None),
+                    ("user", "Continue. Use appropriate tools if needed.", "2026-04-26 10:02:00", None),
+                    (
+                        "user",
+                        "plain-looking hidden prompt",
+                        "2026-04-26 10:02:30",
+                        '{"interactive_history": false, "internal_prompt_kind": "prompt_tool_call"}',
+                    ),
+                    ("user", "follow-up prompt", "2026-04-26 10:03:00", None),
                 ],
             )
 

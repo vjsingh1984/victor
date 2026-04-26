@@ -54,8 +54,11 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     )
     _system_added: bool = False
 
-    def add_message(self, role: str, content: str) -> None:
-        self.messages.append({"role": role, "content": content})
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
+        entry = {"role": role, "content": content}
+        if metadata:
+            entry.update(metadata)
+        self.messages.append(entry)
 
     def _check_context_overflow(self, max_context: int) -> bool:
         return False  # Never overflow in tests

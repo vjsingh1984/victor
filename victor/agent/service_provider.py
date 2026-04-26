@@ -1092,7 +1092,7 @@ class OrchestratorServiceProvider:
         class MockMessageAdder:
             """Mock message adder for StreamingChatHandler."""
 
-            def add_message(self, role: str, content: str):
+            def add_message(self, role: str, content: str, **metadata):
                 pass
 
         message_adder = MockMessageAdder()

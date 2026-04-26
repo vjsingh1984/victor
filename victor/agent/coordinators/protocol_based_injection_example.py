@@ -23,7 +23,7 @@ class MockConversation:
 
     messages: List[Any] = field(default_factory=list)
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         self.messages.append({"role": role, "content": content})
 
     @property
@@ -154,8 +154,8 @@ class MockChatOrchestrator(ChatOrchestratorProtocol):
     _cumulative_token_usage: Dict[str, int] = field(default_factory=dict)
     _system_added: bool = False
 
-    def add_message(self, role: str, content: str) -> None:
-        self.conversation.add_message(role, content)
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
+        self.conversation.add_message(role, content, **metadata)
 
     def _check_context_overflow(self, max_context: int) -> bool:
         return len(self.messages) > 100  # Simple mock

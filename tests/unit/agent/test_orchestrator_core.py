@@ -1038,6 +1038,14 @@ class TestServiceFirstDelegation:
 
         persist.assert_called_once()
 
+    def test_add_message_forwards_metadata_to_chat_service(self, orchestrator):
+        metadata = {"interactive_history": False, "internal_prompt_kind": "system_reminder"}
+
+        with patch("victor.agent.services.chat_service.ChatService.persist_message") as persist:
+            orchestrator.add_message("user", "[SYSTEM-REMINDER: hidden]", metadata=metadata)
+
+        assert persist.call_args.kwargs["metadata"] == metadata
+
     @pytest.mark.asyncio
     async def test_maybe_auto_checkpoint_uses_session_service(self, orchestrator):
         deprecated_session_coordinator = orchestrator._deprecated_session_coordinator

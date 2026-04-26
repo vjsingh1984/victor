@@ -23,6 +23,7 @@ from typing import Any
 
 from victor.agent.task_coordinator import TaskCoordinator as LegacyTaskCoordinator
 from victor.agent.services.task_runtime import TaskCoordinator
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.config.settings import Settings
 
 
@@ -144,6 +145,7 @@ class TestTaskPreparation:
                 if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
             ]
             assert len(calls) > 0
+            assert calls[0].kwargs["metadata"] == build_internal_history_metadata("task_hint")
 
 
 class TestIntentDetection:

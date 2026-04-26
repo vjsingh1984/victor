@@ -34,20 +34,27 @@ def test_load_input_history_from_db_filters_internal_and_keeps_recent_unique(tmp
             CREATE TABLE messages (
                 role TEXT,
                 content TEXT,
-                timestamp TEXT
+                timestamp TEXT,
+                metadata TEXT
             )
             """)
         conn.executemany(
-            "INSERT INTO messages(role, content, timestamp) VALUES (?, ?, ?)",
+            "INSERT INTO messages(role, content, timestamp, metadata) VALUES (?, ?, ?, ?)",
             [
-                ("user", "first real prompt", "2026-04-26 10:00:00"),
-                ("user", "[SYSTEM-REMINDER: use tools]", "2026-04-26 10:01:00"),
-                ("user", "first real prompt", "2026-04-26 10:02:00"),
-                ("user", "Continue. Use appropriate tools if needed.", "2026-04-26 10:03:00"),
-                ("user", "second real prompt", "2026-04-26 10:04:00"),
-                ("user", '<TOOL_OUTPUT tool="read">x</TOOL_OUTPUT>', "2026-04-26 10:05:00"),
-                ("assistant", "ignored assistant", "2026-04-26 10:06:00"),
-                ("user", "multiline\nreal prompt", "2026-04-26 10:07:00"),
+                ("user", "first real prompt", "2026-04-26 10:00:00", None),
+                ("user", "[SYSTEM-REMINDER: use tools]", "2026-04-26 10:01:00", None),
+                ("user", "first real prompt", "2026-04-26 10:02:00", None),
+                ("user", "Continue. Use appropriate tools if needed.", "2026-04-26 10:03:00", None),
+                ("user", "second real prompt", "2026-04-26 10:04:00", None),
+                (
+                    "user",
+                    "plain-looking hidden prompt",
+                    "2026-04-26 10:04:30",
+                    '{"interactive_history": false, "internal_prompt_kind": "prompt_tool_call"}',
+                ),
+                ("user", '<TOOL_OUTPUT tool="read">x</TOOL_OUTPUT>', "2026-04-26 10:05:00", None),
+                ("assistant", "ignored assistant", "2026-04-26 10:06:00", None),
+                ("user", "multiline\nreal prompt", "2026-04-26 10:07:00", None),
             ],
         )
 

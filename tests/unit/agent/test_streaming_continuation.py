@@ -18,6 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.continuation import ContinuationHandler
 
@@ -52,7 +53,11 @@ class TestContinuationSkipRules:
         )
 
         assert result.should_skip_rest is True
-        continuation_handler._message_adder.add_message.assert_called_once()
+        continuation_handler._message_adder.add_message.assert_called_once_with(
+            "user",
+            "Make the actual tool call now.",
+            metadata=build_internal_history_metadata("force_tool_execution"),
+        )
 
     @pytest.mark.asyncio
     async def test_finish_still_respects_skip_continuation(self, continuation_handler):
@@ -68,3 +73,23 @@ class TestContinuationSkipRules:
         assert result.should_return is True
         assert result.should_continue_loop is False
         continuation_handler._message_adder.add_message.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_prompt_tool_call_marks_internal_history_metadata(self, continuation_handler):
+        stream_ctx = StreamingChatContext(user_message="test")
+
+        result = await continuation_handler.handle_action(
+            {
+                "action": "prompt_tool_call",
+                "message": "Continue. Use appropriate tools if needed.",
+            },
+            stream_ctx,
+            full_content="",
+        )
+
+        assert result.should_skip_rest is True
+        continuation_handler._message_adder.add_message.assert_called_once_with(
+            "user",
+            "Continue. Use appropriate tools if needed.",
+            metadata=build_internal_history_metadata("prompt_tool_call"),
+        )
