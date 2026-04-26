@@ -246,6 +246,12 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     `WorkflowExecutor` just to assert isolation defaults; the checks now
     depend directly on `IsolationMapper`, which is the real subject under test
 
+- Phase 4.4 handler test canonical SDK imports:
+  - `tests/unit/workflows/handlers/test_error_boundary.py` now imports
+    `NodeResult` and `ExecutorNodeStatus` directly from `victor_sdk.workflows`
+    instead of the legacy executor re-export surface, keeping compatibility
+    coverage isolated to the explicit interop tests
+
 Next resume point:
 - Remaining `victor.workflows.executor` imports are now intentional
   compatibility/public-test surface (`victor/workflows/__init__.py`,
