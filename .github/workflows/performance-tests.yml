@@ -13,6 +13,7 @@ on:
 permissions:
   contents: read
   checks: write
+  pull-requests: write  # Allow commenting on PRs with benchmark results
 
 jobs:
   performance-regression:
