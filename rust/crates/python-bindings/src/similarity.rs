@@ -499,7 +499,7 @@ mod tests {
 /// Stores vectors in a contiguous flat buffer for SIMD-friendly access.
 #[pyclass]
 pub struct EmbeddingIndex {
-    data: Vec<f32>,     // flat: dim * n_vectors
+    data: Vec<f32>, // flat: dim * n_vectors
     dim: usize,
     n_vectors: usize,
     labels: Vec<String>,
@@ -759,14 +759,11 @@ mod embedding_index_tests {
 
     #[test]
     fn test_add_vectors() {
-        let mut idx = EmbeddingIndex::new(
-            vec![vec![1.0, 0.0]],
-            vec!["a".to_string()],
-        )
-        .unwrap();
+        let mut idx = EmbeddingIndex::new(vec![vec![1.0, 0.0]], vec!["a".to_string()]).unwrap();
         assert_eq!(idx.len(), 1);
 
-        idx.add(vec![vec![0.0, 1.0]], vec!["b".to_string()]).unwrap();
+        idx.add(vec![vec![0.0, 1.0]], vec!["b".to_string()])
+            .unwrap();
         assert_eq!(idx.len(), 2);
         assert_eq!(idx.labels, vec!["a", "b"]);
     }
@@ -774,19 +771,18 @@ mod embedding_index_tests {
     #[test]
     fn test_add_to_empty_index() {
         let mut idx = EmbeddingIndex::new(vec![], vec![]).unwrap();
-        idx.add(vec![vec![1.0, 0.0]], vec!["a".to_string()]).unwrap();
+        idx.add(vec![vec![1.0, 0.0]], vec!["a".to_string()])
+            .unwrap();
         assert_eq!(idx.len(), 1);
         assert_eq!(idx.dim(), 2);
     }
 
     #[test]
     fn test_add_dimension_mismatch() {
-        let mut idx = EmbeddingIndex::new(
-            vec![vec![1.0, 0.0]],
-            vec!["a".to_string()],
-        )
-        .unwrap();
-        assert!(idx.add(vec![vec![1.0, 0.0, 0.0]], vec!["b".to_string()]).is_err());
+        let mut idx = EmbeddingIndex::new(vec![vec![1.0, 0.0]], vec!["a".to_string()]).unwrap();
+        assert!(idx
+            .add(vec![vec![1.0, 0.0, 0.0]], vec!["b".to_string()])
+            .is_err());
     }
 
     #[test]
@@ -833,11 +829,7 @@ mod embedding_index_tests {
 
     #[test]
     fn test_query_wrong_dimension() {
-        let idx = EmbeddingIndex::new(
-            vec![vec![1.0, 0.0]],
-            vec!["a".to_string()],
-        )
-        .unwrap();
+        let idx = EmbeddingIndex::new(vec![vec![1.0, 0.0]], vec!["a".to_string()]).unwrap();
 
         let results = idx.query(vec![1.0, 0.0, 0.0], 1, 0.0);
         assert!(results.is_empty());
@@ -853,18 +845,14 @@ mod embedding_index_tests {
 
         let sims = idx.similarities(vec![1.0, 0.0]).unwrap();
         assert_eq!(sims.len(), 3);
-        assert!((sims[0] - 1.0).abs() < 1e-6);  // identical
-        assert!(sims[1].abs() < 1e-6);            // orthogonal
-        assert!((sims[2] + 1.0).abs() < 1e-6);   // opposite
+        assert!((sims[0] - 1.0).abs() < 1e-6); // identical
+        assert!(sims[1].abs() < 1e-6); // orthogonal
+        assert!((sims[2] + 1.0).abs() < 1e-6); // opposite
     }
 
     #[test]
     fn test_similarities_wrong_dimension() {
-        let idx = EmbeddingIndex::new(
-            vec![vec![1.0, 0.0]],
-            vec!["a".to_string()],
-        )
-        .unwrap();
+        let idx = EmbeddingIndex::new(vec![vec![1.0, 0.0]], vec!["a".to_string()]).unwrap();
         assert!(idx.similarities(vec![1.0, 0.0, 0.0]).is_err());
     }
 

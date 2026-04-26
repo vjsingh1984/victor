@@ -233,7 +233,7 @@ fn smart_quote_replace(value: &str) -> String {
     let mut string_char = '"';
     let mut prev_was_escape = false;
 
-    while let Some(c) = chars.next() {
+    for c in chars {
         if prev_was_escape {
             result.push(c);
             prev_was_escape = false;
@@ -303,7 +303,7 @@ fn repair_trailing_comma(value: &str) -> String {
             // Look ahead for } or ]
             let mut peek_chars = chars.clone();
             let mut found_closing = false;
-            while let Some(pc) = peek_chars.next() {
+            for pc in peek_chars {
                 if pc.is_whitespace() {
                     continue;
                 }
@@ -338,20 +338,23 @@ pub fn is_valid_json(value: &str) -> bool {
 #[pyfunction]
 pub fn get_json_type(value: &str) -> Option<String> {
     match serde_json::from_str::<serde_json::Value>(value) {
-        Ok(v) => Some(match v {
-            serde_json::Value::Null => "null",
-            serde_json::Value::Bool(_) => "bool",
-            serde_json::Value::Number(n) => {
-                if n.is_i64() || n.is_u64() {
-                    "int"
-                } else {
-                    "float"
+        Ok(v) => Some(
+            match v {
+                serde_json::Value::Null => "null",
+                serde_json::Value::Bool(_) => "bool",
+                serde_json::Value::Number(n) => {
+                    if n.is_i64() || n.is_u64() {
+                        "int"
+                    } else {
+                        "float"
+                    }
                 }
+                serde_json::Value::String(_) => "string",
+                serde_json::Value::Array(_) => "list",
+                serde_json::Value::Object(_) => "dict",
             }
-            serde_json::Value::String(_) => "string",
-            serde_json::Value::Array(_) => "list",
-            serde_json::Value::Object(_) => "dict",
-        }.to_string()),
+            .to_string(),
+        ),
         Err(_) => None,
     }
 }

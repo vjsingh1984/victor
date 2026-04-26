@@ -183,7 +183,7 @@ pub fn extract_workflow_names(yaml_content: &str) -> PyResult<Vec<String>> {
     if let serde_yaml::Value::Mapping(map) = &value {
         // Check for "workflows" key
         if let Some(serde_yaml::Value::Mapping(workflows)) =
-            map.get(&serde_yaml::Value::String("workflows".to_string()))
+            map.get(serde_yaml::Value::String("workflows".to_string()))
         {
             for key in workflows.keys() {
                 if let serde_yaml::Value::String(name) = key {
@@ -196,7 +196,7 @@ pub fn extract_workflow_names(yaml_content: &str) -> PyResult<Vec<String>> {
                 if let serde_yaml::Value::String(name) = key {
                     // Check if this looks like a workflow (has "nodes" key)
                     if let serde_yaml::Value::Mapping(wf) = val {
-                        if wf.contains_key(&serde_yaml::Value::String("nodes".to_string())) {
+                        if wf.contains_key(serde_yaml::Value::String("nodes".to_string())) {
                             names.push(name.clone());
                         }
                     }

@@ -333,7 +333,10 @@ pub fn extract_identifiers(source: &str) -> Vec<String> {
     }
 
     // Use HashSet for deduplication
-    let identifiers: HashSet<&str> = IDENTIFIER_REGEX.find_iter(source).map(|m| m.as_str()).collect();
+    let identifiers: HashSet<&str> = IDENTIFIER_REGEX
+        .find_iter(source)
+        .map(|m| m.as_str())
+        .collect();
 
     identifiers.into_iter().map(|s| s.to_string()).collect()
 }
@@ -401,22 +404,14 @@ mod tests {
 
     #[test]
     fn test_batch_is_stdlib_modules() {
-        let modules = vec![
-            "os".to_string(),
-            "victor".to_string(),
-            "json".to_string(),
-        ];
+        let modules = vec!["os".to_string(), "victor".to_string(), "json".to_string()];
         let results = batch_is_stdlib_modules(modules);
         assert_eq!(results, vec![true, false, true]);
     }
 
     #[test]
     fn test_filter_stdlib_imports() {
-        let imports = vec![
-            "os".to_string(),
-            "victor".to_string(),
-            "json".to_string(),
-        ];
+        let imports = vec!["os".to_string(), "victor".to_string(), "json".to_string()];
         let (stdlib, non_stdlib) = filter_stdlib_imports(imports);
         assert_eq!(stdlib, vec!["os", "json"]);
         assert_eq!(non_stdlib, vec!["victor"]);
@@ -448,8 +443,12 @@ mod tests {
 
         assert_eq!(results.len(), 2);
         // foo at 0-3
-        assert!(results.iter().any(|(id, start, end)| id == "foo" && *start == 0 && *end == 3));
+        assert!(results
+            .iter()
+            .any(|(id, start, end)| id == "foo" && *start == 0 && *end == 3));
         // bar at 4-7
-        assert!(results.iter().any(|(id, start, end)| id == "bar" && *start == 4 && *end == 7));
+        assert!(results
+            .iter()
+            .any(|(id, start, end)| id == "bar" && *start == 4 && *end == 7));
     }
 }

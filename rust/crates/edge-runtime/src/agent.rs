@@ -135,10 +135,7 @@ impl EdgeAgent {
             tool_call_id: None,
         });
 
-        debug!(
-            message_count = self.messages.len(),
-            "Sending chat request"
-        );
+        debug!(message_count = self.messages.len(), "Sending chat request");
 
         // Get tool definitions for the provider
         let tool_defs = if self.tools.is_empty() {
@@ -184,10 +181,7 @@ impl EdgeAgent {
             }
         }
 
-        debug!(
-            response_len = content.len(),
-            "Chat turn complete"
-        );
+        debug!(response_len = content.len(), "Chat turn complete");
 
         Ok(content)
     }
@@ -205,7 +199,9 @@ impl EdgeAgent {
         let turns = 1;
 
         // Continue if the model wants to use tools (future: execute them)
-        while turns < self.config.max_turns {
+        // Note: Tool execution not yet implemented, so we stop after first turn
+        // When implemented, increment turns in the loop
+        if turns < self.config.max_turns {
             let has_tool_calls = self
                 .messages
                 .last()
@@ -214,14 +210,13 @@ impl EdgeAgent {
                 .unwrap_or(false);
 
             if !has_tool_calls {
-                break;
+                return Ok(last_response);
             }
 
             warn!(
                 turn = turns,
                 "Model requested tool calls but execution is not yet implemented. Stopping."
             );
-            break;
         }
 
         if turns >= self.config.max_turns {

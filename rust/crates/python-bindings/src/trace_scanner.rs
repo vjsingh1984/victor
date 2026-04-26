@@ -98,7 +98,11 @@ pub fn scan_usage_file(file_path: &str) -> Vec<SessionStats> {
         .collect();
 
     // Sort by completion score descending
-    stats.sort_by(|a, b| b.completion_score.partial_cmp(&a.completion_score).unwrap_or(std::cmp::Ordering::Equal));
+    stats.sort_by(|a, b| {
+        b.completion_score
+            .partial_cmp(&a.completion_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     stats
 }
 
@@ -146,7 +150,11 @@ pub fn scan_usage_files(file_paths: Vec<String>) -> Vec<SessionStats> {
         })
         .collect();
 
-    stats.sort_by(|a, b| b.completion_score.partial_cmp(&a.completion_score).unwrap_or(std::cmp::Ordering::Equal));
+    stats.sort_by(|a, b| {
+        b.completion_score
+            .partial_cmp(&a.completion_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     stats
 }
 
@@ -195,7 +203,10 @@ fn process_lines<R: BufRead>(
             }
             "tool_result" => {
                 let data = event.get("data").unwrap_or(&Value::Null);
-                let success = data.get("success").and_then(|v| v.as_bool()).unwrap_or(true);
+                let success = data
+                    .get("success")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 if !success {
                     session.tool_failures += 1;
                 }

@@ -215,9 +215,7 @@ impl BpeTokenizer {
         };
 
         // Cache for later retrieval.
-        TOKENIZER_CACHE
-            .write()
-            .insert(name, inner.clone());
+        TOKENIZER_CACHE.write().insert(name, inner.clone());
 
         BpeTokenizer { inner }
     }
@@ -331,21 +329,21 @@ mod tests {
         // We define merge ranks so that pairs can be merged.
         let ranks: Vec<(Vec<u8>, u32)> = vec![
             // Single bytes (needed as base tokens)
-            (vec![104], 0),        // h
-            (vec![101], 1),        // e
-            (vec![108], 2),        // l
-            (vec![111], 3),        // o
-            (vec![32], 4),         // space
-            (vec![119], 5),        // w
-            (vec![114], 6),        // r
-            (vec![100], 7),        // d
+            (vec![104], 0), // h
+            (vec![101], 1), // e
+            (vec![108], 2), // l
+            (vec![111], 3), // o
+            (vec![32], 4),  // space
+            (vec![119], 5), // w
+            (vec![114], 6), // r
+            (vec![100], 7), // d
             // Merge pairs
-            (vec![104, 101], 100), // he
-            (vec![108, 108], 101), // ll
-            (vec![104, 101, 108, 108], 102), // hell
+            (vec![104, 101], 100),                // he
+            (vec![108, 108], 101),                // ll
+            (vec![104, 101, 108, 108], 102),      // hell
             (vec![104, 101, 108, 108, 111], 103), // hello
-            (vec![119, 111], 104), // wo
-            (vec![114, 108], 105), // rl
+            (vec![119, 111], 104),                // wo
+            (vec![114, 108], 105),                // rl
             (vec![119, 111, 114, 108, 100], 106), // world
         ];
 
@@ -445,7 +443,11 @@ mod tests {
     fn test_fast_multiple_words() {
         let count = count_tokens_fast("the quick brown fox jumps");
         // 5 words, each short — should be roughly 5 tokens.
-        assert!(count >= 4 && count <= 8, "expected ~5 tokens, got {}", count);
+        assert!(
+            count >= 4 && count <= 8,
+            "expected ~5 tokens, got {}",
+            count
+        );
     }
 
     #[test]
@@ -471,7 +473,10 @@ mod tests {
     #[test]
     fn test_fast_whitespace_only() {
         let count = count_tokens_fast("   \n\n  ");
-        assert!(count >= 1, "whitespace-only should produce at least 1 token");
+        assert!(
+            count >= 1,
+            "whitespace-only should produce at least 1 token"
+        );
     }
 
     #[test]
@@ -487,10 +492,7 @@ mod tests {
         let ascii_count = count_tokens_fast("hello");
         let cjk_count = count_tokens_fast("\u{4f60}\u{597d}\u{4e16}\u{754c}");
         // CJK characters typically use more tokens per character.
-        assert!(
-            cjk_count >= 1,
-            "CJK text should produce at least 1 token",
-        );
+        assert!(cjk_count >= 1, "CJK text should produce at least 1 token",);
         // 4 CJK chars should generally produce more tokens than 5 ASCII chars.
         assert!(
             cjk_count >= ascii_count || cjk_count >= 2,

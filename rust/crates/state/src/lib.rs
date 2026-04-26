@@ -249,10 +249,7 @@ impl ScopedStateStore {
 
     /// Create a snapshot (clone) of a single scope's data.
     pub fn snapshot(&self, scope: &StateScope) -> HashMap<String, serde_json::Value> {
-        self.scopes
-            .get(scope)
-            .cloned()
-            .unwrap_or_default()
+        self.scopes.get(scope).cloned().unwrap_or_default()
     }
 
     /// Restore a scope from a previously taken snapshot.
@@ -299,10 +296,9 @@ mod tests {
         state.message_count = 5;
         state.last_tools = vec!["edit".into()];
         state.stage_confidence = 0.85;
-        state.metadata.insert(
-            "custom_key".to_string(),
-            serde_json::json!("custom_value"),
-        );
+        state
+            .metadata
+            .insert("custom_key".to_string(), serde_json::json!("custom_value"));
 
         let json = state.to_json().unwrap();
         let restored = ConversationState::from_json(&json).unwrap();
@@ -333,7 +329,9 @@ mod tests {
     fn test_conversation_state_metadata_flattened() {
         // Verify that metadata is flattened into the JSON (not nested under "metadata" key)
         let mut state = ConversationState::new();
-        state.metadata.insert("extra".to_string(), serde_json::json!(42));
+        state
+            .metadata
+            .insert("extra".to_string(), serde_json::json!(42));
 
         let json = state.to_json().unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -497,11 +495,7 @@ mod tests {
             "key1".into(),
             serde_json::json!("value1"),
         );
-        store.set(
-            StateScope::Workflow,
-            "key2".into(),
-            serde_json::json!(42),
-        );
+        store.set(StateScope::Workflow, "key2".into(), serde_json::json!(42));
 
         // Get
         assert_eq!(

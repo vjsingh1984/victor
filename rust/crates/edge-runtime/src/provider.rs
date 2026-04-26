@@ -313,12 +313,11 @@ impl HttpProvider {
             let converted: Vec<ToolCall> = calls
                 .into_iter()
                 .map(|tc| {
-                    let arguments = serde_json::from_str(&tc.function.arguments).unwrap_or_else(
-                        |e| {
+                    let arguments =
+                        serde_json::from_str(&tc.function.arguments).unwrap_or_else(|e| {
                             warn!(error = %e, "Failed to parse tool call arguments as JSON");
                             serde_json::json!({})
-                        },
-                    );
+                        });
                     ToolCall {
                         id: tc.id,
                         name: tc.function.name,

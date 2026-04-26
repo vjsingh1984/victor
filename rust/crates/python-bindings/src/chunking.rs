@@ -400,7 +400,11 @@ impl ChunkInfoRust {
 /// List of ChunkInfoRust objects with full metadata
 #[pyfunction]
 #[pyo3(signature = (text, chunk_size=1344, overlap=128))]
-pub fn chunk_with_overlap(text: &str, chunk_size: usize, overlap: usize) -> PyResult<Vec<ChunkInfoRust>> {
+pub fn chunk_with_overlap(
+    text: &str,
+    chunk_size: usize,
+    overlap: usize,
+) -> PyResult<Vec<ChunkInfoRust>> {
     if text.is_empty() {
         return Ok(Vec::new());
     }

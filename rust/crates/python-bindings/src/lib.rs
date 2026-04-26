@@ -49,7 +49,6 @@ mod ast_indexer;
 mod chunking;
 mod classifier;
 mod context_fitter;
-mod trace_scanner;
 mod dedup;
 mod embeddings;
 mod extractor;
@@ -63,6 +62,7 @@ mod similarity;
 mod streaming_filter;
 mod thinking;
 mod tokenizer;
+mod trace_scanner;
 mod yaml_loader;
 
 /// Victor Native Extensions Module
@@ -191,7 +191,10 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(embeddings::quantize_embedding, m)?)?;
     m.add_function(wrap_pyfunction!(embeddings::batch_quantize_embeddings, m)?)?;
     m.add_function(wrap_pyfunction!(embeddings::dequantize_embedding, m)?)?;
-    m.add_function(wrap_pyfunction!(embeddings::quantized_cosine_similarity, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        embeddings::quantized_cosine_similarity,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(
         embeddings::batch_quantized_cosine_similarity,
         m

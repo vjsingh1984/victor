@@ -289,7 +289,12 @@ pub fn validate_tool_name(name: &str) -> (bool, Option<String>) {
     }
 
     // Check starts with number
-    if name.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+    if name
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_digit())
+        .unwrap_or(false)
+    {
         return (false, Some("starts_with_number".to_string()));
     }
 
@@ -330,7 +335,10 @@ mod tests {
     #[test]
     fn test_validate_tool_name() {
         assert_eq!(validate_tool_name("read_file"), (true, None));
-        assert!(matches!(validate_tool_name("example_tool"), (false, Some(_))));
+        assert!(matches!(
+            validate_tool_name("example_tool"),
+            (false, Some(_))
+        ));
         assert!(matches!(validate_tool_name("123tool"), (false, Some(_))));
         assert!(matches!(validate_tool_name("tool name"), (false, Some(_))));
     }

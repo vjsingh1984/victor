@@ -208,17 +208,17 @@ pub fn validate_tool_call(
     arguments: &serde_json::Value,
 ) -> Result<(), ToolCallError> {
     // 1. Check tool exists
-    let tool = registry.get(tool_name).ok_or_else(|| {
-        ToolCallError::UnknownTool(tool_name.to_string())
-    })?;
+    let tool = registry
+        .get(tool_name)
+        .ok_or_else(|| ToolCallError::UnknownTool(tool_name.to_string()))?;
 
     // 2. Arguments must be an object
-    let args_obj = arguments.as_object().ok_or_else(|| {
-        ToolCallError::InvalidArguments {
+    let args_obj = arguments
+        .as_object()
+        .ok_or_else(|| ToolCallError::InvalidArguments {
             tool: tool_name.to_string(),
             reason: "arguments must be a JSON object".to_string(),
-        }
-    })?;
+        })?;
 
     // 3. Check required parameters are present
     if let Some(required) = tool.parameters.get("required") {
@@ -251,10 +251,7 @@ mod tests {
     fn make_tool(name: &str, required: &[&str]) -> ToolDefinition {
         let mut props = serde_json::Map::new();
         for &r in required {
-            props.insert(
-                r.to_string(),
-                serde_json::json!({ "type": "string" }),
-            );
+            props.insert(r.to_string(), serde_json::json!({ "type": "string" }));
         }
 
         ToolDefinition {
@@ -421,11 +418,7 @@ mod tests {
     #[test]
     fn test_validate_tool_call_unknown_tool() {
         let registry = ToolRegistry::new();
-        let result = validate_tool_call(
-            &registry,
-            "nonexistent",
-            &serde_json::json!({}),
-        );
+        let result = validate_tool_call(&registry, "nonexistent", &serde_json::json!({}));
         assert!(result.is_err());
         match result.unwrap_err() {
             ToolCallError::UnknownTool(name) => assert_eq!(name, "nonexistent"),
@@ -438,11 +431,8 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(make_tool("read_file", &["path"]));
 
-        let result = validate_tool_call(
-            &registry,
-            "read_file",
-            &serde_json::json!("not an object"),
-        );
+        let result =
+            validate_tool_call(&registry, "read_file", &serde_json::json!("not an object"));
         assert!(result.is_err());
         match result.unwrap_err() {
             ToolCallError::InvalidArguments { tool, reason } => {
@@ -479,11 +469,7 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(make_tool("write_file", &["path", "content"]));
 
-        let result = validate_tool_call(
-            &registry,
-            "write_file",
-            &serde_json::json!({}),
-        );
+        let result = validate_tool_call(&registry, "write_file", &serde_json::json!({}));
         assert!(result.is_err());
         match result.unwrap_err() {
             ToolCallError::InvalidArguments { tool, reason } => {
@@ -501,11 +487,7 @@ mod tests {
         registry.register(make_tool("list_files", &[]));
 
         // No required params -- empty args is valid
-        let result = validate_tool_call(
-            &registry,
-            "list_files",
-            &serde_json::json!({}),
-        );
+        let result = validate_tool_call(&registry, "list_files", &serde_json::json!({}));
         assert!(result.is_ok());
     }
 
@@ -514,11 +496,7 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(make_tool("read_file", &["path"]));
 
-        let result = validate_tool_call(
-            &registry,
-            "read_file",
-            &serde_json::Value::Null,
-        );
+        let result = validate_tool_call(&registry, "read_file", &serde_json::Value::Null);
         assert!(result.is_err());
     }
 

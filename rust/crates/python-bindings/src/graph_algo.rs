@@ -52,8 +52,7 @@ pub fn pagerank(
             if neighbors.is_empty() {
                 continue;
             }
-            let share = damping * scores.get(src).copied().unwrap_or(0.0)
-                / neighbors.len() as f64;
+            let share = damping * scores.get(src).copied().unwrap_or(0.0) / neighbors.len() as f64;
             for dst in neighbors {
                 if let Some(val) = new_scores.get_mut(dst) {
                     *val += share;
@@ -352,7 +351,15 @@ pub fn detect_cycles(adjacency: &Bound<'_, PyDict>) -> PyResult<Vec<Vec<String>>
 
     for i in 0..n {
         if color[i] == 0 {
-            dfs(i, &adj, &all_nodes, &node_idx, &mut color, &mut path, &mut cycles);
+            dfs(
+                i,
+                &adj,
+                &all_nodes,
+                &node_idx,
+                &mut color,
+                &mut path,
+                &mut cycles,
+            );
         }
     }
 
@@ -361,8 +368,6 @@ pub fn detect_cycles(adjacency: &Bound<'_, PyDict>) -> PyResult<Vec<Vec<String>>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // Tests require PyO3 runtime, so they are integration-tested from Python.
     // Basic algorithm logic is validated via the Python test suite.
 }

@@ -309,7 +309,11 @@ fn check_partial_pattern(text: &str, patterns: &[&str]) -> Option<usize> {
 
     // Check last N characters where N is max pattern length
     // Use character counting for multi-byte UTF-8 safety
-    let max_pattern_len = patterns.iter().map(|p| p.chars().count()).max().unwrap_or(0);
+    let max_pattern_len = patterns
+        .iter()
+        .map(|p| p.chars().count())
+        .max()
+        .unwrap_or(0);
 
     // Get character positions for safe UTF-8 indexing
     let char_indices: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();

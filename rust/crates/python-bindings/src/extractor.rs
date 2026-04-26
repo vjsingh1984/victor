@@ -55,9 +55,8 @@ static CODE_BLOCK_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 // Pre-compiled pattern for indented code blocks
-static INDENTED_CODE_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?m)(?:^|\n)((?:[ ]{4,}|\t).+(?:\n(?:[ ]{4,}|\t).+)*)").unwrap()
-});
+static INDENTED_CODE_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?m)(?:^|\n)((?:[ ]{4,}|\t).+(?:\n(?:[ ]{4,}|\t).+)*)").unwrap());
 
 // Pre-compiled patterns for shell commands
 static SHELL_COMMAND_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
@@ -72,9 +71,8 @@ static SHELL_COMMAND_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 });
 
 // Pattern for backtick-wrapped paths (for ls/list commands)
-static BACKTICK_PATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"`([a-zA-Z0-9_./-]+)`").unwrap()
-});
+static BACKTICK_PATH_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"`([a-zA-Z0-9_./-]+)`").unwrap());
 
 /// Extract a file path from text.
 ///
@@ -229,7 +227,11 @@ pub fn extract_tool_call(
 }
 
 /// Extract write tool call
-fn extract_write_tool(py: Python<'_>, text: &str, current_file: Option<&str>) -> PyResult<Option<PyObject>> {
+fn extract_write_tool(
+    py: Python<'_>,
+    text: &str,
+    current_file: Option<&str>,
+) -> PyResult<Option<PyObject>> {
     let file_path = match extract_file_path(text).or_else(|| current_file.map(|s| s.to_string())) {
         Some(p) => p,
         None => return Ok(None),
@@ -254,7 +256,7 @@ fn extract_write_tool(py: Python<'_>, text: &str, current_file: Option<&str>) ->
     dict.set_item("tool", "write")?;
     dict.set_item("args", args)?;
     dict.set_item("confidence", confidence)?;
-    dict.set_item("source", &text.chars().take(200).collect::<String>())?;
+    dict.set_item("source", text.chars().take(200).collect::<String>())?;
 
     Ok(Some(dict.into()))
 }
@@ -273,7 +275,7 @@ fn extract_read_tool(py: Python<'_>, text: &str) -> PyResult<Option<PyObject>> {
     dict.set_item("tool", "read")?;
     dict.set_item("args", args)?;
     dict.set_item("confidence", 0.9)?;
-    dict.set_item("source", &text.chars().take(100).collect::<String>())?;
+    dict.set_item("source", text.chars().take(100).collect::<String>())?;
 
     Ok(Some(dict.into()))
 }
@@ -293,7 +295,7 @@ fn extract_shell_tool(py: Python<'_>, text: &str) -> PyResult<Option<PyObject>> 
     dict.set_item("tool", "shell")?;
     dict.set_item("args", args)?;
     dict.set_item("confidence", 0.75)?;
-    dict.set_item("source", &text.chars().take(150).collect::<String>())?;
+    dict.set_item("source", text.chars().take(150).collect::<String>())?;
 
     Ok(Some(dict.into()))
 }
@@ -313,7 +315,7 @@ fn extract_list_tool(py: Python<'_>, text: &str) -> PyResult<Option<PyObject>> {
     dict.set_item("tool", "ls")?;
     dict.set_item("args", args)?;
     dict.set_item("confidence", 0.8)?;
-    dict.set_item("source", &text.chars().take(100).collect::<String>())?;
+    dict.set_item("source", text.chars().take(100).collect::<String>())?;
 
     Ok(Some(dict.into()))
 }

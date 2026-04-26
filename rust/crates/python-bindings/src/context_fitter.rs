@@ -175,9 +175,7 @@ pub fn fit_context(
 fn fit_fifo(messages: &[MessageSlot], budget: usize, preserve_system: bool) -> Vec<usize> {
     // Separate system messages if preserving
     let (pinned, rest): (Vec<&MessageSlot>, Vec<&MessageSlot>) = if preserve_system {
-        messages
-            .iter()
-            .partition(|m| m.role == "system")
+        messages.iter().partition(|m| m.role == "system")
     } else {
         (Vec::new(), messages.iter().collect())
     };
@@ -203,9 +201,7 @@ fn fit_fifo(messages: &[MessageSlot], budget: usize, preserve_system: bool) -> V
 /// Priority: score = priority * 0.4 + recency * 0.6, keep highest.
 fn fit_priority(messages: &[MessageSlot], budget: usize, preserve_system: bool) -> Vec<usize> {
     let (pinned, rest): (Vec<&MessageSlot>, Vec<&MessageSlot>) = if preserve_system {
-        messages
-            .iter()
-            .partition(|m| m.role == "system")
+        messages.iter().partition(|m| m.role == "system")
     } else {
         (Vec::new(), messages.iter().collect())
     };
@@ -381,10 +377,7 @@ pub fn truncate_message(content: &str, max_tokens: usize, preserve_lines: usize)
 /// Returns Vec<(index, score)> sorted by score descending.
 #[pyfunction]
 #[pyo3(signature = (priorities, timestamps))]
-pub fn batch_score_messages(
-    priorities: Vec<u8>,
-    timestamps: Vec<f64>,
-) -> Vec<(usize, f32)> {
+pub fn batch_score_messages(priorities: Vec<u8>, timestamps: Vec<f64>) -> Vec<(usize, f32)> {
     let n = priorities.len().min(timestamps.len());
     if n == 0 {
         return Vec::new();
@@ -486,9 +479,9 @@ mod tests {
     #[test]
     fn test_fit_fifo_drops_oldest() {
         let messages = vec![
-            MessageSlot::new(0, 100, 5, "user".to_string(), 0.0),   // oldest
+            MessageSlot::new(0, 100, 5, "user".to_string(), 0.0), // oldest
             MessageSlot::new(1, 100, 5, "assistant".to_string(), 0.5),
-            MessageSlot::new(2, 100, 5, "user".to_string(), 1.0),   // newest
+            MessageSlot::new(2, 100, 5, "user".to_string(), 1.0), // newest
         ];
         // Budget 200: can keep 2 of 3 (total 300)
         let result = fit_context(messages, 200, "fifo", false);
@@ -519,9 +512,9 @@ mod tests {
     #[test]
     fn test_fit_priority_keeps_high_priority() {
         let messages = vec![
-            MessageSlot::new(0, 100, 10, "user".to_string(), 0.0),   // score: 10*0.4 + 0*0.6 = 4.0
-            MessageSlot::new(1, 100, 1, "user".to_string(), 0.5),    // score: 1*0.4 + 0.5*0.6 = 0.7
-            MessageSlot::new(2, 100, 8, "user".to_string(), 1.0),    // score: 8*0.4 + 1.0*0.6 = 3.8
+            MessageSlot::new(0, 100, 10, "user".to_string(), 0.0), // score: 10*0.4 + 0*0.6 = 4.0
+            MessageSlot::new(1, 100, 1, "user".to_string(), 0.5),  // score: 1*0.4 + 0.5*0.6 = 0.7
+            MessageSlot::new(2, 100, 8, "user".to_string(), 1.0),  // score: 8*0.4 + 1.0*0.6 = 3.8
         ];
         // Budget 200: keep top 2 by score → indices 0 (4.0) and 2 (3.8)
         let result = fit_context(messages, 200, "priority", false);
@@ -548,12 +541,12 @@ mod tests {
     #[test]
     fn test_fit_smart_pins_required() {
         let messages = vec![
-            MessageSlot::new(0, 50, 10, "system".to_string(), 0.0),    // pinned (system)
-            MessageSlot::new(1, 50, 5, "user".to_string(), 0.2),       // pinned (first user)
+            MessageSlot::new(0, 50, 10, "system".to_string(), 0.0), // pinned (system)
+            MessageSlot::new(1, 50, 5, "user".to_string(), 0.2),    // pinned (first user)
             MessageSlot::new(2, 50, 5, "assistant".to_string(), 0.4),
             MessageSlot::new(3, 50, 5, "user".to_string(), 0.6),
-            MessageSlot::new(4, 50, 5, "assistant".to_string(), 0.8),   // pinned (2nd to last)
-            MessageSlot::new(5, 50, 5, "user".to_string(), 1.0),       // pinned (last)
+            MessageSlot::new(4, 50, 5, "assistant".to_string(), 0.8), // pinned (2nd to last)
+            MessageSlot::new(5, 50, 5, "user".to_string(), 1.0),      // pinned (last)
         ];
         // Budget 200: 4 pinned messages = 200 tokens, no room for rest
         let result = fit_context(messages, 200, "smart", true);
@@ -569,8 +562,8 @@ mod tests {
         let messages = vec![
             MessageSlot::new(0, 30, 10, "system".to_string(), 0.0),
             MessageSlot::new(1, 30, 5, "user".to_string(), 0.2),
-            MessageSlot::new(2, 30, 1, "assistant".to_string(), 0.4),   // low score
-            MessageSlot::new(3, 30, 9, "user".to_string(), 0.6),       // high score
+            MessageSlot::new(2, 30, 1, "assistant".to_string(), 0.4), // low score
+            MessageSlot::new(3, 30, 9, "user".to_string(), 0.6),      // high score
             MessageSlot::new(4, 30, 5, "assistant".to_string(), 0.8),
             MessageSlot::new(5, 30, 5, "user".to_string(), 1.0),
         ];

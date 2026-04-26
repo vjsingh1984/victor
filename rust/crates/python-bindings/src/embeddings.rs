@@ -50,7 +50,11 @@ pub struct QuantizedEmbedding {
 impl QuantizedEmbedding {
     #[new]
     pub fn new(data: Vec<i8>, scale: f32, zero_point: i8) -> Self {
-        Self { data, scale, zero_point }
+        Self {
+            data,
+            scale,
+            zero_point,
+        }
     }
 
     /// Get the dimension of the embedding
@@ -160,7 +164,10 @@ pub fn dequantize_embedding(quantized: &QuantizedEmbedding) -> Vec<f32> {
 ///
 /// This is faster than dequantizing first because we work with integers.
 #[pyfunction]
-pub fn quantized_cosine_similarity(a: &QuantizedEmbedding, b: &QuantizedEmbedding) -> PyResult<f32> {
+pub fn quantized_cosine_similarity(
+    a: &QuantizedEmbedding,
+    b: &QuantizedEmbedding,
+) -> PyResult<f32> {
     if a.data.len() != b.data.len() {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Embeddings must have same dimension",
@@ -248,7 +255,10 @@ pub fn matmul_vector(matrix: Vec<Vec<f32>>, vector: Vec<f32>) -> PyResult<Vec<f3
     }
 
     let results: Vec<f32> = if matrix.len() > 100 {
-        matrix.par_iter().map(|row| simd_dot(row, &vector)).collect()
+        matrix
+            .par_iter()
+            .map(|row| simd_dot(row, &vector))
+            .collect()
     } else {
         matrix.iter().map(|row| simd_dot(row, &vector)).collect()
     };
@@ -260,7 +270,10 @@ pub fn matmul_vector(matrix: Vec<Vec<f32>>, vector: Vec<f32>) -> PyResult<Vec<f3
 ///
 /// Computes: results[i] = matrix @ vectors[i] for each vector
 #[pyfunction]
-pub fn batch_matmul_vector(matrix: Vec<Vec<f32>>, vectors: Vec<Vec<f32>>) -> PyResult<Vec<Vec<f32>>> {
+pub fn batch_matmul_vector(
+    matrix: Vec<Vec<f32>>,
+    vectors: Vec<Vec<f32>>,
+) -> PyResult<Vec<Vec<f32>>> {
     if matrix.is_empty() || vectors.is_empty() {
         return Ok(Vec::new());
     }
@@ -467,10 +480,7 @@ mod tests {
 
     #[test]
     fn test_matmul_vector() {
-        let matrix = vec![
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-        ];
+        let matrix = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
         let vector = vec![2.0, 3.0];
         let result = matmul_vector(matrix, vector).unwrap();
         assert_eq!(result.len(), 2);
@@ -480,10 +490,7 @@ mod tests {
 
     #[test]
     fn test_random_projection() {
-        let embeddings = vec![
-            vec![1.0, 2.0, 3.0, 4.0],
-            vec![4.0, 3.0, 2.0, 1.0],
-        ];
+        let embeddings = vec![vec![1.0, 2.0, 3.0, 4.0], vec![4.0, 3.0, 2.0, 1.0]];
         let projected = random_projection(embeddings, 2, 42).unwrap();
         assert_eq!(projected.len(), 2);
         assert_eq!(projected[0].len(), 2);
@@ -494,9 +501,9 @@ mod tests {
     fn test_knn_graph() {
         let embeddings = vec![
             vec![1.0, 0.0],
-            vec![0.9, 0.1],  // Close to first
+            vec![0.9, 0.1], // Close to first
             vec![0.0, 1.0],
-            vec![0.1, 0.9],  // Close to third
+            vec![0.1, 0.9], // Close to third
         ];
         let knn = knn_graph(embeddings, 2).unwrap();
         assert_eq!(knn.len(), 4);
