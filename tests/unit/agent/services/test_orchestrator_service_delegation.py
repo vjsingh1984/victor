@@ -218,10 +218,62 @@ class TestAdapterProtocolConformance:
 
         adapter = ContextServiceAdapter(MagicMock())
         assert callable(getattr(adapter, "get_context_metrics", None))
+        assert callable(getattr(adapter, "check_context_overflow", None))
         assert callable(getattr(adapter, "compact_context", None))
         assert callable(getattr(adapter, "add_message", None))
+        assert callable(getattr(adapter, "add_messages", None))
         assert callable(getattr(adapter, "get_messages", None))
+        assert callable(getattr(adapter, "clear_messages", None))
+        assert callable(getattr(adapter, "get_max_tokens", None))
+        assert callable(getattr(adapter, "set_max_tokens", None))
+        assert callable(getattr(adapter, "estimate_tokens", None))
         assert callable(getattr(adapter, "is_healthy", None))
+
+    @pytest.mark.asyncio
+    async def test_context_adapter_supports_controller_backed_chat_runtime_operations(self):
+        from victor.agent.conversation.controller import ConversationController
+        from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
+        controller = ConversationController()
+        controller.set_system_prompt("system prompt")
+        adapter = ContextServiceAdapter(controller)
+
+        adapter.add_message("user", "hello")
+
+        assert [message.role for message in controller.messages] == ["system", "user"]
+        assert await adapter.check_context_overflow() is False
+
+        adapter.clear_messages(retain_system=True)
+
+        assert [message.role for message in controller.messages] == ["system"]
+        assert controller.messages[0].content == "system prompt"
+
+    def test_bootstrap_new_services_registers_context_adapter_backed_by_controller(self):
+        from victor.agent.conversation.controller import ConversationController
+        from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+        from victor.agent.services.protocols import ContextServiceProtocol
+        from victor.core.bootstrap_services import bootstrap_new_services
+        from victor.core.container import ServiceContainer
+
+        container = ServiceContainer()
+        controller = ConversationController()
+        controller.set_system_prompt("system prompt")
+        streaming = MagicMock()
+        flag_manager = MagicMock()
+        flag_manager.is_enabled.return_value = False
+
+        with patch("victor.core.feature_flags.get_feature_flag_manager", return_value=flag_manager):
+            bootstrap_new_services(
+                container,
+                conversation_controller=controller,
+                streaming_coordinator=streaming,
+            )
+
+        context_service = container.get_optional(ContextServiceProtocol)
+
+        assert isinstance(context_service, ContextServiceAdapter)
+        context_service.add_message("user", "hello")
+        assert [message.role for message in controller.messages] == ["system", "user"]
 
     @pytest.mark.asyncio
     async def test_orchestrator_protocol_adapter_prefers_execute_tool_calls(self):

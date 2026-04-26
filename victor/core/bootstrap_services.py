@@ -99,7 +99,10 @@ def bootstrap_new_services(
     # Bootstrap ContextService (reuse existing instance if already registered)
     context_service = container.get_optional(ContextServiceProtocol)
     if context_service is None:
-        context_service = _create_context_service(container)
+        context_service = _create_context_service(
+            container,
+            conversation_controller=conversation_controller,
+        )
     services_created["context"] = context_service
     container.register_or_replace(
         ContextServiceProtocol,
@@ -212,15 +215,24 @@ def bootstrap_new_services(
     logger.info("Bootstrapped ChatService")
 
 
-def _create_context_service(container: ServiceContainer) -> "ContextService":
+def _create_context_service(
+    container: ServiceContainer,
+    conversation_controller: Optional["ConversationController"] = None,
+) -> Any:
     """Create ContextService instance.
 
     Args:
         container: Service container
+        conversation_controller: Optional controller to adapt as the canonical context surface
 
     Returns:
-        Configured ContextService instance
+        Configured ContextService instance or controller-backed adapter
     """
+    if conversation_controller is not None:
+        from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
+        return ContextServiceAdapter(conversation_controller=conversation_controller)
+
     from victor.agent.services.context_service import (
         ContextService,
         ContextServiceConfig,

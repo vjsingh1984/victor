@@ -223,7 +223,11 @@ class ChatService:
             response = await self._run_agentic_loop(user_message, **kwargs)
 
             # Add assistant response to context
-            self._add_assistant_message_to_context(response)
+            self._add_assistant_message_to_context(
+                response.content,
+                tool_calls=response.tool_calls,
+                metadata=getattr(response, "metadata", None),
+            )
 
             return response
 
@@ -505,7 +509,11 @@ class ChatService:
                 await self._execute_tool_calls(response.tool_calls)
 
                 # Add assistant message with tool calls to context
-                self._add_assistant_message_to_context(response)
+                self._add_assistant_message_to_context(
+                    response.content,
+                    tool_calls=response.tool_calls,
+                    metadata=getattr(response, "metadata", None),
+                )
 
                 # Continue loop for next iteration
                 continue
@@ -622,29 +630,6 @@ class ChatService:
         """
         return "Please continue."
 
-    def _add_user_message_to_context(self, message: str) -> None:
-        """Add user message to context.
-
-        Args:
-            message: Message content
-        """
-        msg = {"role": "user", "content": message}
-        self._context.add_message(msg)
-
-    def _add_assistant_message_to_context(self, response: "CompletionResponse") -> None:
-        """Add assistant message to context.
-
-        Args:
-            response: Response to add
-        """
-        msg = {
-            "role": "assistant",
-            "content": response.content,
-        }
-        if hasattr(response, "tool_calls") and response.tool_calls:
-            msg["tool_calls"] = response.tool_calls
-        self._context.add_message(msg)
-
     def _add_tool_result_to_context(
         self,
         tool_name: str,
@@ -671,14 +656,17 @@ class ChatService:
         else:
             content = ""
 
-        msg = {
-            "role": "tool",
-            "content": content,
-            "tool_call_id": tool_call_id
-            or tool_name,  # Use tool_call_id if provided, fallback to tool_name
-            "name": tool_name,  # OpenAI spec requires 'name' for tool messages
-        }
-        self._context.add_message(msg)
+        if self._context:
+            try:
+                self._context.add_message(
+                    role="tool",
+                    content=content,
+                    tool_call_id=tool_call_id
+                    or tool_name,  # Use tool_call_id if provided, fallback to tool_name
+                    name=tool_name,  # OpenAI spec requires 'name' for tool messages
+                )
+            except Exception as e:
+                self._logger.warning(f"Failed to add tool result to context: {e}")
 
     def _aggregate_chunks(self, chunks: List["StreamChunk"]) -> "CompletionResponse":
         """Aggregate stream chunks into completion response.

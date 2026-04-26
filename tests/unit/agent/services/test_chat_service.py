@@ -15,11 +15,13 @@
 """Tests for ChatService implementation."""
 
 import asyncio
+import inspect
 from unittest import mock
 
 import pytest
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+from victor.providers.base import CompletionResponse
 
 # =============================================================================
 # Mock Dependencies
@@ -267,6 +269,69 @@ class TestChatServiceReset(BaseChatServiceTest):
 
         assert service._context.messages == []
         assert service._conversation.reset_count == 1
+
+
+class TestChatServiceControllerBackedContext(BaseChatServiceTest):
+    """Direct ChatService paths should share conversation state with controller-backed context."""
+
+    def _create_controller_backed_service(self):
+        from victor.agent.conversation.controller import ConversationController
+        from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
+        config = ChatServiceConfig()
+        provider = MockProviderService()
+        tools = MockToolService()
+        controller = ConversationController()
+        context = ContextServiceAdapter(controller)
+        recovery = MockRecoveryService()
+        streaming = MockStreamingCoordinator()
+
+        service = ChatService(
+            config=config,
+            provider_service=provider,
+            tool_service=tools,
+            context_service=context,
+            recovery_service=recovery,
+            conversation_controller=controller,
+            streaming_coordinator=streaming,
+        )
+        return service, controller
+
+    @pytest.mark.asyncio
+    async def test_chat_records_user_and_assistant_messages_in_controller_backed_context(self):
+        service, controller = self._create_controller_backed_service()
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
+        service._run_agentic_loop = mock.AsyncMock(return_value=response)
+
+        result = await service.chat("hello")
+
+        assert result is response
+        assert [message.role for message in controller.messages] == ["user", "assistant"]
+        assert [message.content for message in controller.messages] == ["hello", "done"]
+
+    def test_add_tool_result_supports_controller_backed_context_adapter(self):
+        service, controller = self._create_controller_backed_service()
+        result = mock.MagicMock(output="tool output", error=None)
+
+        service._add_tool_result_to_context(
+            "read",
+            result,
+            tool_call_id="call-1",
+            formatted_content="formatted output",
+        )
+
+        tool_message = controller.messages[-1]
+        assert tool_message.role == "tool"
+        assert tool_message.content == "formatted output"
+        assert tool_message.tool_call_id == "call-1"
+        assert tool_message.name == "read"
+
+    def test_chat_service_declares_single_keyword_based_context_helpers(self):
+        source = inspect.getsource(ChatService)
+
+        assert source.count("def _add_user_message_to_context(") == 1
+        assert source.count("def _add_assistant_message_to_context(") == 1
+        assert "self._context.add_message(msg)" not in source
 
 
 class TestStreamingPipelineIntegration:
