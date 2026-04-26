@@ -9,6 +9,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from victor.agent.orchestrator_properties import (
+    _ensure_streaming_chat_coordinator,
+    _ensure_sync_chat_coordinator,
+    _ensure_unified_chat_coordinator,
+)
+
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
 
@@ -160,11 +166,13 @@ class AgentRuntimeBootstrapper:
             get_tool_coordinator=orchestrator._get_deprecated_tool_coordinator,
             get_session_coordinator=orchestrator._get_deprecated_session_coordinator,
             turn_executor=orchestrator._turn_executor,
-            get_sync_chat_coordinator=orchestrator._get_deprecated_sync_chat_coordinator,
+            get_sync_chat_coordinator=lambda: _ensure_sync_chat_coordinator(orchestrator),
             get_streaming_chat_coordinator=(
-                orchestrator._get_deprecated_streaming_chat_coordinator
+                lambda: _ensure_streaming_chat_coordinator(orchestrator)
             ),
-            get_unified_chat_coordinator=orchestrator._get_deprecated_unified_chat_coordinator,
+            get_unified_chat_coordinator=lambda: _ensure_unified_chat_coordinator(
+                orchestrator
+            ),
             protocol_adapter=orchestrator._protocol_adapter,
             streaming_handler=orchestrator._streaming_handler,
             streaming_controller=orchestrator._streaming_controller,

@@ -1,6 +1,6 @@
 """Tests for AgentRuntimeBootstrapper extraction."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, sentinel
 
 from victor.agent.runtime.bootstrapper import AgentRuntimeBootstrapper
 
@@ -13,6 +13,9 @@ class TestAgentRuntimeBootstrapper:
         orch = MagicMock()
         orch.active_session_id = "test-session-123"
         orch._background_tasks = set()
+        orch._deprecated_sync_chat_coordinator = None
+        orch._deprecated_streaming_chat_coordinator = None
+        orch._deprecated_unified_chat_coordinator = None
         return orch
 
     def test_create_facades_sets_all_eight(self):
@@ -59,14 +62,9 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["get_tool_coordinator"] is orch._get_deprecated_tool_coordinator
         assert kwargs["get_session_coordinator"] is orch._get_deprecated_session_coordinator
         assert kwargs["turn_executor"] is orch._turn_executor
-        assert kwargs["get_sync_chat_coordinator"] is orch._get_deprecated_sync_chat_coordinator
-        assert (
-            kwargs["get_streaming_chat_coordinator"]
-            is orch._get_deprecated_streaming_chat_coordinator
-        )
-        assert (
-            kwargs["get_unified_chat_coordinator"] is orch._get_deprecated_unified_chat_coordinator
-        )
+        assert callable(kwargs["get_sync_chat_coordinator"])
+        assert callable(kwargs["get_streaming_chat_coordinator"])
+        assert callable(kwargs["get_unified_chat_coordinator"])
         assert kwargs["protocol_adapter"] is orch._protocol_adapter
         assert kwargs["streaming_handler"] is orch._streaming_handler
         assert kwargs["streaming_controller"] is orch._streaming_controller
@@ -89,6 +87,35 @@ class TestAgentRuntimeBootstrapper:
             task_analyzer=orch._task_analyzer
         )
         orch._factory.create_safety_state_passed_coordinator.assert_called_once_with()
+
+    def test_create_facades_binds_lazy_chat_coordinator_getters_without_orchestrator_wrappers(self):
+        orch = self._make_mock_orchestrator()
+
+        with (
+            patch("victor.agent.facades.OrchestrationFacade") as facade_cls,
+            patch(
+                "victor.agent.runtime.bootstrapper._ensure_sync_chat_coordinator",
+                return_value=sentinel.sync_coordinator,
+            ) as ensure_sync,
+            patch(
+                "victor.agent.runtime.bootstrapper._ensure_streaming_chat_coordinator",
+                return_value=sentinel.streaming_coordinator,
+            ) as ensure_streaming,
+            patch(
+                "victor.agent.runtime.bootstrapper._ensure_unified_chat_coordinator",
+                return_value=sentinel.unified_coordinator,
+            ) as ensure_unified,
+        ):
+            AgentRuntimeBootstrapper.create_facades(orch)
+
+            kwargs = facade_cls.call_args.kwargs
+
+            assert kwargs["get_sync_chat_coordinator"]() is sentinel.sync_coordinator
+            assert kwargs["get_streaming_chat_coordinator"]() is sentinel.streaming_coordinator
+            assert kwargs["get_unified_chat_coordinator"]() is sentinel.unified_coordinator
+            ensure_sync.assert_called_once_with(orch)
+            ensure_streaming.assert_called_once_with(orch)
+            ensure_unified.assert_called_once_with(orch)
 
     def test_wire_lifecycle_calls_setters(self):
         orch = self._make_mock_orchestrator()

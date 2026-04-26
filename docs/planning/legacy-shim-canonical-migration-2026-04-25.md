@@ -77,7 +77,7 @@ For each batch:
 
 ## Current Batch
 
-Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, and Phase 2.5 are now complete:
+Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, and Phase 2.6 are now complete:
 - internal provider switching is service-first in `AgentOrchestrator`
 - provider-switch hook contracts now live in a canonical provider contract
   module instead of being sourced from the legacy switch coordinator
@@ -92,8 +92,24 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, and Phase 2.5 a
 - simple `AgentOrchestrator` compatibility properties now resolve from direct
   canonical backing attributes instead of facades, so facades are no longer
   behavior owners for those runtime accessors
+- lazy sync/streaming/unified deprecated chat coordinator wiring is now bound
+  directly from bootstrapper to compatibility constructors, removing the last
+  internal-only wrapper methods from `AgentOrchestrator` for those shims
+
+- Phase 3.1 compute handler registry extraction:
+  - `victor.workflows.compute_registry` is now the canonical module for
+    `ComputeHandler`, `register_compute_handler`, `get_compute_handler`,
+    `list_compute_handlers`; executor.py re-exports from it with a shared
+    `_compute_handlers` dict
+  - NodeResult/ExecutorNodeStatus imported directly from victor_sdk.workflows
+    in all benchmark callers
+  - Boundary tests enforce canonical paths for all migrated consumers
 
 Next resume point:
-- continue the broader compatibility cleanup around orchestrator and facade
-  shims by auditing the remaining lazy compatibility coordinators and facade
-  bootstrap wiring for any internal runtime dependence
+- Phase 3.2: migrate WorkflowContext and WorkflowResult from executor.py into
+  victor/workflows/context.py as the canonical location; update context.py
+  conversion utilities and any callers that import these types directly from
+  executor
+- After 3.2: continue the broader compatibility cleanup around orchestrator
+  and facade shims by evaluating whether eager facade bootstrap can be reduced
+  further without weakening the remaining public compatibility surface

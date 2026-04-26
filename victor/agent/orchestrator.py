@@ -1195,24 +1195,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Get the deprecated SessionCoordinator compatibility shim."""
         return getattr(self, "_deprecated_session_coordinator", None)
 
-    def _get_deprecated_sync_chat_coordinator(self) -> Any:
-        """Get the deprecated sync chat coordinator compatibility shim."""
-        from victor.agent.orchestrator_properties import _ensure_sync_chat_coordinator
-
-        return _ensure_sync_chat_coordinator(self)
-
-    def _get_deprecated_streaming_chat_coordinator(self) -> Any:
-        """Get the deprecated streaming chat coordinator compatibility shim."""
-        from victor.agent.orchestrator_properties import _ensure_streaming_chat_coordinator
-
-        return _ensure_streaming_chat_coordinator(self)
-
-    def _get_deprecated_unified_chat_coordinator(self) -> Any:
-        """Get the deprecated unified chat coordinator compatibility shim."""
-        from victor.agent.orchestrator_properties import _ensure_unified_chat_coordinator
-
-        return _ensure_unified_chat_coordinator(self)
-
     def _build_callback_coordinator(self) -> Any:
         """Lazily construct the CallbackCoordinator."""
         from victor.agent.callback_coordinator import CallbackCoordinator
