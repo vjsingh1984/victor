@@ -163,7 +163,9 @@ class TestAsyncWrappers:
         )
 
     @pytest.mark.asyncio
-    async def test_analyze_prompt_rollout_experiment_async(self, coordinator: RLCoordinator) -> None:
+    async def test_analyze_prompt_rollout_experiment_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
         """Test async prompt rollout analysis offloads to thread pool."""
         with patch.object(
             coordinator,
@@ -206,6 +208,35 @@ class TestAsyncWrappers:
             provider="ollama",
             treatment_hash="candidate123",
             dry_run=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_process_prompt_candidate_evaluation_suite_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
+        """Test async suite workflow helper offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "process_prompt_candidate_evaluation_suite",
+            return_value={"prompt_rollout": {"created": True}},
+        ) as workflow_mock:
+            workflow = await coordinator.process_prompt_candidate_evaluation_suite_async(
+                {"runs": []},
+                create_rollout=True,
+            )
+
+        assert workflow == {"prompt_rollout": {"created": True}}
+        workflow_mock.assert_called_once_with(
+            {"runs": []},
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=True,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=False,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
         )
 
 

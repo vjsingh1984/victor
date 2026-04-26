@@ -29,6 +29,11 @@ from victor.core.errors import (
     VictorError,
 )
 from victor.ui.output_formatter import InputReader, create_formatter
+from victor.ui.history_utils import (
+    count_prompt_toolkit_history_entries,
+    load_input_history_from_db,
+    sanitize_prompt_toolkit_history_file,
+)
 from victor.ui.rendering.utils import render_status_message
 from victor.ui.commands.utils import (
     preload_semantic_index,
@@ -2031,7 +2036,7 @@ async def run_interactive(
 
 
 def _prune_history_file(history_file, max_entries: int = 250) -> None:
-    """Prune history file to keep only the most recent entries.
+    """Sanitize history file and keep only the most recent complete entries.
 
     This prevents the history file from growing unbounded, which would
     slow down prompt_toolkit's history search on every keystroke.
@@ -2040,24 +2045,8 @@ def _prune_history_file(history_file, max_entries: int = 250) -> None:
         history_file: Path to history file
         max_entries: Maximum number of entries to keep (default 200)
     """
-    if not history_file.exists():
-        return
-
     try:
-        with open(history_file, "r") as f:
-            lines = f.readlines()
-
-        # If file is small enough, no pruning needed
-        if len(lines) <= max_entries:
-            return
-
-        # Keep only the last max_entries lines
-        pruned_lines = lines[-max_entries:]
-
-        # Write back to file
-        with open(history_file, "w") as f:
-            f.writelines(pruned_lines)
-
+        sanitize_prompt_toolkit_history_file(history_file, max_entries=max_entries)
     except Exception as e:
         import logging
 
@@ -2090,12 +2079,10 @@ def _maybe_rotate_history_file(history_file, max_entries: int = 250) -> None:
             if time.time() - last_rotation < 7 * 24 * 3600:
                 return
 
-        # Count lines
-        with open(history_file, "r") as f:
-            line_count = sum(1 for _ in f)
+        entry_count = count_prompt_toolkit_history_entries(history_file)
 
         # If too large, prune
-        if line_count > max_entries * 1.5:  # 50% buffer
+        if entry_count > max_entries * 1.5:  # 50% buffer
             _prune_history_file(history_file, max_entries)
 
             # Update rotation marker
@@ -2119,17 +2106,17 @@ def _check_history_health(history_file, max_entries: int = 250) -> None:
         return
 
     try:
-        line_count = sum(1 for _ in open(history_file))
+        entry_count = count_prompt_toolkit_history_entries(history_file)
         size_kb = history_file.stat().st_size / 1024
 
         # Warning threshold: 2x the configured max_entries or 500, whichever is higher
         warning_threshold = max(max_entries * 2, 500)
         size_warning_threshold = 50  # KB
 
-        if line_count > warning_threshold or size_kb > size_warning_threshold:
+        if entry_count > warning_threshold or size_kb > size_warning_threshold:
             console.print(
                 f"[yellow]Warning:[/] CLI history file is large "
-                f"({line_count:,} entries, {size_kb:.1f} KB). "
+                f"({entry_count:,} entries, {size_kb:.1f} KB). "
                 f"This may slow down typing. "
                 f"Run 'victor chat cleanup-history' to optimize."
             )
@@ -2166,9 +2153,7 @@ def cleanup_history_command(
         return
 
     try:
-        # Count original lines
-        with open(history_file, "r") as f:
-            original_lines = sum(1 for _ in f)
+        original_entries = count_prompt_toolkit_history_entries(history_file)
     except Exception as e:
         console.print(f"[bold red]Error:[/] Failed to read history file: {e}")
         raise typer.Exit(1)
@@ -2176,19 +2161,18 @@ def cleanup_history_command(
     # Prune the history file
     _prune_history_file(history_file, max_entries=max_entries)
 
-    # Count new lines
+    # Count new entries
     try:
-        with open(history_file, "r") as f:
-            new_lines = sum(1 for _ in f)
+        new_entries = count_prompt_toolkit_history_entries(history_file)
     except Exception as e:
         console.print(f"[bold red]Error:[/] Failed to read history file after pruning: {e}")
         raise typer.Exit(1)
 
-    removed = original_lines - new_lines
+    removed = original_entries - new_entries
     size_kb = history_file.stat().st_size / 1024
 
     console.print("[green]✓[/] Cleaned up history file:")
-    console.print(f"  Entries: {original_lines:,} → {new_lines:,} (removed {removed:,})")
+    console.print(f"  Entries: {original_entries:,} → {new_entries:,} (removed {removed:,})")
     console.print(f"  File size: {size_kb:.1f} KB")
     console.print()
     console.print("[dim]Typing should feel snappier now![/]")
@@ -2228,29 +2212,12 @@ def _create_cli_prompt_session(settings=None):
         # Seed from conversation DB if history file is empty/new
         if not history_file.exists() or history_file.stat().st_size == 0:
             try:
-                import sqlite3
-
                 db_path = get_project_paths().project_db
-                if db_path.exists():
-                    with sqlite3.connect(db_path) as conn:
-                        cursor = conn.execute("""
-                            SELECT DISTINCT content
-                            FROM messages
-                            WHERE role = 'user'
-                              AND content IS NOT NULL
-                              AND content != ''
-                              AND LENGTH(content) < 4000
-                              AND content NOT LIKE '<TOOL_OUTPUT%'
-                              AND content NOT LIKE '<%'
-                              AND content NOT LIKE '{%'
-                            ORDER BY timestamp ASC
-                            LIMIT 100
-                            """)
-                        for (msg,) in cursor.fetchall():
-                            history.store_string(msg)
+                for msg in load_input_history_from_db(db_path, limit=min(max_entries, 100)):
+                    history.store_string(msg)
 
-                        # Prune again after seeding to ensure we stay at max_entries
-                        _prune_history_file(history_file, max_entries=max_entries)
+                # Prune again after seeding to ensure we stay at max_entries
+                _prune_history_file(history_file, max_entries=max_entries)
             except Exception:
                 pass  # DB seeding is best-effort
 

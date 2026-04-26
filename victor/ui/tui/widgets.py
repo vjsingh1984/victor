@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import sqlite3
 import time
 from typing import TYPE_CHECKING, Callable, List, Optional
 
@@ -34,6 +33,8 @@ from textual.binding import Binding
 if TYPE_CHECKING:
     pass
 
+from victor.ui.history_utils import load_input_history_from_db
+
 
 def _get_input_history_from_db(limit: int = 100) -> List[str]:
     """Load user message history from conversation database.
@@ -46,29 +47,7 @@ def _get_input_history_from_db(limit: int = 100) -> List[str]:
         from victor.config.settings import get_project_paths
 
         db_path = get_project_paths().project_db
-        if not db_path.exists():
-            return []
-
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.execute(
-                """
-                SELECT DISTINCT content
-                FROM messages
-                WHERE role = 'user'
-                  AND content IS NOT NULL
-                  AND content != ''
-                  AND LENGTH(content) < 4000  # Skip very long messages
-                  AND content NOT LIKE '<TOOL_OUTPUT%'  # Filter tool outputs
-                  AND content NOT LIKE '<%'  # Filter XML-like tags
-                  AND content NOT LIKE '{%'  # Filter JSON blobs
-                ORDER BY timestamp ASC
-                LIMIT ?
-                """,
-                (limit,),
-            )
-            # Already in chronological order (oldest first) from ORDER BY timestamp ASC
-            messages = [row[0] for row in cursor.fetchall()]
-            return messages
+        return load_input_history_from_db(db_path, limit=limit)
     except Exception as e:
         # DB not available - this is expected in some configurations
         logger.debug(f"Failed to load recent messages from database: {e}")

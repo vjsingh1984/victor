@@ -8,6 +8,8 @@ from victor.framework.rl import (
     analyze_prompt_rollout_experiment_async,
     apply_prompt_rollout_recommendation,
     apply_prompt_rollout_recommendation_async,
+    process_prompt_candidate_evaluation_suite,
+    process_prompt_candidate_evaluation_suite_async,
     RLManager,
     create_prompt_rollout_experiment,
     create_prompt_rollout_experiment_async,
@@ -103,6 +105,61 @@ class TestRLManagerPromptRollouts:
             provider="ollama",
             treatment_hash="candidate123",
             dry_run=False,
+        )
+
+    def test_process_prompt_candidate_evaluation_suite_delegates_to_coordinator(self) -> None:
+        coordinator = MagicMock()
+        coordinator.process_prompt_candidate_evaluation_suite.return_value = {"ok": True}
+        manager = RLManager(coordinator=coordinator)
+
+        workflow = manager.process_prompt_candidate_evaluation_suite(
+            {"runs": []},
+            min_pass_rate=0.6,
+            create_rollout=True,
+        )
+
+        assert workflow == {"ok": True}
+        coordinator.process_prompt_candidate_evaluation_suite.assert_called_once_with(
+            {"runs": []},
+            min_pass_rate=0.6,
+            promote_best=False,
+            create_rollout=True,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=False,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_process_prompt_candidate_evaluation_suite_async_delegates_to_coordinator(
+        self,
+    ) -> None:
+        coordinator = MagicMock()
+        coordinator.process_prompt_candidate_evaluation_suite_async = AsyncMock(
+            return_value={"ok": True}
+        )
+        manager = RLManager(coordinator=coordinator)
+
+        workflow = await manager.process_prompt_candidate_evaluation_suite_async(
+            {"runs": []},
+            analyze_rollout=True,
+            apply_rollout_decision=True,
+        )
+
+        assert workflow == {"ok": True}
+        coordinator.process_prompt_candidate_evaluation_suite_async.assert_called_once_with(
+            {"runs": []},
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=False,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=True,
+            apply_rollout_decision=True,
+            rollout_decision_dry_run=False,
         )
 
 
@@ -201,4 +258,57 @@ class TestRLModulePromptRollouts:
             provider="ollama",
             treatment_hash="candidate456",
             dry_run=True,
+        )
+
+    def test_process_prompt_candidate_evaluation_suite_uses_global_coordinator(self) -> None:
+        coordinator = MagicMock()
+        coordinator.process_prompt_candidate_evaluation_suite.return_value = {"ok": True}
+
+        with patch("victor.framework.rl.get_rl_coordinator", return_value=coordinator):
+            workflow = process_prompt_candidate_evaluation_suite({"runs": []}, create_rollout=True)
+
+        assert workflow == {"ok": True}
+        coordinator.process_prompt_candidate_evaluation_suite.assert_called_once_with(
+            {"runs": []},
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=True,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=False,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_process_prompt_candidate_evaluation_suite_async_uses_global_coordinator(
+        self,
+    ) -> None:
+        coordinator = MagicMock()
+        coordinator.process_prompt_candidate_evaluation_suite_async = AsyncMock(
+            return_value={"ok": True}
+        )
+
+        with patch(
+            "victor.framework.rl.get_rl_coordinator_async",
+            new=AsyncMock(return_value=coordinator),
+        ):
+            workflow = await process_prompt_candidate_evaluation_suite_async(
+                {"runs": []},
+                analyze_rollout=True,
+            )
+
+        assert workflow == {"ok": True}
+        coordinator.process_prompt_candidate_evaluation_suite_async.assert_called_once_with(
+            {"runs": []},
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=False,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=True,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
         )

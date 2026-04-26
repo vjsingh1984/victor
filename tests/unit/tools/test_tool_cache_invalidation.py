@@ -85,13 +85,9 @@ async def _run_with_invalidation(tmpdir: str) -> int:
     # First call caches
     await orch.execute_tool_with_retry("code_search", args, context={})
     # Invalidate via write
-    await orch.execute_tool_with_retry(
-        "write_file", {"path": "file_a", "content": "y"}, context={}
-    )
+    await orch.execute_tool_with_retry("write_file", {"path": "file_a", "content": "y"}, context={})
     # Simulate another write to a different path to ensure path tracking works
-    await orch.execute_tool_with_retry(
-        "write_file", {"path": "file_b", "content": "z"}, context={}
-    )
+    await orch.execute_tool_with_retry("write_file", {"path": "file_b", "content": "z"}, context={})
     # Second call should be a miss after invalidation
     await orch.execute_tool_with_retry("code_search", args, context={})
 

@@ -474,6 +474,40 @@ class RLCoordinatorProtocol(Protocol):
         """Async version of apply_prompt_rollout_recommendation."""
         ...
 
+    def process_prompt_candidate_evaluation_suite(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> Any:
+        """Process a prompt-candidate benchmark suite through rollout stages."""
+        ...
+
+    async def process_prompt_candidate_evaluation_suite_async(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> Any:
+        """Async version of process_prompt_candidate_evaluation_suite."""
+        ...
+
     def close(self) -> None:
         """Close database connection."""
         ...

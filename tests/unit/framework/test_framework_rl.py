@@ -22,6 +22,8 @@ from victor.framework.rl import (
     analyze_prompt_rollout_experiment_async,
     apply_prompt_rollout_recommendation,
     apply_prompt_rollout_recommendation_async,
+    process_prompt_candidate_evaluation_suite,
+    process_prompt_candidate_evaluation_suite_async,
     create_prompt_rollout_experiment,
     create_prompt_rollout_experiment_async,
     LearnerType,
@@ -444,8 +446,7 @@ class TestFrameworkExports:
         )
 
         assert (
-            ExportedAnalyzePromptRolloutExperimentAsync
-            is analyze_prompt_rollout_experiment_async
+            ExportedAnalyzePromptRolloutExperimentAsync is analyze_prompt_rollout_experiment_async
         )
 
     def test_apply_prompt_rollout_recommendation_exported(self):
@@ -465,4 +466,26 @@ class TestFrameworkExports:
         assert (
             ExportedApplyPromptRolloutRecommendationAsync
             is apply_prompt_rollout_recommendation_async
+        )
+
+    def test_process_prompt_candidate_evaluation_suite_exported(self):
+        """Test suite workflow helper is exported from framework."""
+        from victor.framework import (
+            process_prompt_candidate_evaluation_suite as ExportedProcessPromptCandidateEvaluationSuite,
+        )
+
+        assert (
+            ExportedProcessPromptCandidateEvaluationSuite
+            is process_prompt_candidate_evaluation_suite
+        )
+
+    def test_process_prompt_candidate_evaluation_suite_async_exported(self):
+        """Test async suite workflow helper is exported from framework."""
+        from victor.framework import (
+            process_prompt_candidate_evaluation_suite_async as ExportedProcessPromptCandidateEvaluationSuiteAsync,
+        )
+
+        assert (
+            ExportedProcessPromptCandidateEvaluationSuiteAsync
+            is process_prompt_candidate_evaluation_suite_async
         )

@@ -31,6 +31,8 @@ from victor_sdk.rl_runtime import (
     analyze_prompt_rollout_experiment_async,
     apply_prompt_rollout_recommendation,
     apply_prompt_rollout_recommendation_async,
+    process_prompt_candidate_evaluation_suite,
+    process_prompt_candidate_evaluation_suite_async,
     create_prompt_rollout_experiment,
     create_prompt_rollout_experiment_async,
     get_rl_coordinator,
@@ -79,6 +81,8 @@ def test_rl_runtime_exports_host_helpers() -> None:
     assert callable(analyze_prompt_rollout_experiment_async)
     assert callable(apply_prompt_rollout_recommendation)
     assert callable(apply_prompt_rollout_recommendation_async)
+    assert callable(process_prompt_candidate_evaluation_suite)
+    assert callable(process_prompt_candidate_evaluation_suite_async)
 
 
 def test_capability_runtime_exports_host_helpers() -> None:

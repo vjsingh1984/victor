@@ -1,5 +1,7 @@
 """Tests for CLI chat history and planning wiring."""
 
+import sqlite3
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
@@ -35,6 +37,40 @@ class TestCliPromptSession:
             from prompt_toolkit.history import InMemoryHistory
 
             assert isinstance(session.history, InMemoryHistory)
+
+    def test_seeds_history_from_db_without_internal_prompts(self, tmp_path):
+        from victor.ui.commands.chat import _create_cli_prompt_session
+
+        project_dir = tmp_path / ".victor"
+        project_dir.mkdir(exist_ok=True)
+        db_path = project_dir / "project.db"
+
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("""
+                CREATE TABLE messages (
+                    role TEXT,
+                    content TEXT,
+                    timestamp TEXT
+                )
+                """)
+            conn.executemany(
+                "INSERT INTO messages(role, content, timestamp) VALUES (?, ?, ?)",
+                [
+                    ("user", "real prompt", "2026-04-26 10:00:00"),
+                    ("user", "[SYSTEM-REMINDER: hidden]", "2026-04-26 10:01:00"),
+                    ("user", "Continue. Use appropriate tools if needed.", "2026-04-26 10:02:00"),
+                    ("user", "follow-up prompt", "2026-04-26 10:03:00"),
+                ],
+            )
+
+        fake_paths = SimpleNamespace(project_victor_dir=project_dir, project_db=db_path)
+        fake_settings = SimpleNamespace(ui=SimpleNamespace(cli_history_max_entries=20))
+
+        with patch("victor.config.settings.get_project_paths", return_value=fake_paths):
+            session = _create_cli_prompt_session(settings=fake_settings)
+
+        history_strings = list(session.history.load_history_strings())
+        assert history_strings == ["follow-up prompt", "real prompt"]
 
 
 class TestPlanningWiring:

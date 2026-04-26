@@ -275,6 +275,38 @@ class TestProtocolImplementation:
             ):
                 return {"action": "rollout", "applied": not dry_run}
 
+            def process_prompt_candidate_evaluation_suite(
+                self,
+                suite,
+                *,
+                min_pass_rate: float = 0.5,
+                promote_best: bool = False,
+                create_rollout: bool = False,
+                rollout_control_hash: str | None = None,
+                rollout_traffic_split: float = 0.1,
+                rollout_min_samples_per_variant: int = 100,
+                analyze_rollout: bool = False,
+                apply_rollout_decision: bool = False,
+                rollout_decision_dry_run: bool = False,
+            ):
+                return {"prompt_optimizer_sync": {"decisions": []}}
+
+            async def process_prompt_candidate_evaluation_suite_async(
+                self,
+                suite,
+                *,
+                min_pass_rate: float = 0.5,
+                promote_best: bool = False,
+                create_rollout: bool = False,
+                rollout_control_hash: str | None = None,
+                rollout_traffic_split: float = 0.1,
+                rollout_min_samples_per_variant: int = 100,
+                analyze_rollout: bool = False,
+                apply_rollout_decision: bool = False,
+                rollout_decision_dry_run: bool = False,
+            ):
+                return {"prompt_optimizer_sync": {"decisions": []}}
+
         assert not isinstance(LegacyOnlyRLRuntime(), RLLearningRuntimeProtocol)
         assert isinstance(RolloutCapableRLRuntime(), RLLearningRuntimeProtocol)
 

@@ -228,7 +228,9 @@ class TestAdapterProtocolConformance:
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
         orchestrator = MagicMock()
-        orchestrator.execute_tool_calls = AsyncMock(return_value=[{"name": "read", "success": True}])
+        orchestrator.execute_tool_calls = AsyncMock(
+            return_value=[{"name": "read", "success": True}]
+        )
         orchestrator._handle_tool_calls = AsyncMock(
             side_effect=AssertionError("legacy _handle_tool_calls bridge should not be used")
         )
@@ -605,7 +607,9 @@ class TestChatServiceBootstrapLaziness:
 
             obj._initialize_services()
 
-            planning_handler = chat_service.bind_runtime_components.call_args.kwargs["planning_handler"]
+            planning_handler = chat_service.bind_runtime_components.call_args.kwargs[
+                "planning_handler"
+            ]
             response = await planning_handler("plan this")
 
         assert response is direct_response
@@ -897,9 +901,7 @@ class TestChatServiceBootstrapLaziness:
             chunks = [c async for c in obj.stream_chat("hello")]
 
         assert [chunk.content for chunk in chunks] == ["fallback"]
-        assert fallback_calls == [
-            ("hello", {"_preserve_iteration": True, "_current_iteration": 3})
-        ]
+        assert fallback_calls == [("hello", {"_preserve_iteration": True, "_current_iteration": 3})]
 
     @pytest.mark.asyncio
     async def test_orchestrator_chat_agentic_loop_records_single_user_and_assistant_turn(self):
@@ -1007,6 +1009,186 @@ class TestChatServiceBootstrapLaziness:
             (("user", "hello"), {}),
             (("assistant", "done"), {}),
         ]
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_chat_fallback_restores_preloop_state_before_retrying_chat_service(
+        self,
+    ):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+
+        obj = object.__new__(AgentOrchestrator)
+        obj._system_added = False
+
+        class FakeConversation:
+            def __init__(self):
+                self.messages = []
+
+            def ensure_system_prompt(self):
+                if not self.messages or self.messages[0].role != "system":
+                    self.messages.insert(0, Message(role="system", content="system prompt"))
+
+        conversation = FakeConversation()
+        obj.conversation = conversation
+
+        def _record_message(role: str, content: str) -> None:
+            conversation.messages.append(Message(role=role, content=content))
+
+        obj.add_message = MagicMock(side_effect=_record_message)
+
+        fallback_response = CompletionResponse(content="fallback", role="assistant")
+
+        async def _fallback_chat(user_message: str) -> CompletionResponse:
+            conversation.ensure_system_prompt()
+            obj.add_message("user", user_message)
+            obj.add_message("assistant", fallback_response.content)
+            return fallback_response
+
+        obj._chat_service = SimpleNamespace(chat=AsyncMock(side_effect=_fallback_chat))
+
+        chat_context = OrchestratorProtocolAdapter(obj)
+        tool_context = SimpleNamespace(tool_calls_used=7)
+        provider_context = SimpleNamespace(
+            task_classifier=SimpleNamespace(classify=MagicMock(return_value="task-analysis"))
+        )
+        turn_executor = SimpleNamespace(
+            _chat_context=chat_context,
+            _tool_context=tool_context,
+            _provider_context=provider_context,
+            _is_question_only=MagicMock(return_value=False),
+            _run_parallel_exploration=AsyncMock(),
+        )
+        obj._turn_executor = turn_executor
+
+        loop_instance = MagicMock()
+        loop_instance.run = AsyncMock(side_effect=RuntimeError("loop exploded after pre-record"))
+
+        flag_manager = MagicMock()
+        flag_manager.is_enabled.return_value = True
+
+        with (
+            patch("victor.core.feature_flags.get_feature_flag_manager", return_value=flag_manager),
+            patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance),
+        ):
+            result = await obj.chat("hello")
+
+        assert result is fallback_response
+        obj._chat_service.chat.assert_awaited_once_with("hello")
+        turn_executor._run_parallel_exploration.assert_awaited_once_with(
+            "hello",
+            "task-analysis",
+        )
+        assert tool_context.tool_calls_used == 7
+        assert [message.role for message in conversation.messages] == [
+            "system",
+            "user",
+            "assistant",
+        ]
+        assert [message.content for message in conversation.messages] == [
+            "system prompt",
+            "hello",
+            "fallback",
+        ]
+        assert obj.add_message.call_args_list == [
+            (("user", "hello"), {}),
+            (("user", "hello"), {}),
+            (("assistant", "fallback"), {}),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_chat_agentic_loop_passes_assembled_history_to_loop(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+
+        obj = object.__new__(AgentOrchestrator)
+        obj._system_added = False
+        obj._chat_service = SimpleNamespace(
+            chat=AsyncMock(side_effect=AssertionError("chat service fallback should not be used"))
+        )
+
+        class FakeConversation:
+            def __init__(self):
+                self.messages = []
+
+            def ensure_system_prompt(self):
+                if not self.messages or self.messages[0].role != "system":
+                    self.messages.insert(0, Message(role="system", content="system prompt"))
+
+        conversation = FakeConversation()
+        obj.conversation = conversation
+
+        def _record_message(role: str, content: str) -> None:
+            conversation.messages.append(Message(role=role, content=content))
+
+        obj.add_message = MagicMock(side_effect=_record_message)
+        obj.get_assembled_messages = MagicMock(
+            return_value=[
+                Message(role="system", content="system prompt"),
+                Message(role="user", content="previous"),
+                Message(role="assistant", content="previous answer"),
+                Message(role="user", content="hello"),
+            ]
+        )
+
+        response = CompletionResponse(content="done", role="assistant")
+        chat_context = OrchestratorProtocolAdapter(obj)
+        tool_context = SimpleNamespace(tool_calls_used=0)
+        provider_context = SimpleNamespace(
+            task_classifier=SimpleNamespace(classify=MagicMock(return_value="task-analysis"))
+        )
+
+        async def _execute_turn(**_kwargs):
+            chat_context.add_message("assistant", response.content)
+            return SimpleNamespace(response=response)
+
+        turn_executor = SimpleNamespace(
+            _chat_context=chat_context,
+            _tool_context=tool_context,
+            _provider_context=provider_context,
+            _is_question_only=MagicMock(return_value=False),
+            _run_parallel_exploration=AsyncMock(),
+            execute_turn=AsyncMock(side_effect=_execute_turn),
+            _ensure_complete_response=AsyncMock(
+                side_effect=AssertionError("completion fallback should not be used")
+            ),
+        )
+        obj._turn_executor = turn_executor
+
+        loop_instance = MagicMock()
+
+        async def _loop_run(query: str, context=None, conversation_history=None):
+            assert query == "hello"
+            assert context == {
+                "_task_classification": "task-analysis",
+                "_is_qa_task": False,
+            }
+            assert conversation_history == [
+                {"role": "system", "content": "system prompt"},
+                {"role": "user", "content": "previous"},
+                {"role": "assistant", "content": "previous answer"},
+            ]
+            action_result = await turn_executor.execute_turn(
+                user_message=query,
+                task_classification=context["_task_classification"],
+                is_qa_task=context["_is_qa_task"],
+                intent=None,
+                temperature_override=None,
+            )
+            return SimpleNamespace(iterations=[SimpleNamespace(action_result=action_result)])
+
+        loop_instance.run = AsyncMock(side_effect=_loop_run)
+
+        flag_manager = MagicMock()
+        flag_manager.is_enabled.return_value = True
+
+        with (
+            patch("victor.core.feature_flags.get_feature_flag_manager", return_value=flag_manager),
+            patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance),
+        ):
+            result = await obj.chat("hello")
+
+        assert result is response
+        obj.get_assembled_messages.assert_called_once_with(current_query="hello")
 
     def test_get_service_streaming_runtime_prefers_factory_and_caches(self):
         from victor.agent.orchestrator import AgentOrchestrator

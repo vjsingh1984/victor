@@ -826,7 +826,9 @@ class EvaluationOrchestrator:
             "model": self._optional_text(getattr(orchestrator, "model", None)),
         }
 
-        prompt_metadata_getter = getattr(orchestrator, "get_active_prompt_optimization_metadata", None)
+        prompt_metadata_getter = getattr(
+            orchestrator, "get_active_prompt_optimization_metadata", None
+        )
         if callable(prompt_metadata_getter):
             prompt_metadata = self._canonical_prompt_optimization_identity(prompt_metadata_getter())
             metadata["prompt_optimization"] = prompt_metadata

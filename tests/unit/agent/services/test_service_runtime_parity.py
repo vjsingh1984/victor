@@ -204,6 +204,35 @@ def test_service_rl_runtime_rollout_analysis_helper_uses_global_coordinator():
     )
 
 
+def test_service_rl_runtime_suite_processing_helper_uses_global_coordinator():
+    from victor.agent.services.rl_runtime import process_prompt_candidate_evaluation_suite
+
+    coordinator = MagicMock()
+    coordinator.process_prompt_candidate_evaluation_suite.return_value = SimpleNamespace(
+        to_dict=lambda: {"prompt_rollout": {"created": True}}
+    )
+
+    with patch("victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator):
+        workflow = process_prompt_candidate_evaluation_suite(
+            {"runs": []},
+            create_rollout=True,
+        )
+
+    assert workflow == {"prompt_rollout": {"created": True}}
+    coordinator.process_prompt_candidate_evaluation_suite.assert_called_once_with(
+        {"runs": []},
+        min_pass_rate=0.5,
+        promote_best=False,
+        create_rollout=True,
+        rollout_control_hash=None,
+        rollout_traffic_split=0.1,
+        rollout_min_samples_per_variant=100,
+        analyze_rollout=False,
+        apply_rollout_decision=False,
+        rollout_decision_dry_run=False,
+    )
+
+
 @pytest.mark.asyncio
 async def test_service_rl_runtime_rollout_apply_async_helper_uses_global_coordinator():
     from victor.agent.services.rl_runtime import apply_prompt_rollout_recommendation_async
@@ -233,16 +262,53 @@ async def test_service_rl_runtime_rollout_apply_async_helper_uses_global_coordin
     )
 
 
+@pytest.mark.asyncio
+async def test_service_rl_runtime_suite_processing_async_helper_uses_global_coordinator():
+    from victor.agent.services.rl_runtime import process_prompt_candidate_evaluation_suite_async
+
+    coordinator = MagicMock()
+    coordinator.process_prompt_candidate_evaluation_suite_async = AsyncMock(
+        return_value=SimpleNamespace(to_dict=lambda: {"prompt_rollout_analysis": {"ok": True}})
+    )
+
+    with patch(
+        "victor.agent.services.rl_runtime.get_rl_coordinator_async",
+        new=AsyncMock(return_value=coordinator),
+    ):
+        workflow = await process_prompt_candidate_evaluation_suite_async(
+            {"runs": []},
+            analyze_rollout=True,
+        )
+
+    assert workflow == {"prompt_rollout_analysis": {"ok": True}}
+    coordinator.process_prompt_candidate_evaluation_suite_async.assert_called_once_with(
+        {"runs": []},
+        min_pass_rate=0.5,
+        promote_best=False,
+        create_rollout=False,
+        rollout_control_hash=None,
+        rollout_traffic_split=0.1,
+        rollout_min_samples_per_variant=100,
+        analyze_rollout=True,
+        apply_rollout_decision=False,
+        rollout_decision_dry_run=False,
+    )
+
+
 def test_agent_services_package_exports_prompt_rollout_helpers():
     from victor.agent.services import (
         analyze_prompt_rollout_experiment as package_rollout_analysis_helper,
         apply_prompt_rollout_recommendation_async as package_rollout_apply_helper_async,
+        process_prompt_candidate_evaluation_suite as package_suite_helper,
+        process_prompt_candidate_evaluation_suite_async as package_suite_helper_async,
         create_prompt_rollout_experiment as package_rollout_helper,
         create_prompt_rollout_experiment_async as package_rollout_helper_async,
     )
     from victor.agent.services.rl_runtime import (
         analyze_prompt_rollout_experiment as runtime_rollout_analysis_helper,
         apply_prompt_rollout_recommendation_async as runtime_rollout_apply_helper_async,
+        process_prompt_candidate_evaluation_suite as runtime_suite_helper,
+        process_prompt_candidate_evaluation_suite_async as runtime_suite_helper_async,
         create_prompt_rollout_experiment as runtime_rollout_helper,
         create_prompt_rollout_experiment_async as runtime_rollout_helper_async,
     )
@@ -251,6 +317,8 @@ def test_agent_services_package_exports_prompt_rollout_helpers():
     assert package_rollout_helper_async is runtime_rollout_helper_async
     assert package_rollout_analysis_helper is runtime_rollout_analysis_helper
     assert package_rollout_apply_helper_async is runtime_rollout_apply_helper_async
+    assert package_suite_helper is runtime_suite_helper
+    assert package_suite_helper_async is runtime_suite_helper_async
 
 
 def test_tool_service_normalize_arguments_full_matches_legacy_contract():

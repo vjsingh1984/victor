@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from pathlib import Path
@@ -274,6 +275,7 @@ class TestABTestingSyncBridge:
 class TestOptimizationSyncBridge:
     def test_optimization_group_exposes_prompt_rollout_command(self) -> None:
         assert "prompt-rollout" in optimization_cmd.opt.commands
+        assert "prompt-suite-process" in optimization_cmd.opt.commands
         assert "prompt-rollouts" in optimization_cmd.opt.commands
         assert "prompt-rollout-status" in optimization_cmd.opt.commands
         assert "prompt-rollout-results" in optimization_cmd.opt.commands
@@ -380,6 +382,169 @@ class TestOptimizationSyncBridge:
             min_samples_per_variant=25,
         )
         mock_run_sync.assert_called_once_with(coro)
+
+    def test_prompt_suite_process_uses_shared_sync_bridge(self) -> None:
+        coro = object()
+        mock_async = Mock(return_value=coro)
+
+        with (
+            patch.object(optimization_cmd, "_process_prompt_suite_artifact_async", mock_async),
+            patch.object(optimization_cmd, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            optimization_cmd.prompt_suite_process.callback(
+                "suite.json",
+                0.6,
+                False,
+                True,
+                "control456",
+                0.2,
+                25,
+                True,
+                True,
+                False,
+                "processed.json",
+            )
+
+        mock_async.assert_called_once_with(
+            suite_file="suite.json",
+            min_approval_pass_rate=0.6,
+            promote_best=False,
+            create_rollout=True,
+            rollout_control_hash="control456",
+            rollout_traffic_split=0.2,
+            rollout_min_samples_per_variant=25,
+            analyze_rollout=True,
+            apply_rollout_decision=True,
+            rollout_decision_dry_run=False,
+            output="processed.json",
+        )
+        mock_run_sync.assert_called_once_with(coro)
+
+    @pytest.mark.asyncio
+    async def test_process_prompt_suite_artifact_async_loads_suite_and_saves_workflow(
+        self, tmp_path: Path
+    ) -> None:
+        suite_payload = {
+            "benchmark": "human_eval",
+            "model": "test-model",
+            "provider": "anthropic",
+            "section_name": "GROUNDING_RULES",
+            "prompt_section_name": "GROUNDING_RULES",
+            "config": {
+                "benchmark": "human_eval",
+                "model": "test-model",
+                "provider": "anthropic",
+                "section_name": "GROUNDING_RULES",
+                "prompt_section_name": "GROUNDING_RULES",
+                "max_tasks": 1,
+                "timeout_per_task": 30,
+                "max_turns": 4,
+                "parallel_tasks": 1,
+                "dataset_metadata": {},
+            },
+            "runs": [
+                {
+                    "label": "GROUNDING_RULES:anthropic:cand-123",
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "metrics": {"pass_rate": 1.0},
+                    "task_results": [
+                        {
+                            "task_id": "task-1",
+                            "status": "passed",
+                            "tests_passed": 1,
+                            "tests_total": 1,
+                            "duration": 1.0,
+                            "tool_calls": 0,
+                            "code_search_calls": 0,
+                            "graph_calls": 0,
+                            "failure_category": None,
+                            "failure_details": {},
+                        }
+                    ],
+                }
+            ],
+        }
+        suite_file = tmp_path / "suite.json"
+        suite_file.write_text(json.dumps(suite_payload))
+        output_file = tmp_path / "processed.json"
+        workflow = SimpleNamespace(
+            prompt_optimizer_sync=SimpleNamespace(
+                decisions=[],
+                to_dict=lambda: {"approved_prompt_candidate_hash": "cand-123"},
+            ),
+            prompt_rollout={
+                "created": True,
+                "experiment_id": "prompt_optimizer_grounding_rules_anthropic_cand-123",
+            },
+            prompt_rollout_analysis={
+                "experiment_id": "prompt_optimizer_grounding_rules_anthropic_cand-123",
+                "status": "running",
+                "analysis_available": True,
+                "recommendation": "Roll out treatment - significant improvement detected",
+                "auto_action": "rollout",
+                "is_significant": True,
+                "treatment_better": True,
+                "effect_size": 0.2,
+                "p_value": 0.01,
+            },
+            prompt_rollout_decision={
+                "experiment_id": "prompt_optimizer_grounding_rules_anthropic_cand-123",
+                "action": "rollout",
+                "applied": True,
+                "dry_run": False,
+            },
+            to_dict=lambda: {
+                "prompt_optimizer_sync": {"approved_prompt_candidate_hash": "cand-123"},
+                "prompt_rollout": {
+                    "created": True,
+                    "experiment_id": "prompt_optimizer_grounding_rules_anthropic_cand-123",
+                },
+                "prompt_rollout_analysis": {
+                    "experiment_id": "prompt_optimizer_grounding_rules_anthropic_cand-123",
+                    "analysis_available": True,
+                    "recommendation": "Roll out treatment - significant improvement detected",
+                },
+                "prompt_rollout_decision": {
+                    "action": "rollout",
+                    "applied": True,
+                    "dry_run": False,
+                },
+            },
+        )
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "process_prompt_candidate_evaluation_suite_async",
+                AsyncMock(return_value=workflow),
+            ) as mock_process,
+            patch.object(click, "echo") as mock_echo,
+        ):
+            await optimization_cmd._process_prompt_suite_artifact_async(
+                suite_file=str(suite_file),
+                min_approval_pass_rate=0.6,
+                promote_best=False,
+                create_rollout=True,
+                rollout_control_hash=None,
+                rollout_traffic_split=0.2,
+                rollout_min_samples_per_variant=25,
+                analyze_rollout=True,
+                apply_rollout_decision=True,
+                rollout_decision_dry_run=False,
+                output=str(output_file),
+            )
+
+        loaded_suite = mock_process.await_args.args[0]
+        assert loaded_suite.runs[0].config.prompt_candidate_hash == "cand-123"
+        assert loaded_suite.best_run().label == "GROUNDING_RULES:anthropic:cand-123"
+        saved = json.loads(output_file.read_text())
+        assert saved["prompt_rollout"]["created"] is True
+        assert saved["prompt_rollout_decision"]["action"] == "rollout"
+        mock_echo.assert_any_call(
+            "Prompt rollout experiment started: prompt_optimizer_grounding_rules_anthropic_cand-123"
+        )
 
     def test_prompt_rollouts_uses_listing_helper(self) -> None:
         with patch.object(optimization_cmd, "_list_prompt_rollouts") as mock_list:

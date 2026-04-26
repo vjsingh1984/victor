@@ -384,9 +384,7 @@ class ProfileCommand(BaseSlashCommand):
                 provider_label = _provider_info_value(info, "provider_name", "provider")
                 model_label = _provider_info_value(info, "model_name", "model")
                 ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
-                ctx.console.print(
-                    f"  [dim]Provider: {provider_label}, Model: {model_label}[/]"
-                )
+                ctx.console.print(f"  [dim]Provider: {provider_label}, Model: {model_label}[/]")
                 ctx.console.print(
                     f"  [dim]Native tools: {info.get('supports_tool_calling', 'N/A')}, "
                     f"Streaming: {info.get('supports_streaming', 'N/A')}[/]"
@@ -531,9 +529,7 @@ class ProviderCommand(BaseSlashCommand):
             info = ctx.agent.get_current_provider_info()
             provider_label = _provider_info_value(info, "provider_name", "provider")
             model_label = _provider_info_value(info, "model_name", "model")
-            ctx.console.print(
-                f"[green]Switched to:[/] {provider_label}:{model_label}"
-            )
+            ctx.console.print(f"[green]Switched to:[/] {provider_label}:{model_label}")
             ctx.console.print(
                 f"  [dim]Native tools: {info.get('supports_tool_calling', 'N/A')}, "
                 f"Streaming: {info.get('supports_streaming', 'N/A')}[/]"

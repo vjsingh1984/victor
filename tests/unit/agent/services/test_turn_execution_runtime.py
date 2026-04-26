@@ -7,6 +7,7 @@ import pytest
 
 from victor.agent.services.turn_execution_runtime import TurnExecutor
 from victor.framework.task.protocols import TaskComplexity
+from victor.providers.base import CompletionResponse, Message
 
 
 def _make_executor(exploration_coordinator=None) -> TurnExecutor:
@@ -163,3 +164,141 @@ async def test_execute_tool_calls_requires_canonical_tool_context_method():
         await executor._execute_tool_calls([{"name": "read", "arguments": {}}])
 
     legacy_handle_tool_calls.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
+    messages = [
+        Message(role="system", content="system prompt"),
+        Message(role="user", content="previous"),
+        Message(role="assistant", content="previous answer"),
+        Message(role="user", content="hello"),
+    ]
+    conversation = SimpleNamespace(messages=messages)
+    chat_context = SimpleNamespace(
+        settings=SimpleNamespace(chat_max_iterations=5),
+        conversation=conversation,
+        messages=messages,
+        add_message=MagicMock(),
+        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+    tool_context = SimpleNamespace(tool_calls_used=0, tool_budget=10)
+    provider_context = SimpleNamespace(
+        provider_name="ollama",
+        model="test-model",
+        task_classifier=SimpleNamespace(
+            classify=MagicMock(return_value=SimpleNamespace(tool_budget=2))
+        ),
+    )
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=provider_context,
+        execution_provider=MagicMock(),
+    )
+    executor._is_question_only = MagicMock(return_value=False)
+    executor._run_parallel_exploration = AsyncMock()
+
+    response = CompletionResponse(content="done", role="assistant")
+    loop_instance = MagicMock()
+
+    async def _loop_run(query: str, context=None, conversation_history=None):
+        assert query == "hello"
+        assert context == {
+            "_task_classification": provider_context.task_classifier.classify.return_value,
+            "_is_qa_task": False,
+        }
+        assert conversation_history == [
+            {"role": "system", "content": "system prompt"},
+            {"role": "user", "content": "previous"},
+            {"role": "assistant", "content": "previous answer"},
+        ]
+        return SimpleNamespace(
+            iterations=[SimpleNamespace(action_result=SimpleNamespace(response=response))]
+        )
+
+    loop_instance.run = AsyncMock(side_effect=_loop_run)
+
+    with patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance):
+        result = await executor._execute_via_agentic_loop("hello", max_iterations=5)
+
+    assert result is response
+    executor._run_parallel_exploration.assert_awaited_once_with(
+        "hello",
+        provider_context.task_classifier.classify.return_value,
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_agentic_loop_restores_state_before_legacy_fallback():
+    messages = []
+
+    class FakeConversation:
+        def __init__(self):
+            self.messages = messages
+            self._system_added = False
+
+        def ensure_system_prompt(self):
+            if not self.messages or self.messages[0].role != "system":
+                self.messages.insert(0, Message(role="system", content="system prompt"))
+            self._system_added = True
+
+    conversation = FakeConversation()
+
+    def _add_message(role: str, content: str) -> None:
+        messages.append(Message(role=role, content=content))
+
+    chat_context = SimpleNamespace(
+        settings=SimpleNamespace(chat_max_iterations=5),
+        conversation=conversation,
+        messages=messages,
+        add_message=MagicMock(side_effect=_add_message),
+        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    )
+    tool_context = SimpleNamespace(tool_calls_used=7, tool_budget=10)
+    provider_context = SimpleNamespace(
+        provider=SimpleNamespace(supports_tools=MagicMock(return_value=False)),
+        provider_name="ollama",
+        model="test-model",
+        thinking=False,
+        task_classifier=SimpleNamespace(
+            classify=MagicMock(return_value=SimpleNamespace(tool_budget=2))
+        ),
+    )
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=provider_context,
+        execution_provider=MagicMock(),
+    )
+    executor._is_question_only = MagicMock(return_value=True)
+    executor._run_parallel_exploration = AsyncMock()
+    executor._check_context_compaction = AsyncMock()
+
+    legacy_response = CompletionResponse(content="legacy done", role="assistant")
+    executor._execute_model_turn = AsyncMock(return_value=legacy_response)
+    executor._ensure_complete_response = AsyncMock(return_value=legacy_response)
+
+    loop_instance = MagicMock()
+
+    async def _loop_run(query: str, context=None, conversation_history=None):
+        assert query == "hello"
+        chat_context.add_message("assistant", "partial delegated answer")
+        tool_context.tool_calls_used = 4
+        raise RuntimeError("delegated loop failed mid-turn")
+
+    loop_instance.run = AsyncMock(side_effect=_loop_run)
+
+    flag_manager = MagicMock()
+    flag_manager.is_enabled.return_value = True
+
+    with (
+        patch("victor.core.feature_flags.get_feature_flag_manager", return_value=flag_manager),
+        patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance),
+    ):
+        result = await executor.execute_agentic_loop("hello", max_iterations=5)
+
+    assert result is legacy_response
+    assert tool_context.tool_calls_used == 0
+    assert [message.role for message in messages] == ["system", "user", "assistant"]
+    assert [message.content for message in messages] == ["system prompt", "hello", "legacy done"]

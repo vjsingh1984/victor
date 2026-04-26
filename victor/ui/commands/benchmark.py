@@ -326,106 +326,6 @@ def _serialize_prompt_candidate_suite(
     return payload
 
 
-def _sync_prompt_candidate_suite_to_optimizer(
-    suite,
-    *,
-    min_pass_rate: float = 0.5,
-    promote_best: bool = False,
-):
-    """Record prompt-candidate suite scores into prompt-optimizer benchmark state."""
-    from victor.framework.rl.coordinator import get_rl_coordinator
-
-    coordinator = get_rl_coordinator()
-    learner = coordinator.get_learner("prompt_optimizer")
-    if learner is None or not hasattr(learner, "sync_evaluation_suite"):
-        raise ValueError("prompt optimizer not available")
-    return learner.sync_evaluation_suite(
-        suite,
-        min_pass_rate=min_pass_rate,
-        promote_best=promote_best,
-    )
-
-
-def _create_prompt_rollout_from_suite_sync(
-    sync_result,
-    suite,
-    *,
-    control_hash: Optional[str] = None,
-    traffic_split: float = 0.1,
-    min_samples_per_variant: int = 100,
-) -> str:
-    """Create a rollout experiment for the benchmark-approved suite winner."""
-    context = _resolve_prompt_rollout_context(sync_result, suite)
-
-    from victor.framework.rl import create_prompt_rollout_experiment
-
-    experiment_id = create_prompt_rollout_experiment(
-        section_name=context["section_name"],
-        provider=context["provider"],
-        treatment_hash=context["prompt_candidate_hash"],
-        control_hash=control_hash,
-        traffic_split=traffic_split,
-        min_samples_per_variant=min_samples_per_variant,
-    )
-    if not experiment_id:
-        raise ValueError("unable to start prompt rollout experiment")
-    return experiment_id
-
-
-def _resolve_prompt_rollout_context(sync_result, suite) -> dict[str, str]:
-    """Resolve approved candidate rollout identity from suite sync state."""
-    approved_hash = getattr(sync_result, "approved_prompt_candidate_hash", None)
-    if not approved_hash:
-        raise ValueError("no benchmark-approved candidate available for rollout")
-
-    section_name = None
-    provider = None
-
-    for decision in getattr(sync_result, "decisions", []) or []:
-        if getattr(decision, "prompt_candidate_hash", None) != approved_hash:
-            continue
-        section_name = getattr(decision, "section_name", None)
-        provider = getattr(decision, "provider", None)
-        if section_name and provider:
-            break
-
-    if not section_name or not provider:
-        for run in getattr(suite, "runs", []) or []:
-            config = getattr(run, "config", None)
-            if getattr(config, "prompt_candidate_hash", None) != approved_hash:
-                continue
-            section_name = getattr(config, "prompt_section_name", None)
-            provider = getattr(config, "provider", None)
-            if section_name and provider:
-                break
-
-    if not section_name or not provider:
-        raise ValueError("approved candidate metadata unavailable for rollout")
-
-    experiment_id = f"prompt_optimizer_{section_name.lower()}_{provider}_{approved_hash}"
-    return {
-        "experiment_id": experiment_id,
-        "section_name": section_name,
-        "provider": provider,
-        "prompt_candidate_hash": approved_hash,
-    }
-
-
-def _analyze_prompt_rollout_for_suite_sync(sync_result, suite) -> dict[str, Any]:
-    """Analyze the rollout experiment associated with the approved suite winner."""
-    context = _resolve_prompt_rollout_context(sync_result, suite)
-    from victor.framework.rl import analyze_prompt_rollout_experiment
-
-    report = analyze_prompt_rollout_experiment(
-        section_name=context["section_name"],
-        provider=context["provider"],
-        treatment_hash=context["prompt_candidate_hash"],
-    )
-    if report is None:
-        raise ValueError(f"prompt rollout experiment not found: {context['experiment_id']}")
-    return report
-
-
 def _print_prompt_rollout_analysis_summary(report: dict[str, Any]) -> None:
     """Print rollout analysis for the approved suite winner."""
     console.print("\n[bold cyan]Prompt rollout analysis[/]")
@@ -441,25 +341,6 @@ def _print_prompt_rollout_analysis_summary(report: dict[str, Any]) -> None:
     console.print(f"Treatment better: {'yes' if report.get('treatment_better') else 'no'}")
     console.print(f"Effect size: {float(report.get('effect_size', 0.0)):.1%}")
     console.print(f"P-value: {float(report.get('p_value', 1.0)):.4f}")
-
-
-def _apply_prompt_rollout_analysis_sync(
-    report: dict[str, Any],
-    *,
-    dry_run: bool = False,
-) -> dict[str, Any]:
-    """Apply the rollout analysis recommendation when it is actionable."""
-    from victor.framework.rl import apply_prompt_rollout_recommendation
-
-    decision = apply_prompt_rollout_recommendation(
-        section_name=str(report.get("section_name") or ""),
-        provider=str(report.get("provider") or ""),
-        treatment_hash=str(report.get("prompt_candidate_hash") or ""),
-        dry_run=dry_run,
-    )
-    if decision is None:
-        raise ValueError(f"prompt rollout experiment not found: {report.get('experiment_id', '-')}")
-    return decision
 
 
 def _print_prompt_optimizer_sync_summary(sync_result) -> None:
@@ -1214,7 +1095,9 @@ def run_prompt_suite(
         console.print("[bold red]Error:[/] --apply-rollout-decision requires --analyze-rollout")
         raise typer.Exit(1)
     if apply_rollout_decision and promote_best:
-        console.print("[bold red]Error:[/] --apply-rollout-decision cannot be combined with --promote-best")
+        console.print(
+            "[bold red]Error:[/] --apply-rollout-decision cannot be combined with --promote-best"
+        )
         raise typer.Exit(1)
     if create_rollout and not 0.0 < rollout_traffic_split < 1.0:
         console.print("[bold red]Error:[/] --rollout-traffic-split must be between 0 and 1")
@@ -1301,71 +1184,59 @@ def run_prompt_suite(
     prompt_rollout_analysis: Optional[dict[str, Any]] = None
     prompt_rollout_decision: Optional[dict[str, Any]] = None
     if record_benchmark_results:
+        from victor.framework.rl import process_prompt_candidate_evaluation_suite
+
         try:
-            prompt_optimizer_sync = _sync_prompt_candidate_suite_to_optimizer(
+            workflow = process_prompt_candidate_evaluation_suite(
                 suite,
                 min_pass_rate=min_approval_pass_rate,
                 promote_best=promote_best,
+                create_rollout=create_rollout,
+                rollout_control_hash=rollout_control_hash,
+                rollout_traffic_split=rollout_traffic_split,
+                rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+                analyze_rollout=analyze_rollout,
+                apply_rollout_decision=apply_rollout_decision,
+                rollout_decision_dry_run=rollout_decision_dry_run,
             )
         except ValueError as exc:
             console.print(f"[bold red]Error:[/] {exc}")
             raise typer.Exit(1) from exc
+        prompt_optimizer_sync = workflow.prompt_optimizer_sync
+        prompt_rollout = workflow.prompt_rollout
+        prompt_rollout_analysis = workflow.prompt_rollout_analysis
+        prompt_rollout_decision = workflow.prompt_rollout_decision
         _print_prompt_optimizer_sync_summary(prompt_optimizer_sync)
-        if create_rollout:
-            try:
-                experiment_id = _create_prompt_rollout_from_suite_sync(
-                    prompt_optimizer_sync,
-                    suite,
-                    control_hash=rollout_control_hash,
-                    traffic_split=rollout_traffic_split,
-                    min_samples_per_variant=rollout_min_samples_per_variant,
+        if prompt_rollout is not None:
+            if prompt_rollout.get("created"):
+                console.print(
+                    "[bold green]Prompt rollout experiment started:[/] "
+                    f"{prompt_rollout.get('experiment_id')}"
                 )
-            except ValueError as exc:
-                prompt_rollout = {"created": False, "error": str(exc)}
-                console.print(f"[yellow]Prompt rollout not created:[/] {exc}")
             else:
-                prompt_rollout = {"created": True, "experiment_id": experiment_id}
-                console.print(f"[bold green]Prompt rollout experiment started:[/] {experiment_id}")
-        if analyze_rollout:
-            try:
-                prompt_rollout_analysis = _analyze_prompt_rollout_for_suite_sync(
-                    prompt_optimizer_sync,
-                    suite,
+                console.print(
+                    "[yellow]Prompt rollout not created:[/] "
+                    f"{prompt_rollout.get('error', 'unable to start prompt rollout experiment')}"
                 )
-            except ValueError as exc:
-                prompt_rollout_analysis = {
-                    "analysis_available": False,
-                    "recommendation": str(exc),
-                }
-                console.print(f"[yellow]Prompt rollout analysis unavailable:[/] {exc}")
-            else:
+        if prompt_rollout_analysis is not None:
+            if prompt_rollout_analysis.get("analysis_available", False):
                 _print_prompt_rollout_analysis_summary(prompt_rollout_analysis)
-            if apply_rollout_decision and prompt_rollout_analysis is not None:
-                try:
-                    prompt_rollout_decision = _apply_prompt_rollout_analysis_sync(
-                        prompt_rollout_analysis,
-                        dry_run=rollout_decision_dry_run,
-                    )
-                except ValueError as exc:
-                    prompt_rollout_decision = {
-                        "applied": False,
-                        "dry_run": rollout_decision_dry_run,
-                        "error": str(exc),
-                    }
-                    console.print(f"[yellow]Prompt rollout decision not applied:[/] {exc}")
-                else:
-                    action = prompt_rollout_decision.get("action")
-                    if action and prompt_rollout_decision.get("applied"):
-                        console.print(f"[bold green]Prompt rollout decision applied:[/] {action}")
-                    elif action and prompt_rollout_decision.get("dry_run"):
-                        console.print(
-                            f"[cyan]Prompt rollout decision dry-run:[/] would apply {action}"
-                        )
-                    else:
-                        console.print(
-                            "[yellow]Prompt rollout decision not applied:[/] "
-                            f"{prompt_rollout_decision.get('reason', 'no actionable recommendation')}"
-                        )
+            else:
+                console.print(
+                    "[yellow]Prompt rollout analysis unavailable:[/] "
+                    f"{prompt_rollout_analysis.get('recommendation', 'analysis unavailable')}"
+                )
+        if prompt_rollout_decision is not None:
+            action = prompt_rollout_decision.get("action")
+            if action and prompt_rollout_decision.get("applied"):
+                console.print(f"[bold green]Prompt rollout decision applied:[/] {action}")
+            elif action and prompt_rollout_decision.get("dry_run"):
+                console.print(f"[cyan]Prompt rollout decision dry-run:[/] would apply {action}")
+            else:
+                console.print(
+                    "[yellow]Prompt rollout decision not applied:[/] "
+                    f"{prompt_rollout_decision.get('reason') or prompt_rollout_decision.get('error') or 'no actionable recommendation'}"
+                )
 
     if output:
         output_data = _serialize_prompt_candidate_suite(

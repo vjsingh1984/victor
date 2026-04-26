@@ -7,7 +7,10 @@ from victor.framework.request_scope_heuristics import (
 
 def test_contains_keyword_marker_uses_whole_word_matching():
     assert contains_keyword_marker("please implement this change", ("implement", "change")) is True
-    assert contains_keyword_marker("clean code implementations and changes", ("implement", "change")) is False
+    assert (
+        contains_keyword_marker("clean code implementations and changes", ("implement", "change"))
+        is False
+    )
 
 
 def test_has_ambiguous_target_reference_ignores_relative_clause_that():

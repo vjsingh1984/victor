@@ -506,7 +506,9 @@ class OptimizationInjector:
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("prompt_optimizer")
             if learner is None or not hasattr(learner, "get_candidate"):
-                raise RuntimeError("prompt optimizer learner does not support exact candidate lookup")
+                raise RuntimeError(
+                    "prompt optimizer learner does not support exact candidate lookup"
+                )
 
             candidate = learner.get_candidate(
                 section_name=section_name,

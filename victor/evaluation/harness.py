@@ -21,6 +21,7 @@ standardized benchmarks like SWE-bench, HumanEval, etc.
 """
 
 import asyncio
+import json
 import logging
 import os
 import shutil
@@ -121,6 +122,132 @@ class PromptCandidateEvaluationSuiteResult:
                 for run in self.runs
             ],
         }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "PromptCandidateEvaluationSuiteResult":
+        """Reconstruct a suite result from a saved suite artifact payload."""
+        if not isinstance(payload, dict):
+            raise ValueError("suite payload must be a dictionary")
+
+        config_payload = payload.get("config")
+        config_dict = dict(config_payload) if isinstance(config_payload, dict) else {}
+        config_dict.setdefault("benchmark", payload.get("benchmark"))
+        config_dict.setdefault("model", payload.get("model"))
+        config_dict.setdefault("provider", payload.get("provider"))
+        config_dict.setdefault(
+            "prompt_section_name",
+            payload.get("prompt_section_name") or payload.get("section_name"),
+        )
+        base_config = evaluation_config_from_artifact_config(config_dict)
+
+        runs: list[PromptCandidateEvaluationRun] = []
+        for run_payload in payload.get("runs", []) or []:
+            if not isinstance(run_payload, dict):
+                continue
+
+            provider = str(run_payload.get("provider") or base_config.provider or "") or None
+            section_name = str(
+                run_payload.get("section_name")
+                or run_payload.get("prompt_section_name")
+                or base_config.prompt_section_name
+                or ""
+            )
+            prompt_candidate_hash = str(run_payload.get("prompt_candidate_hash") or "")
+            run_config = replace(
+                base_config,
+                provider=provider,
+                prompt_candidate_hash=prompt_candidate_hash or None,
+                prompt_section_name=section_name or None,
+            )
+            spec = PromptCandidateEvaluationSpec(
+                section_name=section_name,
+                prompt_candidate_hash=prompt_candidate_hash,
+                provider=provider,
+                label=(
+                    str(run_payload.get("label")) if run_payload.get("label") is not None else None
+                ),
+            )
+            task_results = [
+                task_result_from_artifact(task_payload)
+                for task_payload in run_payload.get("task_results", []) or []
+                if isinstance(task_payload, dict)
+            ]
+            result = EvaluationResult(config=run_config, task_results=task_results)
+            label = (
+                str(run_payload.get("label"))
+                if run_payload.get("label") is not None
+                else spec.resolved_label(run_config.provider)
+            )
+            runs.append(
+                PromptCandidateEvaluationRun(
+                    spec=spec,
+                    config=run_config,
+                    result=result,
+                    label=label,
+                )
+            )
+
+        return cls(base_config=base_config, runs=runs)
+
+
+def evaluation_config_from_artifact_config(payload: dict[str, Any]) -> EvaluationConfig:
+    """Reconstruct evaluation config from a saved artifact config payload."""
+    benchmark_value = str(payload.get("benchmark") or BenchmarkType.CUSTOM.value)
+    return EvaluationConfig(
+        benchmark=BenchmarkType(benchmark_value),
+        model=str(payload.get("model") or "unknown"),
+        provider=(str(payload.get("provider")) if payload.get("provider") is not None else None),
+        prompt_candidate_hash=(
+            str(payload.get("prompt_candidate_hash"))
+            if payload.get("prompt_candidate_hash") is not None
+            else None
+        ),
+        prompt_section_name=(
+            str(payload.get("prompt_section_name") or payload.get("section_name"))
+            if (payload.get("prompt_section_name") or payload.get("section_name")) is not None
+            else None
+        ),
+        max_tasks=payload.get("max_tasks"),
+        timeout_per_task=int(payload.get("timeout_per_task", 300) or 300),
+        parallel_tasks=int(payload.get("parallel_tasks", 1) or 1),
+        max_turns=int(payload.get("max_turns", 10) or 10),
+        dataset_metadata=dict(payload.get("dataset_metadata") or {}),
+    )
+
+
+def task_result_from_artifact(payload: dict[str, Any]) -> TaskResult:
+    """Reconstruct a task result from a saved suite artifact entry."""
+    failure_category_value = payload.get("failure_category")
+    failure_category = (
+        BenchmarkFailureCategory(str(failure_category_value)) if failure_category_value else None
+    )
+    tests_passed = int(payload.get("tests_passed", 0) or 0)
+    tests_total = int(payload.get("tests_total", 0) or 0)
+    return TaskResult(
+        task_id=str(payload.get("task_id") or "unknown-task"),
+        status=TaskStatus(str(payload.get("status") or TaskStatus.ERROR.value)),
+        tests_passed=tests_passed,
+        tests_failed=max(tests_total - tests_passed, 0),
+        tests_total=tests_total,
+        duration_seconds=float(
+            payload.get("duration_seconds", payload.get("duration", 0.0)) or 0.0
+        ),
+        tool_calls=int(payload.get("tool_calls", 0) or 0),
+        code_search_calls=int(payload.get("code_search_calls", 0) or 0),
+        graph_calls=int(payload.get("graph_calls", 0) or 0),
+        failure_category=failure_category,
+        failure_details=dict(payload.get("failure_details") or {}),
+    )
+
+
+def load_prompt_candidate_evaluation_suite(
+    path: str | Path,
+) -> PromptCandidateEvaluationSuiteResult:
+    """Load a saved prompt-candidate suite artifact from disk."""
+    payload = json.loads(Path(path).read_text())
+    if not isinstance(payload, dict):
+        raise ValueError("suite artifact must contain a JSON object")
+    return PromptCandidateEvaluationSuiteResult.from_dict(payload)
 
 
 def bind_prompt_candidate_evaluation_config(

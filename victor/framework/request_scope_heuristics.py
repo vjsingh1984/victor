@@ -22,8 +22,7 @@ _RELATIVE_CLAUSE_THAT_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 _FILE_PATH_PATTERN = re.compile(
-    r"(?:^|\s|[\"'\-`])((?:\.{0,2}/)?[\w./-]+/[\w.-]+\.[a-z]{1,10})"
-    r"(?:\s|[\"'`]|$|[,;:.\)]|\Z)",
+    r"(?:^|\s|[\"'\-`])((?:\.{0,2}/)?[\w./-]+/[\w.-]+\.[a-z]{1,10})" r"(?:\s|[\"'`]|$|[,;:.\)]|\Z)",
     flags=re.IGNORECASE,
 )
 _BARE_FILENAME_PATTERN = re.compile(

@@ -23,6 +23,7 @@ Use this module for:
 - sync and async access to the global RL coordinator
 - benchmark-gated prompt rollout experiment creation from agent runtime code
 - prompt rollout analysis and recommendation application from agent runtime code
+- benchmark-suite post-processing into rollout and rollout-decision state
 """
 
 from typing import Any, Optional
@@ -142,6 +143,66 @@ async def apply_prompt_rollout_recommendation_async(
     )
 
 
+def process_prompt_candidate_evaluation_suite(
+    suite: Any,
+    *,
+    min_pass_rate: float = 0.5,
+    promote_best: bool = False,
+    create_rollout: bool = False,
+    rollout_control_hash: Optional[str] = None,
+    rollout_traffic_split: float = 0.1,
+    rollout_min_samples_per_variant: int = 100,
+    analyze_rollout: bool = False,
+    apply_rollout_decision: bool = False,
+    rollout_decision_dry_run: bool = False,
+) -> Optional[dict[str, Any]]:
+    """Process a prompt-candidate benchmark suite via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    workflow = coordinator.process_prompt_candidate_evaluation_suite(
+        suite,
+        min_pass_rate=min_pass_rate,
+        promote_best=promote_best,
+        create_rollout=create_rollout,
+        rollout_control_hash=rollout_control_hash,
+        rollout_traffic_split=rollout_traffic_split,
+        rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+        analyze_rollout=analyze_rollout,
+        apply_rollout_decision=apply_rollout_decision,
+        rollout_decision_dry_run=rollout_decision_dry_run,
+    )
+    return workflow.to_dict()
+
+
+async def process_prompt_candidate_evaluation_suite_async(
+    suite: Any,
+    *,
+    min_pass_rate: float = 0.5,
+    promote_best: bool = False,
+    create_rollout: bool = False,
+    rollout_control_hash: Optional[str] = None,
+    rollout_traffic_split: float = 0.1,
+    rollout_min_samples_per_variant: int = 100,
+    analyze_rollout: bool = False,
+    apply_rollout_decision: bool = False,
+    rollout_decision_dry_run: bool = False,
+) -> Optional[dict[str, Any]]:
+    """Process a prompt-candidate benchmark suite asynchronously via the global coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    workflow = await coordinator.process_prompt_candidate_evaluation_suite_async(
+        suite,
+        min_pass_rate=min_pass_rate,
+        promote_best=promote_best,
+        create_rollout=create_rollout,
+        rollout_control_hash=rollout_control_hash,
+        rollout_traffic_split=rollout_traffic_split,
+        rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+        analyze_rollout=analyze_rollout,
+        apply_rollout_decision=apply_rollout_decision,
+        rollout_decision_dry_run=rollout_decision_dry_run,
+    )
+    return workflow.to_dict()
+
+
 __all__ = [
     "AsyncWriterQueue",
     "RLCoordinator",
@@ -149,6 +210,8 @@ __all__ = [
     "analyze_prompt_rollout_experiment_async",
     "apply_prompt_rollout_recommendation",
     "apply_prompt_rollout_recommendation_async",
+    "process_prompt_candidate_evaluation_suite",
+    "process_prompt_candidate_evaluation_suite_async",
     "create_prompt_rollout_experiment",
     "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",

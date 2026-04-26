@@ -1460,11 +1460,7 @@ class PromptOptimizerLearner(BaseLearner):
                 or ""
             )
             score = float(getattr(result, "pass_rate", 0.0) or 0.0)
-            passed = (
-                prompt_candidate_hash == best_hash
-                and score > 0.0
-                and score >= min_pass_rate
-            )
+            passed = prompt_candidate_hash == best_hash and score > 0.0 and score >= min_pass_rate
 
             candidate = None
             recorded = bool(section_name and prompt_candidate_hash)
@@ -1889,7 +1885,9 @@ class PromptOptimizerLearner(BaseLearner):
             or cls._artifact_text_value(feedback_metadata.get("prompt_candidate_hash"))
         )
         section_name = (
-            cls._artifact_text_value(payload.get("section_name") or payload.get("prompt_section_name"))
+            cls._artifact_text_value(
+                payload.get("section_name") or payload.get("prompt_section_name")
+            )
             or cls._artifact_text_value(
                 config_dict.get("section_name") or config_dict.get("prompt_section_name")
             )

@@ -29,6 +29,7 @@ Database:
 import asyncio
 import logging
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
@@ -42,6 +43,33 @@ from victor.core.schema import Tables, Schema
 from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PromptCandidateSuiteWorkflowResult:
+    """Result of processing a prompt-candidate benchmark suite."""
+
+    prompt_optimizer_sync: Optional[Any] = None
+    prompt_rollout: Optional[Dict[str, Any]] = None
+    prompt_rollout_analysis: Optional[Dict[str, Any]] = None
+    prompt_rollout_decision: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize workflow state for CLI artifacts."""
+        payload: Dict[str, Any] = {}
+        if self.prompt_optimizer_sync is not None:
+            payload["prompt_optimizer_sync"] = (
+                self.prompt_optimizer_sync.to_dict()
+                if hasattr(self.prompt_optimizer_sync, "to_dict")
+                else self.prompt_optimizer_sync
+            )
+        if self.prompt_rollout is not None:
+            payload["prompt_rollout"] = self.prompt_rollout
+        if self.prompt_rollout_analysis is not None:
+            payload["prompt_rollout_analysis"] = self.prompt_rollout_analysis
+        if self.prompt_rollout_decision is not None:
+            payload["prompt_rollout_decision"] = self.prompt_rollout_decision
+        return payload
 
 
 class AsyncWriterQueue:
@@ -1112,6 +1140,49 @@ class RLCoordinator:
             return "rollback"
         return None
 
+    @staticmethod
+    def _resolve_prompt_rollout_context(sync_result: Any, suite: Any) -> Dict[str, str]:
+        """Resolve rollout identity for the benchmark-approved suite winner."""
+        approved_hash = getattr(sync_result, "approved_prompt_candidate_hash", None)
+        if not approved_hash:
+            raise ValueError("no benchmark-approved candidate available for rollout")
+
+        section_name = None
+        provider = None
+
+        for decision in getattr(sync_result, "decisions", []) or []:
+            if getattr(decision, "prompt_candidate_hash", None) != approved_hash:
+                continue
+            section_name = getattr(decision, "section_name", None)
+            provider = getattr(decision, "provider", None)
+            if section_name and provider:
+                break
+
+        if not section_name or not provider:
+            for run in getattr(suite, "runs", []) or []:
+                config = getattr(run, "config", None)
+                if getattr(config, "prompt_candidate_hash", None) != approved_hash:
+                    continue
+                section_name = getattr(config, "prompt_section_name", None)
+                provider = getattr(config, "provider", None)
+                if section_name and provider:
+                    break
+
+        if not section_name or not provider:
+            raise ValueError("approved candidate metadata unavailable for rollout")
+
+        experiment_id = RLCoordinator.get_prompt_rollout_experiment_id(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=approved_hash,
+        )
+        return {
+            "experiment_id": experiment_id,
+            "section_name": section_name,
+            "provider": provider,
+            "prompt_candidate_hash": approved_hash,
+        }
+
     def analyze_prompt_rollout_experiment(
         self,
         *,
@@ -1224,6 +1295,117 @@ class RLCoordinator:
             "applied": True,
             "dry_run": False,
         }
+
+    def process_prompt_candidate_evaluation_suite(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Process a prompt-candidate suite through sync and rollout stages."""
+        if create_rollout and promote_best:
+            raise ValueError("--create-rollout cannot be combined with promote_best")
+        if apply_rollout_decision and promote_best:
+            raise ValueError("--apply-rollout-decision cannot be combined with promote_best")
+        if create_rollout and not 0.0 < rollout_traffic_split < 1.0:
+            raise ValueError("rollout_traffic_split must be between 0 and 1")
+        if create_rollout and rollout_min_samples_per_variant <= 0:
+            raise ValueError("rollout_min_samples_per_variant must be greater than 0")
+
+        learner = self.get_learner("prompt_optimizer")
+        if learner is None or not hasattr(learner, "sync_evaluation_suite"):
+            raise ValueError("prompt optimizer not available")
+
+        sync_result = learner.sync_evaluation_suite(
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+        )
+        workflow = PromptCandidateSuiteWorkflowResult(prompt_optimizer_sync=sync_result)
+
+        if not (create_rollout or analyze_rollout or apply_rollout_decision):
+            return workflow
+
+        try:
+            context = RLCoordinator._resolve_prompt_rollout_context(sync_result, suite)
+        except ValueError as exc:
+            error = str(exc)
+            if create_rollout:
+                workflow.prompt_rollout = {"created": False, "error": error}
+            if analyze_rollout:
+                workflow.prompt_rollout_analysis = {
+                    "analysis_available": False,
+                    "recommendation": error,
+                }
+            if apply_rollout_decision:
+                workflow.prompt_rollout_decision = {
+                    "applied": False,
+                    "dry_run": rollout_decision_dry_run,
+                    "error": error,
+                }
+            return workflow
+
+        if create_rollout:
+            experiment_id = RLCoordinator.create_prompt_rollout_experiment(
+                self,
+                section_name=context["section_name"],
+                provider=context["provider"],
+                treatment_hash=context["prompt_candidate_hash"],
+                control_hash=rollout_control_hash,
+                traffic_split=rollout_traffic_split,
+                min_samples_per_variant=rollout_min_samples_per_variant,
+            )
+            workflow.prompt_rollout = (
+                {"created": True, "experiment_id": experiment_id}
+                if experiment_id
+                else {"created": False, "error": "unable to start prompt rollout experiment"}
+            )
+
+        if analyze_rollout:
+            report = RLCoordinator.analyze_prompt_rollout_experiment(
+                self,
+                section_name=context["section_name"],
+                provider=context["provider"],
+                treatment_hash=context["prompt_candidate_hash"],
+            )
+            workflow.prompt_rollout_analysis = (
+                report
+                if report is not None
+                else {
+                    "analysis_available": False,
+                    "recommendation": (
+                        f"prompt rollout experiment not found: {context['experiment_id']}"
+                    ),
+                }
+            )
+
+        if apply_rollout_decision:
+            decision = RLCoordinator.apply_prompt_rollout_recommendation(
+                self,
+                section_name=context["section_name"],
+                provider=context["provider"],
+                treatment_hash=context["prompt_candidate_hash"],
+                dry_run=rollout_decision_dry_run,
+            )
+            workflow.prompt_rollout_decision = (
+                decision
+                if decision is not None
+                else {
+                    "applied": False,
+                    "dry_run": rollout_decision_dry_run,
+                    "error": f"prompt rollout experiment not found: {context['experiment_id']}",
+                }
+            )
+
+        return workflow
 
     @staticmethod
     def format_evolution_report(
@@ -1530,6 +1712,35 @@ class RLCoordinator:
             provider=provider,
             treatment_hash=treatment_hash,
             dry_run=dry_run,
+        )
+
+    async def process_prompt_candidate_evaluation_suite_async(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Async version of process_prompt_candidate_evaluation_suite."""
+        return await asyncio.to_thread(
+            self.process_prompt_candidate_evaluation_suite,
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
         )
 
     async def export_metrics_async(self) -> Dict[str, Any]:

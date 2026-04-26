@@ -708,10 +708,7 @@ class UnifiedPromptPipeline:
         )
         target_present = bool(required_files or scope_hints)
         deliverable_present = bool(required_outputs) or (action_task and not report_task)
-        ambiguous_reference = (
-            has_ambiguous_target_reference(message_lower)
-            and not target_present
-        )
+        ambiguous_reference = has_ambiguous_target_reference(message_lower) and not target_present
         search_first = bool(
             action_task and scope_hints and not required_files and not ambiguous_reference
         )

@@ -56,6 +56,7 @@ Recent Refactoring (December 2025 - January 2025):
 
 import ast
 import asyncio
+import inspect
 import json
 import logging
 import threading
@@ -281,6 +282,7 @@ from victor.agent.streaming import (
 )
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
 
 # Tools with progressive parameters - different params = progress, not a loop
 # Format: tool_name -> list of param names that indicate progress
@@ -1874,6 +1876,156 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return 0
 
+    @staticmethod
+    def _serialize_conversation_message(message: Any) -> Optional[Dict[str, Any]]:
+        """Normalize a conversation message into a serializable mapping."""
+        if isinstance(message, dict):
+            role = message.get("role")
+            content = message.get("content")
+        elif hasattr(message, "model_dump"):
+            payload = message.model_dump()
+            if not isinstance(payload, dict):
+                return None
+            role = payload.get("role")
+            content = payload.get("content")
+        else:
+            role = getattr(message, "role", None)
+            content = getattr(message, "content", None)
+        if role is None and content is None:
+            return None
+        return {"role": role, "content": content}
+
+    def _get_agentic_loop_conversation_history(
+        self,
+        user_message: str,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Return assembled conversation history excluding the current user turn."""
+        messages = None
+        assembled_getter = getattr(self, "get_assembled_messages", None)
+        if callable(assembled_getter):
+            try:
+                messages = assembled_getter(current_query=user_message)
+            except Exception as exc:
+                logger.debug("Falling back to raw batch conversation history: %s", exc)
+
+        if messages is None:
+            messages = getattr(self, "messages", None)
+        if not messages:
+            return None
+
+        history = [
+            payload
+            for message in messages
+            if (payload := self._serialize_conversation_message(message)) is not None
+        ]
+        if (
+            history
+            and history[-1].get("role") == "user"
+            and history[-1].get("content") == user_message
+        ):
+            history = history[:-1]
+        return history or None
+
+    def _resolve_batch_turn_executor(self) -> Any:
+        """Return the canonical batch turn executor when available."""
+        turn_executor = getattr(self, "_turn_executor", None)
+        if turn_executor is None and hasattr(self._chat_service, "turn_executor"):
+            turn_executor = self._chat_service.turn_executor
+        return turn_executor
+
+    @staticmethod
+    def _agentic_loop_accepts_conversation_history(loop: Any) -> bool:
+        """Return whether the loop run method supports conversation history."""
+        run = getattr(loop, "run", None)
+        if run is None:
+            return False
+
+        candidate = getattr(run, "side_effect", None)
+        if not callable(candidate):
+            candidate = run
+
+        try:
+            parameters = inspect.signature(candidate).parameters.values()
+        except (TypeError, ValueError):
+            return True
+
+        return any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            or parameter.name == "conversation_history"
+            for parameter in parameters
+        )
+
+    def _snapshot_batch_agentic_loop_state(self, turn_executor: Any) -> Dict[str, Any]:
+        """Capture mutable conversation state before batch AgenticLoop mutates it."""
+        conversation = getattr(self, "conversation", None)
+        messages = getattr(conversation, "messages", None) if conversation is not None else None
+        chat_context = (
+            getattr(turn_executor, "_chat_context", None) if turn_executor is not None else None
+        )
+        tool_context = (
+            getattr(turn_executor, "_tool_context", None) if turn_executor is not None else None
+        )
+
+        return {
+            "messages": list(messages) if messages is not None else None,
+            "conversation_system_added": (
+                getattr(conversation, "_system_added", _MISSING)
+                if conversation is not None
+                else _MISSING
+            ),
+            "orchestrator_system_added": getattr(self, "_system_added", _MISSING),
+            "chat_context_system_added": (
+                getattr(chat_context, "_system_added", _MISSING)
+                if chat_context is not None
+                else _MISSING
+            ),
+            "tool_calls_used": (
+                getattr(tool_context, "tool_calls_used", _MISSING)
+                if tool_context is not None
+                else _MISSING
+            ),
+        }
+
+    def _restore_batch_agentic_loop_state(
+        self, snapshot: Dict[str, Any], turn_executor: Any
+    ) -> None:
+        """Restore batch AgenticLoop state before retrying the legacy fallback path."""
+        conversation = getattr(self, "conversation", None)
+        if conversation is not None and snapshot.get("messages") is not None:
+            restored_messages = list(snapshot["messages"])
+            if hasattr(conversation, "_messages"):
+                conversation._messages = restored_messages
+            else:
+                current_messages = getattr(conversation, "messages", None)
+                if isinstance(current_messages, list):
+                    current_messages[:] = restored_messages
+
+        conversation_system_added = snapshot.get("conversation_system_added", _MISSING)
+        if conversation is not None and conversation_system_added is not _MISSING:
+            conversation._system_added = conversation_system_added
+
+        orchestrator_system_added = snapshot.get("orchestrator_system_added", _MISSING)
+        if orchestrator_system_added is not _MISSING:
+            self._system_added = orchestrator_system_added
+
+        chat_context = (
+            getattr(turn_executor, "_chat_context", None) if turn_executor is not None else None
+        )
+        chat_context_system_added = snapshot.get("chat_context_system_added", _MISSING)
+        if chat_context is not None:
+            if chat_context_system_added is _MISSING:
+                if hasattr(chat_context, "_system_added"):
+                    delattr(chat_context, "_system_added")
+            else:
+                chat_context._system_added = chat_context_system_added
+
+        tool_context = (
+            getattr(turn_executor, "_tool_context", None) if turn_executor is not None else None
+        )
+        tool_calls_used = snapshot.get("tool_calls_used", _MISSING)
+        if tool_context is not None and tool_calls_used is not _MISSING:
+            tool_context.tool_calls_used = tool_calls_used
+
     def _get_stream_fallback_iteration(self) -> int:
         """Return the best-known iteration count for streaming fallback recovery."""
         stream_context = getattr(self, "_current_stream_context", None)
@@ -3422,14 +3574,27 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
             if get_feature_flag_manager().is_enabled(FeatureFlag.USE_AGENTIC_LOOP):
-                return await self._chat_via_agentic_loop(user_message)
+                turn_executor = self._resolve_batch_turn_executor()
+                fallback_state = self._snapshot_batch_agentic_loop_state(turn_executor)
+                try:
+                    return await self._chat_via_agentic_loop(
+                        user_message,
+                        turn_executor=turn_executor,
+                    )
+                except Exception:
+                    self._restore_batch_agentic_loop_state(fallback_state, turn_executor)
+                    raise
         except Exception as e:
             logger.warning(f"AgenticLoop batch failed, falling back: {e}")
 
         # Fallback: ChatCoordinator path
         return await self._chat_service.chat(user_message)
 
-    async def _chat_via_agentic_loop(self, user_message: str) -> CompletionResponse:
+    async def _chat_via_agentic_loop(
+        self,
+        user_message: str,
+        turn_executor: Any = None,
+    ) -> CompletionResponse:
         """Execute batch chat through AgenticLoop (2-hop path).
 
         orchestrator.chat() → AgenticLoop.run() → TurnExecutor.execute_turn()
@@ -3437,9 +3602,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         from victor.framework.agentic_loop import AgenticLoop
 
         # Get or create turn executor
-        turn_executor = getattr(self, "_turn_executor", None)
-        if turn_executor is None and hasattr(self._chat_service, "turn_executor"):
-            turn_executor = self._chat_service.turn_executor
+        turn_executor = turn_executor or self._resolve_batch_turn_executor()
 
         loop = AgenticLoop(
             orchestrator=self,
@@ -3473,8 +3636,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             "_task_classification": task_classification,
             "_is_qa_task": is_qa,
         }
+        conversation_history = self._get_agentic_loop_conversation_history(user_message)
 
-        loop_result = await loop.run(user_message, context=context)
+        loop_run_kwargs = {"context": context}
+        if conversation_history is not None and self._agentic_loop_accepts_conversation_history(
+            loop
+        ):
+            loop_run_kwargs["conversation_history"] = conversation_history
+
+        loop_result = await loop.run(user_message, **loop_run_kwargs)
 
         # Extract CompletionResponse from last TurnResult
         if loop_result.iterations:

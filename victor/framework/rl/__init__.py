@@ -108,6 +108,7 @@ from typing import (
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import (
+    PromptCandidateSuiteWorkflowResult,
     RLCoordinator,
     get_rl_coordinator,
     get_rl_coordinator_async,
@@ -552,6 +553,62 @@ class RLManager:
             dry_run=dry_run,
         )
 
+    def process_prompt_candidate_evaluation_suite(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Process a prompt-candidate suite through sync and rollout stages."""
+        return self._coordinator.process_prompt_candidate_evaluation_suite(
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
+        )
+
+    async def process_prompt_candidate_evaluation_suite_async(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Async version of process_prompt_candidate_evaluation_suite."""
+        return await self._coordinator.process_prompt_candidate_evaluation_suite_async(
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
+        )
+
     # =========================================================================
     # Statistics
     # =========================================================================
@@ -823,6 +880,64 @@ async def apply_prompt_rollout_recommendation_async(
     )
 
 
+def process_prompt_candidate_evaluation_suite(
+    suite: Any,
+    *,
+    min_pass_rate: float = 0.5,
+    promote_best: bool = False,
+    create_rollout: bool = False,
+    rollout_control_hash: Optional[str] = None,
+    rollout_traffic_split: float = 0.1,
+    rollout_min_samples_per_variant: int = 100,
+    analyze_rollout: bool = False,
+    apply_rollout_decision: bool = False,
+    rollout_decision_dry_run: bool = False,
+) -> PromptCandidateSuiteWorkflowResult:
+    """Process a prompt-candidate suite via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.process_prompt_candidate_evaluation_suite(
+        suite,
+        min_pass_rate=min_pass_rate,
+        promote_best=promote_best,
+        create_rollout=create_rollout,
+        rollout_control_hash=rollout_control_hash,
+        rollout_traffic_split=rollout_traffic_split,
+        rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+        analyze_rollout=analyze_rollout,
+        apply_rollout_decision=apply_rollout_decision,
+        rollout_decision_dry_run=rollout_decision_dry_run,
+    )
+
+
+async def process_prompt_candidate_evaluation_suite_async(
+    suite: Any,
+    *,
+    min_pass_rate: float = 0.5,
+    promote_best: bool = False,
+    create_rollout: bool = False,
+    rollout_control_hash: Optional[str] = None,
+    rollout_traffic_split: float = 0.1,
+    rollout_min_samples_per_variant: int = 100,
+    analyze_rollout: bool = False,
+    apply_rollout_decision: bool = False,
+    rollout_decision_dry_run: bool = False,
+) -> PromptCandidateSuiteWorkflowResult:
+    """Async prompt-candidate suite processing helper via the global coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.process_prompt_candidate_evaluation_suite_async(
+        suite,
+        min_pass_rate=min_pass_rate,
+        promote_best=promote_best,
+        create_rollout=create_rollout,
+        rollout_control_hash=rollout_control_hash,
+        rollout_traffic_split=rollout_traffic_split,
+        rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+        analyze_rollout=analyze_rollout,
+        apply_rollout_decision=apply_rollout_decision,
+        rollout_decision_dry_run=rollout_decision_dry_run,
+    )
+
+
 __all__ = [
     # Manager
     "RLManager",
@@ -850,6 +965,9 @@ __all__ = [
     "analyze_prompt_rollout_experiment_async",
     "apply_prompt_rollout_recommendation",
     "apply_prompt_rollout_recommendation_async",
+    "process_prompt_candidate_evaluation_suite",
+    "process_prompt_candidate_evaluation_suite_async",
+    "PromptCandidateSuiteWorkflowResult",
     # Credit Assignment (arXiv:2604.09459)
     "CreditGranularity",
     "CreditMethodology",

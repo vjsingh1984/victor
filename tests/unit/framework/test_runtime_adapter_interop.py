@@ -15,6 +15,8 @@ from victor_sdk.rl_runtime import (
     analyze_prompt_rollout_experiment_async,
     apply_prompt_rollout_recommendation,
     apply_prompt_rollout_recommendation_async,
+    process_prompt_candidate_evaluation_suite,
+    process_prompt_candidate_evaluation_suite_async,
     create_prompt_rollout_experiment,
     create_prompt_rollout_experiment_async,
     get_rl_coordinator_async,
@@ -36,6 +38,8 @@ def test_sdk_runtime_adapters_resolve_host_types() -> None:
     assert callable(analyze_prompt_rollout_experiment_async)
     assert callable(apply_prompt_rollout_recommendation)
     assert callable(apply_prompt_rollout_recommendation_async)
+    assert callable(process_prompt_candidate_evaluation_suite)
+    assert callable(process_prompt_candidate_evaluation_suite_async)
     assert callable(get_rl_coordinator_async)
     assert CodebaseIndexFactoryProtocol.__name__ == "CodebaseIndexFactoryProtocol"
     assert callable(create_lazy_capability_proxy)

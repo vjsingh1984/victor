@@ -477,9 +477,14 @@ class TestBenchmarkRun:
                 side_effect=fake_run_prompt_suite_async,
             ),
             patch(
-                "victor.ui.commands.benchmark._sync_prompt_candidate_suite_to_optimizer",
-                return_value=sync_result,
-            ) as mock_sync,
+                "victor.framework.rl.process_prompt_candidate_evaluation_suite",
+                return_value=SimpleNamespace(
+                    prompt_optimizer_sync=sync_result,
+                    prompt_rollout=None,
+                    prompt_rollout_analysis=None,
+                    prompt_rollout_decision=None,
+                ),
+            ) as mock_process,
         ):
             result = runner.invoke(
                 benchmark_app,
@@ -502,7 +507,18 @@ class TestBenchmarkRun:
             )
 
         assert result.exit_code == 0
-        mock_sync.assert_called_once_with(suite, min_pass_rate=0.5, promote_best=True)
+        mock_process.assert_called_once_with(
+            suite,
+            min_pass_rate=0.5,
+            promote_best=True,
+            create_rollout=False,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=False,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
+        )
         assert "Prompt optimizer benchmark sync" in result.stdout
         assert "Promoted best candidate: cand-123" in result.stdout
         saved = json.loads(output.read_text())
@@ -579,13 +595,17 @@ class TestBenchmarkRun:
                 side_effect=fake_run_prompt_suite_async,
             ),
             patch(
-                "victor.ui.commands.benchmark._sync_prompt_candidate_suite_to_optimizer",
-                return_value=sync_result,
-            ),
-            patch(
-                "victor.ui.commands.benchmark._create_prompt_rollout_from_suite_sync",
-                return_value="prompt_optimizer_grounding_rules_anthropic_cand-123",
-            ) as mock_rollout,
+                "victor.framework.rl.process_prompt_candidate_evaluation_suite",
+                return_value=SimpleNamespace(
+                    prompt_optimizer_sync=sync_result,
+                    prompt_rollout={
+                        "created": True,
+                        "experiment_id": "prompt_optimizer_grounding_rules_anthropic_cand-123",
+                    },
+                    prompt_rollout_analysis=None,
+                    prompt_rollout_decision=None,
+                ),
+            ) as mock_process,
         ):
             result = runner.invoke(
                 benchmark_app,
@@ -612,12 +632,17 @@ class TestBenchmarkRun:
             )
 
         assert result.exit_code == 0
-        mock_rollout.assert_called_once_with(
-            sync_result,
+        mock_process.assert_called_once_with(
             suite,
-            control_hash=None,
-            traffic_split=0.2,
-            min_samples_per_variant=25,
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=True,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.2,
+            rollout_min_samples_per_variant=25,
+            analyze_rollout=False,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
         )
         assert "Prompt rollout experiment started:" in result.stdout
         assert "prompt_optimizer_grounding_rules_anthropic_cand-123" in result.stdout
@@ -698,12 +723,16 @@ class TestBenchmarkRun:
                 side_effect=fake_run_prompt_suite_async,
             ),
             patch(
-                "victor.ui.commands.benchmark._sync_prompt_candidate_suite_to_optimizer",
-                return_value=sync_result,
-            ),
-            patch(
-                "victor.ui.commands.benchmark._create_prompt_rollout_from_suite_sync",
-                side_effect=ValueError("no benchmark-approved candidate available for rollout"),
+                "victor.framework.rl.process_prompt_candidate_evaluation_suite",
+                return_value=SimpleNamespace(
+                    prompt_optimizer_sync=sync_result,
+                    prompt_rollout={
+                        "created": False,
+                        "error": "no benchmark-approved candidate available for rollout",
+                    },
+                    prompt_rollout_analysis=None,
+                    prompt_rollout_decision=None,
+                ),
             ),
         ):
             result = runner.invoke(
@@ -722,7 +751,7 @@ class TestBenchmarkRun:
                     "--record-benchmark-results",
                     "--create-rollout",
                 ],
-        )
+            )
 
         assert result.exit_code == 0
         assert "Prompt rollout not created:" in result.stdout
@@ -816,13 +845,14 @@ class TestBenchmarkRun:
                 side_effect=fake_run_prompt_suite_async,
             ),
             patch(
-                "victor.ui.commands.benchmark._sync_prompt_candidate_suite_to_optimizer",
-                return_value=sync_result,
-            ),
-            patch(
-                "victor.ui.commands.benchmark._analyze_prompt_rollout_for_suite_sync",
-                return_value=rollout_analysis,
-            ) as mock_analyze,
+                "victor.framework.rl.process_prompt_candidate_evaluation_suite",
+                return_value=SimpleNamespace(
+                    prompt_optimizer_sync=sync_result,
+                    prompt_rollout=None,
+                    prompt_rollout_analysis=rollout_analysis,
+                    prompt_rollout_decision=None,
+                ),
+            ) as mock_process,
         ):
             result = runner.invoke(
                 benchmark_app,
@@ -845,7 +875,18 @@ class TestBenchmarkRun:
             )
 
         assert result.exit_code == 0
-        mock_analyze.assert_called_once_with(sync_result, suite)
+        mock_process.assert_called_once_with(
+            suite,
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=False,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=True,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
+        )
         assert "Prompt rollout analysis" in result.stdout
         assert "Auto-apply action: rollout" in result.stdout
         saved = json.loads(output.read_text())
@@ -946,17 +987,14 @@ class TestBenchmarkRun:
                 side_effect=fake_run_prompt_suite_async,
             ),
             patch(
-                "victor.ui.commands.benchmark._sync_prompt_candidate_suite_to_optimizer",
-                return_value=sync_result,
-            ),
-            patch(
-                "victor.ui.commands.benchmark._analyze_prompt_rollout_for_suite_sync",
-                return_value=rollout_analysis,
-            ),
-            patch(
-                "victor.ui.commands.benchmark._apply_prompt_rollout_analysis_sync",
-                return_value=rollout_decision,
-            ) as mock_apply,
+                "victor.framework.rl.process_prompt_candidate_evaluation_suite",
+                return_value=SimpleNamespace(
+                    prompt_optimizer_sync=sync_result,
+                    prompt_rollout=None,
+                    prompt_rollout_analysis=rollout_analysis,
+                    prompt_rollout_decision=rollout_decision,
+                ),
+            ) as mock_process,
         ):
             result = runner.invoke(
                 benchmark_app,
@@ -980,7 +1018,18 @@ class TestBenchmarkRun:
             )
 
         assert result.exit_code == 0
-        mock_apply.assert_called_once_with(rollout_analysis, dry_run=False)
+        mock_process.assert_called_once_with(
+            suite,
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=False,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=True,
+            apply_rollout_decision=True,
+            rollout_decision_dry_run=False,
+        )
         assert "Prompt rollout decision applied: rollout" in result.stdout
         saved = json.loads(output.read_text())
         assert saved["prompt_rollout_decision"]["action"] == "rollout"

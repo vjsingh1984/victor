@@ -57,4 +57,3 @@ def test_resolve_shell_variant_and_task_classification_delegate_to_runtime_depen
 
     assert runtime.classify_task_keywords("fix the bug")["task_type"] == "general"
     assert runtime.classify_task_with_context("write a function", [])["task_type"] == "coding"
-

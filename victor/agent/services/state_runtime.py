@@ -35,7 +35,9 @@ class StateRuntimeAdapter:
         state_machine: Optional["ConversationStateMachine"] = None,
     ) -> None:
         self._controller = conversation_controller
-        self._state_machine = state_machine or getattr(conversation_controller, "_state_machine", None)
+        self._state_machine = state_machine or getattr(
+            conversation_controller, "_state_machine", None
+        )
 
     def get_current_stage(self) -> ConversationStage:
         """Get the current conversation stage."""

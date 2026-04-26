@@ -23,12 +23,16 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import click
 
 from victor.core.async_utils import run_sync
-from victor.framework.rl import create_prompt_rollout_experiment_async
+from victor.evaluation import load_prompt_candidate_evaluation_suite
+from victor.framework.rl import (
+    create_prompt_rollout_experiment_async,
+    process_prompt_candidate_evaluation_suite_async,
+)
 from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
 from victor.optimization import (
     WorkflowOptimizer,
@@ -248,6 +252,93 @@ def prompt_rollout(
             control_hash=control_hash,
             traffic_split=traffic_split,
             min_samples_per_variant=min_samples_per_variant,
+        )
+    )
+
+
+@opt.command("prompt-suite-process")
+@click.argument("suite_file", type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    "--min-approval-pass-rate",
+    default=0.5,
+    type=click.FloatRange(min=0.0, max=1.0),
+    help="Minimum pass rate the suite winner must reach before benchmark approval.",
+)
+@click.option(
+    "--promote-best",
+    is_flag=True,
+    help="Promote the benchmark-approved winner after recording suite results.",
+)
+@click.option(
+    "--create-rollout",
+    is_flag=True,
+    help="Create a prompt rollout experiment for the benchmark-approved suite winner.",
+)
+@click.option(
+    "--rollout-control-hash",
+    default=None,
+    help="Optional control candidate hash for the rollout experiment.",
+)
+@click.option(
+    "--rollout-traffic-split",
+    default=0.1,
+    type=click.FloatRange(min=0.0, max=1.0, min_open=True, max_open=True),
+    help="Traffic share to allocate to the treatment candidate rollout.",
+)
+@click.option(
+    "--rollout-min-samples-per-variant",
+    default=100,
+    type=click.IntRange(min=1),
+    help="Minimum samples per variant before rollout analysis.",
+)
+@click.option(
+    "--analyze-rollout",
+    is_flag=True,
+    help="Analyze the approved winner's prompt rollout experiment, if one exists.",
+)
+@click.option(
+    "--apply-rollout-decision",
+    is_flag=True,
+    help="Apply the rollout analysis recommendation when it is clearly actionable.",
+)
+@click.option(
+    "--rollout-decision-dry-run",
+    is_flag=True,
+    help="Preview the rollout decision without changing experiment state.",
+)
+@click.option(
+    "--output",
+    type=click.Path(),
+    default=None,
+    help="Optional output file for the augmented suite artifact JSON.",
+)
+def prompt_suite_process(
+    suite_file: str,
+    min_approval_pass_rate: float,
+    promote_best: bool,
+    create_rollout: bool,
+    rollout_control_hash: Optional[str],
+    rollout_traffic_split: float,
+    rollout_min_samples_per_variant: int,
+    analyze_rollout: bool,
+    apply_rollout_decision: bool,
+    rollout_decision_dry_run: bool,
+    output: Optional[str],
+) -> None:
+    """Process a saved prompt-suite artifact through benchmark sync and rollout stages."""
+    run_sync(
+        _process_prompt_suite_artifact_async(
+            suite_file=suite_file,
+            min_approval_pass_rate=min_approval_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
+            output=output,
         )
     )
 
@@ -662,6 +753,148 @@ async def _prompt_rollout_async(
         return
 
     click.echo(f"Prompt rollout experiment started: {experiment_id}")
+
+
+def _echo_prompt_optimizer_sync_summary(sync_result: Any) -> None:
+    """Print benchmark-sync results for a processed prompt suite."""
+    decisions = list(getattr(sync_result, "decisions", []) or [])
+    if not decisions:
+        click.echo("No prompt candidates were updated.")
+        return
+
+    click.echo("Prompt optimizer benchmark sync:")
+    for decision in decisions:
+        status_parts = []
+        status_parts.append("recorded" if getattr(decision, "recorded", False) else "missing")
+        if getattr(decision, "passed", False):
+            status_parts.append("approved")
+        if getattr(decision, "promoted", False):
+            status_parts.append("promoted")
+        click.echo(
+            "  "
+            f"#{decision.rank} {decision.section_name}:{decision.provider}:{decision.prompt_candidate_hash} "
+            f"pass_rate={decision.score:.1%} [{', '.join(status_parts)}]"
+        )
+
+    promoted_hash = getattr(sync_result, "promoted_prompt_candidate_hash", None)
+    approved_hash = getattr(sync_result, "approved_prompt_candidate_hash", None)
+    if promoted_hash:
+        click.echo(f"Promoted best candidate: {promoted_hash}")
+    elif approved_hash:
+        click.echo(f"Approved best candidate: {approved_hash}")
+    else:
+        click.echo("No candidate met the benchmark approval threshold.")
+
+
+def _echo_prompt_rollout_analysis_summary(report: dict[str, Any]) -> None:
+    """Print rollout analysis from a processed prompt suite."""
+    click.echo("Prompt rollout analysis:")
+    click.echo(f"  Experiment: {report.get('experiment_id', '-')}")
+    click.echo(f"  Status: {report.get('status', '-')}")
+    if not report.get("analysis_available", False):
+        click.echo(f"  {report.get('recommendation', 'Analysis unavailable')}")
+        return
+
+    click.echo(f"  Recommendation: {report.get('recommendation', '-')}")
+    click.echo(f"  Auto-apply action: {report.get('auto_action') or 'none'}")
+    click.echo(f"  Significant: {'yes' if report.get('is_significant') else 'no'}")
+    click.echo(f"  Treatment better: {'yes' if report.get('treatment_better') else 'no'}")
+    click.echo(f"  Effect size: {float(report.get('effect_size', 0.0)):.1%}")
+    click.echo(f"  P-value: {float(report.get('p_value', 1.0)):.4f}")
+
+
+async def _process_prompt_suite_artifact_async(
+    *,
+    suite_file: str,
+    min_approval_pass_rate: float,
+    promote_best: bool,
+    create_rollout: bool,
+    rollout_control_hash: Optional[str],
+    rollout_traffic_split: float,
+    rollout_min_samples_per_variant: int,
+    analyze_rollout: bool,
+    apply_rollout_decision: bool,
+    rollout_decision_dry_run: bool,
+    output: Optional[str],
+) -> None:
+    """Load a saved prompt-suite artifact and process it through rollout stages."""
+    if create_rollout and promote_best:
+        click.echo(
+            "Cannot process prompt suite: --create-rollout cannot be combined with --promote-best",
+            err=True,
+        )
+        return
+    if apply_rollout_decision and not analyze_rollout:
+        click.echo(
+            "Cannot process prompt suite: --apply-rollout-decision requires --analyze-rollout",
+            err=True,
+        )
+        return
+
+    suite_path = Path(suite_file)
+    payload = json.loads(suite_path.read_text())
+    suite = load_prompt_candidate_evaluation_suite(suite_path)
+
+    click.echo(f"Processing prompt suite artifact: {suite_path}")
+    best_run = suite.best_run()
+    if best_run is not None:
+        click.echo(f"  Best candidate in artifact: {best_run.label}")
+
+    try:
+        workflow = await process_prompt_candidate_evaluation_suite_async(
+            suite,
+            min_pass_rate=min_approval_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
+        )
+    except ValueError as exc:
+        click.echo(f"Cannot process prompt suite: {exc}", err=True)
+        return
+
+    sync_result = getattr(workflow, "prompt_optimizer_sync", None)
+    prompt_rollout = getattr(workflow, "prompt_rollout", None)
+    prompt_rollout_analysis = getattr(workflow, "prompt_rollout_analysis", None)
+    prompt_rollout_decision = getattr(workflow, "prompt_rollout_decision", None)
+
+    if sync_result is not None:
+        _echo_prompt_optimizer_sync_summary(sync_result)
+    if prompt_rollout is not None:
+        if prompt_rollout.get("created"):
+            click.echo(f"Prompt rollout experiment started: {prompt_rollout.get('experiment_id')}")
+        else:
+            click.echo(
+                "Prompt rollout not created: "
+                f"{prompt_rollout.get('error', 'unable to start prompt rollout experiment')}"
+            )
+    if prompt_rollout_analysis is not None:
+        _echo_prompt_rollout_analysis_summary(prompt_rollout_analysis)
+    if prompt_rollout_decision is not None:
+        action = prompt_rollout_decision.get("action")
+        if action and prompt_rollout_decision.get("applied"):
+            click.echo(f"Prompt rollout decision applied: {action}")
+        elif action and prompt_rollout_decision.get("dry_run"):
+            click.echo(f"Prompt rollout decision dry-run: would apply {action}")
+        else:
+            click.echo(
+                "Prompt rollout decision not applied: "
+                f"{prompt_rollout_decision.get('reason') or prompt_rollout_decision.get('error') or 'no actionable recommendation'}"
+            )
+
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(payload, dict):
+            payload.update(workflow.to_dict())
+        else:
+            payload = workflow.to_dict()
+        output_path.write_text(json.dumps(payload, indent=2))
+        click.echo(f"Processed suite artifact saved to: {output_path}")
 
 
 def _matches_prompt_rollout_scope(

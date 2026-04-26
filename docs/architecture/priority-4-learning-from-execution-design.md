@@ -103,6 +103,13 @@ This document outlines the design for Priority 4 (Learning from Execution), whic
    - The rollout analysis and apply path is also exposed as reusable
      framework/runtime helpers, so the benchmark CLI and any future higher-level
      orchestration use the same rollout decision logic instead of re-encoding it
+   - The post-suite benchmark gate -> rollout -> rollout-decision chain is now
+     also exposed as one reusable framework/runtime helper, so callers can
+     reuse the same approval and rollout handoff semantics without copying CLI
+     orchestration code
+   - Saved prompt-suite artifacts can now be reprocessed through that same
+     workflow from the optimization CLI, so rollout/admin operations do not
+     require rerunning the original benchmark suite
    - Semantic trace zones inspired by PRiME
    - 13 failure categories with corrective hints
    - Session-aligned credit enrichment from runtime tool execution
@@ -124,7 +131,7 @@ This document outlines the design for Priority 4 (Learning from Execution), whic
 
 **Note**: PRiME is referenced as inspiration for semantic trace zoning and memory organization, but is not implemented here as a standalone strategy.
 
-**Maintainer note**: Keep this section synchronized with the tests around `prompt_optimizer.py`, `optimization_injector.py`, `agent_adapter.py`, `harness.py`, `benchmark.py`, `coordinator.py`, `rl_runtime.py`, `miprov2_strategy.py`, and `cot_distillation_strategy.py`. If a paper-inspired feature is only partially adapted, describe the adaptation explicitly instead of naming the full paper method. When changing benchmark CLI or evaluation wiring, review the bound-candidate, candidate-suite, benchmark-sync, rollout-handoff, rollout-analysis, and rollout-helper export tests as part of the change so runtime behavior, checkpoint identity, promotion gates, rollout creation, rollout decisions, public helper surfaces, and persisted metadata do not drift apart.
+**Maintainer note**: Keep this section synchronized with the tests around `prompt_optimizer.py`, `optimization_injector.py`, `agent_adapter.py`, `harness.py`, `benchmark.py`, `coordinator.py`, `rl_runtime.py`, `miprov2_strategy.py`, and `cot_distillation_strategy.py`. If a paper-inspired feature is only partially adapted, describe the adaptation explicitly instead of naming the full paper method. When changing benchmark CLI or evaluation wiring, review the bound-candidate, candidate-suite, benchmark-sync, rollout-handoff, rollout-analysis, suite-workflow, and rollout-helper export tests as part of the change so runtime behavior, checkpoint identity, promotion gates, rollout creation, rollout decisions, public helper surfaces, and persisted metadata do not drift apart.
 
 **Evolvable Sections** (5):
 - `ASI_TOOL_EFFECTIVENESS_GUIDANCE`

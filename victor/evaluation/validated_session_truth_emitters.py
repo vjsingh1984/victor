@@ -264,7 +264,9 @@ class SWEBenchValidatedSessionTruthEmitter:
         section_name = _optional_metadata_text(
             context.metadata.get("section_name") or context.metadata.get("prompt_section_name")
         )
-        prompt_candidate_hash = _optional_metadata_text(context.metadata.get("prompt_candidate_hash"))
+        prompt_candidate_hash = _optional_metadata_text(
+            context.metadata.get("prompt_candidate_hash")
+        )
 
         return ValidatedSessionTruthArtifact(
             path=artifact_path,

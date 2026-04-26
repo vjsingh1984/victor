@@ -4,7 +4,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from victor.agent.streaming.context import StreamingChatContext
-from victor.agent.streaming.tool_execution import ToolExecutionHandler, create_tool_execution_handler
+from victor.agent.streaming.tool_execution import (
+    ToolExecutionHandler,
+    create_tool_execution_handler,
+)
 from victor.providers.base import StreamChunk
 
 

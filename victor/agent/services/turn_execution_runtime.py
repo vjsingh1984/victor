@@ -42,6 +42,7 @@ Phase 1: Extract TurnExecutor
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -105,6 +106,7 @@ class TurnResult:
 
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
 
 __all__ = ["TurnExecutor", "TurnResult"]
 
@@ -163,6 +165,113 @@ class TurnExecutor:
         self._exploration_coordinator = exploration_coordinator
         self._exploration_done = False  # Instance-level: fires once per conversation
 
+    @staticmethod
+    def _serialize_conversation_message(message: Any) -> Optional[Dict[str, Any]]:
+        """Normalize a conversation message into a serializable mapping."""
+        if isinstance(message, dict):
+            role = message.get("role")
+            content = message.get("content")
+        elif hasattr(message, "model_dump"):
+            payload = message.model_dump()
+            if not isinstance(payload, dict):
+                return None
+            role = payload.get("role")
+            content = payload.get("content")
+        else:
+            role = getattr(message, "role", None)
+            content = getattr(message, "content", None)
+
+        if role is None and content is None:
+            return None
+        return {"role": role, "content": content}
+
+    def _get_agentic_loop_conversation_history(
+        self,
+        user_message: str,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Return serialized conversation history excluding the current user turn."""
+        messages = getattr(self._chat_context, "messages", None)
+        if messages is None:
+            conversation = getattr(self._chat_context, "conversation", None)
+            messages = getattr(conversation, "messages", None)
+        if not messages:
+            return None
+
+        history = [
+            payload
+            for message in messages
+            if (payload := self._serialize_conversation_message(message)) is not None
+        ]
+        if (
+            history
+            and history[-1].get("role") == "user"
+            and history[-1].get("content") == user_message
+        ):
+            history = history[:-1]
+        return history or None
+
+    @staticmethod
+    def _agentic_loop_accepts_conversation_history(loop: Any) -> bool:
+        """Return whether the loop run method supports conversation history."""
+        run = getattr(loop, "run", None)
+        if run is None:
+            return False
+
+        candidate = getattr(run, "side_effect", None)
+        if not callable(candidate):
+            candidate = run
+
+        try:
+            parameters = inspect.signature(candidate).parameters.values()
+        except (TypeError, ValueError):
+            return True
+
+        return any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            or parameter.name == "conversation_history"
+            for parameter in parameters
+        )
+
+    def _snapshot_agentic_loop_state(self) -> Dict[str, Any]:
+        """Capture mutable state before delegated AgenticLoop execution."""
+        conversation = getattr(self._chat_context, "conversation", None)
+        messages = getattr(conversation, "messages", None) if conversation is not None else None
+        if messages is None:
+            messages = getattr(self._chat_context, "messages", None)
+
+        return {
+            "messages": list(messages) if messages is not None else None,
+            "conversation_system_added": (
+                getattr(conversation, "_system_added", _MISSING)
+                if conversation is not None
+                else _MISSING
+            ),
+            "chat_context_system_added": getattr(self._chat_context, "_system_added", _MISSING),
+        }
+
+    def _restore_agentic_loop_state(self, snapshot: Dict[str, Any]) -> None:
+        """Restore state before resuming the legacy execution loop."""
+        conversation = getattr(self._chat_context, "conversation", None)
+        if conversation is not None and snapshot.get("messages") is not None:
+            restored_messages = list(snapshot["messages"])
+            if hasattr(conversation, "_messages"):
+                conversation._messages = restored_messages
+            else:
+                current_messages = getattr(conversation, "messages", None)
+                if isinstance(current_messages, list):
+                    current_messages[:] = restored_messages
+
+        conversation_system_added = snapshot.get("conversation_system_added", _MISSING)
+        if conversation is not None and conversation_system_added is not _MISSING:
+            conversation._system_added = conversation_system_added
+
+        chat_context_system_added = snapshot.get("chat_context_system_added", _MISSING)
+        if chat_context_system_added is _MISSING:
+            if hasattr(self._chat_context, "_system_added"):
+                delattr(self._chat_context, "_system_added")
+        else:
+            self._chat_context._system_added = chat_context_system_added
+
     async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Execute tool calls through the canonical tool-context surface."""
         return await self._tool_context.execute_tool_calls(tool_calls)
@@ -196,6 +305,7 @@ class TurnExecutor:
 
         # Add user message to history
         self._chat_context.add_message("user", user_message)
+        agentic_loop_state = self._snapshot_agentic_loop_state()
 
         # Phase 10: Delegate to AgenticLoop when enabled (Strangler Fig)
         try:
@@ -204,6 +314,7 @@ class TurnExecutor:
             if get_feature_flag_manager().is_enabled(FeatureFlag.USE_AGENTIC_LOOP):
                 return await self._execute_via_agentic_loop(user_message, max_iterations)
         except Exception as e:
+            self._restore_agentic_loop_state(agentic_loop_state)
             logger.warning(f"AgenticLoop delegation failed, falling back to legacy loop: {e}")
 
         # Initialize tracking for this conversation turn
@@ -609,8 +720,15 @@ class TurnExecutor:
             "_task_classification": task_classification,
             "_is_qa_task": is_qa,
         }
+        conversation_history = self._get_agentic_loop_conversation_history(user_message)
 
-        loop_result = await loop.run(user_message, context=context)
+        loop_run_kwargs = {"context": context}
+        if conversation_history is not None and self._agentic_loop_accepts_conversation_history(
+            loop
+        ):
+            loop_run_kwargs["conversation_history"] = conversation_history
+
+        loop_result = await loop.run(user_message, **loop_run_kwargs)
 
         # Extract the last TurnResult's response
         if loop_result.iterations:

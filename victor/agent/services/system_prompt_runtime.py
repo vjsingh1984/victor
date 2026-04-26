@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from victor.agent.services.prompt_runtime_support import PromptRuntimeSupport
 
+
 class SystemPromptCoordinator(PromptRuntimeSupport):
     """Backward-compatible wrapper over PromptRuntimeSupport.
 

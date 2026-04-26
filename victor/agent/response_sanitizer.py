@@ -377,7 +377,10 @@ class _NativeFilterWrapper:
 
     def process_chunk(self, text: str) -> StreamingChunkResult:
         result = self._inner.process_chunk(text)
-        if not self._should_abort and self._inner.get_thinking_length() > self._max_thinking_content:
+        if (
+            not self._should_abort
+            and self._inner.get_thinking_length() > self._max_thinking_content
+        ):
             self._should_abort = True
             self._abort_reason = (
                 f"Thinking content exceeded {self._max_thinking_content} chars. "

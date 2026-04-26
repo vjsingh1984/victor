@@ -117,4 +117,6 @@ def test_assemble_conversation_prefers_canonical_prompt_runtime_support_surface(
     assert kwargs["task_analyzer"] is orchestrator._task_analyzer
     assert callable(kwargs["get_tools"])
     assert callable(kwargs["get_mode_controller"])
-    assert orchestrator._prompt_runtime_support is factory.create_prompt_runtime_support.return_value
+    assert (
+        orchestrator._prompt_runtime_support is factory.create_prompt_runtime_support.return_value
+    )

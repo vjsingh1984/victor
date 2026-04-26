@@ -27,8 +27,10 @@ from victor.evaluation.harness import (
     BaseBenchmarkRunner,
     EvaluationHarness,
     PromptCandidateEvaluationSpec,
+    PromptCandidateEvaluationSuiteResult,
     TaskEnvironment,
     bind_prompt_candidate_evaluation_config,
+    load_prompt_candidate_evaluation_suite,
     get_harness,
 )
 from victor.evaluation.runtime_feedback import load_runtime_evaluation_feedback
@@ -509,6 +511,86 @@ class TestPromptCandidateEvaluationSuite:
             {"label": "completion-openai"},
         ]
         assert suite.to_dict()["best_label"] == "GROUNDING_RULES:anthropic:cand-123"
+
+    def test_prompt_candidate_evaluation_suite_from_dict_reconstructs_runs(self, tmp_path):
+        suite_payload = {
+            "benchmark": "human_eval",
+            "model": "test-model",
+            "provider": "anthropic",
+            "section_name": "GROUNDING_RULES",
+            "prompt_section_name": "GROUNDING_RULES",
+            "config": {
+                "benchmark": "human_eval",
+                "model": "test-model",
+                "provider": "anthropic",
+                "section_name": "GROUNDING_RULES",
+                "prompt_section_name": "GROUNDING_RULES",
+                "max_tasks": 1,
+                "timeout_per_task": 30,
+                "max_turns": 4,
+                "parallel_tasks": 1,
+                "dataset_metadata": {},
+            },
+            "runs": [
+                {
+                    "label": "GROUNDING_RULES:anthropic:cand-123",
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "metrics": {"pass_rate": 1.0},
+                    "task_results": [
+                        {
+                            "task_id": "task-1",
+                            "status": "passed",
+                            "tests_passed": 1,
+                            "tests_total": 1,
+                            "duration": 1.5,
+                            "tool_calls": 2,
+                            "code_search_calls": 1,
+                            "graph_calls": 0,
+                            "failure_category": None,
+                            "failure_details": {},
+                        }
+                    ],
+                },
+                {
+                    "label": "GROUNDING_RULES:anthropic:cand-456",
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-456",
+                    "section_name": "GROUNDING_RULES",
+                    "metrics": {"pass_rate": 0.0},
+                    "task_results": [
+                        {
+                            "task_id": "task-2",
+                            "status": "failed",
+                            "tests_passed": 0,
+                            "tests_total": 1,
+                            "duration": 2.0,
+                            "tool_calls": 1,
+                            "code_search_calls": 0,
+                            "graph_calls": 0,
+                            "failure_category": "test_failure",
+                            "failure_details": {"reason": "assertion"},
+                        }
+                    ],
+                },
+            ],
+        }
+        suite_file = tmp_path / "suite.json"
+        suite_file.write_text(json.dumps(suite_payload))
+
+        suite = load_prompt_candidate_evaluation_suite(suite_file)
+
+        assert isinstance(suite, PromptCandidateEvaluationSuiteResult)
+        assert suite.base_config.benchmark == BenchmarkType.HUMAN_EVAL
+        assert len(suite.runs) == 2
+        assert suite.runs[0].config.prompt_candidate_hash == "cand-123"
+        assert suite.runs[0].result.pass_rate == 1.0
+        assert (
+            suite.runs[1].result.task_results[0].failure_category
+            == BenchmarkFailureCategory.TEST_FAILURE
+        )
+        assert suite.best_run() is suite.runs[0]
 
 
 class TestClearCheckpoint:
