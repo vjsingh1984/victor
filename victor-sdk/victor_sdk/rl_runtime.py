@@ -9,6 +9,10 @@ if TYPE_CHECKING:
     from victor.framework.rl import (
         RLCoordinator,
         RLManager,
+        analyze_prompt_rollout_experiment,
+        analyze_prompt_rollout_experiment_async,
+        apply_prompt_rollout_recommendation,
+        apply_prompt_rollout_recommendation_async,
         create_prompt_rollout_experiment,
         create_prompt_rollout_experiment_async,
         get_rl_coordinator,
@@ -18,6 +22,10 @@ if TYPE_CHECKING:
 __all__ = [
     "RLCoordinator",
     "RLManager",
+    "analyze_prompt_rollout_experiment",
+    "analyze_prompt_rollout_experiment_async",
+    "apply_prompt_rollout_recommendation",
+    "apply_prompt_rollout_recommendation_async",
     "create_prompt_rollout_experiment",
     "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",
@@ -27,6 +35,10 @@ __all__ = [
 _LAZY_IMPORTS = {
     "RLCoordinator": "victor.framework.rl",
     "RLManager": "victor.framework.rl",
+    "analyze_prompt_rollout_experiment": "victor.framework.rl",
+    "analyze_prompt_rollout_experiment_async": "victor.framework.rl",
+    "apply_prompt_rollout_recommendation": "victor.framework.rl",
+    "apply_prompt_rollout_recommendation_async": "victor.framework.rl",
     "create_prompt_rollout_experiment": "victor.framework.rl",
     "create_prompt_rollout_experiment_async": "victor.framework.rl",
     "get_rl_coordinator": "victor.framework.rl",

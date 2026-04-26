@@ -162,6 +162,52 @@ class TestAsyncWrappers:
             min_samples_per_variant=25,
         )
 
+    @pytest.mark.asyncio
+    async def test_analyze_prompt_rollout_experiment_async(self, coordinator: RLCoordinator) -> None:
+        """Test async prompt rollout analysis offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "analyze_prompt_rollout_experiment",
+            return_value={"auto_action": "rollout"},
+        ) as analyze_mock:
+            report = await coordinator.analyze_prompt_rollout_experiment_async(
+                section_name="GROUNDING_RULES",
+                provider="ollama",
+                treatment_hash="candidate123",
+            )
+
+        assert report == {"auto_action": "rollout"}
+        analyze_mock.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="candidate123",
+        )
+
+    @pytest.mark.asyncio
+    async def test_apply_prompt_rollout_recommendation_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
+        """Test async prompt rollout decision application offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "apply_prompt_rollout_recommendation",
+            return_value={"action": "rollout", "applied": True},
+        ) as apply_mock:
+            decision = await coordinator.apply_prompt_rollout_recommendation_async(
+                section_name="GROUNDING_RULES",
+                provider="ollama",
+                treatment_hash="candidate123",
+                dry_run=True,
+            )
+
+        assert decision == {"action": "rollout", "applied": True}
+        apply_mock.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="candidate123",
+            dry_run=True,
+        )
+
 
 class TestAsyncSingleton:
     """Tests for async singleton getter."""

@@ -1090,6 +1090,142 @@ class RLCoordinator:
             return None
 
     @staticmethod
+    def get_prompt_rollout_experiment_id(
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> str:
+        """Return the canonical experiment id for a prompt rollout candidate."""
+        return f"prompt_optimizer_{section_name.lower()}_{provider or 'default'}_{treatment_hash}"
+
+    @staticmethod
+    def _get_prompt_rollout_auto_action(result: Any) -> Optional[str]:
+        """Infer the safe action from rollout experiment analysis."""
+        recommendation = getattr(result, "recommendation", "")
+        is_significant = bool(getattr(result, "is_significant", False))
+        treatment_better = bool(getattr(result, "treatment_better", False))
+
+        if recommendation.startswith("Roll out treatment") and is_significant and treatment_better:
+            return "rollout"
+        if recommendation.startswith("Keep control") and is_significant and not treatment_better:
+            return "rollback"
+        return None
+
+    def analyze_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze the rollout experiment for a prompt candidate."""
+        experiment_id = RLCoordinator.get_prompt_rollout_experiment_id(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+        experiment_coordinator = get_experiment_coordinator(self.db)
+        status = experiment_coordinator.get_experiment_status(experiment_id)
+        if status is None:
+            return None
+
+        result = experiment_coordinator.analyze_experiment(experiment_id)
+        if result is None:
+            return {
+                "experiment_id": experiment_id,
+                "section_name": section_name,
+                "provider": provider,
+                "prompt_candidate_hash": treatment_hash,
+                "status": status.get("status"),
+                "analysis_available": False,
+                "recommendation": "Prompt rollout analysis unavailable",
+                "auto_action": None,
+                "details": {},
+            }
+
+        return {
+            "experiment_id": experiment_id,
+            "section_name": section_name,
+            "provider": provider,
+            "prompt_candidate_hash": treatment_hash,
+            "status": status.get("status"),
+            "analysis_available": True,
+            "recommendation": result.recommendation,
+            "auto_action": RLCoordinator._get_prompt_rollout_auto_action(result),
+            "is_significant": result.is_significant,
+            "treatment_better": result.treatment_better,
+            "effect_size": result.effect_size,
+            "p_value": result.p_value,
+            "confidence_interval": result.confidence_interval,
+            "details": result.details,
+        }
+
+    def apply_prompt_rollout_recommendation(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Apply the rollout/rollback recommendation for a prompt experiment."""
+        report = RLCoordinator.analyze_prompt_rollout_experiment(
+            self,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+        if report is None:
+            return None
+        if not report.get("analysis_available", False):
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": None,
+                "applied": False,
+                "dry_run": dry_run,
+                "reason": report.get("recommendation"),
+            }
+
+        action = report.get("auto_action")
+        if not action:
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": None,
+                "applied": False,
+                "dry_run": dry_run,
+                "reason": report.get("recommendation"),
+            }
+
+        if dry_run:
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": action,
+                "applied": False,
+                "dry_run": True,
+            }
+
+        experiment_coordinator = get_experiment_coordinator(self.db)
+        if action == "rollout":
+            updated = experiment_coordinator.rollout_treatment(report["experiment_id"])
+        else:
+            updated = experiment_coordinator.rollback_experiment(report["experiment_id"])
+        if not updated:
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": action,
+                "applied": False,
+                "dry_run": False,
+                "reason": f"unable to apply prompt rollout decision for {report['experiment_id']}",
+            }
+        return {
+            "experiment_id": report["experiment_id"],
+            "action": action,
+            "applied": True,
+            "dry_run": False,
+        }
+
+    @staticmethod
     def format_evolution_report(
         section: str,
         generation: int,
@@ -1362,6 +1498,38 @@ class RLCoordinator:
             control_hash=control_hash,
             traffic_split=traffic_split,
             min_samples_per_variant=min_samples_per_variant,
+        )
+
+    async def analyze_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of analyze_prompt_rollout_experiment."""
+        return await asyncio.to_thread(
+            self.analyze_prompt_rollout_experiment,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+
+    async def apply_prompt_rollout_recommendation_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of apply_prompt_rollout_recommendation."""
+        return await asyncio.to_thread(
+            self.apply_prompt_rollout_recommendation,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            dry_run=dry_run,
         )
 
     async def export_metrics_async(self) -> Dict[str, Any]:

@@ -22,9 +22,10 @@ path does not depend on framework module paths directly.
 Use this module for:
 - sync and async access to the global RL coordinator
 - benchmark-gated prompt rollout experiment creation from agent runtime code
+- prompt rollout analysis and recommendation application from agent runtime code
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from victor.framework.rl.coordinator import (
     AsyncWriterQueue,
@@ -77,9 +78,77 @@ async def create_prompt_rollout_experiment_async(
     )
 
 
+def analyze_prompt_rollout_experiment(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+) -> Optional[dict[str, Any]]:
+    """Analyze a prompt rollout experiment via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.analyze_prompt_rollout_experiment(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+    )
+
+
+async def analyze_prompt_rollout_experiment_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+) -> Optional[dict[str, Any]]:
+    """Analyze a prompt rollout experiment asynchronously via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.analyze_prompt_rollout_experiment_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+    )
+
+
+def apply_prompt_rollout_recommendation(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    dry_run: bool = False,
+) -> Optional[dict[str, Any]]:
+    """Apply the recommended prompt rollout decision via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.apply_prompt_rollout_recommendation(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        dry_run=dry_run,
+    )
+
+
+async def apply_prompt_rollout_recommendation_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    dry_run: bool = False,
+) -> Optional[dict[str, Any]]:
+    """Apply the recommended prompt rollout decision asynchronously via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.apply_prompt_rollout_recommendation_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        dry_run=dry_run,
+    )
+
+
 __all__ = [
     "AsyncWriterQueue",
     "RLCoordinator",
+    "analyze_prompt_rollout_experiment",
+    "analyze_prompt_rollout_experiment_async",
+    "apply_prompt_rollout_recommendation",
+    "apply_prompt_rollout_recommendation_async",
     "create_prompt_rollout_experiment",
     "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",

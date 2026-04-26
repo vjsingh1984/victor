@@ -432,6 +432,48 @@ class RLCoordinatorProtocol(Protocol):
         """Async version of create_prompt_rollout_experiment."""
         ...
 
+    def analyze_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze a prompt rollout experiment for a candidate."""
+        ...
+
+    async def analyze_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of analyze_prompt_rollout_experiment."""
+        ...
+
+    def apply_prompt_rollout_recommendation(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Apply the recommended rollout/rollback action for a prompt candidate."""
+        ...
+
+    async def apply_prompt_rollout_recommendation_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of apply_prompt_rollout_recommendation."""
+        ...
+
     def close(self) -> None:
         """Close database connection."""
         ...

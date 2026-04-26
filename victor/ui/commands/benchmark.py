@@ -372,19 +372,6 @@ def _create_prompt_rollout_from_suite_sync(
     return experiment_id
 
 
-def _get_prompt_rollout_auto_action(result: object) -> Optional[str]:
-    """Infer the safe rollout action from experiment analysis."""
-    recommendation = getattr(result, "recommendation", "")
-    is_significant = bool(getattr(result, "is_significant", False))
-    treatment_better = bool(getattr(result, "treatment_better", False))
-
-    if recommendation.startswith("Roll out treatment") and is_significant and treatment_better:
-        return "rollout"
-    if recommendation.startswith("Keep control") and is_significant and not treatment_better:
-        return "rollback"
-    return None
-
-
 def _resolve_prompt_rollout_context(sync_result, suite) -> dict[str, str]:
     """Resolve approved candidate rollout identity from suite sync state."""
     approved_hash = getattr(sync_result, "approved_prompt_candidate_hash", None)
@@ -426,38 +413,17 @@ def _resolve_prompt_rollout_context(sync_result, suite) -> dict[str, str]:
 
 def _analyze_prompt_rollout_for_suite_sync(sync_result, suite) -> dict[str, Any]:
     """Analyze the rollout experiment associated with the approved suite winner."""
-    from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
-
     context = _resolve_prompt_rollout_context(sync_result, suite)
-    coordinator = get_experiment_coordinator()
-    status = coordinator.get_experiment_status(context["experiment_id"])
-    if status is None:
+    from victor.framework.rl import analyze_prompt_rollout_experiment
+
+    report = analyze_prompt_rollout_experiment(
+        section_name=context["section_name"],
+        provider=context["provider"],
+        treatment_hash=context["prompt_candidate_hash"],
+    )
+    if report is None:
         raise ValueError(f"prompt rollout experiment not found: {context['experiment_id']}")
-
-    result = coordinator.analyze_experiment(context["experiment_id"])
-    if result is None:
-        return {
-            **context,
-            "status": status.get("status"),
-            "analysis_available": False,
-            "recommendation": "Prompt rollout analysis unavailable",
-            "auto_action": None,
-            "details": {},
-        }
-
-    return {
-        **context,
-        "status": status.get("status"),
-        "analysis_available": True,
-        "recommendation": result.recommendation,
-        "auto_action": _get_prompt_rollout_auto_action(result),
-        "is_significant": result.is_significant,
-        "treatment_better": result.treatment_better,
-        "effect_size": result.effect_size,
-        "p_value": result.p_value,
-        "confidence_interval": result.confidence_interval,
-        "details": result.details,
-    }
+    return report
 
 
 def _print_prompt_rollout_analysis_summary(report: dict[str, Any]) -> None:
@@ -483,44 +449,17 @@ def _apply_prompt_rollout_analysis_sync(
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Apply the rollout analysis recommendation when it is actionable."""
-    if not report.get("analysis_available", False):
-        raise ValueError("prompt rollout analysis unavailable")
+    from victor.framework.rl import apply_prompt_rollout_recommendation
 
-    action = report.get("auto_action")
-    if not action:
-        return {
-            "experiment_id": report.get("experiment_id"),
-            "action": None,
-            "applied": False,
-            "dry_run": dry_run,
-            "reason": report.get("recommendation"),
-        }
-
-    if dry_run:
-        return {
-            "experiment_id": report.get("experiment_id"),
-            "action": action,
-            "applied": False,
-            "dry_run": True,
-        }
-
-    from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
-
-    coordinator = get_experiment_coordinator()
-    if action == "rollout":
-        updated = coordinator.rollout_treatment(report["experiment_id"])
-    else:
-        updated = coordinator.rollback_experiment(report["experiment_id"])
-
-    if not updated:
-        raise ValueError(f"unable to apply prompt rollout decision for {report['experiment_id']}")
-
-    return {
-        "experiment_id": report.get("experiment_id"),
-        "action": action,
-        "applied": True,
-        "dry_run": False,
-    }
+    decision = apply_prompt_rollout_recommendation(
+        section_name=str(report.get("section_name") or ""),
+        provider=str(report.get("provider") or ""),
+        treatment_hash=str(report.get("prompt_candidate_hash") or ""),
+        dry_run=dry_run,
+    )
+    if decision is None:
+        raise ValueError(f"prompt rollout experiment not found: {report.get('experiment_id', '-')}")
+    return decision
 
 
 def _print_prompt_optimizer_sync_summary(sync_result) -> None:

@@ -492,6 +492,66 @@ class RLManager:
             min_samples_per_variant=min_samples_per_variant,
         )
 
+    def analyze_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze the rollout experiment for a prompt candidate."""
+        return self._coordinator.analyze_prompt_rollout_experiment(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+
+    async def analyze_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of analyze_prompt_rollout_experiment."""
+        return await self._coordinator.analyze_prompt_rollout_experiment_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+
+    def apply_prompt_rollout_recommendation(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Apply the recommended rollout/rollback action for a prompt candidate."""
+        return self._coordinator.apply_prompt_rollout_recommendation(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            dry_run=dry_run,
+        )
+
+    async def apply_prompt_rollout_recommendation_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of apply_prompt_rollout_recommendation."""
+        return await self._coordinator.apply_prompt_rollout_recommendation_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            dry_run=dry_run,
+        )
+
     # =========================================================================
     # Statistics
     # =========================================================================
@@ -699,6 +759,70 @@ async def create_prompt_rollout_experiment_async(
     )
 
 
+def analyze_prompt_rollout_experiment(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+) -> Optional[Dict[str, Any]]:
+    """Analyze a prompt rollout experiment via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.analyze_prompt_rollout_experiment(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+    )
+
+
+async def analyze_prompt_rollout_experiment_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+) -> Optional[Dict[str, Any]]:
+    """Async prompt rollout analysis helper via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.analyze_prompt_rollout_experiment_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+    )
+
+
+def apply_prompt_rollout_recommendation(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    dry_run: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Apply the recommended prompt rollout decision via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.apply_prompt_rollout_recommendation(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        dry_run=dry_run,
+    )
+
+
+async def apply_prompt_rollout_recommendation_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    dry_run: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Async prompt rollout decision helper via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.apply_prompt_rollout_recommendation_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        dry_run=dry_run,
+    )
+
+
 __all__ = [
     # Manager
     "RLManager",
@@ -722,6 +846,10 @@ __all__ = [
     "record_tool_success",
     "create_prompt_rollout_experiment",
     "create_prompt_rollout_experiment_async",
+    "analyze_prompt_rollout_experiment",
+    "analyze_prompt_rollout_experiment_async",
+    "apply_prompt_rollout_recommendation",
+    "apply_prompt_rollout_recommendation_async",
     # Credit Assignment (arXiv:2604.09459)
     "CreditGranularity",
     "CreditMethodology",
