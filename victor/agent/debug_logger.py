@@ -243,9 +243,7 @@ class DebugLogger:
         self.stats.tool_calls_made += 1
 
         visible_args = [(k, v) for k, v in args.items() if k != "_exec_ctx"]
-        preview_parts = [
-            f"{k}={self._format_value(v, max_len=40)}" for k, v in visible_args[:3]
-        ]
+        preview_parts = [f"{k}={self._format_value(v, max_len=40)}" for k, v in visible_args[:3]]
         args_str = ", ".join(preview_parts)
         if len(visible_args) > 3:
             args_str = f"{args_str}, +{len(visible_args) - 3} more"
