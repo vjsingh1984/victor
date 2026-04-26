@@ -44,6 +44,7 @@ from victor.agent.tool_selection_assembler import (
     SemanticToolSelectionAssemblyContext,
 )
 from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
+from victor.agent.tool_selection_cache_key import SemanticToolSelectionCacheKeyBuilder
 from victor.agent.tool_selection_policy import (
     StageToolSelectionContext,
     ToolSelectionStagePolicy,
@@ -52,6 +53,7 @@ from victor.agent.tool_selection_postprocessor import (
     ToolSelectionPostProcessContext,
     ToolSelectionPostProcessor,
 )
+from victor.agent.tool_selection_recorder import ToolSelectionRecorder
 from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
@@ -887,7 +889,12 @@ class ToolSelector(ModeAwareMixin):
         self._stage_policy = ToolSelectionStagePolicy(fallback_max_tools=fallback_max_tools)
         self._post_processor = ToolSelectionPostProcessor()
         self._semantic_cache_adapter = SemanticToolSelectionCacheAdapter()
+        self._semantic_cache_key_builder = SemanticToolSelectionCacheKeyBuilder()
         self._semantic_assembler = SemanticToolSelectionAssembler()
+        self._selection_recorder = ToolSelectionRecorder(
+            stats=self.stats,
+            on_selection_recorded=on_selection_recorded,
+        )
 
         # Tool selection result cache (for expensive semantic selection)
         self._tool_selection_cache: Optional["GenericResultCache"] = None
@@ -1804,9 +1811,7 @@ class ToolSelector(ModeAwareMixin):
             method: Selection method used
             num_tools: Number of tools selected
         """
-        self.stats.record_selection(method, num_tools)
-        if self._on_selection_recorded:
-            self._on_selection_recorded(method, num_tools)
+        self._selection_recorder.record(method, num_tools)
 
     def get_adaptive_threshold(
         self, user_message: str, conversation_depth: int = 0
@@ -1954,16 +1959,11 @@ class ToolSelector(ModeAwareMixin):
         if self._tool_selection_cache_enabled:
             cache = self._init_tool_selection_cache()
             if cache:
-                from victor.storage.cache.generic_result_cache import (
-                    _create_tool_selection_cache_key,
-                )
-
-                cache_key = _create_tool_selection_cache_key(
+                cache_key = self._semantic_cache_key_builder.build(
                     user_message=user_message,
                     conversation_history=conversation_history,
                     conversation_depth=conversation_depth,
-                    stage=stage.value if stage else None,
-                    use_semantic=True,
+                    stage=stage,
                 )
 
                 try:
@@ -2050,10 +2050,10 @@ class ToolSelector(ModeAwareMixin):
         )
 
         # Record selection AFTER final cap to reflect actual tool count
-        if is_fallback:
-            self._record_selection("fallback", len(tools))
-        else:
-            self._record_selection("semantic", len(tools))
+        self._selection_recorder.record_result(
+            is_fallback=is_fallback,
+            num_tools=len(tools),
+        )
 
         # Apply vertical-specific tool selection strategy (DIP/OCP)
         # This allows verticals to prioritize/reorder tools based on domain knowledge

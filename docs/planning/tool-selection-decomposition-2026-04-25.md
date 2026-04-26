@@ -52,6 +52,10 @@ Target state:
     retaining surrounding regression on the existing optimization and selector
     tests
 - Phase 3 started:
+  - added `victor.agent.tool_selection_cache_key` for canonical semantic cache
+    key construction
+  - added `victor.agent.tool_selection_recorder` for canonical selection
+    result recording and callback dispatch
   - added `victor.agent.tool_selection_cache` for semantic selection cache
     payload restore/serialize behavior
   - added `victor.agent.tool_selection_assembler` for semantic + keyword +
@@ -61,17 +65,16 @@ Target state:
   - moved semantic cache read/write control flow onto
     `SemanticToolSelectionCacheAdapter`, so `ToolSelector` no longer performs
     direct cache payload `get` / `set` choreography
+  - migrated `ToolSelector.select_semantic(...)` off inline cache-key
+    construction and off inline semantic-vs-fallback result recording
   - added focused TDD for cache payload normalization and bounded keyword/web
     assembly while retaining surrounding selector/runtime regression
 
 ## Next Resume Point
 
-- Finish Phase 3 by splitting the remaining orchestration concerns out of
-  `ToolSelector.select_semantic(...)`:
-  1. select
-  2. prune / fallback
-  3. decorate / budget
-  4. cache / record
-- Remaining active seams:
-  - final selection recording still lives in `ToolSelector`
-  - selection cache-key construction still lives in `ToolSelector`
+- Phase 3 is complete. The next optional seam is Phase 4:
+  - decide whether `select_semantic(...)` should keep orchestration ownership
+    or whether cache initialization, semantic selection execution, and final
+    enabled-tool filtering should move into a dedicated runtime coordinator
+  - only take that step if the extra indirection is justified by new behavior,
+    because the remaining body is now materially smaller and mostly orchestration
