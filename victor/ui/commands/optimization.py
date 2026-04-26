@@ -277,14 +277,21 @@ def prompt_rollout(
     default=None,
     help="Optional treatment strategy filter.",
 )
+@click.option(
+    "--auto-action",
+    "auto_action_filter",
+    default=None,
+    help="Optional auto-action filter (rollout, rollback).",
+)
 def prompt_rollouts(
     status_filter: Optional[str],
     section_filter: Optional[str],
     provider_filter: Optional[str],
     strategy_filter: Optional[str],
+    auto_action_filter: Optional[str],
 ) -> None:
     """List prompt rollout experiments."""
-    _list_prompt_rollouts(status_filter, section_filter, provider_filter, strategy_filter)
+    _list_prompt_rollouts(status_filter, section_filter, provider_filter, strategy_filter, auto_action_filter)
 
 
 @opt.command("prompt-rollout-status")
@@ -681,6 +688,7 @@ def _list_prompt_rollouts(
     section_filter: Optional[str],
     provider_filter: Optional[str],
     strategy_filter: Optional[str],
+    auto_action_filter: Optional[str] = None,
 ) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
@@ -697,6 +705,11 @@ def _list_prompt_rollouts(
             strategy_filter,
         ):
             continue
+        if auto_action_filter is not None:
+            result = coordinator.analyze_experiment(experiment_id)
+            action = _get_prompt_rollout_auto_action(result) if result is not None else None
+            if action != auto_action_filter:
+                continue
         experiments.append(experiment)
 
     if not experiments:

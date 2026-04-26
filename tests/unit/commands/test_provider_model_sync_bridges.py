@@ -388,9 +388,10 @@ class TestOptimizationSyncBridge:
                 section_filter=None,
                 provider_filter=None,
                 strategy_filter=None,
+                auto_action_filter=None,
             )
 
-        mock_list.assert_called_once_with("running", None, None, None)
+        mock_list.assert_called_once_with("running", None, None, None, None)
 
     def test_prompt_rollouts_support_section_and_provider_filters(self) -> None:
         with patch.object(optimization_cmd, "_list_prompt_rollouts") as mock_list:
@@ -399,9 +400,10 @@ class TestOptimizationSyncBridge:
                 section_filter="GROUNDING_RULES",
                 provider_filter="anthropic",
                 strategy_filter=None,
+                auto_action_filter=None,
             )
 
-        mock_list.assert_called_once_with("running", "GROUNDING_RULES", "anthropic", None)
+        mock_list.assert_called_once_with("running", "GROUNDING_RULES", "anthropic", None, None)
 
     def test_prompt_rollouts_supports_strategy_filter(self) -> None:
         with patch.object(optimization_cmd, "_list_prompt_rollouts") as mock_list:
@@ -410,9 +412,22 @@ class TestOptimizationSyncBridge:
                 section_filter=None,
                 provider_filter=None,
                 strategy_filter="prefpo",
+                auto_action_filter=None,
             )
 
-        mock_list.assert_called_once_with("running", None, None, "prefpo")
+        mock_list.assert_called_once_with("running", None, None, "prefpo", None)
+
+    def test_prompt_rollouts_supports_auto_action_filter(self) -> None:
+        with patch.object(optimization_cmd, "_list_prompt_rollouts") as mock_list:
+            optimization_cmd.prompt_rollouts.callback(
+                status_filter="running",
+                section_filter=None,
+                provider_filter=None,
+                strategy_filter=None,
+                auto_action_filter="rollout",
+            )
+
+        mock_list.assert_called_once_with("running", None, None, None, "rollout")
 
     def test_prompt_rollout_status_uses_status_helper(self) -> None:
         with patch.object(optimization_cmd, "_show_prompt_rollout_status") as mock_status:
@@ -734,7 +749,7 @@ class TestOptimizationSyncBridge:
             ),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._list_prompt_rollouts("running", None, None, None)
+            optimization_cmd._list_prompt_rollouts("running", None, None, None, None)
 
         coordinator.list_experiments.assert_called_once_with()
         mock_echo.assert_any_call("Prompt rollout experiments:")
@@ -771,7 +786,7 @@ class TestOptimizationSyncBridge:
             ),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._list_prompt_rollouts("paused", None, None, None)
+            optimization_cmd._list_prompt_rollouts("paused", None, None, None, None)
 
         mock_echo.assert_called_once_with("No prompt rollout experiments found.")
 
@@ -824,7 +839,13 @@ class TestOptimizationSyncBridge:
             patch.object(optimization_cmd, "get_experiment_coordinator", return_value=coordinator),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._list_prompt_rollouts("running", "GROUNDING_RULES", "anthropic", None)
+            optimization_cmd._list_prompt_rollouts(
+                "running",
+                "GROUNDING_RULES",
+                "anthropic",
+                None,
+                None,
+            )
 
         mock_echo.assert_any_call(
             "  prompt_optimizer_grounding_rules_anthropic_candidate123"
@@ -863,8 +884,65 @@ class TestOptimizationSyncBridge:
             patch.object(optimization_cmd, "get_experiment_coordinator", return_value=coordinator),
             patch.object(optimization_cmd.click, "echo") as mock_echo,
         ):
-            optimization_cmd._list_prompt_rollouts("running", None, None, "prefpo")
+            optimization_cmd._list_prompt_rollouts("running", None, None, "prefpo", None)
 
+        mock_echo.assert_any_call(
+            "  prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        assert all(
+            call.args != ("  prompt_optimizer_completion_guidance_openai_candidate456",)
+            for call in mock_echo.call_args_list
+        )
+
+    def test_list_prompt_rollouts_honors_auto_action_filter(self) -> None:
+        coordinator = MagicMock()
+        coordinator.list_experiments.return_value = [
+            {
+                "experiment_id": "prompt_optimizer_grounding_rules_anthropic_candidate123",
+                "name": "Prompt rollout for GROUNDING_RULES",
+                "status": "running",
+                "section_name": "GROUNDING_RULES",
+                "provider": "anthropic",
+                "traffic_split": 0.1,
+                "control": {"name": "control456", "strategy_name": "gepa", "samples": 12, "success_rate": 0.75},
+                "treatment": {"name": "candidate123", "strategy_name": "prefpo", "samples": 9, "success_rate": 0.89},
+            },
+            {
+                "experiment_id": "prompt_optimizer_completion_guidance_openai_candidate456",
+                "name": "Prompt rollout for COMPLETION_GUIDANCE",
+                "status": "running",
+                "section_name": "COMPLETION_GUIDANCE",
+                "provider": "openai",
+                "traffic_split": 0.1,
+                "control": {"name": "control789", "strategy_name": "gepa", "samples": 10, "success_rate": 0.70},
+                "treatment": {"name": "candidate456", "strategy_name": "miprov2", "samples": 10, "success_rate": 0.80},
+            },
+        ]
+        coordinator.analyze_experiment.side_effect = [
+            SimpleNamespace(
+                is_significant=True,
+                treatment_better=True,
+                recommendation="Roll out treatment - significant improvement detected",
+            ),
+            SimpleNamespace(
+                is_significant=False,
+                treatment_better=False,
+                recommendation="Continue experiment - results not yet significant",
+            ),
+        ]
+
+        with (
+            patch.object(optimization_cmd, "get_experiment_coordinator", return_value=coordinator),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._list_prompt_rollouts("running", None, None, None, "rollout")
+
+        coordinator.analyze_experiment.assert_any_call(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        coordinator.analyze_experiment.assert_any_call(
+            "prompt_optimizer_completion_guidance_openai_candidate456"
+        )
         mock_echo.assert_any_call(
             "  prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
