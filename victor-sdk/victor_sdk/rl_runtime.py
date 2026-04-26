@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         create_prompt_rollout_experiment,
         create_prompt_rollout_experiment_async,
         get_rl_coordinator,
+        get_rl_coordinator_async,
     )
 
 __all__ = [
@@ -20,6 +21,7 @@ __all__ = [
     "create_prompt_rollout_experiment",
     "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",
+    "get_rl_coordinator_async",
 ]
 
 _LAZY_IMPORTS = {
@@ -28,6 +30,7 @@ _LAZY_IMPORTS = {
     "create_prompt_rollout_experiment": "victor.framework.rl",
     "create_prompt_rollout_experiment_async": "victor.framework.rl",
     "get_rl_coordinator": "victor.framework.rl",
+    "get_rl_coordinator_async": "victor.framework.rl",
 }
 
 

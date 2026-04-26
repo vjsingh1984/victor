@@ -13,6 +13,7 @@ from victor_sdk.rl_runtime import (
     RLManager,
     create_prompt_rollout_experiment,
     create_prompt_rollout_experiment_async,
+    get_rl_coordinator_async,
 )
 from victor_sdk.search_runtime import QueryExpander
 from victor_sdk.subagent_runtime import set_role_tool_provider
@@ -27,6 +28,7 @@ def test_sdk_runtime_adapters_resolve_host_types() -> None:
     assert RLManager.__name__ == "RLManager"
     assert callable(create_prompt_rollout_experiment)
     assert callable(create_prompt_rollout_experiment_async)
+    assert callable(get_rl_coordinator_async)
     assert CodebaseIndexFactoryProtocol.__name__ == "CodebaseIndexFactoryProtocol"
     assert callable(create_lazy_capability_proxy)
     assert callable(get_chain_registry)

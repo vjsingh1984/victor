@@ -30,6 +30,7 @@ from victor_sdk.rl_runtime import (
     create_prompt_rollout_experiment,
     create_prompt_rollout_experiment_async,
     get_rl_coordinator,
+    get_rl_coordinator_async,
 )
 from victor_sdk.provider_runtime import Message, ProviderRegistry
 from victor_sdk.search_runtime import QueryExpander, QueryExpansionConfig
@@ -67,6 +68,7 @@ def test_search_runtime_exports_host_helpers() -> None:
 def test_rl_runtime_exports_host_helpers() -> None:
     assert RLManager.__name__ == "RLManager"
     assert callable(get_rl_coordinator)
+    assert callable(get_rl_coordinator_async)
     assert callable(create_prompt_rollout_experiment)
     assert callable(create_prompt_rollout_experiment_async)
 

@@ -208,6 +208,7 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "create_prompt_rollout_experiment_async",
         "create_outcome",
         "get_rl_coordinator",
+        "get_rl_coordinator_async",
         "record_tool_success",
     ],
     "victor.framework.team_registry": [

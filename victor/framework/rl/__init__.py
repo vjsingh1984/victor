@@ -708,6 +708,7 @@ __all__ = [
     "RLCoordinator",
     "BaseLearner",
     "get_rl_coordinator",
+    "get_rl_coordinator_async",
     # Configuration
     "BaseRLConfig",
     "DEFAULT_PATIENCE_MAP",

@@ -29,6 +29,7 @@ from victor.framework.rl import (
     create_outcome,
     record_tool_success,
     get_rl_coordinator,
+    get_rl_coordinator_async,
 )
 
 
@@ -395,6 +396,12 @@ class TestFrameworkExports:
         from victor.framework import get_rl_coordinator as ExportedGetCoordinator
 
         assert ExportedGetCoordinator is get_rl_coordinator
+
+    def test_get_rl_coordinator_async_exported(self):
+        """Test get_rl_coordinator_async is exported from framework."""
+        from victor.framework import get_rl_coordinator_async as ExportedGetCoordinatorAsync
+
+        assert ExportedGetCoordinatorAsync is get_rl_coordinator_async
 
     def test_create_outcome_exported(self):
         """Test create_outcome is exported from framework."""
