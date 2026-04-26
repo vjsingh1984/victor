@@ -51,12 +51,24 @@ Target state:
   - added focused TDD for transform ordering and optional-step gating while
     retaining surrounding regression on the existing optimization and selector
     tests
+- Phase 3 started:
+  - added `victor.agent.tool_selection_cache` for semantic selection cache
+    payload restore/serialize behavior
+  - added `victor.agent.tool_selection_assembler` for semantic + keyword +
+    explicit web-tool assembly and stable deduplication
+  - migrated `ToolSelector.select_semantic(...)` off inline cache payload
+    reconstruction/serialization and off inline semantic-keyword-web assembly
+  - added focused TDD for cache payload normalization and bounded keyword/web
+    assembly while retaining surrounding selector/runtime regression
 
 ## Next Resume Point
 
-- Phase 3: split semantic-selection orchestration concerns out of
-  `ToolSelector.select_semantic(...)` so the remaining flow becomes:
+- Finish Phase 3 by splitting the remaining orchestration concerns out of
+  `ToolSelector.select_semantic(...)`:
   1. select
   2. prune / fallback
   3. decorate / budget
   4. cache / record
+- Remaining active seams:
+  - cache lookup/store control flow still lives in `ToolSelector`
+  - final selection recording still lives in `ToolSelector`

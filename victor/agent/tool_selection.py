@@ -39,6 +39,11 @@ from victor.core.yaml_utils import safe_load as yaml_safe_load
 from victor.core import get_container
 
 from victor.agent.conversation.state_machine import ConversationStage
+from victor.agent.tool_selection_assembler import (
+    SemanticToolSelectionAssembler,
+    SemanticToolSelectionAssemblyContext,
+)
+from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
 from victor.agent.tool_selection_policy import (
     StageToolSelectionContext,
     ToolSelectionStagePolicy,
@@ -881,6 +886,8 @@ class ToolSelector(ModeAwareMixin):
         self.stats = ToolSelectionStats()
         self._stage_policy = ToolSelectionStagePolicy(fallback_max_tools=fallback_max_tools)
         self._post_processor = ToolSelectionPostProcessor()
+        self._semantic_cache_adapter = SemanticToolSelectionCacheAdapter()
+        self._semantic_assembler = SemanticToolSelectionAssembler()
 
         # Tool selection result cache (for expensive semantic selection)
         self._tool_selection_cache: Optional["GenericResultCache"] = None
@@ -1959,28 +1966,12 @@ class ToolSelector(ModeAwareMixin):
                     use_semantic=True,
                 )
 
-                cached_result = cache.get(
-                    ResultType.TOOL_SELECTION,
-                    cache_key,
-                )
+                cached_result = cache.get(ResultType.TOOL_SELECTION, cache_key)
                 if cached_result is not None:
-                    # Reconstruct ToolDefinition objects from cached data
                     try:
-                        tool_names = cached_result.get("tool_names", [])
-                        tool_descriptions = cached_result.get("tool_descriptions", {})
-                        tool_parameters = cached_result.get("tool_parameters", {})
-
-                        reconstructed_tools = []
-                        for name in tool_names:
-                            if name in tool_descriptions:
-                                reconstructed_tools.append(
-                                    ToolDefinition(
-                                        name=name,
-                                        description=tool_descriptions[name],
-                                        parameters=tool_parameters.get(name),
-                                    )
-                                )
-
+                        reconstructed_tools = self._semantic_cache_adapter.restore_tools(
+                            cached_result
+                        )
                         if reconstructed_tools:
                             logger.debug(
                                 f"Tool selection cache HIT: {len(reconstructed_tools)} tools"
@@ -2007,43 +1998,20 @@ class ToolSelector(ModeAwareMixin):
             similarity_threshold=threshold,
         )
 
-        # Blend with keyword-selected tools (limited to prevent token explosion)
-        # Pass _record=False to avoid double-counting in metrics
-        keyword_tools = self.select_keywords(
-            user_message, planned_tools=planned_tools, _record=False
+        tools = self._semantic_assembler.assemble(
+            tools,
+            keyword_tools=self.select_keywords(
+                user_message,
+                planned_tools=planned_tools,
+                _record=False,
+            ),
+            all_tools=self.tools.list_tools(),
+            context=SemanticToolSelectionAssemblyContext(
+                max_tools=max_tools,
+                include_web_tools=any(kw in user_message.lower() for kw in WEB_KEYWORDS),
+                web_tool_names=self._get_web_tools_cached(),
+            ),
         )
-        if keyword_tools:
-            existing = {t.name for t in tools}
-            new_keyword_tools = [t for t in keyword_tools if t.name not in existing]
-            # Limit keyword additions to prevent exceeding max_tools significantly
-            max_keyword_additions = max(3, max_tools - len(tools))
-            if len(new_keyword_tools) > max_keyword_additions:
-                logger.debug(
-                    f"Limiting keyword tools: {len(new_keyword_tools)} -> {max_keyword_additions}"
-                )
-                new_keyword_tools = new_keyword_tools[:max_keyword_additions]
-            tools.extend(new_keyword_tools)
-
-        # Ensure web tools if explicitly mentioned (dynamic discovery)
-        message_lower = user_message.lower()
-        if any(kw in message_lower for kw in WEB_KEYWORDS):
-            must_have = self._get_web_tools_cached()
-            existing = {t.name for t in tools}
-            for tool in self.tools.list_tools():
-                if tool.name in must_have and tool.name not in existing:
-                    tools.append(
-                        ToolDefinition(
-                            name=tool.name,
-                            description=tool.description,
-                            parameters=tool.parameters,
-                        )
-                    )
-
-        # Deduplicate
-        dedup: Dict[str, ToolDefinition] = {}
-        for t in tools:
-            dedup[t.name] = t
-        tools = list(dedup.values())
 
         # Stage-aware filtering (keep read-only tools for exploration/analysis)
         stage = self.conversation_state.get_stage() if self.conversation_state else None
@@ -2104,21 +2072,10 @@ class ToolSelector(ModeAwareMixin):
                 try:
                     from victor.storage.cache.generic_result_cache import ResultType
 
-                    # Serialize tool definitions for caching
-                    tool_names = [t.name for t in tools]
-                    tool_descriptions = {t.name: t.description for t in tools}
-                    tool_parameters = {t.name: t.parameters for t in tools}
-
-                    cache_data = {
-                        "tool_names": tool_names,
-                        "tool_descriptions": tool_descriptions,
-                        "tool_parameters": tool_parameters,
-                    }
-
                     cache.set(
                         ResultType.TOOL_SELECTION,
                         cache_key,
-                        cache_data,
+                        self._semantic_cache_adapter.serialize_tools(tools),
                         ttl=self._tool_selection_cache_ttl,
                     )
                     logger.debug(f"Tool selection cached: {len(tools)} tools")
