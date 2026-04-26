@@ -183,6 +183,36 @@ def test_get_prompt_optimization_bundle_tracks_canonical_prompt_identity():
     }
 
 
+def test_get_prompt_optimization_bundle_falls_back_when_payload_hooks_are_empty():
+    optimizer = MagicMock()
+    optimizer.get_evolved_section_payloads.return_value = []
+    optimizer.get_few_shot_payload.return_value = {}
+    optimizer.get_evolved_sections.return_value = ["Prefer read over cat."]
+    optimizer.get_few_shots.return_value = "Example few shot"
+    optimizer.get_failure_hint.return_value = None
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=optimizer,
+        decision_service=None,
+    )
+    turn_context = SimpleNamespace(
+        provider_name="anthropic",
+        model="claude-sonnet",
+        task_type="edit",
+        last_turn_failed=False,
+    )
+
+    bundle = service.get_prompt_optimization_bundle("Fix the bug", turn_context)
+
+    assert bundle == PromptOptimizationBundle(
+        evolved_sections=["Prefer read over cat."],
+        few_shots="Example few shot",
+        failure_hint=None,
+        identities=[],
+    )
+
+
 def test_reset_decision_budget_delegates_to_service():
     decision_service = MagicMock()
     service = RuntimeIntelligenceService(

@@ -512,17 +512,19 @@ class RuntimeIntelligenceService:
                 model=model_name,
                 task_type=task_type,
             )
+        used_payload_sections = False
         if isinstance(payloads, (list, tuple)):
             for payload in payloads:
                 if not isinstance(payload, dict):
                     continue
+                used_payload_sections = True
                 text = str(payload.get("text", "")).strip()
                 if text:
                     evolved_sections.append(text)
                 identity = self._build_prompt_identity(payload)
                 if identity is not None:
                     identities.append(identity)
-        else:
+        if not used_payload_sections:
             evolved_sections = self._optimization_injector.get_evolved_sections(
                 provider=provider_name,
                 model=model_name,
@@ -538,13 +540,15 @@ class RuntimeIntelligenceService:
                 model=model_name,
                 task_type=task_type,
             )
+        used_payload_few_shot = False
         if isinstance(few_shot_payload, dict):
             if few_shot_payload:
+                used_payload_few_shot = True
                 few_shots = str(few_shot_payload.get("text", "")).strip() or None
                 identity = self._build_prompt_identity(few_shot_payload)
                 if identity is not None:
                     identities.append(identity)
-        else:
+        if not used_payload_few_shot:
             few_shots = self._optimization_injector.get_few_shots(user_message)
 
         failure_hint = None
