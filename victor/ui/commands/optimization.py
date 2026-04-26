@@ -205,13 +205,13 @@ def validate(
 @click.option(
     "--traffic-split",
     default=0.1,
-    type=float,
+    type=click.FloatRange(min=0.0, max=1.0, min_open=True, max_open=True),
     help="Traffic share to allocate to the treatment candidate.",
 )
 @click.option(
     "--min-samples-per-variant",
     default=50,
-    type=int,
+    type=click.IntRange(min=1),
     help="Minimum samples per variant before promotion analysis.",
 )
 def prompt_rollout(
@@ -227,6 +227,17 @@ def prompt_rollout(
     Example:
         victor opt prompt-rollout GROUNDING_RULES anthropic candidate_hash
     """
+    if not 0.0 < traffic_split < 1.0:
+        raise click.BadParameter(
+            "traffic_split must be between 0 and 1 (exclusive)",
+            param_hint="traffic_split",
+        )
+    if min_samples_per_variant < 1:
+        raise click.BadParameter(
+            "min_samples_per_variant must be at least 1",
+            param_hint="min_samples_per_variant",
+        )
+
     run_sync(
         _prompt_rollout_async(
             section_name=section_name,

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import typer
+import click
 
 import victor.ui.commands.ab_testing as ab_testing_cmd
 import victor.ui.commands.benchmark as benchmark_cmd
@@ -450,6 +451,45 @@ class TestOptimizationSyncBridge:
             )
 
         mock_echo.assert_any_call("Cannot start prompt rollout: benchmark gating required", err=True)
+
+    def test_prompt_rollout_rejects_invalid_traffic_split_before_bridge(self) -> None:
+        with (
+            patch.object(optimization_cmd, "_prompt_rollout_async") as mock_async,
+            patch.object(optimization_cmd, "run_sync") as mock_run_sync,
+        ):
+            with pytest.raises(click.BadParameter, match="traffic_split must be between 0 and 1"):
+                optimization_cmd.prompt_rollout.callback(
+                    "GROUNDING_RULES",
+                    "anthropic",
+                    "candidate123",
+                    None,
+                    1.0,
+                    25,
+                )
+
+        mock_async.assert_not_called()
+        mock_run_sync.assert_not_called()
+
+    def test_prompt_rollout_rejects_non_positive_min_samples_before_bridge(self) -> None:
+        with (
+            patch.object(optimization_cmd, "_prompt_rollout_async") as mock_async,
+            patch.object(optimization_cmd, "run_sync") as mock_run_sync,
+        ):
+            with pytest.raises(
+                click.BadParameter,
+                match="min_samples_per_variant must be at least 1",
+            ):
+                optimization_cmd.prompt_rollout.callback(
+                    "GROUNDING_RULES",
+                    "anthropic",
+                    "candidate123",
+                    None,
+                    0.2,
+                    0,
+                )
+
+        mock_async.assert_not_called()
+        mock_run_sync.assert_not_called()
 
 
 class TestConfigSyncBridge:
