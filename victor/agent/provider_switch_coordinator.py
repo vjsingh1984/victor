@@ -53,8 +53,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
-from enum import IntEnum
+from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
@@ -62,10 +61,13 @@ from typing import (
     List,
     Optional,
     TYPE_CHECKING,
-    Protocol,
-    runtime_checkable,
 )
 
+from victor.agent.provider.switch_contracts import (
+    HookPriority,
+    PostSwitchHook,
+    SwitchContext,
+)
 from victor.core.async_utils import run_sync
 
 if TYPE_CHECKING:
@@ -73,81 +75,6 @@ if TYPE_CHECKING:
     from victor.agent.provider.health_monitor import ProviderHealthMonitor
 
 logger = logging.getLogger(__name__)
-
-
-class HookPriority(IntEnum):
-    """Standard hook priorities for predictable execution order.
-
-    Lower values execute first. Use these as guidelines:
-    - FIRST (0): Critical setup that other hooks depend on
-    - EARLY (10): Exploration/capability settings
-    - NORMAL (20): Prompt and builder updates
-    - LATE (30): System prompt rebuilding
-    - LAST (40): Budget and final adjustments
-    """
-
-    FIRST = 0
-    EARLY = 10
-    NORMAL = 20
-    LATE = 30
-    LAST = 40
-
-
-@dataclass(frozen=True)
-class SwitchContext:
-    """Context passed to post-switch hooks.
-
-    Provides all information hooks need to update state after a switch.
-    Immutable to prevent hooks from modifying shared context.
-
-    Attributes:
-        old_provider: Previous provider name (None if first switch)
-        old_model: Previous model name (None if first switch)
-        new_provider: New provider name
-        new_model: New model name
-        reason: Reason for the switch (user_request, fallback, etc.)
-        switch_type: Type of switch ('provider' or 'model')
-        respect_sticky_budget: If True, don't reset tool budget on user override
-        metadata: Additional context-specific data
-    """
-
-    old_provider: Optional[str]
-    old_model: Optional[str]
-    new_provider: str
-    new_model: str
-    reason: str
-    switch_type: str  # 'provider' or 'model'
-    respect_sticky_budget: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-@runtime_checkable
-class PostSwitchHook(Protocol):
-    """Protocol for post-switch hooks (ISP compliance).
-
-    Hooks implement a single responsibility and execute after successful switch.
-    Supports both sync and async execution via duck typing.
-
-    Example:
-        class MyHook:
-            name = "my_hook"
-
-            def execute(self, context: SwitchContext) -> None:
-                # Update state based on new provider/model
-                pass
-
-        # Or async:
-        class MyAsyncHook:
-            name = "my_async_hook"
-
-            async def execute(self, context: SwitchContext) -> None:
-                await do_async_update(context)
-    """
-
-    name: str
-
-    def execute(self, context: SwitchContext) -> None:
-        """Execute the hook with switch context."""
 
 
 @dataclass

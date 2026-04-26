@@ -77,6 +77,12 @@ For each batch:
 
 ## Current Batch
 
-Phase 1 is complete. The active implementation batch is now Phase 2.1:
-internal provider switching is service-first in `AgentOrchestrator`, while the
-legacy provider coordinator remains available only as a compatibility surface.
+Phase 1 is complete. Phase 2.1 and Phase 2.2 are now complete:
+- internal provider switching is service-first in `AgentOrchestrator`
+- provider-switch hook contracts now live in a canonical provider contract
+  module instead of being sourced from the legacy switch coordinator
+
+Next resume point:
+- move remaining runtime/factory/provider package imports off
+  `victor.agent.provider_switch_coordinator` where they only need canonical
+  contracts or a builder-owned construction seam
