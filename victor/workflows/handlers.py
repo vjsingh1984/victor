@@ -998,7 +998,7 @@ def register_framework_handlers() -> None:
         from victor.workflows.handlers import register_framework_handlers
         register_framework_handlers()
     """
-    from victor.workflows.executor import register_compute_handler
+    from victor.workflows.compute_registry import register_compute_handler
 
     for name, handler in FRAMEWORK_HANDLERS.items():
         register_compute_handler(name, handler)

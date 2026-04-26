@@ -38,10 +38,17 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from victor.framework.chain_registry import get_chain_registry
 from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor.workflows.compute_registry import (
+    ComputeHandler,
+    _compute_handlers,
+    get_compute_handler,
+    list_compute_handlers,
+    register_compute_handler,
+)
 from victor.workflows.definition import (
     AgentNode,
     ComputeNode,
@@ -76,85 +83,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ComputeHandler(Protocol):
-    """Protocol for custom compute node handlers.
-
-    Handlers enable domain-specific execution logic for ComputeNodes.
-    Register handlers with register_compute_handler() to extend
-    workflow execution capabilities.
-
-    Example:
-        async def rl_decision_handler(
-            node: ComputeNode,
-            context: WorkflowContext,
-            tool_registry: ToolRegistry,
-        ) -> NodeResult:
-            # Load RL policy and make decision
-            policy = load_policy(context.get("policy_path"))
-            features = {k: context.get(k) for k in node.input_mapping.values()}
-            decision = policy.predict(features)
-            context.set(node.output_key, decision)
-            return NodeResult(node.id, ExecutorNodeStatus.COMPLETED, output=decision)
-
-        register_compute_handler("rl_decision", rl_decision_handler)
-    """
-
-    async def __call__(
-        self,
-        node: "ComputeNode",
-        context: "WorkflowContext",
-        tool_registry: "ToolRegistry",
-    ) -> "NodeResult":
-        """Execute custom handler logic.
-
-        Args:
-            node: The ComputeNode being executed
-            context: Workflow execution context
-            tool_registry: Tool registry for tool execution
-
-        Returns:
-            NodeResult with execution outcome
-        """
-        ...
-
-
-# Global registry for compute handlers
-_compute_handlers: Dict[str, ComputeHandler] = {}
-
-
-def register_compute_handler(name: str, handler: ComputeHandler) -> None:
-    """Register a custom compute handler.
-
-    Handlers enable domain-specific execution logic for ComputeNodes.
-    When a ComputeNode has a `handler` field matching the registered name,
-    the handler will be invoked instead of the default tool execution.
-
-    Args:
-        name: Handler name (referenced in YAML as handler: name)
-        handler: Async callable implementing ComputeHandler protocol
-
-    Example:
-        register_compute_handler("rl_decision", my_rl_handler)
-
-        # In YAML:
-        - id: weights
-          type: compute
-          handler: rl_decision
-          inputs:
-            features: $ctx.valuation_features
-    """
-    _compute_handlers[name] = handler
-    logger.debug(f"Registered compute handler: {name}")
-
-
-def get_compute_handler(name: str) -> Optional[ComputeHandler]:
-    """Get a registered compute handler by name."""
-    return _compute_handlers.get(name)
-
-
-def list_compute_handlers() -> List[str]:
-    """List all registered compute handler names."""
-    return list(_compute_handlers.keys())
 
 
 @dataclass

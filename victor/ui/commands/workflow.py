@@ -197,7 +197,7 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
             module = importlib.import_module(module_name)
 
             if hasattr(module, "register_handlers"):
-                from victor.workflows.executor import register_compute_handler
+                from victor.workflows.compute_registry import register_compute_handler
 
                 register_handlers = module.register_handlers
                 try:
@@ -216,7 +216,7 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
 
     # Get all registered handlers from executor
     try:
-        from victor.workflows.executor import list_compute_handlers
+        from victor.workflows.compute_registry import list_compute_handlers
 
         handlers.update(list_compute_handlers())
     except ImportError:

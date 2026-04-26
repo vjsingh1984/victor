@@ -52,11 +52,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import (
-        NodeResult,
-        ExecutorNodeStatus,
-        WorkflowContext,
-    )
+    from victor.workflows.executor import WorkflowContext
+    from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +88,7 @@ class TestRunnerHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -232,7 +229,7 @@ class EnvironmentSetupHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -321,7 +318,7 @@ class LiveExecutorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -440,7 +437,7 @@ class LanguageDetectorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -512,7 +509,7 @@ class PolyglotVerifierHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -608,7 +605,7 @@ class MultiSolutionValidatorHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -718,7 +715,7 @@ class CodeTesterHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -810,7 +807,7 @@ class SyntaxCheckHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -923,7 +920,7 @@ HANDLERS = {
 
 def register_handlers() -> None:
     """Register Benchmark handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    from victor.workflows.compute_registry import register_compute_handler
 
     for name, handler in HANDLERS.items():
         register_compute_handler(name, handler)

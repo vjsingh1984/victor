@@ -217,3 +217,83 @@ class TestWorkflowExecutorChainHandlers:
         called = mock_to_thread.await_args
         assert called.args[0] is sync_chain
         assert called.kwargs == {"payload": "repo"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.1 boundary tests: compute registry and SDK type migration
+# ---------------------------------------------------------------------------
+
+
+class TestComputeRegistryBoundary:
+    """Enforce that compute handler registry is canonical in compute_registry.py."""
+
+    def test_compute_registry_module_is_canonical_source(self):
+        from victor.workflows.compute_registry import (
+            ComputeHandler,
+            register_compute_handler,
+            get_compute_handler,
+            list_compute_handlers,
+        )
+        assert callable(register_compute_handler)
+        assert callable(get_compute_handler)
+        assert callable(list_compute_handlers)
+        assert ComputeHandler is not None
+
+    def test_executor_reexports_from_compute_registry(self):
+        from victor.workflows import compute_registry, executor
+        assert executor.register_compute_handler is compute_registry.register_compute_handler
+        assert executor.get_compute_handler is compute_registry.get_compute_handler
+        assert executor.list_compute_handlers is compute_registry.list_compute_handlers
+        assert executor.ComputeHandler is compute_registry.ComputeHandler
+
+    def test_shared_registry_dict(self):
+        from victor.workflows import compute_registry, executor
+        assert executor._compute_handlers is compute_registry._compute_handlers
+
+    def test_register_via_registry_visible_in_executor(self):
+        from victor.workflows.compute_registry import register_compute_handler
+        from victor.workflows.executor import get_compute_handler, list_compute_handlers
+
+        async def stub_handler(node, context, tool_registry):
+            pass
+
+        register_compute_handler("_test_boundary_stub", stub_handler)
+        assert "_test_boundary_stub" in list_compute_handlers()
+        assert get_compute_handler("_test_boundary_stub") is stub_handler
+
+    def test_benchmark_handlers_use_sdk_for_node_result(self):
+        source = open("victor/benchmark/handlers.py").read()
+        assert "from victor_sdk.workflows import NodeResult" in source or (
+            "from victor_sdk.workflows import" in source and "NodeResult" in source
+        )
+        assert "from victor.workflows.executor import NodeResult" not in source
+
+    def test_benchmark_handlers_use_compute_registry(self):
+        source = open("victor/benchmark/handlers.py").read()
+        assert "from victor.workflows.compute_registry import register_compute_handler" in source
+        assert "from victor.workflows.executor import register_compute_handler" not in source
+
+    def test_benchmark_escape_hatches_use_sdk_for_node_result(self):
+        source = open("victor/benchmark/escape_hatches.py").read()
+        assert "from victor.workflows.executor import NodeResult" not in source
+
+    def test_benchmark_escape_hatches_use_compute_registry(self):
+        source = open("victor/benchmark/escape_hatches.py").read()
+        assert "from victor.workflows.compute_registry import register_compute_handler" in source
+        assert "from victor.workflows.executor import register_compute_handler" not in source
+
+    def test_framework_integration_uses_compute_registry(self):
+        source = open(
+            "victor/framework/framework_integration_registry_service.py"
+        ).read()
+        assert (
+            "from victor.workflows.compute_registry import register_compute_handler" in source
+        )
+        assert (
+            "from victor.workflows.executor import register_compute_handler" not in source
+        )
+
+    def test_workflow_handlers_use_compute_registry(self):
+        source = open("victor/workflows/handlers.py").read()
+        assert "from victor.workflows.compute_registry import register_compute_handler" in source
+        assert "from victor.workflows.executor import register_compute_handler" not in source
