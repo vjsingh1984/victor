@@ -293,6 +293,18 @@ def prompt_rollout_auto_apply(experiment_id: str) -> None:
     _auto_apply_prompt_rollout_decision(experiment_id)
 
 
+@opt.command("prompt-rollout-auto-apply-all")
+@click.option(
+    "--status",
+    "status_filter",
+    default=None,
+    help="Optional status filter for the prompt rollouts to analyze before auto-apply.",
+)
+def prompt_rollout_auto_apply_all(status_filter: Optional[str]) -> None:
+    """Apply eligible rollout decisions across prompt rollout experiments."""
+    _auto_apply_all_prompt_rollouts(status_filter)
+
+
 async def _profile_async(
     workflow_id: str,
     min_executions: int,
@@ -724,6 +736,69 @@ def _auto_apply_prompt_rollout_decision(experiment_id: str) -> None:
         return
 
     click.echo(success_message)
+
+
+def _auto_apply_all_prompt_rollouts(status_filter: Optional[str]) -> None:
+    coordinator = get_experiment_coordinator()
+    experiments = []
+    for experiment in coordinator.list_experiments():
+        experiment_id = experiment.get("experiment_id", "")
+        if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
+            continue
+        if status_filter and experiment.get("status") != status_filter:
+            continue
+        if not status_filter and experiment.get("status") in {"rolled_out", "rolled_back"}:
+            continue
+        experiments.append(experiment)
+
+    if not experiments:
+        click.echo("No prompt rollout experiments found for auto-apply.")
+        return
+
+    considered = 0
+    applied = 0
+    skipped = 0
+    failed = 0
+
+    for experiment in experiments:
+        experiment_id = experiment["experiment_id"]
+        considered += 1
+        result = coordinator.analyze_experiment(experiment_id)
+        if result is None:
+            click.echo(f"Prompt rollout analysis unavailable: {experiment_id}", err=True)
+            failed += 1
+            continue
+
+        action = _get_prompt_rollout_auto_action(result)
+        if action is None:
+            click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}")
+            skipped += 1
+            continue
+
+        if action == "rollout":
+            updated = coordinator.rollout_treatment(experiment_id)
+            success_message = (
+                f"Prompt rollout auto-applied: rolled out treatment for {experiment_id}"
+            )
+        else:
+            updated = coordinator.rollback_experiment(experiment_id)
+            success_message = f"Prompt rollout auto-applied: kept control for {experiment_id}"
+
+        if not updated:
+            click.echo(
+                f"Unable to auto-apply prompt rollout decision for {experiment_id}",
+                err=True,
+            )
+            failed += 1
+            continue
+
+        click.echo(success_message)
+        applied += 1
+
+    click.echo(
+        "Prompt rollout bulk auto-apply summary: "
+        f"considered={considered} applied={applied} skipped={skipped} failed={failed}"
+    )
 
 
 # Register commands with CLI
