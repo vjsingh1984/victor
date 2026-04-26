@@ -374,3 +374,13 @@ class TestWorkflowExecutorCompatibilityBoundaries:
     def test_adapters_do_not_import_legacy_workflow_executor(self):
         source = open("victor/workflows/adapters.py").read()
         assert "from victor.workflows.executor import WorkflowExecutor" not in source
+
+    def test_yaml_coordinator_does_not_directly_import_legacy_executors(self):
+        source = open("victor/framework/coordinators/yaml_coordinator.py").read()
+        assert "from victor.workflows.executor import WorkflowExecutor" not in source
+        assert "from victor.workflows.streaming_executor import StreamingWorkflowExecutor" not in source
+
+    def test_workflow_engine_does_not_directly_import_legacy_executors(self):
+        source = open("victor/framework/workflow_engine.py").read()
+        assert "from victor.workflows.executor import WorkflowExecutor" not in source
+        assert "from victor.workflows.streaming_executor import StreamingWorkflowExecutor" not in source

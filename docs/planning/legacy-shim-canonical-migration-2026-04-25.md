@@ -194,6 +194,17 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - boundary tests now pin those two modules away from the legacy executor
     module import path
 
+- Phase 3.9 centralized legacy executor construction:
+  - `victor.workflows.runtime_executor_factory` now owns the remaining shared
+    construction seam for compatibility `WorkflowExecutor` and
+    `StreamingWorkflowExecutor` instances
+  - `victor.framework.coordinators.yaml_coordinator` and
+    `victor.framework.workflow_engine` now delegate legacy executor creation
+    through that shared factory instead of importing the legacy executor
+    modules directly
+  - focused boundary tests now pin both framework owners to the shared factory
+    seam so future migrations only need to swap one construction module
+
 - Phase 4.1 canonical team protocol import cleanup:
   - internal tests now import `ITeamMember` from `victor.protocols.team`
     instead of the compatibility shim in `victor.teams.protocols`
@@ -210,7 +221,7 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     of quietly re-entering internal code paths
 
 Next resume point:
-- Continue the remaining `victor.workflows.executor` migration on the higher
-  impact runtime owners (`yaml_coordinator`, `workflow_engine`,
-  `streaming_executor`) or stop here if that larger behavioral seam should be
-  handled as a separate dedicated refactor.
+- The next remaining high-impact seam is `victor.workflows.streaming_executor`
+  still subclassing the legacy DAG executor directly. That is a larger
+  behavioral refactor and should be handled as its own dedicated slice if we
+  continue.

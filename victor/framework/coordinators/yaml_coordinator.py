@@ -44,12 +44,16 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from victor.framework.coordinators.protocols import IStreamingExecutor, IWorkflowExecutor
     from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.cache import WorkflowDefinitionCache
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.executor import WorkflowExecutor
-    from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+from victor.workflows.runtime_executor_factory import (
+    create_legacy_streaming_workflow_executor,
+    create_legacy_workflow_executor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +83,8 @@ class YAMLWorkflowCoordinator:
 
     def __init__(
         self,
-        executor: Optional["WorkflowExecutor"] = None,
-        streaming_executor: Optional["StreamingWorkflowExecutor"] = None,
+        executor: Optional["IWorkflowExecutor"] = None,
+        streaming_executor: Optional["IStreamingExecutor"] = None,
         definition_cache: Optional["WorkflowDefinitionCache"] = None,
         unified_compiler: Optional["UnifiedWorkflowCompiler"] = None,
         use_unified_compiler: bool = True,
@@ -100,20 +104,16 @@ class YAMLWorkflowCoordinator:
         self._unified_compiler = unified_compiler
         self._use_unified_compiler = use_unified_compiler
 
-    def _get_executor(self) -> "WorkflowExecutor":
+    def _get_executor(self) -> "IWorkflowExecutor":
         """Get or create workflow executor."""
         if self._executor is None:
-            from victor.workflows.executor import WorkflowExecutor
-
-            self._executor = WorkflowExecutor()
+            self._executor = create_legacy_workflow_executor()
         return self._executor
 
-    def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":
+    def _get_streaming_executor(self) -> "IStreamingExecutor":
         """Get or create streaming executor."""
         if self._streaming_executor is None:
-            from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-
-            self._streaming_executor = StreamingWorkflowExecutor()
+            self._streaming_executor = create_legacy_streaming_workflow_executor()
         return self._streaming_executor
 
     def _get_definition_cache(self) -> "WorkflowDefinitionCache":

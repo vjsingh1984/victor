@@ -87,10 +87,9 @@ if TYPE_CHECKING:
         HITLCoordinator,
         CacheCoordinator,
     )
+    from victor.framework.coordinators.protocols import IStreamingExecutor, IWorkflowExecutor
     from victor.workflows.context import WorkflowResult
-    from victor.workflows.executor import WorkflowExecutor
     from victor.workflows.streaming import WorkflowStreamChunk
-    from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.hitl import HITLHandler, HITLExecutor
     from victor.workflows.cache import WorkflowCacheManager
     from victor.workflows.definition import WorkflowDefinition
@@ -99,6 +98,11 @@ if TYPE_CHECKING:
     from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 logger = logging.getLogger(__name__)
+
+from victor.workflows.runtime_executor_factory import (
+    create_legacy_streaming_workflow_executor,
+    create_legacy_workflow_executor,
+)
 
 StateType = TypeVar("StateType", bound=Dict[str, Any])
 
@@ -271,8 +275,8 @@ class WorkflowEngine:
         self._cache_coordinator: Optional["CacheCoordinator"] = None
 
         # Lazy-loaded executors (for backward compatibility)
-        self._executor: Optional["WorkflowExecutor"] = None
-        self._streaming_executor: Optional["StreamingWorkflowExecutor"] = None
+        self._executor: Optional["IWorkflowExecutor"] = None
+        self._streaming_executor: Optional["IStreamingExecutor"] = None
         self._hitl_executor: Optional["HITLExecutor"] = None
 
         # Lazy-loaded unified compiler for consistent compilation and caching
@@ -925,20 +929,16 @@ class WorkflowEngine:
     # Helpers (for backward compatibility)
     # =========================================================================
 
-    def _get_executor(self) -> "WorkflowExecutor":
+    def _get_executor(self) -> "IWorkflowExecutor":
         """Get or create workflow executor."""
         if self._executor is None:
-            from victor.workflows.executor import WorkflowExecutor
-
-            self._executor = WorkflowExecutor()
+            self._executor = create_legacy_workflow_executor()
         return self._executor
 
-    def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":
+    def _get_streaming_executor(self) -> "IStreamingExecutor":
         """Get or create streaming executor."""
         if self._streaming_executor is None:
-            from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-
-            self._streaming_executor = StreamingWorkflowExecutor()
+            self._streaming_executor = create_legacy_streaming_workflow_executor()
         return self._streaming_executor
 
 
