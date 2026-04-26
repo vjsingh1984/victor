@@ -107,7 +107,7 @@ if TYPE_CHECKING:
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.streaming.pipeline import StreamingChatPipeline
-    from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+    from victor.agent.provider import ProviderSwitchCoordinator
     from victor.agent.lifecycle_manager import LifecycleManager
     from victor.agent.tool_deduplication import ToolDeduplicationTracker
     from victor.agent.provider_manager import ProviderManager
