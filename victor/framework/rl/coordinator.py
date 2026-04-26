@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
 
 if TYPE_CHECKING:
     from victor.framework.rl.option_framework import OptionRegistry
@@ -1052,6 +1053,40 @@ class RLCoordinator:
             return learner.get_recommendation(provider, model, task_type)
         except Exception as e:
             logger.error(f"RL: Failed to get recommendation from {learner_name}: {e}")
+            return None
+
+    def create_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Create and start a prompt rollout experiment through the prompt optimizer.
+
+        Returns:
+            Experiment ID if created and started successfully, else None.
+        """
+        learner = self.get_learner("prompt_optimizer")
+        if learner is None or not hasattr(learner, "create_rollout_experiment"):
+            return None
+
+        try:
+            experiment_coordinator = get_experiment_coordinator(self.db)
+            return learner.create_rollout_experiment(
+                experiment_coordinator,
+                section_name=section_name,
+                provider=provider,
+                treatment_hash=treatment_hash,
+                control_hash=control_hash,
+                traffic_split=traffic_split,
+                min_samples_per_variant=min_samples_per_variant,
+            )
+        except Exception as e:
+            logger.warning("RL: Failed to create prompt rollout experiment: %s", e)
             return None
 
     @staticmethod
