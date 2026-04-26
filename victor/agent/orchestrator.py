@@ -99,7 +99,7 @@ if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.provider_manager import ProviderManager
-    from victor.agent.provider_coordinator import ProviderCoordinator
+    from victor.agent.provider.coordinator import ProviderCoordinator
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.safety import SafetyChecker

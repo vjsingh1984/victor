@@ -25,7 +25,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.provider_coordinator import (
+from victor.agent.provider.coordinator import (
     ProviderCoordinator,
     ProviderCoordinatorConfig,
     RateLimitInfo,
@@ -429,7 +429,7 @@ class TestProviderCoordinator:
             yield "success"
 
         # Patch sleep to avoid actual waiting
-        with patch("victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock):
+        with patch("victor.agent.provider.coordinator.asyncio.sleep", new_callable=AsyncMock):
             chunks = []
             async for chunk in coordinator.stream_with_rate_limit_retry(mock_stream):
                 chunks.append(chunk)
@@ -448,7 +448,7 @@ class TestProviderCoordinator:
                 yield "never"
             raise Exception("Rate limit exceeded. 429 Too Many Requests")
 
-        with patch("victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock):
+        with patch("victor.agent.provider.coordinator.asyncio.sleep", new_callable=AsyncMock):
             with pytest.raises(Exception, match="Rate limit"):
                 async for _ in coordinator.stream_with_rate_limit_retry(mock_stream):
                     pass

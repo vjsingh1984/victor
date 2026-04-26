@@ -77,13 +77,17 @@ For each batch:
 
 ## Current Batch
 
-Phase 1 is complete. Phase 2.1 and Phase 2.2 are now complete:
+Phase 1 is complete. Phase 2.1, Phase 2.2, and Phase 2.3 are now complete:
 - internal provider switching is service-first in `AgentOrchestrator`
 - provider-switch hook contracts now live in a canonical provider contract
   module instead of being sourced from the legacy switch coordinator
+- `ProviderSwitchCoordinator` behavior now lives in the canonical provider
+  package, with the root module reduced to a public compatibility shim
+- `ProviderCoordinator` behavior now lives in the canonical provider package
+  module, with the root module reduced to a public compatibility shim and
+  internal runtime imports moved to the canonical module path
 
 Next resume point:
-- `ProviderSwitchCoordinator` behavior now lives in the canonical provider
-  package; the next analogous migration seam is the root
-  `victor.agent.provider_coordinator` behavior owner so the root module can
-  become a thin public shim as well
+- audit and shrink the remaining coordinator-path provider compatibility
+  surface in `victor.agent.coordinators.provider_coordinator`, then continue
+  the broader compatibility cleanup around orchestrator and facade shims

@@ -479,7 +479,7 @@ class RuntimeBuildersMixin:
         This keeps the legacy compatibility wrapper isolated to the factory layer
         while canonical runtime code migrates away from direct module imports.
         """
-        from victor.agent.provider_coordinator import create_provider_coordinator
+        from victor.agent.provider.coordinator import create_provider_coordinator
 
         coordinator = create_provider_coordinator(
             provider_manager=provider_manager,

@@ -88,7 +88,7 @@ def create_provider_runtime_components(
     """Create lazy provider runtime components for orchestrator wiring."""
 
     def _build_provider_coordinator() -> Any:
-        from victor.agent.provider_coordinator import ProviderCoordinatorConfig
+        from victor.agent.provider.coordinator import ProviderCoordinatorConfig
 
         coord = factory.create_deprecated_provider_coordinator(
             provider_manager=provider_manager,
