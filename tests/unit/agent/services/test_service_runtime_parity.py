@@ -125,6 +125,78 @@ def test_legacy_protocol_adapter_module_reexports_service_adapter():
     assert legacy_adapter is service_adapter
 
 
+def test_service_rl_runtime_prompt_rollout_helper_uses_global_coordinator():
+    from victor.agent.services.rl_runtime import create_prompt_rollout_experiment
+
+    coordinator = MagicMock()
+    coordinator.create_prompt_rollout_experiment.return_value = "prompt_exp_service"
+
+    with patch("victor.agent.services.rl_runtime.get_rl_coordinator", return_value=coordinator):
+        experiment_id = create_prompt_rollout_experiment(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            treatment_hash="candidate_hash",
+            traffic_split=0.2,
+            min_samples_per_variant=25,
+        )
+
+    assert experiment_id == "prompt_exp_service"
+    coordinator.create_prompt_rollout_experiment.assert_called_once_with(
+        section_name="GROUNDING_RULES",
+        provider="anthropic",
+        treatment_hash="candidate_hash",
+        control_hash=None,
+        traffic_split=0.2,
+        min_samples_per_variant=25,
+    )
+
+
+@pytest.mark.asyncio
+async def test_service_rl_runtime_prompt_rollout_async_helper_uses_global_coordinator():
+    from victor.agent.services.rl_runtime import create_prompt_rollout_experiment_async
+
+    coordinator = MagicMock()
+    coordinator.create_prompt_rollout_experiment_async = AsyncMock(
+        return_value="prompt_exp_service_async"
+    )
+
+    with patch(
+        "victor.agent.services.rl_runtime.get_rl_coordinator_async",
+        new=AsyncMock(return_value=coordinator),
+    ):
+        experiment_id = await create_prompt_rollout_experiment_async(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            treatment_hash="candidate_hash",
+            traffic_split=0.2,
+            min_samples_per_variant=25,
+        )
+
+    assert experiment_id == "prompt_exp_service_async"
+    coordinator.create_prompt_rollout_experiment_async.assert_called_once_with(
+        section_name="GROUNDING_RULES",
+        provider="anthropic",
+        treatment_hash="candidate_hash",
+        control_hash=None,
+        traffic_split=0.2,
+        min_samples_per_variant=25,
+    )
+
+
+def test_agent_services_package_exports_prompt_rollout_helpers():
+    from victor.agent.services import (
+        create_prompt_rollout_experiment as package_rollout_helper,
+        create_prompt_rollout_experiment_async as package_rollout_helper_async,
+    )
+    from victor.agent.services.rl_runtime import (
+        create_prompt_rollout_experiment as runtime_rollout_helper,
+        create_prompt_rollout_experiment_async as runtime_rollout_helper_async,
+    )
+
+    assert package_rollout_helper is runtime_rollout_helper
+    assert package_rollout_helper_async is runtime_rollout_helper_async
+
+
 def test_tool_service_normalize_arguments_full_matches_legacy_contract():
     service = _make_tool_service()
     argument_normalizer = SimpleNamespace(

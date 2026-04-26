@@ -47,6 +47,8 @@ from victor.agent.services.runtime_intelligence import (
 from victor.agent.services.rl_runtime import (
     AsyncWriterQueue,
     RLCoordinator,
+    create_prompt_rollout_experiment,
+    create_prompt_rollout_experiment_async,
     get_rl_coordinator,
     get_rl_coordinator_async,
     reset_rl_coordinator,
@@ -167,6 +169,8 @@ __all__ = [
     "create_state_coordinator",
     "create_tool_coordinator",
     "create_metrics_coordinator",
+    "create_prompt_rollout_experiment",
+    "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",
     "get_rl_coordinator_async",
     "reset_rl_coordinator",

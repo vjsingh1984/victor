@@ -20,6 +20,8 @@ service-first import surface for agent runtime code so the live orchestration
 path does not depend on framework module paths directly.
 """
 
+from typing import Optional
+
 from victor.framework.rl.coordinator import (
     AsyncWriterQueue,
     RLCoordinator,
@@ -28,9 +30,54 @@ from victor.framework.rl.coordinator import (
     reset_rl_coordinator,
 )
 
+
+def create_prompt_rollout_experiment(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str] = None,
+    traffic_split: float = 0.1,
+    min_samples_per_variant: int = 50,
+) -> Optional[str]:
+    """Create a prompt rollout experiment via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.create_prompt_rollout_experiment(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        control_hash=control_hash,
+        traffic_split=traffic_split,
+        min_samples_per_variant=min_samples_per_variant,
+    )
+
+
+async def create_prompt_rollout_experiment_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str] = None,
+    traffic_split: float = 0.1,
+    min_samples_per_variant: int = 50,
+) -> Optional[str]:
+    """Create a prompt rollout experiment asynchronously via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.create_prompt_rollout_experiment_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        control_hash=control_hash,
+        traffic_split=traffic_split,
+        min_samples_per_variant=min_samples_per_variant,
+    )
+
+
 __all__ = [
     "AsyncWriterQueue",
     "RLCoordinator",
+    "create_prompt_rollout_experiment",
+    "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",
     "get_rl_coordinator_async",
     "reset_rl_coordinator",
