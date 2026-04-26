@@ -69,7 +69,12 @@ class TestCliPromptSession:
                 [
                     ("user", "real prompt", "2026-04-26 10:00:00", None),
                     ("user", "[SYSTEM-REMINDER: hidden]", "2026-04-26 10:01:00", None),
-                    ("user", "Continue. Use appropriate tools if needed.", "2026-04-26 10:02:00", None),
+                    (
+                        "user",
+                        "Continue. Use appropriate tools if needed.",
+                        "2026-04-26 10:02:00",
+                        None,
+                    ),
                     (
                         "user",
                         "plain-looking hidden prompt",

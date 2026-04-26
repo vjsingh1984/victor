@@ -153,14 +153,12 @@ def backfill_internal_history_metadata(db_path: Path, limit: int = 1000) -> int:
     updated = 0
 
     with sqlite3.connect(db_path) as conn:
-        table_check = conn.execute(
-            """
+        table_check = conn.execute("""
             SELECT 1
             FROM sqlite_master
             WHERE type = 'table'
               AND name = 'messages'
-            """
-        ).fetchone()
+            """).fetchone()
         if table_check is None:
             return 0
 
