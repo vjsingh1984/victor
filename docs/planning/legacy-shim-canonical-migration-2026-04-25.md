@@ -111,6 +111,23 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 - internal runtime code no longer depends on any facade as a behavior owner;
   facades are now reduced to thin compatibility groupings over canonical
   service/runtime/state-passed seams
+- Phase 2.9 provider facade compatibility derivation:
+  - `ProviderFacade` now derives deprecated `provider_coordinator` and
+    `provider_switch_coordinator` compatibility accessors from
+    `provider_runtime` by default instead of requiring bootstrapper to wire the
+    deprecated slots directly
+  - bootstrapper now passes only canonical provider runtime inputs into
+    `ProviderFacade`, reducing another internal dependency on coordinator
+    compatibility fields while preserving the public properties
+- Phase 2.10 provider health-monitoring canonicalization:
+  - `AgentOrchestrator.start_health_monitoring()` and
+    `AgentOrchestrator.stop_health_monitoring()` now depend on
+    `ProviderService` only and return `False` when the canonical service is
+    unavailable instead of silently succeeding through deprecated coordinator
+    fallback
+  - `AgentOrchestrator.get_current_provider_info()` now sources rate-limit
+    stats from `ProviderService` only, removing the remaining coordinator
+    fallback branch from that canonical method
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -253,7 +270,13 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     coverage isolated to the explicit interop tests
 
 Next resume point:
-- Remaining `victor.workflows.executor` imports are now intentional
-  compatibility/public-test surface (`victor/workflows/__init__.py`,
-  integration coverage, and the legacy executor module itself). This
-  migration track is in a clean stop state.
+- The workflow/executor migration track is in a clean stop state; remaining
+  `victor.workflows.executor` imports are intentional compatibility/public-test
+  surface (`victor/workflows/__init__.py`, integration coverage, and the
+  legacy executor module itself).
+- The next active compatibility seam is provider runtime exposure through
+  `_provider_coordinator` / `_provider_switch_coordinator` compatibility slots
+  and `OrchestratorProtocolAdapter._provider_coordinator`. If continued, the
+  next step is to move internal adapter/runtime callers to canonical provider
+  service or provider-runtime handles and leave the coordinator fields as
+  public compatibility-only shims.

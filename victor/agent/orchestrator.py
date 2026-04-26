@@ -2617,11 +2617,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             True if monitoring started, False if already running or unavailable
         """
         try:
-            # [CANONICAL] Use state-passed service
-            if self._provider_service is not None:
-                await self._provider_service.start_health_monitoring()
-            elif self._provider_coordinator is not None:
-                await self._provider_coordinator.start_health_monitoring()
+            if self._provider_service is None:
+                return False
+            await self._provider_service.start_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to start health monitoring: {e}")
@@ -2634,11 +2632,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             True if monitoring stopped, False if not running or error
         """
         try:
-            # [CANONICAL] Use state-passed service
-            if self._provider_service is not None:
-                await self._provider_service.stop_health_monitoring()
-            elif self._provider_coordinator is not None:
-                await self._provider_coordinator.stop_health_monitoring()
+            if self._provider_service is None:
+                return False
+            await self._provider_service.stop_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to stop health monitoring: {e}")
@@ -2715,13 +2711,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             "tool_calls_used": self.tool_calls_used,
         }
 
-        stats = {}
-        if self._provider_service is not None and hasattr(
-            self._provider_service, "get_rate_limit_stats"
-        ):
-            stats = self._provider_service.get_rate_limit_stats()
-        elif self._provider_coordinator:
-            stats = self._provider_coordinator.get_rate_limit_stats()
+        stats = self._provider_service.get_rate_limit_stats()
         if stats:
             result.update(stats)
 

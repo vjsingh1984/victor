@@ -2524,6 +2524,21 @@ class TestGetCurrentProviderInfo:
         info = orchestrator.get_current_provider_info()
         assert "name" in info or "provider" in info
 
+    def test_uses_provider_service_rate_limit_stats_only(self, orchestrator):
+        """Canonical provider info should not consult the deprecated coordinator."""
+        orchestrator._provider_coordinator = MagicMock()
+        orchestrator._provider_coordinator.get_rate_limit_stats.side_effect = AssertionError(
+            "legacy coordinator stats path should not be used"
+        )
+        orchestrator._provider_service.get_rate_limit_stats.return_value = {
+            "rate_limits_hit": 7,
+        }
+
+        info = orchestrator.get_current_provider_info()
+
+        assert info["rate_limits_hit"] == 7
+        orchestrator._provider_coordinator.get_rate_limit_stats.assert_not_called()
+
 
 class TestClassifyTaskKeywords:
     """Tests for _classify_task_keywords method."""
@@ -4429,6 +4444,56 @@ class TestHealthMonitoring:
         """Test stop_health_monitoring."""
         result = await orchestrator.stop_health_monitoring()
         assert isinstance(result, bool)
+
+    @pytest.mark.asyncio
+    async def test_start_health_monitoring_uses_provider_service_only(self, orchestrator):
+        """Canonical health monitoring should not fall back to the legacy coordinator."""
+        orchestrator._provider_service = MagicMock()
+        orchestrator._provider_service.start_health_monitoring = AsyncMock()
+        orchestrator._provider_coordinator = MagicMock()
+        orchestrator._provider_coordinator.start_health_monitoring = AsyncMock(
+            side_effect=AssertionError("legacy coordinator path should not be used")
+        )
+
+        result = await orchestrator.start_health_monitoring()
+
+        assert result is True
+        orchestrator._provider_service.start_health_monitoring.assert_awaited_once_with()
+        orchestrator._provider_coordinator.start_health_monitoring.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_stop_health_monitoring_uses_provider_service_only(self, orchestrator):
+        """Canonical health monitoring shutdown should not fall back to the legacy coordinator."""
+        orchestrator._provider_service = MagicMock()
+        orchestrator._provider_service.stop_health_monitoring = AsyncMock()
+        orchestrator._provider_coordinator = MagicMock()
+        orchestrator._provider_coordinator.stop_health_monitoring = AsyncMock(
+            side_effect=AssertionError("legacy coordinator path should not be used")
+        )
+
+        result = await orchestrator.stop_health_monitoring()
+
+        assert result is True
+        orchestrator._provider_service.stop_health_monitoring.assert_awaited_once_with()
+        orchestrator._provider_coordinator.stop_health_monitoring.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_start_health_monitoring_returns_false_without_provider_service(self, orchestrator):
+        """Unavailable canonical service should report failure instead of silent success."""
+        orchestrator._provider_service = None
+
+        result = await orchestrator.start_health_monitoring()
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_stop_health_monitoring_returns_false_without_provider_service(self, orchestrator):
+        """Unavailable canonical service should report failure instead of silent success."""
+        orchestrator._provider_service = None
+
+        result = await orchestrator.stop_health_monitoring()
+
+        assert result is False
 
 
 class TestGracefulShutdown:
