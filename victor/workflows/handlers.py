@@ -47,14 +47,12 @@ from dataclasses import dataclass, field
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import (
-        NodeResult,
-        ExecutorNodeStatus,
-        WorkflowContext,
-    )
+    from victor.workflows.context import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +153,6 @@ class HandlerErrorBoundary:
         Returns:
             NodeResult with execution outcome or error details
         """
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         # Snapshot context before execution (for debugging on failure)
@@ -254,8 +250,6 @@ class HandlerErrorBoundary:
         Returns:
             NodeResult with FAILED status and error details
         """
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         return NodeResult(
             node_id=node.id,
             status=ExecutorNodeStatus.FAILED,
@@ -334,8 +328,6 @@ class ParallelToolsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
         semaphore = asyncio.Semaphore(self.max_concurrent)
         outputs: Dict[str, Any] = {}
@@ -468,8 +460,6 @@ class SequentialToolsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
         outputs: Dict[str, Any] = {}
         tool_calls_used = 0
@@ -608,8 +598,6 @@ class RetryBackoffHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
         outputs: Dict[str, Any] = {}
         tool_calls_used = 0
@@ -749,8 +737,6 @@ class DataTransformHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         # Get data and operations from inputs
@@ -894,8 +880,6 @@ class ConditionalBranchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         # Get condition from inputs

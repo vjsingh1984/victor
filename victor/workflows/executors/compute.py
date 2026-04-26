@@ -223,7 +223,7 @@ class ComputeNodeExecutor:
         Returns:
             Handler instance or None if not found
         """
-        from victor.workflows.executor import get_compute_handler
+        from victor.workflows.compute_registry import get_compute_handler
 
         return get_compute_handler(handler_name)
 

@@ -22,24 +22,24 @@ centralized and can be swapped later in one place.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.framework.coordinators.protocols import IStreamingExecutor, IWorkflowExecutor
 
 
-def create_legacy_workflow_executor() -> "IWorkflowExecutor":
+def create_legacy_workflow_executor(*args: Any, **kwargs: Any) -> "IWorkflowExecutor":
     """Create the compatibility workflow executor through a single seam."""
     from victor.workflows.executor import WorkflowExecutor
 
-    return WorkflowExecutor()
+    return WorkflowExecutor(*args, **kwargs)
 
 
-def create_legacy_streaming_workflow_executor() -> "IStreamingExecutor":
+def create_legacy_streaming_workflow_executor(*args: Any, **kwargs: Any) -> "IStreamingExecutor":
     """Create the compatibility streaming workflow executor through a single seam."""
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
 
-    return StreamingWorkflowExecutor()
+    return StreamingWorkflowExecutor(*args, **kwargs)
 
 
 __all__ = [

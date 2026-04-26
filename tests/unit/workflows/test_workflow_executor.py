@@ -384,3 +384,25 @@ class TestWorkflowExecutorCompatibilityBoundaries:
         source = open("victor/framework/workflow_engine.py").read()
         assert "from victor.workflows.executor import WorkflowExecutor" not in source
         assert "from victor.workflows.streaming_executor import StreamingWorkflowExecutor" not in source
+
+    def test_streaming_executor_does_not_subclass_legacy_workflow_executor(self):
+        source = open("victor/workflows/streaming_executor.py").read()
+        assert "from victor.workflows.executor import WorkflowExecutor" not in source
+        assert "class StreamingWorkflowExecutor(WorkflowExecutor)" not in source
+
+    def test_workflow_handlers_use_canonical_result_types(self):
+        source = open("victor/workflows/handlers.py").read()
+        assert "from victor.workflows.executor import NodeResult" not in source
+        assert "from victor.workflows.executor import ExecutorNodeStatus" not in source
+
+    def test_workflow_handlers_use_canonical_compute_registry(self):
+        source = open("victor/workflows/executors/compute.py").read()
+        assert "from victor.workflows.executor import get_compute_handler" not in source
+
+    def test_node_runners_use_canonical_compute_registry(self):
+        source = open("victor/workflows/node_runners.py").read()
+        assert "from victor.workflows.executor import get_compute_handler" not in source
+
+    def test_workflow_cache_uses_canonical_result_types(self):
+        source = open("victor/workflows/cache.py").read()
+        assert "from victor.workflows.executor import NodeResult" not in source

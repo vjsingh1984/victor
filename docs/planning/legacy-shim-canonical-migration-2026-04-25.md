@@ -205,6 +205,27 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - focused boundary tests now pin both framework owners to the shared factory
     seam so future migrations only need to swap one construction module
 
+- Phase 3.10 streaming executor composition:
+  - `victor.workflows.streaming_executor.StreamingWorkflowExecutor` no longer
+    subclasses the legacy DAG executor directly; it now composes a delegated
+    compatibility runtime created through the shared runtime-executor factory
+  - backward-compatible `execute()` behavior and `sub_agents` access are
+    preserved through thin delegation, while inherited helper calls are routed
+    through the wrapped runtime explicitly
+  - boundary and unit tests now pin both the absence of direct inheritance and
+    the constructor's use of the shared runtime-executor factory
+
+- Phase 3.11 workflow utility canonical imports:
+  - `victor.workflows.handlers` now depends on canonical SDK result types and
+    `WorkflowContext` from `context.py` instead of importing those through the
+    legacy executor convenience surface
+  - `victor.workflows.cache` now references canonical `NodeResult` typing from
+    `victor_sdk.workflows`, and `victor.workflows.executors.compute` plus
+    `victor.workflows.node_runners` now resolve compute handlers from
+    `victor.workflows.compute_registry`
+  - boundary tests now pin those workflow utility modules away from the legacy
+    executor convenience imports
+
 - Phase 4.1 canonical team protocol import cleanup:
   - internal tests now import `ITeamMember` from `victor.protocols.team`
     instead of the compatibility shim in `victor.teams.protocols`
@@ -221,7 +242,9 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     of quietly re-entering internal code paths
 
 Next resume point:
-- The next remaining high-impact seam is `victor.workflows.streaming_executor`
-  still subclassing the legacy DAG executor directly. That is a larger
-  behavioral refactor and should be handled as its own dedicated slice if we
-  continue.
+- Remaining `victor.workflows.executor` imports are now effectively
+  compatibility/public-test surface (`victor/workflows/__init__.py`,
+  `victor/tests/workflows/test_isolation.py`, and the legacy executor module
+  itself). If we continue, the next small slice is test-only cleanup for
+  `victor/tests/workflows/test_isolation.py`; otherwise this executor
+  migration track is in a clean stop state.

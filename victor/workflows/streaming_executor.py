@@ -16,7 +16,8 @@
 
 Phase 3 of Graph Orchestration Streaming API.
 
-Provides StreamingWorkflowExecutor that extends WorkflowExecutor to add
+Provides StreamingWorkflowExecutor that layers streaming over the
+compatibility workflow executor runtime
 streaming capabilities via the astream() method, yielding WorkflowStreamChunk
 events during workflow execution.
 
@@ -60,7 +61,7 @@ from victor.workflows.definition import (
     WorkflowDefinition,
     WorkflowNode,
 )
-from victor.workflows.executor import WorkflowExecutor
+from victor.workflows.runtime_executor_factory import create_legacy_workflow_executor
 
 # Import canonical streaming types from streaming.py (DRY - Phase 5 consolidation)
 from victor.workflows.streaming import (
@@ -120,10 +121,10 @@ class _Subscription:
     active: bool = True
 
 
-class StreamingWorkflowExecutor(WorkflowExecutor):
+class StreamingWorkflowExecutor:
     """Workflow executor with streaming support.
 
-    Extends WorkflowExecutor to add astream() method that yields
+    Wraps the compatibility workflow executor to add astream() that yields
     WorkflowStreamChunk events during execution, enabling real-time
     progress tracking and content streaming from agent nodes.
 
@@ -172,7 +173,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
             cache: Optional WorkflowCache for node result caching
             cache_config: Optional config to create a cache
         """
-        super().__init__(
+        self._runtime = create_legacy_workflow_executor(
             orchestrator,
             max_parallel=max_parallel,
             default_timeout=default_timeout,
@@ -185,6 +186,28 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
         self._active_workflows: Dict[str, _ExecutorStreamContext] = {}
         self._subscriptions: List[_Subscription] = []
         self._queue_poll_interval = 0.1  # 100ms poll interval
+
+    @property
+    def sub_agents(self) -> Any:
+        """Expose the delegated sub-agent runtime for compatibility."""
+        return self._runtime.sub_agents
+
+    @property
+    def default_timeout(self) -> float:
+        """Expose delegated default timeout for streaming node execution."""
+        return self._runtime.default_timeout
+
+    async def execute(self, *args: Any, **kwargs: Any) -> Any:
+        """Delegate legacy execute() calls to the wrapped runtime."""
+        return await self._runtime.execute(*args, **kwargs)
+
+    def cancel(self) -> None:
+        """Delegate cancellation to the wrapped legacy runtime."""
+        self._runtime.cancel()
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate compatibility attributes to the wrapped runtime."""
+        return getattr(self._runtime, name)
 
     async def astream(
         self,
@@ -441,7 +464,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
             next_nodes = self._get_next_nodes(node, context)
 
             # Save checkpoint after each node
-            if self._checkpointer and thread_id:
+            if self._runtime._checkpointer and thread_id:
                 self._save_workflow_checkpoint(
                     thread_id=thread_id,
                     workflow_name=workflow.name,
@@ -520,6 +543,26 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
             duration_seconds=time.time() - start_time,
             tool_calls_used=result.tool_calls_used,
         )
+
+    async def _execute_node(self, node: WorkflowNode, context: WorkflowContext) -> NodeResult:
+        """Delegate single-node execution to the wrapped compatibility runtime."""
+        return await self._runtime._execute_node(node, context)
+
+    def _get_next_nodes(self, node: WorkflowNode, context: WorkflowContext) -> List[str]:
+        """Delegate next-node resolution to the wrapped compatibility runtime."""
+        return self._runtime._get_next_nodes(node, context)
+
+    def _save_workflow_checkpoint(self, **kwargs: Any) -> None:
+        """Delegate checkpoint persistence to the wrapped compatibility runtime."""
+        self._runtime._save_workflow_checkpoint(**kwargs)
+
+    def _emit_workflow_step_event(self, **kwargs: Any) -> None:
+        """Delegate workflow-step event emission to the wrapped compatibility runtime."""
+        self._runtime._emit_workflow_step_event(**kwargs)
+
+    def _build_agent_task(self, node: AgentNode, context: WorkflowContext) -> str:
+        """Delegate agent-task construction to the wrapped compatibility runtime."""
+        return self._runtime._build_agent_task(node, context)
 
     def subscribe(
         self,
