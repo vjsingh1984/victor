@@ -316,13 +316,20 @@ def prompt_rollout_auto_apply(experiment_id: str, dry_run: bool) -> None:
     default=None,
     help="Only auto-apply one decision type across the selected prompt rollouts.",
 )
+@click.option(
+    "--limit",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum number of prompt rollout experiments to process in this batch.",
+)
 def prompt_rollout_auto_apply_all(
     status_filter: Optional[str],
     dry_run: bool,
     action_filter: Optional[str],
+    limit: Optional[int],
 ) -> None:
     """Apply eligible rollout decisions across prompt rollout experiments."""
-    _auto_apply_all_prompt_rollouts(status_filter, dry_run, action_filter)
+    _auto_apply_all_prompt_rollouts(status_filter, dry_run, action_filter, limit)
 
 
 async def _profile_async(
@@ -777,6 +784,7 @@ def _auto_apply_all_prompt_rollouts(
     status_filter: Optional[str],
     dry_run: bool = False,
     action_filter: Optional[str] = None,
+    limit: Optional[int] = None,
 ) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
@@ -789,6 +797,9 @@ def _auto_apply_all_prompt_rollouts(
         if not status_filter and experiment.get("status") in {"rolled_out", "rolled_back"}:
             continue
         experiments.append(experiment)
+
+    if limit is not None:
+        experiments = experiments[:limit]
 
     if not experiments:
         click.echo("No prompt rollout experiments found for auto-apply.")
