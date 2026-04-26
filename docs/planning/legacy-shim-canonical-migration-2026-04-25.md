@@ -108,11 +108,18 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     in all benchmark callers
   - Boundary tests enforce canonical paths for all migrated consumers
 
+- Phase 3.2 workflow context/result/temporal canonicalization:
+  - `victor.workflows.context` is now the canonical module for
+    `WorkflowContext`, `WorkflowResult`, and `TemporalContext`
+  - executor.py re-exports those types for compatibility but no longer defines
+    them, and `TemporalContext.get_date_range()` behavior is preserved in the
+    canonical module
+  - internal callers that previously imported those types directly from
+    executor.py now import them from `victor.workflows.context`
+  - workflow package exports now source those types from the canonical module
+  - boundary and workflow regression tests enforce the canonical import paths
+
 Next resume point:
-- Phase 3.2: migrate WorkflowContext and WorkflowResult from executor.py into
-  victor/workflows/context.py as the canonical location; update context.py
-  conversion utilities and any callers that import these types directly from
-  executor
-- After 3.2: continue the broader compatibility cleanup around orchestrator
-  and facade shims by evaluating whether eager facade bootstrap can be reduced
-  further without weakening the remaining public compatibility surface
+- continue the broader compatibility cleanup around orchestrator and facade
+  shims by evaluating whether eager facade bootstrap can be reduced further
+  without weakening the remaining public compatibility surface

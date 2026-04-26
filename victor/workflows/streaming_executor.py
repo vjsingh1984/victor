@@ -50,6 +50,8 @@ from typing import (
     Set,
 )
 
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+from victor.workflows.context import WorkflowContext, WorkflowResult
 from victor.workflows.definition import (
     AgentNode,
     ConditionNode,
@@ -58,13 +60,7 @@ from victor.workflows.definition import (
     WorkflowDefinition,
     WorkflowNode,
 )
-from victor.workflows.executor import (
-    NodeResult,
-    ExecutorNodeStatus,
-    WorkflowContext,
-    WorkflowExecutor,
-    WorkflowResult,
-)
+from victor.workflows.executor import WorkflowExecutor
 
 # Import canonical streaming types from streaming.py (DRY - Phase 5 consolidation)
 from victor.workflows.streaming import (

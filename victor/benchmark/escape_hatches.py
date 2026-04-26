@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Literal
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import WorkflowContext
+    from victor.workflows.context import WorkflowContext
     from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
 logger = logging.getLogger(__name__)

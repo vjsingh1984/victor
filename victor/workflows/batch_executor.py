@@ -56,7 +56,8 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
+    from victor.workflows.context import WorkflowResult
+    from victor.workflows.executor import WorkflowExecutor
 
 logger = logging.getLogger(__name__)
 

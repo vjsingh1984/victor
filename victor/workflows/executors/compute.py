@@ -125,7 +125,7 @@ class ComputeNodeExecutor:
             handler = self._get_compute_handler(node.handler)
             if handler:
                 # Create minimal WorkflowContext wrapper
-                from victor.workflows.executor import WorkflowContext
+                from victor.workflows.context import WorkflowContext
 
                 context = WorkflowContext(dict(state))
                 result = await handler(node, context, tool_registry)

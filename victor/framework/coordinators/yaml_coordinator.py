@@ -303,7 +303,7 @@ class YAMLWorkflowCoordinator:
                 )
             else:
                 # Legacy path: Use old WorkflowExecutor
-                from victor.workflows.executor import WorkflowContext
+                from victor.workflows.context import WorkflowContext
 
                 # Load workflow (uses cache)
                 workflow_def = self.load_workflow(

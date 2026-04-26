@@ -18,7 +18,7 @@ from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 if TYPE_CHECKING:
     from victor.workflows.definition import ComputeNode
     from victor.tools.registry import ToolRegistry
-    from victor.workflows.executor import WorkflowContext
+    from victor.workflows.context import WorkflowContext
 
 logger = logging.getLogger(__name__)
 

@@ -150,7 +150,7 @@ def __getattr__(name: str):
         "TurnType": "victor_sdk.conversation",
         # Workflow execution
         "WorkflowExecutor": "victor.workflows.executor",
-        "WorkflowContext": "victor.workflows.executor",
+        "WorkflowContext": "victor.workflows.context",
         "NodeResult": "victor.workflows.executor",
         "ExecutorNodeStatus": "victor.workflows.executor",
         "register_compute_handler": "victor.workflows.executor",

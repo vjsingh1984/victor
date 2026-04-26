@@ -57,11 +57,140 @@ from typing import (
 from victor.core.async_utils import run_sync
 from victor.workflows.models import WorkflowExecutionContextModel
 from victor.workflows.models.adapters import WorkflowExecutionContextAdapter
-
-if TYPE_CHECKING:
-    from victor.workflows.executor import NodeResult, TemporalContext, WorkflowContext
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TemporalContext:
+    """Point-in-time context for backtesting and historical analysis."""
+
+    as_of_date: Optional[str] = None
+    lookback_periods: int = 0
+    period_type: str = "quarters"
+    include_end_date: bool = True
+
+    def get_date_range(self) -> tuple[str, str]:
+        """Calculate start and end dates based on lookback."""
+        from datetime import datetime, timedelta
+
+        if not self.as_of_date:
+            end_date = datetime.now()
+        else:
+            end_date = datetime.fromisoformat(self.as_of_date)
+
+        if self.period_type == "days":
+            delta = timedelta(days=self.lookback_periods)
+        elif self.period_type == "weeks":
+            delta = timedelta(weeks=self.lookback_periods)
+        elif self.period_type == "months":
+            delta = timedelta(days=self.lookback_periods * 30)
+        elif self.period_type == "quarters":
+            delta = timedelta(days=self.lookback_periods * 91)
+        elif self.period_type == "years":
+            delta = timedelta(days=self.lookback_periods * 365)
+        else:
+            delta = timedelta(days=0)
+
+        start_date = end_date - delta
+        return (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+
+    def is_valid_for_date(self, data_date: str) -> bool:
+        if not self.as_of_date:
+            return True
+        from datetime import datetime
+
+        data_dt = datetime.fromisoformat(data_date)
+        as_of_dt = datetime.fromisoformat(self.as_of_date)
+        if self.include_end_date:
+            return data_dt <= as_of_dt
+        return data_dt < as_of_dt
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "as_of_date": self.as_of_date,
+            "lookback_periods": self.lookback_periods,
+            "period_type": self.period_type,
+            "include_end_date": self.include_end_date,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TemporalContext":
+        return cls(
+            as_of_date=data.get("as_of_date"),
+            lookback_periods=data.get("lookback_periods", 0),
+            period_type=data.get("period_type", "quarters"),
+            include_end_date=data.get("include_end_date", True),
+        )
+
+
+@dataclass
+class WorkflowContext:
+    """Execution context for a workflow run.
+
+    Maintains shared state across workflow nodes and provides utilities
+    for accessing and updating context data.
+    """
+
+    data: Dict[str, Any] = field(default_factory=dict)
+    node_results: Dict[str, NodeResult] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    temporal: Optional[TemporalContext] = None
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.data.get(key, default)
+
+    def set(self, key: str, value: Any) -> None:
+        self.data[key] = value
+
+    def update(self, values: Dict[str, Any]) -> None:
+        self.data.update(values)
+
+    def get_result(self, node_id: str) -> Optional[NodeResult]:
+        return self.node_results.get(node_id)
+
+    def add_result(self, result: NodeResult) -> None:
+        self.node_results[result.node_id] = result
+
+    def has_failures(self) -> bool:
+        return any(r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values())
+
+    def get_outputs(self) -> Dict[str, Any]:
+        return {
+            node_id: result.output
+            for node_id, result in self.node_results.items()
+            if result.success and result.output is not None
+        }
+
+
+@dataclass
+class WorkflowResult:
+    """Result from executing a complete workflow."""
+
+    workflow_name: str
+    success: bool
+    context: WorkflowContext
+    total_duration: float = 0.0
+    total_tool_calls: int = 0
+    error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "workflow_name": self.workflow_name,
+            "success": self.success,
+            "total_duration": self.total_duration,
+            "total_tool_calls": self.total_tool_calls,
+            "error": self.error,
+            "outputs": self.context.get_outputs(),
+            "node_results": {
+                nid: r.to_dict() for nid, r in self.context.node_results.items()
+            },
+        }
+
+    def get_output(self, node_id: str) -> Optional[Any]:
+        result = self.context.get_result(node_id)
+        return result.output if result else None
 
 
 # =============================================================================
@@ -274,7 +403,7 @@ class ExecutionContextWrapper:
 # =============================================================================
 
 
-def from_workflow_context(ctx: "WorkflowContext") -> WorkflowExecutionContextModel:
+def from_workflow_context(ctx: WorkflowContext) -> WorkflowExecutionContextModel:
     """Convert legacy WorkflowContext to ExecutionContext.
 
     Args:
@@ -283,8 +412,6 @@ def from_workflow_context(ctx: "WorkflowContext") -> WorkflowExecutionContextMod
     Returns:
         WorkflowExecutionContextModel with data migrated from WorkflowContext
     """
-    from victor.workflows.executor import WorkflowContext
-
     # Convert node results to dict format
     node_results: Dict[str, Any] = {}
     for node_id, result in ctx.node_results.items():
@@ -333,7 +460,7 @@ def from_workflow_context(ctx: "WorkflowContext") -> WorkflowExecutionContextMod
     return model
 
 
-def to_workflow_context(ctx: WorkflowExecutionContextModel) -> "WorkflowContext":
+def to_workflow_context(ctx: WorkflowExecutionContextModel) -> WorkflowContext:
     """Convert ExecutionContext to legacy WorkflowContext.
 
     Args:
@@ -342,13 +469,6 @@ def to_workflow_context(ctx: WorkflowExecutionContextModel) -> "WorkflowContext"
     Returns:
         WorkflowContext dataclass for use with legacy code
     """
-    from victor.workflows.executor import (
-        WorkflowContext,
-        NodeResult,
-        ExecutorNodeStatus,
-        TemporalContext,
-    )
-
     # Convert node results from dict to NodeResult
     node_results: Dict[str, NodeResult] = {}
     for node_id, result in ctx.node_results.items():
@@ -514,6 +634,10 @@ def to_adapter_workflow_state(ctx: WorkflowExecutionContextModel) -> Dict[str, A
 # =============================================================================
 
 __all__ = [
+    # Canonical workflow runtime types
+    "TemporalContext",
+    "WorkflowContext",
+    "WorkflowResult",
     # Core type
     "ExecutionContext",
     # Factory

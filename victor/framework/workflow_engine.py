@@ -87,7 +87,8 @@ if TYPE_CHECKING:
         HITLCoordinator,
         CacheCoordinator,
     )
-    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
+    from victor.workflows.context import WorkflowResult
+    from victor.workflows.executor import WorkflowExecutor
     from victor.workflows.streaming import WorkflowStreamChunk
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.hitl import HITLHandler, HITLExecutor

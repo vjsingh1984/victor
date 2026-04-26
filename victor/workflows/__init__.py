@@ -52,7 +52,13 @@ Example (YAML):
             goal: "Analyze data patterns"
 """
 
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.base import BaseWorkflow
+from victor.workflows.context import (
+    TemporalContext,
+    WorkflowContext,
+    WorkflowResult,
+)
 from victor.workflows.definition import (
     WorkflowNodeType,
     WorkflowNode,
@@ -70,13 +76,7 @@ from victor.workflows.registry import (
     WorkflowRegistry,
     get_global_registry,
 )
-from victor.workflows.executor import (
-    ExecutorNodeStatus,
-    NodeResult,
-    WorkflowContext,
-    WorkflowResult,
-    WorkflowExecutor,
-)
+from victor.workflows.executor import WorkflowExecutor
 from victor.workflows.protocols import (
     RetryPolicy,
     IWorkflowNode,
@@ -145,12 +145,11 @@ from victor.workflows.definition import (
     ComputeOnlyConstraints,
     FullAccessConstraints,
 )
-from victor.workflows.executor import (
+from victor.workflows.compute_registry import (
     ComputeHandler,
-    TemporalContext,
-    register_compute_handler,
     get_compute_handler,
     list_compute_handlers,
+    register_compute_handler,
 )
 from victor.workflows.isolation import (
     SandboxType,

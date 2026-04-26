@@ -297,3 +297,68 @@ class TestComputeRegistryBoundary:
         source = open("victor/workflows/handlers.py").read()
         assert "from victor.workflows.compute_registry import register_compute_handler" in source
         assert "from victor.workflows.executor import register_compute_handler" not in source
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.2 boundary tests: WorkflowContext/WorkflowResult/TemporalContext migration
+# ---------------------------------------------------------------------------
+
+
+class TestWorkflowContextBoundary:
+    """Enforce that WorkflowContext/WorkflowResult/TemporalContext are canonical in context.py."""
+
+    def test_context_module_is_canonical_source(self):
+        from victor.workflows.context import WorkflowContext, WorkflowResult, TemporalContext
+        assert WorkflowContext is not None
+        assert WorkflowResult is not None
+        assert TemporalContext is not None
+
+    def test_executor_reexports_from_context(self):
+        from victor.workflows import context, executor
+        assert executor.WorkflowContext is context.WorkflowContext
+        assert executor.WorkflowResult is context.WorkflowResult
+        assert executor.TemporalContext is context.TemporalContext
+
+    def test_executor_does_not_define_workflow_context(self):
+        import ast
+        import inspect
+
+        import victor.workflows.executor as mod
+        source = inspect.getsource(mod)
+        tree = ast.parse(source)
+        defined_classes = {node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}
+        assert "WorkflowContext" not in defined_classes
+        assert "WorkflowResult" not in defined_classes
+        assert "TemporalContext" not in defined_classes
+
+    def test_temporal_context_preserves_date_range_behavior(self):
+        from victor.workflows.context import TemporalContext
+
+        temporal = TemporalContext(
+            as_of_date="2024-12-31",
+            lookback_periods=2,
+            period_type="quarters",
+        )
+
+        start_date, end_date = temporal.get_date_range()
+
+        assert end_date == "2024-12-31"
+        assert start_date < end_date
+
+    def test_context_module_exports_all_three(self):
+        from victor.workflows.context import __all__
+        assert "WorkflowContext" in __all__
+        assert "WorkflowResult" in __all__
+        assert "TemporalContext" in __all__
+
+    def test_from_workflow_context_no_executor_import(self):
+        import inspect
+        from victor.workflows import context
+        source = inspect.getsource(context.from_workflow_context)
+        assert "from victor.workflows.executor import" not in source
+
+    def test_to_workflow_context_no_executor_import(self):
+        import inspect
+        from victor.workflows import context
+        source = inspect.getsource(context.to_workflow_context)
+        assert "from victor.workflows.executor import" not in source
