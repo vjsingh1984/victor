@@ -644,6 +644,7 @@ def _show_prompt_rollout_results(experiment_id: str) -> None:
         f"[{result.confidence_interval[0]:.4f}, {result.confidence_interval[1]:.4f}]"
     )
     click.echo(f"  Recommendation: {result.recommendation}")
+    click.echo(f"  Auto-apply action: {_get_prompt_rollout_auto_action(result) or 'none'}")
     click.echo(
         "  Control: "
         f"samples={control.get('samples', 0)} "
@@ -681,6 +682,18 @@ def _apply_prompt_rollout_decision(experiment_id: str, action: str) -> None:
     click.echo(success_message)
 
 
+def _get_prompt_rollout_auto_action(result: object) -> Optional[str]:
+    recommendation = getattr(result, "recommendation", "")
+    is_significant = bool(getattr(result, "is_significant", False))
+    treatment_better = bool(getattr(result, "treatment_better", False))
+
+    if recommendation.startswith("Roll out treatment") and is_significant and treatment_better:
+        return "rollout"
+    if recommendation.startswith("Keep control") and is_significant and not treatment_better:
+        return "rollback"
+    return None
+
+
 def _auto_apply_prompt_rollout_decision(experiment_id: str) -> None:
     if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
         click.echo(f"Experiment is not a prompt rollout: {experiment_id}", err=True)
@@ -692,15 +705,15 @@ def _auto_apply_prompt_rollout_decision(experiment_id: str) -> None:
         click.echo(f"Prompt rollout analysis unavailable: {experiment_id}", err=True)
         return
 
-    recommendation = result.recommendation
-    if recommendation.startswith("Roll out treatment") and result.is_significant and result.treatment_better:
+    action = _get_prompt_rollout_auto_action(result)
+    if action == "rollout":
         updated = coordinator.rollout_treatment(experiment_id)
         success_message = f"Prompt rollout auto-applied: rolled out treatment for {experiment_id}"
-    elif recommendation.startswith("Keep control") and result.is_significant and not result.treatment_better:
+    elif action == "rollback":
         updated = coordinator.rollback_experiment(experiment_id)
         success_message = f"Prompt rollout auto-applied: kept control for {experiment_id}"
     else:
-        click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {recommendation}")
+        click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}")
         return
 
     if not updated:

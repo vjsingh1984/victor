@@ -709,6 +709,7 @@ class TestOptimizationSyncBridge:
         mock_echo.assert_any_call(
             "  Recommendation: Roll out treatment - significant improvement detected"
         )
+        mock_echo.assert_any_call("  Auto-apply action: rollout")
         mock_echo.assert_any_call(
             "  Control: samples=24 success_rate=75.0% avg_quality=0.810"
         )
@@ -1001,6 +1002,33 @@ class TestOptimizationSyncBridge:
             "prompt_optimizer_grounding_rules_anthropic_candidate123",
             err=True,
         )
+
+    def test_get_prompt_rollout_auto_action_returns_rollout(self) -> None:
+        result = SimpleNamespace(
+            is_significant=True,
+            treatment_better=True,
+            recommendation="Roll out treatment - significant improvement detected",
+        )
+
+        assert optimization_cmd._get_prompt_rollout_auto_action(result) == "rollout"
+
+    def test_get_prompt_rollout_auto_action_returns_rollback(self) -> None:
+        result = SimpleNamespace(
+            is_significant=True,
+            treatment_better=False,
+            recommendation="Keep control - treatment performed worse",
+        )
+
+        assert optimization_cmd._get_prompt_rollout_auto_action(result) == "rollback"
+
+    def test_get_prompt_rollout_auto_action_returns_none_for_non_actionable_result(self) -> None:
+        result = SimpleNamespace(
+            is_significant=False,
+            treatment_better=True,
+            recommendation="Continue experiment - results not yet significant",
+        )
+
+        assert optimization_cmd._get_prompt_rollout_auto_action(result) is None
 
     def test_prompt_rollout_rejects_invalid_traffic_split_before_bridge(self) -> None:
         with (
