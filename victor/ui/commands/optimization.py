@@ -310,9 +310,19 @@ def prompt_rollout_auto_apply(experiment_id: str, dry_run: bool) -> None:
     is_flag=True,
     help="Preview all eligible auto-apply actions without changing experiment state.",
 )
-def prompt_rollout_auto_apply_all(status_filter: Optional[str], dry_run: bool) -> None:
+@click.option(
+    "--action-filter",
+    type=click.Choice(["rollout", "rollback"]),
+    default=None,
+    help="Only auto-apply one decision type across the selected prompt rollouts.",
+)
+def prompt_rollout_auto_apply_all(
+    status_filter: Optional[str],
+    dry_run: bool,
+    action_filter: Optional[str],
+) -> None:
     """Apply eligible rollout decisions across prompt rollout experiments."""
-    _auto_apply_all_prompt_rollouts(status_filter, dry_run)
+    _auto_apply_all_prompt_rollouts(status_filter, dry_run, action_filter)
 
 
 async def _profile_async(
@@ -763,7 +773,11 @@ def _auto_apply_prompt_rollout_decision(experiment_id: str, dry_run: bool = Fals
     click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False))
 
 
-def _auto_apply_all_prompt_rollouts(status_filter: Optional[str], dry_run: bool = False) -> None:
+def _auto_apply_all_prompt_rollouts(
+    status_filter: Optional[str],
+    dry_run: bool = False,
+    action_filter: Optional[str] = None,
+) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
     for experiment in coordinator.list_experiments():
@@ -798,6 +812,13 @@ def _auto_apply_all_prompt_rollouts(status_filter: Optional[str], dry_run: bool 
         action = _get_prompt_rollout_auto_action(result)
         if action is None:
             click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {result.recommendation}")
+            skipped += 1
+            continue
+        if action_filter and action != action_filter:
+            click.echo(
+                f"Prompt rollout auto-apply skipped for {experiment_id}: "
+                f"filtered out by action={action_filter}"
+            )
             skipped += 1
             continue
 
