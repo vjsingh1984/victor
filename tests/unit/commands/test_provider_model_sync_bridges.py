@@ -276,6 +276,7 @@ class TestOptimizationSyncBridge:
         assert "prompt-rollout" in optimization_cmd.opt.commands
         assert "prompt-rollouts" in optimization_cmd.opt.commands
         assert "prompt-rollout-status" in optimization_cmd.opt.commands
+        assert "prompt-rollout-results" in optimization_cmd.opt.commands
 
     def test_profile_uses_shared_sync_bridge(self) -> None:
         coro = object()
@@ -390,6 +391,16 @@ class TestOptimizationSyncBridge:
             )
 
         mock_status.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+
+    def test_prompt_rollout_results_uses_results_helper(self) -> None:
+        with patch.object(optimization_cmd, "_show_prompt_rollout_results") as mock_results:
+            optimization_cmd.prompt_rollout_results.callback(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        mock_results.assert_called_once_with(
             "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
 
@@ -618,6 +629,96 @@ class TestOptimizationSyncBridge:
 
         mock_echo.assert_called_once_with(
             "Prompt rollout experiment not found: "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            err=True,
+        )
+
+    def test_show_prompt_rollout_results_displays_analysis(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = SimpleNamespace(
+            experiment_id="prompt_optimizer_grounding_rules_anthropic_candidate123",
+            is_significant=True,
+            treatment_better=True,
+            effect_size=0.12,
+            p_value=0.03,
+            confidence_interval=(0.02, 0.18),
+            recommendation="Roll out treatment - significant improvement detected",
+            details={
+                "control": {
+                    "samples": 24,
+                    "success_rate": 0.75,
+                    "avg_quality": 0.81,
+                },
+                "treatment": {
+                    "samples": 25,
+                    "success_rate": 0.84,
+                    "avg_quality": 0.88,
+                },
+                "z_score": 2.1,
+            },
+        )
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._show_prompt_rollout_results(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        coordinator.analyze_experiment.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_any_call(
+            "Prompt rollout analysis: "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_any_call("  Significant: yes")
+        mock_echo.assert_any_call("  Treatment better: yes")
+        mock_echo.assert_any_call("  Effect size: 12.0%")
+        mock_echo.assert_any_call("  P-value: 0.0300")
+        mock_echo.assert_any_call("  Confidence interval: [0.0200, 0.1800]")
+        mock_echo.assert_any_call(
+            "  Recommendation: Roll out treatment - significant improvement detected"
+        )
+        mock_echo.assert_any_call(
+            "  Control: samples=24 success_rate=75.0% avg_quality=0.810"
+        )
+        mock_echo.assert_any_call(
+            "  Treatment: samples=25 success_rate=84.0% avg_quality=0.880"
+        )
+
+    def test_show_prompt_rollout_results_rejects_non_prompt_rollout_id(self) -> None:
+        with patch.object(optimization_cmd.click, "echo") as mock_echo:
+            optimization_cmd._show_prompt_rollout_results("other_experiment")
+
+        mock_echo.assert_called_once_with(
+            "Experiment is not a prompt rollout: other_experiment",
+            err=True,
+        )
+
+    def test_show_prompt_rollout_results_reports_missing_analysis(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = None
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._show_prompt_rollout_results(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        mock_echo.assert_called_once_with(
+            "Prompt rollout analysis unavailable: "
             "prompt_optimizer_grounding_rules_anthropic_candidate123",
             err=True,
         )

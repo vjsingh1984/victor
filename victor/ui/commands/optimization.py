@@ -271,6 +271,13 @@ def prompt_rollout_status(experiment_id: str) -> None:
     _show_prompt_rollout_status(experiment_id)
 
 
+@opt.command("prompt-rollout-results")
+@click.argument("experiment_id")
+def prompt_rollout_results(experiment_id: str) -> None:
+    """Show analysis results for a specific prompt rollout experiment."""
+    _show_prompt_rollout_results(experiment_id)
+
+
 async def _profile_async(
     workflow_id: str,
     min_executions: int,
@@ -595,6 +602,44 @@ def _show_prompt_rollout_status(experiment_id: str) -> None:
         "  Treatment: "
         f"{treatment.get('name', '-')} samples={treatment.get('samples', 0)} "
         f"success_rate={treatment.get('success_rate', 0.0):.1%}"
+    )
+
+
+def _show_prompt_rollout_results(experiment_id: str) -> None:
+    if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
+        click.echo(f"Experiment is not a prompt rollout: {experiment_id}", err=True)
+        return
+
+    coordinator = get_experiment_coordinator()
+    result = coordinator.analyze_experiment(experiment_id)
+    if result is None:
+        click.echo(f"Prompt rollout analysis unavailable: {experiment_id}", err=True)
+        return
+
+    control = result.details.get("control", {})
+    treatment = result.details.get("treatment", {})
+
+    click.echo(f"Prompt rollout analysis: {experiment_id}")
+    click.echo(f"  Significant: {'yes' if result.is_significant else 'no'}")
+    click.echo(f"  Treatment better: {'yes' if result.treatment_better else 'no'}")
+    click.echo(f"  Effect size: {result.effect_size:.1%}")
+    click.echo(f"  P-value: {result.p_value:.4f}")
+    click.echo(
+        "  Confidence interval: "
+        f"[{result.confidence_interval[0]:.4f}, {result.confidence_interval[1]:.4f}]"
+    )
+    click.echo(f"  Recommendation: {result.recommendation}")
+    click.echo(
+        "  Control: "
+        f"samples={control.get('samples', 0)} "
+        f"success_rate={control.get('success_rate', 0.0):.1%} "
+        f"avg_quality={control.get('avg_quality', 0.0):.3f}"
+    )
+    click.echo(
+        "  Treatment: "
+        f"samples={treatment.get('samples', 0)} "
+        f"success_rate={treatment.get('success_rate', 0.0):.1%} "
+        f"avg_quality={treatment.get('avg_quality', 0.0):.3f}"
     )
 
 
