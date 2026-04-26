@@ -96,11 +96,6 @@ if TYPE_CHECKING:
     from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.graph_dsl import WorkflowGraph
     from victor.workflows.node_runners import NodeRunnerRegistry
-    from victor.workflows.graph_compiler import (
-        WorkflowGraphCompiler,
-        WorkflowDefinitionCompiler,
-        CompilerConfig,
-    )
     from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 logger = logging.getLogger(__name__)
@@ -279,10 +274,6 @@ class WorkflowEngine:
         self._executor: Optional["WorkflowExecutor"] = None
         self._streaming_executor: Optional["StreamingWorkflowExecutor"] = None
         self._hitl_executor: Optional["HITLExecutor"] = None
-
-        # Lazy-loaded compilers
-        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
-        self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
 
         # Lazy-loaded unified compiler for consistent compilation and caching
         self._unified_compiler: Optional["UnifiedWorkflowCompiler"] = None
@@ -616,9 +607,6 @@ class WorkflowEngine:
             registry: NodeRunnerRegistry with configured runners.
         """
         self._runner_registry = registry
-        # Reset compilers to use new registry
-        self._graph_compiler = None
-        self._definition_compiler = None
         # Reset unified compiler to use new registry
         if self._unified_compiler is not None:
             self._unified_compiler.set_runner_registry(registry)

@@ -132,8 +132,21 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - workflow package exports now source those types from the canonical module
   - boundary and workflow regression tests enforce the canonical import paths
 
+- Phase 3.3 workflow graph-compiler caller migration:
+  - `victor.framework.coordinators.graph_coordinator` now compiles
+    `WorkflowGraph` and `WorkflowDefinition` execution through the canonical
+    `UnifiedWorkflowCompiler` path instead of importing legacy
+    `victor.workflows.graph_compiler` execution-time entrypoints directly
+  - `GraphTurnExecutor` now caches canonical unified compiler instances keyed
+    by node-runner usage, preserving the `use_node_runners` execution contract
+    without reviving direct legacy compiler ownership
+  - `victor.framework.workflow_engine` no longer carries dead legacy
+    `WorkflowGraphCompiler` / `WorkflowDefinitionCompiler` state and type
+    imports; the workflow engine now treats `UnifiedWorkflowCompiler` as the
+    only compiler boundary it owns directly
+
 Next resume point:
-- Phase 2 facade/bootstrap compatibility cleanup is in a good stop state.
-- Continue Phase 3 by migrating internal workflow compiler consumers off
-  `victor.workflows.graph_compiler` and onto the compiler boundary / unified
-  compiler entrypoints.
+- Continue Phase 3 by migrating remaining internal
+  `victor.workflows.yaml_to_graph_compiler` callers onto compiler boundary /
+  unified compiler entrypoints, starting with framework and UI command
+  call sites rather than public compatibility exports.
