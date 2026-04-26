@@ -1405,8 +1405,10 @@ class AgenticLoop:
             response_text = turn.content.strip()
             had_prior_tool_usage = getattr(self.spin_detector, "total_tool_calls", 0) > 0
             is_substantial_answer = len(response_text) > 100
-            if not turn.has_tool_calls and turn.has_content and (
-                had_prior_tool_usage or is_substantial_answer
+            if (
+                not turn.has_tool_calls
+                and turn.has_content
+                and (had_prior_tool_usage or is_substantial_answer)
             ):
                 # Model provided a substantial response without requesting tools
                 # This is likely a complete answer
