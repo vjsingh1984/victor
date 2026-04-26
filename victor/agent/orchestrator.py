@@ -5173,7 +5173,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         try:
             provider_service = getattr(self, "_provider_service", None)
             if provider_service is None:
-                logger.error("Provider switch failed: canonical provider service is not initialized")
+                logger.error(
+                    "Provider switch failed: canonical provider service is not initialized"
+                )
                 return False
 
             await provider_service.switch_provider(provider_name, model)

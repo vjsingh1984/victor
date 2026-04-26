@@ -69,7 +69,9 @@ def test_resolve_validated_session_truth_service_delegates_to_factory(monkeypatc
         captured["emitters"] = emitters
         return stub_service
 
-    monkeypatch.setattr("victor.evaluation.services.create_validated_session_truth_service", fake_factory)
+    monkeypatch.setattr(
+        "victor.evaluation.services.create_validated_session_truth_service", fake_factory
+    )
     registry = ValidatedSessionTruthEmitterRegistry()
 
     resolved = resolve_validated_session_truth_service(emitters=registry)
@@ -113,8 +115,12 @@ def test_materialize_validated_session_truth_service_composes_parser_and_resolve
         captured["emitters"] = emitters
         return stub_service
 
-    monkeypatch.setattr("victor.evaluation.services.parse_validated_session_truth_legacy_kwargs", fake_parse)
-    monkeypatch.setattr("victor.evaluation.services.resolve_validated_session_truth_service", fake_resolve)
+    monkeypatch.setattr(
+        "victor.evaluation.services.parse_validated_session_truth_legacy_kwargs", fake_parse
+    )
+    monkeypatch.setattr(
+        "victor.evaluation.services.resolve_validated_session_truth_service", fake_resolve
+    )
 
     resolved = materialize_validated_session_truth_service(
         service="explicit-service",
