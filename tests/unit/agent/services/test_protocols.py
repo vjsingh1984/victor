@@ -190,6 +190,56 @@ class TestProtocolDefinitions:
 class TestProtocolImplementation:
     """Test that protocols can be implemented by concrete classes."""
 
+    def test_rl_runtime_protocol_requires_prompt_rollout_methods(self):
+        """RL runtime protocol should require prompt rollout support."""
+
+        class LegacyOnlyRLRuntime:
+            def record_outcome(self, learner_name: str, outcome, vertical: str = "coding") -> None:
+                return None
+
+            def get_recommendation(
+                self,
+                learner_name: str,
+                provider: str,
+                model: str,
+                task_type: str,
+            ):
+                return None
+
+            def export_metrics(self):
+                return {}
+
+            def close(self) -> None:
+                return None
+
+        class RolloutCapableRLRuntime(LegacyOnlyRLRuntime):
+            def create_prompt_rollout_experiment(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                control_hash: str | None = None,
+                traffic_split: float = 0.1,
+                min_samples_per_variant: int = 50,
+            ):
+                return "prompt_exp_123"
+
+            async def create_prompt_rollout_experiment_async(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                control_hash: str | None = None,
+                traffic_split: float = 0.1,
+                min_samples_per_variant: int = 50,
+            ):
+                return "prompt_exp_123"
+
+        assert not isinstance(LegacyOnlyRLRuntime(), RLLearningRuntimeProtocol)
+        assert isinstance(RolloutCapableRLRuntime(), RLLearningRuntimeProtocol)
+
     def test_chat_service_protocol_implementation(self):
         """Test that a class can implement ChatServiceProtocol."""
 

@@ -379,7 +379,8 @@ class ReminderManagerProtocol(Protocol):
 class RLCoordinatorProtocol(Protocol):
     """Protocol for reinforcement learning coordinator.
 
-    Manages all RL learners with unified SQLite storage.
+    Manages all RL learners with unified SQLite storage, including
+    benchmark-gated prompt rollout experiments.
     """
 
     def record_outcome(
@@ -403,6 +404,32 @@ class RLCoordinatorProtocol(Protocol):
 
     def export_metrics(self) -> Dict[str, Any]:
         """Export all learned values and metrics for monitoring."""
+        ...
+
+    def create_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 50,
+    ) -> Optional[str]:
+        """Create a prompt rollout experiment for an approved prompt candidate."""
+        ...
+
+    async def create_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 50,
+    ) -> Optional[str]:
+        """Async version of create_prompt_rollout_experiment."""
         ...
 
     def close(self) -> None:
