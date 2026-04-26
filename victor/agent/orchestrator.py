@@ -480,10 +480,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             get_provider_service=lambda: getattr(self, "_provider_service", None),
         )
 
-        # [LEGACY] Keep coordinator for compatibility while deferring heavy init.
-        self._provider_coordinator = self._provider_runtime.provider_coordinator
-        self._provider_switch_coordinator = self._provider_runtime.provider_switch_coordinator
-
     def _initialize_memory_runtime(self) -> None:
         """Initialize memory/session runtime boundaries with canonical service."""
         from victor.agent.runtime.memory_runtime import create_memory_runtime_components

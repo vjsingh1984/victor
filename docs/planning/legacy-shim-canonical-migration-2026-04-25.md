@@ -135,6 +135,18 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - `OrchestratorProtocolAdapter` now surfaces the canonical provider service
     for the chat shim path, and the deprecated chat coordinator tests/mocks no
     longer depend on a legacy provider coordinator field
+- Phase 2.12 provider compatibility-slot derivation:
+  - `AgentOrchestrator._provider_coordinator` and
+    `AgentOrchestrator._provider_switch_coordinator` are now deprecated
+    compatibility properties derived from `provider_runtime` instead of
+    concrete orchestrator attributes
+  - `_initialize_provider_runtime()` no longer stores duplicate coordinator
+    compatibility state on the orchestrator instance; explicit overrides now
+    go through `_deprecated_provider_coordinator` and
+    `_deprecated_provider_switch_coordinator`
+  - provider compatibility tests now seed the explicit deprecated backing
+    slots directly, keeping the deprecation path intentional and reducing
+    warning noise in regression runs
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -282,8 +294,8 @@ Next resume point:
   surface (`victor/workflows/__init__.py`, integration coverage, and the
   legacy executor module itself).
 - The next active compatibility seam is provider runtime exposure through
-  `_provider_coordinator` / `_provider_switch_coordinator` compatibility slots
-  and deprecated provider-runtime construction. If continued, the next step is
-  to isolate those slots behind explicit compatibility adapters or public-only
-  exports, while keeping canonical runtime code on provider-service and
-  provider-runtime handles.
+  deprecated provider-runtime construction and public provider shim exports.
+  If continued, the next step is to isolate lazy coordinator construction
+  behind explicit provider compatibility adapters/factories so canonical
+  runtime code depends only on `provider_runtime` and `ProviderService`, with
+  root provider coordinator modules left as public-only compatibility exports.

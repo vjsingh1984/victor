@@ -249,7 +249,7 @@ class TestChatServiceBootstrapLaziness:
         obj._container.is_registered.return_value = True
         obj._conversation_controller = MagicMock()
         obj._streaming_controller = MagicMock()
-        obj._provider_coordinator = MagicMock()
+        obj._deprecated_provider_coordinator = MagicMock()
         obj._recovery_coordinator = MagicMock()
         obj._recovery_handler = MagicMock()
         obj._recovery_integration = MagicMock()
@@ -371,7 +371,7 @@ class TestChatServiceBootstrapLaziness:
         obj._container.is_registered.return_value = True
         obj._conversation_controller = MagicMock()
         obj._streaming_controller = MagicMock()
-        obj._provider_coordinator = MagicMock()
+        obj._deprecated_provider_coordinator = MagicMock()
         obj._recovery_coordinator = MagicMock()
         obj._recovery_handler = MagicMock()
         obj._recovery_integration = MagicMock()
@@ -482,7 +482,7 @@ class TestChatServiceBootstrapLaziness:
         obj._container.is_registered.return_value = True
         obj._conversation_controller = MagicMock()
         obj._streaming_controller = MagicMock()
-        obj._provider_coordinator = MagicMock()
+        obj._deprecated_provider_coordinator = MagicMock()
         obj._recovery_coordinator = MagicMock()
         obj._recovery_handler = MagicMock()
         obj._recovery_integration = MagicMock()

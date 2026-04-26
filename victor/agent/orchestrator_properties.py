@@ -477,6 +477,64 @@ def _cumulative_token_usage_set(self: "AgentOrchestrator", value: dict) -> None:
 # =====================================================================
 
 
+def _get_provider_runtime_component(
+    self: "AgentOrchestrator", component_name: str
+) -> Optional[Any]:
+    """Resolve a provider compatibility component from provider_runtime."""
+    runtime = getattr(self, "_provider_runtime", None)
+    if runtime is None:
+        return None
+    return getattr(runtime, component_name, None)
+
+
+def _provider_coordinator_get(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated ProviderCoordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator._provider_coordinator is deprecated compatibility surface. "
+        "Use AgentOrchestrator._provider_runtime.provider_coordinator or ProviderService instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    override = getattr(self, "_deprecated_provider_coordinator", None)
+    if override is not None:
+        return override
+    return _get_provider_runtime_component(self, "provider_coordinator")
+
+
+def _provider_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
+    warnings.warn(
+        "AgentOrchestrator._provider_coordinator is deprecated compatibility surface. "
+        "Store explicit compatibility overrides on _deprecated_provider_coordinator instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    self._deprecated_provider_coordinator = value
+
+
+def _provider_switch_coordinator_get(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated ProviderSwitchCoordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator._provider_switch_coordinator is deprecated compatibility surface. "
+        "Use AgentOrchestrator._provider_runtime.provider_switch_coordinator instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    override = getattr(self, "_deprecated_provider_switch_coordinator", None)
+    if override is not None:
+        return override
+    return _get_provider_runtime_component(self, "provider_switch_coordinator")
+
+
+def _provider_switch_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
+    warnings.warn(
+        "AgentOrchestrator._provider_switch_coordinator is deprecated compatibility surface. "
+        "Store explicit compatibility overrides on _deprecated_provider_switch_coordinator instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    self._deprecated_provider_switch_coordinator = value
+
+
 def _tool_coordinator_get(self: "AgentOrchestrator") -> Any:
     """Get the deprecated ToolCoordinator compatibility shim."""
     warnings.warn(
@@ -633,6 +691,11 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "_cumulative_token_usage": (
         _cumulative_token_usage_get,
         _cumulative_token_usage_set,
+    ),
+    "_provider_coordinator": (_provider_coordinator_get, _provider_coordinator_set),
+    "_provider_switch_coordinator": (
+        _provider_switch_coordinator_get,
+        _provider_switch_coordinator_set,
     ),
     "_chat_coordinator": (_chat_coordinator_get, _chat_coordinator_set),
     "_session_coordinator": (_session_coordinator_get, _session_coordinator_set),

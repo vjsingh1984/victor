@@ -172,6 +172,93 @@ class TestOrchestratorPropertyInstallation:
 
         assert orchestrator._deprecated_session_coordinator is shim
 
+    def test_provider_coordinator_alias_warns_and_derives_from_provider_runtime(self):
+        """The legacy _provider_coordinator alias should warn and derive from provider_runtime."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="provider_shim")
+        orchestrator._provider_runtime = SimpleNamespace(provider_coordinator=shim)
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._provider_coordinator is deprecated compatibility surface",
+        ):
+            result = orchestrator._provider_coordinator
+
+        assert result is shim
+
+    def test_provider_coordinator_alias_setter_warns_and_overrides_runtime(self):
+        """The legacy _provider_coordinator setter should warn and update the override slot."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        orchestrator._provider_runtime = SimpleNamespace(
+            provider_coordinator=MagicMock(name="runtime_provider_shim")
+        )
+        shim = MagicMock(name="provider_shim")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._provider_coordinator is deprecated compatibility surface",
+        ):
+            orchestrator._provider_coordinator = shim
+
+        assert orchestrator._deprecated_provider_coordinator is shim
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._provider_coordinator is deprecated compatibility surface",
+        ):
+            assert orchestrator._provider_coordinator is shim
+
+    def test_provider_switch_coordinator_alias_warns_and_derives_from_provider_runtime(self):
+        """The legacy _provider_switch_coordinator alias should derive from provider_runtime."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="provider_switch_shim")
+        orchestrator._provider_runtime = SimpleNamespace(provider_switch_coordinator=shim)
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator._provider_switch_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            result = orchestrator._provider_switch_coordinator
+
+        assert result is shim
+
+    def test_provider_switch_coordinator_alias_setter_warns_and_overrides_runtime(self):
+        """The legacy _provider_switch_coordinator setter should warn and update the override slot."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        orchestrator._provider_runtime = SimpleNamespace(
+            provider_switch_coordinator=MagicMock(name="runtime_provider_switch_shim")
+        )
+        shim = MagicMock(name="provider_switch_shim")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator._provider_switch_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            orchestrator._provider_switch_coordinator = shim
+
+        assert orchestrator._deprecated_provider_switch_coordinator is shim
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator._provider_switch_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            assert orchestrator._provider_switch_coordinator is shim
+
     def test_specialized_chat_coordinators_use_deprecated_backing_slots(self):
         """Lazy chat coordinator properties should store instances in deprecated slots."""
         from victor.agent.orchestrator import AgentOrchestrator

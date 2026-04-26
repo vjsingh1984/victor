@@ -2258,8 +2258,8 @@ class TestSwitchProvider:
             model_name="gpt-4.1",
         )
         orchestrator._provider_service = provider_service
-        orchestrator._provider_coordinator = MagicMock()
-        orchestrator._provider_coordinator.switch_provider_async = AsyncMock(
+        orchestrator._deprecated_provider_coordinator = MagicMock()
+        orchestrator._deprecated_provider_coordinator.switch_provider_async = AsyncMock(
             side_effect=AssertionError("legacy coordinator path should not be used")
         )
 
@@ -2267,7 +2267,7 @@ class TestSwitchProvider:
 
         assert result is True
         provider_service.switch_provider.assert_awaited_once_with("openai", "gpt-4.1")
-        orchestrator._provider_coordinator.switch_provider_async.assert_not_called()
+        orchestrator._deprecated_provider_coordinator.switch_provider_async.assert_not_called()
 
 
 class TestSwitchModel:
@@ -2304,8 +2304,8 @@ class TestSwitchModel:
             model_name="claude-3-7-sonnet",
         )
         orchestrator._provider_service = provider_service
-        orchestrator._provider_coordinator = MagicMock()
-        orchestrator._provider_coordinator.switch_model_async = AsyncMock(
+        orchestrator._deprecated_provider_coordinator = MagicMock()
+        orchestrator._deprecated_provider_coordinator.switch_model_async = AsyncMock(
             side_effect=AssertionError("legacy coordinator path should not be used")
         )
 
@@ -2313,7 +2313,7 @@ class TestSwitchModel:
 
         assert result is True
         provider_service.switch_model.assert_awaited_once_with("claude-3-7-sonnet")
-        orchestrator._provider_coordinator.switch_model_async.assert_not_called()
+        orchestrator._deprecated_provider_coordinator.switch_model_async.assert_not_called()
 
 
 class TestIntelligentIntegration:
@@ -2526,9 +2526,11 @@ class TestGetCurrentProviderInfo:
 
     def test_uses_provider_service_rate_limit_stats_only(self, orchestrator):
         """Canonical provider info should not consult the deprecated coordinator."""
-        orchestrator._provider_coordinator = MagicMock()
-        orchestrator._provider_coordinator.get_rate_limit_stats.side_effect = AssertionError(
+        orchestrator._deprecated_provider_coordinator = MagicMock()
+        orchestrator._deprecated_provider_coordinator.get_rate_limit_stats.side_effect = (
+            AssertionError(
             "legacy coordinator stats path should not be used"
+            )
         )
         orchestrator._provider_service.get_rate_limit_stats.return_value = {
             "rate_limits_hit": 7,
@@ -2537,7 +2539,7 @@ class TestGetCurrentProviderInfo:
         info = orchestrator.get_current_provider_info()
 
         assert info["rate_limits_hit"] == 7
-        orchestrator._provider_coordinator.get_rate_limit_stats.assert_not_called()
+        orchestrator._deprecated_provider_coordinator.get_rate_limit_stats.assert_not_called()
 
 
 class TestClassifyTaskKeywords:
@@ -4450,8 +4452,8 @@ class TestHealthMonitoring:
         """Canonical health monitoring should not fall back to the legacy coordinator."""
         orchestrator._provider_service = MagicMock()
         orchestrator._provider_service.start_health_monitoring = AsyncMock()
-        orchestrator._provider_coordinator = MagicMock()
-        orchestrator._provider_coordinator.start_health_monitoring = AsyncMock(
+        orchestrator._deprecated_provider_coordinator = MagicMock()
+        orchestrator._deprecated_provider_coordinator.start_health_monitoring = AsyncMock(
             side_effect=AssertionError("legacy coordinator path should not be used")
         )
 
@@ -4459,15 +4461,15 @@ class TestHealthMonitoring:
 
         assert result is True
         orchestrator._provider_service.start_health_monitoring.assert_awaited_once_with()
-        orchestrator._provider_coordinator.start_health_monitoring.assert_not_called()
+        orchestrator._deprecated_provider_coordinator.start_health_monitoring.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_stop_health_monitoring_uses_provider_service_only(self, orchestrator):
         """Canonical health monitoring shutdown should not fall back to the legacy coordinator."""
         orchestrator._provider_service = MagicMock()
         orchestrator._provider_service.stop_health_monitoring = AsyncMock()
-        orchestrator._provider_coordinator = MagicMock()
-        orchestrator._provider_coordinator.stop_health_monitoring = AsyncMock(
+        orchestrator._deprecated_provider_coordinator = MagicMock()
+        orchestrator._deprecated_provider_coordinator.stop_health_monitoring = AsyncMock(
             side_effect=AssertionError("legacy coordinator path should not be used")
         )
 
@@ -4475,7 +4477,7 @@ class TestHealthMonitoring:
 
         assert result is True
         orchestrator._provider_service.stop_health_monitoring.assert_awaited_once_with()
-        orchestrator._provider_coordinator.stop_health_monitoring.assert_not_called()
+        orchestrator._deprecated_provider_coordinator.stop_health_monitoring.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_start_health_monitoring_returns_false_without_provider_service(self, orchestrator):
