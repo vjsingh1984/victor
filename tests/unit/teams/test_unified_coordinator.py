@@ -27,7 +27,7 @@ from victor.teams import (
     UnifiedTeamCoordinator,
     create_coordinator,
 )
-from victor.teams.protocols import ITeamMember
+from victor.protocols.team import ITeamMember
 
 
 class MockTeamMember:

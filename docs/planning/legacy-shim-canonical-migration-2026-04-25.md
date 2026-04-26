@@ -168,7 +168,7 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 - Phase 3.6 chat workflow-mode compile-only canonicalization:
   - `victor.ui.commands.chat.run_workflow_mode` now validates already-loaded
     `WorkflowDefinition` objects through a canonical `UnifiedWorkflowCompiler`
-  helper instead of instantiating `YAMLToStateGraphCompiler` directly
+    helper instead of instantiating `YAMLToStateGraphCompiler` directly
   - focused async chat workflow-mode tests now pin the canonical helper path
     and failure behavior for validation-only runs
 
@@ -184,8 +184,15 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
     seam so future internal callers cannot regress back to direct legacy
     backend ownership
 
+- Phase 4.1 canonical team protocol import cleanup:
+  - internal tests now import `ITeamMember` from `victor.protocols.team`
+    instead of the compatibility shim in `victor.teams.protocols`
+  - architecture boundary tests now scan the `tests/` tree as well, so new
+    test code cannot regress back to the deprecated team protocol shim
+  - the team consolidation guide now points its canonical import example at
+    `victor.protocols.team`
+
 Next resume point:
-- Continue Phase 3 by migrating remaining internal
-  legacy workflow compiler consumers and reducing any remaining internal
-  direct ownership of compatibility-layer backend objects, while leaving
-  public compatibility exports and explicit legacy adapters intact.
+- Continue Phase 4 by codifying the same "canonical import only" rule for
+  `victor.core.types`, which is already unused internally but not yet guarded
+  by architecture tests.

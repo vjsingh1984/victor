@@ -240,6 +240,36 @@ class TestCanonicalProtocolImports:
         if errors:
             pytest.fail("\n".join(errors))
 
+    def test_no_test_imports_from_teams_protocols(self) -> None:
+        """Tests should also import team protocols from the canonical module."""
+        tests_path = Path("tests")
+        if not tests_path.exists():
+            pytest.skip("tests directory not found")
+
+        py_files = [f for f in tests_path.rglob("*.py") if "__pycache__" not in str(f)]
+
+        errors = []
+        for py_file in py_files:
+            # Allow this boundary test module to inspect the compatibility shim.
+            if py_file.as_posix().endswith("tests/unit/architecture/test_import_boundaries.py"):
+                continue
+
+            content = py_file.read_text()
+            if "from victor.teams.protocols import" in content:
+                lines = content.split("\n")
+                for i, line in enumerate(lines, 1):
+                    if "from victor.teams.protocols import" in line and not line.strip().startswith(
+                        "#"
+                    ):
+                        errors.append(
+                            f"{py_file.relative_to(tests_path)}:{i} "
+                            "imports from victor.teams.protocols, should use "
+                            "victor.protocols.team (canonical location)"
+                        )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
 
 class TestNoCircularImports:
     """Verify there are no circular import chains.
