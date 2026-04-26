@@ -54,29 +54,29 @@ def test_lazy_runtime_proxy_setattr_delegates_to_instance():
 
 
 def test_create_provider_runtime_components_provider_coordinator_lazy():
-    factory = MagicMock()
     manager = MagicMock()
     manager._provider_switcher = object()
     manager._health_monitor = object()
     settings = SimpleNamespace(max_rate_limit_retries=7, provider_health_checks=False)
 
-    runtime = create_provider_runtime_components(
-        factory=factory,
-        settings=settings,
-        provider_manager=manager,
-    )
-
-    assert runtime.provider_coordinator.initialized is False
-
     coordinator_instance = MagicMock()
-    factory.create_deprecated_provider_coordinator.return_value = coordinator_instance
+    with patch(
+        "victor.agent.provider.coordinator.create_provider_coordinator",
+        return_value=coordinator_instance,
+    ) as create_provider_coordinator:
+        runtime = create_provider_runtime_components(
+            settings=settings,
+            provider_manager=manager,
+        )
 
-    resolved = runtime.provider_coordinator.get_instance()
-    assert resolved is coordinator_instance
-    assert runtime.provider_coordinator.initialized is True
+        assert runtime.provider_coordinator.initialized is False
 
-    factory.create_deprecated_provider_coordinator.assert_called_once()
-    kwargs = factory.create_deprecated_provider_coordinator.call_args.kwargs
+        resolved = runtime.provider_coordinator.get_instance()
+        assert resolved is coordinator_instance
+        assert runtime.provider_coordinator.initialized is True
+
+    create_provider_coordinator.assert_called_once()
+    kwargs = create_provider_coordinator.call_args.kwargs
     assert kwargs["provider_manager"] is manager
     config = kwargs["config"]
     assert config.max_rate_limit_retries == 7
@@ -84,27 +84,27 @@ def test_create_provider_runtime_components_provider_coordinator_lazy():
 
 
 def test_create_provider_runtime_components_switch_coordinator_lazy():
-    factory = MagicMock()
     manager = MagicMock()
     manager._provider_switcher = object()
     manager._health_monitor = object()
     settings = SimpleNamespace(max_rate_limit_retries=3, provider_health_checks=True)
 
     switch_coordinator = object()
-    factory.create_provider_switch_coordinator.return_value = switch_coordinator
+    with patch(
+        "victor.agent.provider.switch_coordinator.create_provider_switch_coordinator",
+        return_value=switch_coordinator,
+    ) as create_provider_switch_coordinator:
+        runtime = create_provider_runtime_components(
+            settings=settings,
+            provider_manager=manager,
+        )
 
-    runtime = create_provider_runtime_components(
-        factory=factory,
-        settings=settings,
-        provider_manager=manager,
-    )
+        assert runtime.provider_switch_coordinator.initialized is False
+        resolved = runtime.provider_switch_coordinator.get_instance()
+        assert resolved is switch_coordinator
+        assert runtime.provider_switch_coordinator.initialized is True
 
-    assert runtime.provider_switch_coordinator.initialized is False
-    resolved = runtime.provider_switch_coordinator.get_instance()
-    assert resolved is switch_coordinator
-    assert runtime.provider_switch_coordinator.initialized is True
-
-    factory.create_provider_switch_coordinator.assert_called_once_with(
+    create_provider_switch_coordinator.assert_called_once_with(
         provider_switcher=manager._provider_switcher,
         health_monitor=manager._health_monitor,
     )

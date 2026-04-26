@@ -474,7 +474,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._provider_service = ProviderService(registry=ProviderRegistry)
 
         self._provider_runtime = create_provider_runtime_components(
-            factory=self._factory,
             settings=self.settings,
             provider_manager=self._provider_manager,
             get_provider_service=lambda: getattr(self, "_provider_service", None),

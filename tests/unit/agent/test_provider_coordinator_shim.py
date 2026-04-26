@@ -30,9 +30,13 @@ def test_internal_code_uses_canonical_provider_coordinator_module():
     orchestrator_source = Path("victor/agent/orchestrator.py").read_text()
 
     assert "from victor.agent.provider_coordinator import create_provider_coordinator" not in runtime_builders_source
-    assert "from victor.agent.provider.coordinator import create_provider_coordinator" in runtime_builders_source
+    assert "create_deprecated_provider_coordinator" not in runtime_builders_source
+    assert "create_provider_switch_coordinator" not in runtime_builders_source
     assert "from victor.agent.provider_coordinator import ProviderCoordinatorConfig" not in provider_runtime_source
-    assert "from victor.agent.provider.coordinator import ProviderCoordinatorConfig" in provider_runtime_source
+    assert "from victor.agent.provider.coordinator import (" in provider_runtime_source
+    assert "ProviderCoordinatorConfig," in provider_runtime_source
+    assert "create_provider_coordinator," in provider_runtime_source
+    assert "from victor.agent.provider.switch_coordinator import create_provider_switch_coordinator" in provider_runtime_source
     assert "from victor.agent.provider_coordinator import ProviderCoordinator" not in provider_package_source
     assert "from victor.agent.provider.coordinator import (" not in provider_package_source
     assert "from victor.agent.provider_coordinator import ProviderCoordinator" not in provider_coordinator_source

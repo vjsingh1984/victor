@@ -444,52 +444,6 @@ class RuntimeBuildersMixin:
             manager.capabilities,
         )
 
-    def create_provider_switch_coordinator(
-        self,
-        provider_switcher: "IProviderSwitcher",
-        health_monitor: Optional["IProviderHealthMonitor"] = None,
-    ) -> "ProviderSwitchCoordinator":
-        """Create provider switch coordinator for switching workflow.
-
-        Args:
-            provider_switcher: ProviderSwitcher for switching logic
-            health_monitor: Optional ProviderHealthMonitor for pre-switch checks
-
-        Returns:
-            ProviderSwitchCoordinator instance for coordinating switches
-        """
-        from victor.agent.provider import ProviderSwitchCoordinator
-
-        coordinator = ProviderSwitchCoordinator(
-            provider_switcher=provider_switcher,
-            health_monitor=health_monitor,
-        )
-        logger.debug("ProviderSwitchCoordinator created")
-        return coordinator
-
-    def create_deprecated_provider_coordinator(
-        self,
-        provider_manager: "ProviderManager",
-        config: Optional[Any] = None,
-        tool_adapter: Optional[Any] = None,
-        capabilities: Optional["ToolCallingCapabilities"] = None,
-    ) -> Any:
-        """Create the deprecated provider coordinator behind the builder boundary.
-
-        This keeps the legacy compatibility wrapper isolated to the factory layer
-        while canonical runtime code migrates away from direct module imports.
-        """
-        from victor.agent.provider.coordinator import create_provider_coordinator
-
-        coordinator = create_provider_coordinator(
-            provider_manager=provider_manager,
-            config=config,
-            tool_adapter=tool_adapter,
-            capabilities=capabilities,
-        )
-        logger.debug("Deprecated ProviderCoordinator created via runtime builder")
-        return coordinator
-
     def create_response_completer(self) -> "ResponseCompleter":
         """Create response completer for ensuring complete responses after tool calls.
 

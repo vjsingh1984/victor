@@ -147,6 +147,16 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - provider compatibility tests now seed the explicit deprecated backing
     slots directly, keeping the deprecation path intentional and reducing
     warning noise in regression runs
+- Phase 2.13 provider runtime construction extraction:
+  - `victor.agent.runtime.provider_runtime` now constructs the deprecated
+    provider coordinator and provider switch coordinator directly from the
+    canonical provider package instead of routing through generic
+    `RuntimeBuilder` helper methods
+  - `AgentOrchestrator._initialize_provider_runtime()` no longer passes the
+    generic factory into provider runtime construction
+  - the provider shim boundary tests now assert that `RuntimeBuilder` no
+    longer owns provider coordinator construction helpers for the active
+    runtime path
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -294,8 +304,8 @@ Next resume point:
   surface (`victor/workflows/__init__.py`, integration coverage, and the
   legacy executor module itself).
 - The next active compatibility seam is provider runtime exposure through
-  deprecated provider-runtime construction and public provider shim exports.
-  If continued, the next step is to isolate lazy coordinator construction
-  behind explicit provider compatibility adapters/factories so canonical
-  runtime code depends only on `provider_runtime` and `ProviderService`, with
-  root provider coordinator modules left as public-only compatibility exports.
+  public provider shim exports and compatibility-only provider runtime tests.
+  If continued, the next step is to reduce or retire remaining public-facing
+  root provider shim surfaces (`victor.agent.provider_coordinator`,
+  `victor.agent.provider_switch_coordinator`) where internal code no longer
+  depends on them, while keeping explicit compatibility coverage where needed.
