@@ -1343,6 +1343,27 @@ class RLCoordinator:
         """
         return await asyncio.to_thread(self.get_all_recommendations, provider, model, task_type)
 
+    async def create_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Async version of create_prompt_rollout_experiment."""
+        return await asyncio.to_thread(
+            self.create_prompt_rollout_experiment,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+
     async def export_metrics_async(self) -> Dict[str, Any]:
         """Async version of export_metrics.
 

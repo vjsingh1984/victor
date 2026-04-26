@@ -136,6 +136,34 @@ class TestAsyncWrappers:
         assert "total_outcomes" in stats
         assert "learner_count" in stats
 
+    @pytest.mark.asyncio
+    async def test_create_prompt_rollout_experiment_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
+        """Test async prompt rollout creation offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "create_prompt_rollout_experiment",
+            return_value="prompt_exp_123",
+        ) as create_mock:
+            experiment_id = await coordinator.create_prompt_rollout_experiment_async(
+                section_name="GROUNDING_RULES",
+                provider="ollama",
+                treatment_hash="candidate123",
+                traffic_split=0.2,
+                min_samples_per_variant=25,
+            )
+
+        assert experiment_id == "prompt_exp_123"
+        create_mock.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="candidate123",
+            control_hash=None,
+            traffic_split=0.2,
+            min_samples_per_variant=25,
+        )
+
 
 class TestAsyncSingleton:
     """Tests for async singleton getter."""
