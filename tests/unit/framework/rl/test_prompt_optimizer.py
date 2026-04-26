@@ -15,6 +15,11 @@ from victor.config.prompt_optimization_settings import PromptOptimizationSetting
 from victor.core.container import ServiceContainer, reset_container, set_container
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.credit_tracking_service import CreditTrackingService
+from victor.framework.rl.experiment_coordinator import (
+    ExperimentCoordinator,
+    ExperimentStatus,
+    VariantType,
+)
 from victor.framework.rl.learners.prompt_optimizer import (
     ExecutionTrace,
     GEPAStrategy,
@@ -275,6 +280,8 @@ class TestPromptOptimizerLearner:
             benchmark_runs=3,
             benchmark_passed=True,
             is_active=True,
+            strategy_name="prefpo",
+            requires_benchmark=True,
         )
         key = learner1._candidate_key("TEST_SECTION", "ollama")
         learner1._candidates[key] = [candidate]
@@ -286,6 +293,8 @@ class TestPromptOptimizerLearner:
         assert loaded.benchmark_runs == 3
         assert loaded.benchmark_passed is True
         assert loaded.is_active is True
+        assert loaded.strategy_name == "prefpo"
+        assert loaded.requires_benchmark is True
 
     def test_record_benchmark_result_updates_running_average(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)
@@ -428,6 +437,59 @@ class TestPromptOptimizerLearner:
         assert rec is not None
         assert rec.value == "Approved active prompt"
 
+    def test_get_recommendation_skips_pending_benchmark_gated_candidate(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        pending_prefpo = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Pending PrefPO candidate",
+            text_hash="pending",
+            generation=2,
+            parent_hash="baseline",
+            alpha=20.0,
+            beta_val=1.0,
+            sample_count=25,
+            strategy_name="prefpo",
+            requires_benchmark=True,
+        )
+        fallback = PromptCandidate(
+            section_name="TEST",
+            provider="default",
+            text="Approved default baseline",
+            text_hash="baseline",
+            generation=1,
+            parent_hash="parent",
+            benchmark_score=0.9,
+            benchmark_runs=3,
+            benchmark_passed=True,
+            is_active=True,
+        )
+        learner._candidates[learner._candidate_key("TEST", "ollama")] = [pending_prefpo]
+        learner._candidates[learner._candidate_key("TEST", "default")] = [fallback]
+
+        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
+
+        assert rec is not None
+        assert rec.value == "Approved default baseline"
+
+    def test_promote_candidate_requires_benchmark_when_candidate_is_gated(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Pending PrefPO candidate",
+            text_hash="pending",
+            generation=1,
+            parent_hash="parent",
+            strategy_name="prefpo",
+            requires_benchmark=True,
+        )
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [candidate]
+
+        with pytest.raises(ValueError, match="benchmark gating"):
+            learner.promote_candidate(section_name="TEST", provider="ollama", text_hash="pending")
+
     def test_section_strategies_use_builtin_defaults(self, db):
         settings = SimpleNamespace(prompt_optimization=PromptOptimizationSettings(enabled=True))
 
@@ -529,8 +591,101 @@ class TestPromptOptimizerLearner:
         assert candidate is not None
         assert candidate.is_active is False
         assert candidate.benchmark_passed is False
+        assert candidate.strategy_name == "prefpo"
+        assert candidate.requires_benchmark is True
         assert "Verify file paths with ls()" in candidate.text
         enrich_mock.assert_called_once()
+
+    def test_build_rollout_experiment_config_uses_existing_ab_primitives(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        control = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            text="Approved baseline prompt",
+            text_hash="control",
+            generation=1,
+            parent_hash="parent",
+            benchmark_score=0.88,
+            benchmark_runs=4,
+            benchmark_passed=True,
+            is_active=True,
+            strategy_name="gepa",
+        )
+        treatment = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            text="Approved PrefPO prompt",
+            text_hash="treat",
+            generation=2,
+            parent_hash="control",
+            benchmark_score=0.93,
+            benchmark_runs=3,
+            benchmark_passed=True,
+            strategy_name="prefpo",
+            requires_benchmark=True,
+        )
+        key = learner._candidate_key("GROUNDING_RULES", "ollama")
+        learner._candidates[key] = [control, treatment]
+
+        config = learner.build_rollout_experiment_config(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="treat",
+            traffic_split=0.2,
+            min_samples_per_variant=25,
+        )
+
+        assert config.experiment_id.startswith("prompt_optimizer_grounding_rules_ollama_treat")
+        assert config.control.type == VariantType.CONTROL
+        assert config.control.config["text_hash"] == "control"
+        assert config.treatment.type == VariantType.TREATMENT
+        assert config.treatment.config["text_hash"] == "treat"
+        assert config.traffic_split == 0.2
+        assert config.min_samples_per_variant == 25
+
+    def test_create_rollout_experiment_registers_and_starts_ab_test(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        coordinator = ExperimentCoordinator()
+        control = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            text="Approved baseline prompt",
+            text_hash="control",
+            generation=1,
+            parent_hash="parent",
+            benchmark_score=0.88,
+            benchmark_runs=4,
+            benchmark_passed=True,
+            is_active=True,
+            strategy_name="gepa",
+        )
+        treatment = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            text="Approved PrefPO prompt",
+            text_hash="treat",
+            generation=2,
+            parent_hash="control",
+            benchmark_score=0.93,
+            benchmark_runs=3,
+            benchmark_passed=True,
+            strategy_name="prefpo",
+            requires_benchmark=True,
+        )
+        key = learner._candidate_key("GROUNDING_RULES", "ollama")
+        learner._candidates[key] = [control, treatment]
+
+        experiment_id = learner.create_rollout_experiment(
+            coordinator,
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="treat",
+            traffic_split=0.2,
+            min_samples_per_variant=25,
+        )
+
+        assert experiment_id in coordinator._experiments
+        assert coordinator._status[experiment_id] == ExperimentStatus.RUNNING
 
     def test_enrich_traces_with_credit_uses_registered_service(self, learner):
         """Recent credit summary should enrich traces when service is in DI."""

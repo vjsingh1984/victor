@@ -324,6 +324,8 @@ class PromptCandidate:
     benchmark_runs: int = 0
     benchmark_passed: bool = False
     is_active: bool = False
+    strategy_name: str = "gepa"
+    requires_benchmark: bool = False
 
     def sample(self) -> float:
         """Thompson Sampling: draw from Beta distribution with staleness decay.
@@ -784,6 +786,8 @@ class PromptOptimizerLearner(BaseLearner):
                 ("benchmark_score REAL", "0.0"),
                 ("benchmark_runs INTEGER", "0"),
                 ("benchmark_passed INTEGER", "0"),
+                ("strategy_name TEXT", "'gepa'"),
+                ("requires_benchmark INTEGER", "0"),
             ]:
                 try:
                     self.db.execute(
@@ -810,7 +814,7 @@ class PromptOptimizerLearner(BaseLearner):
                 f"SELECT section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
                 f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
-                f"benchmark_passed, is_active "
+                f"benchmark_passed, is_active, strategy_name, requires_benchmark "
                 f"FROM {Tables.AGENT_PROMPT_CANDIDATE}"
             )
             for row in cursor.fetchall():
@@ -833,6 +837,8 @@ class PromptOptimizerLearner(BaseLearner):
                     benchmark_runs=row[13] or 0,
                     benchmark_passed=bool(row[14]),
                     is_active=bool(row[15]),
+                    strategy_name=row[16] or "gepa",
+                    requires_benchmark=bool(row[17]),
                 )
                 key = self._candidate_key(row[0], row[1] or "default")
                 self._candidates.setdefault(key, []).append(candidate)
@@ -846,6 +852,30 @@ class PromptOptimizerLearner(BaseLearner):
     def _candidate_key(section_name: str, provider: str = "default") -> str:
         """Build the dict key for a (section, provider) pair."""
         return f"{section_name}::{provider}"
+
+    @staticmethod
+    def _strategy_name_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> str:
+        """Derive a stable strategy name for persisted candidate metadata."""
+        if not strategies:
+            return "gepa"
+        primary = type(strategies[0]).__name__
+        if primary.endswith("Strategy"):
+            primary = primary[: -len("Strategy")]
+        return primary.lower()
+
+    @staticmethod
+    def _requires_benchmark_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> bool:
+        """Whether a strategy chain should remain shadow-only until benchmark approval."""
+        return any(bool(getattr(strategy, "requires_benchmark_gate", False)) for strategy in strategies)
+
+    @staticmethod
+    def _servable_candidates(candidates: List[PromptCandidate]) -> List[PromptCandidate]:
+        """Filter out pending candidates that are explicitly benchmark-gated."""
+        return [
+            candidate
+            for candidate in candidates
+            if not candidate.requires_benchmark or candidate.benchmark_passed
+        ]
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Update posteriors for the active candidate."""
@@ -890,12 +920,14 @@ class PromptOptimizerLearner(BaseLearner):
         if not section_name:
             return None
 
-        # Try provider-specific first, then default
-        candidates = self._candidates.get(
-            self._candidate_key(section_name, provider or "default"), []
+        provider_candidates = self._servable_candidates(
+            self._candidates.get(self._candidate_key(section_name, provider or "default"), [])
         )
-        if not candidates:
-            candidates = self._candidates.get(self._candidate_key(section_name, "default"), [])
+        default_candidates = self._servable_candidates(
+            self._candidates.get(self._candidate_key(section_name, "default"), [])
+        )
+
+        candidates = provider_candidates or default_candidates
         if not candidates:
             return None
 
@@ -1017,6 +1049,7 @@ class PromptOptimizerLearner(BaseLearner):
         parent_hash = hashlib.md5(current_text.encode()).hexdigest()[:12]
         key = self._candidate_key(section_name, provider)
         generation = self._get_max_generation(key) + 1
+        strategies = self._strategies_for_section(section_name)
 
         candidate = PromptCandidate(
             section_name=section_name,
@@ -1025,6 +1058,8 @@ class PromptOptimizerLearner(BaseLearner):
             text_hash=text_hash,
             generation=generation,
             parent_hash=parent_hash,
+            strategy_name=self._strategy_name_for_candidate(strategies),
+            requires_benchmark=self._requires_benchmark_for_candidate(strategies),
         )
 
         self._candidates.setdefault(key, []).append(candidate)
@@ -1096,8 +1131,8 @@ class PromptOptimizerLearner(BaseLearner):
                 f"(section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
                 f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
-                f"benchmark_passed, is_active) "
-                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                f"benchmark_passed, is_active, strategy_name, requires_benchmark) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     candidate.section_name,
                     candidate.provider,
@@ -1115,6 +1150,8 @@ class PromptOptimizerLearner(BaseLearner):
                     candidate.benchmark_runs,
                     int(candidate.benchmark_passed),
                     int(candidate.is_active),
+                    candidate.strategy_name,
+                    int(candidate.requires_benchmark),
                 ),
             )
             self.db.commit()
@@ -1179,6 +1216,8 @@ class PromptOptimizerLearner(BaseLearner):
 
         if target is None:
             return None
+        if target.requires_benchmark and not target.benchmark_passed:
+            raise ValueError("cannot promote candidate before benchmark gating passes")
         if target.benchmark_runs > 0 and not target.benchmark_passed:
             raise ValueError("cannot promote candidate that has failed benchmark gating")
 
@@ -1186,6 +1225,119 @@ class PromptOptimizerLearner(BaseLearner):
             candidate.is_active = candidate.text_hash == text_hash
             self._save_candidate(candidate)
         return target
+
+    def build_rollout_experiment_config(
+        self,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        *,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Any:
+        """Build an A/B experiment config for safely rolling out a prompt candidate."""
+        from victor.framework.rl.experiment_coordinator import (
+            ExperimentConfig,
+            Variant,
+            VariantType,
+        )
+
+        key = self._candidate_key(section_name, provider)
+        candidates = self._candidates.get(key, [])
+        if not candidates:
+            raise ValueError(f"no candidates found for {section_name}/{provider}")
+
+        treatment = next((c for c in candidates if c.text_hash == treatment_hash), None)
+        if treatment is None:
+            raise ValueError(f"unknown treatment candidate: {treatment_hash}")
+        if treatment.requires_benchmark and not treatment.benchmark_passed:
+            raise ValueError("cannot create rollout experiment before benchmark gating passes")
+
+        if control_hash:
+            control = next(
+                (c for c in candidates if c.text_hash == control_hash and c.text_hash != treatment_hash),
+                None,
+            )
+        else:
+            approved_controls = [
+                candidate
+                for candidate in candidates
+                if candidate.text_hash != treatment_hash and candidate.benchmark_passed
+            ]
+            active_controls = [candidate for candidate in approved_controls if candidate.is_active]
+            control = active_controls[0] if active_controls else None
+            if control is None and approved_controls:
+                control = max(
+                    approved_controls,
+                    key=lambda c: (c.benchmark_score, c.benchmark_runs, c.sample_count, c.generation),
+                )
+        if control is None:
+            raise ValueError("no approved control candidate available for rollout")
+
+        experiment_id = (
+            f"prompt_optimizer_{section_name.lower()}_{provider or 'default'}_{treatment_hash}"
+        )
+        return ExperimentConfig(
+            experiment_id=experiment_id,
+            name=f"Prompt rollout for {section_name}",
+            description=(
+                f"Roll out prompt candidate {treatment_hash} against control {control.text_hash} "
+                f"for section {section_name} on provider {provider or 'default'}."
+            ),
+            control=Variant(
+                name=control.text_hash,
+                type=VariantType.CONTROL,
+                config={
+                    "learner": "prompt_optimizer",
+                    "section_name": section_name,
+                    "provider": provider,
+                    "text_hash": control.text_hash,
+                    "strategy_name": control.strategy_name,
+                },
+                description=f"Approved control prompt ({control.strategy_name})",
+            ),
+            treatment=Variant(
+                name=treatment.text_hash,
+                type=VariantType.TREATMENT,
+                config={
+                    "learner": "prompt_optimizer",
+                    "section_name": section_name,
+                    "provider": provider,
+                    "text_hash": treatment.text_hash,
+                    "strategy_name": treatment.strategy_name,
+                },
+                description=f"Candidate rollout prompt ({treatment.strategy_name})",
+            ),
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+
+    def create_rollout_experiment(
+        self,
+        coordinator: Any,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> str:
+        """Create and start a rollout experiment for an approved candidate."""
+        config = self.build_rollout_experiment_config(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+        if not coordinator.create_experiment(config):
+            raise ValueError(f"experiment already exists: {config.experiment_id}")
+        if not coordinator.start_experiment(config.experiment_id):
+            raise ValueError(f"failed to start experiment: {config.experiment_id}")
+        return config.experiment_id
 
     def rollback_active_candidate(
         self,
