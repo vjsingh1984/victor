@@ -272,6 +272,9 @@ class TestABTestingSyncBridge:
 
 
 class TestOptimizationSyncBridge:
+    def test_optimization_group_exposes_prompt_rollout_command(self) -> None:
+        assert "prompt-rollout" in optimization_cmd.opt.commands
+
     def test_profile_uses_shared_sync_bridge(self) -> None:
         coro = object()
         mock_async = Mock(return_value=coro)
