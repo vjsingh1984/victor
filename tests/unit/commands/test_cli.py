@@ -11,6 +11,7 @@ import io
 import logging
 import sys
 from typing import Any
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch, Mock
 
 import pytest
@@ -113,6 +114,26 @@ class TestConfigureLogging:
         stream = io.StringIO()
         _configure_logging("debug", stream=stream, file_logging=False)
         assert any(h.level == logging.DEBUG for h in logging.root.handlers)
+
+    def test_configure_logging_uses_global_victor_dir_for_default_log_file(self, tmp_path):
+        """Default log file should resolve through centralized Victor paths."""
+        from victor.ui.commands.utils import configure_logging as _configure_logging
+
+        global_dir = tmp_path / ".victor"
+        fake_paths = SimpleNamespace(global_victor_dir=global_dir)
+        mock_file_handler = MagicMock()
+        mock_file_handler.level = logging.NOTSET
+
+        with (
+            patch("victor.ui.commands.utils.get_project_paths", return_value=fake_paths),
+            patch(
+                "logging.handlers.RotatingFileHandler", return_value=mock_file_handler
+            ) as mock_handler,
+        ):
+            _configure_logging("INFO", stream=io.StringIO(), file_logging=True)
+
+        assert mock_handler.call_args is not None
+        assert mock_handler.call_args.args[0] == global_dir / "logs" / "victor.log"
 
 
 # =============================================================================

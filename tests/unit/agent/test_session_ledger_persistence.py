@@ -1,6 +1,8 @@
 """Tests for session ledger persistence and merge functionality."""
 
+import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -110,6 +112,40 @@ def temp_project_db_path(tmp_path: Path):
 
 
 class TestSQLiteSessionPersistenceCompatibility:
+    def test_default_constructor_uses_canonical_project_db_path(self, tmp_path: Path):
+        """Default constructor should honor the canonical ProjectPaths.project_db property."""
+        db_path = tmp_path / "isolated-project.db"
+
+        with patch(
+            "victor.config.settings.get_project_paths",
+            return_value=SimpleNamespace(project_db=db_path),
+        ):
+            persistence = SQLiteSessionPersistence()
+
+        try:
+            assert persistence._db_path == db_path
+        finally:
+            reset_project_database(db_path)
+
+    def test_schema_compatibility_adds_legacy_session_columns(self, temp_project_db_path: Path):
+        """Compatibility shim should backfill columns older sessions tables may lack."""
+        with sqlite3.connect(temp_project_db_path) as conn:
+            conn.execute("CREATE TABLE sessions (session_id TEXT PRIMARY KEY)")
+            conn.execute("CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, role TEXT)")
+
+        persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
+
+        session_columns = persistence._table_columns("sessions")
+        assert {
+            "created_at",
+            "last_activity",
+            "project_path",
+            "provider",
+            "model",
+            "profile",
+            "metadata",
+        } <= session_columns
+
     def test_sqlite_roundtrip_preserves_preview_sidecar(self, temp_project_db_path: Path):
         """Deprecated SQLite adapter should preserve replay-only preview messages."""
         persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)

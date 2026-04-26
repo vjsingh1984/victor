@@ -19,6 +19,7 @@ from victor.agent.safety import (
     OperationalRiskLevel,
     set_confirmation_callback,
 )
+from victor.config.settings import get_project_paths
 
 from victor.core.container import get_container
 
@@ -37,9 +38,15 @@ console = Console()
 # Global reference for signal handler cleanup
 _current_agent: Optional[AgentOrchestrator] = None
 
-# Default log file location
-DEFAULT_LOG_DIR = Path.home() / ".victor" / "logs"
-DEFAULT_LOG_FILE = DEFAULT_LOG_DIR / "victor.log"
+
+def _get_default_log_dir() -> Path:
+    """Resolve the default CLI log directory through centralized Victor paths."""
+    return get_project_paths().global_victor_dir / "logs"
+
+
+def _get_default_log_file() -> Path:
+    """Resolve the default CLI log file through centralized Victor paths."""
+    return _get_default_log_dir() / "victor.log"
 
 
 def configure_logging_from_config(
@@ -242,7 +249,7 @@ def configure_logging(
     # File handler (INFO by default) with rotation
     if file_logging:
         try:
-            log_path = log_file or DEFAULT_LOG_FILE
+            log_path = log_file or _get_default_log_file()
             log_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Use RotatingFileHandler to prevent unbounded growth
