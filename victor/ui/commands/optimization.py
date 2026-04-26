@@ -322,14 +322,26 @@ def prompt_rollout_auto_apply(experiment_id: str, dry_run: bool) -> None:
     default=None,
     help="Maximum number of prompt rollout experiments to process in this batch.",
 )
+@click.option(
+    "--stop-on-failure",
+    is_flag=True,
+    help="Stop the batch after the first analysis or transition failure.",
+)
 def prompt_rollout_auto_apply_all(
     status_filter: Optional[str],
     dry_run: bool,
     action_filter: Optional[str],
     limit: Optional[int],
+    stop_on_failure: bool,
 ) -> None:
     """Apply eligible rollout decisions across prompt rollout experiments."""
-    _auto_apply_all_prompt_rollouts(status_filter, dry_run, action_filter, limit)
+    _auto_apply_all_prompt_rollouts(
+        status_filter,
+        dry_run,
+        action_filter,
+        limit,
+        stop_on_failure,
+    )
 
 
 async def _profile_async(
@@ -785,6 +797,7 @@ def _auto_apply_all_prompt_rollouts(
     dry_run: bool = False,
     action_filter: Optional[str] = None,
     limit: Optional[int] = None,
+    stop_on_failure: bool = False,
 ) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
@@ -818,6 +831,9 @@ def _auto_apply_all_prompt_rollouts(
         if result is None:
             click.echo(f"Prompt rollout analysis unavailable: {experiment_id}", err=True)
             failed += 1
+            if stop_on_failure:
+                click.echo("Stopping prompt rollout bulk auto-apply after failure.")
+                break
             continue
 
         action = _get_prompt_rollout_auto_action(result)
@@ -849,6 +865,9 @@ def _auto_apply_all_prompt_rollouts(
                 err=True,
             )
             failed += 1
+            if stop_on_failure:
+                click.echo("Stopping prompt rollout bulk auto-apply after failure.")
+                break
             continue
 
         click.echo(_describe_prompt_rollout_auto_action(action, experiment_id, dry_run=False))
