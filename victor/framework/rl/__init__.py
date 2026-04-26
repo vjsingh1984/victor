@@ -89,7 +89,11 @@ from typing import (
 )
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
-from victor.framework.rl.coordinator import RLCoordinator, get_rl_coordinator
+from victor.framework.rl.coordinator import (
+    RLCoordinator,
+    get_rl_coordinator,
+    get_rl_coordinator_async,
+)
 from victor.framework.rl.option_framework import OptionRegistry
 from victor.framework.rl.config import (
     BaseRLConfig,
@@ -635,6 +639,48 @@ def record_tool_success(
     )
 
 
+def create_prompt_rollout_experiment(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str] = None,
+    traffic_split: float = 0.1,
+    min_samples_per_variant: int = 50,
+) -> Optional[str]:
+    """Create a prompt rollout experiment via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.create_prompt_rollout_experiment(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        control_hash=control_hash,
+        traffic_split=traffic_split,
+        min_samples_per_variant=min_samples_per_variant,
+    )
+
+
+async def create_prompt_rollout_experiment_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str] = None,
+    traffic_split: float = 0.1,
+    min_samples_per_variant: int = 50,
+) -> Optional[str]:
+    """Async prompt rollout experiment helper via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.create_prompt_rollout_experiment_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        control_hash=control_hash,
+        traffic_split=traffic_split,
+        min_samples_per_variant=min_samples_per_variant,
+    )
+
+
 __all__ = [
     # Manager
     "RLManager",
@@ -655,6 +701,8 @@ __all__ = [
     # Convenience functions
     "create_outcome",
     "record_tool_success",
+    "create_prompt_rollout_experiment",
+    "create_prompt_rollout_experiment_async",
     # Credit Assignment (arXiv:2604.09459)
     "CreditGranularity",
     "CreditMethodology",
