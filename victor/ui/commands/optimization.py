@@ -286,6 +286,13 @@ def prompt_rollout_apply(experiment_id: str, action: str) -> None:
     _apply_prompt_rollout_decision(experiment_id, action)
 
 
+@opt.command("prompt-rollout-auto-apply")
+@click.argument("experiment_id")
+def prompt_rollout_auto_apply(experiment_id: str) -> None:
+    """Apply rollout or rollback only when analysis clearly supports it."""
+    _auto_apply_prompt_rollout_decision(experiment_id)
+
+
 async def _profile_async(
     workflow_id: str,
     min_executions: int,
@@ -667,6 +674,38 @@ def _apply_prompt_rollout_decision(experiment_id: str, action: str) -> None:
     if not updated:
         click.echo(
             f"Unable to apply {action} decision for prompt rollout: {experiment_id}",
+            err=True,
+        )
+        return
+
+    click.echo(success_message)
+
+
+def _auto_apply_prompt_rollout_decision(experiment_id: str) -> None:
+    if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
+        click.echo(f"Experiment is not a prompt rollout: {experiment_id}", err=True)
+        return
+
+    coordinator = get_experiment_coordinator()
+    result = coordinator.analyze_experiment(experiment_id)
+    if result is None:
+        click.echo(f"Prompt rollout analysis unavailable: {experiment_id}", err=True)
+        return
+
+    recommendation = result.recommendation
+    if recommendation.startswith("Roll out treatment") and result.is_significant and result.treatment_better:
+        updated = coordinator.rollout_treatment(experiment_id)
+        success_message = f"Prompt rollout auto-applied: rolled out treatment for {experiment_id}"
+    elif recommendation.startswith("Keep control") and result.is_significant and not result.treatment_better:
+        updated = coordinator.rollback_experiment(experiment_id)
+        success_message = f"Prompt rollout auto-applied: kept control for {experiment_id}"
+    else:
+        click.echo(f"Prompt rollout auto-apply skipped for {experiment_id}: {recommendation}")
+        return
+
+    if not updated:
+        click.echo(
+            f"Unable to auto-apply prompt rollout decision for {experiment_id}",
             err=True,
         )
         return

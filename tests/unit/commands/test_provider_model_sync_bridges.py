@@ -278,6 +278,7 @@ class TestOptimizationSyncBridge:
         assert "prompt-rollout-status" in optimization_cmd.opt.commands
         assert "prompt-rollout-results" in optimization_cmd.opt.commands
         assert "prompt-rollout-apply" in optimization_cmd.opt.commands
+        assert "prompt-rollout-auto-apply" in optimization_cmd.opt.commands
 
     def test_profile_uses_shared_sync_bridge(self) -> None:
         coro = object()
@@ -415,6 +416,16 @@ class TestOptimizationSyncBridge:
         mock_apply.assert_called_once_with(
             "prompt_optimizer_grounding_rules_anthropic_candidate123",
             "rollout",
+        )
+
+    def test_prompt_rollout_auto_apply_uses_auto_apply_helper(self) -> None:
+        with patch.object(optimization_cmd, "_auto_apply_prompt_rollout_decision") as mock_apply:
+            optimization_cmd.prompt_rollout_auto_apply.callback(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        mock_apply.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
         )
 
     @pytest.mark.asyncio
@@ -814,6 +825,179 @@ class TestOptimizationSyncBridge:
 
         mock_echo.assert_called_once_with(
             "Unable to apply rollout decision for prompt rollout: "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            err=True,
+        )
+
+    def test_auto_apply_prompt_rollout_decision_rolls_out_treatment(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = SimpleNamespace(
+            experiment_id="prompt_optimizer_grounding_rules_anthropic_candidate123",
+            is_significant=True,
+            treatment_better=True,
+            effect_size=0.12,
+            p_value=0.03,
+            confidence_interval=(0.02, 0.18),
+            recommendation="Roll out treatment - significant improvement detected",
+            details={},
+        )
+        coordinator.rollout_treatment.return_value = True
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._auto_apply_prompt_rollout_decision(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        coordinator.analyze_experiment.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        coordinator.rollout_treatment.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_called_once_with(
+            "Prompt rollout auto-applied: rolled out treatment for "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+
+    def test_auto_apply_prompt_rollout_decision_rolls_back_experiment(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = SimpleNamespace(
+            experiment_id="prompt_optimizer_grounding_rules_anthropic_candidate123",
+            is_significant=True,
+            treatment_better=False,
+            effect_size=-0.12,
+            p_value=0.03,
+            confidence_interval=(-0.18, -0.02),
+            recommendation="Keep control - treatment performed worse",
+            details={},
+        )
+        coordinator.rollback_experiment.return_value = True
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._auto_apply_prompt_rollout_decision(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        coordinator.analyze_experiment.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        coordinator.rollback_experiment.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_called_once_with(
+            "Prompt rollout auto-applied: kept control for "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+
+    def test_auto_apply_prompt_rollout_decision_skips_non_actionable_recommendation(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = SimpleNamespace(
+            experiment_id="prompt_optimizer_grounding_rules_anthropic_candidate123",
+            is_significant=False,
+            treatment_better=True,
+            effect_size=0.12,
+            p_value=0.18,
+            confidence_interval=(-0.01, 0.18),
+            recommendation="Continue experiment - results not yet significant",
+            details={},
+        )
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._auto_apply_prompt_rollout_decision(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        coordinator.analyze_experiment.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        coordinator.rollout_treatment.assert_not_called()
+        coordinator.rollback_experiment.assert_not_called()
+        mock_echo.assert_called_once_with(
+            "Prompt rollout auto-apply skipped for "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123: "
+            "Continue experiment - results not yet significant"
+        )
+
+    def test_auto_apply_prompt_rollout_decision_rejects_non_prompt_rollout_id(self) -> None:
+        with patch.object(optimization_cmd.click, "echo") as mock_echo:
+            optimization_cmd._auto_apply_prompt_rollout_decision("other_experiment")
+
+        mock_echo.assert_called_once_with(
+            "Experiment is not a prompt rollout: other_experiment",
+            err=True,
+        )
+
+    def test_auto_apply_prompt_rollout_decision_reports_missing_analysis(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = None
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._auto_apply_prompt_rollout_decision(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        mock_echo.assert_called_once_with(
+            "Prompt rollout analysis unavailable: "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            err=True,
+        )
+
+    def test_auto_apply_prompt_rollout_decision_reports_failed_transition(self) -> None:
+        coordinator = MagicMock()
+        coordinator.analyze_experiment.return_value = SimpleNamespace(
+            experiment_id="prompt_optimizer_grounding_rules_anthropic_candidate123",
+            is_significant=True,
+            treatment_better=True,
+            effect_size=0.12,
+            p_value=0.03,
+            confidence_interval=(0.02, 0.18),
+            recommendation="Roll out treatment - significant improvement detected",
+            details={},
+        )
+        coordinator.rollout_treatment.return_value = False
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._auto_apply_prompt_rollout_decision(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        mock_echo.assert_called_once_with(
+            "Unable to auto-apply prompt rollout decision for "
             "prompt_optimizer_grounding_rules_anthropic_candidate123",
             err=True,
         )
