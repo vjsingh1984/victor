@@ -481,7 +481,7 @@ def _tool_coordinator_get(self: "AgentOrchestrator") -> Any:
     """Get the deprecated ToolCoordinator compatibility shim."""
     warnings.warn(
         "AgentOrchestrator._tool_coordinator is deprecated compatibility surface. "
-        "Use AgentOrchestrator._get_deprecated_tool_coordinator() or ToolService instead.",
+        "Use AgentOrchestrator._deprecated_tool_coordinator or ToolService instead.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -502,7 +502,7 @@ def _chat_coordinator_get(self: "AgentOrchestrator") -> Any:
     """Get the deprecated ChatCoordinator compatibility shim."""
     warnings.warn(
         "AgentOrchestrator._chat_coordinator is deprecated compatibility surface. "
-        "Use AgentOrchestrator._get_deprecated_chat_coordinator() or ChatService instead.",
+        "Use AgentOrchestrator._deprecated_chat_coordinator or ChatService instead.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -523,7 +523,7 @@ def _session_coordinator_get(self: "AgentOrchestrator") -> Any:
     """Get the deprecated SessionCoordinator compatibility shim."""
     warnings.warn(
         "AgentOrchestrator._session_coordinator is deprecated compatibility surface. "
-        "Use AgentOrchestrator._get_deprecated_session_coordinator() or SessionService instead.",
+        "Use AgentOrchestrator._deprecated_session_coordinator or SessionService instead.",
         DeprecationWarning,
         stacklevel=2,
     )

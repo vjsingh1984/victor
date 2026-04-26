@@ -111,15 +111,15 @@ class TestRuntimeLazyInitialization:
                 assert hasattr(interaction_runtime, "tool_coordinator") is False
 
                 # Deprecated compatibility shims still exist on the orchestrator.
-                session_coordinator = orchestrator._get_deprecated_session_coordinator()
+                session_coordinator = orchestrator._deprecated_session_coordinator
                 assert session_coordinator is not None, "session_coordinator shim should exist"
                 assert getattr(session_coordinator, "initialized", False) is False
 
-                chat_coordinator = orchestrator._get_deprecated_chat_coordinator()
+                chat_coordinator = orchestrator._deprecated_chat_coordinator
                 assert chat_coordinator is not None, "chat_coordinator shim should exist"
                 assert getattr(chat_coordinator, "initialized", False) is False
 
-                tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
+                tool_coordinator = orchestrator._deprecated_tool_coordinator
                 assert tool_coordinator is not None, "tool_coordinator shim should exist"
                 assert getattr(tool_coordinator, "initialized", False) is False
 

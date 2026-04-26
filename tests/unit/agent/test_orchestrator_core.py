@@ -68,7 +68,7 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_tool_svc.is_tool_enabled.side_effect = lambda name: name in enabled_tools
     mock_tool_svc.set_enabled_tools.side_effect = lambda tools: enabled_tools.update(tools)
     mock_tool_svc.process_tool_results.side_effect = (
-        lambda pipeline_result, ctx: orch._get_deprecated_tool_coordinator().process_tool_results(
+        lambda pipeline_result, ctx: orch._deprecated_tool_coordinator.process_tool_results(
             pipeline_result, ctx
         )
     )
@@ -923,7 +923,7 @@ class TestHandleToolCalls:
         from unittest.mock import AsyncMock
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
 
-        deprecated_tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
+        deprecated_tool_coordinator = orchestrator._deprecated_tool_coordinator
         pipeline_result = PipelineExecutionResult(
             results=[
                 ToolCallResult(
@@ -983,7 +983,7 @@ class TestServiceFirstDelegation:
 
     @pytest.mark.asyncio
     async def test_maybe_auto_checkpoint_uses_session_service(self, orchestrator):
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator._session_service.maybe_auto_checkpoint = AsyncMock(return_value="ckpt-1")
         deprecated_session_coordinator.maybe_auto_checkpoint = AsyncMock(
             side_effect=AssertionError("coordinator path should not be used")
@@ -995,7 +995,7 @@ class TestServiceFirstDelegation:
         assert result == "ckpt-1"
 
     def test_parse_and_validate_tool_calls_uses_tool_service(self, orchestrator):
-        deprecated_tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
+        deprecated_tool_coordinator = orchestrator._deprecated_tool_coordinator
         orchestrator._tool_service.parse_and_validate_tool_calls = MagicMock(
             return_value=([{"name": "read", "arguments": {}}], "")
         )
@@ -1009,7 +1009,7 @@ class TestServiceFirstDelegation:
         assert result == ([{"name": "read", "arguments": {}}], "")
 
     def test_recover_session_uses_session_service(self, orchestrator):
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator._session_service.recover_session = MagicMock(return_value=True)
         deprecated_session_coordinator.recover_session = MagicMock(
             side_effect=AssertionError("coordinator path should not be used")
@@ -1020,7 +1020,7 @@ class TestServiceFirstDelegation:
         assert orchestrator._memory_session_id == "session-123"
 
     def test_build_tool_access_context_uses_tool_service(self, orchestrator):
-        deprecated_tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
+        deprecated_tool_coordinator = orchestrator._deprecated_tool_coordinator
         sentinel = MagicMock(name="tool_access_context")
         orchestrator._tool_service.build_tool_access_context = MagicMock(return_value=sentinel)
         deprecated_tool_coordinator.build_tool_access_context = MagicMock(
@@ -3231,7 +3231,7 @@ class TestGetRecentSessions:
 
     def test_returns_empty_when_no_memory_manager(self, orchestrator):
         """Test returns empty list when memory manager not enabled."""
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = None
         deprecated_session_coordinator._memory_manager = None
         result = orchestrator.get_recent_sessions()
@@ -3252,7 +3252,7 @@ class TestGetRecentSessions:
 
         mock_manager = MagicMock()
         mock_manager.list_sessions.return_value = [mock_session]
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = mock_manager
         deprecated_session_coordinator._memory_manager = mock_manager
 
@@ -3267,7 +3267,7 @@ class TestGetRecentSessions:
         """Test handles exception and returns empty list."""
         mock_manager = MagicMock()
         mock_manager.list_sessions.side_effect = Exception("Database error")
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = mock_manager
         deprecated_session_coordinator._memory_manager = mock_manager
 
@@ -3362,7 +3362,7 @@ class TestGetMemoryContext:
             {"role": "user", "content": "test1"},
             {"role": "assistant", "content": "test2"},
         ]
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
         deprecated_session_coordinator._memory_manager = mock_manager
@@ -3401,7 +3401,7 @@ class TestGetSessionStats:
 
     def test_returns_disabled_when_no_memory_manager(self, orchestrator):
         """Test returns disabled stats when no memory manager."""
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = None
         orchestrator._memory_session_id = None
         deprecated_session_coordinator._memory_manager = None
@@ -3416,7 +3416,7 @@ class TestGetSessionStats:
         mock_manager = MagicMock()
         # Simulate get_session_stats returning empty dict when session not found
         mock_manager.get_session_stats.return_value = {}
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
         deprecated_session_coordinator._memory_manager = mock_manager
@@ -3441,7 +3441,7 @@ class TestGetSessionStats:
             "last_activity": "2024-01-01T13:00:00",
             "duration_seconds": 3600.0,
         }
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
         deprecated_session_coordinator._memory_manager = mock_manager
@@ -3462,7 +3462,7 @@ class TestGetSessionStats:
         """Test handles exception and returns error via SessionCoordinator."""
         mock_manager = MagicMock()
         mock_manager.get_session_stats.side_effect = Exception("DB error")
-        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
+        deprecated_session_coordinator = orchestrator._deprecated_session_coordinator
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
         deprecated_session_coordinator._memory_manager = mock_manager

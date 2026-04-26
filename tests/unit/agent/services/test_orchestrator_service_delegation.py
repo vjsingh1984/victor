@@ -323,7 +323,7 @@ class TestChatServiceBootstrapLaziness:
         assert tool_kwargs["argument_normalizer"] is obj.argument_normalizer
         assert "retry_executor" not in tool_kwargs
         assert "tool_call_parser" not in tool_kwargs
-        assert obj._get_deprecated_tool_coordinator().initialized is False
+        assert obj._deprecated_tool_coordinator.initialized is False
         assert trap_tool.touched is False
 
         chat_service.bind_runtime_components.assert_called_once()
@@ -336,7 +336,7 @@ class TestChatServiceBootstrapLaziness:
         )
         assert callable(kwargs["context_limit_handler"])
         obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
-        assert obj._get_deprecated_chat_coordinator().initialized is False
+        assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
         recovery_service.bind_runtime_components.assert_called_once()
@@ -455,7 +455,7 @@ class TestChatServiceBootstrapLaziness:
         obj.add_message.assert_any_call("user", "plan this")
         obj.add_message.assert_any_call("assistant", "planned")
         obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
-        assert obj._get_deprecated_chat_coordinator().initialized is False
+        assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
     @pytest.mark.asyncio
@@ -550,7 +550,7 @@ class TestChatServiceBootstrapLaziness:
 
         assert chunks == [stream_chunk]
         obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
-        assert obj._get_deprecated_chat_coordinator().initialized is False
+        assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
     @pytest.mark.asyncio

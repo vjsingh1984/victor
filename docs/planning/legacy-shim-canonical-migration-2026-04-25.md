@@ -77,7 +77,7 @@ For each batch:
 
 ## Current Batch
 
-Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, and Phase 2.6 are now complete:
+Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phase 2.6, and Phase 2.7 are now complete:
 - internal provider switching is service-first in `AgentOrchestrator`
 - provider-switch hook contracts now live in a canonical provider contract
   module instead of being sourced from the legacy switch coordinator
@@ -95,6 +95,9 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, and 
 - lazy sync/streaming/unified deprecated chat coordinator wiring is now bound
   directly from bootstrapper to compatibility constructors, removing the last
   internal-only wrapper methods from `AgentOrchestrator` for those shims
+- lazy deprecated chat/tool/session coordinator access in bootstrapper now
+  binds directly to the backing compatibility slots, removing the remaining
+  internal wrapper methods from `AgentOrchestrator` for those shims
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for

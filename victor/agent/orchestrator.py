@@ -1183,18 +1183,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     # Callbacks for decomposed components — delegated to CallbackCoordinator
     # =====================================================================
 
-    def _get_deprecated_tool_coordinator(self) -> Any:
-        """Get the deprecated ToolCoordinator compatibility shim."""
-        return getattr(self, "_deprecated_tool_coordinator", None)
-
-    def _get_deprecated_chat_coordinator(self) -> Any:
-        """Get the deprecated ChatCoordinator compatibility shim."""
-        return getattr(self, "_deprecated_chat_coordinator", None)
-
-    def _get_deprecated_session_coordinator(self) -> Any:
-        """Get the deprecated SessionCoordinator compatibility shim."""
-        return getattr(self, "_deprecated_session_coordinator", None)
-
     def _build_callback_coordinator(self) -> Any:
         """Lazily construct the CallbackCoordinator."""
         from victor.agent.callback_coordinator import CallbackCoordinator

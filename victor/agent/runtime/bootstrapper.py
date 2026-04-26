@@ -162,9 +162,11 @@ class AgentRuntimeBootstrapper:
             context_service=getattr(orchestrator, "_context_service", None),
             provider_service=getattr(orchestrator, "_provider_service", None),
             recovery_service=getattr(orchestrator, "_recovery_service", None),
-            get_chat_coordinator=orchestrator._get_deprecated_chat_coordinator,
-            get_tool_coordinator=orchestrator._get_deprecated_tool_coordinator,
-            get_session_coordinator=orchestrator._get_deprecated_session_coordinator,
+            get_chat_coordinator=lambda: getattr(orchestrator, "_deprecated_chat_coordinator", None),
+            get_tool_coordinator=lambda: getattr(orchestrator, "_deprecated_tool_coordinator", None),
+            get_session_coordinator=lambda: getattr(
+                orchestrator, "_deprecated_session_coordinator", None
+            ),
             turn_executor=orchestrator._turn_executor,
             get_sync_chat_coordinator=lambda: _ensure_sync_chat_coordinator(orchestrator),
             get_streaming_chat_coordinator=(
