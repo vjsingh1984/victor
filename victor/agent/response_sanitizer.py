@@ -369,18 +369,39 @@ class _NativeFilterWrapper:
     active.
     """
 
-    def __init__(self, inner: Any) -> None:
+    def __init__(self, inner: Any, max_thinking_content: int) -> None:
         self._inner = inner
+        self._max_thinking_content = max_thinking_content
+        self._should_abort = False
+        self._abort_reason: Optional[str] = None
 
     def process_chunk(self, text: str) -> StreamingChunkResult:
-        return self._inner.process_chunk(text)
+        result = self._inner.process_chunk(text)
+        if not self._should_abort and self._inner.get_thinking_length() > self._max_thinking_content:
+            self._should_abort = True
+            self._abort_reason = (
+                f"Thinking content exceeded {self._max_thinking_content} chars. "
+                "Model may be stuck in a reasoning loop."
+            )
+
+        if self._should_abort and (
+            result.is_thinking or result.entering_thinking or result.exiting_thinking
+        ):
+            return StreamingChunkResult(
+                content="",
+                is_thinking=result.is_thinking,
+                state_changed=result.state_changed,
+                entering_thinking=result.entering_thinking,
+                exiting_thinking=result.exiting_thinking,
+            )
+        return result
 
     def should_abort(self) -> bool:
-        return self._inner.should_abort()
+        return self._should_abort or self._inner.should_abort()
 
     @property
     def abort_reason(self) -> Optional[str]:
-        return self._inner.get_abort_reason()
+        return self._abort_reason or self._inner.get_abort_reason()
 
     @property
     def is_thinking(self) -> bool:
@@ -392,7 +413,7 @@ class _NativeFilterWrapper:
 
 
 def create_streaming_filter(
-    suppress_thinking: bool = False, max_thinking_content: int = 50000
+    suppress_thinking: bool = False, max_thinking_content: Optional[int] = None
 ) -> "StreamingContentFilter":
     """Factory function to create the best available streaming filter.
 
@@ -401,14 +422,22 @@ def create_streaming_filter(
 
     Args:
         suppress_thinking: If True, suppress thinking content entirely
-        max_thinking_content: Max chars before aborting (default 50000)
+        max_thinking_content: Max chars before aborting. When omitted, use the
+            current ``StreamingContentFilter.MAX_THINKING_CONTENT`` value so test
+            patches and runtime overrides apply consistently to both backends.
 
     Returns:
         StreamingContentFilter (native or Python implementation)
     """
+    effective_max_thinking_content = (
+        StreamingContentFilter.MAX_THINKING_CONTENT
+        if max_thinking_content is None
+        else max_thinking_content
+    )
     if _NATIVE_AVAILABLE:
         return _NativeFilterWrapper(
-            _native.StreamingFilter(suppress_thinking, max_thinking_content)
+            _native.StreamingFilter(suppress_thinking, effective_max_thinking_content),
+            effective_max_thinking_content,
         )
     return StreamingContentFilter(suppress_thinking)
 

@@ -93,6 +93,7 @@ class ToolPlanner:
             return tools
 
         from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
         blocked_tools = INTENT_BLOCKED_TOOLS.get(current_intent, frozenset())
         if not blocked_tools:
@@ -100,9 +101,9 @@ class ToolPlanner:
 
         def get_tool_name(tool: Any) -> str:
             if hasattr(tool, "name"):
-                return tool.name
+                return canonicalize_core_tool_name(tool.name)
             if isinstance(tool, dict):
-                return tool.get("name", "")
+                return canonicalize_core_tool_name(tool.get("name", ""))
             return ""
 
         original_count = len(tools)

@@ -86,7 +86,7 @@ class TestMCPAdapterTool:
         tool = _tool("github_search", "Search GitHub repos")
         registry = MagicMock()
         adapter = MCPAdapterTool(tool, registry, "github-server")
-        assert adapter.name == "github_search"
+        assert adapter.name == "mcp_github_search"
 
     def test_name_with_prefix(self):
         tool = _tool("search", "Search")
@@ -179,7 +179,7 @@ class TestMCPToolProjector:
         result = MCPToolProjector.project(registry)
         assert len(result) == 2
         names = {t.name for t in result}
-        assert names == {"read", "write"}
+        assert names == {"mcp_read", "mcp_write"}
 
     def test_project_multiple_servers(self):
         servers = {
@@ -191,7 +191,7 @@ class TestMCPToolProjector:
         result = MCPToolProjector.project(registry)
         assert len(result) == 2
         names = {t.name for t in result}
-        assert names == {"search", "send"}
+        assert names == {"mcp_search", "mcp_send"}
 
     def test_project_with_prefix(self):
         servers = {"fs": FakeServerEntry(tools_cache=[_tool("read", "Read")])}
@@ -211,8 +211,8 @@ class TestMCPToolProjector:
         result = MCPToolProjector.project(registry, conflict_strategy="prefix_server")
         assert len(result) == 2
         names = {t.name for t in result}
-        # First gets "search", second gets "jira_search"
-        assert "search" in names
+        assert "mcp_search" in names
+        assert "mcp_jira_search" in names
 
     def test_project_name_collision_skip(self):
         servers = {
@@ -223,7 +223,7 @@ class TestMCPToolProjector:
 
         result = MCPToolProjector.project(registry, conflict_strategy="skip")
         assert len(result) == 1
-        assert result[0].name == "search"
+        assert result[0].name == "mcp_search"
 
     def test_project_empty_registry(self):
         registry = self._make_registry({})

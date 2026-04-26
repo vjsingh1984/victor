@@ -951,27 +951,6 @@ def _build_stats(loaded: LoadedGraph) -> Dict[str, Any]:
     }
 
 
-@tool(
-    category="search",
-    priority=Priority.HIGH,
-    access_mode=AccessMode.READONLY,
-    danger_level=DangerLevel.SAFE,
-    execution_category=ExecutionCategory.READ_ONLY,
-    keywords=[
-        "graph",
-        "callers",
-        "callees",
-        "trace",
-        "dependencies",
-        "impact",
-        "pagerank",
-        "centrality",
-        "architecture",
-        "neighbors",
-    ],
-    aliases=["graph_tool"],
-    timeout=60.0,
-)
 async def _handle_multi_mode(
     loaded: Any,
     mode_str: str,
@@ -1104,6 +1083,27 @@ async def _handle_multi_mode(
     }
 
 
+@tool(
+    category="search",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=[
+        "graph",
+        "callers",
+        "callees",
+        "trace",
+        "dependencies",
+        "impact",
+        "pagerank",
+        "centrality",
+        "architecture",
+        "neighbors",
+    ],
+    aliases=["graph_tool"],
+    timeout=60.0,
+)
 async def graph(
     mode: GraphMode = GraphMode.NEIGHBORS,
     path: str = ".",

@@ -753,8 +753,9 @@ async def edit(
             _capture_stdout(_do_commit)
             success = success_ref[0]
             if success:
-                # Capture actual diff after commit for preview
-                diff_output = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
+                # FileEditor clears its transaction on commit, so preserve the
+                # already-computed preview diff as the authoritative change view.
+                diff_output = preview_text
                 formatted_diff = _format_diff_for_console(diff_output)
                 return {
                     "success": True,
@@ -774,6 +775,10 @@ async def edit(
 
     # Handle commit (suppress FileEditor's transaction stdout — Victor formats its own output)
     if commit:
+        # FileEditor clears current_transaction during commit(), so capture the
+        # diff while the transaction is still active.
+        diff_output = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
+        formatted_diff = _format_diff_for_console(diff_output) if diff_output else None
         success_ref = [False]
 
         def _do_commit():
@@ -784,11 +789,6 @@ async def edit(
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
-
-            # Capture actual diff after commit for preview renderer
-            # This shows what actually changed, not just what was requested
-            diff_output = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
-            formatted_diff = _format_diff_for_console(diff_output) if diff_output else None
 
             result = {
                 "success": True,

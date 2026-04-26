@@ -67,7 +67,7 @@ class TestLangChainAdapterToolMock:
     def test_name_without_prefix(self):
         lc = FakeLCTool(name="search")
         adapter = LangChainAdapterTool(lc)
-        assert adapter.name == "search"
+        assert adapter.name == "lgc_search"
 
     def test_name_with_prefix(self):
         lc = FakeLCTool(name="search")
@@ -115,7 +115,7 @@ class TestLangChainToolProjectorMock:
         adapted = LangChainToolProjector.project(tools)
         assert len(adapted) == 2
         names = {t.name for t in adapted}
-        assert names == {"search", "calc"}
+        assert names == {"lgc_search", "lgc_calc"}
 
     def test_project_with_prefix(self):
         tools = [FakeLCTool(name="search")]
@@ -150,7 +150,7 @@ class TestLangChainAdapterReal:
             return a * b
 
         adapter = LangChainAdapterTool(multiply)
-        assert adapter.name == "multiply"
+        assert adapter.name == "lgc_multiply"
         assert "Multiply two numbers" in adapter.description
 
     def test_real_tool_schema(self):
