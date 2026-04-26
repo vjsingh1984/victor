@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from victor.workflows.compiler.boundary import (
+    LegacyWorkflowDslCompiler,
     LegacyWorkflowGraphCompiler,
     NativeWorkflowGraphCompiler,
     ParsedWorkflowDefinition,
@@ -186,6 +187,24 @@ class TestLegacyWorkflowGraphCompiler:
 
         backend_factory.assert_called_once_with()
         backend.compile.assert_called_once_with(workflow)
+        assert result is compiled
+
+
+class TestLegacyWorkflowDslCompiler:
+    def test_legacy_workflow_dsl_compiler_uses_backend_factory(self) -> None:
+        graph = Mock(name="workflow_graph")
+        compiled = object()
+        backend = Mock()
+        backend.compile.return_value = compiled
+        backend_factory = Mock(return_value=backend)
+
+        result = LegacyWorkflowDslCompiler(compiler_factory=backend_factory).compile(
+            graph,
+            name="graph-alpha",
+        )
+
+        backend_factory.assert_called_once_with()
+        backend.compile.assert_called_once_with(graph, "graph-alpha")
         assert result is compiled
 
 

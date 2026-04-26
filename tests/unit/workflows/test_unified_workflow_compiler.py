@@ -549,6 +549,40 @@ class TestCompilationFromGraphDSL:
         assert isinstance(compiled, CachedCompiledGraph)
         assert compiled.compiled_graph is not None
 
+    def test_compile_graph_uses_boundary_graph_dsl_adapter(self):
+        """UnifiedWorkflowCompiler should depend on the boundary adapter, not graph_compiler directly."""
+        from victor.workflows.graph_dsl import State, WorkflowGraph
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+        @dataclass
+        class TestState(State):
+            value: str = ""
+
+        graph = WorkflowGraph(TestState, name="boundary_graph")
+        graph.add_node("process", lambda state: state)
+        graph.set_entry_point("process")
+        graph.set_finish_point("process")
+
+        backend = MagicMock(name="graph_backend")
+        backend.compile.return_value = object()
+
+        with patch(
+            "victor.workflows.compiler.boundary.LegacyWorkflowDslCompiler",
+            return_value=backend,
+        ) as adapter_cls:
+            compiler = UnifiedWorkflowCompiler()
+            compiled = compiler.compile_graph(graph, name="graph-name")
+
+        adapter_cls.assert_called_once_with(
+            runner_registry=None,
+            validate_before_compile=True,
+            preserve_state_type=False,
+            emitter=None,
+            enable_observability=False,
+        )
+        backend.compile.assert_called_once_with(graph, "graph-name")
+        assert compiled.compiled_graph is backend.compile.return_value
+
 
 class TestCompilationWithCaching:
     """Tests for compilation caching behavior."""

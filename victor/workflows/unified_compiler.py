@@ -98,10 +98,7 @@ if TYPE_CHECKING:
     )
     from victor.workflows.graph_dsl import WorkflowGraph
     from victor.workflows.node_runners import NodeRunnerRegistry
-    from victor.workflows.graph_compiler import (
-        CompilerConfig,
-        WorkflowGraphCompiler,
-    )
+    from victor.workflows.compiler.boundary import LegacyWorkflowDslCompiler
     from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
 logger = logging.getLogger(__name__)
@@ -460,7 +457,7 @@ class UnifiedWorkflowCompiler:
         )
 
         # Lazy-loaded compilers
-        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
+        self._graph_compiler: Optional["LegacyWorkflowDslCompiler"] = None
         self._definition_validator: Optional[Any] = None
         self._definition_graph_compiler: Optional[Any] = None
 
@@ -498,23 +495,18 @@ class UnifiedWorkflowCompiler:
             self._execution_cache = get_workflow_cache_manager()
         return self._execution_cache
 
-    def _get_graph_compiler(self) -> "WorkflowGraphCompiler":
-        """Get or create WorkflowGraph compiler."""
+    def _get_graph_compiler(self) -> "LegacyWorkflowDslCompiler":
+        """Get or create the canonical WorkflowGraph DSL adapter."""
         if self._graph_compiler is None:
-            from victor.workflows.graph_compiler import (
-                WorkflowGraphCompiler,
-                CompilerConfig,
-            )
+            from victor.workflows.compiler.boundary import LegacyWorkflowDslCompiler
 
-            config = CompilerConfig(
-                use_node_runners=self._runner_registry is not None,
+            self._graph_compiler = LegacyWorkflowDslCompiler(
                 runner_registry=self._runner_registry,
                 validate_before_compile=self._config.validate_before_compile,
                 preserve_state_type=self._config.preserve_state_type,
                 emitter=self._emitter if self._config.enable_observability else None,
                 enable_observability=self._config.enable_observability,
             )
-            self._graph_compiler = WorkflowGraphCompiler(config)
         return self._graph_compiler
 
     def _get_definition_validator(self) -> Any:

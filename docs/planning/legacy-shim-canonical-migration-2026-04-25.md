@@ -168,12 +168,24 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
 - Phase 3.6 chat workflow-mode compile-only canonicalization:
   - `victor.ui.commands.chat.run_workflow_mode` now validates already-loaded
     `WorkflowDefinition` objects through a canonical `UnifiedWorkflowCompiler`
-    helper instead of instantiating `YAMLToStateGraphCompiler` directly
+  helper instead of instantiating `YAMLToStateGraphCompiler` directly
   - focused async chat workflow-mode tests now pin the canonical helper path
     and failure behavior for validation-only runs
 
+- Phase 3.7 workflow graph-DSL boundary normalization:
+  - `victor.workflows.compiler.boundary` now owns a dedicated
+    `LegacyWorkflowDslCompiler` adapter for `WorkflowGraph` DSL compilation
+    through the legacy backend, so internal canonical callers no longer
+    construct `WorkflowGraphCompiler` directly
+  - `victor.workflows.unified_compiler.UnifiedWorkflowCompiler` now resolves
+    graph-DSL compilation through that boundary adapter instead of importing
+    `victor.workflows.graph_compiler` directly
+  - focused compiler boundary and unified compiler tests now pin the adapter
+    seam so future internal callers cannot regress back to direct legacy
+    backend ownership
+
 Next resume point:
 - Continue Phase 3 by migrating remaining internal
-  legacy workflow compiler consumers (`graph_compiler.py` / YAML adapter
-  compatibility layers) onto boundary/unified entrypoints where safe, while
-  leaving public compatibility exports and explicit legacy adapters intact.
+  legacy workflow compiler consumers and reducing any remaining internal
+  direct ownership of compatibility-layer backend objects, while leaving
+  public compatibility exports and explicit legacy adapters intact.
