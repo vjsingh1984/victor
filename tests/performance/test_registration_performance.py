@@ -180,7 +180,7 @@ class TestQueryPerformance:
         populated_registry.get_tool_schemas()
 
         # Second call should hit cache
-        benchmark(populated_registry.get_schemas)
+        benchmark(populated_registry.get_tool_schemas)
 
 
 class TestBatchAPIPerformance:
