@@ -712,6 +712,7 @@ class ExperimentCoordinator:
             "traffic_split": config.traffic_split,
             "control": {
                 "name": config.control.name,
+                "strategy_name": control_config.get("strategy_name"),
                 "samples": metrics.get(
                     config.control.name, VariantMetrics(config.control.name)
                 ).sample_count,
@@ -721,6 +722,7 @@ class ExperimentCoordinator:
             },
             "treatment": {
                 "name": config.treatment.name,
+                "strategy_name": treatment_config.get("strategy_name"),
                 "samples": metrics.get(
                     config.treatment.name, VariantMetrics(config.treatment.name)
                 ).sample_count,

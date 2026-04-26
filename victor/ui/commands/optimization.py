@@ -271,13 +271,20 @@ def prompt_rollout(
     default=None,
     help="Optional provider filter.",
 )
+@click.option(
+    "--strategy",
+    "strategy_filter",
+    default=None,
+    help="Optional treatment strategy filter.",
+)
 def prompt_rollouts(
     status_filter: Optional[str],
     section_filter: Optional[str],
     provider_filter: Optional[str],
+    strategy_filter: Optional[str],
 ) -> None:
     """List prompt rollout experiments."""
-    _list_prompt_rollouts(status_filter, section_filter, provider_filter)
+    _list_prompt_rollouts(status_filter, section_filter, provider_filter, strategy_filter)
 
 
 @opt.command("prompt-rollout-status")
@@ -355,6 +362,12 @@ def prompt_rollout_auto_apply(experiment_id: str, dry_run: bool) -> None:
     default=None,
     help="Optional provider filter.",
 )
+@click.option(
+    "--strategy",
+    "strategy_filter",
+    default=None,
+    help="Optional treatment strategy filter.",
+)
 def prompt_rollout_auto_apply_all(
     status_filter: Optional[str],
     dry_run: bool,
@@ -363,6 +376,7 @@ def prompt_rollout_auto_apply_all(
     stop_on_failure: bool,
     section_filter: Optional[str],
     provider_filter: Optional[str],
+    strategy_filter: Optional[str],
 ) -> None:
     """Apply eligible rollout decisions across prompt rollout experiments."""
     _auto_apply_all_prompt_rollouts(
@@ -373,6 +387,7 @@ def prompt_rollout_auto_apply_all(
         stop_on_failure,
         section_filter,
         provider_filter,
+        strategy_filter,
     )
 
 
@@ -644,12 +659,19 @@ def _matches_prompt_rollout_scope(
     experiment: dict[str, object],
     section_filter: Optional[str],
     provider_filter: Optional[str],
+    strategy_filter: Optional[str],
 ) -> bool:
     section_name = str(experiment.get("section_name") or "")
     provider = str(experiment.get("provider") or "")
+    treatment = experiment.get("treatment", {})
+    treatment_strategy = ""
+    if isinstance(treatment, dict):
+        treatment_strategy = str(treatment.get("strategy_name") or "")
     if section_filter and section_name.casefold() != section_filter.casefold():
         return False
     if provider_filter and provider.casefold() != provider_filter.casefold():
+        return False
+    if strategy_filter and treatment_strategy.casefold() != strategy_filter.casefold():
         return False
     return True
 
@@ -658,6 +680,7 @@ def _list_prompt_rollouts(
     status_filter: Optional[str],
     section_filter: Optional[str],
     provider_filter: Optional[str],
+    strategy_filter: Optional[str],
 ) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
@@ -667,7 +690,12 @@ def _list_prompt_rollouts(
             continue
         if status_filter and experiment.get("status") != status_filter:
             continue
-        if not _matches_prompt_rollout_scope(experiment, section_filter, provider_filter):
+        if not _matches_prompt_rollout_scope(
+            experiment,
+            section_filter,
+            provider_filter,
+            strategy_filter,
+        ):
             continue
         experiments.append(experiment)
 
@@ -685,6 +713,10 @@ def _list_prompt_rollouts(
             click.echo(f"    Section: {experiment['section_name']}")
         if experiment.get("provider"):
             click.echo(f"    Provider: {experiment['provider']}")
+        if control.get("strategy_name"):
+            click.echo(f"    Control strategy: {control['strategy_name']}")
+        if treatment.get("strategy_name"):
+            click.echo(f"    Treatment strategy: {treatment['strategy_name']}")
         click.echo(f"    Traffic split: {experiment['traffic_split']:.1%}")
         click.echo(
             "    Control: "
@@ -718,6 +750,10 @@ def _show_prompt_rollout_status(experiment_id: str) -> None:
         click.echo(f"  Section: {experiment['section_name']}")
     if experiment.get("provider"):
         click.echo(f"  Provider: {experiment['provider']}")
+    if control.get("strategy_name"):
+        click.echo(f"  Control strategy: {control['strategy_name']}")
+    if treatment.get("strategy_name"):
+        click.echo(f"  Treatment strategy: {treatment['strategy_name']}")
     click.echo(f"  Traffic split: {experiment.get('traffic_split', 0.0):.1%}")
     click.echo(
         "  Control: "
@@ -860,6 +896,7 @@ def _auto_apply_all_prompt_rollouts(
     stop_on_failure: bool = False,
     section_filter: Optional[str] = None,
     provider_filter: Optional[str] = None,
+    strategy_filter: Optional[str] = None,
 ) -> None:
     coordinator = get_experiment_coordinator()
     experiments = []
@@ -871,7 +908,12 @@ def _auto_apply_all_prompt_rollouts(
             continue
         if not status_filter and experiment.get("status") in {"rolled_out", "rolled_back"}:
             continue
-        if not _matches_prompt_rollout_scope(experiment, section_filter, provider_filter):
+        if not _matches_prompt_rollout_scope(
+            experiment,
+            section_filter,
+            provider_filter,
+            strategy_filter,
+        ):
             continue
         experiments.append(experiment)
 
