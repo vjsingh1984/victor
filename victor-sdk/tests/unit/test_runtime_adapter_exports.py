@@ -25,7 +25,12 @@ from victor_sdk.processing_runtime import (
     Position,
     get_default_text_chunker,
 )
-from victor_sdk.rl_runtime import RLManager, get_rl_coordinator
+from victor_sdk.rl_runtime import (
+    RLManager,
+    create_prompt_rollout_experiment,
+    create_prompt_rollout_experiment_async,
+    get_rl_coordinator,
+)
 from victor_sdk.provider_runtime import Message, ProviderRegistry
 from victor_sdk.search_runtime import QueryExpander, QueryExpansionConfig
 from victor_sdk.subagent_runtime import RoleToolProvider, set_role_tool_provider
@@ -62,6 +67,8 @@ def test_search_runtime_exports_host_helpers() -> None:
 def test_rl_runtime_exports_host_helpers() -> None:
     assert RLManager.__name__ == "RLManager"
     assert callable(get_rl_coordinator)
+    assert callable(create_prompt_rollout_experiment)
+    assert callable(create_prompt_rollout_experiment_async)
 
 
 def test_capability_runtime_exports_host_helpers() -> None:

@@ -6,17 +6,27 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.framework.rl import RLCoordinator, RLManager, get_rl_coordinator
+    from victor.framework.rl import (
+        RLCoordinator,
+        RLManager,
+        create_prompt_rollout_experiment,
+        create_prompt_rollout_experiment_async,
+        get_rl_coordinator,
+    )
 
 __all__ = [
     "RLCoordinator",
     "RLManager",
+    "create_prompt_rollout_experiment",
+    "create_prompt_rollout_experiment_async",
     "get_rl_coordinator",
 ]
 
 _LAZY_IMPORTS = {
     "RLCoordinator": "victor.framework.rl",
     "RLManager": "victor.framework.rl",
+    "create_prompt_rollout_experiment": "victor.framework.rl",
+    "create_prompt_rollout_experiment_async": "victor.framework.rl",
     "get_rl_coordinator": "victor.framework.rl",
 }
 
