@@ -264,6 +264,13 @@ def prompt_rollouts(status_filter: Optional[str]) -> None:
     _list_prompt_rollouts(status_filter)
 
 
+@opt.command("prompt-rollout-status")
+@click.argument("experiment_id")
+def prompt_rollout_status(experiment_id: str) -> None:
+    """Show status for a specific prompt rollout experiment."""
+    _show_prompt_rollout_status(experiment_id)
+
+
 async def _profile_async(
     workflow_id: str,
     min_executions: int,
@@ -560,6 +567,35 @@ def _list_prompt_rollouts(status_filter: Optional[str]) -> None:
             f"{treatment.get('name', '-')} samples={treatment.get('samples', 0)} "
             f"success_rate={treatment.get('success_rate', 0.0):.1%}"
         )
+
+
+def _show_prompt_rollout_status(experiment_id: str) -> None:
+    if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
+        click.echo(f"Experiment is not a prompt rollout: {experiment_id}", err=True)
+        return
+
+    coordinator = get_experiment_coordinator()
+    experiment = coordinator.get_experiment_status(experiment_id)
+    if experiment is None:
+        click.echo(f"Prompt rollout experiment not found: {experiment_id}", err=True)
+        return
+
+    control = experiment.get("control", {})
+    treatment = experiment.get("treatment", {})
+    click.echo(f"Prompt rollout experiment: {experiment_id}")
+    click.echo(f"  Name: {experiment.get('name', '-')}")
+    click.echo(f"  Status: {experiment.get('status', '-')}")
+    click.echo(f"  Traffic split: {experiment.get('traffic_split', 0.0):.1%}")
+    click.echo(
+        "  Control: "
+        f"{control.get('name', '-')} samples={control.get('samples', 0)} "
+        f"success_rate={control.get('success_rate', 0.0):.1%}"
+    )
+    click.echo(
+        "  Treatment: "
+        f"{treatment.get('name', '-')} samples={treatment.get('samples', 0)} "
+        f"success_rate={treatment.get('success_rate', 0.0):.1%}"
+    )
 
 
 # Register commands with CLI

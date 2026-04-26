@@ -275,6 +275,7 @@ class TestOptimizationSyncBridge:
     def test_optimization_group_exposes_prompt_rollout_command(self) -> None:
         assert "prompt-rollout" in optimization_cmd.opt.commands
         assert "prompt-rollouts" in optimization_cmd.opt.commands
+        assert "prompt-rollout-status" in optimization_cmd.opt.commands
 
     def test_profile_uses_shared_sync_bridge(self) -> None:
         coro = object()
@@ -381,6 +382,16 @@ class TestOptimizationSyncBridge:
             optimization_cmd.prompt_rollouts.callback(status_filter="running")
 
         mock_list.assert_called_once_with("running")
+
+    def test_prompt_rollout_status_uses_status_helper(self) -> None:
+        with patch.object(optimization_cmd, "_show_prompt_rollout_status") as mock_status:
+            optimization_cmd.prompt_rollout_status.callback(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        mock_status.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
 
     @pytest.mark.asyncio
     async def test_prompt_rollout_async_reports_started_experiment(self) -> None:
@@ -535,6 +546,81 @@ class TestOptimizationSyncBridge:
             optimization_cmd._list_prompt_rollouts("paused")
 
         mock_echo.assert_called_once_with("No prompt rollout experiments found.")
+
+    def test_show_prompt_rollout_status_displays_experiment_summary(self) -> None:
+        coordinator = MagicMock()
+        coordinator.get_experiment_status.return_value = {
+            "experiment_id": "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            "name": "Prompt rollout for GROUNDING_RULES",
+            "status": "running",
+            "traffic_split": 0.1,
+            "control": {
+                "name": "control456",
+                "samples": 12,
+                "success_rate": 0.75,
+            },
+            "treatment": {
+                "name": "candidate123",
+                "samples": 9,
+                "success_rate": 0.89,
+            },
+        }
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._show_prompt_rollout_status(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        coordinator.get_experiment_status.assert_called_once_with(
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_any_call(
+            "Prompt rollout experiment: "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123"
+        )
+        mock_echo.assert_any_call("  Name: Prompt rollout for GROUNDING_RULES")
+        mock_echo.assert_any_call("  Status: running")
+        mock_echo.assert_any_call("  Traffic split: 10.0%")
+        mock_echo.assert_any_call("  Control: control456 samples=12 success_rate=75.0%")
+        mock_echo.assert_any_call("  Treatment: candidate123 samples=9 success_rate=89.0%")
+
+    def test_show_prompt_rollout_status_rejects_non_prompt_rollout_id(self) -> None:
+        with patch.object(optimization_cmd.click, "echo") as mock_echo:
+            optimization_cmd._show_prompt_rollout_status("other_experiment")
+
+        mock_echo.assert_called_once_with(
+            "Experiment is not a prompt rollout: other_experiment",
+            err=True,
+        )
+
+    def test_show_prompt_rollout_status_reports_missing_experiment(self) -> None:
+        coordinator = MagicMock()
+        coordinator.get_experiment_status.return_value = None
+
+        with (
+            patch.object(
+                optimization_cmd,
+                "get_experiment_coordinator",
+                return_value=coordinator,
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            optimization_cmd._show_prompt_rollout_status(
+                "prompt_optimizer_grounding_rules_anthropic_candidate123"
+            )
+
+        mock_echo.assert_called_once_with(
+            "Prompt rollout experiment not found: "
+            "prompt_optimizer_grounding_rules_anthropic_candidate123",
+            err=True,
+        )
 
     def test_prompt_rollout_rejects_invalid_traffic_split_before_bridge(self) -> None:
         with (
