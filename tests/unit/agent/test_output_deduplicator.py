@@ -157,6 +157,21 @@ def foo():
         assert dedup.duplicates_removed == 0
         assert dedup.get_stats()["total_blocks"] == 0
 
+    def test_native_and_python_paths_deduplicate_across_calls(self):
+        """Repeated blocks should be suppressed across separate process() calls."""
+        content = (
+            "Now I have enough data to produce the complete analysis based on the "
+            "evidence collected from the repository."
+        )
+
+        dedup = OutputDeduplicator(min_block_length=40)
+        first = dedup.process(f"{content}\n\nFirst unique detail.")
+        second = dedup.process(f"{content}\n\nSecond unique detail.")
+
+        assert "First unique detail." in first
+        assert second == "Second unique detail."
+        assert dedup.duplicates_removed >= 1
+
     def test_get_stats(self, dedup):
         """Test getting statistics."""
         content = """First unique paragraph with enough content to count.

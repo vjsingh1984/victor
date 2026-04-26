@@ -455,6 +455,7 @@ class TestTurnResultEvaluation:
         return AgenticLoop(
             orchestrator=MagicMock(spec=[]),
             enable_fulfillment_check=False,
+            config={"disable_enhanced_completion": True},
         )
 
     def _make_perception(self):

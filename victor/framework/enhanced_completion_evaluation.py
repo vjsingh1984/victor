@@ -433,11 +433,12 @@ class EnhancedCompletionEvaluator:
                 )
 
             # Detect final answers
-            if not turn.has_tool_calls and turn.has_content and len(turn.response.strip()) > 100:
+            response_text = turn.content or ""
+            if not turn.has_tool_calls and turn.has_content and len(response_text.strip()) > 100:
                 return EvaluationResult(
                     decision=EvaluationDecision.COMPLETE,
                     score=0.8,
-                    reason=f"Model provided substantial response ({len(turn.response)} chars)",
+                    reason=f"Model provided substantial response ({len(response_text)} chars)",
                 )
 
             # No tools, no content = needs retry
@@ -502,10 +503,14 @@ class EnhancedCompletionEvaluator:
     def _extract_response(self, action_result: Any) -> Optional[str]:
         """Extract response text from action_result."""
         if hasattr(action_result, "response"):
-            return action_result.response
-        elif hasattr(action_result, "content"):
+            response = action_result.response
+            if isinstance(response, str):
+                return response
+            if hasattr(response, "content") and isinstance(response.content, str):
+                return response.content
+        if hasattr(action_result, "content") and isinstance(action_result.content, str):
             return action_result.content
-        elif isinstance(action_result, str):
+        if isinstance(action_result, str):
             return action_result
         return None
 

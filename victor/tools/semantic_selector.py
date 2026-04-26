@@ -44,6 +44,7 @@ from victor.tools.metadata_registry import (
     get_tools_matching_mandatory_keywords,
     get_tools_by_task_type,
 )
+from victor.tools.tool_names import get_canonical_name
 from victor.config.tool_selection_defaults import (
     SemanticSelectorDefaults,
     FallbackTools,
@@ -62,6 +63,15 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
+
+_PREFERRED_SEQUENCE_TOOL_ALIASES = {
+    "read": "read_file",
+    "write": "write_file",
+    "edit": "edit_files",
+    "test": "run_tests",
+    "ls": "list_directory",
+    "shell": "execute_bash",
+}
 
 # Lazy numpy import — keeps ``import victor`` lightweight when numpy is absent.
 _np = None
@@ -1135,10 +1145,11 @@ class SemanticToolSelector:
 
         # Get sequence suggestions (confidence ordered)
         suggestions = self._sequence_tracker.get_next_suggestions(top_k=10)
+        canonical_tool_name = get_canonical_name(tool_name)
 
         # Find this tool's confidence in suggestions
         for suggested_tool, confidence in suggestions:
-            if suggested_tool == tool_name:
+            if suggested_tool == canonical_tool_name:
                 # Scale confidence to boost value (max 0.15)
                 boost = confidence * 0.15
                 logger.log(
@@ -1149,6 +1160,12 @@ class SemanticToolSelector:
                 return boost
 
         return 0.0
+
+    @staticmethod
+    def _to_sequence_public_tool_name(tool_name: str) -> str:
+        """Expose stable selector-facing aliases for canonical sequence names."""
+        canonical_tool_name = get_canonical_name(tool_name)
+        return _PREFERRED_SEQUENCE_TOOL_ALIASES.get(canonical_tool_name, canonical_tool_name)
 
     def _apply_sequence_boosts(
         self, similarities: List[Tuple[Any, float]]
@@ -2075,7 +2092,11 @@ class SemanticToolSelector:
         if not self._sequence_tracker:
             return []
 
-        return self._sequence_tracker.get_next_suggestions(top_k=top_k)
+        suggestions = self._sequence_tracker.get_next_suggestions(top_k=top_k)
+        return [
+            (self._to_sequence_public_tool_name(tool_name), confidence)
+            for tool_name, confidence in suggestions
+        ]
 
     def get_current_workflow(self) -> Optional[Tuple[str, float]]:
         """Detect if we're in the middle of a known workflow (Phase 9).

@@ -1402,24 +1402,33 @@ class AgenticLoop:
                 )
 
             # Detect final answers - both after tools AND direct answers
-            # Removed requirement for prior tool usage to detect direct answers
-            if (
-                not turn.has_tool_calls
-                and turn.has_content
-                # Check for sufficient content length instead of requiring prior tool usage
-                and len(turn.response.strip()) > 100  # Heuristic: substantial answer
+            response_text = turn.content.strip()
+            had_prior_tool_usage = getattr(self.spin_detector, "total_tool_calls", 0) > 0
+            is_substantial_answer = len(response_text) > 100
+            if not turn.has_tool_calls and turn.has_content and (
+                had_prior_tool_usage or is_substantial_answer
             ):
                 # Model provided a substantial response without requesting tools
                 # This is likely a complete answer
 
                 # Additional check: is this a continuation request?
-                is_continuation = self._is_continuation_request(turn.response)
+                is_continuation = self._is_continuation_request(turn.content)
 
                 if not is_continuation:
+                    if had_prior_tool_usage and not is_substantial_answer:
+                        reason = (
+                            "Model provided final answer after prior tool usage "
+                            f"({len(turn.content)} chars) without requesting tools"
+                        )
+                    else:
+                        reason = (
+                            "Model provided substantial response "
+                            f"({len(turn.content)} chars) without requesting tools"
+                        )
                     heuristic = EvaluationResult(
                         decision=EvaluationDecision.COMPLETE,
                         score=0.8,
-                        reason=f"Model provided substantial response ({len(turn.response)} chars) without requesting tools",
+                        reason=reason,
                     )
                     return await self._refine_with_llm(heuristic, action_result, state)
                 else:
