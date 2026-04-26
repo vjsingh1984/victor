@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from victor.core.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
+_AUTO_DB = object()
 
 
 @dataclass
@@ -116,22 +117,24 @@ class ProviderPerformanceTracker:
     def __init__(
         self,
         window_size: int = 100,
-        db: Optional["DatabaseManager"] = None,
+        db: Optional["DatabaseManager"] | object = _AUTO_DB,
     ):
         """Initialize performance tracker.
 
         Args:
             window_size: Number of recent requests to track per provider.
-            db: DatabaseManager to persist metrics. Defaults to the global
-                singleton (DatabaseManager()). Pass None to disable persistence
-                (useful in tests that don't want DB side-effects).
+            db: DatabaseManager to persist metrics. When omitted, the tracker
+                uses the global singleton (``DatabaseManager()``). Pass
+                ``None`` to disable persistence and keep all metrics in-memory,
+                which is useful for deterministic unit tests and session-local
+                routing modes.
         """
         self.window_size = window_size
         self.metrics: Dict[str, Deque[RequestMetric]] = {}
         # Track which providers have been hydrated from DB this session
         self._hydrated: set[str] = set()
 
-        if db is None:
+        if db is _AUTO_DB:
             try:
                 from victor.core.database import DatabaseManager
 
@@ -140,6 +143,8 @@ class ProviderPerformanceTracker:
             except Exception:
                 logger.debug("Global DB unavailable; performance tracker will be in-memory only")
                 self._db = None
+        elif db is None:
+            self._db = None
         else:
             self._db = db
             if self._db is not None:

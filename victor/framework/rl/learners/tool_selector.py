@@ -244,6 +244,10 @@ class ToolSelectorLearner(BaseLearner):
         # Persist to database
         self._save_to_db(tool_name, task_type, outcome, reward)
 
+        # Keep the Priority 3 sequence predictor in sync with the learned tool
+        # outcomes without replacing the learner's own Q-value update path.
+        self.feed_outcome_to_predictor(outcome)
+
         logger.debug(
             f"RL: Tool '{tool_name}' Q-value: {old_global_q:.3f} -> {new_global_q:.3f} "
             f"(reward={reward:.3f}, task={task_type})"
@@ -659,8 +663,3 @@ class ToolSelectorLearner(BaseLearner):
 
         enhanced.sort(key=lambda x: x[1], reverse=True)
         return enhanced
-
-    def record_outcome(self, outcome: "RLOutcome") -> None:
-        """Override to also feed the outcome to the Priority 3 CooccurrenceTracker."""
-        super().record_outcome(outcome)
-        self.feed_outcome_to_predictor(outcome)

@@ -487,8 +487,16 @@ class SmartRoutingProvider:
         self.providers = {p.name: p for p in providers}
         self.config = config
 
-        # Create supporting components
-        self.tracker = ProviderPerformanceTracker(window_size=config.performance_window_size)
+        # Keep non-learning mode session-local and deterministic. Persisting and
+        # hydrating cross-session routing history only helps when learning is
+        # enabled, and it makes unit-test behavior depend on ambient DB state.
+        if config.learning_enabled:
+            self.tracker = ProviderPerformanceTracker(window_size=config.performance_window_size)
+        else:
+            self.tracker = ProviderPerformanceTracker(
+                window_size=config.performance_window_size,
+                db=None,
+            )
         self.detector = ResourceAvailabilityDetector()
         self.checker = ProviderHealthChecker()
 

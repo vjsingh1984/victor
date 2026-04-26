@@ -110,6 +110,14 @@ class TestProviderPerformanceTracker:
         assert tracker.window_size == 50
         assert len(tracker.metrics) == 0
 
+    def test_explicit_none_db_disables_persistence(self):
+        """db=None should stay purely in-memory and skip DatabaseManager bootstrap."""
+        with patch("victor.core.database.DatabaseManager") as mock_db:
+            tracker = ProviderPerformanceTracker(db=None)
+
+        assert tracker._db is None
+        mock_db.assert_not_called()
+
     def test_record_request(self):
         """Test recording a request metric."""
         tracker = ProviderPerformanceTracker()

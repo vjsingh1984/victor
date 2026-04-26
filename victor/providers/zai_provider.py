@@ -26,9 +26,10 @@ References:
 - https://docs.z.ai/guides/develop/http/introduction
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
-from victor.providers.base import ProviderError
+from victor.providers.base import CompletionResponse, ProviderError
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
@@ -300,6 +301,86 @@ class ZAIProvider(HttpxOpenAICompatProvider):
         if rc:
             return {"reasoning_content": rc, "thinking_mode": True}
         return None
+
+    def _normalize_tool_calls(
+        self, tool_calls: Optional[List[Dict[str, Any]]]
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Normalize tool calls into Victor's provider-neutral shape.
+
+        ``ZAIProvider`` now inherits the shared OpenAI-compatible transport and
+        parsing stack, but several repo-local call sites and tests still reach
+        this helper directly. Keep the provider surface stable and coerce
+        malformed JSON arguments to ``{}``, which matches the existing runtime
+        behavior of the neighboring provider implementations.
+        """
+        if not tool_calls:
+            return None
+
+        normalized: List[Dict[str, Any]] = []
+        for call in tool_calls:
+            if isinstance(call, dict) and "function" in call:
+                function = call.get("function", {})
+                name = function.get("name")
+                arguments = function.get("arguments", "{}")
+
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        arguments = {}
+
+                if name:
+                    normalized.append(
+                        {
+                            "id": call.get("id", ""),
+                            "name": name,
+                            "arguments": arguments,
+                        }
+                    )
+            elif isinstance(call, dict) and "name" in call:
+                normalized.append(call)
+
+        return normalized if normalized else None
+
+    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+        """Parse a non-streaming chat completion response.
+
+        The base compat provider already handles most of this flow, but ZAI
+        keeps its own tool-call normalizer so invalid JSON arguments degrade to
+        an empty object instead of propagating raw strings into tool execution.
+        """
+        choices = result.get("choices", [])
+        if not choices:
+            return CompletionResponse(
+                content="", role="assistant", model=model, raw_response=result
+            )
+
+        choice = choices[0]
+        message = choice.get("message", {})
+        content = message.get("content", "") or ""
+        tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
+
+        usage = None
+        usage_data = result.get("usage")
+        if usage_data:
+            usage = {
+                "prompt_tokens": usage_data.get("prompt_tokens", 0),
+                "completion_tokens": usage_data.get("completion_tokens", 0),
+                "total_tokens": usage_data.get("total_tokens", 0),
+            }
+
+        metadata = self._extract_response_metadata(message)
+
+        return CompletionResponse(
+            content=content,
+            role="assistant",
+            tool_calls=tool_calls,
+            stop_reason=choice.get("finish_reason"),
+            usage=usage,
+            model=model,
+            raw_response=result,
+            metadata=metadata,
+        )
 
     # ── ZAI-specific helpers ──────────────────────────────────────────────────
 

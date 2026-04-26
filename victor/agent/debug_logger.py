@@ -236,19 +236,19 @@ class DebugLogger:
         args: Dict[str, Any],
         iteration: int,
     ) -> None:
-        """Log tool call with full parameters for visibility."""
+        """Log tool call with compact parameter previews."""
         if not self.enabled:
             return
 
         self.stats.tool_calls_made += 1
 
-        # Format all arguments with full visibility (no truncation)
-        # Use truncation only for extremely long values (>200 chars)
-        args_str = ", ".join(
-            f"{k}={self._format_value(v)}"
-            for k, v in args.items()
-            if k != "_exec_ctx"  # Skip internal context parameter
-        )
+        visible_args = [(k, v) for k, v in args.items() if k != "_exec_ctx"]
+        preview_parts = [
+            f"{k}={self._format_value(v, max_len=40)}" for k, v in visible_args[:3]
+        ]
+        args_str = ", ".join(preview_parts)
+        if len(visible_args) > 3:
+            args_str = f"{args_str}, +{len(visible_args) - 3} more"
 
         running_icon = self._presentation.icon("running", with_color=False)
         self.logger.info(f"   {running_icon} {tool_name}({args_str})")

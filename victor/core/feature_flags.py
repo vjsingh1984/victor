@@ -124,6 +124,7 @@ class FeatureFlag(Enum):
     USE_SMART_ROUTING = "use_smart_routing"
 
     # Priority 4 - Learning from Execution (meta-learning, user feedback, explainability)
+    # Default: enabled. Roll back with VICTOR_USE_LEARNING_FROM_EXECUTION=false.
     USE_LEARNING_FROM_EXECUTION = "use_learning_from_execution"
 
     # Tool Broadcasting Optimization (context-aware, economy-first)
@@ -174,7 +175,6 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE,
             FeatureFlag.USE_CONTEXT_TEMPERATURE,
             FeatureFlag.USE_CONFIDENCE_MONITOR,
-            FeatureFlag.USE_LEARNING_FROM_EXECUTION,
             FeatureFlag.TOOL_STRATEGY_V2,
             FeatureFlag.USE_AGENTIC_BENCH_GATES,
             FeatureFlag.USE_CALIBRATED_COMPLETION,

@@ -100,11 +100,9 @@ class TestProviderRuntimePoolWiring:
         mock_settings.max_rate_limit_retries = 3
         mock_settings.provider_health_checks = True
 
-        mock_factory = MagicMock()
         mock_manager = MagicMock()
 
         components = create_provider_runtime_components(
-            factory=mock_factory,
             settings=mock_settings,
             provider_manager=mock_manager,
         )
@@ -120,11 +118,9 @@ class TestProviderRuntimePoolWiring:
         mock_settings.feature_flags = MagicMock()
         mock_settings.feature_flags.use_provider_pooling = False
 
-        mock_factory = MagicMock()
         mock_manager = MagicMock()
 
         components = create_provider_runtime_components(
-            factory=mock_factory,
             settings=mock_settings,
             provider_manager=mock_manager,
         )

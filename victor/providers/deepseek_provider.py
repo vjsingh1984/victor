@@ -73,6 +73,9 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
     """
 
     DEFAULT_TIMEOUT = 120
+    # DeepSeek sees intermittent sustained-load transport failures in practice,
+    # so use a slightly more patient retry budget than the generic compat default.
+    RETRY_ATTEMPTS = 5
     # Cap per-call timeout to prevent a single API call from stalling a benchmark
     MAX_API_TIMEOUT = 120
 
@@ -123,7 +126,7 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
             api_key=key_result.key,
             base_url=base_url,
             timeout=api_timeout,
-            max_retries=kwargs.pop("max_retries", 3),
+            max_retries=kwargs.pop("max_retries", self.RETRY_ATTEMPTS),
             provider_name="deepseek",
             **kwargs,
         )

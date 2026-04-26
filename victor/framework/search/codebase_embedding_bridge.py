@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
+from victor.core.verticals.import_resolver import vertical_module_candidates
 from victor.core.utils.capability_loader import load_tree_sitter_get_parser
 from victor.storage.vector_stores import EmbeddingConfig as InternalEmbeddingConfig
 from victor.storage.vector_stores.base import BaseEmbeddingProvider as InternalEmbeddingProvider
@@ -241,12 +242,26 @@ def enable_structural_codebase_embeddings(
     return config
 
 
+def _import_coding_codebase_module(module_suffix: str) -> Optional[Any]:
+    """Import a coding-vertical codebase module without hard-coding package names.
+
+    The structural bridge lives in core runtime code, so it must not couple
+    itself directly to the external ``victor_coding`` package path. Resolve the
+    module through the shared vertical import resolver instead.
+    """
+    for candidate in vertical_module_candidates("coding", module_suffix):
+        try:
+            return importlib.import_module(candidate)
+        except ImportError:
+            continue
+    return None
+
+
 def register_structural_codebase_embedding_provider() -> bool:
     """Register the structural bridge into victor-coding's embedding registry."""
 
-    try:
-        registry_module = importlib.import_module("victor_coding.codebase.embeddings.registry")
-    except ImportError:
+    registry_module = _import_coding_codebase_module("codebase.embeddings.registry")
+    if registry_module is None:
         return False
 
     registry = getattr(registry_module, "EmbeddingRegistry", None)
@@ -271,9 +286,8 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
     if _STRUCTURAL_PROVIDER_CLASS is not None:
         return _STRUCTURAL_PROVIDER_CLASS
 
-    try:
-        base_module = importlib.import_module("victor_coding.codebase.embeddings.base")
-    except ImportError:
+    base_module = _import_coding_codebase_module("codebase.embeddings.base")
+    if base_module is None:
         return None
 
     base_provider_class = getattr(base_module, "BaseEmbeddingProvider", None)
@@ -633,7 +647,9 @@ def _resolve_language(full_path: Path, documents: list[dict[str, Any]]) -> str:
         pass
 
     try:
-        chunker_module = importlib.import_module("victor_coding.codebase.chunker")
+        chunker_module = _import_coding_codebase_module("codebase.chunker")
+        if chunker_module is None:
+            raise ImportError("coding chunker module unavailable")
         detect_language = getattr(chunker_module, "detect_language", None)
         if callable(detect_language):
             detected = detect_language(str(full_path))
