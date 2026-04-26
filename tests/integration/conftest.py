@@ -3,7 +3,46 @@
 Provides autouse fixtures for test isolation in integration tests.
 """
 
+from pathlib import Path
+from unittest.mock import PropertyMock, patch
+
 import pytest
+
+
+@pytest.fixture
+def isolated_integration_project_victor_dir(tmp_path) -> Path:
+    """Provide an isolated project-local .victor directory for integration tests."""
+    temp_victor = tmp_path / ".victor"
+    temp_victor.mkdir(exist_ok=True)
+    return temp_victor
+
+
+@pytest.fixture(autouse=True)
+def isolate_integration_project_victor_storage(isolated_integration_project_victor_dir):
+    """Redirect integration-test project-local persistence into temp .victor storage.
+
+    Integration tests should exercise the real SQLite/filesystem behavior without
+    writing into the repository's shared .victor/ directory.
+    """
+    from victor.config.settings import ProjectPaths
+
+    temp_project_db = isolated_integration_project_victor_dir / "project.db"
+
+    with (
+        patch.object(
+            ProjectPaths,
+            "project_victor_dir",
+            new_callable=PropertyMock,
+            return_value=isolated_integration_project_victor_dir,
+        ),
+        patch.object(
+            ProjectPaths,
+            "project_db",
+            new_callable=PropertyMock,
+            return_value=temp_project_db,
+        ),
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
