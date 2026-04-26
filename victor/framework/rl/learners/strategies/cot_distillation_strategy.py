@@ -48,12 +48,14 @@ class CoTDistillationStrategy:
         traces: List[Any],
         section_name: str,
         current_text: str,
+        **kwargs: Any,
     ) -> str:
         """Extract reasoning patterns from successful strong-model traces.
 
         Identifies traces where the source provider succeeded and builds
         a generalizable step-by-step reasoning template.
         """
+        del section_name, current_text, kwargs
         if not traces:
             return ""
 

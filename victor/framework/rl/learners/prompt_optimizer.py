@@ -374,6 +374,7 @@ class PromptOptimizationStrategy(Protocol):
         traces: List[ExecutionTrace],
         section_name: str,
         current_text: str,
+        **kwargs: Any,
     ) -> str:
         """Analyze traces and produce a reflection/diagnosis."""
         ...
@@ -483,8 +484,10 @@ class GEPAStrategy:
         traces: List[ExecutionTrace],
         section_name: str,
         current_text: str,
+        **kwargs: Any,
     ) -> str:
         """Analyze traces and produce natural language reflection."""
+        del kwargs
         # Aggregate failure patterns
         total = len(traces)
         successes = sum(1 for t in traces if t.success)
@@ -655,30 +658,44 @@ class PromptOptimizerLearner(BaseLearner):
             self._init_pareto_frontiers()
         self._init_section_strategies()
 
+    @staticmethod
+    def _load_prompt_optimization_settings() -> Any:
+        """Load prompt-optimization settings, tolerating bootstrap-time failures."""
+        try:
+            from victor.config.settings import get_settings
+
+            settings = get_settings()
+            return getattr(settings, "prompt_optimization", None)
+        except Exception:
+            return None
+
     def _init_section_strategies(self) -> None:
         """Initialize section-specific strategies from config."""
         try:
-            from victor.framework.rl.learners.strategies import (
-                MIPROv2Strategy,
-                CoTDistillationStrategy,
+            from victor.config.prompt_optimization_settings import (
+                PromptOptimizationSettings,
+            )
+            from victor.framework.rl.learners.strategy_registry import (
+                build_prompt_strategy,
             )
 
-            # FEW_SHOT_EXAMPLES uses MIPROv2 (mine demonstrations)
-            self._extra_strategies["FEW_SHOT_EXAMPLES"] = [MIPROv2Strategy()]
+            po_settings = self._load_prompt_optimization_settings()
+            if po_settings is None:
+                po_settings = PromptOptimizationSettings(enabled=True)
 
-            # ASI guidance uses GEPA (default) + CoT distillation (layered)
-            self._extra_strategies["ASI_TOOL_EFFECTIVENESS_GUIDANCE"] = [
-                self._strategy,  # GEPA first
-                CoTDistillationStrategy(),  # CoT layered on top
-            ]
-
-            # INIT_SYNTHESIS_RULES: GEPA only for single-shot synthesis.
-            # MIPROv2 and CoT add tool-use patterns irrelevant to single-shot
-            # LLM calls. GEPA reflects on init output quality (section scores,
-            # line counts) and mutates the RULES to improve synthesis quality.
-            self._extra_strategies["INIT_SYNTHESIS_RULES"] = [
-                self._strategy,  # GEPA: reflect on quality, mutate rules
-            ]
+            self._extra_strategies = {}
+            for section_name in self.EVOLVABLE_SECTIONS:
+                strategy_names = po_settings.get_strategies_for_section(section_name)
+                strategies = []
+                for strategy_name in strategy_names:
+                    strategy = build_prompt_strategy(
+                        strategy_name,
+                        settings=po_settings,
+                        gepa_strategy=self._strategy,
+                    )
+                    if strategy is not None:
+                        strategies.append(strategy)
+                self._extra_strategies[section_name] = strategies
 
             logger.debug(
                 "Section strategies initialized: %s",
@@ -686,6 +703,70 @@ class PromptOptimizerLearner(BaseLearner):
             )
         except ImportError:
             logger.debug("Strategy imports failed, using default GEPA only")
+
+    def _strategies_for_section(self, section_name: str) -> List["PromptOptimizationStrategy"]:
+        """Return the configured strategy chain for a section."""
+        if section_name in self._extra_strategies:
+            return list(self._extra_strategies[section_name])
+        return [self._strategy]
+
+    def _collect_learning_traces(self, limit: int = 50) -> List[ExecutionTrace]:
+        """Collect and merge traces for prompt optimization."""
+        if self._use_pareto:
+            jsonl_traces = self._collect_traces_v2(limit=limit)
+        else:
+            jsonl_traces = self._collect_traces(limit=limit)
+
+        conv_traces = self._collect_traces_from_conversations(limit=limit)
+        traces = self._merge_traces(jsonl_traces, conv_traces)
+
+        if conv_traces:
+            logger.info(
+                "Unified traces: %d from JSONL + %d from conversations = %d unique",
+                len(jsonl_traces),
+                len(conv_traces),
+                len(traces),
+            )
+        return traces
+
+    def _apply_section_strategies(
+        self,
+        section_name: str,
+        current_text: str,
+        traces: List[ExecutionTrace],
+        *,
+        query: Optional[str] = None,
+    ) -> str:
+        """Apply the configured strategy chain for a section."""
+        new_text = current_text
+        for strat in self._strategies_for_section(section_name):
+            strat_name = type(strat).__name__
+            reflection = strat.reflect(traces, section_name, new_text, query=query)
+            if reflection:
+                logger.info(
+                    "%s reflection for '%s':\n%s", strat_name, section_name, reflection[:200]
+                )
+                new_text = strat.mutate(new_text, reflection, section_name)
+        return new_text
+
+    def get_query_aware_few_shots(self, query: str) -> Optional[str]:
+        """Render MIPROv2 few-shot examples tailored to the current query."""
+        if not query or not query.strip():
+            return None
+        if not self._strategies_for_section("FEW_SHOT_EXAMPLES"):
+            return None
+
+        traces = self._collect_learning_traces(limit=50)
+        if not traces:
+            return None
+
+        few_shots = self._apply_section_strategies(
+            "FEW_SHOT_EXAMPLES",
+            "",
+            traces,
+            query=query,
+        ).strip()
+        return few_shots or None
 
     def _ensure_tables(self) -> None:
         """Create the prompt candidate table and GEPA v2 extensions."""
@@ -871,6 +952,7 @@ class PromptOptimizerLearner(BaseLearner):
         section_name: str,
         current_text: str,
         provider: str = "default",
+        query: Optional[str] = None,
     ) -> Optional[PromptCandidate]:
         """Run one GEPA evolution cycle for a section.
 
@@ -888,25 +970,7 @@ class PromptOptimizerLearner(BaseLearner):
         Returns:
             New PromptCandidate, or None if insufficient data
         """
-        # Collect traces from JSONL logs (primary source)
-        if self._use_pareto:
-            jsonl_traces = self._collect_traces_v2(limit=50)
-        else:
-            jsonl_traces = self._collect_traces(limit=50)
-
-        # Collect traces from ConversationStore (supplementary source)
-        conv_traces = self._collect_traces_from_conversations(limit=50)
-
-        # Merge + deduplicate: unique sessions, richest data wins
-        traces = self._merge_traces(jsonl_traces, conv_traces)
-
-        if conv_traces:
-            logger.info(
-                "Unified traces: %d from JSONL + %d from conversations " "= %d unique",
-                len(jsonl_traces),
-                len(conv_traces),
-                len(traces),
-            )
+        traces = self._collect_learning_traces(limit=50)
 
         # Enrich traces with credit signals (FEP-0001 Phase 3)
         self._enrich_traces_with_credit(traces)
@@ -919,19 +983,13 @@ class PromptOptimizerLearner(BaseLearner):
             )
             return None
 
-        # Get strategies for this section (section-specific or default)
-        strategies = self._extra_strategies.get(section_name, [self._strategy])
-
         # Apply strategies sequentially (layered composition)
-        new_text = current_text
-        for strat in strategies:
-            strat_name = type(strat).__name__
-            reflection = strat.reflect(traces, section_name, new_text)
-            if reflection:
-                logger.info(
-                    "%s reflection for '%s':\n%s", strat_name, section_name, reflection[:200]
-                )
-                new_text = strat.mutate(new_text, reflection, section_name)
+        new_text = self._apply_section_strategies(
+            section_name,
+            current_text,
+            traces,
+            query=query,
+        )
         if new_text == current_text:
             logger.info("Mutation produced no change for '%s'", section_name)
             return None

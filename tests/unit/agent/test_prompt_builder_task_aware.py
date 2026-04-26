@@ -236,6 +236,18 @@ class TestPromptOptimizationSettings:
         s = PromptOptimizationSettings(enabled=True)
         assert s.get_strategies_for_section("GROUNDING_RULES") == ["gepa"]
 
+    def test_get_strategies_uses_builtin_section_defaults(self):
+        from victor.config.prompt_optimization_settings import (
+            PromptOptimizationSettings,
+        )
+
+        s = PromptOptimizationSettings(enabled=True)
+        assert s.get_strategies_for_section("FEW_SHOT_EXAMPLES") == ["miprov2"]
+        assert s.get_strategies_for_section("ASI_TOOL_EFFECTIVENESS_GUIDANCE") == [
+            "gepa",
+            "cot_distillation",
+        ]
+
     def test_get_strategies_uses_override(self):
         from victor.config.prompt_optimization_settings import (
             PromptOptimizationSettings,
@@ -263,6 +275,8 @@ class TestPromptOptimizationSettings:
 
         s = PromptOptimizationSettings(enabled=True)
         assert s.is_strategy_active("gepa")
+        assert s.is_strategy_active("miprov2")
+        assert s.is_strategy_active("cot_distillation")
         assert not s.is_strategy_active("nonexistent")
 
     def test_nested_gepa_config(self):
@@ -273,3 +287,41 @@ class TestPromptOptimizationSettings:
         s = PromptOptimizationSettings(enabled=True)
         assert s.gepa.max_prompt_chars == 1500
         assert s.gepa.default_tier == "balanced"
+
+
+class TestOptimizationInjectorFewShots:
+    def test_query_aware_few_shots_are_cached_per_query(self):
+        from unittest.mock import MagicMock, patch
+
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.config.prompt_optimization_settings import PromptOptimizationSettings
+
+        mock_learner = MagicMock()
+        mock_learner.get_query_aware_few_shots.side_effect = (
+            lambda query: f"few-shot for {query}"
+        )
+        mock_coordinator = MagicMock()
+        mock_coordinator.get_learner.return_value = mock_learner
+
+        mock_settings = MagicMock()
+        mock_settings.prompt_optimization = PromptOptimizationSettings(enabled=True)
+
+        with (
+            patch(
+                "victor.config.settings.get_settings",
+                return_value=mock_settings,
+            ),
+            patch(
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
+                return_value=mock_coordinator,
+            ),
+        ):
+            injector = OptimizationInjector()
+            first = injector.get_few_shots("fix auth bug")
+            second = injector.get_few_shots("fix billing bug")
+            third = injector.get_few_shots("fix auth bug")
+
+        assert first == "few-shot for fix auth bug"
+        assert second == "few-shot for fix billing bug"
+        assert third == "few-shot for fix auth bug"
+        assert mock_learner.get_query_aware_few_shots.call_count == 2

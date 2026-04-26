@@ -143,12 +143,14 @@ class OptimizationInjector:
 
     def __init__(self) -> None:
         self._section_cache: Dict[str, Optional[str]] = {}
+        self._few_shot_cache: Dict[str, Optional[str]] = {}
         self._last_failure_category: Optional[str] = None
         self._last_failure_error: Optional[str] = None
 
     def clear_session_cache(self) -> None:
         """Clear per-session cache (called on workspace switch)."""
         self._section_cache.clear()
+        self._few_shot_cache.clear()
 
     def get_evolved_sections(
         self,
@@ -222,12 +224,38 @@ class OptimizationInjector:
         Returns:
             Few-shot examples text or None.
         """
-        # Check session cache (MIPROv2 is still session-level for now)
-        if "FEW_SHOT_EXAMPLES" in self._section_cache:
-            return self._section_cache["FEW_SHOT_EXAMPLES"]
+        normalized_query = (query or "").strip()
+        cache_key = normalized_query or "__empty_query__"
+        if cache_key in self._few_shot_cache:
+            return self._few_shot_cache[cache_key]
+
+        try:
+            from victor.config.settings import get_settings
+
+            po = getattr(get_settings(), "prompt_optimization", None)
+            if po is not None:
+                strategies = po.get_strategies_for_section("FEW_SHOT_EXAMPLES")
+                if not strategies:
+                    self._few_shot_cache[cache_key] = None
+                    return None
+        except Exception:
+            pass
+
+        try:
+            from victor.agent.services.rl_runtime import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("prompt_optimizer")
+            if learner is not None and hasattr(learner, "get_query_aware_few_shots"):
+                few_shots = learner.get_query_aware_few_shots(normalized_query)
+                self._few_shot_cache[cache_key] = few_shots
+                if few_shots:
+                    return few_shots
+        except Exception:
+            pass
 
         evolved = self._sample_evolved("FEW_SHOT_EXAMPLES", "", "", "default")
-        self._section_cache["FEW_SHOT_EXAMPLES"] = evolved
+        self._few_shot_cache[cache_key] = evolved
         return evolved
 
     def get_failure_hint(

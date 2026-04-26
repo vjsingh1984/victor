@@ -58,8 +58,10 @@ class GEPAServiceStrategy:
         traces: List[Any],
         section_name: str,
         current_text: str,
+        **kwargs: Any,
     ) -> str:
         """Convert traces to ASI summary and call GEPA reflection."""
+        del kwargs
         from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
 
         service = self._tier_manager.get_service()

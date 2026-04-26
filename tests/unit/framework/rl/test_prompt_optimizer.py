@@ -7,9 +7,11 @@
 
 import sqlite3
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
+from victor.config.prompt_optimization_settings import PromptOptimizationSettings
 from victor.core.container import ServiceContainer, reset_container, set_container
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.credit_tracking_service import CreditTrackingService
@@ -425,6 +427,110 @@ class TestPromptOptimizerLearner:
 
         assert rec is not None
         assert rec.value == "Approved active prompt"
+
+    def test_section_strategies_use_builtin_defaults(self, db):
+        settings = SimpleNamespace(prompt_optimization=PromptOptimizationSettings(enabled=True))
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        few_shot_names = [type(s).__name__ for s in learner._strategies_for_section("FEW_SHOT_EXAMPLES")]
+        asi_names = [
+            type(s).__name__
+            for s in learner._strategies_for_section("ASI_TOOL_EFFECTIVENESS_GUIDANCE")
+        ]
+        grounding_names = [
+            type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES")
+        ]
+
+        assert few_shot_names == ["MIPROv2Strategy"]
+        assert asi_names == ["GEPAStrategy", "CoTDistillationStrategy"]
+        assert grounding_names == ["GEPAStrategy"]
+
+    def test_section_strategies_honor_config_overrides(self, db):
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=["cot_distillation"],
+                section_strategies={
+                    "GROUNDING_RULES": ["gepa", "cot_distillation"],
+                    "FEW_SHOT_EXAMPLES": [],
+                },
+            )
+        )
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        grounding_names = [
+            type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES")
+        ]
+        completion_names = [
+            type(s).__name__ for s in learner._strategies_for_section("COMPLETION_GUIDANCE")
+        ]
+
+        assert grounding_names == ["GEPAStrategy", "CoTDistillationStrategy"]
+        assert learner._strategies_for_section("FEW_SHOT_EXAMPLES") == []
+        assert completion_names == ["CoTDistillationStrategy"]
+
+    def test_section_strategies_support_prefpo_override(self, db):
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=["gepa"],
+                section_strategies={
+                    "GROUNDING_RULES": ["prefpo"],
+                },
+            )
+        )
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        grounding_names = [
+            type(s).__name__ for s in learner._strategies_for_section("GROUNDING_RULES")
+        ]
+
+        assert grounding_names == ["PrefPOStrategy"]
+
+    def test_evolve_with_prefpo_creates_non_active_candidate(self, db):
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=[],
+                section_strategies={"GROUNDING_RULES": ["prefpo"]},
+            )
+        )
+        traces = [
+            ExecutionTrace(
+                session_id=f"s{i}",
+                task_type="action",
+                provider="ollama",
+                model="qwen",
+                tool_calls=4,
+                tool_failures={"file_not_found": 2, "edit_mismatch": 1},
+                success=False,
+                completion_score=0.3,
+                tokens_used=700,
+            )
+            for i in range(5)
+        ]
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        with patch.object(learner, "_collect_learning_traces", return_value=traces):
+            with patch.object(learner, "_enrich_traces_with_credit") as enrich_mock:
+                candidate = learner.evolve(
+                    "GROUNDING_RULES",
+                    "Base responses on tool output only.",
+                )
+
+        assert candidate is not None
+        assert candidate.is_active is False
+        assert candidate.benchmark_passed is False
+        assert "Verify file paths with ls()" in candidate.text
+        enrich_mock.assert_called_once()
 
     def test_enrich_traces_with_credit_uses_registered_service(self, learner):
         """Recent credit summary should enrich traces when service is in DI."""

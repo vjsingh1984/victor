@@ -187,3 +187,8 @@ class MIPROv2Strategy:
 
         example_text = "\n".join(examples)
         return f"{current_text}\n\n--- Few-shot demonstrations ---\n{example_text}"
+
+    def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
+        """Return the mined few-shot block as the updated section text."""
+        del section_name
+        return reflection or current_text
