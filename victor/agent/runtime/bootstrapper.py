@@ -103,8 +103,6 @@ class AgentRuntimeBootstrapper:
                 thinking=orchestrator.thinking,
                 provider_manager=orchestrator._provider_manager,
                 provider_runtime=orchestrator._provider_runtime,
-                provider_coordinator=orchestrator._provider_coordinator,
-                provider_switch_coordinator=(orchestrator._provider_switch_coordinator),
             ),
             name="provider_facade",
         )

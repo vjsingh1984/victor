@@ -15,6 +15,7 @@
 """Tests for ProviderFacade domain facade."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from victor.agent.facades.provider_facade import ProviderFacade
@@ -71,6 +72,51 @@ class TestProviderFacadeInit:
         assert facade.provider_runtime is None
         assert facade.provider_coordinator is None
         assert facade.provider_switch_coordinator is None
+
+    def test_init_derives_deprecated_coordinators_from_runtime(self):
+        """Deprecated coordinator accessors derive from provider runtime by default."""
+        provider = MagicMock()
+        manager = MagicMock()
+        provider_coordinator = MagicMock(name="provider_coordinator")
+        switch_coordinator = MagicMock(name="switch_coordinator")
+        runtime = SimpleNamespace(
+            provider_coordinator=provider_coordinator,
+            provider_switch_coordinator=switch_coordinator,
+        )
+
+        facade = ProviderFacade(
+            provider=provider,
+            model="gpt-4",
+            provider_manager=manager,
+            provider_runtime=runtime,
+        )
+
+        assert facade.provider_runtime is runtime
+        assert facade.provider_coordinator is provider_coordinator
+        assert facade.provider_switch_coordinator is switch_coordinator
+
+    def test_init_prefers_explicit_deprecated_coordinator_over_runtime(self):
+        """Explicit compatibility slots still override runtime-derived values."""
+        provider = MagicMock()
+        manager = MagicMock()
+        explicit_provider_coordinator = MagicMock(name="explicit_provider_coordinator")
+        explicit_switch_coordinator = MagicMock(name="explicit_switch_coordinator")
+        runtime = SimpleNamespace(
+            provider_coordinator=MagicMock(name="runtime_provider_coordinator"),
+            provider_switch_coordinator=MagicMock(name="runtime_switch_coordinator"),
+        )
+
+        facade = ProviderFacade(
+            provider=provider,
+            model="gpt-4",
+            provider_manager=manager,
+            provider_runtime=runtime,
+            provider_coordinator=explicit_provider_coordinator,
+            provider_switch_coordinator=explicit_switch_coordinator,
+        )
+
+        assert facade.provider_coordinator is explicit_provider_coordinator
+        assert facade.provider_switch_coordinator is explicit_switch_coordinator
 
 
 class TestProviderFacadeProperties:

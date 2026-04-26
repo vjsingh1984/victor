@@ -56,12 +56,19 @@ class TestAgentRuntimeBootstrapper:
 
     def test_lazy_facades_materialize_from_current_orchestrator_state(self):
         orch = self._make_mock_orchestrator()
+        orch._provider_runtime.provider_coordinator = sentinel.provider_coordinator
+        orch._provider_runtime.provider_switch_coordinator = sentinel.provider_switch_coordinator
 
         AgentRuntimeBootstrapper.create_facades(orch)
 
         assert orch._chat_facade.conversation_controller is orch._conversation_controller
         assert orch._tool_facade.tool_pipeline is orch._tool_pipeline
         assert orch._provider_facade.provider_manager is orch._provider_manager
+        assert orch._provider_facade.provider_coordinator is sentinel.provider_coordinator
+        assert (
+            orch._provider_facade.provider_switch_coordinator
+            is sentinel.provider_switch_coordinator
+        )
         assert orch._session_facade.session_ledger is orch._session_ledger
         assert orch._metrics_facade.metrics_runtime is orch._metrics_runtime
         assert orch._resilience_facade.recovery_coordinator is orch._recovery_coordinator
@@ -73,6 +80,18 @@ class TestAgentRuntimeBootstrapper:
         assert orch._metrics_facade.initialized is True
         assert orch._resilience_facade.initialized is True
         assert orch._workflow_facade.initialized is True
+
+    def test_create_facades_provider_facade_derives_compatibility_from_runtime(self):
+        orch = self._make_mock_orchestrator()
+
+        with patch("victor.agent.facades.ProviderFacade") as facade_cls:
+            AgentRuntimeBootstrapper.create_facades(orch)
+            assert orch._provider_facade.provider_manager is facade_cls.return_value.provider_manager
+
+        kwargs = facade_cls.call_args.kwargs
+        assert kwargs["provider_runtime"] is orch._provider_runtime
+        assert "provider_coordinator" not in kwargs
+        assert "provider_switch_coordinator" not in kwargs
 
     def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(self):
         orch = self._make_mock_orchestrator()
