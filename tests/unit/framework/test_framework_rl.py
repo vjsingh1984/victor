@@ -18,6 +18,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.framework.rl import (
+    create_prompt_rollout_experiment,
+    create_prompt_rollout_experiment_async,
     LearnerType,
     LearnerStats,
     RLStats,
@@ -399,3 +401,22 @@ class TestFrameworkExports:
         from victor.framework import create_outcome as ExportedCreateOutcome
 
         assert ExportedCreateOutcome is create_outcome
+
+    def test_create_prompt_rollout_experiment_exported(self):
+        """Test create_prompt_rollout_experiment is exported from framework."""
+        from victor.framework import (
+            create_prompt_rollout_experiment as ExportedCreatePromptRolloutExperiment,
+        )
+
+        assert ExportedCreatePromptRolloutExperiment is create_prompt_rollout_experiment
+
+    def test_create_prompt_rollout_experiment_async_exported(self):
+        """Test async prompt rollout helper is exported from framework."""
+        from victor.framework import (
+            create_prompt_rollout_experiment_async as ExportedCreatePromptRolloutExperimentAsync,
+        )
+
+        assert (
+            ExportedCreatePromptRolloutExperimentAsync
+            is create_prompt_rollout_experiment_async
+        )

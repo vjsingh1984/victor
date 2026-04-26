@@ -204,6 +204,8 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "RLOutcome",
         "RLRecommendation",
         "RLStats",
+        "create_prompt_rollout_experiment",
+        "create_prompt_rollout_experiment_async",
         "create_outcome",
         "get_rl_coordinator",
         "record_tool_success",
