@@ -269,6 +269,32 @@ class TestToolCoordinator:
         assert coordinator.budget_used == 2
         assert coordinator.execution_count == 2
 
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_forwards_credit_context(self, coordinator, mock_pipeline):
+        """Additional context needed for credit attribution should reach the pipeline."""
+        mock_result = MagicMock()
+        mock_result.successful_calls = 1
+        mock_pipeline.execute_tool_calls.return_value = mock_result
+
+        tool_calls = [{"name": "read", "args": {}}]
+        context = TaskContext(
+            message="investigate failure",
+            task_type="debug",
+            additional_context={
+                "agent_id": "researcher_1",
+                "team_id": "team_debug",
+                "session_id": "session-123",
+            },
+        )
+
+        await coordinator.execute_tool_calls(tool_calls, context=context)
+
+        mock_pipeline.execute_tool_calls.assert_awaited_once()
+        forwarded_context = mock_pipeline.execute_tool_calls.await_args.kwargs["context"]
+        assert forwarded_context["agent_id"] == "researcher_1"
+        assert forwarded_context["team_id"] == "team_debug"
+        assert forwarded_context["session_id"] == "session-123"
+
     def test_get_selection_stats(self, coordinator):
         """Test selection statistics via observability handler."""
         stats = coordinator._observability.get_selection_stats()

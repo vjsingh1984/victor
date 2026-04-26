@@ -55,6 +55,7 @@ class ToolRewardSignal:
     execution_time_ms: float
     agent_id: str = "default"
     team_id: Optional[str] = None
+    session_id: Optional[str] = None
     error: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
     arguments_summary: str = ""
@@ -206,6 +207,7 @@ class CreditTrackingService:
         arguments: Optional[Dict[str, Any]] = None,
         agent_id: str = "default",
         team_id: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> ToolRewardSignal:
         """Record a tool execution result for the current turn.
 
@@ -220,6 +222,7 @@ class CreditTrackingService:
             arguments: Optional tool arguments (for context)
             agent_id: Agent that initiated the call
             team_id: Optional team identifier for multi-agent runs
+            session_id: Optional execution/session identifier for trace alignment
 
         Returns:
             The extracted ToolRewardSignal
@@ -231,6 +234,7 @@ class CreditTrackingService:
             tool_name=tool_name,
             agent_id=agent_id,
             team_id=team_id,
+            session_id=session_id,
             success=success,
             reward=reward,
             execution_time_ms=execution_time_ms,
@@ -298,6 +302,7 @@ class CreditTrackingService:
                 tool_name=signal.tool_name,
                 timestamp=signal.timestamp,
                 duration_ms=int(signal.execution_time_ms),
+                session_id=signal.session_id,
             )
             trajectory.append(metadata)
             rewards.append(signal.reward)
@@ -352,7 +357,13 @@ class CreditTrackingService:
         """
         return list(reversed(self._recent_credit_signals[-limit:]))
 
-    def get_tool_credit_summary(self) -> Dict[str, Dict[str, float]]:
+    def get_tool_credit_summary(
+        self,
+        *,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        team_id: Optional[str] = None,
+    ) -> Dict[str, Dict[str, float]]:
         """Get aggregate credit summary by tool name.
 
         Returns:
@@ -363,6 +374,13 @@ class CreditTrackingService:
         )
 
         for signal in self._recent_credit_signals:
+            if not self._matches_filters(
+                signal,
+                session_id=session_id,
+                agent_id=agent_id,
+                team_id=team_id,
+            ):
+                continue
             if signal.metadata and signal.metadata.tool_name:
                 tool = signal.metadata.tool_name
                 tool_stats[tool]["total_credit"] += signal.credit
@@ -382,7 +400,12 @@ class CreditTrackingService:
 
         return result
 
-    def get_agent_credit_summary(self) -> Dict[str, Dict[str, Any]]:
+    def get_agent_credit_summary(
+        self,
+        *,
+        session_id: Optional[str] = None,
+        team_id: Optional[str] = None,
+    ) -> Dict[str, Dict[str, Any]]:
         """Get aggregate credit summary by agent ID.
 
         Returns:
@@ -398,6 +421,12 @@ class CreditTrackingService:
         )
 
         for signal in self._recent_credit_signals:
+            if not self._matches_filters(
+                signal,
+                session_id=session_id,
+                team_id=team_id,
+            ):
+                continue
             if signal.metadata and signal.metadata.agent_id:
                 agent_id = signal.metadata.agent_id
                 agent_stats[agent_id]["total_credit"] += signal.credit
@@ -424,7 +453,14 @@ class CreditTrackingService:
     # Feedback loop: credit-driven guidance for prompt injection
     # ----------------------------------------------------------------
 
-    def generate_tool_guidance(self, max_hints: int = 5) -> Optional[str]:
+    def generate_tool_guidance(
+        self,
+        max_hints: int = 5,
+        *,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        team_id: Optional[str] = None,
+    ) -> Optional[str]:
         """Generate concise tool effectiveness guidance from credit history.
 
         This is the core feedback loop: credit signals flow back into the
@@ -441,7 +477,11 @@ class CreditTrackingService:
         Returns:
             Guidance string or None if insufficient data
         """
-        summary = self.get_tool_credit_summary()
+        summary = self.get_tool_credit_summary(
+            session_id=session_id,
+            agent_id=agent_id,
+            team_id=team_id,
+        )
         if not summary:
             return None
 
@@ -478,13 +518,19 @@ class CreditTrackingService:
 
         return "\n".join(lines)
 
-    def generate_agent_guidance(self, max_agents: int = 4) -> Optional[str]:
+    def generate_agent_guidance(
+        self,
+        max_agents: int = 4,
+        *,
+        session_id: Optional[str] = None,
+        team_id: Optional[str] = None,
+    ) -> Optional[str]:
         """Generate concise agent-specific guidance from recent team credit.
 
         Returns a short textual summary that can be fed into prompt optimization
         for offline reflection in multi-agent scenarios.
         """
-        summary = self.get_agent_credit_summary()
+        summary = self.get_agent_credit_summary(session_id=session_id, team_id=team_id)
         if not summary:
             return None
 
@@ -611,6 +657,26 @@ class CreditTrackingService:
             else:
                 parts.append(key)
         return ", ".join(parts[:5])
+
+    @staticmethod
+    def _matches_filters(
+        signal: CreditSignal,
+        *,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        team_id: Optional[str] = None,
+    ) -> bool:
+        """Return whether a stored credit signal matches the requested scope."""
+        metadata = signal.metadata
+        if metadata is None:
+            return False
+        if session_id is not None and metadata.session_id != session_id:
+            return False
+        if agent_id is not None and metadata.agent_id != agent_id:
+            return False
+        if team_id is not None and metadata.team_id != team_id:
+            return False
+        return True
 
 
 # ============================================================================

@@ -2145,6 +2145,9 @@ class ToolPipeline:
                     execution_time_ms=call_result.execution_time_ms,
                     error=call_result.error,
                     arguments=call_result.arguments,
+                    agent_id=context.get("agent_id", "default"),
+                    team_id=context.get("team_id"),
+                    session_id=context.get("session_id"),
                 )
             except Exception:
                 pass  # Credit tracking is non-critical

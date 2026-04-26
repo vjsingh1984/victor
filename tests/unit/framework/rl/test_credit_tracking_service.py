@@ -152,6 +152,23 @@ class TestCreditTrackingService:
         assert agent_ids == ["researcher_1", "executor_1"]
         assert team_ids == ["team_debug", "team_debug"]
 
+    def test_assign_turn_credit_preserves_session_ids(self):
+        service = CreditTrackingService()
+
+        service.record_tool_result(
+            "search",
+            True,
+            40.0,
+            agent_id="researcher_1",
+            team_id="team_debug",
+            session_id="session-alpha",
+        )
+
+        signals = service.assign_turn_credit(agent_id="manager", team_id="team_debug")
+
+        assert len(signals) == 1
+        assert getattr(signals[0].metadata, "session_id", None) == "session-alpha"
+
     def test_assign_turn_credit_uses_gae_by_default(self):
         service = CreditTrackingService(methodology=CreditMethodology.GAE)
 

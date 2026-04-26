@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MIPROv2 prompt optimization strategy with KNNFewShot selection.
+"""MIPROv2-inspired few-shot prompt adaptation.
 
-Inspired by DSPy's KNNFewShot optimizer (arXiv:2604.04869), this strategy
-selects few-shot demonstrations that are most similar to the current query
-using embedding-based cosine similarity. Different queries get different
-demonstrations, improving prompt relevance.
-
-The strategy:
-1. Embeds trace descriptions (task type, tools used, failures) into vectors
-2. Embeds the current user query
-3. Uses cosine similarity to find the most relevant traces
-4. Falls back to score-based selection when embeddings are unavailable
+This is not a full implementation of the original MIPROv2 optimizer with
+proposal search and Bayesian optimization. In the current framework shape,
+it serves as a query-aware few-shot retriever that mines successful traces,
+prefers stronger examples, enforces light diversity, and bounds the injected
+few-shot payload size.
 """
 
 import logging
@@ -33,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class MIPROv2Strategy:
-    """MIPROv2-style few-shot demonstration mining strategy.
+    """MIPROv2-inspired few-shot demonstration mining strategy.
 
     Uses embedding-based KNN selection to find the most relevant
     traces for a given query, producing input-aware few-shot examples.
@@ -42,13 +37,25 @@ class MIPROv2Strategy:
         _max_examples: Maximum number of few-shot examples to include.
     """
 
-    def __init__(self, max_examples: int = 3):
+    def __init__(
+        self,
+        max_examples: int = 3,
+        min_completion_score: float = 0.7,
+        example_diversity: bool = True,
+        max_example_chars: int = 400,
+    ):
         """Initialize the MIPROv2 strategy.
 
         Args:
             max_examples: Maximum number of few-shot examples to produce.
+            min_completion_score: Minimum trace score required for inclusion.
+            example_diversity: Whether to deduplicate near-identical traces.
+            max_example_chars: Maximum size of the formatted example block.
         """
         self._max_examples = max_examples
+        self._min_completion_score = min_completion_score
+        self._example_diversity = example_diversity
+        self._max_example_chars = max_example_chars
 
     def select_similar_traces(self, traces: List[Any], query: str, top_k: int = 3) -> List[Any]:
         """KNNFewShot: select traces most similar to the current query.
@@ -155,16 +162,22 @@ class MIPROv2Strategy:
         successful = [
             t
             for t in traces
-            if getattr(t, "success", False) and getattr(t, "completion_score", 0) > 0.5
+            if getattr(t, "success", False)
+            and getattr(t, "completion_score", 0) >= self._min_completion_score
         ]
 
         if not successful:
             return current_text
 
+        successful.sort(key=lambda trace: getattr(trace, "completion_score", 0.0), reverse=True)
+
         # Use KNN selection when query is available and we have more
         # traces than needed
         if query and len(successful) > self._max_examples:
             successful = self.select_similar_traces(successful, query, self._max_examples)
+
+        if self._example_diversity:
+            successful = self._dedupe_traces(successful)
 
         # Limit to max_examples
         selected = successful[: self._max_examples]
@@ -186,9 +199,34 @@ class MIPROv2Strategy:
             return current_text
 
         example_text = "\n".join(examples)
+        if len(example_text) > self._max_example_chars:
+            max_len = max(self._max_example_chars - 3, 0)
+            example_text = f"{example_text[:max_len].rstrip()}..."
         return f"{current_text}\n\n--- Few-shot demonstrations ---\n{example_text}"
 
     def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
         """Return the mined few-shot block as the updated section text."""
         del section_name
         return reflection or current_text
+
+    def _dedupe_traces(self, traces: List[Any]) -> List[Any]:
+        """Drop near-identical examples so few-shot blocks stay varied."""
+        unique: List[Any] = []
+        seen = set()
+        for trace in traces:
+            signature = self._trace_signature(trace)
+            if signature in seen:
+                continue
+            seen.add(signature)
+            unique.append(trace)
+        return unique
+
+    @staticmethod
+    def _trace_signature(trace: Any) -> str:
+        """Build a lightweight trace signature for diversity filtering."""
+        task = getattr(trace, "task_type", "unknown")
+        tools = [
+            getattr(detail, "tool_name", "unknown")
+            for detail in getattr(trace, "tool_call_details", [])[:5]
+        ]
+        return f"{task}:{','.join(tools)}"

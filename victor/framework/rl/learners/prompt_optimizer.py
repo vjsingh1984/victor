@@ -15,6 +15,11 @@ LLM-driven reflection, following the GEPA methodology (ICLR 2026):
 Uses strategy pattern — GEPAStrategy is the default, but can be
 swapped for alternatives (random mutation, manual, etc.).
 
+Current implementation notes:
+- Candidates are provider-scoped and persist full layered strategy-chain metadata.
+- Pareto frontiers are tracked per `(section, provider)` key.
+- Credit enrichment is session-aligned when runtime credit metadata is available.
+
 Usage:
     from victor.framework.rl.learners.prompt_optimizer import (
         PromptOptimizerLearner,
@@ -31,6 +36,7 @@ import hashlib
 import json
 import logging
 import random
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -327,6 +333,7 @@ class PromptCandidate:
     benchmark_passed: bool = False
     is_active: bool = False
     strategy_name: str = "gepa"
+    strategy_chain: str = "gepa"
     requires_benchmark: bool = False
 
     def sample(self) -> float:
@@ -748,13 +755,21 @@ class PromptOptimizerLearner(BaseLearner):
         current_text: str,
         traces: List[ExecutionTrace],
         *,
+        provider: str = "default",
         query: Optional[str] = None,
     ) -> str:
         """Apply the configured strategy chain for a section."""
         new_text = current_text
         for strat in self._strategies_for_section(section_name):
             strat_name = type(strat).__name__
-            reflection = strat.reflect(traces, section_name, new_text, query=query)
+            reflection = strat.reflect(
+                traces,
+                section_name,
+                new_text,
+                query=query,
+                provider=provider,
+                target_provider=provider,
+            )
             if reflection:
                 logger.info(
                     "%s reflection for '%s':\n%s", strat_name, section_name, reflection[:200]
@@ -798,6 +813,7 @@ class PromptOptimizerLearner(BaseLearner):
                 ("benchmark_runs INTEGER", "0"),
                 ("benchmark_passed INTEGER", "0"),
                 ("strategy_name TEXT", "'gepa'"),
+                ("strategy_chain TEXT", "'gepa'"),
                 ("requires_benchmark INTEGER", "0"),
             ]:
                 try:
@@ -825,7 +841,8 @@ class PromptOptimizerLearner(BaseLearner):
                 f"SELECT section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
                 f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
-                f"benchmark_passed, is_active, strategy_name, requires_benchmark "
+                f"benchmark_passed, is_active, strategy_name, strategy_chain, "
+                f"requires_benchmark "
                 f"FROM {Tables.AGENT_PROMPT_CANDIDATE}"
             )
             for row in cursor.fetchall():
@@ -849,7 +866,8 @@ class PromptOptimizerLearner(BaseLearner):
                     benchmark_passed=bool(row[14]),
                     is_active=bool(row[15]),
                     strategy_name=row[16] or "gepa",
-                    requires_benchmark=bool(row[17]),
+                    strategy_chain=row[17] or row[16] or "gepa",
+                    requires_benchmark=bool(row[18]),
                 )
                 key = self._candidate_key(row[0], row[1] or "default")
                 self._candidates.setdefault(key, []).append(candidate)
@@ -865,14 +883,35 @@ class PromptOptimizerLearner(BaseLearner):
         return f"{section_name}::{provider}"
 
     @staticmethod
+    def _normalize_strategy_class_name(strategy: "PromptOptimizationStrategy") -> str:
+        """Convert a strategy class name to a stable config-style identifier."""
+        name = type(strategy).__name__
+        if name.endswith("Strategy"):
+            name = name[: -len("Strategy")]
+        known_names = {
+            "GEPA": "gepa",
+            "MIPROv2": "miprov2",
+            "CoTDistillation": "cot_distillation",
+            "PrefPO": "prefpo",
+        }
+        if name in known_names:
+            return known_names[name]
+        return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
+    @staticmethod
     def _strategy_name_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> str:
         """Derive a stable strategy name for persisted candidate metadata."""
         if not strategies:
             return "gepa"
-        primary = type(strategies[0]).__name__
-        if primary.endswith("Strategy"):
-            primary = primary[: -len("Strategy")]
-        return primary.lower()
+        return PromptOptimizerLearner._normalize_strategy_class_name(strategies[0])
+
+    @staticmethod
+    def _strategy_chain_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> str:
+        """Derive a stable layered strategy-chain label for observability."""
+        if not strategies:
+            return "gepa"
+        parts = [PromptOptimizerLearner._normalize_strategy_class_name(strategy) for strategy in strategies]
+        return "+".join(parts) or "gepa"
 
     @staticmethod
     def _requires_benchmark_for_candidate(strategies: List["PromptOptimizationStrategy"]) -> bool:
@@ -952,8 +991,11 @@ class PromptOptimizerLearner(BaseLearner):
 
         # Hybrid: if Pareto enabled, restrict Thompson to frontier candidates
         if self._use_pareto:
-            key = self._candidate_key(section_name, provider or "default")
-            frontier = self._pareto_frontiers.get(key)
+            frontier_key = self._candidate_key(
+                section_name,
+                candidates[0].provider if candidates else (provider or "default"),
+            )
+            frontier = self._pareto_frontiers.get(frontier_key)
             if frontier:
                 frontier_hashes = {e.text_hash for e in frontier.get_frontier()}
                 if frontier_hashes:
@@ -972,7 +1014,10 @@ class PromptOptimizerLearner(BaseLearner):
         evidence_count = max(best.sample_count, best.benchmark_runs)
         confidence = min(evidence_count / (MIN_SAMPLES_FOR_CONFIDENCE * 2), 1.0)
 
-        reason_parts = [f"GEPA gen-{best.generation} (α={best.alpha:.1f}, β={best.beta_val:.1f})"]
+        strategy_label = best.strategy_chain or best.strategy_name or "gepa"
+        reason_parts = [
+            f"{strategy_label} gen-{best.generation} (α={best.alpha:.1f}, β={best.beta_val:.1f})"
+        ]
         if best.is_active:
             reason_parts.append("active")
         if best.benchmark_passed:
@@ -988,6 +1033,12 @@ class PromptOptimizerLearner(BaseLearner):
             reason=", ".join(reason_parts),
             sample_size=evidence_count,
             is_baseline=best.sample_count < MIN_SAMPLES_FOR_CONFIDENCE,
+            metadata={
+                "strategy_name": best.strategy_name,
+                "strategy_chain": best.strategy_chain,
+                "provider": best.provider,
+                "generation": best.generation,
+            },
         )
 
     def evolve(
@@ -1031,6 +1082,7 @@ class PromptOptimizerLearner(BaseLearner):
             section_name,
             current_text,
             traces,
+            provider=provider,
             query=query,
         )
         if new_text == current_text:
@@ -1070,6 +1122,7 @@ class PromptOptimizerLearner(BaseLearner):
             generation=generation,
             parent_hash=parent_hash,
             strategy_name=self._strategy_name_for_candidate(strategies),
+            strategy_chain=self._strategy_chain_for_candidate(strategies),
             requires_benchmark=self._requires_benchmark_for_candidate(strategies),
         )
 
@@ -1105,11 +1158,11 @@ class PromptOptimizerLearner(BaseLearner):
 
         # GEPA v2: Add to Pareto frontier
         if self._use_pareto:
-            if section_name not in self._pareto_frontiers:
+            if key not in self._pareto_frontiers:
                 from victor.framework.rl.pareto import ParetoFrontier
 
-                self._pareto_frontiers[section_name] = ParetoFrontier(max_candidates=20)
-            self._pareto_frontiers[section_name].add_candidate(
+                self._pareto_frontiers[key] = ParetoFrontier(max_candidates=20)
+            self._pareto_frontiers[key].add_candidate(
                 text_hash=text_hash,
                 text=new_text,
                 generation=generation,
@@ -1142,8 +1195,9 @@ class PromptOptimizerLearner(BaseLearner):
                 f"(section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
                 f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
-                f"benchmark_passed, is_active, strategy_name, requires_benchmark) "
-                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                f"benchmark_passed, is_active, strategy_name, strategy_chain, "
+                f"requires_benchmark) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     candidate.section_name,
                     candidate.provider,
@@ -1162,6 +1216,7 @@ class PromptOptimizerLearner(BaseLearner):
                     int(candidate.benchmark_passed),
                     int(candidate.is_active),
                     candidate.strategy_name,
+                    candidate.strategy_chain,
                     int(candidate.requires_benchmark),
                 ),
             )
@@ -1606,10 +1661,9 @@ class PromptOptimizerLearner(BaseLearner):
             return
 
         for key, candidates in self._candidates.items():
-            section = key.split("::")[0] if "::" in key else key
-            if section not in self._pareto_frontiers:
-                self._pareto_frontiers[section] = ParetoFrontier(max_candidates=20)
-            frontier = self._pareto_frontiers[section]
+            if key not in self._pareto_frontiers:
+                self._pareto_frontiers[key] = ParetoFrontier(max_candidates=20)
+            frontier = self._pareto_frontiers[key]
             for c in candidates:
                 frontier.add_candidate(
                     text_hash=c.text_hash,
@@ -1618,9 +1672,9 @@ class PromptOptimizerLearner(BaseLearner):
                     instance_scores=c.scores,
                 )
 
-    def get_pareto_frontier(self, section_name: str) -> Optional[Any]:
-        """Get the Pareto frontier for a section (if Pareto mode enabled)."""
-        return self._pareto_frontiers.get(section_name)
+    def get_pareto_frontier(self, section_name: str, provider: str = "default") -> Optional[Any]:
+        """Get the provider-scoped Pareto frontier for a section."""
+        return self._pareto_frontiers.get(self._candidate_key(section_name, provider))
 
     def _collect_traces_v2(self, limit: int = 50) -> List[ExecutionTrace]:
         """Collect enriched execution traces (GEPA v2 with ASI detail).
@@ -1857,13 +1911,28 @@ class PromptOptimizerLearner(BaseLearner):
             if service is None:
                 return
 
-            tool_summary = service.get_tool_credit_summary()
-            agent_guidance = service.generate_agent_guidance()
-            if not tool_summary and not agent_guidance:
-                return
+            tool_summary_cache: Dict[Optional[str], Dict[str, Dict[str, float]]] = {}
+            agent_guidance_cache: Dict[Optional[str], Optional[str]] = {}
 
-            # For each trace, attach credit data for its tools
             for trace in traces:
+                session_id = getattr(trace, "session_id", None)
+                if session_id not in tool_summary_cache:
+                    try:
+                        tool_summary_cache[session_id] = service.get_tool_credit_summary(
+                            session_id=session_id
+                        )
+                    except TypeError:
+                        tool_summary_cache[session_id] = service.get_tool_credit_summary()
+                if session_id not in agent_guidance_cache:
+                    try:
+                        agent_guidance_cache[session_id] = service.generate_agent_guidance(
+                            session_id=session_id
+                        )
+                    except TypeError:
+                        agent_guidance_cache[session_id] = service.generate_agent_guidance()
+
+                tool_summary = tool_summary_cache[session_id]
+                agent_guidance = agent_guidance_cache[session_id]
                 credit_data = []
                 for detail in trace.tool_call_details:
                     tool_name = getattr(detail, "tool_name", "")

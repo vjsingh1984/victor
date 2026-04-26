@@ -167,6 +167,7 @@ class ActionMetadata:
     duration_ms: int = 0
     parent_action_id: Optional[str] = None
     action_id: str = ""
+    session_id: Optional[str] = None
 
     def __post_init__(self):
         # Generate action_id if not provided

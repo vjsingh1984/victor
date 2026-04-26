@@ -218,6 +218,14 @@ pytest tests/unit/framework/rl/ tests/integration/rl/ -v
 
 After all tool calls in a turn complete, `CreditTrackingService.assign_turn_credit()` runs credit assignment and generates tool effectiveness guidance that's injected into the next turn's prompt.
 
+Current runtime behavior:
+- Tool executions preserve `agent_id`, `team_id`, and `session_id` through `ToolCoordinator`, `ToolPipeline`, and `CreditTrackingService`.
+- GEPA trace enrichment reads credit summaries with session scoping first, so prompt reflection does not leak unrelated recent runs into the current trace.
+- Agent guidance is best-effort and currently summary-based; it should be described as runtime attribution support, not as a full multi-agent credit-learning algorithm by itself.
+
+Maintainer note:
+- When runtime attribution semantics change, update both this document and the tests around `credit_tracking_service.py`, `tool_compat.py`, `tool_pipeline.py`, and `prompt_optimizer.py` in the same change. That keeps paper references and actual data flow from drifting apart.
+
 ```python
 # Automatic — wired in ToolCoordinator after execute_tool_calls()
 # Credit signals → ObservabilityBus → GEPA trace enrichment

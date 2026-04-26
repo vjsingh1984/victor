@@ -3,18 +3,12 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Chain-of-Thought Distillation strategy.
+"""Chain-of-Thought transfer strategy for prompt optimization.
 
-Extracts step-by-step reasoning patterns from successful traces of
-strong models (e.g., GPT-5.4 at 70%) and distills them into structured
-guidance for weaker models (e.g., DeepSeek at 25%, Haiku at 25%).
-
-Based on: Symbolic Chain-of-Thought Distillation (ACL 2023) — train
-smaller models on rationales sampled from larger teacher models.
-
-Our adaptation: instead of fine-tuning, we inject successful reasoning
-patterns as structured prompts, teaching weaker models the step-by-step
-approach that works for stronger models.
+This is a prompt-layer adaptation of CoT distillation, not student-model
+training. The strategy mines strong execution traces from better-performing
+providers and converts them into a compact reasoning scaffold that can be
+injected into weaker target-provider prompts.
 """
 
 import logging
@@ -50,14 +44,18 @@ class CoTDistillationStrategy:
         current_text: str,
         **kwargs: Any,
     ) -> str:
-        """Extract reasoning patterns from successful strong-model traces.
+        """Extract provider-aware reasoning patterns from strong traces.
 
-        Identifies traces where the source provider succeeded and builds
-        a generalizable step-by-step reasoning template.
+        When a target provider is supplied, only distill when another provider
+        materially outperforms it. This keeps us from re-injecting guidance
+        into the already-best provider and matches the current prompt-transfer
+        use case more closely than unconditional trace copying.
         """
-        del section_name, current_text, kwargs
+        del section_name, current_text
         if not traces:
             return ""
+
+        target_provider = kwargs.get("target_provider") or kwargs.get("provider")
 
         # Find high-scoring successful traces
         strong = [
@@ -75,9 +73,35 @@ class CoTDistillationStrategy:
             )
             return ""
 
-        # Select the best trace for distillation
-        best = max(strong, key=lambda t: t.completion_score)
+        if target_provider:
+            target_traces = [t for t in strong if getattr(t, "provider", None) == target_provider]
+            source_traces = [t for t in strong if getattr(t, "provider", None) != target_provider]
 
+            if not source_traces:
+                logger.debug("CoT: no stronger source provider available for %s", target_provider)
+                return ""
+
+            best_source = max(source_traces, key=lambda t: t.completion_score)
+            best_target_score = max(
+                (getattr(t, "completion_score", 0.0) for t in target_traces),
+                default=0.0,
+            )
+
+            if best_target_score >= getattr(best_source, "completion_score", 0.0) - self._min_gap:
+                logger.debug(
+                    "CoT: target provider %s already within %.2f of best source",
+                    target_provider,
+                    self._min_gap,
+                )
+                return ""
+
+            return self._distill_reasoning(
+                best_source,
+                source_provider=getattr(best_source, "provider", "unknown"),
+                target_provider=target_provider,
+            )
+
+        best = max(strong, key=lambda t: t.completion_score)
         return self._distill_reasoning(best)
 
     def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
@@ -86,7 +110,13 @@ class CoTDistillationStrategy:
             return current_text
         return f"{current_text}\n\n{reflection}"
 
-    def _distill_reasoning(self, trace: Any) -> str:
+    def _distill_reasoning(
+        self,
+        trace: Any,
+        *,
+        source_provider: str = "",
+        target_provider: str = "",
+    ) -> str:
         """Convert a successful trace into a step-by-step reasoning template.
 
         Extracts the tool-call sequence and generalizes it into a
@@ -140,5 +170,8 @@ class CoTDistillationStrategy:
         # Limit to max_steps
         steps = steps[: self._max_steps]
 
-        header = f"STEP-BY-STEP APPROACH (distilled from {score:.0%} success rate):"
+        scope = ""
+        if source_provider and target_provider:
+            scope = f" from {source_provider} to {target_provider}"
+        header = f"STEP-BY-STEP APPROACH{scope} (distilled from {score:.0%} success rate):"
         return f"{header}\n" + "\n".join(steps)

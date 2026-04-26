@@ -65,23 +65,29 @@ This document outlines the design for Priority 4 (Learning from Execution), whic
 **Location**: `victor/framework/rl/learners/prompt_optimizer.py`
 
 **Existing Strategies**:
-1. **GEPA (GEPAStrategy - Default)**: Gradient-Enhanced Prompt Architecture
-   - Thompson Sampling for exploration
-   - Pareto frontier optimization
-   - Semantic trace zones (inspired by PRiME paper)
+1. **GEPA (GEPAStrategy - Default)**: Trace-reflection prompt evolution
+   - Thompson Sampling for candidate serving
+   - Provider-scoped Pareto frontier bookkeeping
+   - Semantic trace zones inspired by PRiME
    - 13 failure categories with corrective hints
+   - Session-aligned credit enrichment from runtime tool execution
    - Used for: ASI_TOOL_EFFECTIVENESS_GUIDANCE, GROUNDING_RULES, COMPLETION_GUIDANCE, INIT_SYNTHESIS_RULES
 
-2. **MIPROv2 (MIPROv2Strategy)**: Few-shot demonstration mining
-   - KNN-based selection
-   - Embedding similarity matching
+2. **MIPROv2-inspired (MIPROv2Strategy)**: Query-aware few-shot retrieval adaptation
+   - KNN-style embedding similarity when embeddings are available
+   - Score thresholding, lightweight diversity filtering, and bounded example size
    - Used for: FEW_SHOT_EXAMPLES section only
+   - Not a full implementation of MIPROv2 proposal search or Bayesian optimization
 
-3. **CoT Distillation (CoTDistillationStrategy)**: Chain-of-Thought extraction
-   - Pattern extraction from traces
+3. **CoT Transfer (CoTDistillationStrategy)**: Provider-aware reasoning-template transfer
+   - Extracts stepwise execution scaffolds from stronger-provider traces
+   - Only transfers when another provider materially outperforms the target provider
    - Layered with GEPA for ASI_TOOL_EFFECTIVENESS_GUIDANCE
+   - This is prompt-level transfer, not student-model distillation
 
-**Note**: PRiME is referenced as inspiration for semantic trace zones design but is not implemented as a standalone strategy.
+**Note**: PRiME is referenced as inspiration for semantic trace zoning and memory organization, but is not implemented here as a standalone strategy.
+
+**Maintainer note**: Keep this section synchronized with the tests around `prompt_optimizer.py`, `miprov2_strategy.py`, and `cot_distillation_strategy.py`. If a paper-inspired feature is only partially adapted, describe the adaptation explicitly instead of naming the full paper method.
 
 **Evolvable Sections** (5):
 - `ASI_TOOL_EFFECTIVENESS_GUIDANCE`

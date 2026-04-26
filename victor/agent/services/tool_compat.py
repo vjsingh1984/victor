@@ -768,6 +768,7 @@ class ToolCoordinator:
                 "observed_files": context.observed_files,
                 "executed_tools": context.executed_tools,
             }
+            execution_context.update(context.additional_context)
 
         # Execute through pipeline
         result = await self._pipeline.execute_tool_calls(
@@ -786,7 +787,10 @@ class ToolCoordinator:
         credit_service = self._pipeline.credit_tracking_service
         if credit_service is not None and credit_service.pending_signals > 0:
             try:
-                credit_service.assign_turn_credit()
+                credit_service.assign_turn_credit(
+                    agent_id=execution_context.get("agent_id", "default"),
+                    team_id=execution_context.get("team_id"),
+                )
             except Exception:
                 pass  # Credit assignment is non-critical
 

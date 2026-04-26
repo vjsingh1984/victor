@@ -197,6 +197,29 @@ class TestPromptOptimizerLearner:
         assert rec.value == "Better prompt"
         assert rec.confidence > 0
 
+    def test_get_recommendation_reason_uses_strategy_chain_when_present(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Layered prompt",
+            text_hash="hash_chain",
+            generation=2,
+            parent_hash="parent",
+            alpha=6.0,
+            beta_val=1.0,
+            sample_count=8,
+            strategy_name="gepa",
+        )
+        candidate.strategy_chain = "gepa+cot_distillation"
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [candidate]
+
+        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
+
+        assert rec is not None
+        assert "gepa+cot_distillation" in rec.reason
+
     def test_get_recommendation_falls_back_to_default(self, db):
         """Provider-specific miss should fall back to 'default' candidates."""
         learner = PromptOptimizerLearner(name="test", db_connection=db)
@@ -241,6 +264,67 @@ class TestPromptOptimizerLearner:
         )
         learner.record_outcome(outcome)
         assert candidate.alpha > 1.0  # Updated
+
+    def test_evolve_records_full_strategy_chain_metadata(self, db):
+        settings = SimpleNamespace(
+            prompt_optimization=PromptOptimizationSettings(
+                enabled=True,
+                default_strategies=[],
+                section_strategies={
+                    "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ["gepa", "cot_distillation"],
+                },
+            )
+        )
+        traces = [
+            ExecutionTrace(
+                session_id=f"s{i}",
+                task_type="action",
+                provider="anthropic" if i < 3 else "ollama",
+                model="model-a",
+                tool_calls=4,
+                tool_failures={"edit_mismatch": 1} if i == 0 else {},
+                success=True,
+                completion_score=0.9 if i < 3 else 0.5,
+                tokens_used=500,
+            )
+            for i in range(5)
+        ]
+
+        with patch("victor.config.settings.get_settings", return_value=settings):
+            learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        with (
+            patch.object(learner, "_collect_learning_traces", return_value=traces),
+            patch.object(learner, "_enrich_traces_with_credit"),
+            patch.object(learner, "_apply_section_strategies", return_value="mutated prompt"),
+        ):
+            candidate = learner.evolve(
+                "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                "base prompt",
+                provider="ollama",
+            )
+
+        assert candidate is not None
+        assert getattr(candidate, "strategy_chain", None) == "gepa+cot_distillation"
+
+    def test_init_pareto_frontiers_uses_section_provider_key(self, db):
+        base = PromptOptimizerLearner(name="base", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            text="candidate",
+            text_hash="pareto1",
+            generation=1,
+            parent_hash="parent",
+            sample_count=3,
+        )
+        key = base._candidate_key("GROUNDING_RULES", "ollama")
+        base._candidates[key] = [candidate]
+        base._save_candidate(candidate)
+
+        learner = PromptOptimizerLearner(name="pareto", db_connection=db, use_pareto=True)
+
+        assert key in learner._pareto_frontiers
 
     def test_export_metrics(self, learner):
         metrics = learner.export_metrics()
@@ -747,3 +831,75 @@ class TestPromptOptimizerLearner:
             assert "researcher_1" in (trace.agent_guidance or "")
         finally:
             reset_container()
+
+    def test_enrich_traces_with_credit_filters_by_trace_session_id(self, learner):
+        service = CreditTrackingService()
+        service.record_tool_result("grep", True, 50.0, session_id="session-target")
+        service.assign_turn_credit(agent_id="researcher_1")
+        service.record_tool_result("edit", False, 100.0, error="Mismatch", session_id="session-other")
+        service.assign_turn_credit(agent_id="executor_1")
+
+        container = ServiceContainer()
+        container.register_instance(CreditTrackingService, service)
+        set_container(container)
+        try:
+            trace = ExecutionTrace(
+                session_id="session-target",
+                provider="ollama",
+                model="qwen",
+                task_type="search",
+                tool_calls=2,
+                tool_failures={},
+                completion_score=0.9,
+                success=True,
+                tokens_used=120,
+                tool_call_details=[
+                    SimpleNamespace(tool_name="grep"),
+                    SimpleNamespace(tool_name="edit"),
+                ],
+            )
+            learner._enrich_traces_with_credit([trace])
+            tool_names = [signal["tool_name"] for signal in trace.credit_signals]
+            assert tool_names == ["grep"]
+        finally:
+            reset_container()
+
+    def test_cot_distillation_skips_when_target_provider_is_best(self):
+        from victor.framework.rl.learners.strategies.cot_distillation_strategy import (
+            CoTDistillationStrategy,
+        )
+
+        strategy = CoTDistillationStrategy(min_source_score=0.7, min_score_gap=0.15)
+        traces = [
+            ExecutionTrace(
+                session_id="s1",
+                task_type="action",
+                provider="anthropic",
+                model="claude",
+                tool_calls=5,
+                tool_failures={},
+                success=True,
+                completion_score=0.92,
+                tokens_used=300,
+            ),
+            ExecutionTrace(
+                session_id="s2",
+                task_type="action",
+                provider="ollama",
+                model="qwen",
+                tool_calls=5,
+                tool_failures={},
+                success=True,
+                completion_score=0.55,
+                tokens_used=300,
+            ),
+        ]
+
+        reflection = strategy.reflect(
+            traces,
+            "COMPLETION_GUIDANCE",
+            "base prompt",
+            provider="anthropic",
+        )
+
+        assert reflection == ""

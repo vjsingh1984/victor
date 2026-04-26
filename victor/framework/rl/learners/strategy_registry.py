@@ -36,6 +36,9 @@ def build_prompt_strategy(
         mipro_settings = getattr(settings, "miprov2", None)
         return MIPROv2Strategy(
             max_examples=getattr(mipro_settings, "max_examples", 3),
+            min_completion_score=getattr(mipro_settings, "min_completion_score", 0.7),
+            example_diversity=getattr(mipro_settings, "example_diversity", True),
+            max_example_chars=getattr(mipro_settings, "max_example_chars", 400),
         )
 
     if normalized == "cot_distillation":

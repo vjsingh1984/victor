@@ -507,7 +507,17 @@ class Schema:
             alpha REAL DEFAULT 1.0,
             beta REAL DEFAULT 1.0,
             sample_count INTEGER DEFAULT 0,
+            instance_scores TEXT DEFAULT '{{}}',
+            coverage_count INTEGER DEFAULT 0,
+            is_on_frontier INTEGER DEFAULT 1,
+            char_length INTEGER DEFAULT 0,
+            benchmark_score REAL DEFAULT 0.0,
+            benchmark_runs INTEGER DEFAULT 0,
+            benchmark_passed INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 0,
+            strategy_name TEXT DEFAULT 'gepa',
+            strategy_chain TEXT DEFAULT 'gepa',
+            requires_benchmark INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now')),
             UNIQUE(section_name, provider, text_hash)
         )
