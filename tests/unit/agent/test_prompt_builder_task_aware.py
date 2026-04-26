@@ -332,7 +332,9 @@ class TestOptimizationInjectorFewShots:
                 task_type="edit",
             )
 
-        grounding = next(payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES")
+        grounding = next(
+            payload for payload in payloads if payload["section_name"] == "GROUNDING_RULES"
+        )
         assert grounding["text"] == "EVOLVED GROUNDING"
         assert grounding["provider"] == "anthropic"
         assert grounding["prompt_candidate_hash"] == "cand-123"

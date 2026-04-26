@@ -2151,6 +2151,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         break
 
                 prefix = pipeline.compose_turn_prefix(last_user_msg, turn_ctx)
+                self._record_prompt_optimization_metadata(turn_ctx)
 
                 # Clear failure state after injecting hint
                 if injector and turn_ctx.last_turn_failed:

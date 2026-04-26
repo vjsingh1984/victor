@@ -15,6 +15,7 @@
 """Core tests for AgentOrchestrator module - focusing on high-impact functionality."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.orchestrator import AgentOrchestrator
@@ -257,6 +258,42 @@ class TestToolDependencies:
 
 class TestConversationState:
     """Tests for conversation state management."""
+
+
+class TestPromptOptimizationMetadata:
+    def test_record_prompt_optimization_metadata_updates_session(self, orchestrator):
+        metadata = {
+            "entries": [
+                {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "prompt_section_name": "GROUNDING_RULES",
+                    "strategy_name": "gepa",
+                    "source": "candidate",
+                }
+            ],
+            "by_section": {
+                "GROUNDING_RULES": {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "prompt_section_name": "GROUNDING_RULES",
+                    "strategy_name": "gepa",
+                    "source": "candidate",
+                }
+            },
+        }
+        orchestrator._session_service.update_session_metadata = MagicMock()
+
+        orchestrator._record_prompt_optimization_metadata(
+            SimpleNamespace(prompt_optimization_metadata=metadata)
+        )
+
+        assert orchestrator._active_prompt_optimization_metadata == metadata
+        orchestrator._session_service.update_session_metadata.assert_called_once_with(
+            {"prompt_optimization": metadata}
+        )
 
     def test_reset_conversation(self, orchestrator):
         """Test reset_conversation resets state."""

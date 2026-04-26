@@ -143,14 +143,70 @@ class OptimizationInjector:
 
     def __init__(self) -> None:
         self._section_cache: Dict[str, Optional[str]] = {}
+        self._section_payload_cache: Dict[str, Optional[Dict[str, Any]]] = {}
         self._few_shot_cache: Dict[str, Optional[str]] = {}
+        self._few_shot_payload_cache: Dict[str, Optional[Dict[str, Any]]] = {}
         self._last_failure_category: Optional[str] = None
         self._last_failure_error: Optional[str] = None
 
     def clear_session_cache(self) -> None:
         """Clear per-session cache (called on workspace switch)."""
         self._section_cache.clear()
+        self._section_payload_cache.clear()
         self._few_shot_cache.clear()
+        self._few_shot_payload_cache.clear()
+
+    def get_evolved_section_payloads(
+        self,
+        provider: str = "",
+        model: str = "",
+        task_type: str = "default",
+    ) -> List[Dict[str, Any]]:
+        """Get evolved sections plus canonical prompt-identity metadata."""
+        results: List[Dict[str, Any]] = []
+
+        evolvable_sections = [
+            "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+            "GROUNDING_RULES",
+            "COMPLETION_GUIDANCE",
+            "INIT_SYNTHESIS_RULES",
+        ]
+
+        for section_name in evolvable_sections:
+            if section_name in self._section_payload_cache:
+                payload = self._section_payload_cache[section_name]
+            else:
+                payload = self._sample_evolved_payload(section_name, provider, model, task_type)
+                if payload is None and section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE":
+                    from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
+
+                    payload = {
+                        "text": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                        "provider": provider or "",
+                        "prompt_candidate_hash": None,
+                        "section_name": section_name,
+                        "prompt_section_name": section_name,
+                        "strategy_name": None,
+                        "strategy_chain": None,
+                        "source": "static_fallback",
+                    }
+                self._section_payload_cache[section_name] = payload
+
+            if payload and payload.get("text"):
+                results.append(dict(payload))
+
+        if results:
+            evolved_count = sum(1 for payload in results if payload.get("prompt_candidate_hash"))
+            if evolved_count > 0:
+                logger.info(
+                    "[OptimizationInjector] Serving %d evolved + %d static sections for %s/%s",
+                    evolved_count,
+                    len(results) - evolved_count,
+                    provider or "default",
+                    model or "default",
+                )
+
+        return results
 
     def get_evolved_sections(
         self,
@@ -171,48 +227,17 @@ class OptimizationInjector:
         Returns:
             List of evolved section texts to include in user prefix.
         """
-        results: List[str] = []
+        payloads = self.get_evolved_section_payloads(provider, model, task_type)
+        return [str(payload.get("text", "")).strip() for payload in payloads if payload.get("text")]
 
-        evolvable_sections = [
-            "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
-            "GROUNDING_RULES",
-            "COMPLETION_GUIDANCE",
-            "INIT_SYNTHESIS_RULES",
-        ]
-
-        for section_name in evolvable_sections:
-            # Check session cache first
-            if section_name in self._section_cache:
-                cached = self._section_cache[section_name]
-                if cached:
-                    results.append(cached)
-                continue
-
-            evolved = self._sample_evolved(section_name, provider, model, task_type)
-            self._section_cache[section_name] = evolved
-            if evolved:
-                results.append(evolved)
-
-        # Always include static ASI_TOOL_EFFECTIVENESS if no evolved version
-        if not any("TOOL EFFECTIVENESS" in r for r in results):
-            from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
-
-            results.insert(0, ASI_TOOL_EFFECTIVENESS_GUIDANCE)
-
-        if results:
-            evolved_count = sum(1 for r in results if "TOOL EFFECTIVENESS" not in r)
-            if evolved_count > 0:
-                logger.info(
-                    "[OptimizationInjector] Serving %d evolved + %d static sections " "for %s/%s",
-                    evolved_count,
-                    len(results) - evolved_count,
-                    provider or "default",
-                    model or "default",
-                )
-
-        return results
-
-    def get_few_shots(self, query: str) -> Optional[str]:
+    def get_few_shot_payload(
+        self,
+        query: str,
+        provider: str = "",
+        model: str = "",
+        task_type: str = "default",
+    ) -> Optional[Dict[str, Any]]:
+        """Get few-shot text plus canonical prompt-identity metadata."""
         """Get MIPROv2 KNN-selected few-shot examples.
 
         Unlike evolved sections (per-session), few-shots can be
@@ -226,8 +251,9 @@ class OptimizationInjector:
         """
         normalized_query = (query or "").strip()
         cache_key = normalized_query or "__empty_query__"
-        if cache_key in self._few_shot_cache:
-            return self._few_shot_cache[cache_key]
+        if cache_key in self._few_shot_payload_cache:
+            cached_payload = self._few_shot_payload_cache[cache_key]
+            return dict(cached_payload) if cached_payload else None
 
         try:
             from victor.config.settings import get_settings
@@ -237,6 +263,7 @@ class OptimizationInjector:
                 strategies = po.get_strategies_for_section("FEW_SHOT_EXAMPLES")
                 if not strategies:
                     self._few_shot_cache[cache_key] = None
+                    self._few_shot_payload_cache[cache_key] = None
                     return None
         except Exception:
             pass
@@ -248,15 +275,37 @@ class OptimizationInjector:
             learner = coordinator.get_learner("prompt_optimizer")
             if learner is not None and hasattr(learner, "get_query_aware_few_shots"):
                 few_shots = learner.get_query_aware_few_shots(normalized_query)
-                self._few_shot_cache[cache_key] = few_shots
                 if few_shots:
-                    return few_shots
+                    payload = {
+                        "text": few_shots,
+                        "provider": provider or "",
+                        "prompt_candidate_hash": None,
+                        "section_name": "FEW_SHOT_EXAMPLES",
+                        "prompt_section_name": "FEW_SHOT_EXAMPLES",
+                        "strategy_name": "miprov2",
+                        "strategy_chain": "miprov2",
+                        "source": "query_aware_strategy",
+                    }
+                    self._few_shot_cache[cache_key] = few_shots
+                    self._few_shot_payload_cache[cache_key] = payload
+                    return dict(payload)
         except Exception:
             pass
 
-        evolved = self._sample_evolved("FEW_SHOT_EXAMPLES", "", "", "default")
-        self._few_shot_cache[cache_key] = evolved
-        return evolved
+        payload = self._sample_evolved_payload("FEW_SHOT_EXAMPLES", provider, model, task_type)
+        self._few_shot_payload_cache[cache_key] = payload
+        self._few_shot_cache[cache_key] = (
+            str(payload.get("text")).strip() if payload and payload.get("text") else None
+        )
+        return dict(payload) if payload else None
+
+    def get_few_shots(self, query: str) -> Optional[str]:
+        """Get MIPROv2 KNN-selected few-shot examples."""
+        payload = self.get_few_shot_payload(query)
+        if not payload:
+            return None
+        text = str(payload.get("text", "")).strip()
+        return text or None
 
     def get_failure_hint(
         self,
@@ -320,6 +369,20 @@ class OptimizationInjector:
         Gated by prompt_optimization.enabled setting. Returns None if
         no candidates exist or confidence is below threshold.
         """
+        payload = self._sample_evolved_payload(section_name, provider, model, task_type)
+        if not payload:
+            return None
+        text = str(payload.get("text", "")).strip()
+        return text or None
+
+    def _sample_evolved_payload(
+        self,
+        section_name: str,
+        provider: str,
+        model: str,
+        task_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Sample an evolved section and preserve candidate identity when present."""
         try:
             from victor.config.settings import get_settings
 
@@ -347,13 +410,29 @@ class OptimizationInjector:
                 section_name=section_name,
             )
             if rec and rec.confidence > 0.6 and not rec.is_baseline:
+                rec_metadata = dict(getattr(rec, "metadata", {}) or {})
+                resolved_provider = str(rec_metadata.get("provider") or provider or "")
+                resolved_section = str(
+                    rec_metadata.get("section_name")
+                    or rec_metadata.get("prompt_section_name")
+                    or section_name
+                )
                 logger.info(
                     "[OptimizationInjector] Using evolved '%s' (gen=%s, conf=%.2f)",
                     section_name,
                     rec.reason,
                     rec.confidence,
                 )
-                return rec.value
+                return {
+                    "text": rec.value,
+                    "provider": resolved_provider,
+                    "prompt_candidate_hash": rec_metadata.get("prompt_candidate_hash"),
+                    "section_name": resolved_section,
+                    "prompt_section_name": resolved_section,
+                    "strategy_name": rec_metadata.get("strategy_name"),
+                    "strategy_chain": rec_metadata.get("strategy_chain"),
+                    "source": "candidate",
+                }
         except Exception:
             pass
 

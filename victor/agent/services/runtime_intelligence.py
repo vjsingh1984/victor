@@ -44,12 +44,49 @@ _FEEDBACK_OVERRIDE_FIELDS = {
 
 
 @dataclass(frozen=True)
+class PromptOptimizationIdentity:
+    """Canonical identity for a live prompt optimization payload."""
+
+    provider: Optional[str] = None
+    prompt_candidate_hash: Optional[str] = None
+    section_name: Optional[str] = None
+    prompt_section_name: Optional[str] = None
+    strategy_name: Optional[str] = None
+    source: Optional[str] = None
+
+    def to_metadata(self) -> Dict[str, Any]:
+        """Serialize identity using the shared prompt-optimization schema."""
+        resolved_section = self.prompt_section_name or self.section_name
+        return {
+            "provider": self.provider,
+            "prompt_candidate_hash": self.prompt_candidate_hash,
+            "section_name": resolved_section,
+            "prompt_section_name": resolved_section,
+            "strategy_name": self.strategy_name,
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True)
 class PromptOptimizationBundle:
     """Typed prompt-optimization payload for a single turn."""
 
     evolved_sections: List[str] = field(default_factory=list)
     few_shots: Optional[str] = None
     failure_hint: Optional[str] = None
+    identities: List[PromptOptimizationIdentity] = field(default_factory=list)
+
+    def to_session_metadata(self) -> Dict[str, Any]:
+        """Serialize applied live prompt optimizations for session artifacts."""
+        entries = [identity.to_metadata() for identity in self.identities]
+        by_section: Dict[str, Dict[str, Any]] = {}
+        for entry in entries:
+            section_name = str(
+                entry.get("section_name") or entry.get("prompt_section_name") or ""
+            ).strip()
+            if section_name:
+                by_section[section_name] = dict(entry)
+        return {"entries": entries, "by_section": by_section}
 
 
 @dataclass(frozen=True)
@@ -462,12 +499,48 @@ class RuntimeIntelligenceService:
         if self._optimization_injector is None:
             return PromptOptimizationBundle()
 
-        evolved_sections = self._optimization_injector.get_evolved_sections(
-            provider=getattr(turn_context, "provider_name", ""),
-            model=getattr(turn_context, "model", ""),
-            task_type=getattr(turn_context, "task_type", "default"),
-        )
-        few_shots = self._optimization_injector.get_few_shots(user_message)
+        provider_name = getattr(turn_context, "provider_name", "")
+        model_name = getattr(turn_context, "model", "")
+        task_type = getattr(turn_context, "task_type", "default")
+        evolved_sections: List[str] = []
+        identities: List[PromptOptimizationIdentity] = []
+
+        if hasattr(self._optimization_injector, "get_evolved_section_payloads"):
+            payloads = self._optimization_injector.get_evolved_section_payloads(
+                provider=provider_name,
+                model=model_name,
+                task_type=task_type,
+            )
+            for payload in payloads or []:
+                text = str(payload.get("text", "")).strip()
+                if text:
+                    evolved_sections.append(text)
+                identity = self._build_prompt_identity(payload)
+                if identity is not None:
+                    identities.append(identity)
+        else:
+            evolved_sections = self._optimization_injector.get_evolved_sections(
+                provider=provider_name,
+                model=model_name,
+                task_type=task_type,
+            )
+
+        few_shots = None
+        if hasattr(self._optimization_injector, "get_few_shot_payload"):
+            few_shot_payload = self._optimization_injector.get_few_shot_payload(
+                user_message,
+                provider=provider_name,
+                model=model_name,
+                task_type=task_type,
+            )
+            if few_shot_payload:
+                few_shots = str(few_shot_payload.get("text", "")).strip() or None
+                identity = self._build_prompt_identity(few_shot_payload)
+                if identity is not None:
+                    identities.append(identity)
+        else:
+            few_shots = self._optimization_injector.get_few_shots(user_message)
+
         failure_hint = None
         if getattr(turn_context, "last_turn_failed", False):
             failure_hint = self._optimization_injector.get_failure_hint(
@@ -479,4 +552,33 @@ class RuntimeIntelligenceService:
             evolved_sections=list(evolved_sections or []),
             few_shots=few_shots,
             failure_hint=failure_hint,
+            identities=identities,
+        )
+
+    @staticmethod
+    def _build_prompt_identity(payload: Any) -> Optional[PromptOptimizationIdentity]:
+        """Extract canonical prompt identity from an optimization payload."""
+        if not isinstance(payload, dict):
+            return None
+
+        def _optional_text(value: Any) -> Optional[str]:
+            text = str(value).strip() if value is not None else ""
+            return text or None
+
+        section_name = _optional_text(
+            payload.get("section_name") or payload.get("prompt_section_name")
+        )
+        provider = _optional_text(payload.get("provider"))
+        prompt_candidate_hash = _optional_text(payload.get("prompt_candidate_hash"))
+        strategy_name = _optional_text(payload.get("strategy_name"))
+        source = _optional_text(payload.get("source"))
+        if not any([section_name, provider, prompt_candidate_hash, strategy_name, source]):
+            return None
+        return PromptOptimizationIdentity(
+            provider=provider,
+            prompt_candidate_hash=prompt_candidate_hash,
+            section_name=section_name,
+            prompt_section_name=section_name,
+            strategy_name=strategy_name,
+            source=source,
         )

@@ -211,13 +211,26 @@ class TestComposeTurnPrefix:
 
     def test_runtime_intelligence_supplies_prompt_optimizations(self):
         """Canonical runtime intelligence service can supply prompt optimizations."""
-        from victor.agent.services.runtime_intelligence import PromptOptimizationBundle
+        from victor.agent.services.runtime_intelligence import (
+            PromptOptimizationBundle,
+            PromptOptimizationIdentity,
+        )
 
         runtime_intelligence = MagicMock()
         runtime_intelligence.get_prompt_optimization_bundle.return_value = PromptOptimizationBundle(
             evolved_sections=["Prefer read over cat."],
             few_shots="Example trajectory",
             failure_hint="Check the file path before editing.",
+            identities=[
+                PromptOptimizationIdentity(
+                    provider="anthropic",
+                    prompt_candidate_hash="cand-123",
+                    section_name="GROUNDING_RULES",
+                    prompt_section_name="GROUNDING_RULES",
+                    strategy_name="gepa",
+                    source="candidate",
+                )
+            ],
         )
         pipeline = _make_pipeline(runtime_intelligence=runtime_intelligence)
         ctx = self._make_turn_context(last_turn_failed=True)
@@ -227,6 +240,28 @@ class TestComposeTurnPrefix:
         assert "Prefer read over cat." in prefix
         assert "Example trajectory" in prefix
         assert "Check the file path before editing." in prefix
+        assert ctx.prompt_optimization_metadata == {
+            "entries": [
+                {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "prompt_section_name": "GROUNDING_RULES",
+                    "strategy_name": "gepa",
+                    "source": "candidate",
+                }
+            ],
+            "by_section": {
+                "GROUNDING_RULES": {
+                    "provider": "anthropic",
+                    "prompt_candidate_hash": "cand-123",
+                    "section_name": "GROUNDING_RULES",
+                    "prompt_section_name": "GROUNDING_RULES",
+                    "strategy_name": "gepa",
+                    "source": "candidate",
+                }
+            },
+        }
 
     def test_credit_in_prefix_tier_a(self):
         """Tier A: credit guidance goes in user prefix (not system prompt)."""

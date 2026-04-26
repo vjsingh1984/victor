@@ -1101,6 +1101,9 @@ class PromptOptimizerLearner(BaseLearner):
                 "strategy_chain": best.strategy_chain,
                 "provider": best.provider,
                 "generation": best.generation,
+                "prompt_candidate_hash": best.text_hash,
+                "section_name": best.section_name,
+                "prompt_section_name": best.section_name,
             },
         )
 

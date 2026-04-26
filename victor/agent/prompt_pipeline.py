@@ -178,6 +178,7 @@ class TurnContext:
     last_failure_category: Optional[str] = None
     last_failure_error: Optional[str] = None
     reminder_text: Optional[str] = None
+    prompt_optimization_metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -473,6 +474,11 @@ class UnifiedPromptPipeline:
                 few_shots=few_shots,
                 failure_hint=hint,
             )
+
+        if optimization_bundle:
+            turn_context.prompt_optimization_metadata = optimization_bundle.to_session_metadata()
+        else:
+            turn_context.prompt_optimization_metadata = {"entries": [], "by_section": {}}
 
         if optimization_bundle:
             for index, section in enumerate(optimization_bundle.evolved_sections):
