@@ -88,12 +88,9 @@ def create_provider_runtime_components(
     """Create lazy provider runtime components for orchestrator wiring."""
 
     def _build_provider_coordinator() -> Any:
-        from victor.agent.provider_coordinator import (
-            ProviderCoordinator,
-            ProviderCoordinatorConfig,
-        )
+        from victor.agent.provider_coordinator import ProviderCoordinatorConfig
 
-        coord = ProviderCoordinator(
+        coord = factory.create_deprecated_provider_coordinator(
             provider_manager=provider_manager,
             config=ProviderCoordinatorConfig(
                 max_rate_limit_retries=getattr(settings, "max_rate_limit_retries", 3),

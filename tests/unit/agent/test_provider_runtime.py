@@ -68,20 +68,19 @@ def test_create_provider_runtime_components_provider_coordinator_lazy():
 
     assert runtime.provider_coordinator.initialized is False
 
-    with patch("victor.agent.provider_coordinator.ProviderCoordinator") as coordinator_cls:
-        coordinator_instance = MagicMock()
-        coordinator_cls.return_value = coordinator_instance
+    coordinator_instance = MagicMock()
+    factory.create_deprecated_provider_coordinator.return_value = coordinator_instance
 
-        resolved = runtime.provider_coordinator.get_instance()
-        assert resolved is coordinator_instance
-        assert runtime.provider_coordinator.initialized is True
-        coordinator_cls.assert_called_once()
+    resolved = runtime.provider_coordinator.get_instance()
+    assert resolved is coordinator_instance
+    assert runtime.provider_coordinator.initialized is True
 
-        kwargs = coordinator_cls.call_args.kwargs
-        assert kwargs["provider_manager"] is manager
-        config = kwargs["config"]
-        assert config.max_rate_limit_retries == 7
-        assert config.enable_health_monitoring is False
+    factory.create_deprecated_provider_coordinator.assert_called_once()
+    kwargs = factory.create_deprecated_provider_coordinator.call_args.kwargs
+    assert kwargs["provider_manager"] is manager
+    config = kwargs["config"]
+    assert config.max_rate_limit_retries == 7
+    assert config.enable_health_monitoring is False
 
 
 def test_create_provider_runtime_components_switch_coordinator_lazy():
