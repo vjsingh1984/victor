@@ -128,6 +128,13 @@ Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phas
   - `AgentOrchestrator.get_current_provider_info()` now sources rate-limit
     stats from `ProviderService` only, removing the remaining coordinator
     fallback branch from that canonical method
+- Phase 2.11 legacy chat provider protocol alignment:
+  - the deprecated chat runtime protocol now exposes `_provider_service`
+    instead of `_provider_coordinator`, matching the actual rate-limit retry
+    helper implementation
+  - `OrchestratorProtocolAdapter` now surfaces the canonical provider service
+    for the chat shim path, and the deprecated chat coordinator tests/mocks no
+    longer depend on a legacy provider coordinator field
 
 - Phase 3.1 compute handler registry extraction:
   - `victor.workflows.compute_registry` is now the canonical module for
@@ -276,7 +283,7 @@ Next resume point:
   legacy executor module itself).
 - The next active compatibility seam is provider runtime exposure through
   `_provider_coordinator` / `_provider_switch_coordinator` compatibility slots
-  and `OrchestratorProtocolAdapter._provider_coordinator`. If continued, the
-  next step is to move internal adapter/runtime callers to canonical provider
-  service or provider-runtime handles and leave the coordinator fields as
-  public compatibility-only shims.
+  and deprecated provider-runtime construction. If continued, the next step is
+  to isolate those slots behind explicit compatibility adapters or public-only
+  exports, while keeping canonical runtime code on provider-service and
+  provider-runtime handles.

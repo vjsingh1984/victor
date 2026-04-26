@@ -422,9 +422,9 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.response_completer
 
     @property
-    def _provider_coordinator(self) -> Any:
-        """Get provider coordinator."""
-        return self._orchestrator._provider_coordinator
+    def _provider_service(self) -> Any:
+        """Get canonical provider service for chat compatibility helpers."""
+        return self._orchestrator._provider_service
 
     @property
     def _cancel_event(self) -> Optional["asyncio.Event"]:

@@ -112,7 +112,7 @@ class ProviderContextProtocol(Protocol):
     temperature: float
     max_tokens: int
     thinking: Any
-    _provider_coordinator: Any
+    _provider_service: Any
     _cancel_event: Any
     _is_streaming: bool
 

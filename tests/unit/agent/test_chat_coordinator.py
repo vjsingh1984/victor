@@ -68,8 +68,8 @@ def mock_orchestrator():
     orch.provider = MagicMock()
     orch.provider.supports_tools = MagicMock(return_value=True)
     orch.provider.chat = AsyncMock()
-    orch._provider_coordinator = MagicMock()
-    orch._provider_coordinator.get_rate_limit_wait_time = MagicMock(return_value=1.0)
+    orch._provider_service = MagicMock()
+    orch._provider_service.get_rate_limit_wait_time = MagicMock(return_value=1.0)
 
     # Budget settings
     orch.tool_budget = 15
@@ -277,7 +277,6 @@ class TestGetRateLimitWaitTime:
 
     def test_calculates_wait_time_with_backoff(self, chat_coordinator, mock_orchestrator):
         """Calculate wait time with exponential backoff."""
-        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 2.0
         mock_orchestrator._provider_service.get_rate_limit_wait_time.return_value = 2.0
         exc = Exception("Rate limited")
 
@@ -295,7 +294,6 @@ class TestGetRateLimitWaitTime:
 
     def test_caps_wait_at_max(self, chat_coordinator, mock_orchestrator):
         """Cap wait time at 300 seconds."""
-        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 100.0
         mock_orchestrator._provider_service.get_rate_limit_wait_time.return_value = 100.0
         exc = Exception("Rate limited")
 

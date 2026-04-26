@@ -87,7 +87,7 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     temperature: float = 0.7
     max_tokens: int = 2000
     thinking: Any = None
-    _provider_coordinator: Any = MagicMock()
+    _provider_service: Any = MagicMock()
     _cancel_event: Any = MagicMock()
     _is_streaming: bool = False
 
