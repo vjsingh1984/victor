@@ -18,6 +18,10 @@ The RL implementation remains a first-class public framework API in
 ``victor.framework.rl.coordinator``. This module provides the canonical
 service-first import surface for agent runtime code so the live orchestration
 path does not depend on framework module paths directly.
+
+Use this module for:
+- sync and async access to the global RL coordinator
+- benchmark-gated prompt rollout experiment creation from agent runtime code
 """
 
 from typing import Optional

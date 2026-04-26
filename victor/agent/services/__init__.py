@@ -24,6 +24,8 @@ Services:
     ContextService: Context management and metrics
     ProviderService: Provider management and switching
     RecoveryService: Error recovery and resilience
+    RL runtime helpers: Service-first access to the global RL coordinator and
+        prompt rollout helpers for benchmark-gated prompt optimization
     SessionService: Session lifecycle management
     LLMDecisionService: LLM-assisted decision making fallback
 """
