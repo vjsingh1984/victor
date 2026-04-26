@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from pathlib import Path
 
 import pytest
@@ -343,6 +343,113 @@ class TestOptimizationSyncBridge:
 
         mock_async.assert_called_once_with("variant.json", "workflow-a", "tests.json")
         mock_run_sync.assert_called_once_with(coro)
+
+    def test_prompt_rollout_uses_shared_sync_bridge(self) -> None:
+        coro = object()
+        mock_async = Mock(return_value=coro)
+
+        with (
+            patch.object(optimization_cmd, "_prompt_rollout_async", mock_async),
+            patch.object(optimization_cmd, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            optimization_cmd.prompt_rollout.callback(
+                "GROUNDING_RULES",
+                "anthropic",
+                "candidate123",
+                "control456",
+                0.2,
+                25,
+            )
+
+        mock_async.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            treatment_hash="candidate123",
+            control_hash="control456",
+            traffic_split=0.2,
+            min_samples_per_variant=25,
+        )
+        mock_run_sync.assert_called_once_with(coro)
+
+    @pytest.mark.asyncio
+    async def test_prompt_rollout_async_reports_started_experiment(self) -> None:
+        with (
+            patch.object(
+                optimization_cmd,
+                "create_prompt_rollout_experiment_async",
+                AsyncMock(return_value="prompt_exp_123"),
+            ) as mock_create,
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            await optimization_cmd._prompt_rollout_async(
+                section_name="GROUNDING_RULES",
+                provider="anthropic",
+                treatment_hash="candidate123",
+                control_hash=None,
+                traffic_split=0.1,
+                min_samples_per_variant=50,
+            )
+
+        mock_create.assert_awaited_once_with(
+            section_name="GROUNDING_RULES",
+            provider="anthropic",
+            treatment_hash="candidate123",
+            control_hash=None,
+            traffic_split=0.1,
+            min_samples_per_variant=50,
+        )
+        mock_echo.assert_any_call("Starting prompt rollout experiment:")
+        mock_echo.assert_any_call("  Section: GROUNDING_RULES")
+        mock_echo.assert_any_call("  Provider: anthropic")
+        mock_echo.assert_any_call("  Treatment hash: candidate123")
+        mock_echo.assert_any_call("  Traffic split: 10.0%")
+        mock_echo.assert_any_call("  Min samples per variant: 50")
+        mock_echo.assert_any_call("Prompt rollout experiment started: prompt_exp_123")
+
+    @pytest.mark.asyncio
+    async def test_prompt_rollout_async_reports_creation_failure(self) -> None:
+        with (
+            patch.object(
+                optimization_cmd,
+                "create_prompt_rollout_experiment_async",
+                AsyncMock(return_value=None),
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            await optimization_cmd._prompt_rollout_async(
+                section_name="GROUNDING_RULES",
+                provider="anthropic",
+                treatment_hash="candidate123",
+                control_hash=None,
+                traffic_split=0.1,
+                min_samples_per_variant=50,
+            )
+
+        mock_echo.assert_any_call(
+            "Unable to start prompt rollout experiment for section: GROUNDING_RULES",
+            err=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_prompt_rollout_async_reports_validation_error(self) -> None:
+        with (
+            patch.object(
+                optimization_cmd,
+                "create_prompt_rollout_experiment_async",
+                AsyncMock(side_effect=ValueError("benchmark gating required")),
+            ),
+            patch.object(optimization_cmd.click, "echo") as mock_echo,
+        ):
+            await optimization_cmd._prompt_rollout_async(
+                section_name="GROUNDING_RULES",
+                provider="anthropic",
+                treatment_hash="candidate123",
+                control_hash=None,
+                traffic_split=0.1,
+                min_samples_per_variant=50,
+            )
+
+        mock_echo.assert_any_call("Cannot start prompt rollout: benchmark gating required", err=True)
 
 
 class TestConfigSyncBridge:

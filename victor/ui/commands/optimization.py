@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""CLI commands for workflow optimization.
+"""CLI commands for workflow and prompt optimization.
 
 This module provides command-line interface commands for interacting
-with the workflow optimization system.
+with the workflow and prompt optimization systems.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from typing import Optional
 import click
 
 from victor.core.async_utils import run_sync
+from victor.framework.rl import create_prompt_rollout_experiment_async
 from victor.optimization import (
     WorkflowOptimizer,
     OptimizationConfig,
@@ -190,6 +191,52 @@ def validate(
         victor opt validate variant.json my_workflow --test-inputs tests.json
     """
     run_sync(_validate_async(variant_file, workflow_id, test_inputs))
+
+
+@opt.command("prompt-rollout")
+@click.argument("section_name")
+@click.argument("provider")
+@click.argument("treatment_hash")
+@click.option(
+    "--control-hash",
+    default=None,
+    help="Optional control candidate hash. Uses current active candidate when omitted.",
+)
+@click.option(
+    "--traffic-split",
+    default=0.1,
+    type=float,
+    help="Traffic share to allocate to the treatment candidate.",
+)
+@click.option(
+    "--min-samples-per-variant",
+    default=50,
+    type=int,
+    help="Minimum samples per variant before promotion analysis.",
+)
+def prompt_rollout(
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str],
+    traffic_split: float,
+    min_samples_per_variant: int,
+) -> None:
+    """Start a benchmark-gated prompt rollout experiment.
+
+    Example:
+        victor opt prompt-rollout GROUNDING_RULES anthropic candidate_hash
+    """
+    run_sync(
+        _prompt_rollout_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+    )
 
 
 async def _profile_async(
@@ -413,6 +460,47 @@ async def _validate_async(
         click.echo("\nAdditional metrics:")
         for key, value in result.metrics.items():
             click.echo(f"  {key}: {value}")
+
+
+async def _prompt_rollout_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str],
+    traffic_split: float,
+    min_samples_per_variant: int,
+) -> None:
+    click.echo("Starting prompt rollout experiment:")
+    click.echo(f"  Section: {section_name}")
+    click.echo(f"  Provider: {provider}")
+    click.echo(f"  Treatment hash: {treatment_hash}")
+    if control_hash:
+        click.echo(f"  Control hash: {control_hash}")
+    click.echo(f"  Traffic split: {traffic_split:.1%}")
+    click.echo(f"  Min samples per variant: {min_samples_per_variant}")
+
+    try:
+        experiment_id = await create_prompt_rollout_experiment_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+    except ValueError as exc:
+        click.echo(f"Cannot start prompt rollout: {exc}", err=True)
+        return
+
+    if not experiment_id:
+        click.echo(
+            f"Unable to start prompt rollout experiment for section: {section_name}",
+            err=True,
+        )
+        return
+
+    click.echo(f"Prompt rollout experiment started: {experiment_id}")
 
 
 # Register commands with CLI
