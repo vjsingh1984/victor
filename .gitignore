@@ -250,3 +250,4 @@ MagicMock/
 # Workflow Pydantic models (Python code, not ML models)
 !victor/workflows/models/
 victor/workflows/models/__pycache__/
+.coverage*
