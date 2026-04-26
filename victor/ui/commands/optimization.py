@@ -278,6 +278,14 @@ def prompt_rollout_results(experiment_id: str) -> None:
     _show_prompt_rollout_results(experiment_id)
 
 
+@opt.command("prompt-rollout-apply")
+@click.argument("experiment_id")
+@click.argument("action", type=click.Choice(["rollout", "rollback"]))
+def prompt_rollout_apply(experiment_id: str, action: str) -> None:
+    """Apply a manual decision to a prompt rollout experiment."""
+    _apply_prompt_rollout_decision(experiment_id, action)
+
+
 async def _profile_async(
     workflow_id: str,
     min_executions: int,
@@ -641,6 +649,29 @@ def _show_prompt_rollout_results(experiment_id: str) -> None:
         f"success_rate={treatment.get('success_rate', 0.0):.1%} "
         f"avg_quality={treatment.get('avg_quality', 0.0):.3f}"
     )
+
+
+def _apply_prompt_rollout_decision(experiment_id: str, action: str) -> None:
+    if not experiment_id.startswith(PROMPT_ROLLOUT_EXPERIMENT_PREFIX):
+        click.echo(f"Experiment is not a prompt rollout: {experiment_id}", err=True)
+        return
+
+    coordinator = get_experiment_coordinator()
+    if action == "rollout":
+        updated = coordinator.rollout_treatment(experiment_id)
+        success_message = f"Prompt rollout marked as rolled out: {experiment_id}"
+    else:
+        updated = coordinator.rollback_experiment(experiment_id)
+        success_message = f"Prompt rollout marked as rolled back: {experiment_id}"
+
+    if not updated:
+        click.echo(
+            f"Unable to apply {action} decision for prompt rollout: {experiment_id}",
+            err=True,
+        )
+        return
+
+    click.echo(success_message)
 
 
 # Register commands with CLI
