@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from victor.providers.performance_tracker import (
+    ProviderDegradationSnapshot,
     RequestMetric,
     ProviderPerformanceTracker,
 )
@@ -475,3 +476,73 @@ class TestProviderPerformanceTracker:
         assert stats["providers_tracked"] == 1
         assert "ollama" in stats["provider_stats"]
         assert stats["provider_stats"]["ollama"]["total_requests"] == 10
+
+    def test_get_degradation_snapshot_detects_persistent_failure_streak(self):
+        tracker = ProviderPerformanceTracker()
+        now = datetime.now()
+
+        for i in range(2):
+            tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test",
+                    success=True,
+                    latency_ms=800.0,
+                    timestamp=now + timedelta(seconds=i),
+                )
+            )
+        for i in range(2, 5):
+            tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test",
+                    success=False,
+                    latency_ms=2400.0,
+                    timestamp=now + timedelta(seconds=i),
+                    error_type="ProviderError",
+                )
+            )
+
+        snapshot = tracker.get_degradation_snapshot("ollama")
+
+        assert isinstance(snapshot, ProviderDegradationSnapshot)
+        assert snapshot.degraded is True
+        assert snapshot.failure_streak == 3
+        assert "failure_streak" in snapshot.degradation_reasons
+        assert snapshot.recent_error_types == {"ProviderError": 3}
+
+    def test_get_degradation_snapshot_detects_recovery_after_multi_failure_incident(self):
+        tracker = ProviderPerformanceTracker()
+        now = datetime.now()
+
+        for i in range(3):
+            tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test",
+                    success=False,
+                    latency_ms=2200.0,
+                    timestamp=now + timedelta(seconds=i),
+                    error_type="ProviderError",
+                )
+            )
+        for i in range(3, 7):
+            tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test",
+                    success=True,
+                    latency_ms=700.0,
+                    timestamp=now + timedelta(seconds=i),
+                )
+            )
+
+        snapshot = tracker.get_degradation_snapshot("ollama")
+
+        assert snapshot.degraded is False
+        assert snapshot.recovered_from_recent_incident is True
+        assert snapshot.success_streak == 4
+        assert snapshot.recent_incident_failure_count == 3
+        assert snapshot.time_to_recover_seconds == pytest.approx(3.0)
+        assert snapshot.last_failure_at is not None
+        assert snapshot.last_recovery_at is not None

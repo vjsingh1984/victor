@@ -88,6 +88,8 @@ class TestRoutingDecision:
         assert hints["fallback_chain"] == ["openai"]
         assert hints["health_score"] == 1.0
         assert hints["latency_score"] == 0.3
+        assert hints["provider_degraded"] is False
+        assert hints["provider_degradation_reasons"] == []
 
 
 class TestRoutingDecisionEngine:
@@ -105,7 +107,7 @@ class TestRoutingDecisionEngine:
     @pytest.fixture
     def tracker(self):
         """Create performance tracker."""
-        return ProviderPerformanceTracker()
+        return ProviderPerformanceTracker(db=None)
 
     @pytest.fixture
     def detector(self):
@@ -295,6 +297,84 @@ class TestRoutingDecisionEngine:
         assert score > 0.5  # Should have good score
 
     @pytest.mark.asyncio
+    async def test_score_performance_penalizes_degraded_provider(self, engine):
+        """Persistent degradation should lower the effective performance score."""
+        engine.config.learning_enabled = True
+        now = datetime.now()
+
+        for _ in range(2):
+            engine.tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test",
+                    success=True,
+                    latency_ms=700.0,
+                    timestamp=now,
+                )
+            )
+        for _ in range(3):
+            engine.tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test",
+                    success=False,
+                    latency_ms=2200.0,
+                    timestamp=now,
+                    error_type="ProviderError",
+                )
+            )
+
+        score = await engine._score_performance("ollama")
+
+        assert score < 0.5
+
+    @pytest.mark.asyncio
+    async def test_decide_downranks_recently_degraded_provider(
+        self, config, tracker, detector, checker
+    ):
+        """Degradation-aware scoring should prefer a stable provider when other factors tie."""
+        config.learning_enabled = True
+        config.custom_fallback_chain = ["ollama", "anthropic"]
+        engine = RoutingDecisionEngine(
+            config=config,
+            performance_tracker=tracker,
+            resource_detector=detector,
+            health_checker=checker,
+            available_providers=["ollama", "anthropic"],
+        )
+        now = datetime.now()
+        for _ in range(3):
+            tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test",
+                    success=False,
+                    latency_ms=2200.0,
+                    timestamp=now,
+                    error_type="ProviderError",
+                )
+            )
+            tracker.record_request(
+                RequestMetric(
+                    provider="anthropic",
+                    model="test",
+                    success=True,
+                    latency_ms=800.0,
+                    timestamp=now,
+                )
+            )
+
+        with patch.object(engine, "_score_health", new=AsyncMock(return_value=1.0)), patch.object(
+            engine, "_score_resources", new=AsyncMock(return_value=1.0)
+        ), patch.object(engine, "_score_cost", new=AsyncMock(return_value=1.0)), patch.object(
+            engine, "_score_latency", new=AsyncMock(return_value=1.0)
+        ):
+            decision = await engine.decide(task_type="default")
+
+        assert decision.selected_provider == "anthropic"
+        assert "ollama" in decision.fallback_chain
+
+    @pytest.mark.asyncio
     async def test_get_topology_provider_hints(self, engine):
         """Engine should expose selector-friendly provider-routing hints."""
         hints = await engine.get_topology_provider_hints(task_type="default")
@@ -304,6 +384,8 @@ class TestRoutingDecisionEngine:
         assert "fallback_chain" in hints
         assert "health_score" in hints
         assert "cost_score" in hints
+        assert "provider_degraded" in hints
+        assert "provider_degradation_penalty" in hints
 
 
 class TestSmartRoutingProvider:

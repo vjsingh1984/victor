@@ -109,6 +109,15 @@ class RoutingDecision:
             "cost_score": self.factors.get("cost"),
             "latency_score": self.factors.get("latency"),
             "performance_score": self.factors.get("performance"),
+            "provider_degraded": bool(self.factors.get("degraded", False)),
+            "provider_degradation_penalty": self.factors.get("degradation_penalty"),
+            "provider_degradation_reasons": list(self.factors.get("degradation_reasons") or []),
+            "provider_failure_streak": self.factors.get("failure_streak"),
+            "provider_success_streak": self.factors.get("success_streak"),
+            "provider_recovered_from_recent_incident": bool(
+                self.factors.get("recovered_from_recent_incident", False)
+            ),
+            "provider_time_to_recover_seconds": self.factors.get("time_to_recover_seconds"),
         }
 
 
@@ -235,7 +244,7 @@ class RoutingDecisionEngine:
         self,
         selected_provider: str,
         score: float,
-        factors: Dict[str, float],
+        factors: Dict[str, Any],
     ) -> str:
         """Generate human-readable rationale for routing decision.
 
@@ -248,12 +257,24 @@ class RoutingDecisionEngine:
             Rationale string
         """
         # Find highest-weighted factor
-        max_factor = max(factors.items(), key=lambda x: x[1])
+        numeric_factors = {
+            name: float(value)
+            for name, value in factors.items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        }
+        max_factor = (
+            max(numeric_factors.items(), key=lambda x: x[1]) if numeric_factors else ("score", score)
+        )
 
         rationale = f"Selected {selected_provider} (confidence={score:.2f})"
 
         if max_factor[1] >= 0.8:
             rationale += f" based on {max_factor[0]} ({max_factor[1]:.2f})"
+        if factors.get("degraded"):
+            reasons = ",".join(str(reason) for reason in factors.get("degradation_reasons") or [])
+            rationale += f"; recent degradation remains active ({reasons or 'unknown'})"
+        elif factors.get("recovered_from_recent_incident"):
+            rationale += "; provider has recently recovered from instability"
 
         return rationale
 
@@ -309,6 +330,7 @@ class RoutingDecisionEngine:
         factors = {}
         total_score = 0.0
         weight_sum = 0.0
+        degradation_snapshot = self._get_degradation_snapshot(provider)
 
         # Factor 1: Provider health (weight: 0.3)
         health_score = await self._score_health(provider)
@@ -335,10 +357,35 @@ class RoutingDecisionEngine:
         weight_sum += 0.15
 
         # Factor 5: Performance history (weight: 0.15)
-        perf_score = await self._score_performance(provider)
+        perf_score = await self._score_performance(
+            provider,
+            degradation_snapshot=degradation_snapshot,
+        )
         factors["performance"] = perf_score
         total_score += 0.15 * perf_score
         weight_sum += 0.15
+
+        if degradation_snapshot is not None:
+            degradation_penalty = self._degradation_penalty(degradation_snapshot)
+            factors["degraded"] = bool(getattr(degradation_snapshot, "degraded", False))
+            factors["degradation_penalty"] = degradation_penalty
+            factors["degradation_reasons"] = list(
+                getattr(degradation_snapshot, "degradation_reasons", ()) or ()
+            )
+            factors["failure_streak"] = int(
+                getattr(degradation_snapshot, "failure_streak", 0) or 0
+            )
+            factors["success_streak"] = int(
+                getattr(degradation_snapshot, "success_streak", 0) or 0
+            )
+            factors["recovered_from_recent_incident"] = bool(
+                getattr(degradation_snapshot, "recovered_from_recent_incident", False)
+            )
+            factors["time_to_recover_seconds"] = getattr(
+                degradation_snapshot,
+                "time_to_recover_seconds",
+                None,
+            )
 
         # Normalize score
         if weight_sum > 0:
@@ -477,7 +524,51 @@ class RoutingDecisionEngine:
         else:  # high
             return 0.5  # Neutral
 
-    async def _score_performance(self, provider: str) -> float:
+    def _get_degradation_snapshot(self, provider: str) -> Optional[Any]:
+        """Return the latest degradation snapshot for a provider when available."""
+        if not hasattr(self.tracker, "get_degradation_snapshot"):
+            return None
+        try:
+            return self.tracker.get_degradation_snapshot(provider)
+        except Exception as exc:
+            logger.debug("Provider degradation snapshot unavailable for %s: %s", provider, exc)
+            return None
+
+    @staticmethod
+    def _degradation_penalty(snapshot: Optional[Any]) -> float:
+        """Return a bounded penalty for degraded or recently recovered providers."""
+        if snapshot is None:
+            return 0.0
+
+        degraded = bool(getattr(snapshot, "degraded", False))
+        recovered = bool(getattr(snapshot, "recovered_from_recent_incident", False))
+        failure_streak = int(getattr(snapshot, "failure_streak", 0) or 0)
+        recent_success_rate = float(getattr(snapshot, "recent_success_rate", 0.5) or 0.5)
+        reasons = set(getattr(snapshot, "degradation_reasons", ()) or ())
+
+        penalty = 0.0
+        if degraded:
+            penalty += min(0.30, 0.08 * max(1, failure_streak))
+            if "low_recent_success_rate" in reasons:
+                penalty += 0.12
+            if "latency_trend" in reasons:
+                penalty += 0.08
+            if recent_success_rate < 0.5:
+                penalty += min(0.15, (0.5 - recent_success_rate) * 0.3)
+        elif recovered:
+            penalty += min(
+                0.08,
+                0.02 * max(1, int(getattr(snapshot, "recent_incident_failure_count", 0) or 0)),
+            )
+
+        return round(min(0.55, penalty), 4)
+
+    async def _score_performance(
+        self,
+        provider: str,
+        *,
+        degradation_snapshot: Optional[Any] = None,
+    ) -> float:
         """Score based on performance history (0.0 to 1.0).
 
         Args:
@@ -487,11 +578,14 @@ class RoutingDecisionEngine:
             Performance score
         """
         if not self.config.learning_enabled:
-            return 0.5  # Neutral if learning disabled
+            base_score = 0.5  # Neutral if learning disabled
+        else:
+            # Get composite score from tracker
+            base_score = self.tracker.get_provider_score(provider)
 
-        # Get composite score from tracker
-        score = self.tracker.get_provider_score(provider)
-        return score
+        snapshot = degradation_snapshot or self._get_degradation_snapshot(provider)
+        penalty = self._degradation_penalty(snapshot)
+        return max(0.0, min(1.0, base_score - penalty))
 
 
 class SmartRoutingProvider:

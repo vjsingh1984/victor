@@ -56,6 +56,7 @@ Example:
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -788,6 +789,15 @@ class AgenticLoop:
                             effective_max,
                             max(1, int(topology_plan.iteration_budget)),
                         )
+                    if topology_plan is not None:
+                        topology_preparation = await self._prepare_topology_runtime(
+                            topology_plan=topology_plan,
+                            query=query,
+                            state=state,
+                        )
+                        if topology_preparation:
+                            state["topology_preparation"] = topology_preparation
+                    self._capture_provider_degradation_baseline(state)
 
                 # Skip planning stage when fast-path routing chooses direct execution
                 if not use_llm_planning:
@@ -886,6 +896,19 @@ class AgenticLoop:
                     if (
                         len(recent_lengths) >= 3 and len(set(recent_lengths)) == 1 and i >= 5
                     ):  # Only check after 5 iterations to avoid false positives
+                        state.setdefault("degradation_events", []).append(
+                            {
+                                "source": "agentic_loop",
+                                "kind": "content_repetition",
+                                "failure_type": "STUCK_LOOP",
+                                "iteration": i,
+                                "task_type": state.get("task_type"),
+                                "post_degraded": True,
+                                "recovered": False,
+                                "adaptation_cost": float(len(recent_lengths)),
+                                "degradation_reasons": ["content_repetition"],
+                            }
+                        )
                         logger.warning(
                             f"Content degradation detected: same content length ({recent_lengths[0]}) "
                             f"repeated for 3 iterations - stopping loop"
@@ -1005,6 +1028,10 @@ class AgenticLoop:
 
             # Determine success
             success = self._determine_success(iterations)
+            self._record_provider_degradation_event(
+                state,
+                total_iterations=len(iterations),
+            )
 
             # Store cacheable responses in semantic cache for future queries
             if success and _sem_cache is not None:
@@ -1039,12 +1066,17 @@ class AgenticLoop:
                     "planning_events": list(state.get("planning_events", [])),
                     "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
                     "topology_events": list(state.get("topology_events", [])),
+                    "degradation_events": list(state.get("degradation_events", [])),
                 },
             )
 
         except Exception as e:
             logger.error(f"Agentic loop error: {e}", exc_info=True)
             duration = time.time() - start_time
+            self._record_provider_degradation_event(
+                state,
+                total_iterations=len(iterations),
+            )
 
             return LoopResult(
                 success=False,
@@ -1057,6 +1089,7 @@ class AgenticLoop:
                     "planning_events": list(state.get("planning_events", [])),
                     "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
                     "topology_events": list(state.get("topology_events", [])),
+                    "degradation_events": list(state.get("degradation_events", [])),
                 },
             )
 
@@ -1208,6 +1241,7 @@ class AgenticLoop:
             context=routing_context,
         )
         if provider_hints:
+            state["_topology_provider_hints"] = dict(provider_hints)
             routing_context.update(provider_hints)
             provider_candidates = []
             primary_provider = provider_hints.get("provider_hint")
@@ -1267,6 +1301,38 @@ class AgenticLoop:
             topology_plan.formation,
         )
         return topology_plan
+
+    async def _prepare_topology_runtime(
+        self,
+        topology_plan: GroundedTopologyPlan,
+        query: str,
+        state: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Let the runtime prepare topology-specific execution state once selected."""
+        if self.turn_executor is None:
+            return None
+
+        prepare_runtime_topology = getattr(self.turn_executor, "prepare_runtime_topology", None)
+        if (
+            prepare_runtime_topology is None
+            or not callable(prepare_runtime_topology)
+            or not inspect.iscoroutinefunction(prepare_runtime_topology)
+        ):
+            return None
+
+        try:
+            result = await prepare_runtime_topology(
+                topology_plan,
+                user_message=query,
+                task_classification=state.get("_task_classification"),
+            )
+        except Exception as exc:
+            logger.debug("Topology runtime preparation unavailable: %s", exc)
+            return None
+
+        if isinstance(result, dict):
+            return dict(result)
+        return None
 
     async def _get_topology_provider_hints(
         self,
@@ -1328,6 +1394,130 @@ class AgenticLoop:
         from victor.teams.types import TeamFormation
 
         return [formation.value for formation in TeamFormation]
+
+    def _capture_provider_degradation_baseline(self, state: Dict[str, Any]) -> None:
+        """Capture the pre-execution provider degradation snapshot once per task."""
+        if state.get("_provider_degradation_before") is not None:
+            return
+        tracker, provider_name, model_name = self._resolve_provider_degradation_runtime(state)
+        if tracker is None or not provider_name or not hasattr(tracker, "get_degradation_snapshot"):
+            return
+        try:
+            snapshot = tracker.get_degradation_snapshot(provider_name)
+        except Exception as exc:
+            logger.debug("Failed to capture provider degradation baseline: %s", exc)
+            return
+        snapshot_payload = snapshot.to_dict() if hasattr(snapshot, "to_dict") else dict(snapshot)
+        if model_name and snapshot_payload.get("model") is None:
+            snapshot_payload["model"] = model_name
+        state["_provider_degradation_before"] = snapshot_payload
+
+    def _record_provider_degradation_event(
+        self,
+        state: Dict[str, Any],
+        *,
+        total_iterations: int,
+    ) -> None:
+        """Emit a stable provider degradation event when runtime evidence exists."""
+        if state.get("_provider_degradation_recorded"):
+            return
+        tracker, provider_name, model_name = self._resolve_provider_degradation_runtime(state)
+        if tracker is None or not provider_name or not hasattr(tracker, "get_degradation_snapshot"):
+            return
+        try:
+            snapshot = tracker.get_degradation_snapshot(provider_name)
+        except Exception as exc:
+            logger.debug("Failed to capture provider degradation summary: %s", exc)
+            return
+        before = dict(state.get("_provider_degradation_before") or {})
+        after = snapshot.to_dict() if hasattr(snapshot, "to_dict") else dict(snapshot)
+        if model_name and after.get("model") is None:
+            after["model"] = model_name
+
+        pre_degraded = bool(before.get("degraded", False))
+        post_degraded = bool(after.get("degraded", False))
+        recovered = bool(after.get("recovered_from_recent_incident", False)) or (
+            pre_degraded and not post_degraded
+        )
+        if not (pre_degraded or post_degraded or recovered):
+            return
+
+        error_types = dict(after.get("recent_error_types") or {})
+        failure_type = "PROVIDER_ERROR"
+        if any("rate" in str(name).lower() and "limit" in str(name).lower() for name in error_types):
+            failure_type = "RATE_LIMITED"
+
+        event = {
+            "source": "provider_performance",
+            "kind": (
+                "provider_recovered"
+                if recovered and not post_degraded
+                else "persistent_provider_degradation"
+            ),
+            "failure_type": failure_type,
+            "provider": provider_name,
+            "model": after.get("latest_model") or model_name,
+            "task_type": state.get("task_type"),
+            "pre_degraded": pre_degraded,
+            "post_degraded": post_degraded,
+            "recovered": recovered,
+            "iteration": total_iterations,
+            "adaptation_cost": float(
+                after.get("recent_incident_failure_count")
+                or after.get("failure_streak")
+                or before.get("failure_streak")
+                or 0.0
+            ),
+            "time_to_recover_seconds": after.get("time_to_recover_seconds"),
+            "degradation_reasons": list(
+                after.get("degradation_reasons")
+                or before.get("degradation_reasons")
+                or []
+            ),
+            "recent_error_types": error_types,
+            "score_before": before.get("score"),
+            "score_after": after.get("score"),
+            "latency_trend_before": before.get("latency_trend"),
+            "latency_trend_after": after.get("latency_trend"),
+            "failure_streak_before": before.get("failure_streak"),
+            "failure_streak_after": after.get("failure_streak"),
+            "success_streak_after": after.get("success_streak"),
+        }
+        state.setdefault("degradation_events", []).append(event)
+        state["_provider_degradation_after"] = after
+        state["_provider_degradation_recorded"] = True
+
+    def _resolve_provider_degradation_runtime(
+        self,
+        state: Dict[str, Any],
+    ) -> tuple[Optional[Any], Optional[str], Optional[str]]:
+        """Resolve the active provider-performance tracker and target provider name."""
+        if self.turn_executor is None:
+            return None, None, None
+
+        provider_context = getattr(self.turn_executor, "_provider_context", None)
+        if provider_context is None:
+            return None, None, None
+
+        provider = getattr(provider_context, "provider", None)
+        model_name = getattr(provider_context, "model", None)
+        tracker = None
+        if provider is not None:
+            tracker = getattr(provider, "tracker", None)
+            if tracker is None:
+                tracker = getattr(getattr(provider, "engine", None), "tracker", None)
+
+        provider_name = None
+        provider_hints = dict(state.get("_topology_provider_hints") or {})
+        hinted_provider = provider_hints.get("provider_hint")
+        if isinstance(hinted_provider, str) and hinted_provider:
+            provider_name = hinted_provider
+        elif provider is not None:
+            candidate_name = getattr(provider, "name", None)
+            if isinstance(candidate_name, str) and candidate_name and candidate_name != "smart-router":
+                provider_name = candidate_name
+
+        return tracker, provider_name, model_name
 
     @staticmethod
     def _topology_feedback_status(decision: EvaluationDecision) -> str:

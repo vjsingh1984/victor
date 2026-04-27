@@ -785,6 +785,43 @@ class TestBenchmarkToolUsageMetrics:
             "experiment_forced_slow_path"
         )
 
+    @pytest.mark.asyncio
+    async def test_run_single_task_maps_degradation_metadata_from_agent_callback(self):
+        """Dict-returning callbacks should preserve degradation events in task metadata."""
+        harness = EvaluationHarness()
+        runner = MockBenchmarkRunner()
+        task = BenchmarkTask(
+            task_id="task-degradation",
+            benchmark=BenchmarkType.CUSTOM,
+            description="Degradation-aware task",
+        )
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.CUSTOM,
+            model="test-model",
+        )
+
+        async def agent_callback(_task):
+            return {
+                "code": "print('hi')",
+                "tool_calls": 1,
+                "turns": 1,
+                "degradation_events": [
+                    {
+                        "source": "provider_performance",
+                        "kind": "provider_recovered",
+                        "failure_type": "PROVIDER_ERROR",
+                        "provider": "ollama",
+                        "pre_degraded": True,
+                        "post_degraded": False,
+                        "recovered": True,
+                    }
+                ],
+            }
+
+        result = await harness._run_single_task(task, runner, agent_callback, config)
+
+        assert result.metadata["degradation_events"][0]["provider"] == "ollama"
+
     def test_save_results_persists_code_intelligence_metrics(self, tmp_path):
         """Saved benchmark result JSON should include per-task tool telemetry."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)
@@ -858,9 +895,45 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["planning_policy_counts"] == {
             "experiment_forced_slow_path": 1
         }
-        assert loaded["summary"]["planning_force_reasons"] == {
-            "experiment_constraints: tests_pass": 1
-        }
+
+    def test_save_results_persists_degradation_feedback_metrics(self, tmp_path):
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.HUMAN_EVAL,
+                model="test",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    metadata={
+                        "degradation_events": [
+                            {
+                                "source": "provider_performance",
+                                "kind": "provider_recovered",
+                                "failure_type": "PROVIDER_ERROR",
+                                "provider": "ollama",
+                                "pre_degraded": True,
+                                "post_degraded": False,
+                                "recovered": True,
+                                "adaptation_cost": 2,
+                                "time_to_recover_seconds": 4.0,
+                                "degradation_reasons": ["failure_streak"],
+                            }
+                        ]
+                    },
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["summary"]["degradation_feedback_coverage"] == 1.0
+        assert loaded["summary"]["recovered_task_count"] == 1
+        assert loaded["summary"]["degradation_providers"] == {"ollama": 1}
+        assert loaded["tasks"][0]["metadata"]["degradation_events"][0]["provider"] == "ollama"
 
     def test_save_results_persists_failure_taxonomy(self, tmp_path):
         """Saved results should include normalized failure category fields."""

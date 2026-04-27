@@ -49,8 +49,8 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from collections import deque
-from dataclasses import dataclass
+from collections import Counter, deque
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Deque, Dict, List, Optional, TYPE_CHECKING
 
@@ -93,6 +93,59 @@ class RequestMetric:
             "timestamp": self.timestamp.isoformat(),
             "error_type": self.error_type,
             "task_type": self.task_type,
+        }
+
+
+@dataclass(frozen=True)
+class ProviderDegradationSnapshot:
+    """Structured snapshot of recent provider degradation and recovery state."""
+
+    provider: str
+    total_requests: int
+    success_rate: float
+    recent_success_rate: float
+    average_latency_ms: float
+    recent_average_latency_ms: float
+    latency_trend: str
+    score: float
+    failure_streak: int
+    success_streak: int
+    degraded: bool
+    degradation_reasons: tuple[str, ...] = ()
+    recovered_from_recent_incident: bool = False
+    time_to_recover_seconds: Optional[float] = None
+    recent_incident_failure_count: int = 0
+    recent_error_types: Dict[str, int] = field(default_factory=dict)
+    latest_model: Optional[str] = None
+    last_failure_at: Optional[str] = None
+    last_recovery_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, object]:
+        """Serialize the snapshot into plain runtime metadata."""
+        return {
+            "provider": self.provider,
+            "total_requests": self.total_requests,
+            "success_rate": round(self.success_rate, 4),
+            "recent_success_rate": round(self.recent_success_rate, 4),
+            "average_latency_ms": round(self.average_latency_ms, 4),
+            "recent_average_latency_ms": round(self.recent_average_latency_ms, 4),
+            "latency_trend": self.latency_trend,
+            "score": round(self.score, 4),
+            "failure_streak": self.failure_streak,
+            "success_streak": self.success_streak,
+            "degraded": self.degraded,
+            "degradation_reasons": list(self.degradation_reasons),
+            "recovered_from_recent_incident": self.recovered_from_recent_incident,
+            "time_to_recover_seconds": (
+                round(self.time_to_recover_seconds, 4)
+                if self.time_to_recover_seconds is not None
+                else None
+            ),
+            "recent_incident_failure_count": self.recent_incident_failure_count,
+            "recent_error_types": dict(self.recent_error_types),
+            "latest_model": self.latest_model,
+            "last_failure_at": self.last_failure_at,
+            "last_recovery_at": self.last_recovery_at,
         }
 
 
@@ -418,6 +471,137 @@ class ProviderPerformanceTracker:
 
         return composite_score
 
+    def get_failure_streak(self, provider: str) -> int:
+        """Return the current trailing failure streak for a provider."""
+        metrics = self.get_metrics(provider)
+        streak = 0
+        for metric in reversed(metrics):
+            if metric.success:
+                break
+            streak += 1
+        return streak
+
+    def get_success_streak(self, provider: str) -> int:
+        """Return the current trailing success streak for a provider."""
+        metrics = self.get_metrics(provider)
+        streak = 0
+        for metric in reversed(metrics):
+            if not metric.success:
+                break
+            streak += 1
+        return streak
+
+    def get_degradation_snapshot(self, provider: str) -> ProviderDegradationSnapshot:
+        """Return a structured degradation/recovery snapshot for a provider.
+
+        The snapshot intentionally favors simple, deterministic signals:
+        consecutive failures, recent success-rate erosion, and degrading
+        latency trend. Recovery is only reported after a multi-failure incident
+        is followed by a stable success streak.
+        """
+        provider = provider.lower()
+        metrics = self.get_metrics(provider)
+        if not metrics:
+            return ProviderDegradationSnapshot(
+                provider=provider,
+                total_requests=0,
+                success_rate=0.5,
+                recent_success_rate=0.5,
+                average_latency_ms=1000.0,
+                recent_average_latency_ms=1000.0,
+                latency_trend="stable",
+                score=0.5,
+                failure_streak=0,
+                success_streak=0,
+                degraded=False,
+            )
+
+        recent_window = metrics[-min(5, len(metrics)) :]
+        success_rate = self.get_success_rate(provider)
+        recent_success_rate = sum(1 for metric in recent_window if metric.success) / max(
+            1, len(recent_window)
+        )
+        average_latency = self.get_average_latency(provider)
+        recent_successful = [metric.latency_ms for metric in recent_window if metric.success]
+        recent_average_latency = (
+            (sum(recent_successful) / len(recent_successful))
+            if recent_successful
+            else average_latency
+        )
+        latency_trend = self.get_latency_trend(provider)
+        score = self.get_provider_score(provider)
+        failure_streak = self.get_failure_streak(provider)
+        success_streak = self.get_success_streak(provider)
+
+        degradation_reasons: list[str] = []
+        if failure_streak >= 2:
+            degradation_reasons.append("failure_streak")
+        if len(metrics) >= 4 and recent_success_rate < 0.5:
+            degradation_reasons.append("low_recent_success_rate")
+        if len(metrics) >= 10 and latency_trend == "degrading":
+            degradation_reasons.append("latency_trend")
+        degraded = bool(degradation_reasons)
+
+        recent_error_types = Counter(
+            str(metric.error_type)
+            for metric in recent_window
+            if not metric.success and metric.error_type is not None
+        )
+
+        last_failure_at: Optional[str] = None
+        last_recovery_at: Optional[str] = None
+        recovered_from_recent_incident = False
+        time_to_recover_seconds: Optional[float] = None
+        recent_incident_failure_count = 0
+
+        if success_streak >= 2:
+            incident_end = len(metrics) - success_streak - 1
+            if incident_end >= 0 and not metrics[incident_end].success:
+                incident_start = incident_end
+                while incident_start > 0 and not metrics[incident_start - 1].success:
+                    incident_start -= 1
+                recent_incident_failure_count = (incident_end - incident_start) + 1
+                if recent_incident_failure_count >= 2:
+                    first_failure = metrics[incident_start]
+                    first_recovery = metrics[incident_end + 1]
+                    last_failure = metrics[incident_end]
+                    last_failure_at = last_failure.timestamp.isoformat()
+                    last_recovery_at = first_recovery.timestamp.isoformat()
+                    time_to_recover_seconds = max(
+                        0.0,
+                        (first_recovery.timestamp - first_failure.timestamp).total_seconds(),
+                    )
+                    recovered_from_recent_incident = not degraded
+
+        if last_failure_at is None:
+            for metric in reversed(metrics):
+                if not metric.success:
+                    last_failure_at = metric.timestamp.isoformat()
+                    break
+
+        latest_model = metrics[-1].model if metrics else None
+        return ProviderDegradationSnapshot(
+            provider=provider,
+            total_requests=len(metrics),
+            success_rate=success_rate,
+            recent_success_rate=recent_success_rate,
+            average_latency_ms=average_latency,
+            recent_average_latency_ms=recent_average_latency,
+            latency_trend=latency_trend,
+            score=score,
+            failure_streak=failure_streak,
+            success_streak=success_streak,
+            degraded=degraded,
+            degradation_reasons=tuple(degradation_reasons),
+            recovered_from_recent_incident=recovered_from_recent_incident,
+            time_to_recover_seconds=time_to_recover_seconds,
+            recent_incident_failure_count=recent_incident_failure_count,
+            recent_error_types=dict(recent_error_types),
+            latest_model=latest_model,
+            last_failure_at=last_failure_at,
+            last_recovery_at=last_recovery_at,
+        )
+
     def get_all_scores(self) -> Dict[str, float]:
         """Get scores for all tracked providers.
 
@@ -473,6 +657,9 @@ class ProviderPerformanceTracker:
                 "average_latency_ms": self.get_average_latency(provider),
                 "latency_trend": self.get_latency_trend(provider),
                 "score": self.get_provider_score(provider),
+                "failure_streak": self.get_failure_streak(provider),
+                "success_streak": self.get_success_streak(provider),
+                "degradation": self.get_degradation_snapshot(provider).to_dict(),
             }
 
         return {

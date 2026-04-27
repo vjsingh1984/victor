@@ -27,6 +27,7 @@ from typing import Any, Optional
 
 from victor.evaluation.topology_feedback import aggregate_topology_feedback
 from victor.evaluation.planning_feedback import aggregate_planning_feedback
+from victor.evaluation.degradation_feedback import aggregate_degradation_feedback
 
 
 @dataclass
@@ -718,6 +719,9 @@ class EvaluationResult:
         }
         metrics.update(aggregate_planning_feedback(self.task_results, total_tasks=self.total_tasks))
         metrics.update(aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks))
+        metrics.update(
+            aggregate_degradation_feedback(self.task_results, total_tasks=self.total_tasks)
+        )
         return metrics
 
 

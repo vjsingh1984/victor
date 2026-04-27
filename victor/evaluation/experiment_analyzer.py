@@ -268,6 +268,54 @@ def _append_planning_insights(
         )
 
 
+def _append_degradation_insights(
+    insights: list[ExperimentInsight],
+    keywords: set[str],
+    summary_metrics: Mapping[str, Any],
+) -> None:
+    provider_degradation_tasks = int(summary_metrics.get("provider_degradation_task_count", 0) or 0)
+    content_degradation_tasks = int(summary_metrics.get("content_degradation_task_count", 0) or 0)
+    recovery_rate = _coerce_float(summary_metrics.get("degradation_recovery_rate"))
+    reasons = dict(summary_metrics.get("degradation_reasons") or {})
+
+    if provider_degradation_tasks > 0:
+        keywords.update({"provider_degradation", "recovery"})
+        insights.append(
+            ExperimentInsight(
+                kind="environment_constraint",
+                summary="Provider instability affected this scope during execution.",
+                confidence=min(0.92, 0.45 + (0.08 * provider_degradation_tasks)),
+                evidence={
+                    "provider_degradation_task_count": provider_degradation_tasks,
+                    "recovery_rate": recovery_rate,
+                },
+            )
+        )
+
+    if content_degradation_tasks > 0:
+        keywords.update({"stuck_loop", "content_repetition"})
+        insights.append(
+            ExperimentInsight(
+                kind="failed_hypothesis",
+                summary="Loop content repetition indicates unresolved convergence pressure.",
+                confidence=min(0.9, 0.42 + (0.08 * content_degradation_tasks)),
+                evidence={"content_degradation_task_count": content_degradation_tasks},
+            )
+        )
+
+    if reasons:
+        dominant_reason = sorted(reasons.items(), key=lambda item: (-int(item[1]), item[0]))[0]
+        keywords.add(str(dominant_reason[0]))
+        insights.append(
+            ExperimentInsight(
+                kind="next_candidate",
+                summary=f"Harden recovery against the dominant degradation cause: {dominant_reason[0]}.",
+                confidence=0.74,
+                evidence={"reason": dominant_reason[0], "count": int(dominant_reason[1])},
+            )
+        )
+
+
 def _append_next_candidate(
     insights: list[ExperimentInsight],
     keywords: set[str],
@@ -404,6 +452,7 @@ def analyze_evaluation_result(
     keyword_seed: set[str] = set()
     _append_policy_insights(insights, keyword_seed, summary_metrics)
     _append_planning_insights(insights, keyword_seed, summary_metrics)
+    _append_degradation_insights(insights, keyword_seed, summary_metrics)
     _append_gate_failure_constraints(insights, keyword_seed, summary_metrics)
     _append_next_candidate(insights, keyword_seed, summary_metrics)
     keywords = sorted(set(_build_keywords(scope, task_summaries, insights)) | keyword_seed)

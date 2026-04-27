@@ -53,6 +53,20 @@ TOPOLOGY_RUNTIME_METADATA_KEYS = (
     "topology_feedback_coverage",
     "avg_topology_reward",
     "avg_topology_confidence",
+    "degradation_feedback_coverage",
+    "degradation_event_count",
+    "degraded_task_count",
+    "recovered_task_count",
+    "degradation_recovery_rate",
+    "avg_degradation_adaptation_cost",
+    "avg_degradation_time_to_recover_seconds",
+    "content_degradation_task_count",
+    "provider_degradation_task_count",
+    "degradation_sources",
+    "degradation_kinds",
+    "degradation_failure_types",
+    "degradation_providers",
+    "degradation_reasons",
     "optimization_feasible_tasks",
     "optimization_infeasible_tasks",
     "optimization_feasibility_rate",
@@ -247,7 +261,7 @@ def _extract_task_entries(
     payload = dict(result_or_payload or {})
     tasks = list(payload.get("tasks") or payload.get("task_results") or [])
     summary = dict(payload.get("summary") or {})
-    for section_name in ("quality", "optimization", "topology"):
+    for section_name in ("quality", "optimization", "topology", "degradation"):
         section_payload = payload.get(section_name)
         if isinstance(section_payload, Mapping):
             summary.update(dict(section_payload))
@@ -385,6 +399,37 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             "avg_topology_confidence": round(
                 float(summary.get("avg_topology_confidence", 0.0) or 0.0), 4
             ),
+            "degradation_feedback_coverage": round(
+                float(summary.get("degradation_feedback_coverage", 0.0) or 0.0), 4
+            ),
+            "degradation_event_count": int(summary.get("degradation_event_count", 0) or 0),
+            "degraded_task_count": int(summary.get("degraded_task_count", 0) or 0),
+            "recovered_task_count": int(summary.get("recovered_task_count", 0) or 0),
+            "degradation_recovery_rate": round(
+                float(summary.get("degradation_recovery_rate", 0.0) or 0.0),
+                4,
+            ),
+            "avg_degradation_adaptation_cost": round(
+                float(summary.get("avg_degradation_adaptation_cost", 0.0) or 0.0),
+                4,
+            ),
+            "avg_degradation_time_to_recover_seconds": round(
+                float(summary.get("avg_degradation_time_to_recover_seconds", 0.0) or 0.0),
+                4,
+            ),
+            "content_degradation_task_count": int(
+                summary.get("content_degradation_task_count", 0) or 0
+            ),
+            "provider_degradation_task_count": int(
+                summary.get("provider_degradation_task_count", 0) or 0
+            ),
+            "degradation_sources": dict(summary.get("degradation_sources") or {}),
+            "degradation_kinds": dict(summary.get("degradation_kinds") or {}),
+            "degradation_failure_types": dict(
+                summary.get("degradation_failure_types") or {}
+            ),
+            "degradation_providers": dict(summary.get("degradation_providers") or {}),
+            "degradation_reasons": dict(summary.get("degradation_reasons") or {}),
             "topology_actions": dict(summary.get("topology_actions") or {}),
             "topology_execution_modes": dict(summary.get("topology_execution_modes") or {}),
             "topology_selection_policies": dict(summary.get("topology_selection_policies") or {}),
@@ -1737,6 +1782,30 @@ def _aggregate_feedback_payloads(
             "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
             "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
             "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
+            "degradation_feedback_coverage": weighted_metadata_average(
+                "degradation_feedback_coverage"
+            ),
+            "degradation_event_count": weighted_metadata_average("degradation_event_count"),
+            "degraded_task_count": weighted_metadata_average("degraded_task_count"),
+            "recovered_task_count": weighted_metadata_average("recovered_task_count"),
+            "degradation_recovery_rate": weighted_metadata_average("degradation_recovery_rate"),
+            "avg_degradation_adaptation_cost": weighted_metadata_average(
+                "avg_degradation_adaptation_cost"
+            ),
+            "avg_degradation_time_to_recover_seconds": weighted_metadata_average(
+                "avg_degradation_time_to_recover_seconds"
+            ),
+            "content_degradation_task_count": weighted_metadata_average(
+                "content_degradation_task_count"
+            ),
+            "provider_degradation_task_count": weighted_metadata_average(
+                "provider_degradation_task_count"
+            ),
+            "degradation_sources": weighted_distribution("degradation_sources"),
+            "degradation_kinds": weighted_distribution("degradation_kinds"),
+            "degradation_failure_types": weighted_distribution("degradation_failure_types"),
+            "degradation_providers": weighted_distribution("degradation_providers"),
+            "degradation_reasons": weighted_distribution("degradation_reasons"),
             "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
             "optimization_infeasible_tasks": weighted_metadata_average(
                 "optimization_infeasible_tasks"
@@ -1961,6 +2030,30 @@ def _aggregate_topology_feedback_metadata(
         "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
         "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
         "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
+        "degradation_feedback_coverage": weighted_metadata_average(
+            "degradation_feedback_coverage"
+        ),
+        "degradation_event_count": weighted_metadata_average("degradation_event_count"),
+        "degraded_task_count": weighted_metadata_average("degraded_task_count"),
+        "recovered_task_count": weighted_metadata_average("recovered_task_count"),
+        "degradation_recovery_rate": weighted_metadata_average("degradation_recovery_rate"),
+        "avg_degradation_adaptation_cost": weighted_metadata_average(
+            "avg_degradation_adaptation_cost"
+        ),
+        "avg_degradation_time_to_recover_seconds": weighted_metadata_average(
+            "avg_degradation_time_to_recover_seconds"
+        ),
+        "content_degradation_task_count": weighted_metadata_average(
+            "content_degradation_task_count"
+        ),
+        "provider_degradation_task_count": weighted_metadata_average(
+            "provider_degradation_task_count"
+        ),
+        "degradation_sources": weighted_distribution("degradation_sources"),
+        "degradation_kinds": weighted_distribution("degradation_kinds"),
+        "degradation_failure_types": weighted_distribution("degradation_failure_types"),
+        "degradation_providers": weighted_distribution("degradation_providers"),
+        "degradation_reasons": weighted_distribution("degradation_reasons"),
         "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
         "optimization_infeasible_tasks": weighted_metadata_average(
             "optimization_infeasible_tasks"

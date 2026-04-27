@@ -44,6 +44,13 @@ def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
             "topology_feedback_coverage": 0.5,
             "avg_topology_reward": 0.64,
             "avg_topology_confidence": 0.73,
+            "degradation_feedback_coverage": 0.5,
+            "degradation_event_count": 1,
+            "degraded_task_count": 1,
+            "recovered_task_count": 0,
+            "degradation_recovery_rate": 0.0,
+            "degradation_sources": {"provider_performance": 1},
+            "degradation_kinds": {"persistent_provider_degradation": 1},
             "topology_actions": {"team_plan": 1},
             "topology_execution_modes": {"team_execution": 1},
         },
@@ -88,6 +95,10 @@ def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
     assert feedback.metadata["topology_feedback_coverage"] == pytest.approx(0.5)
     assert feedback.metadata["avg_topology_reward"] == pytest.approx(0.64)
     assert feedback.metadata["avg_topology_confidence"] == pytest.approx(0.73)
+    assert feedback.metadata["degradation_feedback_coverage"] == pytest.approx(0.5)
+    assert feedback.metadata["degradation_event_count"] == 1
+    assert feedback.metadata["degraded_task_count"] == 1
+    assert feedback.metadata["degradation_sources"] == {"provider_performance": 1}
     assert feedback.metadata["topology_actions"] == {"team_plan": 1}
     assert feedback.metadata["topology_execution_modes"] == {"team_execution": 1}
     assert feedback.metadata["topology_selection_policies"] == {}
@@ -103,6 +114,15 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
             "optimization_infeasible_tasks": 1,
             "optimization_feasibility_rate": 0.5,
             "topology_feedback_coverage": 1.0,
+            "degradation_feedback_coverage": 1.0,
+            "degradation_event_count": 2,
+            "degraded_task_count": 2,
+            "recovered_task_count": 1,
+            "degradation_recovery_rate": 0.5,
+            "avg_degradation_adaptation_cost": 2.5,
+            "avg_degradation_time_to_recover_seconds": 4.0,
+            "content_degradation_task_count": 1,
+            "provider_degradation_task_count": 1,
         },
         "quality": {
             "avg_topology_reward": 0.73,
@@ -147,6 +167,16 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
             "topology_learned_override_optimization_reward_delta": 0.36,
             "topology_learned_override_feasibility_delta": 1.0,
         },
+        "degradation": {
+            "degradation_sources": {"provider_performance": 1, "agentic_loop": 1},
+            "degradation_kinds": {
+                "provider_recovered": 1,
+                "content_repetition": 1,
+            },
+            "degradation_failure_types": {"PROVIDER_ERROR": 1, "STUCK_LOOP": 1},
+            "degradation_providers": {"ollama": 1},
+            "degradation_reasons": {"failure_streak": 1, "content_repetition": 1},
+        },
         "tasks": [
             {"status": "passed"},
             {"status": "failed"},
@@ -156,6 +186,13 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
     feedback = derive_runtime_evaluation_feedback(payload)
 
     assert feedback.metadata["optimization_feasible_tasks"] == 1
+    assert feedback.metadata["degradation_feedback_coverage"] == pytest.approx(1.0)
+    assert feedback.metadata["degradation_event_count"] == 2
+    assert feedback.metadata["recovered_task_count"] == 1
+    assert feedback.metadata["degradation_reasons"] == {
+        "failure_streak": 1,
+        "content_repetition": 1,
+    }
     assert feedback.metadata["optimization_infeasible_tasks"] == 1
     assert feedback.metadata["optimization_feasibility_rate"] == pytest.approx(0.5)
     assert feedback.metadata["avg_optimization_reward"] == pytest.approx(0.64)

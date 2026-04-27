@@ -6,6 +6,7 @@ components for PERCEIVE → PLAN → ACT → EVALUATE → DECIDE loops.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,6 +33,7 @@ from victor.framework.fulfillment import FulfillmentResult, FulfillmentStatus, T
 from victor.framework.perception_integration import Perception
 from victor.framework.task.protocols import TaskComplexity
 from victor.providers.base import CompletionResponse
+from victor.providers.performance_tracker import ProviderPerformanceTracker, RequestMetric
 
 # ============================================================================
 # LoopStage enum tests
@@ -335,6 +337,106 @@ class TestAgenticLoop:
         assert feedback_payload["completion_score"] == pytest.approx(0.92)
         emit_mock.assert_awaited_once()
 
+    async def test_run_parallel_topology_prepares_runtime_once_selected(self, monkeypatch):
+        perception = _make_perception()
+        perception.confidence = 0.9
+        task_classification = SimpleNamespace(tool_budget=6, complexity=TaskComplexity.COMPLEX)
+        turn_executor = MagicMock()
+        turn_executor.prepare_runtime_topology = AsyncMock(
+            return_value={
+                "action": "parallel_exploration",
+                "prepared": True,
+                "execution_mode": "parallel_exploration",
+            }
+        )
+        turn_executor.execute_turn = AsyncMock(
+            return_value=TurnResult(
+                response=CompletionResponse(content="done", role="assistant"),
+                tool_results=[],
+                has_tool_calls=False,
+                tool_calls_count=0,
+                all_tools_blocked=False,
+                is_qa_response=False,
+            )
+        )
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            turn_executor=turn_executor,
+            max_iterations=1,
+        )
+        agentic_loop_module = __import__(
+            "victor.framework.agentic_loop",
+            fromlist=["emit_topology_telemetry_event"],
+        )
+        emit_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr(agentic_loop_module, "emit_topology_telemetry_event", emit_mock)
+        loop._analyze_turn = AsyncMock(return_value=perception)
+        loop._plan = AsyncMock(return_value={"steps": ["inspect", "summarize"]})
+        loop._evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=0.9,
+                reason="Parallel exploration prepared the runtime",
+            )
+        )
+        loop._get_topology_provider_hints = AsyncMock(return_value={})
+        loop.paradigm_router = MagicMock()
+        loop.paradigm_router.route.return_value = MagicMock(
+            skip_planning=False,
+            paradigm=SimpleNamespace(value="deep"),
+            model_tier=SimpleNamespace(value="large"),
+            max_tokens=4096,
+            confidence=0.88,
+            to_dict=MagicMock(return_value={"paradigm": "deep", "model_tier": "large"}),
+        )
+        loop.paradigm_router.build_topology_input = MagicMock(
+            return_value=TopologyDecisionInput(
+                query="Fix the bug",
+                task_type="code_generation",
+                task_complexity="high",
+                expected_breadth="high",
+                tool_budget=6,
+                iteration_budget=1,
+                available_team_formations=["parallel", "hierarchical"],
+            )
+        )
+        topology_decision = TopologyDecision(
+            action=TopologyAction.PARALLEL_EXPLORATION,
+            topology=TopologyKind.PARALLEL_EXPLORATION,
+            confidence=0.84,
+            rationale="Breadth-heavy task benefits from exploration before execution",
+            grounding_requirements=TopologyGroundingRequirements(
+                max_workers=3,
+                tool_budget=4,
+                iteration_budget=1,
+            ),
+        )
+        topology_plan = GroundedTopologyPlan(
+            action=TopologyAction.PARALLEL_EXPLORATION,
+            topology=TopologyKind.PARALLEL_EXPLORATION,
+            execution_mode="parallel_exploration",
+            max_workers=3,
+            tool_budget=4,
+            iteration_budget=1,
+            metadata={"source": "test"},
+        )
+        loop._topology_selector.select = MagicMock(return_value=topology_decision)
+        loop._topology_grounder.ground = MagicMock(return_value=topology_plan)
+
+        result = await loop.run("Fix the bug", context={"_task_classification": task_classification})
+
+        assert result.success is True
+        turn_executor.prepare_runtime_topology.assert_awaited_once_with(
+            topology_plan,
+            user_message="Fix the bug",
+            task_classification=task_classification,
+        )
+        assert result.final_state["topology_preparation"] == {
+            "action": "parallel_exploration",
+            "prepared": True,
+            "execution_mode": "parallel_exploration",
+        }
+
     async def test_experiment_memory_planning_hints_can_override_fast_path(self):
         perception = _make_perception()
         perception.confidence = 0.9
@@ -390,6 +492,92 @@ class TestAgenticLoop:
             loop.runtime_intelligence.get_planning_routing_context.call_args.kwargs["scope_context"]
         )
         assert planning_scope_context["task_type"] == "action"
+
+    async def test_run_records_provider_degradation_recovery_event(self):
+        perception = _make_perception()
+        perception.confidence = 0.9
+        tracker = ProviderPerformanceTracker(db=None)
+        provider = SimpleNamespace(name="ollama", tracker=tracker)
+        provider_context = SimpleNamespace(provider=provider, model="test-model")
+        now = datetime.now()
+        for offset in range(2):
+            tracker.record_request(
+                RequestMetric(
+                    provider="ollama",
+                    model="test-model",
+                    success=False,
+                    latency_ms=2000.0,
+                    timestamp=now,
+                    error_type="ProviderError",
+                )
+            )
+
+        turn_executor = MagicMock()
+        turn_executor._provider_context = provider_context
+        turn_executor.execute_turn = AsyncMock(
+            return_value=TurnResult(
+                response=CompletionResponse(content="done", role="assistant"),
+                tool_results=[],
+                has_tool_calls=False,
+                tool_calls_count=0,
+                all_tools_blocked=False,
+                is_qa_response=False,
+            )
+        )
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            turn_executor=turn_executor,
+            max_iterations=1,
+            config={"enable_topology_routing": False},
+        )
+        loop._analyze_turn = AsyncMock(return_value=perception)
+        loop._plan = AsyncMock(return_value={"steps": ["recover", "execute"]})
+        loop._evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=0.88,
+                reason="Provider recovered",
+            )
+        )
+        loop.paradigm_router = MagicMock()
+        loop.paradigm_router.route.return_value = MagicMock(
+            skip_planning=False,
+            paradigm=SimpleNamespace(value="deep"),
+            model_tier=SimpleNamespace(value="small"),
+            max_tokens=2048,
+            confidence=0.72,
+            to_dict=MagicMock(return_value={"paradigm": "deep", "model_tier": "small"}),
+        )
+
+        async def _act_with_recovery(*_args, **_kwargs):
+            for step in range(3):
+                tracker.record_request(
+                    RequestMetric(
+                        provider="ollama",
+                        model="test-model",
+                        success=True,
+                        latency_ms=700.0,
+                        timestamp=now + timedelta(seconds=step + 2),
+                    )
+                )
+            return TurnResult(
+                response=CompletionResponse(content="done", role="assistant"),
+                tool_results=[],
+                has_tool_calls=False,
+                tool_calls_count=0,
+                all_tools_blocked=False,
+                is_qa_response=False,
+            )
+
+        loop._act = AsyncMock(side_effect=_act_with_recovery)
+
+        result = await loop.run("Fix the provider issue", context={"task_type": "action"})
+
+        assert result.success is True
+        assert result.metadata["degradation_events"][0]["source"] == "provider_performance"
+        assert result.metadata["degradation_events"][0]["recovered"] is True
+        assert result.metadata["degradation_events"][0]["provider"] == "ollama"
+        assert result.metadata["degradation_events"][0]["failure_type"] == "PROVIDER_ERROR"
 
     async def test_fast_path_skips_planning_and_uses_direct_execution_plan(self):
         perception = _make_perception()

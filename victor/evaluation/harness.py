@@ -1242,6 +1242,9 @@ class EvaluationHarness:
                     planning_events = partial_data.get("planning_events")
                     if planning_events:
                         task_result.metadata["planning_events"] = list(planning_events)
+                    degradation_events = partial_data.get("degradation_events")
+                    if degradation_events:
+                        task_result.metadata["degradation_events"] = list(degradation_events)
                     task_result.generated_code = partial_data.get("code", "")
                     logger.info(
                         f"Task timed out - partial metrics recovered: "
@@ -1270,6 +1273,9 @@ class EvaluationHarness:
                 planning_events = agent_output.get("planning_events")
                 if planning_events:
                     task_result.metadata["planning_events"] = list(planning_events)
+                degradation_events = agent_output.get("degradation_events")
+                if degradation_events:
+                    task_result.metadata["degradation_events"] = list(degradation_events)
                 agent_output = agent_output.get("code", "")
 
             # Self-correction loop (if enabled)

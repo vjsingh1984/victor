@@ -123,6 +123,11 @@ from victor.evaluation.planning_feedback import (
     extract_planning_events,
     summarize_planning_feedback,
 )
+from victor.evaluation.degradation_feedback import (
+    aggregate_degradation_feedback,
+    extract_degradation_events,
+    summarize_degradation_feedback,
+)
 
 # Code generation harness (HumanEval, MBPP - provider-only, no tools)
 from victor.evaluation.code_generation_harness import (
@@ -291,6 +296,9 @@ __all__ = [
     "aggregate_planning_feedback",
     "extract_planning_events",
     "summarize_planning_feedback",
+    "aggregate_degradation_feedback",
+    "extract_degradation_events",
+    "summarize_degradation_feedback",
     # Code generation harness (HumanEval, MBPP - provider-only)
     "CodeGenMetrics",
     "CodeGenResult",
