@@ -718,6 +718,43 @@ class TestChatServiceBootstrapLaziness:
             task_analysis="task-analysis",
         )
 
+    def test_get_context_limit_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.context_limit_runtime import ContextLimitRuntime
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_context_limit_runtime()
+        second = obj._get_context_limit_runtime()
+
+        assert isinstance(first, ContextLimitRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
+    @pytest.mark.asyncio
+    async def test_handle_context_and_iteration_limits_runtime_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.handle_limits = AsyncMock(return_value=(False, None))
+        obj._context_limit_runtime = helper
+        obj._check_context_overflow = MagicMock(return_value=False)
+
+        result = await AgentOrchestrator._handle_context_and_iteration_limits_runtime(
+            obj,
+            "plan this",
+            5,
+            1000,
+            1,
+            0.8,
+        )
+
+        assert result == (False, None)
+        helper.handle_limits.assert_awaited_once_with("plan this", 5, 1000, 1, 0.8)
+
     @pytest.mark.asyncio
     async def test_planning_handler_skips_duplicate_turn_recording_after_direct_chat_fallback(self):
         from victor.agent.orchestrator import AgentOrchestrator

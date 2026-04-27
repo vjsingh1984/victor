@@ -241,9 +241,6 @@ from victor.providers.base import (
 )
 from victor.providers.registry import ProviderRegistry
 from victor.core.errors import (
-    ProviderAuthError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
     ToolNotFoundError,
     ToolValidationError,
 )
@@ -3499,6 +3496,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return response
 
+    def _get_context_limit_runtime(self) -> Any:
+        """Get the canonical service-owned context/iteration limit runtime helper."""
+        runtime = getattr(self, "_context_limit_runtime", None)
+        if runtime is None:
+            from victor.agent.services.context_limit_runtime import ContextLimitRuntime
+
+            runtime = ContextLimitRuntime(self.protocol_adapter)
+            self._context_limit_runtime = runtime
+        return runtime
+
     async def _handle_context_and_iteration_limits_runtime(
         self,
         user_message: str,
@@ -3508,132 +3515,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         last_quality_score: float,
     ) -> tuple[bool, Optional[StreamChunk]]:
         """Handle context and iteration limits from the canonical service runtime path."""
-        if self._check_context_overflow(max_context):
-            logger.warning("Context overflow detected. Attempting smart compaction...")
-            removed = self._conversation_controller.smart_compact_history(
-                current_query=user_message
-            )
-            if removed > 0:
-                logger.info(f"Smart compaction removed {removed} messages")
-                chunk = StreamChunk(
-                    content=f"\n[context] Compacted history ({removed} messages) to continue.\n"
-                )
-                self._conversation_controller.inject_compaction_context()
-                return False, chunk
-
-            if self._check_context_overflow(max_context):
-                logger.warning("Still overflowing after compaction. Forcing completion.")
-                chunk = StreamChunk(
-                    content=(
-                        f"\n[tool] {self._presentation.icon('warning', with_color=False)} "
-                        "Context size limit reached. Providing summary.\n"
-                    )
-                )
-                completion_prompt = self._get_thinking_disabled_prompt(
-                    "Context limit reached. Summarize in 2-3 sentences."
-                )
-                recent_messages = self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
-                completion_messages = recent_messages + [
-                    Message(role="user", content=completion_prompt)
-                ]
-
-                try:
-                    response = await self.provider.chat(
-                        messages=completion_messages,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=min(self.max_tokens, 1024),
-                        tools=None,
-                    )
-                    if response and response.content:
-                        sanitized = self.sanitizer.sanitize(response.content)
-                        if sanitized:
-                            self.add_message("assistant", sanitized)
-                            chunk = StreamChunk(content=sanitized, is_final=True)
-                            self._record_intelligent_outcome(
-                                success=True,
-                                quality_score=last_quality_score,
-                                user_satisfied=True,
-                                completed=True,
-                            )
-                            return True, chunk
-                except Exception as exc:
-                    logger.warning(f"Final response after context overflow failed: {exc}")
-                self._record_intelligent_outcome(
-                    success=True,
-                    quality_score=last_quality_score,
-                    user_satisfied=True,
-                    completed=True,
-                )
-                return True, StreamChunk(content="", is_final=True)
-
-        if total_iterations > max_total_iterations:
-            logger.warning(
-                f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
-            )
-            iteration_prompt = self._get_thinking_disabled_prompt(
-                "Max iterations reached. Summarize key findings in 3-4 sentences. "
-                "Do NOT attempt any more tool calls."
-            )
-            recent_messages = self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-            completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
-
-            chunk = StreamChunk(
-                content=(
-                    f"\n[tool] {self._presentation.icon('warning', with_color=False)} "
-                    f"Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
-                )
-            )
-
-            try:
-                response = await self.provider.chat(
-                    messages=completion_messages,
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=min(self.max_tokens, 1024),
-                    tools=None,
-                )
-                if response and response.content:
-                    sanitized = self.sanitizer.sanitize(response.content)
-                    if sanitized:
-                        self.add_message("assistant", sanitized)
-                        chunk = StreamChunk(content=sanitized, is_final=True)
-                        self._record_intelligent_outcome(
-                            success=True,
-                            quality_score=last_quality_score,
-                            user_satisfied=True,
-                            completed=True,
-                        )
-                        return True, chunk
-            except (ProviderRateLimitError, ProviderTimeoutError) as exc:
-                logger.error(f"Rate limit/timeout during final response: {exc}")
-                chunk = StreamChunk(
-                    content="Rate limited or timeout. Please retry in a moment.\n", is_final=True
-                )
-            except ProviderAuthError as exc:
-                logger.error(f"Auth error during final response: {exc}")
-                chunk = StreamChunk(
-                    content="Authentication error. Check API credentials.\n", is_final=True
-                )
-            except (ConnectionError, TimeoutError) as exc:
-                logger.error(f"Network error during final response: {exc}")
-                chunk = StreamChunk(content="Network error. Check connection.\n", is_final=True)
-            except Exception:
-                logger.exception("Unexpected error during final response generation")
-                chunk = StreamChunk(
-                    content="Unable to generate final summary due to iteration limit.\n",
-                    is_final=True,
-                )
-
-            self._record_intelligent_outcome(
-                success=True,
-                quality_score=last_quality_score,
-                user_satisfied=True,
-                completed=True,
-            )
-            return True, chunk if chunk else StreamChunk(content="", is_final=True)
-
-        return False, None
+        return await self._get_context_limit_runtime().handle_limits(
+            user_message,
+            max_total_iterations,
+            max_context,
+            total_iterations,
+            last_quality_score,
+        )
 
     async def _handle_context_and_iteration_limits(
         self,
