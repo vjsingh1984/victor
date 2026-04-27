@@ -326,6 +326,19 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
         assert tool_message.tool_call_id == "call-1"
         assert tool_message.name == "read"
 
+    def test_reset_conversation_preserves_system_prompt_without_double_reset(self):
+        service, controller = self._create_controller_backed_service()
+        controller.set_system_prompt("system prompt")
+        controller.ensure_system_message()
+        controller.add_message("user", "hello")
+        controller.reset = mock.MagicMock(wraps=controller.reset)
+
+        service.reset_conversation()
+
+        assert controller.reset.call_count == 1
+        assert [message.role for message in controller.messages] == ["system"]
+        assert [message.content for message in controller.messages] == ["system prompt"]
+
     def test_chat_service_declares_single_keyword_based_context_helpers(self):
         source = inspect.getsource(ChatService)
 

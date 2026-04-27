@@ -146,14 +146,12 @@ def test_graph_enrichment_adds_synthetic_protocol_and_tool_edges(tmp_path: Path)
     assert stats.registers_edges == 1
 
     db = get_project_database(tmp_path)
-    edge_rows = db.query(
-        """
+    edge_rows = db.query("""
         SELECT src, dst, type
         FROM graph_edge
         WHERE type IN ('IMPLEMENTS', 'DECORATES', 'REGISTERS')
         ORDER BY type, src, dst
-        """
-    )
+        """)
     edges = {(row["src"], row["dst"], row["type"]) for row in edge_rows}
     assert (
         "symbol:tools_sample.py:SampleStore",
@@ -183,12 +181,10 @@ def test_graph_enrichment_is_idempotent_for_same_repo_state(tmp_path: Path) -> N
     assert second.skipped is True
 
     db = get_project_database(tmp_path)
-    row = db.query_one(
-        """
+    row = db.query_one("""
         SELECT COUNT(*)
         FROM graph_edge
         WHERE type IN ('IMPLEMENTS', 'DECORATES', 'REGISTERS')
-        """
-    )
+        """)
     assert row is not None
     assert int(row[0]) == 3

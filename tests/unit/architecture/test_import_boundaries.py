@@ -267,9 +267,8 @@ class TestPresentationBoundaries:
                     stripped = line.strip()
                     if not stripped or stripped.startswith("#"):
                         continue
-                    if (
-                        stripped.startswith("from victor.ui.emoji import")
-                        or stripped.startswith("import victor.ui.emoji")
+                    if stripped.startswith("from victor.ui.emoji import") or stripped.startswith(
+                        "import victor.ui.emoji"
                     ):
                         errors.append(
                             f"{rel_path}:{line_no} imports victor.ui.emoji directly; "

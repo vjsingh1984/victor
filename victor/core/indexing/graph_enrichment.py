@@ -143,16 +143,14 @@ def _record_enrichment_state(conn: object, latest_mtime: Optional[float]) -> Non
 
 
 def _infer_protocol_implementation_edges(conn: object) -> int:
-    rows = conn.execute(
-        """
+    rows = conn.execute("""
         SELECT e.src, e.dst
         FROM graph_edge e
         JOIN graph_node dst ON dst.node_id = e.dst
         WHERE e.type = 'INHERITS'
           AND dst.type = 'class'
           AND dst.name LIKE '%Protocol'
-        """
-    ).fetchall()
+        """).fetchall()
     if not rows:
         return 0
 
@@ -184,15 +182,13 @@ def _infer_tool_registration_edges(conn: object, repo_root: Path) -> Tuple[int, 
     if _TOOL_DECORATOR_NODE_ID not in available_nodes:
         return 0, 0
 
-    node_rows = conn.execute(
-        """
+    node_rows = conn.execute("""
         SELECT node_id, file, name, line
         FROM graph_node
         WHERE file LIKE '%.py'
           AND line IS NOT NULL
           AND type IN ('function', 'class')
-        """
-    ).fetchall()
+        """).fetchall()
     node_lookup: Dict[str, Dict[Tuple[str, int], str]] = {}
     for node_id, file_path, name, line in node_rows:
         node_lookup.setdefault(str(file_path), {})[(str(name), int(line))] = str(node_id)

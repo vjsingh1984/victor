@@ -18,6 +18,7 @@ from victor.tools.base import (
     CostTier,
     Priority,
 )
+from victor.tools.decorators import tool
 from victor.tools.registry import ToolRegistry
 
 
@@ -333,6 +334,27 @@ class TestToolRegistry:
             else list(registry._tools.values())
         )
         assert isinstance(tools, (list, dict))
+
+    def test_tool_registry_filters_unavailable_tools_from_listings(self):
+        """Unavailable tools should be hidden from selection and schemas."""
+        registry = ToolRegistry()
+        availability = {"ready": False}
+
+        @tool(name="conditional_tool", availability_check=lambda: availability["ready"])
+        async def conditional_tool():
+            return "ok"
+
+        registry.register(conditional_tool)
+
+        assert registry.list_tools() == []
+        assert registry.get_tool_schemas() == []
+
+        availability["ready"] = True
+
+        assert [tool.name for tool in registry.list_tools()] == ["conditional_tool"]
+        assert [schema["function"]["name"] for schema in registry.get_tool_schemas()] == [
+            "conditional_tool"
+        ]
 
     def test_tool_registry_unregister_tool(self):
         """Test unregistering a tool."""
