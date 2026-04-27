@@ -212,12 +212,7 @@ class TestResponseSanitizerEdgeCases:
         assert "Then I will summarize the findings." in result
 
     def test_has_tool_format_confusion_detects_plaintext_shell_commands(self, sanitizer):
-        text = (
-            "I'll inspect the repository first.\n"
-            "ls rust\n"
-            "scripts ls\n"
-            "victor/tools ls\n"
-        )
+        text = "I'll inspect the repository first.\n" "ls rust\n" "scripts ls\n" "victor/tools ls\n"
         assert sanitizer.has_tool_format_confusion(text) is True
 
     def test_sanitize_logs_warning_on_significant_removal(self, sanitizer, caplog):

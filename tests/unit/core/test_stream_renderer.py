@@ -423,8 +423,7 @@ class TestLiveDisplayRenderer:
         printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("next:" in call_str for call_str in printed_calls)
         assert any(
-            'graph(mode="overview", path=".", top_k=10)' in call_str
-            for call_str in printed_calls
+            'graph(mode="overview", path=".", top_k=10)' in call_str for call_str in printed_calls
         )
 
     @patch("victor.ui.rendering.live_renderer.Live")

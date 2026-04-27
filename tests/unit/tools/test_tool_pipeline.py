@@ -255,6 +255,95 @@ class TestToolPipeline:
         assert "code_search" in skipped.result
         assert "project_overview" in skipped.result
 
+    @pytest.mark.asyncio
+    async def test_redundant_code_search_skip_includes_recovery_payload(self, mock_tool_registry):
+        """Repeated code_search calls should return actionable follow-up suggestions."""
+        from victor.agent.tool_deduplication import ToolDeduplicationTracker
+
+        mock_executor = MagicMock()
+        mock_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="code_search",
+                success=True,
+                result={"matches": []},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_executor,
+            config=ToolPipelineConfig(enable_idempotent_caching=False),
+            deduplication_tracker=ToolDeduplicationTracker(),
+        )
+        tool_calls = [
+            {
+                "name": "code_search",
+                "arguments": {
+                    "query": "graph_indexer codebase_graph build_symbol_graph",
+                    "path": "victor/core",
+                    "mode": "semantic",
+                },
+            }
+        ]
+
+        first = await pipeline.execute_tool_calls(tool_calls, {})
+        second = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert first.results[0].skipped is False
+        assert second.skipped_calls == 1
+        skipped = second.results[0]
+        assert skipped.skipped is True
+        assert skipped.success is True
+        assert skipped.skip_reason == "Redundant call (semantic overlap with recent operations)"
+        assert skipped.result["success"] is False
+        assert "Do not repeat the same search" in skipped.result["error"]
+        suggestions = skipped.result["metadata"]["follow_up_suggestions"]
+        assert [item["tool"] for item in suggestions] == ["overview", "graph"]
+        assert suggestions[1]["arguments"]["mode"] == "search"
+        assert mock_executor.execute.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_redundant_refs_skip_includes_symbol_specific_recovery(self, mock_tool_registry):
+        """Repeated refs calls should steer the model toward graph or text follow-up."""
+        from victor.agent.tool_deduplication import ToolDeduplicationTracker
+
+        mock_executor = MagicMock()
+        mock_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="refs",
+                success=True,
+                result=[],
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_executor,
+            config=ToolPipelineConfig(enable_idempotent_caching=False),
+            deduplication_tracker=ToolDeduplicationTracker(),
+        )
+        tool_calls = [
+            {
+                "name": "refs",
+                "arguments": {"symbol_name": "BaseProvider", "search_path": "victor"},
+            }
+        ]
+
+        first = await pipeline.execute_tool_calls(tool_calls, {})
+        second = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert first.results[0].skipped is False
+        assert second.skipped_calls == 1
+        skipped = second.results[0]
+        assert skipped.skipped is True
+        assert skipped.result["success"] is False
+        assert "Do not repeat the same refs() scan" in skipped.result["error"]
+        suggestions = skipped.result["metadata"]["follow_up_suggestions"]
+        assert [item["tool"] for item in suggestions] == ["graph", "code_search"]
+        assert suggestions[0]["arguments"]["mode"] == "callers|callees"
+        assert suggestions[1]["arguments"]["query"] == "BaseProvider"
+        assert mock_executor.execute.call_count == 1
+
     def test_reset(self, pipeline):
         """Test resetting pipeline state."""
         pipeline._calls_used = 5

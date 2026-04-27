@@ -203,7 +203,9 @@ class TestSQLiteSessionPersistenceCompatibility:
             profile="default",
         )
         store.add_message(session.session_id, MessageRole.USER, "Show app.py")
-        store.add_message(session.session_id, MessageRole.ASSISTANT, "Here is the current file preview.")
+        store.add_message(
+            session.session_id, MessageRole.ASSISTANT, "Here is the current file preview."
+        )
         store.add_message(
             session.session_id,
             MessageRole.SYSTEM,

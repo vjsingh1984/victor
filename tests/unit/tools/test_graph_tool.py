@@ -284,7 +284,9 @@ async def test_graph_tool_unsupported_mode_returns_follow_up_suggestions(
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_unresolved_node_returns_follow_up_suggestions(monkeypatch, tmp_path: Path):
+async def test_graph_tool_unresolved_node_returns_follow_up_suggestions(
+    monkeypatch, tmp_path: Path
+):
     from victor.tools import graph_tool as graph_tool_module
 
     store = MemoryGraphStore()
