@@ -354,6 +354,39 @@ class TestAdapterProtocolConformance:
             0.8,
         )
 
+    @pytest.mark.asyncio
+    async def test_orchestrator_protocol_adapter_exposes_service_chat_runtime_handlers(self):
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+
+        response = CompletionResponse(content="planned", role="assistant")
+        orchestrator = MagicMock()
+        orchestrator._run_planning_chat_runtime = AsyncMock(return_value=response)
+        orchestrator._handle_context_and_iteration_limits_runtime = AsyncMock(
+            return_value=(False, None)
+        )
+
+        adapter = OrchestratorProtocolAdapter(orchestrator)
+        planning_response = await adapter._run_planning_chat_runtime("plan this")
+        handled, chunk = await adapter._handle_context_and_iteration_limits_runtime(
+            "plan this",
+            5,
+            1000,
+            1,
+            0.8,
+        )
+
+        assert planning_response is response
+        assert handled is False
+        assert chunk is None
+        orchestrator._run_planning_chat_runtime.assert_awaited_once_with("plan this")
+        orchestrator._handle_context_and_iteration_limits_runtime.assert_awaited_once_with(
+            "plan this",
+            5,
+            1000,
+            1,
+            0.8,
+        )
+
     def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
@@ -520,11 +553,13 @@ class TestChatServiceBootstrapLaziness:
         kwargs = chat_service.bind_runtime_components.call_args.kwargs
         assert kwargs["turn_executor"].initialized is False
         assert callable(kwargs["planning_handler"])
+        assert kwargs["planning_handler"].__self__ is obj._protocol_adapter
         assert (
             kwargs["stream_chat_handler"]
             is obj._factory.create_service_streaming_runtime.return_value.stream_chat
         )
         assert callable(kwargs["context_limit_handler"])
+        assert kwargs["context_limit_handler"].__self__ is obj._protocol_adapter
         obj._factory.create_service_streaming_runtime.assert_called_once_with(
             obj._protocol_adapter
         )

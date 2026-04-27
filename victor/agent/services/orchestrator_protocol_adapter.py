@@ -212,6 +212,10 @@ class OrchestratorProtocolAdapter:
             last_quality_score,
         )
 
+    async def _run_planning_chat_runtime(self, user_message: str) -> Any:
+        """Delegate service-owned planning execution to the canonical runtime."""
+        return await self._orchestrator._run_planning_chat_runtime(user_message)
+
     def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:
         """Expose the sync chat fallback metadata surface."""
         return self._orchestrator.get_last_skill_match_info()

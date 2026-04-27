@@ -798,14 +798,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
             stream_chat_runtime = self._get_service_streaming_runtime()
+            protocol_adapter = self.protocol_adapter
             self._chat_service.bind_runtime_components(
                 turn_executor=LazyRuntimeProxy(
                     factory=lambda: self.turn_executor,
                     name="turn_executor",
                 ),
-                planning_handler=self._run_planning_chat_runtime,
+                planning_handler=protocol_adapter._run_planning_chat_runtime,
                 stream_chat_handler=stream_chat_runtime.stream_chat,
-                context_limit_handler=self._handle_context_and_iteration_limits_runtime,
+                context_limit_handler=protocol_adapter._handle_context_and_iteration_limits_runtime,
             )
 
         if self._provider_service is not None and hasattr(
