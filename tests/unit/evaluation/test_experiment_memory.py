@@ -138,6 +138,61 @@ def test_analyze_evaluation_result_distills_structured_experiment_memory(tmp_pat
     assert "tests_pass" in record.keywords
 
 
+def test_analyze_evaluation_result_distills_team_worktree_insights(tmp_path):
+    result = EvaluationResult(
+        config=EvaluationConfig(
+            benchmark=BenchmarkType.CUSTOM,
+            model="gpt-5",
+            provider="openai",
+        ),
+        task_results=[
+            TaskResult(
+                task_id="team-1",
+                status=TaskStatus.FAILED,
+                metadata={
+                    "worktree_plan": {
+                        "team_name": "feature_team",
+                        "formation": "parallel",
+                        "assignments": [
+                            {"member_id": "planner", "claimed_paths": ["src/auth"]},
+                            {"member_id": "reviewer", "claimed_paths": ["src/auth"]},
+                        ],
+                    },
+                    "worktree_session": {
+                        "materialized": True,
+                        "assignments": [
+                            {"member_id": "planner", "materialized": True},
+                            {"member_id": "reviewer", "materialized": True},
+                        ],
+                    },
+                    "merge_analysis": {
+                        "risk_level": "high",
+                        "conflict_count": 2,
+                        "overlapping_files": [{"path": "src/auth/service.py"}],
+                        "member_changed_files": {
+                            "planner": ["src/auth/service.py"],
+                            "reviewer": ["src/auth/service.py"],
+                        },
+                    },
+                    "worktree_cleanup": {"removed": [], "errors": ["cleanup failed"]},
+                },
+            )
+        ],
+    )
+
+    record = analyze_evaluation_result(
+        result,
+        source_result_path=tmp_path / "eval_custom_20260427_020202.json",
+    )
+
+    assert record.summary_metrics["team_high_risk_task_count"] == 1
+    assert record.summary_metrics["team_cleanup_error_task_count"] == 1
+    assert any("merge risk" in insight.summary.lower() for insight in record.insights)
+    assert any("scope and cleanup enforcement" in insight.summary for insight in record.insights)
+    assert "worktree" in record.keywords
+    assert "team" in record.keywords
+
+
 def test_experiment_memory_store_persists_and_supports_structured_search(tmp_path):
     store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
     older = ExperimentMemoryRecord(

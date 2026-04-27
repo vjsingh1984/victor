@@ -935,6 +935,58 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["summary"]["degradation_providers"] == {"ollama": 1}
         assert loaded["tasks"][0]["metadata"]["degradation_events"][0]["provider"] == "ollama"
 
+    def test_save_results_persists_team_feedback_metrics(self, tmp_path):
+        """Saved benchmark summaries should include team/worktree telemetry aggregates."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.HUMAN_EVAL,
+                model="test",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    metadata={
+                        "worktree_plan": {
+                            "team_name": "feature_team",
+                            "formation": "parallel",
+                            "assignments": [
+                                {"member_id": "planner", "claimed_paths": ["src/auth"]},
+                                {"member_id": "tester", "claimed_paths": ["tests/auth"]},
+                            ],
+                        },
+                        "worktree_session": {
+                            "materialized": True,
+                            "assignments": [
+                                {"member_id": "planner", "materialized": True},
+                                {"member_id": "tester", "materialized": True},
+                            ],
+                        },
+                        "merge_analysis": {
+                            "risk_level": "low",
+                            "conflict_count": 0,
+                            "member_changed_files": {
+                                "planner": ["src/auth/service.py"],
+                                "tester": ["tests/auth/test_service.py"],
+                            },
+                        },
+                        "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
+                    },
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["summary"]["team_feedback_coverage"] == 1.0
+        assert loaded["summary"]["team_formations"] == {"parallel": 1}
+        assert loaded["summary"]["team_merge_risk_levels"] == {"low": 1}
+        assert loaded["summary"]["team_worktree_materialized_count"] == 1
+        assert loaded["summary"]["team_materialized_assignment_total"] == 2
+        assert loaded["tasks"][0]["metadata"]["worktree_plan"]["team_name"] == "feature_team"
+
     def test_save_results_persists_failure_taxonomy(self, tmp_path):
         """Saved results should include normalized failure category fields."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)

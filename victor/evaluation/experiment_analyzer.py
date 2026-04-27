@@ -313,6 +313,87 @@ def _append_degradation_insights(
                 confidence=0.74,
                 evidence={"reason": dominant_reason[0], "count": int(dominant_reason[1])},
             )
+            )
+
+
+def _append_team_insights(
+    insights: list[ExperimentInsight],
+    keywords: set[str],
+    summary_metrics: Mapping[str, Any],
+) -> None:
+    materialized_count = int(summary_metrics.get("team_worktree_materialized_count", 0) or 0)
+    low_risk_count = int(summary_metrics.get("team_low_risk_task_count", 0) or 0)
+    medium_risk_count = int(summary_metrics.get("team_medium_risk_task_count", 0) or 0)
+    high_risk_count = int(summary_metrics.get("team_high_risk_task_count", 0) or 0)
+    merge_conflict_tasks = int(summary_metrics.get("team_merge_conflict_task_count", 0) or 0)
+    out_of_scope_tasks = int(summary_metrics.get("team_out_of_scope_write_task_count", 0) or 0)
+    readonly_violation_tasks = int(
+        summary_metrics.get("team_readonly_violation_task_count", 0) or 0
+    )
+    cleanup_error_tasks = int(summary_metrics.get("team_cleanup_error_task_count", 0) or 0)
+
+    if high_risk_count > 0 or merge_conflict_tasks > 0:
+        keywords.update({"team", "worktree", "merge"})
+        insights.append(
+            ExperimentInsight(
+                kind="failed_hypothesis",
+                summary="Worktree-isolated team execution still produced high merge risk for this scope.",
+                confidence=min(0.92, 0.45 + (0.08 * max(high_risk_count, merge_conflict_tasks))),
+                evidence={
+                    "high_risk_task_count": high_risk_count,
+                    "merge_conflict_task_count": merge_conflict_tasks,
+                },
+            )
+        )
+
+    if materialized_count > 0 and low_risk_count >= materialized_count and cleanup_error_tasks == 0:
+        keywords.update({"team", "worktree", "merge_safe"})
+        insights.append(
+            ExperimentInsight(
+                kind="successful_transformation",
+                summary="Worktree-isolated team execution stayed merge-safe for this scope.",
+                confidence=min(0.9, 0.5 + (0.07 * low_risk_count)),
+                evidence={
+                    "materialized_count": materialized_count,
+                    "low_risk_task_count": low_risk_count,
+                },
+            )
+        )
+
+    if cleanup_error_tasks > 0 or out_of_scope_tasks > 0 or readonly_violation_tasks > 0:
+        keywords.update({"team", "worktree", "scope_control"})
+        insights.append(
+            ExperimentInsight(
+                kind="environment_constraint",
+                summary="Isolated team execution needs tighter scope and cleanup enforcement.",
+                confidence=min(
+                    0.9,
+                    0.46
+                    + (
+                        0.07
+                        * max(cleanup_error_tasks, out_of_scope_tasks, readonly_violation_tasks)
+                    ),
+                ),
+                evidence={
+                    "cleanup_error_task_count": cleanup_error_tasks,
+                    "out_of_scope_write_task_count": out_of_scope_tasks,
+                    "readonly_violation_task_count": readonly_violation_tasks,
+                },
+            )
+        )
+
+    if medium_risk_count > 0 or out_of_scope_tasks > 0:
+        keywords.update({"team", "merge_order", "claimed_paths"})
+        insights.append(
+            ExperimentInsight(
+                kind="next_candidate",
+                summary="Narrow claimed_paths or enforce stricter merge ordering before widening team parallelism.",
+                confidence=0.76,
+                evidence={
+                    "medium_risk_task_count": medium_risk_count,
+                    "out_of_scope_write_task_count": out_of_scope_tasks,
+                },
+            )
         )
 
 
@@ -453,6 +534,7 @@ def analyze_evaluation_result(
     _append_policy_insights(insights, keyword_seed, summary_metrics)
     _append_planning_insights(insights, keyword_seed, summary_metrics)
     _append_degradation_insights(insights, keyword_seed, summary_metrics)
+    _append_team_insights(insights, keyword_seed, summary_metrics)
     _append_gate_failure_constraints(insights, keyword_seed, summary_metrics)
     _append_next_candidate(insights, keyword_seed, summary_metrics)
     keywords = sorted(set(_build_keywords(scope, task_summaries, insights)) | keyword_seed)

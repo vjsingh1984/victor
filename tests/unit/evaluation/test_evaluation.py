@@ -25,9 +25,12 @@ from victor.evaluation import (
     TaskResult,
     TaskStatus,
     aggregate_planning_feedback,
+    aggregate_team_feedback,
     extract_planning_events,
+    extract_team_feedback_artifacts,
     pass_at_k,
     summarize_planning_feedback,
+    summarize_team_feedback,
 )
 from victor.evaluation.code_quality import CodeQualityAnalyzer
 from victor.evaluation.pass_at_k import (
@@ -87,6 +90,13 @@ def test_public_api_exports_planning_feedback_helpers():
     assert callable(extract_planning_events)
     assert callable(summarize_planning_feedback)
     assert callable(aggregate_planning_feedback)
+
+
+def test_public_api_exports_team_feedback_helpers():
+    """The package-level evaluation API should expose team feedback helpers."""
+    assert callable(extract_team_feedback_artifacts)
+    assert callable(summarize_team_feedback)
+    assert callable(aggregate_team_feedback)
 
     def test_combinations(self):
         """Test combinations calculation."""
@@ -584,6 +594,81 @@ class TestEvaluationResult:
         assert metrics["planning_force_reasons"] == {"experiment_constraints: tests_pass": 1}
         assert metrics["planning_used_llm_rate"] == pytest.approx(0.5)
         assert metrics["planning_forced_slow_path_completion_delta"] == pytest.approx(0.7)
+
+    def test_get_metrics_includes_team_feedback_summary(self):
+        """Aggregate metrics should expose team/worktree coverage and merge risk."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    metadata={
+                        "worktree_plan": {
+                            "formation": "parallel",
+                            "assignments": [
+                                {"member_id": "planner", "claimed_paths": ["src/auth"]},
+                                {"member_id": "tester", "claimed_paths": ["tests/auth"]},
+                            ],
+                        },
+                        "worktree_session": {
+                            "materialized": True,
+                            "assignments": [
+                                {"member_id": "planner", "materialized": True},
+                                {"member_id": "tester", "materialized": True},
+                            ],
+                        },
+                        "merge_analysis": {
+                            "risk_level": "low",
+                            "conflict_count": 0,
+                            "member_changed_files": {
+                                "planner": ["src/auth/service.py"],
+                                "tester": ["tests/auth/test_service.py"],
+                            },
+                        },
+                    },
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    metadata={
+                        "worktree_plan": {
+                            "formation": "parallel",
+                            "assignments": [
+                                {"member_id": "planner", "claimed_paths": ["src/auth"]},
+                                {"member_id": "reviewer", "claimed_paths": ["src/auth"]},
+                            ],
+                        },
+                        "merge_analysis": {
+                            "risk_level": "high",
+                            "conflict_count": 1,
+                            "overlapping_files": [{"path": "src/auth/service.py"}],
+                            "member_changed_files": {
+                                "planner": ["src/auth/service.py"],
+                                "reviewer": ["src/auth/service.py"],
+                            },
+                            "readonly_violations": {"reviewer": ["docs/guide.md"]},
+                        },
+                        "worktree_cleanup": {"removed": [], "errors": ["cleanup failed"]},
+                    },
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["tasks_with_team_feedback"] == 2
+        assert metrics["team_feedback_coverage"] == pytest.approx(1.0)
+        assert metrics["team_formations"] == {"parallel": 2}
+        assert metrics["team_merge_risk_levels"] == {"low": 1, "high": 1}
+        assert metrics["team_worktree_materialized_count"] == 1
+        assert metrics["team_high_risk_task_count"] == 1
+        assert metrics["team_merge_conflict_count"] == 1
+        assert metrics["team_readonly_violation_count"] == 1
+        assert metrics["team_cleanup_error_task_count"] == 1
 
 
 class TestPassAtKResult:
