@@ -1014,7 +1014,13 @@ class TurnExecutor:
         if tool_service is None:
             tool_service = getattr(self._tool_context, "_tool_service", None)
         if tool_service is not None and hasattr(tool_service, "get_tool_budget"):
-            snapshot["tool_service_budget"] = tool_service.get_tool_budget()
+            snapshot["tool_service_budget"] = getattr(
+                tool_service,
+                "budget",
+                tool_service.get_budget_info().get("max")
+                if hasattr(tool_service, "get_budget_info")
+                else tool_service.get_tool_budget(),
+            )
             if hasattr(tool_service, "set_tool_budget"):
                 try:
                     tool_service.set_tool_budget(max(0, tool_budget))

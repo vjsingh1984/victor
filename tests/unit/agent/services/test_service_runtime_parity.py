@@ -90,6 +90,49 @@ def test_tool_service_validate_tool_call_matches_legacy_contract():
     assert validation.canonical_name == "read"
 
 
+def test_tool_service_bound_pipeline_budget_is_authoritative():
+    service = _make_tool_service()
+
+    class _PipelineBudgetStub:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(tool_budget=9)
+            self._calls_used = 4
+
+        @property
+        def tool_budget(self) -> int:
+            return self.config.tool_budget
+
+        @property
+        def calls_used(self) -> int:
+            return self._calls_used
+
+        def set_tool_budget(self, budget: int) -> None:
+            self.config.tool_budget = budget
+
+        def start_new_turn(self) -> None:
+            self._calls_used = 0
+
+        def consume_budget(self, amount: int = 1) -> None:
+            self._calls_used += amount
+
+    pipeline = _PipelineBudgetStub()
+    service.bind_runtime_components(tool_pipeline=pipeline)
+
+    assert service.budget == 9
+    assert service.budget_used == 4
+    assert service.get_remaining_budget() == 5
+    assert service.get_tool_budget() == 5
+
+    service.set_tool_budget(12)
+    assert pipeline.config.tool_budget == 12
+    assert service.budget == 12
+
+    service.start_new_turn()
+    assert pipeline.calls_used == 0
+    assert service.budget_used == 0
+    assert service.get_remaining_budget() == 12
+
+
 def test_legacy_tool_retry_module_reexports_service_executor():
     """Legacy coordinator path should re-export the service-owned retry runtime."""
     from victor.agent.coordinators.tool_retry import ToolRetryExecutor as legacy_executor

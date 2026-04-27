@@ -849,9 +849,34 @@ class ToolPipeline:
         return max(0, self.config.tool_budget - self._calls_used)
 
     @property
+    def tool_budget(self) -> int:
+        """Configured maximum tool budget for the current turn."""
+        return self.config.tool_budget
+
+    @property
     def executed_tools(self) -> List[str]:
         """List of executed tool names."""
         return list(self._executed_tools)
+
+    def set_tool_budget(self, budget: int) -> None:
+        """Update the configured tool budget limit."""
+        if budget < 0:
+            raise ValueError(f"Tool budget must be non-negative: {budget}")
+        self.config.tool_budget = budget
+        if self._output_aggregator is not None and hasattr(self._output_aggregator, "_max_results"):
+            self._output_aggregator._max_results = budget
+
+    def start_new_turn(self) -> None:
+        """Reset per-turn budget counters while preserving caches and learned state."""
+        self._calls_used = 0
+        self.last_batch_all_skipped = False
+        self.last_batch_effectively_blocked = False
+
+    def consume_budget(self, amount: int = 1) -> None:
+        """Record externally executed tool usage against the shared turn budget."""
+        if amount < 0:
+            raise ValueError(f"Cannot consume negative tool budget: {amount}")
+        self._calls_used += amount
 
     @property
     def parallel_executor(self) -> ParallelToolExecutor:

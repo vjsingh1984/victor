@@ -557,6 +557,65 @@ class ToolService:
         self._tool_call_validator: Optional[Any] = ToolCallValidator()
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
 
+    def _get_budget_limit(self) -> int:
+        """Return the active tool budget ceiling."""
+        tool_pipeline = self._tool_pipeline
+        if tool_pipeline is not None:
+            pipeline_budget = getattr(tool_pipeline, "tool_budget", None)
+            if isinstance(pipeline_budget, int):
+                return max(0, pipeline_budget)
+            pipeline_config = getattr(tool_pipeline, "config", None)
+            budget = getattr(pipeline_config, "tool_budget", None)
+            if isinstance(budget, int):
+                return max(0, budget)
+        return max(0, self._budget_manager.max_budget)
+
+    def _get_budget_used(self) -> int:
+        """Return the active count of tool calls already spent this turn."""
+        tool_pipeline = self._tool_pipeline
+        if tool_pipeline is not None:
+            pipeline_used = getattr(tool_pipeline, "calls_used", None)
+            if isinstance(pipeline_used, int):
+                return max(0, pipeline_used)
+        return max(0, self._budget_manager.calls_made)
+
+    def _sync_budget_manager_from_runtime(self) -> None:
+        """Mirror the active runtime budget into the local compatibility manager."""
+        self._budget_manager.max_budget = self._get_budget_limit()
+        self._budget_manager.calls_made = self._get_budget_used()
+
+    def _set_budget_limit(self, budget: int) -> None:
+        """Set the active tool budget ceiling across bound runtime owners."""
+        if budget < 0:
+            raise ValueError(f"Tool budget must be non-negative: {budget}")
+
+        self._budget_manager.max_budget = budget
+
+        tool_pipeline = self._tool_pipeline
+        if tool_pipeline is not None:
+            set_tool_budget = getattr(tool_pipeline, "set_tool_budget", None)
+            if callable(set_tool_budget):
+                set_tool_budget(budget)
+            else:
+                pipeline_config = getattr(tool_pipeline, "config", None)
+                if pipeline_config is not None and hasattr(pipeline_config, "tool_budget"):
+                    pipeline_config.tool_budget = budget
+
+    def _consume_budget(self, amount: int = 1) -> None:
+        """Record tool usage against the active runtime budget."""
+        if amount < 0:
+            raise ValueError(f"Cannot consume negative budget: {amount}")
+
+        tool_pipeline = self._tool_pipeline
+        if tool_pipeline is not None:
+            consume_budget = getattr(tool_pipeline, "consume_budget", None)
+            if callable(consume_budget):
+                consume_budget(amount)
+            else:
+                tool_pipeline._calls_used = self._get_budget_used() + amount
+
+        self._budget_manager.record_usage(amount)
+
     async def select_tools(
         self,
         context: "ToolSelectionContext",
@@ -617,11 +676,10 @@ class ToolService:
         self._logger.debug(f"Executing tool: {tool_name}")
 
         # Check budget
-        if self._budget_manager.is_exhausted():
+        if self.is_budget_exhausted():
             self._logger.warning("Tool budget exhausted")
             raise ToolBudgetExceededError(
-                f"Tool budget exhausted ({self._budget_manager.calls_made} "
-                f"/ {self._budget_manager.max_budget})"
+                f"Tool budget exhausted ({self.budget_used} / {self.budget})"
             )
 
         # Check cache if enabled
@@ -636,7 +694,7 @@ class ToolService:
             result = await self._executor.execute(tool_name, arguments)
 
             # Track usage
-            self._budget_manager.record_usage()
+            self._consume_budget()
             self._track_tool_usage(tool_name, success=True)
 
             # Cache result if enabled and successful
@@ -697,7 +755,7 @@ class ToolService:
         Returns:
             Number of remaining tool calls allowed
         """
-        return self._budget_manager.get_remaining()
+        return self.get_remaining_budget()
 
     def set_tool_budget(self, budget: int) -> None:
         """Set the tool budget limit.
@@ -708,11 +766,8 @@ class ToolService:
         Raises:
             ValueError: If budget is negative
         """
-        if budget < 0:
-            raise ValueError(f"Tool budget must be non-negative: {budget}")
-
-        old_max = self._budget_manager.max_budget
-        self._budget_manager.max_budget = budget
+        old_max = self.budget
+        self._set_budget_limit(budget)
         self._logger.info(f"Tool budget updated: {old_max} -> {budget}")
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
@@ -733,7 +788,7 @@ class ToolService:
             "success_rate": successful_calls / total_calls if total_calls > 0 else 1.0,
             "by_tool": self._usage_stats.copy(),
             "budget_remaining": self.get_tool_budget(),
-            "budget_used": self._budget_manager.calls_made,
+            "budget_used": self.budget_used,
         }
 
     def start_new_turn(self) -> None:
@@ -742,7 +797,15 @@ class ToolService:
         Interactive chat sessions should replenish executable tool budget for
         each new user prompt, but cross-turn analytics should remain intact.
         """
+        tool_pipeline = self._tool_pipeline
+        if tool_pipeline is not None:
+            start_new_turn = getattr(tool_pipeline, "start_new_turn", None)
+            if callable(start_new_turn):
+                start_new_turn()
+            else:
+                tool_pipeline._calls_used = 0
         self._budget_manager.reset()
+        self._sync_budget_manager_from_runtime()
         self._logger.debug("Tool turn budget reset")
 
     def reset_tool_budget(self) -> None:
@@ -752,7 +815,7 @@ class ToolService:
         operator-driven recovery where cumulative usage analytics should be
         cleared along with the budget.
         """
-        self._budget_manager.reset()
+        self.start_new_turn()
         self._usage_stats.clear()
         self._logger.info("Tool budget reset")
 
@@ -786,6 +849,7 @@ class ToolService:
             self._registrar = tool_registry
         if tool_pipeline is not None:
             self._tool_pipeline = tool_pipeline
+            self._sync_budget_manager_from_runtime()
         if tool_cache is not None:
             self._tool_cache = tool_cache
         if mode_controller is not None:
@@ -818,7 +882,7 @@ class ToolService:
         Returns:
             Maximum number of tool calls allowed
         """
-        return self._budget_manager.max_budget
+        return self._get_budget_limit()
 
     @budget.setter
     def budget(self, value: int) -> None:
@@ -836,7 +900,7 @@ class ToolService:
         Returns:
             Number of tool calls made so far
         """
-        return self._budget_manager.calls_made
+        return self._get_budget_used()
 
     @property
     def execution_count(self) -> int:
@@ -901,11 +965,11 @@ class ToolService:
 
             raise BudgetExhaustedError(
                 f"Insufficient budget: need {amount}, have {remaining}",
-                budget=self._budget_manager.max_budget,
-                used=self._budget_manager.calls_made,
+                budget=self.budget,
+                used=self.budget_used,
             )
 
-        self._budget_manager.record_usage(amount)
+        self._consume_budget(amount)
 
     def on_tool_complete(
         self,
@@ -1157,7 +1221,7 @@ class ToolService:
             remaining = service.get_remaining_budget()
             # Returns: 85 (out of 100)
         """
-        return self._budget_manager.get_remaining()
+        return max(0, self.budget - self.budget_used)
 
     def is_budget_exhausted(self) -> bool:
         """Check if tool budget is exhausted.
@@ -1169,7 +1233,7 @@ class ToolService:
             if service.is_budget_exhausted():
                 # Stop tool execution
         """
-        return self._budget_manager.is_exhausted()
+        return self.get_remaining_budget() <= 0
 
     def get_budget_info(self) -> Dict[str, int]:
         """Get detailed budget information.
@@ -1182,9 +1246,9 @@ class ToolService:
             # {"max": 100, "used": 15, "remaining": 85}
         """
         return {
-            "max": self._budget_manager.max_budget,
-            "used": self._budget_manager.calls_made,
-            "remaining": self._budget_manager.get_remaining(),
+            "max": self.budget,
+            "used": self.budget_used,
+            "remaining": self.get_remaining_budget(),
         }
 
     def get_available_tools(self) -> set[str]:

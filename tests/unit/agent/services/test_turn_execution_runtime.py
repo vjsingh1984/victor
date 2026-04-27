@@ -300,18 +300,22 @@ async def test_execute_agentic_loop_restores_state_before_reraising_failure():
 @pytest.mark.asyncio
 async def test_execute_turn_applies_runtime_overrides_and_restores_state():
     class FakeToolService:
-        def __init__(self, budget: int):
+        def __init__(self, budget: int, used: int = 0):
             self.budget = budget
+            self.used = used
             self.history = []
 
         def get_tool_budget(self) -> int:
-            return self.budget
+            return max(0, self.budget - self.used)
+
+        def get_remaining_budget(self) -> int:
+            return self.get_tool_budget()
 
         def set_tool_budget(self, budget: int) -> None:
             self.history.append(budget)
             self.budget = budget
 
-    tool_service = FakeToolService(budget=8)
+    tool_service = FakeToolService(budget=8, used=1)
     messages = []
     observed_tool_contexts = []
     settings = SimpleNamespace(chat_max_iterations=9)
@@ -400,6 +404,7 @@ async def test_execute_turn_applies_runtime_overrides_and_restores_state():
     assert observed_tool_contexts[0]["tool_budget"] == 2
     assert fake_orchestrator.tool_budget == 8
     assert tool_service.budget == 8
+    assert tool_service.get_remaining_budget() == 7
     assert tool_service.history == [2, 8]
     assert fake_orchestrator._tool_pipeline.config.tool_budget == 8
     assert settings.chat_max_iterations == 9
