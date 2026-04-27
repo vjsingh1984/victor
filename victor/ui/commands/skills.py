@@ -37,39 +37,12 @@ def _get_skills_dir() -> str:
 
 
 def _build_registry():
-    """Build a SkillRegistry populated from verticals and entry points."""
+    """Build a SkillRegistry populated from all sources.
+
+    Delegates to SkillRegistry.from_all_sources() for a single source of truth.
+    """
     from victor.framework.skills import SkillRegistry
-
-    registry = SkillRegistry()
-
-    # Load from discovered verticals via VerticalLoader
-    try:
-        from victor.core.verticals.vertical_loader import VerticalLoader
-
-        loader = VerticalLoader()
-        loader.discover_verticals()
-        for _name, vertical_cls in loader._discovered_verticals.items():
-            if hasattr(vertical_cls, "get_skills"):
-                try:
-                    registry.from_vertical(vertical_cls)
-                except Exception:
-                    logger.debug("Failed to load skills from %s", _name)
-    except Exception:
-        logger.debug("Could not load verticals for skill discovery", exc_info=True)
-
-    # Load from entry points
-    try:
-        registry.from_entry_points()
-    except Exception:
-        logger.debug("Could not load skills from entry points", exc_info=True)
-
-    # Load from user YAML skills (~/.victor/skills/)
-    try:
-        registry.from_user_skills()
-    except Exception:
-        logger.debug("Could not load user skills", exc_info=True)
-
-    return registry
+    return SkillRegistry.from_all_sources()
 
 
 def _render_skills_table(skills, title: str = "Skills") -> None:

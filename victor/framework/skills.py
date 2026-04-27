@@ -158,3 +158,34 @@ class SkillRegistry:
     def from_user_skills(self) -> None:
         """Load skills from the user's ~/.victor/skills/ directory."""
         self.from_yaml_directory(USER_SKILLS_DIR)
+
+    @classmethod
+    def from_all_sources(cls) -> "SkillRegistry":
+        """Create a fully populated registry from all sources.
+
+        This is the recommended way to get a complete registry for CLI commands
+        and other consumers that need access to all available skills.
+
+        Returns:
+            SkillRegistry populated from verticals, entry points, and user skills
+        """
+        registry = cls()
+
+        # Load from verticals
+        try:
+            from victor.core.verticals.vertical_loader import VerticalLoader
+
+            loader = VerticalLoader()
+            loader.discover_verticals()
+            for _name, vertical_cls in loader._discovered_verticals.items():
+                registry.from_vertical(vertical_cls)
+        except Exception:
+            logger.debug("Failed to load skills from verticals", exc_info=True)
+
+        # Load from entry points
+        registry.from_entry_points()
+
+        # Load from user skills
+        registry.from_user_skills()
+
+        return registry

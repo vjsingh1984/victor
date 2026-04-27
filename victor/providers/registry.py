@@ -359,6 +359,44 @@ class ProviderRegistry:
         global _mlx_preflight_result
         _mlx_preflight_result = None
 
+    @classmethod
+    def get_aliases(cls) -> Dict[str, str]:
+        """Get mapping of provider aliases to their primary names.
+
+        Returns a dictionary where keys are all known aliases (including primary
+        names) and values are the canonical/primary provider name. This provides
+        a single source of truth for provider alias resolution.
+
+        Returns:
+            Dictionary mapping alias -> primary provider name
+
+        Example:
+            >>> aliases = ProviderRegistry.get_aliases()
+            >>> aliases["claude"]
+            "anthropic"
+            >>> aliases["anthropic"]
+            "anthropic"
+        """
+        aliases: Dict[str, str] = {}
+        seen_specs: set = set()
+
+        for alias, spec in _lazy_provider_specs.items():
+            if spec not in seen_specs:
+                # First time seeing this spec - the class_name is the primary
+                primary_name = spec.class_name.lower()
+                seen_specs.add(spec)
+                aliases[alias] = primary_name
+            else:
+                # We've seen this spec before - find the primary name
+                primary_name = spec.class_name.lower()
+                aliases[alias] = primary_name
+
+        # Also include registered providers
+        for name in _registry_instance.list_all():
+            aliases[name] = name
+
+        return aliases
+
 
 def get_provider_registry() -> _ProviderRegistryImpl:
     """Get the provider registry instance.

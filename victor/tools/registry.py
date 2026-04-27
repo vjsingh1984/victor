@@ -978,3 +978,81 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
     # Backward-compatible alias for discover_plugins()
     register_from_entry_points = discover_plugins
+
+    # ========================================================================
+    # Lightweight Tool Discovery (for CLI)
+    # ========================================================================
+
+    @classmethod
+    def discover_lightweight(cls) -> List[Tuple[str, str, str]]:
+        """Discover tools without full orchestrator initialization.
+
+        Dynamically discovers tools from the victor/tools directory by scanning
+        for @tool decorated functions and BaseTool subclasses. This is useful
+        for CLI commands that need to list tools without the overhead of
+        initializing the full agent.
+
+        Returns:
+            List of tuples: (name, description, cost_tier)
+        """
+        from victor.tools.base import BaseTool
+        import importlib
+        import inspect
+        import os
+
+        tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
+        excluded_files = {
+            "__init__.py",
+            "base.py",
+            "decorators.py",
+            "semantic_selector.py",
+            "enums.py",
+            "registry.py",
+            "metadata.py",
+            "metadata_registry.py",
+            "tool_names.py",
+            "output_utils.py",
+            "shared_ast_utils.py",
+            "dependency_graph.py",
+            "plugin_registry.py",
+        }
+
+        discovered_tools = []
+
+        for filename in os.listdir(tools_dir):
+            if filename.endswith(".py") and filename not in excluded_files:
+                module_name = f"victor.tools.{filename[:-3]}"
+                try:
+                    module = importlib.import_module(module_name)
+                    for _name, obj in inspect.getmembers(module):
+                        # Check @tool decorated functions
+                        if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+                            tool_instance = getattr(obj, "Tool", None)
+                            if tool_instance:
+                                name = tool_instance.name
+                                description = tool_instance.description or "No description"
+                                cost_tier = getattr(tool_instance, "cost_tier", None)
+                                cost_str = cost_tier.value if cost_tier else "unknown"
+                                discovered_tools.append((name, description, cost_str))
+                        # Check BaseTool class instances
+                        elif (
+                            inspect.isclass(obj)
+                            and issubclass(obj, BaseTool)
+                            and obj is not BaseTool
+                            and hasattr(obj, "name")
+                        ):
+                            try:
+                                tool_instance = obj()
+                                name = tool_instance.name
+                                description = tool_instance.description or "No description"
+                                cost_tier = getattr(tool_instance, "cost_tier", None)
+                                cost_str = cost_tier.value if cost_tier else "unknown"
+                                discovered_tools.append((name, description, cost_str))
+                            except Exception:
+                                # Skip tools that can't be instantiated
+                                pass
+                except Exception:
+                    # Log but continue with other modules
+                    pass
+
+        return discovered_tools
