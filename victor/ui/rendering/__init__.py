@@ -39,6 +39,18 @@ from victor.ui.rendering.handler import stream_response
 from victor.ui.rendering.live_renderer import LiveDisplayRenderer
 from victor.ui.rendering.metrics import StreamingMetrics
 from victor.ui.rendering.protocol import StreamRenderer
+from victor.ui.rendering.table_builder import (
+    create_name_description_table,
+    create_name_status_table,
+    create_provider_table,
+    create_skill_table,
+    create_table,
+    format_configured_status,
+    format_enabled_status,
+    format_status,
+    render_table_from_dict,
+    render_table_from_list,
+)
 from victor.ui.rendering.utils import (
     StreamDeltaNormalizer,
     format_tool_args,
@@ -66,4 +78,15 @@ __all__ = [
     "render_edit_preview",
     "render_thinking_indicator",
     "render_thinking_text",
+    # Table builders
+    "create_table",
+    "create_name_status_table",
+    "create_name_description_table",
+    "create_provider_table",
+    "create_skill_table",
+    "format_status",
+    "format_configured_status",
+    "format_enabled_status",
+    "render_table_from_dict",
+    "render_table_from_list",
 ]

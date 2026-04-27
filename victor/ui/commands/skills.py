@@ -47,15 +47,13 @@ def _build_registry():
 
 def _render_skills_table(skills, title: str = "Skills") -> None:
     """Render a list of skills as a rich table."""
+    from victor.ui.rendering.table_builder import create_skill_table
+
     if not skills:
         console.print("[dim]No skills found.[/]")
         return
 
-    table = Table(title=title, show_lines=False)
-    table.add_column("Name", style="cyan", no_wrap=True)
-    table.add_column("Category", style="green")
-    table.add_column("Description")
-    table.add_column("Tools", style="dim")
+    table = create_skill_table(title=title, show_tools=True)
 
     for skill in sorted(skills, key=lambda s: s.name):
         tool_count = len(skill.required_tools) + len(skill.optional_tools)
