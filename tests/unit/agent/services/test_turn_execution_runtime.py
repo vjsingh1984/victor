@@ -410,3 +410,108 @@ async def test_execute_turn_applies_runtime_overrides_and_restores_state():
     assert settings.chat_max_iterations == 9
     assert not hasattr(fake_orchestrator, "_runtime_tool_context_overrides")
     assert not hasattr(chat_context, "_runtime_context_overrides")
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches():
+    executor = _make_executor()
+    executor._provider_context.provider = SimpleNamespace(supports_tools=MagicMock(return_value=True))
+    executor._provider_context.thinking = False
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 8
+    executor._tool_context._tool_pipeline = SimpleNamespace(last_batch_effectively_blocked=True)
+    executor._select_tools_for_turn = AsyncMock(return_value=[{"name": "read"}])
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        return_value=CompletionResponse(
+            content="",
+            role="assistant",
+            tool_calls=[{"name": "read", "arguments": {"path": "victor/core/container.py"}}],
+        )
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {
+                "name": "read",
+                "success": False,
+                "error": "File already read",
+                "skipped": True,
+                "follow_up_suggestions": [
+                    {
+                        "tool": "overview",
+                        "command": "overview(path='victor/core', max_depth=2)",
+                        "arguments": {"path": "victor/core", "max_depth": 2},
+                        "description": "Inspect the nearby module structure first.",
+                        "reason": "Inspect the nearby module structure first.",
+                    },
+                    {
+                        "tool": "graph",
+                        "command": "graph(mode='overview', path='victor/core', top_k=5)",
+                        "arguments": {"mode": "overview", "path": "victor/core", "top_k": 5},
+                        "description": "Use the graph overview to find a different file to read.",
+                        "reason": "Use the graph overview to find a different file to read.",
+                    },
+                ],
+                "outcome_kind": "duplicate_read",
+                "block_source": "session_read_dedup",
+            }
+        ]
+    )
+
+    result = await executor.execute_turn("inspect the container wiring")
+
+    assert [suggestion["tool"] for suggestion in result.follow_up_suggestions] == [
+        "overview",
+        "graph",
+    ]
+    executor._chat_context.add_message.assert_called_once()
+    role, content = executor._chat_context.add_message.call_args.args
+    assert role == "user"
+    assert "[Tool recovery guidance]" in content
+    assert "overview(path='victor/core', max_depth=2)" in content
+    assert "graph(mode='overview', path='victor/core', top_k=5)" in content
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_deduplicates_repeated_recovery_guidance():
+    executor = _make_executor()
+    executor._provider_context.provider = SimpleNamespace(supports_tools=MagicMock(return_value=True))
+    executor._provider_context.thinking = False
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 8
+    executor._tool_context._tool_pipeline = SimpleNamespace(last_batch_effectively_blocked=True)
+    executor._select_tools_for_turn = AsyncMock(return_value=[{"name": "read"}])
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        return_value=CompletionResponse(
+            content="",
+            role="assistant",
+            tool_calls=[{"name": "read", "arguments": {"path": "victor/core/container.py"}}],
+        )
+    )
+    executor._execute_tool_calls = AsyncMock(
+        return_value=[
+            {
+                "name": "read",
+                "success": False,
+                "error": "File already read",
+                "skipped": True,
+                "follow_up_suggestions": [
+                    {
+                        "tool": "overview",
+                        "command": "overview(path='victor/core', max_depth=2)",
+                        "arguments": {"path": "victor/core", "max_depth": 2},
+                        "description": "Inspect the nearby module structure first.",
+                        "reason": "Inspect the nearby module structure first.",
+                    }
+                ],
+                "outcome_kind": "duplicate_read",
+                "block_source": "session_read_dedup",
+            }
+        ]
+    )
+
+    await executor.execute_turn("inspect the container wiring")
+    await executor.execute_turn("inspect the container wiring")
+
+    assert executor._chat_context.add_message.call_count == 1

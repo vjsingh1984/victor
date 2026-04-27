@@ -70,6 +70,7 @@ class TurnResult:
     Attributes:
         response: Raw model response
         tool_results: Results from tool execution (empty if no tools called)
+        follow_up_suggestions: Aggregated recovery suggestions from blocked/failed tools
         has_tool_calls: Whether the model requested tools
         tool_calls_count: Number of tool calls in this turn
         all_tools_blocked: Whether all tool calls were blocked by dedup
@@ -79,6 +80,7 @@ class TurnResult:
 
     response: CompletionResponse
     tool_results: List[Dict[str, Any]] = field(default_factory=list)
+    follow_up_suggestions: List[Dict[str, Any]] = field(default_factory=list)
     has_tool_calls: bool = False
     tool_calls_count: int = 0
     all_tools_blocked: bool = False
@@ -164,6 +166,7 @@ class TurnExecutor:
         self._token_tracker = token_tracker
         self._exploration_coordinator = exploration_coordinator
         self._exploration_done = False  # Instance-level: fires once per conversation
+        self._last_tool_follow_up_guidance_signature: Optional[tuple[str, ...]] = None
 
     @staticmethod
     def _serialize_conversation_message(message: Any) -> Optional[Dict[str, Any]]:
@@ -413,6 +416,7 @@ class TurnExecutor:
 
             # Execute tool calls if present
             tool_results: List[Dict[str, Any]] = []
+            follow_up_suggestions: List[Dict[str, Any]] = []
             all_blocked = False
             if response.tool_calls:
                 # Resolve orchestrator/container once for all per-turn services
@@ -485,6 +489,13 @@ class TurnExecutor:
                     )
                 )
 
+                follow_up_suggestions = self._collect_follow_up_suggestions(tool_results)
+                self._inject_tool_follow_up_guidance(
+                    follow_up_suggestions,
+                    tool_results,
+                    all_tools_blocked=all_blocked,
+                )
+
                 # Record failures for optimization hints
                 for result in tool_results:
                     if not result.get("success"):
@@ -500,6 +511,7 @@ class TurnExecutor:
             return TurnResult(
                 response=response,
                 tool_results=tool_results,
+                follow_up_suggestions=follow_up_suggestions,
                 has_tool_calls=bool(response.tool_calls),
                 tool_calls_count=len(response.tool_calls) if response.tool_calls else 0,
                 all_tools_blocked=all_blocked,
@@ -814,6 +826,97 @@ class TurnExecutor:
     # =====================================================================
     # Private Methods
     # =====================================================================
+
+    @staticmethod
+    def _collect_follow_up_suggestions(tool_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Collect unique follow-up suggestions from blocked or failed tool results."""
+        suggestions: List[Dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+
+        for result in tool_results:
+            if result.get("success"):
+                continue
+            raw_suggestions = result.get("follow_up_suggestions")
+            if not isinstance(raw_suggestions, list):
+                continue
+
+            for suggestion in raw_suggestions:
+                if not isinstance(suggestion, dict):
+                    continue
+                command = suggestion.get("command")
+                if not isinstance(command, str) or not command.strip():
+                    continue
+                tool_name = str(suggestion.get("tool") or "")
+                description = str(
+                    suggestion.get("description")
+                    or suggestion.get("reason")
+                    or "Use this alternative tool path."
+                ).strip()
+                signature = (tool_name, command.strip(), description)
+                if signature in seen:
+                    continue
+                seen.add(signature)
+
+                normalized = dict(suggestion)
+                normalized["tool"] = tool_name
+                normalized["command"] = command.strip()
+                normalized["description"] = description
+                normalized["reason"] = str(
+                    suggestion.get("reason") or description
+                ).strip() or description
+                suggestions.append(normalized)
+                if len(suggestions) >= 4:
+                    return suggestions
+
+        return suggestions
+
+    @staticmethod
+    def _format_tool_follow_up_guidance(suggestions: List[Dict[str, Any]]) -> str:
+        """Format a compact recovery nudge for the next model turn."""
+        lines = [
+            "[Tool recovery guidance]",
+            "The previous tool batch was blocked or unproductive. Do not repeat the same tool call.",
+            "Choose one of these next actions instead:",
+        ]
+        for suggestion in suggestions[:2]:
+            command = suggestion.get("command", "").strip()
+            description = str(
+                suggestion.get("description")
+                or suggestion.get("reason")
+                or "Try this alternative next."
+            ).strip()
+            if command:
+                lines.append(f"- {command}: {description}")
+        return "\n".join(lines)
+
+    def _inject_tool_follow_up_guidance(
+        self,
+        follow_up_suggestions: List[Dict[str, Any]],
+        tool_results: List[Dict[str, Any]],
+        *,
+        all_tools_blocked: bool,
+    ) -> None:
+        """Inject actionable recovery guidance into conversation state for the next turn."""
+        has_success = any(result.get("success") for result in tool_results)
+        requires_recovery_nudge = all_tools_blocked or (tool_results and not has_success)
+        if not requires_recovery_nudge:
+            self._last_tool_follow_up_guidance_signature = None
+            return
+
+        if not follow_up_suggestions or not hasattr(self._chat_context, "add_message"):
+            return
+
+        signature = tuple(
+            suggestion.get("command", "").strip() for suggestion in follow_up_suggestions[:2]
+        )
+        if not any(signature) or signature == self._last_tool_follow_up_guidance_signature:
+            return
+
+        self._chat_context.add_message(
+            "user",
+            self._format_tool_follow_up_guidance(follow_up_suggestions),
+        )
+        self._last_tool_follow_up_guidance_signature = signature
 
     async def _select_tools_for_turn(
         self,
