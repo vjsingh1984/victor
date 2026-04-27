@@ -49,3 +49,13 @@ def test_get_deprecated_chat_compat_report_returns_structured_telemetry():
         "total": 1,
         "routes": {"lazy_getter": 1},
     }
+
+
+def test_has_deprecated_chat_compat_usage_reflects_telemetry_state():
+    orchestrator = object.__new__(AgentOrchestrator)
+
+    assert orchestrator.has_deprecated_chat_compat_usage() is False
+
+    record_deprecated_chat_shim_access("chat_coordinator", "chat", "chat_service")
+
+    assert orchestrator.has_deprecated_chat_compat_usage() is True
