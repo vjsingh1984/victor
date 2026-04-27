@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import threading
 from collections import defaultdict
-from typing import DefaultDict, Dict, Tuple
+from typing import Any, DefaultDict, Dict, Tuple
 
 _LOCK = threading.Lock()
 _COUNTS: DefaultDict[Tuple[str, str, str], int] = defaultdict(int)
@@ -41,6 +41,57 @@ def get_deprecated_chat_shim_telemetry() -> Dict[str, int]:
     return telemetry
 
 
+def get_deprecated_chat_shim_report() -> Dict[str, Any]:
+    """Return a structured summary of deprecated chat compatibility usage."""
+    telemetry = get_deprecated_chat_shim_telemetry()
+    report: Dict[str, Any] = {
+        "total": telemetry.get("total", 0),
+        "deprecated_surface_count": 0,
+        "components": {},
+        "route_totals": {},
+        "active_surfaces": [],
+    }
+
+    surface_totals: Dict[str, int] = {}
+
+    for key, count in telemetry.items():
+        if key == "total":
+            continue
+
+        component, surface, route = key.split(".", 2)
+        component_entry = report["components"].setdefault(
+            component,
+            {"total": 0, "surfaces": {}},
+        )
+        surface_entry = component_entry["surfaces"].setdefault(
+            surface,
+            {"total": 0, "routes": {}},
+        )
+
+        component_entry["total"] += count
+        surface_entry["total"] += count
+        surface_entry["routes"][route] = count
+        report["route_totals"][route] = report["route_totals"].get(route, 0) + count
+
+        surface_key = f"{component}.{surface}"
+        surface_totals[surface_key] = surface_totals.get(surface_key, 0) + count
+
+    report["deprecated_surface_count"] = len(surface_totals)
+    report["active_surfaces"] = [
+        {"surface": surface, "count": count}
+        for surface, count in sorted(
+            surface_totals.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+    ]
+    return report
+
+
+def has_deprecated_chat_shim_usage() -> bool:
+    """Return whether any deprecated chat compatibility surface was used."""
+    return get_deprecated_chat_shim_telemetry().get("total", 0) > 0
+
+
 def reset_deprecated_chat_shim_telemetry() -> None:
     """Reset deprecated chat shim telemetry counters."""
     with _LOCK:
@@ -48,7 +99,9 @@ def reset_deprecated_chat_shim_telemetry() -> None:
 
 
 __all__ = [
+    "get_deprecated_chat_shim_report",
     "get_deprecated_chat_shim_telemetry",
+    "has_deprecated_chat_shim_usage",
     "record_deprecated_chat_shim_access",
     "reset_deprecated_chat_shim_telemetry",
 ]
