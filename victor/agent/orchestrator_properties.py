@@ -250,8 +250,6 @@ def _ensure_unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
         from victor.agent.services.protocols.chat_runtime import ExecutionMode
 
         self._deprecated_unified_chat_coordinator = UnifiedChatCoordinator(
-            sync_coordinator=_ensure_sync_chat_coordinator(self),
-            streaming_coordinator=_ensure_streaming_chat_coordinator(self),
             default_mode=ExecutionMode.SYNC,
             chat_service=getattr(self, "_chat_service", None),
         )

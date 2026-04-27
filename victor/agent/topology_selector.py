@@ -300,7 +300,10 @@ class TopologySelector:
         second_score: float,
     ) -> Optional[TopologyAction]:
         gap = best_score - second_score
-        if confidence < self.config.low_confidence_threshold or gap <= self.config.fallback_score_gap:
+        if (
+            confidence < self.config.low_confidence_threshold
+            or gap <= self.config.fallback_score_gap
+        ):
             if second_action is not best_action:
                 return second_action
         return None
@@ -315,13 +318,17 @@ class TopologySelector:
             return None
 
         if action == TopologyAction.ESCALATE_MODEL:
-            remote_candidates = [provider for provider in candidates if not self._is_local_provider(provider)]
+            remote_candidates = [
+                provider for provider in candidates if not self._is_local_provider(provider)
+            ]
             if remote_candidates:
                 return remote_candidates[0]
             return candidates[0]
 
         if self._is_high(decision_input.privacy_sensitivity):
-            local_candidates = [provider for provider in candidates if self._is_local_provider(provider)]
+            local_candidates = [
+                provider for provider in candidates if self._is_local_provider(provider)
+            ]
             if local_candidates:
                 return local_candidates[0]
 
@@ -436,9 +443,7 @@ class TopologySelector:
             return (
                 "Low confidence or weak observability favors escalating to a stronger model path."
             )
-        return (
-            "High privacy sensitivity combined with remote-only execution pressure favors a safe stop."
-        )
+        return "High privacy sensitivity combined with remote-only execution pressure favors a safe stop."
 
     def _normalize_confidence(self, score: float) -> float:
         return max(0.0, min(score, 1.0))

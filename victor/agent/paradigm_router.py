@@ -525,9 +525,7 @@ class ParadigmRouter:
         )
 
     @staticmethod
-    def _complexity_label(
-        query_complexity: Optional[float], paradigm: ProcessingParadigm
-    ) -> str:
+    def _complexity_label(query_complexity: Optional[float], paradigm: ProcessingParadigm) -> str:
         """Convert numeric complexity or paradigm signal into low/medium/high."""
         if query_complexity is not None:
             if query_complexity >= 0.6:

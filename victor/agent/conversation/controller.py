@@ -1104,9 +1104,7 @@ class ConversationController:
                 sanitized_summary = _sanitize_compaction_summary(summary)
                 if not sanitized_summary:
                     continue
-                context = (
-                    f"[Prior context summary (relevance: {score:.2f})]: {sanitized_summary}"
-                )
+                context = f"[Prior context summary (relevance: {score:.2f})]: {sanitized_summary}"
                 relevant_context.append(context)
 
         except (OSError, IOError) as e:
