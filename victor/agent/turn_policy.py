@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 MAX_NO_TOOL_TURNS = 3
 """Maximum consecutive turns without tool calls before termination."""
 
-MAX_ALL_BLOCKED = 3
+MAX_ALL_BLOCKED = 4
 """Maximum consecutive turns where all tool calls are dedup-blocked."""
 
 NUDGE_THRESHOLD = 2

@@ -59,6 +59,12 @@ class TestSpinDetector:
         state = detector.record_turn(has_tool_calls=True, all_blocked=True)
         assert state == SpinState.BLOCKED
 
+    def test_all_blocked_three_turns_remains_blocked(self):
+        detector = SpinDetector()
+        for _ in range(3):
+            detector.record_turn(has_tool_calls=True, all_blocked=True)
+        assert detector.state == SpinState.BLOCKED
+
     def test_all_blocked_reaches_terminated(self):
         detector = SpinDetector()
         for _ in range(MAX_ALL_BLOCKED):
@@ -323,7 +329,7 @@ class TestBatchStreamingConsistency:
     def test_same_spin_detection_constants(self):
         """Both paths use same thresholds from turn_policy."""
         assert MAX_NO_TOOL_TURNS == 3
-        assert MAX_ALL_BLOCKED == 3
+        assert MAX_ALL_BLOCKED == 4
         assert NUDGE_THRESHOLD == 2
 
     def test_spin_detector_deterministic(self):

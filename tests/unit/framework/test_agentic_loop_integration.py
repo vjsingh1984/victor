@@ -480,11 +480,11 @@ class TestTurnResultEvaluation:
         assert "Q&A shortcut" in result.reason
 
     async def test_spin_detection_fails(self):
-        """3+ consecutive all-blocked turns should fail."""
+        """4+ consecutive all-blocked turns should fail."""
         from victor.agent.services.turn_execution_runtime import TurnResult
 
         loop = self._make_loop()
-        loop.spin_detector.consecutive_all_blocked = 3
+        loop.spin_detector.consecutive_all_blocked = 4
         turn = TurnResult(
             response=MagicMock(content="", tool_calls=[{"name": "read"}]),
             has_tool_calls=True,

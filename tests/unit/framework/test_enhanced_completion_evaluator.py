@@ -146,7 +146,7 @@ class TestEnhancedCompletionEvaluator:
         action_result = MockTurnResult(response="Stuck")
         state = {}
         spin_detector = MockSpinDetector(
-            state=SpinState.TERMINATED, consecutive_all_blocked=3, consecutive_no_tool_turns=0
+            state=SpinState.TERMINATED, consecutive_all_blocked=4, consecutive_no_tool_turns=0
         )
 
         result = await evaluator.evaluate(

@@ -298,7 +298,7 @@ class TestEnhancedCompletionIntegration:
     async def test_spin_detection_bypasses_enhanced(self, loop_with_enhanced_enabled):
         """Test that spin detection takes priority over enhanced evaluation."""
         # SpinDetector.state is a property - need to set counters instead
-        loop_with_enhanced_enabled.spin_detector.consecutive_all_blocked = 3
+        loop_with_enhanced_enabled.spin_detector.consecutive_all_blocked = 4
         loop_with_enhanced_enabled.spin_detector.consecutive_no_tool_turns = 0
 
         # Verify state is TERMINATED
