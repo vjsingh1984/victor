@@ -47,6 +47,10 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import yaml
 
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    derive_blocked_total_threshold,
+)
 from victor.tools.tool_names import ToolNames, get_canonical_name
 from victor.tools.metadata_registry import get_progress_params
 from victor.protocols.mode_aware import ModeAwareMixin
@@ -1125,10 +1129,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
             - total_limit: Force completion after N total blocked attempts (across conversation)
         """
         threshold = self._get_loop_threshold()
-        # Consecutive: same as threshold (4 by default)
-        # Total: 1.5x threshold (6 by default when threshold is 4)
         consecutive_limit = threshold
-        total_limit = int(threshold * 1.5)
+        total_limit = derive_blocked_total_threshold(threshold)
         return consecutive_limit, total_limit
 
     # =========================================================================
@@ -1408,7 +1410,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         - PLAN mode: 2.5x (e.g., threshold 4 becomes 10)
         - EXPLORE mode: 3.0x (e.g., threshold 4 becomes 12)
         """
-        base_threshold = 4
+        base_threshold = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
         if self._task_config:
             base_threshold = self._task_config.loop_repeat_threshold
 
