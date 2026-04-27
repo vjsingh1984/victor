@@ -72,6 +72,9 @@ def test_deprecated_chat_shims_do_not_materialize_local_chat_loops() -> None:
     sync_source = _method_source(
         "victor/agent/services/sync_chat_compat.py", "SyncChatCoordinator", "chat"
     )
+    sync_planning_source = _method_source(
+        "victor/agent/services/sync_chat_compat.py", "SyncChatCoordinator", "_chat_with_planning"
+    )
     streaming_source = _method_source(
         "victor/agent/services/streaming_chat_compat.py",
         "StreamingChatCoordinator",
@@ -81,5 +84,6 @@ def test_deprecated_chat_shims_do_not_materialize_local_chat_loops() -> None:
     assert "execute_agentic_loop(" not in chat_source
     assert "materializing a legacy local" not in turn_executor_source
     assert "execute_agentic_loop(" not in sync_source
+    assert "execute_agentic_loop(" not in sync_planning_source
     assert "_stream_from_provider(" not in streaming_source
     assert "raise RuntimeError" in streaming_source

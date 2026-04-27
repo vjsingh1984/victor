@@ -219,14 +219,17 @@ class SyncChatCoordinator:
         Returns:
             CompletionResponse from planning-based execution
         """
+        if self._chat_service is not None:
+            return await self._chat_service.chat(user_message, use_planning=True)
+
         # PlanningCoordinator currently requires orchestrator.
-        # Fall back to normal execution if orchestrator is unavailable.
+        # Deprecated compatibility shims should not bypass the canonical
+        # chat service / orchestrator runtime path for planning.
         if self._orchestrator is None:
-            logger.warning(
-                "Planning requested but orchestrator not provided to SyncChatCoordinator; "
-                "falling back to standard execution."
+            raise RuntimeError(
+                "SyncChatCoordinator planning requires a bound ChatService or orchestrator. "
+                "Bind ChatService before using deprecated compatibility shims."
             )
-            return await self._turn_executor.execute_agentic_loop(user_message)
 
         # Import here to avoid circular dependency
         from victor.agent.services.planning_runtime import PlanningCoordinator

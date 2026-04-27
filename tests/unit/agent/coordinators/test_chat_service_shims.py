@@ -72,6 +72,43 @@ async def test_sync_chat_coordinator_delegates_to_bound_chat_service():
     chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
 
 
+@pytest.mark.asyncio
+async def test_sync_chat_coordinator_planning_prefers_bound_chat_service():
+    chat_service = AsyncMock()
+    response = CompletionResponse(content="planned-service", role="assistant")
+    chat_service.chat.return_value = response
+
+    coordinator = SyncChatCoordinator(
+        chat_context=MagicMock(),
+        tool_context=MagicMock(),
+        provider_context=MagicMock(),
+        turn_executor=MagicMock(),
+        chat_service=chat_service,
+    )
+
+    result = await coordinator._chat_with_planning("hello")
+
+    assert result is response
+    chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
+
+
+@pytest.mark.asyncio
+async def test_sync_chat_coordinator_planning_requires_canonical_runtime():
+    with pytest.warns(
+        DeprecationWarning,
+        match="SyncChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = SyncChatCoordinator(
+            chat_context=MagicMock(),
+            tool_context=MagicMock(),
+            provider_context=MagicMock(),
+            turn_executor=MagicMock(),
+        )
+
+    with pytest.raises(RuntimeError, match="planning requires a bound ChatService or orchestrator"):
+        await coordinator._chat_with_planning("hello")
+
+
 def test_sync_chat_coordinator_constructor_warns_without_chat_service():
     with pytest.warns(
         DeprecationWarning,
