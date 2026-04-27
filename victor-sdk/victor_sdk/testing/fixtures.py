@@ -31,6 +31,14 @@ class MockPluginContext:
         self.registered_commands: Dict[str, Any] = {}
         self.registered_chunkers: List[Any] = []
         self.registered_workflow_node_executors: Dict[str, Any] = {}
+        self.registered_categories: Dict[str, set[str]] = {}
+        self.extended_categories: Dict[str, set[str]] = {}
+        self.registered_safety_rules: List[Any] = []
+        self.registered_tool_dependencies: Dict[str, Any] = {}
+        self.registered_escape_hatches: List[Any] = []
+        self.pending_rl_configs: Dict[str, Any] = {}
+        self.pending_bootstrap_services: List[tuple[str, Any]] = []
+        self.pending_mcp_servers: List[Any] = []
         self._services: Dict[Type[Any], Any] = {}
         self._settings: Dict[str, Any] = {
             "default_provider": "mock",
@@ -64,9 +72,55 @@ class MockPluginContext:
         """Register a custom workflow node executor."""
         self.registered_workflow_node_executors[node_type] = executor_factory
 
+    def register_category(
+        self,
+        name: str,
+        tools: set[str],
+        *,
+        description: Optional[str] = None,
+    ) -> None:
+        """Register a custom tool category."""
+        self.registered_categories[name] = set(tools)
+
+    def extend_category(self, name: str, tools: set[str]) -> None:
+        """Extend an existing tool category."""
+        if name not in self.extended_categories:
+            self.extended_categories[name] = set()
+        self.extended_categories[name].update(tools)
+
     def get_service(self, service_type: Type[Any]) -> Optional[Any]:
         """Retrieve a registered service, or None."""
         return self._services.get(service_type)
+
+    def get_provider_registry(self) -> Optional[Any]:
+        """Return the registered provider-registry service, if any."""
+        from victor_sdk.verticals.protocols import ProviderRegistryProtocol
+
+        return self.get_service(ProviderRegistryProtocol)
+
+    def get_graph_store(self) -> Optional[Any]:
+        """Return the registered graph-store service, if any."""
+        from victor_sdk.verticals.protocols import GraphStoreProtocol
+
+        return self.get_service(GraphStoreProtocol)
+
+    def get_vector_store(self) -> Optional[Any]:
+        """Return the registered vector-store service, if any."""
+        from victor_sdk.verticals.protocols import VectorStoreProtocol
+
+        return self.get_service(VectorStoreProtocol)
+
+    def get_embedding_service(self) -> Optional[Any]:
+        """Return the registered embedding service, if any."""
+        from victor_sdk.verticals.protocols import EmbeddingServiceProtocol
+
+        return self.get_service(EmbeddingServiceProtocol)
+
+    def get_memory_coordinator(self) -> Optional[Any]:
+        """Return the registered memory-coordinator service, if any."""
+        from victor_sdk.verticals.protocols import MemoryCoordinatorProtocol
+
+        return self.get_service(MemoryCoordinatorProtocol)
 
     def get_settings(self) -> Any:
         """Return mock settings dict."""
@@ -83,6 +137,35 @@ class MockPluginContext:
         if not hasattr(self, "_capabilities"):
             self._capabilities: Dict[Type[Any], Any] = {}
         self._capabilities[protocol_type] = provider
+
+    def register_safety_rule(self, rule: Any) -> None:
+        """Register a safety rule for testing."""
+        self.registered_safety_rules.append(rule)
+
+    def register_tool_dependency(self, name: str, provider: Any) -> None:
+        """Register a tool dependency provider for testing."""
+        self.registered_tool_dependencies[name] = provider
+
+    def register_escape_hatch(self, hatch: Any) -> None:
+        """Register an escape hatch for testing."""
+        self.registered_escape_hatches.append(hatch)
+
+    def register_rl_config(self, key: str, config: Any) -> None:
+        """Buffer RL config fragments for testing."""
+        self.pending_rl_configs[key] = config
+
+    def register_bootstrap_service(
+        self,
+        factory: Any,
+        *,
+        phase: str = "vertical_services",
+    ) -> None:
+        """Buffer bootstrap services for testing."""
+        self.pending_bootstrap_services.append((phase, factory))
+
+    def register_mcp_server(self, spec: Any) -> None:
+        """Buffer MCP server specs for testing."""
+        self.pending_mcp_servers.append(spec)
 
     # --- Test helpers (not part of PluginContext protocol) ---
 

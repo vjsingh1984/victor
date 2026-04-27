@@ -12,6 +12,15 @@ from types import SimpleNamespace
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def reset_tool_category_registry():
+    from victor.framework.tools import ToolCategoryRegistry
+
+    ToolCategoryRegistry.reset_instance()
+    yield
+    ToolCategoryRegistry.reset_instance()
+
+
 def test_register_rl_config_buffers_payload():
     from victor.core.plugins.context import HostPluginContext
 
@@ -115,6 +124,13 @@ def test_pluginctx_protocol_has_new_methods():
     from victor_sdk.core.plugins import PluginContext
 
     for name in (
+        "register_category",
+        "extend_category",
+        "get_provider_registry",
+        "get_graph_store",
+        "get_vector_store",
+        "get_embedding_service",
+        "get_memory_coordinator",
         "register_safety_rule",
         "register_tool_dependency",
         "register_escape_hatch",
@@ -123,3 +139,147 @@ def test_pluginctx_protocol_has_new_methods():
         "register_mcp_server",
     ):
         assert hasattr(PluginContext, name), f"SDK PluginContext missing {name}"
+
+
+def test_register_category_routes_to_tool_category_registry():
+    from victor.core.plugins.context import HostPluginContext
+    from victor.framework.tools import get_category_registry
+
+    ctx = HostPluginContext(container=None)
+    ctx.register_category("rag", {"rag_search", "rag_query"})
+
+    assert get_category_registry().get_tools("rag") == {"rag_search", "rag_query"}
+
+
+def test_extend_category_routes_to_tool_category_registry():
+    from victor.core.plugins.context import HostPluginContext
+    from victor.framework.tools import get_category_registry
+
+    ctx = HostPluginContext(container=None)
+    ctx.extend_category("search", {"semantic_rag_search"})
+
+    assert "semantic_rag_search" in get_category_registry().get_tools("search")
+
+
+def test_typed_service_accessors_bridge_internal_and_sdk_service_keys(monkeypatch):
+    from victor.agent.protocols import ProviderRegistryProtocol as HostProviderRegistryProtocol
+    from victor.core.plugins.context import HostPluginContext
+    from victor.core.protocols import EmbeddingServiceProtocol as HostEmbeddingServiceProtocol
+    from victor.storage.graph.protocol import GraphStoreProtocol as HostGraphStoreProtocol
+    from victor_sdk.verticals.protocols import VectorStoreProtocol as SdkVectorStoreProtocol
+
+    class FakeProviderRegistry:
+        def get(self, name: str) -> str:
+            return f"provider:{name}"
+
+        def list_providers(self) -> list[str]:
+            return ["openai"]
+
+    class FakeEmbeddingService:
+        async def embed_text(self, text: str) -> list[float]:
+            return [float(len(text))]
+
+        async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+            return [[float(len(text))] for text in texts]
+
+        def embed_text_sync(self, text: str) -> list[float]:
+            return [float(len(text))]
+
+    class FakeGraphStore:
+        async def upsert_nodes(self, nodes):
+            return None
+
+        async def upsert_edges(self, edges):
+            return None
+
+        async def get_neighbors(self, node_id: str, edge_types=None, **kwargs):
+            return []
+
+        async def find_nodes(self, **kwargs):
+            return []
+
+    class FakeVectorStore:
+        async def index_document(self, doc_id: str, content: str, embedding, metadata=None):
+            return None
+
+        async def search_similar(self, query_embedding, limit: int = 10):
+            return []
+
+        async def delete_document(self, doc_id: str):
+            return None
+
+    class FakeContainer:
+        def __init__(self, services):
+            self._services = services
+
+        def get_optional(self, service_type):
+            return self._services.get(service_type)
+
+        def get(self, service_type):
+            service = self.get_optional(service_type)
+            if service is None:
+                raise LookupError(service_type)
+            return service
+
+        def is_registered(self, service_type):
+            return service_type in self._services
+
+    provider_registry = FakeProviderRegistry()
+    embedding_service = FakeEmbeddingService()
+    graph_store = FakeGraphStore()
+    vector_store = FakeVectorStore()
+
+    ctx = HostPluginContext(
+        container=FakeContainer(
+            {
+                HostProviderRegistryProtocol: provider_registry,
+                HostEmbeddingServiceProtocol: embedding_service,
+                HostGraphStoreProtocol: graph_store,
+                SdkVectorStoreProtocol: vector_store,
+            }
+        )
+    )
+
+    provider_registry_service = ctx.get_provider_registry()
+    assert provider_registry_service is not None
+    assert provider_registry_service.get_provider("openai") == "provider:openai"
+    assert provider_registry_service.list_providers() == ["openai"]
+    assert ctx.get_embedding_service() is embedding_service
+    assert ctx.get_graph_store() is graph_store
+    assert ctx.get_vector_store() is vector_store
+
+
+def test_get_memory_coordinator_falls_back_to_global_accessor(monkeypatch):
+    from victor.core.plugins.context import HostPluginContext
+
+    class FakeMemoryCoordinator:
+        async def search_all(self, query: str, limit: int = 20, **kwargs):
+            return []
+
+        async def search_type(self, memory_type, query: str, limit: int = 20, **kwargs):
+            return []
+
+        async def store(self, memory_type, key: str, value, metadata=None) -> bool:
+            return True
+
+        async def get(self, memory_type, key: str):
+            return None
+
+        def register_provider(self, provider) -> None:
+            return None
+
+        def unregister_provider(self, memory_type) -> bool:
+            return True
+
+        def get_registered_types(self):
+            return []
+
+        def get_stats(self):
+            return {}
+
+    sentinel = FakeMemoryCoordinator()
+    monkeypatch.setattr("victor.storage.memory.get_memory_coordinator", lambda: sentinel)
+
+    ctx = HostPluginContext(container=SimpleNamespace(get_optional=lambda *_args: None))
+
+    assert ctx.get_memory_coordinator() is sentinel

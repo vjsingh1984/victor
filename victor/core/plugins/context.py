@@ -74,6 +74,34 @@ class HostPluginContext(PluginContext):
         """Return MCP server specs registered by plugins."""
         return list(self._pending_mcp_servers)
 
+    def _ensure_container(self) -> Optional[Any]:
+        """Resolve and cache the host service container."""
+
+        if self._container is None:
+            from victor.core.container import get_container
+
+            self._container = get_container()
+        return self._container
+
+    def _get_optional_service(self, *service_types: Type[Any]) -> Optional[Any]:
+        """Resolve the first available service for the given protocol types."""
+
+        container = self._ensure_container()
+        if container is None:
+            return None
+
+        for service_type in service_types:
+            try:
+                if hasattr(container, "get_optional"):
+                    service = container.get_optional(service_type)
+                else:
+                    service = container.get(service_type)
+                if service is not None:
+                    return service
+            except Exception:
+                continue
+        return None
+
     def register_tool(self, tool_instance: Any) -> None:
         """Register a tool with the framework's ToolRegistry."""
         try:
@@ -254,6 +282,28 @@ class HostPluginContext(PluginContext):
         except Exception as e:
             logger.error(f"Plugin failed to register chunker: {e}")
 
+    def register_category(
+        self,
+        name: str,
+        tools: set[str],
+        *,
+        description: Optional[str] = None,
+    ) -> None:
+        """Register a custom tool category for plugin-owned tools."""
+
+        from victor.framework.tools import get_category_registry
+
+        get_category_registry().register_category(name, set(tools), description=description)
+        logger.debug("Plugin registered tool category: %s", name)
+
+    def extend_category(self, name: str, tools: set[str]) -> None:
+        """Extend an existing tool category with plugin-owned tools."""
+
+        from victor.framework.tools import get_category_registry
+
+        get_category_registry().extend_category(name, set(tools))
+        logger.debug("Plugin extended tool category: %s", name)
+
     def register_command(self, name: str, app: typer.Typer) -> None:
         """Register a command app."""
         self._commands[name] = app
@@ -300,13 +350,110 @@ class HostPluginContext(PluginContext):
 
     def get_service(self, service_type: Type[Any]) -> Optional[Any]:
         """Retrieve a service from the container."""
-        if not self._container:
-            from victor.core.container import get_container
+        return self._get_optional_service(service_type)
 
-            self._container = get_container()
+    def get_provider_registry(self) -> Optional[Any]:
+        """Retrieve the host's LLM provider registry via a stable SDK seam."""
+
+        from victor_sdk.verticals.protocols import ProviderRegistryProtocol as SdkProviderRegistry
+
+        service = self._get_optional_service(SdkProviderRegistry)
+        if service is not None:
+            return service
 
         try:
-            return self._container.get(service_type)
+            from victor.agent.protocols import ProviderRegistryProtocol as HostProviderRegistry
+        except ImportError:
+            return None
+
+        service = self._get_optional_service(HostProviderRegistry)
+        if service is None:
+            return None
+        if hasattr(service, "get_provider"):
+            return service
+        if hasattr(service, "get") and hasattr(service, "list_providers"):
+            return _ProviderRegistryAdapter(service)
+        return None
+
+    def get_graph_store(self) -> Optional[Any]:
+        """Retrieve the host's graph-store service via a stable SDK seam."""
+
+        from victor_sdk.verticals.protocols import GraphStoreProtocol as SdkGraphStore
+
+        service = self._get_optional_service(SdkGraphStore)
+        if service is not None:
+            return service
+
+        try:
+            from victor.storage.graph.protocol import GraphStoreProtocol as HostGraphStore
+        except ImportError:
+            return None
+
+        return self._get_optional_service(HostGraphStore)
+
+    def get_vector_store(self) -> Optional[Any]:
+        """Retrieve the host's vector-store service via a stable SDK seam."""
+
+        from victor_sdk.verticals.protocols import VectorStoreProtocol as SdkVectorStore
+
+        service = self._get_optional_service(SdkVectorStore)
+        if service is not None:
+            return service
+
+        try:
+            from victor.framework.vertical_protocols import VectorStoreProtocol as HostVectorStore
+        except ImportError:
+            return None
+
+        service = self._get_optional_service(HostVectorStore)
+        if service is None:
+            return None
+        if hasattr(service, "index_document"):
+            return service
+        if all(hasattr(service, attr) for attr in ("add_documents", "search", "delete")):
+            return _VectorStoreAdapter(service)
+        return None
+
+    def get_embedding_service(self) -> Optional[Any]:
+        """Retrieve the host's embedding service via a stable SDK seam."""
+
+        from victor_sdk.verticals.protocols import EmbeddingServiceProtocol as SdkEmbeddingService
+
+        service = self._get_optional_service(SdkEmbeddingService)
+        if service is not None:
+            return service
+
+        try:
+            from victor.core.protocols import EmbeddingServiceProtocol as HostEmbeddingService
+        except ImportError:
+            return None
+
+        return self._get_optional_service(HostEmbeddingService)
+
+    def get_memory_coordinator(self) -> Optional[Any]:
+        """Retrieve the host's shared memory coordinator via a stable SDK seam."""
+
+        from victor_sdk.verticals.protocols import MemoryCoordinatorProtocol as SdkMemoryCoordinator
+
+        service = self._get_optional_service(SdkMemoryCoordinator)
+        if service is not None:
+            return service
+
+        try:
+            from victor.agent.protocols import (
+                UnifiedMemoryCoordinatorProtocol as HostMemoryCoordinator,
+            )
+
+            service = self._get_optional_service(HostMemoryCoordinator)
+        except ImportError:
+            service = None
+        if service is not None:
+            return service
+
+        try:
+            from victor.storage.memory import get_memory_coordinator
+
+            return get_memory_coordinator()
         except Exception:
             return None
 
@@ -314,14 +461,10 @@ class HostPluginContext(PluginContext):
         """Retrieve the application settings from the container."""
         from victor.config.settings import Settings
 
-        if not self._container:
-            from victor.core.container import get_container
-
-            self._container = get_container()
-
-        try:
-            return self._container.get(Settings)
-        except Exception:
+        settings = self._get_optional_service(Settings)
+        if settings is not None:
+            return settings
+        else:
             # Fallback: load default settings
             return Settings()
 
@@ -479,3 +622,50 @@ class _LazyCapabilityProxy:
         """Support calling the proxy as a constructor/factory."""
         resolved = self._resolve()
         return resolved(*args, **kwargs)
+
+
+class _ProviderRegistryAdapter:
+    """Adapter exposing host provider registries through the SDK protocol."""
+
+    def __init__(self, delegate: Any) -> None:
+        self._delegate = delegate
+
+    def get_provider(self, name: str) -> Any:
+        getter = getattr(self._delegate, "get_provider", None) or getattr(self._delegate, "get", None)
+        if getter is None:
+            raise AttributeError("Provider registry does not expose get_provider() or get()")
+        return getter(name)
+
+    def list_providers(self) -> list[str]:
+        return list(self._delegate.list_providers())
+
+
+class _VectorStoreAdapter:
+    """Adapter exposing legacy vector stores through the SDK protocol."""
+
+    def __init__(self, delegate: Any) -> None:
+        self._delegate = delegate
+
+    async def index_document(
+        self,
+        doc_id: str,
+        content: str,
+        embedding: list[float],
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> None:
+        await self._delegate.add_documents(
+            [content],
+            [embedding],
+            metadata=None if metadata is None else [metadata],
+            ids=[doc_id],
+        )
+
+    async def search_similar(
+        self,
+        query_embedding: list[float],
+        limit: int = 10,
+    ) -> list[Any]:
+        return await self._delegate.search(query_embedding, top_k=limit)
+
+    async def delete_document(self, doc_id: str) -> None:
+        await self._delegate.delete([doc_id])

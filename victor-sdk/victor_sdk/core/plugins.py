@@ -24,6 +24,13 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Protocol, Type, runtime_c
 
 if TYPE_CHECKING:
     import typer
+    from victor_sdk.verticals.protocols import (
+        EmbeddingServiceProtocol,
+        GraphStoreProtocol,
+        MemoryCoordinatorProtocol,
+        ProviderRegistryProtocol,
+        VectorStoreProtocol,
+    )
 
 
 @runtime_checkable
@@ -88,6 +95,31 @@ class PluginContext(Protocol):
         """
         ...
 
+    def register_category(
+        self,
+        name: str,
+        tools: set[str],
+        *,
+        description: Optional[str] = None,
+    ) -> None:
+        """Register a custom tool category with the host.
+
+        Args:
+            name: Category name.
+            tools: Tool names exposed through the category.
+            description: Optional human-readable description.
+        """
+        ...
+
+    def extend_category(self, name: str, tools: set[str]) -> None:
+        """Extend an existing tool category with additional tools.
+
+        Args:
+            name: Category name to extend.
+            tools: Tool names to merge into the category.
+        """
+        ...
+
     def get_service(self, service_type: Type[Any]) -> Optional[Any]:
         """Retrieve a service from the host container.
 
@@ -97,6 +129,26 @@ class PluginContext(Protocol):
         Returns:
             The service instance or None if not found.
         """
+        ...
+
+    def get_provider_registry(self) -> Optional["ProviderRegistryProtocol"]:
+        """Retrieve the host's LLM provider registry, if available."""
+        ...
+
+    def get_graph_store(self) -> Optional["GraphStoreProtocol"]:
+        """Retrieve the host's graph-store service, if available."""
+        ...
+
+    def get_vector_store(self) -> Optional["VectorStoreProtocol"]:
+        """Retrieve the host's vector-store service, if available."""
+        ...
+
+    def get_embedding_service(self) -> Optional["EmbeddingServiceProtocol"]:
+        """Retrieve the host's embedding service, if available."""
+        ...
+
+    def get_memory_coordinator(self) -> Optional["MemoryCoordinatorProtocol"]:
+        """Retrieve the host's shared memory coordinator, if available."""
         ...
 
     def get_settings(self) -> Any:

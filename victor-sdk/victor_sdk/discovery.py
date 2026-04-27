@@ -564,7 +564,34 @@ class _CollectingPluginContext:
     ) -> None:
         return None
 
+    def register_category(
+        self,
+        name: str,
+        tools: set[str],
+        *,
+        description: str | None = None,
+    ) -> None:
+        return None
+
+    def extend_category(self, name: str, tools: set[str]) -> None:
+        return None
+
     def get_service(self, service_type: type[Any]) -> None:
+        return None
+
+    def get_provider_registry(self) -> None:
+        return None
+
+    def get_graph_store(self) -> None:
+        return None
+
+    def get_vector_store(self) -> None:
+        return None
+
+    def get_embedding_service(self) -> None:
+        return None
+
+    def get_memory_coordinator(self) -> None:
         return None
 
     def get_settings(self) -> None:

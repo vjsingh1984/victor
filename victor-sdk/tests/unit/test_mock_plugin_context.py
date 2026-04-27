@@ -75,6 +75,17 @@ class TestMockPluginContextRegistration:
         assert "custom" in ctx.registered_workflow_node_executors
         assert ctx.registered_workflow_node_executors["custom"] is factory
 
+    def test_register_category_stores_categories(self):
+        ctx = MockPluginContext()
+        ctx.register_category("rag", {"rag_search", "rag_query"})
+        assert ctx.registered_categories["rag"] == {"rag_search", "rag_query"}
+
+    def test_extend_category_accumulates_extensions(self):
+        ctx = MockPluginContext()
+        ctx.extend_category("search", {"semantic_search"})
+        ctx.extend_category("search", {"hybrid_search"})
+        assert ctx.extended_categories["search"] == {"semantic_search", "hybrid_search"}
+
     def test_multiple_tools_accumulate(self):
         ctx = MockPluginContext()
         ctx.register_tool("tool_a")
@@ -99,6 +110,34 @@ class TestMockPluginContextServices:
         ctx = MockPluginContext()
         settings = ctx.get_settings()
         assert isinstance(settings, dict)
+
+    def test_typed_service_helpers_use_registered_services(self):
+        from victor_sdk.verticals.protocols import (
+            EmbeddingServiceProtocol,
+            GraphStoreProtocol,
+            MemoryCoordinatorProtocol,
+            ProviderRegistryProtocol,
+            VectorStoreProtocol,
+        )
+
+        ctx = MockPluginContext()
+        provider_registry = object()
+        graph_store = object()
+        vector_store = object()
+        embedding_service = object()
+        memory_coordinator = object()
+
+        ctx.set_service(ProviderRegistryProtocol, provider_registry)
+        ctx.set_service(GraphStoreProtocol, graph_store)
+        ctx.set_service(VectorStoreProtocol, vector_store)
+        ctx.set_service(EmbeddingServiceProtocol, embedding_service)
+        ctx.set_service(MemoryCoordinatorProtocol, memory_coordinator)
+
+        assert ctx.get_provider_registry() is provider_registry
+        assert ctx.get_graph_store() is graph_store
+        assert ctx.get_vector_store() is vector_store
+        assert ctx.get_embedding_service() is embedding_service
+        assert ctx.get_memory_coordinator() is memory_coordinator
 
 
 class TestMockPluginContextRoundtrip:
