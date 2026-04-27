@@ -71,6 +71,8 @@ When changing native-extension behavior, verify both the Rust side and the Pytho
 Use the smallest layer that fits the change:
 - Put framework-wide abstractions in `victor/framework/` only when they are truly reusable.
 - Keep domain-specific behavior in verticals, tools, providers, or integrations instead of expanding core APIs.
+- Reuse existing framework-level capabilities wherever feasible. When CLI, chat, API, or integration behavior needs to change, prefer extending or upgrading the underlying `victor/framework/` capability first, then wire the surface layer to consume and test that shared path instead of adding local ad hoc logic.
+- Treat this as a design mandate for user-facing orchestration work: interface layers should primarily compose, configure, and expose framework behavior. If a surface needs special handling, make the framework abstraction capable of supporting it cleanly before adding surface-specific branching.
 - Update docs when user-facing commands, config, providers, workflows, or public APIs change.
 - Before adding new logic, first verify whether similar behavior already exists in the repo and prefer enhancing or reusing it instead of duplicating it.
 - If the existing implementation is close but not sufficient, refactor toward the smallest clear abstraction that improves reuse, maintainability, and scalability without widening scope unnecessarily.
