@@ -15,7 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Any, Dict, Iterable, Optional, Sequence
+import subprocess
+from typing import Any, Dict, Optional, Sequence
 
 from victor.teams.types import TeamFormation
 
@@ -142,6 +143,79 @@ class WorktreeExecutionPlan:
         }
 
 
+@dataclass(frozen=True)
+class MaterializedWorktreeAssignment:
+    """One worktree assignment after optional git-backed materialization."""
+
+    assignment: WorktreeAssignment
+    materialized: bool = False
+    cleanup_required: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def member_id(self) -> str:
+        return self.assignment.member_id
+
+    @property
+    def worktree_path(self) -> str:
+        return self.assignment.worktree_path
+
+    @property
+    def branch_name(self) -> str:
+        return self.assignment.branch_name
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = self.assignment.to_dict()
+        payload.update(
+            {
+                "materialized": self.materialized,
+                "cleanup_required": self.cleanup_required,
+                "runtime_metadata": dict(self.metadata),
+            }
+        )
+        return payload
+
+    def to_context_overrides(self) -> Dict[str, Any]:
+        payload = self.assignment.to_context_overrides()
+        payload["materialized_worktree"] = self.materialized
+        if self.metadata:
+            payload["worktree_runtime"] = dict(self.metadata)
+        return payload
+
+
+@dataclass(frozen=True)
+class WorktreeMaterializationSession:
+    """Runtime session for a planned set of isolated worktrees."""
+
+    plan: WorktreeExecutionPlan
+    assignments: tuple[MaterializedWorktreeAssignment, ...]
+    materialized: bool
+    dry_run: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def assignment_for(self, member_id: str) -> Optional[MaterializedWorktreeAssignment]:
+        normalized = _normalize_text(member_id)
+        if normalized is None:
+            return None
+        for assignment in self.assignments:
+            if assignment.member_id == normalized:
+                return assignment
+        return None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "plan": self.plan.to_dict(),
+            "assignments": [assignment.to_dict() for assignment in self.assignments],
+            "materialized": self.materialized,
+            "dry_run": self.dry_run,
+            "metadata": dict(self.metadata),
+        }
+
+
+class WorktreeRuntimeError(RuntimeError):
+    """Raised when git-backed worktree orchestration fails."""
+
+
 class WorktreeIsolationPlanner:
     """Plan isolated per-member workspaces for team execution."""
 
@@ -258,8 +332,202 @@ class WorktreeIsolationPlanner:
         return len(explicit_merge_order) + index
 
 
+class GitWorktreeRuntime:
+    """Materialize planned worktrees and collect merge-time repo signals."""
+
+    def materialize(
+        self,
+        plan: WorktreeExecutionPlan,
+        *,
+        dry_run: bool = False,
+    ) -> WorktreeMaterializationSession:
+        if dry_run:
+            assignments = tuple(
+                MaterializedWorktreeAssignment(
+                    assignment=assignment,
+                    materialized=False,
+                    cleanup_required=False,
+                    metadata={"dry_run": True},
+                )
+                for assignment in plan.assignments
+            )
+            return WorktreeMaterializationSession(
+                plan=plan,
+                assignments=assignments,
+                materialized=False,
+                dry_run=True,
+                metadata={"dry_run": True},
+            )
+
+        Path(plan.parent_dir).mkdir(parents=True, exist_ok=True)
+        created_paths: list[str] = []
+        assignments: list[MaterializedWorktreeAssignment] = []
+        try:
+            for assignment in plan.assignments:
+                worktree_path = Path(assignment.worktree_path)
+                if worktree_path.exists():
+                    raise WorktreeRuntimeError(
+                        f"Worktree path already exists: {assignment.worktree_path}"
+                    )
+                self._run_git(
+                    plan.repo_root,
+                    "worktree",
+                    "add",
+                    "-b",
+                    assignment.branch_name,
+                    assignment.worktree_path,
+                    plan.base_ref,
+                )
+                created_paths.append(assignment.worktree_path)
+                assignments.append(
+                    MaterializedWorktreeAssignment(
+                        assignment=assignment,
+                        materialized=True,
+                        cleanup_required=True,
+                        metadata={
+                            "repo_root": plan.repo_root,
+                            "base_ref": plan.base_ref,
+                        },
+                    )
+                )
+        except Exception:
+            for path in reversed(created_paths):
+                try:
+                    self._run_git(plan.repo_root, "worktree", "remove", "--force", path)
+                except Exception:
+                    pass
+            raise
+
+        return WorktreeMaterializationSession(
+            plan=plan,
+            assignments=tuple(assignments),
+            materialized=True,
+            dry_run=False,
+            metadata={"created_paths": list(created_paths)},
+        )
+
+    def collect_changed_files(
+        self,
+        session: WorktreeMaterializationSession,
+        member_id: str,
+    ) -> tuple[str, ...]:
+        assignment = session.assignment_for(member_id)
+        if assignment is None or not assignment.materialized:
+            return ()
+        stdout = self._run_git_stdout(
+            assignment.worktree_path,
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+        )
+        files: list[str] = []
+        for line in stdout.splitlines():
+            if not line.strip():
+                continue
+            filename = line[3:].strip()
+            if " -> " in filename:
+                filename = filename.split(" -> ", 1)[1]
+            if filename:
+                files.append(filename)
+        return tuple(dict.fromkeys(files))
+
+    def build_merge_orchestration(
+        self,
+        session: WorktreeMaterializationSession,
+        *,
+        merge_analysis: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        recommended_merge_order = (
+            list(merge_analysis.get("recommended_merge_order") or ())
+            if isinstance(merge_analysis, dict)
+            else list(session.plan.merge_order)
+        )
+        return {
+            "materialized": session.materialized,
+            "dry_run": session.dry_run,
+            "recommended_merge_order": recommended_merge_order,
+            "branches": {item.member_id: item.branch_name for item in session.assignments},
+            "worktree_paths": {item.member_id: item.worktree_path for item in session.assignments},
+            "merge_base": session.plan.base_ref,
+            "merge_risk_level": (
+                merge_analysis.get("risk_level")
+                if isinstance(merge_analysis, dict)
+                else None
+            ),
+            "conflict_paths": [
+                item.get("path")
+                for item in (
+                    merge_analysis.get("overlapping_files") if isinstance(merge_analysis, dict) else []
+                )
+                or []
+                if item.get("path")
+            ],
+        }
+
+    def cleanup(
+        self,
+        session: WorktreeMaterializationSession,
+        *,
+        force: bool = True,
+    ) -> Dict[str, Any]:
+        removed: list[str] = []
+        skipped: list[str] = []
+        errors: list[str] = []
+        if not session.materialized:
+            return {"removed": removed, "skipped": skipped, "errors": errors}
+
+        for assignment in session.assignments:
+            if not assignment.cleanup_required:
+                skipped.append(assignment.worktree_path)
+                continue
+            if not Path(assignment.worktree_path).exists():
+                skipped.append(assignment.worktree_path)
+                continue
+            args = ["worktree", "remove"]
+            if force:
+                args.append("--force")
+            args.append(assignment.worktree_path)
+            try:
+                self._run_git(session.plan.repo_root, *args)
+                removed.append(assignment.worktree_path)
+            except Exception as exc:
+                errors.append(f"{assignment.worktree_path}: {exc}")
+        return {"removed": removed, "skipped": skipped, "errors": errors}
+
+    @staticmethod
+    def _run_git(repo_root: str, *args: str) -> None:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise WorktreeRuntimeError(result.stderr.strip() or result.stdout.strip() or "git failed")
+
+    @staticmethod
+    def _run_git_stdout(repo_root: str, *args: str) -> str:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise WorktreeRuntimeError(result.stderr.strip() or result.stdout.strip() or "git failed")
+        return result.stdout
+
+
 __all__ = [
+    "GitWorktreeRuntime",
+    "MaterializedWorktreeAssignment",
     "WorktreeAssignment",
     "WorktreeExecutionPlan",
     "WorktreeIsolationPlanner",
+    "WorktreeMaterializationSession",
+    "WorktreeRuntimeError",
 ]

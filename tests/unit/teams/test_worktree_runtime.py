@@ -1,7 +1,9 @@
+from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 
 from victor.teams.types import TeamFormation
-from victor.teams.worktree_runtime import WorktreeIsolationPlanner
+from victor.teams.worktree_runtime import GitWorktreeRuntime, WorktreeIsolationPlanner
 
 
 def test_worktree_planner_builds_assignments_and_manager_last_merge_order():
@@ -35,3 +37,67 @@ def test_worktree_planner_builds_assignments_and_manager_last_merge_order():
     assert plan.assignment_for("researcher").readonly_paths == ("README.md", "docs/reference")
     assert plan.merge_order[-1] == "lead"
     assert plan.assignment_for("lead").to_context_overrides()["isolation_mode"] == "worktree"
+
+
+def _init_git_repo(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "team-runtime@example.com"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Team Runtime"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+    (path / "README.md").write_text("seed\n")
+    subprocess.run(["git", "add", "README.md"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True)
+
+
+def test_git_worktree_runtime_materializes_collects_changes_and_cleans_up(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [SimpleNamespace(id="worker", is_manager=False)],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+            "member_write_scopes": {"worker": ["src/auth"]},
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+
+    runtime = GitWorktreeRuntime()
+    session = runtime.materialize(plan)
+
+    assert session.materialized is True
+    assignment = session.assignment_for("worker")
+    assert assignment is not None
+    assert Path(assignment.worktree_path).exists()
+
+    changed_file = Path(assignment.worktree_path) / "src" / "auth" / "service.py"
+    changed_file.parent.mkdir(parents=True, exist_ok=True)
+    changed_file.write_text("print('ok')\n")
+
+    changed_files = runtime.collect_changed_files(session, "worker")
+    assert changed_files == ("src/auth/service.py",)
+
+    orchestration = runtime.build_merge_orchestration(
+        session,
+        merge_analysis={"risk_level": "low", "recommended_merge_order": ["worker"]},
+    )
+    assert orchestration["branches"]["worker"] == assignment.branch_name
+
+    cleanup = runtime.cleanup(session)
+    assert cleanup["errors"] == []
+    assert not Path(assignment.worktree_path).exists()

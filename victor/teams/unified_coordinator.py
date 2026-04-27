@@ -59,7 +59,12 @@ from victor.teams.types import (
     TeamResult,
 )
 from victor.teams.merge_analyzer import MergeAnalyzer
-from victor.teams.worktree_runtime import WorktreeExecutionPlan, WorktreeIsolationPlanner
+from victor.teams.worktree_runtime import (
+    GitWorktreeRuntime,
+    WorktreeExecutionPlan,
+    WorktreeIsolationPlanner,
+    WorktreeMaterializationSession,
+)
 
 if TYPE_CHECKING:
     from victor.protocols.team import ITeamMember
@@ -226,6 +231,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         lightweight_mode: bool = False,
         worktree_planner: Optional[Any] = None,
         merge_analyzer: Optional[Any] = None,
+        worktree_runtime: Optional[Any] = None,
     ) -> None:
         """Initialize the unified coordinator.
 
@@ -259,6 +265,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._shared_context: Dict[str, Any] = {}
         self._worktree_planner = worktree_planner or WorktreeIsolationPlanner()
         self._merge_analyzer = merge_analyzer or MergeAnalyzer()
+        self._worktree_runtime = worktree_runtime or GitWorktreeRuntime()
 
         # LSP capability for language intelligence
         self._lsp: Optional[Any] = None
@@ -543,12 +550,16 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             context=context,
             formation=active_formation,
         )
+        worktree_session = self._materialize_worktree_plan(worktree_plan, context=context)
+        worktree_overrides_source = worktree_session.assignments if worktree_session else (
+            worktree_plan.assignments if worktree_plan is not None else ()
+        )
         member_context_overrides = (
             {
                 assignment.member_id: assignment.to_context_overrides()
-                for assignment in worktree_plan.assignments
+                for assignment in worktree_overrides_source
             }
-            if worktree_plan is not None
+            if worktree_overrides_source
             else {}
         )
         adapted_members = [
@@ -562,6 +573,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         shared_state_with_manager["effective_formation"] = active_formation.value
         if worktree_plan is not None:
             shared_state_with_manager["worktree_plan"] = worktree_plan.to_dict()
+        if worktree_session is not None:
+            shared_state_with_manager["worktree_session"] = worktree_session.to_dict()
 
         team_context = TeamContext(
             team_id=context.get("team_name", "UnifiedTeam"),
@@ -578,51 +591,71 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             data=context,
         )
 
-        # Execute using formation strategy
-        member_results_list = await strategy.execute(adapted_members, team_context, agent_task)
+        result_dict: Optional[Dict[str, Any]] = None
+        try:
+            # Execute using formation strategy
+            member_results_list = await strategy.execute(adapted_members, team_context, agent_task)
 
-        # Convert list of MemberResults to dict
-        member_results: Dict[str, MemberResult] = {r.member_id: r for r in member_results_list}
+            # Convert list of MemberResults to dict
+            member_results: Dict[str, MemberResult] = {r.member_id: r for r in member_results_list}
+            self._inject_worktree_changed_files(
+                member_results,
+                worktree_session=worktree_session,
+            )
 
-        # Build final output
-        success = all(r.success for r in member_results_list) if member_results_list else False
-        final_outputs = [r.output for r in member_results_list if r.success]
-        total_tool_calls = sum(r.tool_calls_used for r in member_results_list)
+            # Build final output
+            success = all(r.success for r in member_results_list) if member_results_list else False
+            final_outputs = [r.output for r in member_results_list if r.success]
+            total_tool_calls = sum(r.tool_calls_used for r in member_results_list)
 
-        # Determine final output based on formation
-        # For pipeline, use only the last stage's output
-        # For other formations, join all outputs
-        if self._formation == TeamFormation.PIPELINE and final_outputs:
-            final_output = final_outputs[-1]  # Last stage's output only
-        else:
-            final_output = "\n\n".join(final_outputs)
+            # Determine final output based on formation
+            # For pipeline, use only the last stage's output
+            # For other formations, join all outputs
+            if self._formation == TeamFormation.PIPELINE and final_outputs:
+                final_output = final_outputs[-1]  # Last stage's output only
+            else:
+                final_output = "\n\n".join(final_outputs)
 
-        # Extract consensus metadata if present (from ConsensusFormation)
-        result_dict = {
-            "success": success,
-            "member_results": member_results,
-            "final_output": final_output,
-            "formation": active_formation.value,
-            "total_tool_calls": total_tool_calls,
-            "communication_log": self._message_history,
-            "shared_context": self._shared_context,
-        }
+            # Extract consensus metadata if present (from ConsensusFormation)
+            result_dict = {
+                "success": success,
+                "member_results": member_results,
+                "final_output": final_output,
+                "formation": active_formation.value,
+                "total_tool_calls": total_tool_calls,
+                "communication_log": self._message_history,
+                "shared_context": self._shared_context,
+            }
 
-        # Add consensus metadata if any member result has it
-        if member_results_list:
-            first_metadata = member_results_list[0].metadata
-            if "consensus_achieved" in first_metadata:
-                result_dict["consensus_achieved"] = first_metadata["consensus_achieved"]
-            if "consensus_rounds" in first_metadata:
-                result_dict["consensus_rounds"] = first_metadata["consensus_rounds"]
-        if worktree_plan is not None:
-            result_dict["worktree_plan"] = worktree_plan.to_dict()
-        merge_analysis = self._analyze_merge(member_results, worktree_plan=worktree_plan)
-        if merge_analysis is not None:
-            result_dict["merge_analysis"] = merge_analysis.to_dict()
-            result_dict["merge_risk_level"] = merge_analysis.risk_level.value
+            # Add consensus metadata if any member result has it
+            if member_results_list:
+                first_metadata = member_results_list[0].metadata
+                if "consensus_achieved" in first_metadata:
+                    result_dict["consensus_achieved"] = first_metadata["consensus_achieved"]
+                if "consensus_rounds" in first_metadata:
+                    result_dict["consensus_rounds"] = first_metadata["consensus_rounds"]
+            if worktree_plan is not None:
+                result_dict["worktree_plan"] = worktree_plan.to_dict()
+            if worktree_session is not None:
+                result_dict["worktree_session"] = worktree_session.to_dict()
+            merge_analysis = self._analyze_merge(member_results, worktree_plan=worktree_plan)
+            if merge_analysis is not None:
+                result_dict["merge_analysis"] = merge_analysis.to_dict()
+                result_dict["merge_risk_level"] = merge_analysis.risk_level.value
+                if worktree_session is not None:
+                    merge_orchestration = self._build_merge_orchestration(
+                        worktree_session,
+                        merge_analysis=merge_analysis.to_dict(),
+                    )
+                    if merge_orchestration is not None:
+                        result_dict["merge_orchestration"] = merge_orchestration
 
-        return result_dict
+            return result_dict
+        finally:
+            if worktree_session is not None and self._should_cleanup_worktrees(context):
+                cleanup_summary = self._cleanup_worktree_session(worktree_session)
+                if result_dict is not None:
+                    result_dict["worktree_cleanup"] = cleanup_summary
 
     def _plan_worktree_execution(
         self,
@@ -640,6 +673,41 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             logger.debug("Worktree planning failed; continuing without isolation: %s", exc)
             return None
 
+    @staticmethod
+    def _coerce_context_flag(
+        context: Dict[str, Any],
+        key: str,
+        *,
+        default: bool = False,
+    ) -> bool:
+        raw_value = context.get(key)
+        if raw_value is None:
+            return default
+        if isinstance(raw_value, bool):
+            return raw_value
+        return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
+
+    def _materialize_worktree_plan(
+        self,
+        worktree_plan: Optional[WorktreeExecutionPlan],
+        *,
+        context: Dict[str, Any],
+    ) -> Optional[WorktreeMaterializationSession]:
+        if worktree_plan is None:
+            return None
+        materialize = self._coerce_context_flag(context, "materialize_worktrees", default=False)
+        dry_run = self._coerce_context_flag(context, "dry_run_worktrees", default=False)
+        if not materialize and not dry_run:
+            return None
+        runtime = getattr(self._worktree_runtime, "materialize", None)
+        if not callable(runtime):
+            return None
+        try:
+            return runtime(worktree_plan, dry_run=dry_run)
+        except Exception as exc:
+            logger.debug("Worktree materialization failed; continuing with planned paths: %s", exc)
+            return None
+
     def _analyze_merge(
         self,
         member_results: Dict[str, MemberResult],
@@ -654,6 +722,71 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         except Exception as exc:
             logger.debug("Merge analysis failed; continuing without merge metadata: %s", exc)
             return None
+
+    def _inject_worktree_changed_files(
+        self,
+        member_results: Dict[str, MemberResult],
+        *,
+        worktree_session: Optional[WorktreeMaterializationSession],
+    ) -> None:
+        if worktree_session is None:
+            return
+        collector = getattr(self._worktree_runtime, "collect_changed_files", None)
+        if not callable(collector):
+            return
+        for member_id, result in list(member_results.items()):
+            metadata = dict(result.metadata or {})
+            if any(metadata.get(key) for key in ("changed_files", "files_touched", "modified_files")):
+                continue
+            try:
+                changed_files = list(collector(worktree_session, member_id))
+            except Exception as exc:
+                logger.debug("Failed to collect changed files for %s: %s", member_id, exc)
+                continue
+            if not changed_files:
+                continue
+            metadata["changed_files"] = changed_files
+            member_results[member_id] = MemberResult(
+                member_id=result.member_id,
+                success=result.success,
+                output=result.output,
+                error=result.error,
+                metadata=metadata,
+                tool_calls_used=result.tool_calls_used,
+                duration_seconds=result.duration_seconds,
+                discoveries=list(result.discoveries),
+            )
+
+    def _build_merge_orchestration(
+        self,
+        worktree_session: WorktreeMaterializationSession,
+        *,
+        merge_analysis: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        builder = getattr(self._worktree_runtime, "build_merge_orchestration", None)
+        if not callable(builder):
+            return None
+        try:
+            return builder(worktree_session, merge_analysis=merge_analysis)
+        except Exception as exc:
+            logger.debug("Merge orchestration build failed: %s", exc)
+            return None
+
+    def _should_cleanup_worktrees(self, context: Dict[str, Any]) -> bool:
+        return self._coerce_context_flag(context, "cleanup_worktrees", default=True)
+
+    def _cleanup_worktree_session(
+        self,
+        worktree_session: WorktreeMaterializationSession,
+    ) -> Dict[str, Any]:
+        cleaner = getattr(self._worktree_runtime, "cleanup", None)
+        if not callable(cleaner):
+            return {"removed": [], "skipped": [], "errors": []}
+        try:
+            return cleaner(worktree_session, force=True)
+        except Exception as exc:
+            logger.debug("Worktree cleanup failed: %s", exc)
+            return {"removed": [], "skipped": [], "errors": [str(exc)]}
 
     def _resolve_effective_formation(self, context: Dict[str, Any]) -> TeamFormation:
         """Resolve formation override hints without mutating the default formation."""
