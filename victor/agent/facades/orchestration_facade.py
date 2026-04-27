@@ -152,6 +152,35 @@ class OrchestrationFacade:
                 "Use only one of unified_chat_coordinator or deprecated_unified_chat_coordinator."
             )
 
+        if get_chat_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade(get_chat_coordinator=...) is deprecated. "
+                "Use deprecated_chat_coordinator=... or chat_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if get_sync_chat_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade(get_sync_chat_coordinator=...) is deprecated. "
+                "Use deprecated_sync_chat_coordinator=... or chat_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if get_streaming_chat_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade(get_streaming_chat_coordinator=...) is deprecated. "
+                "Use deprecated_streaming_chat_coordinator=... or chat_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if get_unified_chat_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade(get_unified_chat_coordinator=...) is deprecated. "
+                "Use deprecated_unified_chat_coordinator=... or chat_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         resolved_deprecated_chat_coordinator = deprecated_chat_coordinator
         if chat_coordinator is not None:
             warnings.warn(

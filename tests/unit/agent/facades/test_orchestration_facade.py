@@ -205,7 +205,11 @@ class TestOrchestrationFacadeProperties:
     def test_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """ChatCoordinator compatibility accessor resolves lazily when needed."""
         chat = MagicMock(name="chat")
-        facade = OrchestrationFacade(get_chat_coordinator=lambda: chat)
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade\\(get_chat_coordinator=...\\) is deprecated",
+        ):
+            facade = OrchestrationFacade(get_chat_coordinator=lambda: chat)
 
         with pytest.warns(
             DeprecationWarning,
@@ -358,7 +362,11 @@ class TestOrchestrationFacadeProperties:
     def test_sync_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """Sync chat coordinator compatibility accessor resolves lazily when needed."""
         sync = MagicMock(name="sync")
-        facade = OrchestrationFacade(get_sync_chat_coordinator=lambda: sync)
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade\\(get_sync_chat_coordinator=...\\) is deprecated",
+        ):
+            facade = OrchestrationFacade(get_sync_chat_coordinator=lambda: sync)
 
         with pytest.warns(
             DeprecationWarning,
@@ -385,7 +393,11 @@ class TestOrchestrationFacadeProperties:
     def test_streaming_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """Streaming chat coordinator compatibility accessor resolves lazily when needed."""
         streaming = MagicMock(name="streaming_chat")
-        facade = OrchestrationFacade(get_streaming_chat_coordinator=lambda: streaming)
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade\\(get_streaming_chat_coordinator=...\\) is deprecated",
+        ):
+            facade = OrchestrationFacade(get_streaming_chat_coordinator=lambda: streaming)
 
         with pytest.warns(
             DeprecationWarning,
@@ -412,7 +424,11 @@ class TestOrchestrationFacadeProperties:
     def test_unified_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """Unified chat coordinator compatibility accessor resolves lazily when needed."""
         unified = MagicMock(name="unified")
-        facade = OrchestrationFacade(get_unified_chat_coordinator=lambda: unified)
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade\\(get_unified_chat_coordinator=...\\) is deprecated",
+        ):
+            facade = OrchestrationFacade(get_unified_chat_coordinator=lambda: unified)
 
         with pytest.warns(
             DeprecationWarning,
