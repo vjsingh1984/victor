@@ -718,35 +718,6 @@ class StreamingChatPipeline:
                 if recovery_action.action in ("retry", "force_summary"):
                     continue
 
-            # Spin detection for ALL paths (via shared SpinDetector)
-            _pipeline_obj = getattr(orch, "_tool_pipeline", None)
-            if (
-                tool_calls
-                and _pipeline_obj
-                and getattr(
-                    _pipeline_obj,
-                    "last_batch_effectively_blocked",
-                    getattr(_pipeline_obj, "last_batch_all_skipped", False),
-                )
-            ):
-                _spin.record_turn(has_tool_calls=True, all_blocked=True)
-                logger.info(f"[spin-check] all_blocked=True state={_spin.state.value}")
-                _intent = getattr(orch, "_current_intent", None)
-                nudge = _nudge_policy.evaluate(_spin, intent=_intent)
-                if nudge.should_inject:
-                    orch.add_message(nudge.role, nudge.message)
-                if _spin.state == SpinState.TERMINATED:
-                    logger.warning(
-                        f"[spin-detect] {_spin.consecutive_all_blocked} consecutive "
-                        f"blocked tool calls. Breaking loop."
-                    )
-                    yield orch._chunk_generator.generate_content_chunk(
-                        "\n\n[Agent detected a tool-call loop — all attempts were "
-                        "blocked by deduplication. Try a different approach.]",
-                        is_final=True,
-                    )
-                    return
-
             if full_content:
                 visible_content = self._prepare_visible_content(full_content)
                 if visible_content:
@@ -835,36 +806,25 @@ class StreamingChatPipeline:
 
             content_length = len(full_content.strip())
 
-            # Spin detection via shared SpinDetector (consistent with batch path)
-            _all_tools_blocked = False
-            _pipeline_obj = getattr(orch, "_tool_pipeline", None)
-            if (
-                tool_calls
-                and _pipeline_obj
-                and getattr(
-                    _pipeline_obj,
-                    "last_batch_effectively_blocked",
-                    getattr(_pipeline_obj, "last_batch_all_skipped", False),
-                )
-            ):
-                _all_tools_blocked = True
-
+            # Blocked-tool recovery is handled in ToolExecutionHandler using the
+            # current iteration's filtered tool batch. The ToolPipeline blocked
+            # flags reflect the previous batch, so consulting them here would let
+            # stale state terminate the current iteration before execution.
             _has_tools = bool(tool_calls)
-            _no_progress = (not _has_tools and content_length < 120) or _all_tools_blocked
+            _no_progress = not _has_tools and content_length < 120
 
             # Record turn in shared detector
             tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
             _spin.record_turn(
                 has_tool_calls=_has_tools,
-                all_blocked=_all_tools_blocked,
                 tool_names=tool_names_set,
                 tool_count=len(tool_calls) if tool_calls else 0,
             )
 
             logger.info(
                 f"[spin-check] tool_calls={len(tool_calls) if tool_calls else 0} "
-                f"content_len={content_length} all_blocked={_all_tools_blocked} "
-                f"no_progress={_no_progress} state={_spin.state.value}"
+                f"content_len={content_length} no_progress={_no_progress} "
+                f"state={_spin.state.value}"
             )
 
             if _no_progress:

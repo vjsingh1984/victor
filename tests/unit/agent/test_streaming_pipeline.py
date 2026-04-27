@@ -101,6 +101,53 @@ async def test_pipeline_executes_tool_calls():
 
 
 @pytest.mark.asyncio
+async def test_pipeline_ignores_stale_blocked_state_before_current_tool_execution():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._provider_response = (
+        "",
+        [{"name": "read", "arguments": {"path": "victor/agent/streaming/pipeline.py"}}],
+        None,
+        False,
+    )
+    coordinator._orchestrator._tool_pipeline = SimpleNamespace(
+        last_batch_effectively_blocked=True,
+        last_batch_all_skipped=True,
+    )
+
+    class _TwoIterationToolHandler:
+        def __init__(self) -> None:
+            self.calls = []
+            self.updated_files = None
+
+        def update_observed_files(self, files):
+            self.updated_files = files
+
+        async def execute_tools(self, **kwargs):
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                return StubToolExecutionResult(
+                    chunks=[StreamChunk(content="blocked-once")],
+                    tool_calls_executed=0,
+                    should_return=False,
+                )
+            return StubToolExecutionResult(
+                chunks=[StreamChunk(content="recovered", is_final=True)],
+                tool_calls_executed=0,
+                should_return=True,
+            )
+
+    coordinator._tool_execution_handler = _TwoIterationToolHandler()
+    pipeline = StreamingChatPipeline(coordinator)
+
+    chunks = []
+    async for chunk in pipeline.run("retry the blocked read"):
+        chunks.append(chunk.content)
+
+    assert chunks == ["blocked-once", "recovered"]
+    assert len(coordinator._tool_execution_handler.calls) == 2
+
+
+@pytest.mark.asyncio
 async def test_pipeline_records_pending_grounding_feedback():
     coordinator = DummyCoordinator(limit_result=(False, None))
     coordinator._provider_response = ("analysis output " * 5, None, None, False)
