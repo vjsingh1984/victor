@@ -24,6 +24,7 @@ from victor.tools.filesystem import (
     read,
     write,
     ls,
+    reset_path_resolver,
     detect_file_type_by_magic,
     check_extension_magic_mismatch,
     FileCategory,
@@ -78,6 +79,28 @@ async def test_read_file_not_found():
     """Test reading non-existent file."""
     with pytest.raises(FileNotFoundError):
         await read(path="/nonexistent/path/file.txt")
+
+
+@pytest.mark.asyncio
+async def test_read_file_not_found_prefers_package_file_suggestions(tmp_path, monkeypatch):
+    """Missing module files should suggest package-backed source files first."""
+    package_dir = tmp_path / "victor" / "core" / "registry"
+    package_dir.mkdir(parents=True)
+    (package_dir / "__init__.py").write_text("# package")
+    (package_dir / "base.py").write_text("# base")
+    (tmp_path / "victor" / "core" / "registry_base.py").write_text("# legacy")
+    monkeypatch.chdir(tmp_path)
+    reset_path_resolver()
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        await read(path="victor/core/registry.py")
+
+    message = str(exc_info.value)
+    assert "victor/core/registry/base.py" in message
+    assert (
+        message.index("victor/core/registry/base.py")
+        < message.index("victor/core/registry_base.py")
+    )
 
 
 @pytest.mark.asyncio
