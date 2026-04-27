@@ -157,7 +157,9 @@ class StreamingChatPipeline:
 
         signals = getattr(state, "completion_signals", None)
         if isinstance(signals, set):
-            signals_to_keep = {signal for signal in signals if not str(signal).startswith("active:")}
+            signals_to_keep = {
+                signal for signal in signals if not str(signal).startswith("active:")
+            }
             state.completion_signals = signals_to_keep
 
     @staticmethod
@@ -660,7 +662,9 @@ class StreamingChatPipeline:
                                     sanitized_summary, []
                                 )
                                 orch._conversation_controller.inject_compaction_context()
-                                logger.info("VICTOR_SUMMARY persisted for next-turn context injection")
+                                logger.info(
+                                    "VICTOR_SUMMARY persisted for next-turn context injection"
+                                )
                             except Exception as _e:
                                 logger.debug(f"Failed to persist VICTOR_SUMMARY: {_e}")
                 elif confidence == CompletionConfidence.MEDIUM:

@@ -1043,7 +1043,9 @@ class AgenticLoop:
         default_tool_budget = getattr(task_classification, "tool_budget", None)
         tool_budget = state.get("tool_budget", default_tool_budget if default_tool_budget else 10)
         routing_context = dict(context or {})
-        routing_context.setdefault("iteration_budget", state.get("iteration_budget", self.max_iterations))
+        routing_context.setdefault(
+            "iteration_budget", state.get("iteration_budget", self.max_iterations)
+        )
         routing_context.setdefault("tool_budget", tool_budget)
         routing_context.setdefault("available_team_formations", self._default_team_formations())
 
@@ -1143,7 +1145,11 @@ class AgenticLoop:
         if complexity is None:
             return None
         complexity_value = getattr(complexity, "value", str(complexity)).lower()
-        if "action" in complexity_value or "complex" in complexity_value or "high" in complexity_value:
+        if (
+            "action" in complexity_value
+            or "complex" in complexity_value
+            or "high" in complexity_value
+        ):
             return 0.8
         if "medium" in complexity_value or "moderate" in complexity_value:
             return 0.5
@@ -1329,8 +1335,7 @@ class AgenticLoop:
                 state.get("enable_thinking")
                 or (
                     isinstance(runtime_context_overrides, dict)
-                    and runtime_context_overrides.get("execution_mode")
-                    == "escalated_single_agent"
+                    and runtime_context_overrides.get("execution_mode") == "escalated_single_agent"
                 )
             )
 
