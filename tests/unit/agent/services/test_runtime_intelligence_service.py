@@ -11,6 +11,12 @@ from victor.agent.services.runtime_intelligence import (
     PromptOptimizationBundle,
     RuntimeIntelligenceService,
 )
+from victor.evaluation.experiment_memory import (
+    ExperimentInsight,
+    ExperimentMemoryRecord,
+    ExperimentMemoryStore,
+    ExperimentScope,
+)
 from victor.evaluation.runtime_feedback import (
     RuntimeEvaluationFeedbackScope,
     build_validated_session_feedback_payload,
@@ -725,6 +731,76 @@ def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_
     assert hints["learned_override_policy_feasibility_delta"] == pytest.approx(0.5)
 
 
+def test_runtime_intelligence_exposes_experiment_memory_routing_hints(tmp_path):
+    store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+    store.record(
+        ExperimentMemoryRecord(
+            record_id="guide-memory-1",
+            created_at=10.0,
+            scope=ExperimentScope(
+                benchmark="guide",
+                provider="openai",
+                model="gpt-5",
+                prompt_candidate_hash="cand-123",
+                section_name="GROUNDING_RULES",
+            ),
+            summary_metrics={
+                "topology_learned_override_optimization_reward_delta": -0.3,
+            },
+            task_summaries=[],
+            insights=[
+                ExperimentInsight(
+                    kind="failed_hypothesis",
+                    summary="Learned close override underperformed heuristic routing for this scope.",
+                    confidence=0.9,
+                    evidence={"selection_policy": "learned_close_override"},
+                ),
+                ExperimentInsight(
+                    kind="environment_constraint",
+                    summary="Repeated hard constraint failure: tests_pass.",
+                    confidence=0.8,
+                    evidence={"gate_failure": "tests_pass", "count": 2},
+                ),
+                ExperimentInsight(
+                    kind="next_candidate",
+                    summary="Tighten learned override thresholds for this scope.",
+                    confidence=0.76,
+                ),
+            ],
+            keywords=["learned_close_override", "heuristic", "tests_pass", "guide"],
+        )
+    )
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        evaluation_feedback_scope=RuntimeEvaluationFeedbackScope(
+            provider="openai",
+            model="gpt-5",
+            task_type="edit",
+        ),
+    )
+
+    hints = service.get_topology_routing_context(
+        query="Fix the guide flow and verify tests pass",
+        scope_context={
+            "provider": "openai",
+            "model": "gpt-5",
+            "prompt_candidate_hash": "cand-123",
+            "section_name": "GROUNDING_RULES",
+        },
+    )
+
+    assert hints["experiment_memory_match_count"] == 1
+    assert hints["experiment_memory_support"] > 0.0
+    assert hints["experiment_memory_preferred_selection_policy"] == "heuristic"
+    assert hints["experiment_memory_selection_policy_bias"] < 0.0
+    assert hints["experiment_memory_constraint_tags"] == ["tests_pass"]
+    assert "Tighten learned override thresholds" in hints["experiment_memory_next_candidate_hints"][0]
+
+
 def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp_path):
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
@@ -905,6 +981,69 @@ async def test_analyze_turn_includes_topology_feedback_metadata(tmp_path):
     assert snapshot.metadata["topology_routing_hints"]["learned_topology_action"] == (
         "single_agent"
     )
+
+
+@pytest.mark.asyncio
+async def test_analyze_turn_includes_experiment_memory_hints(tmp_path):
+    store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+    store.record(
+        ExperimentMemoryRecord(
+            record_id="guide-memory-2",
+            created_at=20.0,
+            scope=ExperimentScope(
+                benchmark="guide",
+                provider="openai",
+                model="gpt-5",
+                prompt_candidate_hash="cand-789",
+                section_name="GROUNDING_RULES",
+            ),
+            summary_metrics={
+                "topology_learned_override_optimization_reward_delta": -0.22,
+            },
+            task_summaries=[],
+            insights=[
+                ExperimentInsight(
+                    kind="failed_hypothesis",
+                    summary="Learned close override underperformed heuristic routing for this scope.",
+                    confidence=0.88,
+                )
+            ],
+            keywords=["learned_close_override", "heuristic", "guide"],
+        )
+    )
+    perception = SimpleNamespace(task_analysis=MagicMock(task_type="edit"), confidence=0.81)
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=SimpleNamespace(
+            perceive=AsyncMock(return_value=perception),
+            evaluation_policy=RuntimeEvaluationPolicy(),
+            config={},
+        ),
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        evaluation_feedback_scope=RuntimeEvaluationFeedbackScope(
+            provider="openai",
+            model="gpt-5",
+            task_type="edit",
+        ),
+    )
+
+    snapshot = await service.analyze_turn(
+        "Fix the guide issue",
+        context={
+            "provider": "openai",
+            "model": "gpt-5",
+            "prompt_candidate_hash": "cand-789",
+            "section_name": "GROUNDING_RULES",
+        },
+    )
+
+    assert snapshot.metadata["experiment_memory_hints"]["experiment_memory_match_count"] == 1
+    assert snapshot.metadata["experiment_memory_hints"]["experiment_memory_preferred_selection_policy"] == (
+        "heuristic"
+    )
+    assert snapshot.metadata["topology_routing_hints"]["experiment_memory_selection_policy_bias"] < 0.0
 
 
 def test_from_container_merges_persisted_feedback_before_decision_service_feedback(tmp_path):

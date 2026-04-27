@@ -18,10 +18,12 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.agent.optimization_injector import OptimizationInjector
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
+from victor.evaluation.experiment_memory import ExperimentMemoryStore
 from victor.evaluation.topology_feedback import (
     aggregate_topology_feedback,
     summarize_topology_feedback,
@@ -605,6 +607,7 @@ class RuntimeIntelligenceService:
         evaluation_policy: Optional[RuntimeEvaluationPolicy] = None,
         evaluation_feedback_path: Optional[Any] = None,
         evaluation_feedback_scope: Optional[Any] = None,
+        experiment_memory_path: Optional[Any] = None,
     ) -> None:
         derived_policy = evaluation_policy
         if derived_policy is None and perception_integration is not None:
@@ -642,6 +645,13 @@ class RuntimeIntelligenceService:
             getattr(persisted_feedback, "metadata", None),
             getattr(decision_feedback, "metadata", None),
         )
+        self._experiment_memory_path = self._resolve_experiment_memory_path(
+            explicit_path=experiment_memory_path,
+            evaluation_feedback_path=evaluation_feedback_path,
+        )
+        self._experiment_memory_store = self._load_experiment_memory_store(
+            self._experiment_memory_path
+        )
         self._persisted_topology_routing_feedback = self._extract_topology_routing_feedback(
             self._runtime_feedback_metadata
         )
@@ -671,6 +681,7 @@ class RuntimeIntelligenceService:
         optimization_injector: Optional[OptimizationInjector] = None,
         evaluation_feedback_path: Optional[Any] = None,
         evaluation_feedback_scope: Optional[Any] = None,
+        experiment_memory_path: Optional[Any] = None,
     ) -> "RuntimeIntelligenceService":
         """Create a service instance by resolving the decision service from an orchestrator."""
         container = getattr(orchestrator, "_container", None)
@@ -681,6 +692,7 @@ class RuntimeIntelligenceService:
                 optimization_injector=optimization_injector,
                 evaluation_feedback_path=evaluation_feedback_path,
                 evaluation_feedback_scope=evaluation_feedback_scope,
+                experiment_memory_path=experiment_memory_path,
             )
 
         return cls.from_container(
@@ -690,6 +702,7 @@ class RuntimeIntelligenceService:
             optimization_injector=optimization_injector,
             evaluation_feedback_path=evaluation_feedback_path,
             evaluation_feedback_scope=evaluation_feedback_scope,
+            experiment_memory_path=experiment_memory_path,
         )
 
     @classmethod
@@ -702,6 +715,7 @@ class RuntimeIntelligenceService:
         optimization_injector: Optional[OptimizationInjector] = None,
         evaluation_feedback_path: Optional[Any] = None,
         evaluation_feedback_scope: Optional[Any] = None,
+        experiment_memory_path: Optional[Any] = None,
     ) -> "RuntimeIntelligenceService":
         """Create a service instance by resolving the decision service from a container."""
         decision_service = cls._resolve_decision_service(container)
@@ -712,6 +726,7 @@ class RuntimeIntelligenceService:
             decision_service=decision_service,
             evaluation_feedback_path=evaluation_feedback_path,
             evaluation_feedback_scope=evaluation_feedback_scope,
+            experiment_memory_path=experiment_memory_path,
         )
 
     @staticmethod
@@ -768,6 +783,37 @@ class RuntimeIntelligenceService:
             return load_runtime_evaluation_feedback(path, scope=scope)
         except Exception as exc:
             logger.debug("Runtime intelligence could not load persisted feedback: %s", exc)
+            return None
+
+    @staticmethod
+    def _resolve_experiment_memory_path(
+        *,
+        explicit_path: Optional[Any],
+        evaluation_feedback_path: Optional[Any],
+    ) -> Optional[Path]:
+        """Resolve the experiment-memory artifact path next to runtime feedback by default."""
+        candidate = explicit_path if explicit_path is not None else evaluation_feedback_path
+        if candidate is None:
+            return None
+        try:
+            path = Path(candidate)
+        except TypeError:
+            return None
+        if explicit_path is not None:
+            return path
+        if path.suffix:
+            return path.parent / "experiment_memory.json"
+        return path / "experiment_memory.json"
+
+    @staticmethod
+    def _load_experiment_memory_store(path: Optional[Path]) -> Optional[ExperimentMemoryStore]:
+        """Load the persisted experiment-memory store when available."""
+        if path is None:
+            return None
+        try:
+            return ExperimentMemoryStore(persist_path=path)
+        except Exception as exc:
+            logger.debug("Runtime intelligence could not load experiment memory: %s", exc)
             return None
 
     @staticmethod
@@ -1301,19 +1347,31 @@ class RuntimeIntelligenceService:
         min_coverage: float = 0.2,
         min_reward: float = 0.45,
         min_observations: int = 2,
+        query: Optional[str] = None,
         scope_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Return soft topology-routing hints extracted from validated feedback."""
-        feedback = self.get_topology_routing_feedback()
-        if feedback is None:
-            return {}
+        """Return soft topology-routing hints from validated feedback and experiment memory."""
         resolved_scope_context = self._resolve_routing_scope_context(scope_context)
-        return feedback.to_routing_context(
-            min_coverage=min_coverage,
-            min_reward=min_reward,
-            min_observations=min_observations,
+        routing_context: Dict[str, Any] = {}
+
+        feedback = self.get_topology_routing_feedback()
+        if feedback is not None:
+            routing_context.update(
+                feedback.to_routing_context(
+                    min_coverage=min_coverage,
+                    min_reward=min_reward,
+                    min_observations=min_observations,
+                    scope_context=resolved_scope_context,
+                )
+            )
+
+        experiment_hints = self.get_experiment_routing_context(
+            query=query,
             scope_context=resolved_scope_context,
         )
+        if experiment_hints:
+            routing_context.update(experiment_hints)
+        return routing_context
 
     def _resolve_routing_scope_context(
         self,
@@ -1321,6 +1379,8 @@ class RuntimeIntelligenceService:
     ) -> Dict[str, Any]:
         """Merge runtime routing scope hints with the persisted feedback scope defaults."""
         resolved_context = dict(scope_context or {})
+        if "provider" not in resolved_context and resolved_context.get("provider_hint"):
+            resolved_context["provider"] = resolved_context.get("provider_hint")
         if self._evaluation_feedback_scope.task_type and "task_type" not in resolved_context:
             resolved_context["task_type"] = self._evaluation_feedback_scope.task_type
         if self._evaluation_feedback_scope.provider and "provider" not in resolved_context:
@@ -1328,6 +1388,138 @@ class RuntimeIntelligenceService:
         if self._evaluation_feedback_scope.model and "model" not in resolved_context:
             resolved_context["model"] = self._evaluation_feedback_scope.model
         return resolved_context
+
+    @staticmethod
+    def _coerce_optional_float(value: Any) -> Optional[float]:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _coerce_optional_text(value: Any) -> Optional[str]:
+        text = str(value).strip() if value is not None else ""
+        return text or None
+
+    def _resolve_experiment_scope_filters(
+        self,
+        scope_context: Optional[Dict[str, Any]],
+    ) -> Dict[str, Optional[str]]:
+        """Resolve query filters for experiment-memory retrieval."""
+        resolved_context = self._resolve_routing_scope_context(scope_context)
+        benchmark = self._coerce_optional_text(
+            resolved_context.get("benchmark") or self._runtime_feedback_metadata.get("benchmark")
+        )
+        provider = self._coerce_optional_text(
+            resolved_context.get("provider") or resolved_context.get("provider_hint")
+        )
+        model = self._coerce_optional_text(
+            resolved_context.get("model") or resolved_context.get("model_name")
+        )
+        prompt_candidate_hash = self._coerce_optional_text(
+            resolved_context.get("prompt_candidate_hash")
+        )
+        section_name = self._coerce_optional_text(
+            resolved_context.get("section_name") or resolved_context.get("prompt_section_name")
+        )
+        return {
+            "benchmark": benchmark,
+            "provider": provider,
+            "model": model,
+            "prompt_candidate_hash": prompt_candidate_hash,
+            "section_name": section_name,
+        }
+
+    def get_experiment_routing_context(
+        self,
+        *,
+        query: Optional[str] = None,
+        scope_context: Optional[Dict[str, Any]] = None,
+        limit: int = 3,
+    ) -> Dict[str, Any]:
+        """Return soft routing hints distilled from reusable experiment-memory records."""
+        store = self._experiment_memory_store
+        if store is None or len(store) == 0 or limit <= 0:
+            return {}
+
+        scope_filters = self._resolve_experiment_scope_filters(scope_context)
+        records = store.search(
+            query or "",
+            benchmark=scope_filters["benchmark"],
+            provider=scope_filters["provider"],
+            model=scope_filters["model"],
+            prompt_candidate_hash=scope_filters["prompt_candidate_hash"],
+            section_name=scope_filters["section_name"],
+            limit=limit,
+        )
+        if not records and query:
+            records = store.search(
+                query,
+                provider=scope_filters["provider"],
+                model=scope_filters["model"],
+                limit=limit,
+            )
+        if not records:
+            return {}
+
+        bias_total = 0.0
+        bias_weight = 0.0
+        constraint_tags: set[str] = set()
+        next_candidate_hints: list[str] = []
+        record_ids: list[str] = []
+        for record in records:
+            record_ids.append(record.record_id)
+            summary_delta = self._coerce_optional_float(
+                record.summary_metrics.get("topology_learned_override_optimization_reward_delta")
+            )
+            if summary_delta is not None:
+                normalized_delta = max(-1.0, min(1.0, summary_delta / 0.25))
+                weight = min(1.0, max(0.25, abs(normalized_delta)))
+                bias_total += normalized_delta * weight
+                bias_weight += weight
+
+            for insight in record.insights:
+                summary_text = insight.summary.lower()
+                confidence = max(0.0, min(float(insight.confidence), 1.0))
+                if insight.kind == "failed_hypothesis":
+                    if "learned close override" in summary_text and "heuristic" in summary_text:
+                        bias_total -= max(0.25, confidence)
+                        bias_weight += max(0.25, confidence)
+                elif insight.kind == "successful_transformation":
+                    if "learned close override" in summary_text and "heuristic" in summary_text:
+                        bias_total += max(0.25, confidence)
+                        bias_weight += max(0.25, confidence)
+                elif insight.kind == "environment_constraint":
+                    gate_failure = self._coerce_optional_text(
+                        insight.evidence.get("gate_failure")
+                        or insight.evidence.get("failure_category")
+                    )
+                    if gate_failure:
+                        constraint_tags.add(gate_failure)
+                elif insight.kind == "next_candidate":
+                    if insight.summary and insight.summary not in next_candidate_hints:
+                        next_candidate_hints.append(insight.summary)
+
+        if bias_weight <= 0.0:
+            bias = 0.0
+        else:
+            bias = round(max(-1.0, min(1.0, bias_total / bias_weight)), 4)
+
+        preferred_selection_policy = None
+        if bias <= -0.1:
+            preferred_selection_policy = "heuristic"
+        elif bias >= 0.1:
+            preferred_selection_policy = "learned_close_override"
+
+        return {
+            "experiment_memory_match_count": len(records),
+            "experiment_memory_support": round(min(1.0, len(records) / max(1.0, float(limit))), 4),
+            "experiment_memory_selection_policy_bias": bias,
+            "experiment_memory_preferred_selection_policy": preferred_selection_policy,
+            "experiment_memory_constraint_tags": sorted(constraint_tags),
+            "experiment_memory_next_candidate_hints": next_candidate_hints[:2],
+            "experiment_memory_record_ids": record_ids[:3],
+        }
 
     def _build_persistable_session_topology_feedback(self) -> Optional[RuntimeEvaluationFeedback]:
         """Build the scoped live-topology feedback payload for persistence."""
@@ -1488,9 +1680,22 @@ class RuntimeIntelligenceService:
         topology_feedback = self.get_topology_routing_feedback()
         if topology_feedback is not None:
             metadata["topology_feedback"] = topology_feedback.to_metadata()
-            routing_hints = topology_feedback.to_routing_context()
-            if routing_hints:
-                metadata["topology_routing_hints"] = routing_hints
+        routing_scope_context = dict(context or {})
+        if task_analysis is not None and "task_type" not in routing_scope_context:
+            routing_scope_context["task_type"] = getattr(task_analysis, "task_type", None)
+        routing_hints = self.get_topology_routing_context(
+            query=query,
+            scope_context=routing_scope_context,
+        )
+        if routing_hints:
+            metadata["topology_routing_hints"] = routing_hints
+            experiment_memory_hints = {
+                key: value
+                for key, value in routing_hints.items()
+                if str(key).startswith("experiment_memory_")
+            }
+            if experiment_memory_hints:
+                metadata["experiment_memory_hints"] = experiment_memory_hints
 
         return RuntimeIntelligenceSnapshot(
             query=query,

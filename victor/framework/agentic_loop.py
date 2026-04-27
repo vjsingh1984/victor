@@ -1096,6 +1096,7 @@ class AgenticLoop:
             learned_scope_context.setdefault("task_type", task_type)
             try:
                 learned_topology_context = self.runtime_intelligence.get_topology_routing_context(
+                    query=query,
                     scope_context=learned_scope_context
                 )
             except Exception as exc:

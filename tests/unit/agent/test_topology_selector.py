@@ -558,3 +558,45 @@ class TestTopologySelector:
             "adaptive_disabled_feasibility"
         )
         assert decision.grounding_requirements.metadata["learned_override_disabled"] is True
+
+    def test_negative_experiment_memory_bias_disables_learned_close_override(self):
+        """Experiment-memory evidence should suppress learned overrides before live policy data exists."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="investigate an intermittent issue",
+                task_type="analysis",
+                task_complexity="medium",
+                confidence_hint=0.52,
+                tool_budget=6,
+                expected_depth="medium",
+                expected_breadth="low",
+                observability_level="medium",
+                latency_sensitivity="medium",
+                prior_failures=1,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                    "experiment_memory_match_count": 2,
+                    "experiment_memory_support": 0.7,
+                    "experiment_memory_selection_policy_bias": -0.8,
+                    "experiment_memory_preferred_selection_policy": "heuristic",
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.SINGLE_AGENT
+        assert decision.telemetry_tags["selection_policy"] == "heuristic"
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == (
+            "experiment_memory_disabled_negative"
+        )
+        assert decision.grounding_requirements.metadata["learned_override_disabled"] is True
+        assert decision.grounding_requirements.metadata["experiment_memory_selection_policy_bias"] == (
+            -0.8
+        )

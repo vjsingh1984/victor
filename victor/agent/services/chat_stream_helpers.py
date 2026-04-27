@@ -333,6 +333,7 @@ class ChatStreamHelperMixin:
             learned_scope_context.setdefault("task_type", task_type)
             try:
                 learned_topology_context = runtime_intelligence.get_topology_routing_context(
+                    query=user_message,
                     scope_context=learned_scope_context
                 )
             except Exception as exc:

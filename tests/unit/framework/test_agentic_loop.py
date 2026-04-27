@@ -324,6 +324,9 @@ class TestAgenticLoop:
         learned_scope_context = loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs[
             "scope_context"
         ]
+        assert loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs["query"] == (
+            "Fix the bug"
+        )
         assert learned_scope_context["task_type"] == "code_generation"
         assert "provider_hint" not in learned_scope_context
         loop.runtime_intelligence.record_topology_outcome.assert_called_once()

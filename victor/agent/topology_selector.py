@@ -52,6 +52,8 @@ class TopologySelectorConfig:
     learned_override_support_tuning_gain: float = 0.2
     learned_override_agreement_tuning_gain: float = 0.2
     learned_override_conflict_tuning_gain: float = 0.2
+    experiment_memory_disable_bias_threshold: float = -0.75
+    experiment_memory_bias_tuning_gain: float = 0.25
     min_parallel_workers: int = 2
     max_parallel_workers: int = 4
 
@@ -68,6 +70,9 @@ class LearnedOverrideThresholds:
     optimization_reward_delta: Optional[float] = None
     feasibility_delta: Optional[float] = None
     reward_evidence: int = 0
+    experiment_memory_bias: Optional[float] = None
+    experiment_memory_match_count: int = 0
+    experiment_memory_preferred_policy: Optional[str] = None
     profile: str = "static"
     disabled: bool = False
 
@@ -599,6 +604,15 @@ class TopologySelector:
         feasibility_delta = self._coerce_optional_float(
             context.get("learned_override_policy_feasibility_delta")
         )
+        experiment_memory_bias = self._coerce_optional_float(
+            context.get("experiment_memory_selection_policy_bias")
+        )
+        experiment_memory_match_count = self._coerce_non_negative_int(
+            context.get("experiment_memory_match_count")
+        )
+        experiment_memory_preferred_policy = self._optional_text(
+            context.get("experiment_memory_preferred_selection_policy")
+        )
         reward_evidence = min(
             self._coerce_non_negative_int(context.get("learned_override_policy_count")),
             self._coerce_non_negative_int(context.get("heuristic_policy_count")),
@@ -612,14 +626,42 @@ class TopologySelector:
             optimization_reward_delta=optimization_reward_delta,
             feasibility_delta=feasibility_delta,
             reward_evidence=reward_evidence,
+            experiment_memory_bias=experiment_memory_bias,
+            experiment_memory_match_count=experiment_memory_match_count,
+            experiment_memory_preferred_policy=experiment_memory_preferred_policy,
         )
         effective_reward_delta = (
             optimization_reward_delta if optimization_reward_delta is not None else reward_delta
         )
         if (
-            effective_reward_delta is None
-            and feasibility_delta is None
-        ) or reward_evidence < self.config.learned_override_min_policy_count:
+            experiment_memory_match_count > 0
+            and experiment_memory_bias is not None
+            and experiment_memory_bias <= self.config.experiment_memory_disable_bias_threshold
+        ):
+            return LearnedOverrideThresholds(
+                score_gap=thresholds.score_gap,
+                min_support=thresholds.min_support,
+                min_agreement=thresholds.min_agreement,
+                max_conflict=thresholds.max_conflict,
+                reward_delta=reward_delta,
+                optimization_reward_delta=optimization_reward_delta,
+                feasibility_delta=feasibility_delta,
+                reward_evidence=reward_evidence,
+                experiment_memory_bias=experiment_memory_bias,
+                experiment_memory_match_count=experiment_memory_match_count,
+                experiment_memory_preferred_policy=experiment_memory_preferred_policy,
+                profile="experiment_memory_disabled_negative",
+                disabled=True,
+            )
+        has_live_policy_signal = not (
+            (
+                effective_reward_delta is None
+                and feasibility_delta is None
+            ) or reward_evidence < self.config.learned_override_min_policy_count
+        )
+        if not has_live_policy_signal and (
+            experiment_memory_match_count <= 0 or experiment_memory_bias is None
+        ):
             return thresholds
         if (
             feasibility_delta is not None
@@ -634,6 +676,9 @@ class TopologySelector:
                 optimization_reward_delta=optimization_reward_delta,
                 feasibility_delta=feasibility_delta,
                 reward_evidence=reward_evidence,
+                experiment_memory_bias=experiment_memory_bias,
+                experiment_memory_match_count=experiment_memory_match_count,
+                experiment_memory_preferred_policy=experiment_memory_preferred_policy,
                 profile="adaptive_disabled_feasibility",
                 disabled=True,
             )
@@ -650,6 +695,9 @@ class TopologySelector:
                 optimization_reward_delta=optimization_reward_delta,
                 feasibility_delta=feasibility_delta,
                 reward_evidence=reward_evidence,
+                experiment_memory_bias=experiment_memory_bias,
+                experiment_memory_match_count=experiment_memory_match_count,
+                experiment_memory_preferred_policy=experiment_memory_preferred_policy,
                 profile="adaptive_disabled_negative",
                 disabled=True,
             )
@@ -660,11 +708,37 @@ class TopologySelector:
                 tuning_signal = feasibility_delta
             else:
                 tuning_signal = (effective_reward_delta * 0.7) + (feasibility_delta * 0.3)
+        if experiment_memory_match_count > 0 and experiment_memory_bias is not None:
+            experiment_memory_signal = self._clamp_float(
+                experiment_memory_bias * self.config.experiment_memory_bias_tuning_gain,
+                -self.config.learned_override_reward_delta_cap,
+                self.config.learned_override_reward_delta_cap,
+            )
+            if has_live_policy_signal:
+                tuning_signal = (tuning_signal * 0.75) + (experiment_memory_signal * 0.25)
+            else:
+                tuning_signal = experiment_memory_signal
         bounded_delta = self._clamp_float(
             tuning_signal,
             -self.config.learned_override_reward_delta_cap,
             self.config.learned_override_reward_delta_cap,
         )
+        if not has_live_policy_signal and experiment_memory_match_count > 0:
+            profile = (
+                "experiment_memory_positive"
+                if bounded_delta > 0.0
+                else "experiment_memory_negative"
+                if bounded_delta < 0.0
+                else "experiment_memory_neutral"
+            )
+        else:
+            profile = (
+                "adaptive_positive"
+                if bounded_delta > 0.0
+                else "adaptive_negative"
+                if bounded_delta < 0.0
+                else "adaptive_neutral"
+            )
         return LearnedOverrideThresholds(
             score_gap=self._clamp_float(
                 self.config.learned_override_score_gap
@@ -694,13 +768,10 @@ class TopologySelector:
             optimization_reward_delta=optimization_reward_delta,
             feasibility_delta=feasibility_delta,
             reward_evidence=reward_evidence,
-            profile=(
-                "adaptive_positive"
-                if bounded_delta > 0.0
-                else "adaptive_negative"
-                if bounded_delta < 0.0
-                else "adaptive_neutral"
-            ),
+            experiment_memory_bias=experiment_memory_bias,
+            experiment_memory_match_count=experiment_memory_match_count,
+            experiment_memory_preferred_policy=experiment_memory_preferred_policy,
+            profile=profile,
         )
 
     def _threshold_metadata(
@@ -733,6 +804,17 @@ class TopologySelector:
             )
         if thresholds.reward_evidence > 0:
             metadata["learned_override_policy_evidence"] = thresholds.reward_evidence
+        if thresholds.experiment_memory_bias is not None:
+            metadata["experiment_memory_selection_policy_bias"] = round(
+                thresholds.experiment_memory_bias,
+                4,
+            )
+        if thresholds.experiment_memory_match_count > 0:
+            metadata["experiment_memory_match_count"] = thresholds.experiment_memory_match_count
+        if thresholds.experiment_memory_preferred_policy is not None:
+            metadata["experiment_memory_preferred_selection_policy"] = (
+                thresholds.experiment_memory_preferred_policy
+            )
         return metadata
 
     def _feedback_support(self, context: Dict[str, object]) -> float:
@@ -878,6 +960,9 @@ class TopologySelector:
             "learned_override_policy_optimization_reward_delta",
             "learned_override_policy_feasibility_delta",
             "learned_override_policy_evidence",
+            "experiment_memory_selection_policy_bias",
+            "experiment_memory_match_count",
+            "experiment_memory_preferred_selection_policy",
             "learned_override_disabled",
         ):
             if key in policy_metadata:
