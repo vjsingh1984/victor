@@ -487,6 +487,46 @@ async def test_code_search_semantic_mode_adds_graph_follow_up_for_entrypoint(
 
 
 @pytest.mark.asyncio
+async def test_code_search_semantic_follow_up_prefers_qualified_symbol_name(tmp_path) -> None:
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/agent.py",
+                    "content": "class Agent:\n    def run(self): ...\n",
+                    "score": 0.84,
+                    "symbol_type": "method",
+                    "symbol_name": "run",
+                    "metadata": {
+                        "qualified_name": "Agent.run",
+                        "symbol_name": "run",
+                        "symbol_type": "method",
+                    },
+                }
+            ]
+        )
+    )
+    exec_ctx = {"settings": _settings()}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ):
+        result = await code_search(
+            query="where does the agent run method live",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    follow_ups = result["metadata"]["follow_up_suggestions"]
+    assert result["success"] is True
+    assert result["results"][0]["qualified_name"] == "Agent.run"
+    assert follow_ups[0]["arguments"]["node"] == "Agent.run"
+    assert any(item["arguments"]["node"] == "Agent.run" for item in follow_ups)
+
+
+@pytest.mark.asyncio
 async def test_code_search_filename_mode_uses_literal_filename_search(tmp_path) -> None:
     """Explicit filename mode should bypass semantic indexing."""
     literal_result = {
@@ -731,6 +771,50 @@ async def test_code_search_semantic_symbol_filter_post_filters_backend_results(t
     assert result["mode"] == "semantic"
     assert result["count"] == 1
     assert result["results"][0]["symbol_name"] == "parse_json"
+
+
+@pytest.mark.asyncio
+async def test_code_search_semantic_symbol_filter_matches_qualified_name_metadata(tmp_path) -> None:
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.py",
+                    "content": "class Parser:\n    def parse_json(self, data): return data\n",
+                    "score": 0.74,
+                    "symbol_type": "method",
+                    "metadata": {
+                        "qualified_name": "Parser.parse_json",
+                        "symbol_type": "method",
+                    },
+                }
+            ]
+        )
+    )
+    filters = SearchFilters(symbol="parse_json")
+
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(return_value=(mock_index, False)),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(),
+        ) as literal_search,
+    ):
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=3,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_not_awaited()
+    assert result["mode"] == "semantic"
+    assert result["count"] == 1
+    assert result["results"][0]["qualified_name"] == "Parser.parse_json"
 
 
 @pytest.mark.asyncio

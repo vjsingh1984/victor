@@ -909,8 +909,10 @@ def _result_matches_symbol_filter(result: Any, symbol: str) -> bool:
     metadata = result_dict.get("metadata")
     metadata_dict = metadata if isinstance(metadata, dict) else {}
     candidate_names = (
+        result_dict.get("qualified_name"),
         result_dict.get("symbol_name"),
         result_dict.get("name"),
+        metadata_dict.get("qualified_name"),
         metadata_dict.get("symbol_name"),
         metadata_dict.get("name"),
     )
@@ -920,6 +922,10 @@ def _result_matches_symbol_filter(result: Any, symbol: str) -> bool:
         normalized_candidate = candidate.strip()
         if normalized_candidate == target_symbol or normalized_candidate.endswith(
             f".{target_symbol}"
+        ) or normalized_candidate.endswith(f":{target_symbol}"):
+            return True
+        if ("." in target_symbol or ":" in target_symbol) and normalized_candidate.endswith(
+            target_symbol
         ):
             return True
 
@@ -1487,6 +1493,10 @@ def _prepare_ranked_results(
         metadata = result_dict.get("metadata")
         if isinstance(metadata, dict):
             result_dict["metadata"] = _sanitize_search_metadata(metadata)
+            if not result_dict.get("qualified_name"):
+                qualified_name = metadata.get("qualified_name")
+                if isinstance(qualified_name, str) and qualified_name.strip():
+                    result_dict["qualified_name"] = qualified_name.strip()
 
         content = result_dict.get("content", "")
         if isinstance(content, str) and len(content) > max_content_chars:
@@ -1527,7 +1537,9 @@ def _extract_graph_follow_up_symbol(result: Dict[str, Any]) -> Optional[Dict[str
         or metadata_dict.get("type")
     )
     symbol_name = (
-        result.get("name")
+        result.get("qualified_name")
+        or metadata_dict.get("qualified_name")
+        or result.get("name")
         or result.get("symbol_name")
         or metadata_dict.get("name")
         or metadata_dict.get("symbol_name")

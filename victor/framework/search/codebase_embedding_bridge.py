@@ -587,6 +587,7 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
                         "metadata": {
                             "file_path": file_path,
                             "symbol_name": symbol_name,
+                            "qualified_name": symbol_name,
                             "symbol_type": chunk.chunk_type,
                             "line_number": chunk.start_line,
                             "end_line": chunk.end_line,

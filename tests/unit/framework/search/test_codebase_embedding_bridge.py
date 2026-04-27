@@ -298,6 +298,10 @@ async def test_structural_bridge_indexes_grounded_file_chunks(tmp_path, monkeypa
     assert all(
         "function parse_json" not in doc["content"] for doc in fake_provider.indexed_documents
     )
+    assert any(
+        doc["metadata"].get("qualified_name") == "parse_json"
+        for doc in fake_provider.indexed_documents
+    )
     assert any(result.metadata["chunking_strategy"] == "symbol_span" for result in results)
     assert any(result.metadata["file_path"] == "src/parser.py" for result in results)
 
