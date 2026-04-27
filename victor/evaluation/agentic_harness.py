@@ -56,6 +56,11 @@ from victor.evaluation.test_runners import (
 logger = logging.getLogger(__name__)
 
 
+def _clamp(value: float, lower: float, upper: float) -> float:
+    """Bound a numeric score into a closed interval."""
+    return max(lower, min(upper, value))
+
+
 class AgenticValidationType(Enum):
     """Types of validation for agentic tasks."""
 
@@ -282,6 +287,122 @@ class AgenticTaskResult:
         )
         return self.overall_score
 
+    def evaluate_generative_optimization(
+        self,
+        *,
+        gate: Optional["GenerativeOptimizationFeasibilityGate"] = None,
+        weights: Optional["GenerativeOptimizationWeights"] = None,
+    ) -> "GenerativeOptimizationAssessment":
+        """Evaluate the task using a continuous reward plus feasibility gate."""
+        resolved_gate = gate or GenerativeOptimizationFeasibilityGate()
+        resolved_weights = weights or GenerativeOptimizationWeights()
+        topology_summary = summarize_topology_feedback(self)
+        topology_reward = self.overall_score
+        if topology_summary is not None:
+            topology_reward = float(topology_summary.get("topology_reward", self.overall_score) or 0.0)
+        reward_components = {
+            "overall_score": round(self.overall_score, 4),
+            "completion_precision": round(self.completion_precision, 4),
+            "topology_reward": round(topology_reward, 4),
+        }
+        reward = _clamp(
+            (reward_components["overall_score"] * resolved_weights.overall_score)
+            + (reward_components["completion_precision"] * resolved_weights.completion_precision)
+            + (reward_components["topology_reward"] * resolved_weights.topology_reward),
+            0.0,
+            1.0,
+        )
+
+        feasibility_failures: list[str] = []
+        if self.status == TaskStatus.TIMEOUT:
+            feasibility_failures.append("timeout")
+        elif self.status == TaskStatus.ERROR:
+            feasibility_failures.append("execution_error")
+
+        patch_validation = self.trace.validations.get(AgenticValidationType.PATCH_APPLIES.value)
+        if resolved_gate.require_patch_application and patch_validation is False:
+            feasibility_failures.append(AgenticValidationType.PATCH_APPLIES.value)
+
+        test_validation = self.trace.validations.get(AgenticValidationType.TESTS_PASS.value)
+        if resolved_gate.require_tests_pass and test_validation is False:
+            feasibility_failures.append(AgenticValidationType.TESTS_PASS.value)
+
+        if self.unsupported_claim_rate > resolved_gate.max_unsupported_claim_rate:
+            feasibility_failures.append("unsupported_claim_rate")
+
+        if self.completion_precision < resolved_gate.min_completion_precision:
+            feasibility_failures.append("completion_precision")
+
+        if (
+            resolved_gate.require_task_complete_validation
+            and self.trace.validations.get(AgenticValidationType.TASK_COMPLETE.value) is False
+        ):
+            feasibility_failures.append(AgenticValidationType.TASK_COMPLETE.value)
+
+        return GenerativeOptimizationAssessment(
+            feasible=not feasibility_failures,
+            reward=round(reward, 4),
+            reward_components=reward_components,
+            feasibility_failures=feasibility_failures,
+            gate=resolved_gate,
+            topology_summary=topology_summary,
+        )
+
+
+@dataclass(frozen=True)
+class GenerativeOptimizationWeights:
+    """Reward weights for PR2-style continuous optimization scoring."""
+
+    overall_score: float = 0.7
+    completion_precision: float = 0.15
+    topology_reward: float = 0.15
+
+
+@dataclass(frozen=True)
+class GenerativeOptimizationFeasibilityGate:
+    """Hard constraints for PR2-style optimization benchmarks."""
+
+    require_patch_application: bool = True
+    require_tests_pass: bool = True
+    require_task_complete_validation: bool = False
+    max_unsupported_claim_rate: float = 0.25
+    min_completion_precision: float = 0.0
+
+
+@dataclass(frozen=True)
+class GenerativeOptimizationAssessment:
+    """Structured task-level reward and feasibility signal."""
+
+    feasible: bool
+    reward: float
+    reward_components: dict[str, float] = field(default_factory=dict)
+    feasibility_failures: list[str] = field(default_factory=list)
+    gate: GenerativeOptimizationFeasibilityGate = field(
+        default_factory=GenerativeOptimizationFeasibilityGate
+    )
+    topology_summary: Optional[dict[str, Any]] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize assessment data for benchmark artifacts."""
+        return {
+            "feasible": self.feasible,
+            "reward": round(self.reward, 4),
+            "reward_components": dict(self.reward_components),
+            "feasibility_failures": list(self.feasibility_failures),
+            "gate": {
+                "require_patch_application": self.gate.require_patch_application,
+                "require_tests_pass": self.gate.require_tests_pass,
+                "require_task_complete_validation": self.gate.require_task_complete_validation,
+                "max_unsupported_claim_rate": round(self.gate.max_unsupported_claim_rate, 4),
+                "min_completion_precision": round(self.gate.min_completion_precision, 4),
+            },
+            "topology_reward": (
+                round(float(self.topology_summary.get("topology_reward", 0.0) or 0.0), 4)
+                if self.topology_summary is not None
+                else None
+            ),
+        }
+
 
 @dataclass
 class AgenticMetrics:
@@ -374,9 +495,34 @@ class AgenticMetrics:
             counts[key] = counts.get(key, 0) + 1
         return counts
 
+    @property
+    def optimization_assessments(self) -> list[GenerativeOptimizationAssessment]:
+        """Task-level PR2 optimization assessments."""
+        return [result.evaluate_generative_optimization() for result in self.task_results]
+
     def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
         topology_metrics = aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks)
+        optimization_assessments = self.optimization_assessments
+        feasible_tasks = sum(1 for assessment in optimization_assessments if assessment.feasible)
+        infeasible_tasks = max(0, len(optimization_assessments) - feasible_tasks)
+        avg_optimization_reward = (
+            sum(assessment.reward for assessment in optimization_assessments)
+            / len(optimization_assessments)
+            if optimization_assessments
+            else 0.0
+        )
+        feasible_rewards = [
+            assessment.reward for assessment in optimization_assessments if assessment.feasible
+        ]
+        infeasible_rewards = [
+            assessment.reward for assessment in optimization_assessments if not assessment.feasible
+        ]
+        gate_failures = Counter(
+            failure
+            for assessment in optimization_assessments
+            for failure in assessment.feasibility_failures
+        )
         return {
             "summary": {
                 "total_tasks": self.total_tasks,
@@ -389,6 +535,12 @@ class AgenticMetrics:
                 "external_benchmark_tasks": self.external_benchmark_task_count,
                 "failure_categories": self.failure_categories,
                 "topology_feedback_coverage": topology_metrics["topology_feedback_coverage"],
+                "optimization_feasible_tasks": feasible_tasks,
+                "optimization_infeasible_tasks": infeasible_tasks,
+                "optimization_feasibility_rate": round(
+                    feasible_tasks / max(1, self.total_tasks),
+                    4,
+                ),
             },
             "efficiency": {
                 "total_turns": self.total_turns,
@@ -406,6 +558,23 @@ class AgenticMetrics:
                 "avg_completion_precision": round(self.avg_completion_precision, 4),
                 "avg_unsupported_claim_rate": round(self.avg_unsupported_claim_rate, 4),
                 "avg_overall_score": round(self.avg_overall_score, 4),
+                "avg_optimization_reward": round(avg_optimization_reward, 4),
+                "avg_feasible_optimization_reward": round(
+                    (
+                        sum(feasible_rewards) / len(feasible_rewards)
+                        if feasible_rewards
+                        else 0.0
+                    ),
+                    4,
+                ),
+                "avg_infeasible_optimization_reward": round(
+                    (
+                        sum(infeasible_rewards) / len(infeasible_rewards)
+                        if infeasible_rewards
+                        else 0.0
+                    ),
+                    4,
+                ),
                 "avg_topology_reward": topology_metrics["avg_topology_reward"],
                 "avg_topology_confidence": topology_metrics["avg_topology_confidence"],
             },
@@ -416,6 +585,29 @@ class AgenticMetrics:
                 "total_auto_fixes": self.total_auto_fixes,
                 "total_correction_time_seconds": round(self.total_correction_time_seconds, 2),
                 "avg_correction_time": round(self.avg_correction_time, 2),
+            },
+            "optimization": {
+                "feasible_tasks": feasible_tasks,
+                "infeasible_tasks": infeasible_tasks,
+                "feasibility_rate": round(feasible_tasks / max(1, self.total_tasks), 4),
+                "avg_reward": round(avg_optimization_reward, 4),
+                "avg_feasible_reward": round(
+                    (
+                        sum(feasible_rewards) / len(feasible_rewards)
+                        if feasible_rewards
+                        else 0.0
+                    ),
+                    4,
+                ),
+                "avg_infeasible_reward": round(
+                    (
+                        sum(infeasible_rewards) / len(infeasible_rewards)
+                        if infeasible_rewards
+                        else 0.0
+                    ),
+                    4,
+                ),
+                "gate_failures": dict(gate_failures),
             },
             "topology": topology_metrics,
             "tasks": [
@@ -434,6 +626,7 @@ class AgenticMetrics:
                     "completion_precision": round(r.completion_precision, 4),
                     "unsupported_claim_rate": round(r.unsupported_claim_rate, 4),
                     "overall_score": round(r.overall_score, 4),
+                    "optimization_summary": r.evaluate_generative_optimization().to_dict(),
                     "topology_summary": summarize_topology_feedback(r),
                 }
                 for r in self.task_results
@@ -1154,10 +1347,13 @@ class AgenticBenchmarkRunner:
             topology_summary = summarize_topology_feedback(result)
             if topology_summary is not None:
                 trace.completion_signals.setdefault("topology_summary", topology_summary)
+            optimization_summary = result.evaluate_generative_optimization().to_dict()
+            trace.completion_signals.setdefault("optimization_summary", optimization_summary)
             if result.failure_category is not None:
                 result.failure_details = {
                     "validation_errors": dict(trace.validation_errors),
                     "unsupported_claim_rate": result.unsupported_claim_rate,
+                    "optimization_summary": optimization_summary,
                 }
                 if topology_summary is not None:
                     result.failure_details["topology_summary"] = topology_summary
@@ -1444,6 +1640,9 @@ def generate_agentic_report(metrics: AgenticMetrics) -> str:
     lines.append(f"  Edit Accuracy:  {metrics.avg_edit_accuracy:.3f}")
     lines.append(f"  Tool Efficiency:{metrics.avg_tool_efficiency:.3f}")
     lines.append(f"  Overall Score:  {metrics.avg_overall_score:.3f}")
+    optimization_metrics = metrics.to_dict()["optimization"]
+    lines.append(f"  Feasibility:    {optimization_metrics['feasibility_rate']:.1%}")
+    lines.append(f"  Opt Reward:     {optimization_metrics['avg_reward']:.3f}")
     lines.append("")
 
     lines.append("=" * 70)
