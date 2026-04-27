@@ -136,6 +136,7 @@ class StreamingChatContext:
     topology_input: Optional[Dict[str, Any]] = None
     topology_decision: Optional[Dict[str, Any]] = None
     topology_plan: Optional[Dict[str, Any]] = None
+    topology_preparation: Optional[Dict[str, Any]] = None
     topology_events: List[Dict[str, Any]] = field(default_factory=list)
     degradation_events: List[Dict[str, Any]] = field(default_factory=list)
     recovery_events: List[Dict[str, Any]] = field(default_factory=list)

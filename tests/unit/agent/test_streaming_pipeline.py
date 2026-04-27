@@ -1,6 +1,6 @@
 import importlib
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -8,7 +8,9 @@ from victor.agent.task_completion import CompletionConfidence
 from victor.agent.streaming.intent_classification import IntentClassificationResult
 from victor.core.completion_markers import SUMMARY_MARKER
 from victor.agent.streaming.pipeline import StreamingChatPipeline
+from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.providers.base import StreamChunk
+from victor.teams.types import TeamFormation, TeamResult
 from .streaming_pipeline_stubs import (
     DummyCoordinator,
     StubContinuationHandler,
@@ -307,6 +309,61 @@ async def test_pipeline_merges_stream_context_provider_kwargs():
     assert provider_kwargs["provider_hint"] == "smart-router"
     assert provider_kwargs["execution_mode"] == "escalated_single_agent"
     assert provider_kwargs["thinking"]["type"] == "enabled"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_executes_prepared_team_before_provider_stream():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._stream_ctx.runtime_context_overrides = {
+        "execution_mode": "team_execution",
+        "team_name": "feature_team",
+        "formation_hint": "parallel",
+        "tool_budget": 4,
+        "max_workers": 2,
+    }
+    coordinator._stream_ctx.topology_plan = {"execution_mode": "team_execution"}
+    coordinator._stream_provider_response = AsyncMock(
+        return_value=("assistant notes", None, None, False)
+    )
+
+    pipeline = StreamingChatPipeline(coordinator)
+
+    with patch(
+        "victor.framework.team_runtime.run_configured_team",
+        new=AsyncMock(
+            return_value=(
+                ResolvedTeamExecutionPlan(
+                    team_name="feature_team",
+                    display_name="Feature Team",
+                    formation=TeamFormation.PARALLEL,
+                    member_count=2,
+                    total_tool_budget=4,
+                    max_iterations=20,
+                    max_workers=2,
+                ),
+                TeamResult(
+                    success=True,
+                    final_output="Team streaming result with final synthesized guidance.",
+                    member_results={},
+                    formation=TeamFormation.PARALLEL,
+                    total_tool_calls=3,
+                ),
+            )
+        ),
+    ) as run_team:
+        chunks = [chunk async for chunk in pipeline.run("implement the feature")]
+
+    assert [chunk.content for chunk in chunks] == [
+        "Team streaming result with final synthesized guidance."
+    ]
+    assert chunks[0].is_final is True
+    run_team.assert_awaited_once()
+    coordinator._stream_provider_response.assert_not_awaited()
+    assert coordinator._stream_ctx.full_content == (
+        "Team streaming result with final synthesized guidance."
+    )
+    assert coordinator._stream_ctx.tool_calls_used == 3
+    assert coordinator._stream_ctx.topology_plan["team_name"] == "feature_team"
 
 
 @pytest.mark.asyncio

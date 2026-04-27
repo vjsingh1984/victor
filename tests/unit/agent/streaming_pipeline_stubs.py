@@ -29,6 +29,7 @@ class DummyStreamContext:
         self.force_completion = False
         self.provider_kwargs = {}
         self.runtime_context_overrides = {}
+        self.topology_preparation = None
         self.topology_events = []
         self.degradation_events = []
         self.recovery_events = []

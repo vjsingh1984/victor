@@ -308,6 +308,111 @@ class StreamingChatPipeline:
             self._last_tools = tools
         return tools
 
+    @staticmethod
+    def _should_execute_prepared_team(stream_ctx: Any) -> bool:
+        """Check whether streaming topology resolved a concrete team execution."""
+        runtime_context_overrides = getattr(stream_ctx, "runtime_context_overrides", None)
+        return bool(
+            isinstance(runtime_context_overrides, dict)
+            and runtime_context_overrides.get("execution_mode") == "team_execution"
+            and runtime_context_overrides.get("team_name")
+        )
+
+    @staticmethod
+    def _build_stream_team_context(
+        user_message: str,
+        stream_ctx: Any,
+    ) -> dict[str, Any]:
+        """Build shared context for framework team execution in streaming mode."""
+        runtime_context_overrides = getattr(stream_ctx, "runtime_context_overrides", {}) or {}
+        context = {
+            "query": user_message,
+            "task_type": getattr(stream_ctx, "coarse_task_type", None),
+            "task_complexity": getattr(
+                getattr(getattr(stream_ctx, "task_classification", None), "complexity", None),
+                "value",
+                getattr(getattr(stream_ctx, "task_classification", None), "complexity", None),
+            ),
+            "topology_plan": getattr(stream_ctx, "topology_plan", None),
+            "topology_decision": getattr(stream_ctx, "topology_decision", None),
+            "perception": getattr(stream_ctx, "perception", None),
+        }
+        for key in (
+            "team_name",
+            "team_display_name",
+            "formation_hint",
+            "topology_action",
+            "topology_kind",
+            "topology_metadata",
+            "provider_hint",
+            "max_workers",
+        ):
+            value = runtime_context_overrides.get(key)
+            if value is not None:
+                context[key] = value
+        return context
+
+    async def _execute_prepared_team(
+        self,
+        orch: Any,
+        user_message: str,
+        stream_ctx: Any,
+    ) -> Optional[StreamChunk]:
+        """Execute a prepared framework team and convert it into a final stream chunk."""
+        runtime_context_overrides = getattr(stream_ctx, "runtime_context_overrides", None)
+        if not isinstance(runtime_context_overrides, dict):
+            return None
+
+        from victor.framework.team_runtime import run_configured_team
+
+        complexity_value = getattr(getattr(stream_ctx, "task_classification", None), "complexity", None)
+        if hasattr(complexity_value, "value"):
+            complexity_value = complexity_value.value
+        if complexity_value is None:
+            complexity_value = "medium"
+
+        team_execution = await run_configured_team(
+            orch,
+            goal=user_message,
+            task_type=str(getattr(stream_ctx, "coarse_task_type", None) or "unknown"),
+            complexity=str(complexity_value),
+            preferred_team=runtime_context_overrides.get("team_name"),
+            preferred_formation=runtime_context_overrides.get("formation_hint"),
+            max_workers=runtime_context_overrides.get("max_workers"),
+            tool_budget=runtime_context_overrides.get("tool_budget"),
+            context=self._build_stream_team_context(user_message, stream_ctx),
+        )
+        if team_execution is None:
+            return None
+
+        resolved_team, team_result = team_execution
+        final_output = team_result.final_output.strip() or team_result.error or "Team execution completed."
+        if final_output:
+            orch.add_message("assistant", final_output)
+            if hasattr(stream_ctx, "accumulate_content"):
+                stream_ctx.accumulate_content(final_output)
+            if hasattr(stream_ctx, "update_context_message"):
+                stream_ctx.update_context_message(final_output)
+        if hasattr(stream_ctx, "reset_activity_timer"):
+            stream_ctx.reset_activity_timer()
+        if hasattr(stream_ctx, "update_quality_score"):
+            stream_ctx.update_quality_score(0.92 if team_result.success else 0.2)
+
+        stream_ctx.full_content = final_output
+        stream_ctx.force_completion = True
+        stream_ctx.total_iterations = max(1, getattr(stream_ctx, "total_iterations", 0))
+        stream_ctx.tool_calls_used = team_result.total_tool_calls
+        if hasattr(orch, "tool_calls_used"):
+            orch.tool_calls_used = team_result.total_tool_calls
+
+        metadata = getattr(stream_ctx, "topology_plan", None)
+        if isinstance(metadata, dict):
+            metadata["team_name"] = resolved_team.team_name
+            metadata["team_display_name"] = resolved_team.display_name
+            metadata["member_count"] = resolved_team.member_count
+
+        return orch._chunk_generator.generate_content_chunk(final_output, is_final=True)
+
     async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming pipeline for the provided message."""
         runtime_owner = self._runtime_owner
@@ -510,6 +615,12 @@ class StreamingChatPipeline:
         self._repetition_count = 0
         self._visible_output_deduplicator.reset()
         self._prev_visible_content = ""
+
+        if self._should_execute_prepared_team(stream_ctx):
+            team_chunk = await self._execute_prepared_team(orch, user_message, stream_ctx)
+            if team_chunk is not None:
+                yield team_chunk
+                return
 
         while True:
             # Yield separator between iterations when content was emitted
