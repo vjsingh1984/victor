@@ -123,6 +123,20 @@ class TestFormations:
         assert result["formation"] == "parallel"
 
     @pytest.mark.asyncio
+    async def test_formation_hint_overrides_default_for_single_execution(self):
+        """Per-call formation hints should override the coordinator default."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Result1"))
+        coordinator.add_member(MockTeamMember("m2", "Result2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+        result = await coordinator.execute_task("Test task", {"formation_hint": "parallel"})
+
+        assert result["success"] is True
+        assert result["formation"] == "parallel"
+        assert coordinator.formation == TeamFormation.SEQUENTIAL
+
+    @pytest.mark.asyncio
     async def test_hierarchical_execution(self):
         """Hierarchical formation should have manager plan and synthesize."""
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
@@ -153,6 +167,21 @@ class TestFormations:
         assert result["success"] is True
         assert result["final_output"] == "Stage2Output"  # Last stage output
         assert result["formation"] == "pipeline"
+
+    @pytest.mark.asyncio
+    async def test_max_workers_limits_execution_members(self):
+        """Per-call max_workers should limit the participating members."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Result1"))
+        coordinator.add_member(MockTeamMember("m2", "Result2"))
+        coordinator.add_member(MockTeamMember("m3", "Result3"))
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task("Test task", {"max_workers": 2})
+
+        assert result["success"] is True
+        assert result["formation"] == "parallel"
+        assert len(result["member_results"]) == 2
 
     @pytest.mark.asyncio
     async def test_consensus_execution(self):

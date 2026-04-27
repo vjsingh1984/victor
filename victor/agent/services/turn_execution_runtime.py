@@ -346,6 +346,7 @@ class TurnExecutor:
         enable_thinking: bool = False,
         intent: Optional[str] = None,
         temperature_override: Optional[float] = None,
+        runtime_context_overrides: Optional[Dict[str, Any]] = None,
     ) -> TurnResult:
         """Execute a single complete turn: LLM call + tool execution.
 
@@ -365,127 +366,145 @@ class TurnExecutor:
         Returns:
             TurnResult with response, tool results, and metadata
         """
-        # Select tools (unless Q&A task)
-        tools = None
-        if (
-            not is_qa_task
-            and self._provider_context.provider.supports_tools()
-            and self._tool_context.tool_calls_used < self._tool_context.tool_budget
-        ):
-            tools = await self._select_tools_for_turn(user_message, intent=intent)
+        overrides = dict(runtime_context_overrides or {})
+        runtime_snapshot = self._apply_runtime_context_overrides(overrides)
+        try:
+            effective_tool_budget = self._coerce_int_override(overrides.get("tool_budget"))
+            if effective_tool_budget is None:
+                effective_tool_budget = self._tool_context.tool_budget
 
-        # Prepare thinking parameter
-        provider_kwargs: Dict[str, Any] = {}
-        if enable_thinking or self._provider_context.thinking:
-            provider_kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": 10000,
-            }
+            # Select tools (unless Q&A task)
+            tools = None
+            if (
+                not is_qa_task
+                and self._provider_context.provider.supports_tools()
+                and self._tool_context.tool_calls_used < effective_tool_budget
+            ):
+                tools = await self._select_tools_for_turn(user_message, intent=intent)
 
-        # Check context compaction before API call
-        if task_classification:
-            await self._check_context_compaction(user_message, task_classification)
+            # Prepare thinking parameter
+            provider_kwargs: Dict[str, Any] = {}
+            if enable_thinking or self._provider_context.thinking:
+                provider_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": 10000,
+                }
 
-        # Apply task-aware temperature from TaskTypeHint (None = provider default)
-        if temperature_override is not None:
-            provider_kwargs["temperature_override"] = temperature_override
-
-        # Execute model turn
-        response = await self._execute_model_turn(tools=tools, **provider_kwargs)
-
-        # Track tokens
-        self._accumulate_token_usage(response)
-
-        # Add assistant response to conversation history
-        if response.content:
-            self._chat_context.add_message("assistant", response.content)
+            # Check context compaction before API call
             if task_classification:
                 await self._check_context_compaction(user_message, task_classification)
 
-        # Execute tool calls if present
-        tool_results: List[Dict[str, Any]] = []
-        all_blocked = False
-        if response.tool_calls:
-            # Resolve orchestrator/container once for all per-turn services
-            _orch = getattr(self, "_orchestrator", None) or getattr(
-                self._chat_context, "_orchestrator", None
-            )
+            # Apply task-aware temperature from TaskTypeHint (None = provider default)
+            if temperature_override is not None:
+                provider_kwargs["temperature_override"] = temperature_override
+            provider_kwargs.update(self._provider_call_overrides(overrides))
 
-            # Sort tool calls by dependency order when multiple tools are requested
-            if len(response.tool_calls) > 1:
+            # Execute model turn
+            response = await self._execute_model_turn(tools=tools, **provider_kwargs)
+
+            # Track tokens
+            self._accumulate_token_usage(response)
+
+            # Add assistant response to conversation history
+            if response.content:
+                self._chat_context.add_message("assistant", response.content)
+                if task_classification:
+                    await self._check_context_compaction(user_message, task_classification)
+
+            # Execute tool calls if present
+            tool_results: List[Dict[str, Any]] = []
+            all_blocked = False
+            if response.tool_calls:
+                # Resolve orchestrator/container once for all per-turn services
+                _orch = getattr(self, "_orchestrator", None) or getattr(
+                    self._chat_context, "_orchestrator", None
+                )
+
+                # Sort tool calls by dependency order when multiple tools are requested
+                if len(response.tool_calls) > 1:
+                    try:
+                        from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
+
+                        _container = getattr(_orch, "_container", None)
+                        _dep_graph = (
+                            _container.get_optional(ToolDependencyGraphProtocol)
+                            if _container
+                            else None
+                        )
+                        if _dep_graph:
+                            _names = [tc.get("name", "") for tc in response.tool_calls]
+                            _ordered = _dep_graph.get_execution_order(_names)
+                            _name_rank = {n: i for i, n in enumerate(_ordered)}
+                            response.tool_calls.sort(
+                                key=lambda tc: _name_rank.get(tc.get("name", ""), 999)
+                            )
+                    except Exception:
+                        pass  # Never block execution on ordering failure
+
+                tool_results = await self._execute_tool_calls(response.tool_calls)
+
+                # Record tool→tool transitions for trajectory learning
                 try:
                     from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
 
                     _container = getattr(_orch, "_container", None)
                     _dep_graph = (
-                        _container.get_optional(ToolDependencyGraphProtocol) if _container else None
+                        _container.get_optional(ToolDependencyGraphProtocol)
+                        if _container
+                        else None
                     )
-                    if _dep_graph:
-                        _names = [tc.get("name", "") for tc in response.tool_calls]
-                        _ordered = _dep_graph.get_execution_order(_names)
-                        _name_rank = {n: i for i, n in enumerate(_ordered)}
-                        response.tool_calls.sort(
-                            key=lambda tc: _name_rank.get(tc.get("name", ""), 999)
+                    if _dep_graph and len(tool_results) > 1:
+                        _task_type = (
+                            getattr(task_classification, "task_type", "general")
+                            if task_classification
+                            else "general"
                         )
+                        _tool_names = [
+                            r.get("tool_name", "") for r in tool_results if r.get("tool_name")
+                        ]
+                        for i in range(len(_tool_names) - 1):
+                            _dep_graph.record_transition(
+                                _tool_names[i],
+                                _tool_names[i + 1],
+                                _task_type,
+                            )
                 except Exception:
-                    pass  # Never block execution on ordering failure
+                    pass  # Trajectory learning is best-effort
 
-            tool_results = await self._execute_tool_calls(response.tool_calls)
-
-            # Record tool→tool transitions for trajectory learning
-            try:
-                from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
-
-                _container = getattr(_orch, "_container", None)
-                _dep_graph = (
-                    _container.get_optional(ToolDependencyGraphProtocol) if _container else None
-                )
-                if _dep_graph and len(tool_results) > 1:
-                    _task_type = (
-                        getattr(task_classification, "task_type", "general")
-                        if task_classification
-                        else "general"
+                # Check for dedup-blocked spin
+                _pipeline = getattr(self._tool_context, "_tool_pipeline", None)
+                if _pipeline is None:
+                    if _orch:
+                        _pipeline = getattr(_orch, "_tool_pipeline", None)
+                all_blocked = bool(
+                    _pipeline
+                    and getattr(
+                        _pipeline,
+                        "last_batch_effectively_blocked",
+                        getattr(_pipeline, "last_batch_all_skipped", False),
                     )
-                    _tool_names = [
-                        r.get("tool_name", "") for r in tool_results if r.get("tool_name")
-                    ]
-                    for i in range(len(_tool_names) - 1):
-                        _dep_graph.record_transition(_tool_names[i], _tool_names[i + 1], _task_type)
-            except Exception:
-                pass  # Trajectory learning is best-effort
-
-            # Check for dedup-blocked spin
-            _pipeline = getattr(self._tool_context, "_tool_pipeline", None)
-            if _pipeline is None:
-                if _orch:
-                    _pipeline = getattr(_orch, "_tool_pipeline", None)
-            all_blocked = bool(
-                _pipeline
-                and getattr(
-                    _pipeline,
-                    "last_batch_effectively_blocked",
-                    getattr(_pipeline, "last_batch_all_skipped", False),
                 )
+
+                # Record failures for optimization hints
+                for result in tool_results:
+                    if not result.get("success"):
+                        _injector = getattr(_orch, "_optimization_injector", None) if _orch else None
+                        if _injector and result.get("error"):
+                            _injector.record_failure(
+                                result.get("tool_name", "unknown"),
+                                result["error"],
+                            )
+
+            return TurnResult(
+                response=response,
+                tool_results=tool_results,
+                has_tool_calls=bool(response.tool_calls),
+                tool_calls_count=len(response.tool_calls) if response.tool_calls else 0,
+                all_tools_blocked=all_blocked,
+                is_qa_response=is_qa_task and bool(response.content),
             )
-
-            # Record failures for optimization hints
-            for result in tool_results:
-                if not result.get("success"):
-                    _injector = getattr(_orch, "_optimization_injector", None) if _orch else None
-                    if _injector and result.get("error"):
-                        _injector.record_failure(
-                            result.get("tool_name", "unknown"),
-                            result["error"],
-                        )
-
-        return TurnResult(
-            response=response,
-            tool_results=tool_results,
-            has_tool_calls=bool(response.tool_calls),
-            tool_calls_count=len(response.tool_calls) if response.tool_calls else 0,
-            all_tools_blocked=all_blocked,
-            is_qa_response=is_qa_task and bool(response.content),
-        )
+        finally:
+            self._restore_runtime_context_overrides(runtime_snapshot)
 
     # =====================================================================
     # AgenticLoop Integration (Phase 10)
@@ -877,6 +896,185 @@ class TurnExecutor:
             tools=tools,
             **kwargs,
         )
+
+    def _provider_call_overrides(self, overrides: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract provider-facing runtime override hints."""
+        provider_keys = (
+            "provider_hint",
+            "execution_mode",
+            "escalation_target",
+            "topology_action",
+            "topology_kind",
+            "topology_metadata",
+        )
+        return {
+            key: value
+            for key, value in overrides.items()
+            if key in provider_keys and value is not None
+        }
+
+    def _apply_runtime_context_overrides(
+        self,
+        overrides: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Apply temporary runtime overrides for the duration of one turn."""
+        if not overrides:
+            return None
+
+        snapshot: Dict[str, Any] = {}
+        orchestrator = getattr(self, "_orchestrator", None) or getattr(
+            self._chat_context, "_orchestrator", None
+        )
+        snapshot["orchestrator"] = orchestrator
+        snapshot["chat_runtime_context"] = getattr(
+            self._chat_context,
+            "_runtime_context_overrides",
+            _MISSING,
+        )
+        self._chat_context._runtime_context_overrides = dict(overrides)
+
+        if orchestrator is not None:
+            snapshot["orchestrator_runtime_context"] = getattr(
+                orchestrator,
+                "_runtime_tool_context_overrides",
+                _MISSING,
+            )
+            merged_context = {}
+            previous_runtime_context = snapshot["orchestrator_runtime_context"]
+            if isinstance(previous_runtime_context, dict):
+                merged_context.update(previous_runtime_context)
+            merged_context.update(overrides)
+            orchestrator._runtime_tool_context_overrides = merged_context
+
+        tool_budget = self._coerce_int_override(overrides.get("tool_budget"))
+        if tool_budget is not None:
+            self._apply_tool_budget_override(tool_budget, snapshot, orchestrator)
+
+        iteration_budget = self._coerce_int_override(overrides.get("iteration_budget"))
+        settings = getattr(self._chat_context, "settings", None)
+        if iteration_budget is not None and settings is not None:
+            snapshot["chat_max_iterations"] = getattr(settings, "chat_max_iterations", _MISSING)
+            try:
+                settings.chat_max_iterations = max(1, iteration_budget)
+            except Exception:
+                pass
+
+        return snapshot
+
+    def _restore_runtime_context_overrides(self, snapshot: Optional[Dict[str, Any]]) -> None:
+        """Restore runtime state after one turn completes."""
+        if not snapshot:
+            return
+
+        orchestrator = snapshot.get("orchestrator")
+        if orchestrator is not None:
+            previous_context = snapshot.get("orchestrator_runtime_context", _MISSING)
+            if previous_context is _MISSING:
+                if hasattr(orchestrator, "_runtime_tool_context_overrides"):
+                    delattr(orchestrator, "_runtime_tool_context_overrides")
+            else:
+                orchestrator._runtime_tool_context_overrides = previous_context
+
+        previous_chat_context = snapshot.get("chat_runtime_context", _MISSING)
+        if previous_chat_context is _MISSING:
+            if hasattr(self._chat_context, "_runtime_context_overrides"):
+                delattr(self._chat_context, "_runtime_context_overrides")
+        else:
+            self._chat_context._runtime_context_overrides = previous_chat_context
+
+        settings = getattr(self._chat_context, "settings", None)
+        previous_iterations = snapshot.get("chat_max_iterations", _MISSING)
+        if settings is not None and previous_iterations is not _MISSING:
+            try:
+                settings.chat_max_iterations = previous_iterations
+            except Exception:
+                pass
+
+        self._restore_tool_budget_override(snapshot, orchestrator)
+
+    def _apply_tool_budget_override(
+        self,
+        tool_budget: int,
+        snapshot: Dict[str, Any],
+        orchestrator: Any,
+    ) -> None:
+        """Apply a temporary tool budget override to known runtime owners."""
+        if orchestrator is not None and hasattr(orchestrator, "tool_budget"):
+            snapshot["orchestrator_tool_budget"] = getattr(orchestrator, "tool_budget", _MISSING)
+            try:
+                orchestrator.tool_budget = max(0, tool_budget)
+            except Exception:
+                pass
+
+        tool_service = getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+        if tool_service is None:
+            tool_service = getattr(self._tool_context, "_tool_service", None)
+        if tool_service is not None and hasattr(tool_service, "get_tool_budget"):
+            snapshot["tool_service_budget"] = tool_service.get_tool_budget()
+            if hasattr(tool_service, "set_tool_budget"):
+                try:
+                    tool_service.set_tool_budget(max(0, tool_budget))
+                except Exception:
+                    pass
+
+        tool_pipeline = getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+        if tool_pipeline is None:
+            tool_pipeline = getattr(self._tool_context, "_tool_pipeline", None)
+        pipeline_config = getattr(tool_pipeline, "config", None)
+        if pipeline_config is not None and hasattr(pipeline_config, "tool_budget"):
+            snapshot["pipeline_tool_budget"] = getattr(pipeline_config, "tool_budget", _MISSING)
+            try:
+                pipeline_config.tool_budget = max(0, tool_budget)
+            except Exception:
+                pass
+
+    def _restore_tool_budget_override(
+        self,
+        snapshot: Dict[str, Any],
+        orchestrator: Any,
+    ) -> None:
+        """Restore prior tool budget state after a temporary override."""
+        previous_orchestrator_budget = snapshot.get("orchestrator_tool_budget", _MISSING)
+        if orchestrator is not None and previous_orchestrator_budget is not _MISSING:
+            try:
+                orchestrator.tool_budget = previous_orchestrator_budget
+            except Exception:
+                pass
+
+        tool_service = getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+        if tool_service is None:
+            tool_service = getattr(self._tool_context, "_tool_service", None)
+        previous_service_budget = snapshot.get("tool_service_budget", _MISSING)
+        if (
+            tool_service is not None
+            and previous_service_budget is not _MISSING
+            and hasattr(tool_service, "set_tool_budget")
+        ):
+            try:
+                tool_service.set_tool_budget(previous_service_budget)
+            except Exception:
+                pass
+
+        tool_pipeline = getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+        if tool_pipeline is None:
+            tool_pipeline = getattr(self._tool_context, "_tool_pipeline", None)
+        pipeline_config = getattr(tool_pipeline, "config", None)
+        previous_pipeline_budget = snapshot.get("pipeline_tool_budget", _MISSING)
+        if pipeline_config is not None and previous_pipeline_budget is not _MISSING:
+            try:
+                pipeline_config.tool_budget = previous_pipeline_budget
+            except Exception:
+                pass
+
+    @staticmethod
+    def _coerce_int_override(value: Any) -> Optional[int]:
+        """Best-effort coercion for integer runtime overrides."""
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def _accumulate_token_usage(self, response: CompletionResponse) -> None:
         """Accumulate token usage for evaluation tracking.

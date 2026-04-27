@@ -32,6 +32,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
 
+from victor.agent.topology_contract import TopologyDecisionInput
+
 logger = logging.getLogger(__name__)
 
 
@@ -176,6 +178,12 @@ class ParadigmRouter:
         "find ",
         "search ",
     ]
+
+    BREADTH_TASK_TYPES = {
+        "search",
+        "exploration",
+        "analysis_deep",
+    }
 
     def __init__(
         self,
@@ -468,6 +476,108 @@ class ParadigmRouter:
             "small_model_usage": paradigm_percentages.get("direct", 0)
             + (paradigm_percentages.get("focused", 0) * 0.5),  # Focused uses medium
         }
+
+    def build_topology_input(
+        self,
+        task_type: str,
+        query: str,
+        history_length: int = 0,
+        query_complexity: Optional[float] = None,
+        tool_budget: Optional[int] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> TopologyDecisionInput:
+        """Build topology selector input from current paradigm routing heuristics."""
+        execution_context = dict(context or {})
+        decision = self.route(
+            task_type=task_type,
+            query=query,
+            history_length=history_length,
+            query_complexity=query_complexity,
+            tool_budget=tool_budget,
+            context=execution_context,
+        )
+
+        return TopologyDecisionInput(
+            query=query,
+            task_type=task_type,
+            task_complexity=self._complexity_label(query_complexity, decision.paradigm),
+            confidence_hint=decision.confidence,
+            tool_budget=decision.tool_budget,
+            iteration_budget=int(execution_context.get("iteration_budget", 1)),
+            expected_depth=self._expected_depth_from_paradigm(decision.paradigm),
+            expected_breadth=self._expected_breadth(task_type, query, execution_context),
+            privacy_sensitivity=str(execution_context.get("privacy_sensitivity", "medium")),
+            bandwidth_pressure=str(execution_context.get("bandwidth_pressure", "medium")),
+            latency_sensitivity=str(execution_context.get("latency_sensitivity", "medium")),
+            token_cost_pressure=str(execution_context.get("token_cost_pressure", "medium")),
+            observability_level=str(
+                execution_context.get(
+                    "observability_level",
+                    self._default_observability_level(task_type, query_complexity),
+                )
+            ),
+            prior_failures=int(execution_context.get("prior_failures", 0)),
+            similar_experience_count=int(execution_context.get("similar_experience_count", 0)),
+            available_tools=list(execution_context.get("available_tools", [])),
+            available_team_formations=list(execution_context.get("available_team_formations", [])),
+            provider_candidates=list(execution_context.get("provider_candidates", [])),
+            context=execution_context,
+        )
+
+    @staticmethod
+    def _complexity_label(
+        query_complexity: Optional[float], paradigm: ProcessingParadigm
+    ) -> str:
+        """Convert numeric complexity or paradigm signal into low/medium/high."""
+        if query_complexity is not None:
+            if query_complexity >= 0.6:
+                return "high"
+            if query_complexity >= 0.3:
+                return "medium"
+            return "low"
+
+        if paradigm == ProcessingParadigm.DEEP:
+            return "high"
+        if paradigm == ProcessingParadigm.FOCUSED:
+            return "medium"
+        return "low"
+
+    @staticmethod
+    def _expected_depth_from_paradigm(paradigm: ProcessingParadigm) -> str:
+        """Map paradigm choice to expected execution depth."""
+        if paradigm == ProcessingParadigm.DEEP:
+            return "high"
+        if paradigm in {ProcessingParadigm.FOCUSED, ProcessingParadigm.STANDARD}:
+            return "medium"
+        return "low"
+
+    def _expected_breadth(
+        self,
+        task_type: str,
+        query: str,
+        context: Dict[str, Any],
+    ) -> str:
+        """Infer expected breadth for topology exploration decisions."""
+        if "expected_breadth" in context:
+            return str(context["expected_breadth"])
+
+        query_lower = query.lower()
+        if task_type in self.BREADTH_TASK_TYPES:
+            return "high"
+        if any(term in query_lower for term in ("all ", "across ", "multiple ", "compare ")):
+            return "high"
+        if task_type in self.FOCUSED_TASK_TYPES or task_type in self.DEEP_TASK_TYPES:
+            return "medium"
+        return "low"
+
+    @staticmethod
+    def _default_observability_level(task_type: str, query_complexity: Optional[float]) -> str:
+        """Infer a default observability level when none is explicitly provided."""
+        if task_type in {"search", "exploration", "analysis_deep"}:
+            return "low"
+        if query_complexity is not None and query_complexity >= 0.6:
+            return "medium"
+        return "high"
 
     def reset_statistics(self) -> None:
         """Reset routing statistics."""

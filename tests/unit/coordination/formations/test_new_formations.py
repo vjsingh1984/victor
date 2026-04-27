@@ -764,3 +764,26 @@ class TestAdaptiveFormation:
             "sequential",
             "consensus",
         ]
+
+    @pytest.mark.asyncio
+    async def test_adaptive_formation_respects_initial_formation_hint(self, team_context):
+        """Explicit formation hints should override the task-size heuristic."""
+        formation = AdaptiveFormation()
+
+        for i in range(2):
+            agent = MagicMock()
+            agent.id = f"agent{i}"
+            agent.execute = AsyncMock(return_value=f"Result {i}")
+            team_context.set(agent.id, agent)
+
+        team_context.set("formation_hint", "consensus")
+        small_task = AgentMessage(
+            sender_id="test",
+            content="Small task",
+            message_type=MessageType.TASK,
+        )
+
+        results = await formation.execute([], team_context, small_task)
+
+        assert results[0].success is True
+        assert results[0].metadata["current_formation"] == "consensus"

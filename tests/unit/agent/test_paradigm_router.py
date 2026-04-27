@@ -14,6 +14,8 @@
 
 """Tests for ParadigmRouter."""
 
+import importlib
+
 import pytest
 
 from victor.agent.paradigm_router import (
@@ -23,6 +25,9 @@ from victor.agent.paradigm_router import (
     ModelTier,
     get_paradigm_router,
 )
+from victor.agent.topology_contract import TopologyDecisionInput
+
+paradigm_router_module = importlib.import_module("victor.agent.paradigm_router")
 
 
 class TestParadigmRouter:
@@ -243,6 +248,33 @@ class TestParadigmRouter:
         assert decision_dict["skip_planning"] is True
         assert decision_dict["confidence"] == 0.9
 
+    def test_build_topology_input_from_routing_hints(self):
+        """Router should synthesize topology selector input from existing heuristics."""
+        router = ParadigmRouter(enabled=True)
+
+        topology_input = router.build_topology_input(
+            task_type="exploration",
+            query="compare all authentication approaches across the repo",
+            history_length=1,
+            query_complexity=0.7,
+            tool_budget=9,
+            context={
+                "iteration_budget": 3,
+                "privacy_sensitivity": "high",
+                "provider_candidates": ["ollama", "openai"],
+                "available_team_formations": ["adaptive", "hierarchical"],
+            },
+        )
+
+        assert isinstance(topology_input, TopologyDecisionInput)
+        assert topology_input.task_complexity == "high"
+        assert topology_input.expected_depth == "high"
+        assert topology_input.expected_breadth == "high"
+        assert topology_input.iteration_budget == 3
+        assert topology_input.privacy_sensitivity == "high"
+        assert topology_input.provider_candidates == ["ollama", "openai"]
+        assert topology_input.available_team_formations == ["adaptive", "hierarchical"]
+
     def test_get_statistics_empty(self):
         """Test statistics when no routings have occurred."""
         router = ParadigmRouter(enabled=True)
@@ -445,6 +477,7 @@ class TestParadigmRouterSingleton:
 
     def test_get_paradigm_router_returns_singleton(self):
         """Test get_paradigm_router returns singleton instance."""
+        paradigm_router_module._paradigm_router_instance = None
         router1 = get_paradigm_router()
         router2 = get_paradigm_router()
 
@@ -453,6 +486,7 @@ class TestParadigmRouterSingleton:
 
     def test_singleton_shares_statistics(self):
         """Test singleton instance shares statistics across calls."""
+        paradigm_router_module._paradigm_router_instance = None
         router1 = get_paradigm_router()
         router2 = get_paradigm_router()
 

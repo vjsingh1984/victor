@@ -4631,7 +4631,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "workflow_registry": self.workflow_registry,
                 "settings": self.settings,
             }
-        return self._tool_context_cache
+        runtime_overrides = getattr(self, "_runtime_tool_context_overrides", None)
+        if not isinstance(runtime_overrides, dict) or not runtime_overrides:
+            return self._tool_context_cache
+
+        merged_context = dict(self._tool_context_cache)
+        merged_context.update(runtime_overrides)
+        return merged_context
 
     def reset_conversation(self) -> None:
         """Clear conversation history and session state.

@@ -6,11 +6,21 @@ components for PERCEIVE → PLAN → ACT → EVALUATE → DECIDE loops.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from victor.agent.action_authorizer import ActionIntent
+from victor.agent.services.turn_execution_runtime import TurnResult
+from victor.agent.topology_contract import (
+    TopologyAction,
+    TopologyDecision,
+    TopologyDecisionInput,
+    TopologyGroundingRequirements,
+    TopologyKind,
+)
+from victor.agent.topology_grounder import GroundedTopologyPlan
 from victor.framework.agentic_loop import (
     AgenticLoop,
     LoopIteration,
@@ -21,6 +31,7 @@ from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResu
 from victor.framework.fulfillment import FulfillmentResult, FulfillmentStatus, TaskType
 from victor.framework.perception_integration import Perception
 from victor.framework.task.protocols import TaskComplexity
+from victor.providers.base import CompletionResponse
 
 # ============================================================================
 # LoopStage enum tests
@@ -204,6 +215,95 @@ class TestAgenticLoop:
 
         assert result.success is True
         runtime_intelligence.analyze_turn.assert_awaited_once()
+
+    async def test_run_applies_topology_overrides_and_records_event(self):
+        perception = _make_perception()
+        perception.confidence = 0.9
+        turn_executor = MagicMock()
+        turn_executor.execute_turn = AsyncMock(
+            return_value=TurnResult(
+                response=CompletionResponse(content="done", role="assistant"),
+                tool_results=[],
+                has_tool_calls=False,
+                tool_calls_count=0,
+                all_tools_blocked=False,
+                is_qa_response=False,
+            )
+        )
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            turn_executor=turn_executor,
+            max_iterations=1,
+        )
+        loop._analyze_turn = AsyncMock(return_value=perception)
+        loop._plan = AsyncMock(return_value={"steps": ["inspect", "execute"]})
+        loop._evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=0.92,
+                reason="Topology-guided execution completed",
+            )
+        )
+        loop._get_topology_provider_hints = AsyncMock(return_value={})
+        loop.paradigm_router = MagicMock()
+        loop.paradigm_router.route.return_value = MagicMock(
+            skip_planning=False,
+            paradigm=SimpleNamespace(value="deep"),
+            model_tier=SimpleNamespace(value="large"),
+            max_tokens=4096,
+            confidence=0.88,
+            to_dict=MagicMock(return_value={"paradigm": "deep", "model_tier": "large"}),
+        )
+        loop.paradigm_router.build_topology_input = MagicMock(
+            return_value=TopologyDecisionInput(
+                query="Fix the bug",
+                task_type="code_generation",
+                task_complexity="high",
+                tool_budget=6,
+                iteration_budget=1,
+                available_team_formations=["parallel", "hierarchical"],
+            )
+        )
+        topology_decision = TopologyDecision(
+            action=TopologyAction.TEAM_PLAN,
+            topology=TopologyKind.TEAM,
+            confidence=0.82,
+            rationale="Task benefits from coordinated parallel execution",
+            grounding_requirements=TopologyGroundingRequirements(
+                provider="smart-router",
+                formation="parallel",
+                max_workers=3,
+                tool_budget=4,
+                iteration_budget=1,
+            ),
+            provider="smart-router",
+            formation="parallel",
+        )
+        topology_plan = GroundedTopologyPlan(
+            action=TopologyAction.TEAM_PLAN,
+            topology=TopologyKind.TEAM,
+            execution_mode="team_execution",
+            provider="smart-router",
+            formation="parallel",
+            max_workers=3,
+            tool_budget=4,
+            iteration_budget=1,
+            metadata={"source": "test"},
+        )
+        loop._topology_selector.select = MagicMock(return_value=topology_decision)
+        loop._topology_grounder.ground = MagicMock(return_value=topology_plan)
+
+        result = await loop.run("Fix the bug")
+
+        assert result.success is True
+        turn_kwargs = turn_executor.execute_turn.await_args.kwargs
+        assert turn_kwargs["runtime_context_overrides"]["formation_hint"] == "parallel"
+        assert turn_kwargs["runtime_context_overrides"]["max_workers"] == 3
+        assert turn_kwargs["runtime_context_overrides"]["provider_hint"] == "smart-router"
+        assert result.metadata["topology_events"][0]["action"] == "team_plan"
+        assert result.metadata["topology_events"][0]["formation"] == "parallel"
+        assert result.final_state["topology_plan"]["execution_mode"] == "team_execution"
+        assert result.final_state["tool_budget"] == 4
 
     def test_loop_uses_policy_completion_threshold_from_config(self):
         loop = self._make_loop(

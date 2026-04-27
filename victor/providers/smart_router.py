@@ -55,6 +55,15 @@ from victor.providers.routing_config import SmartRoutingConfig, load_routing_pro
 
 logger = logging.getLogger(__name__)
 
+LOCAL_PROVIDER_HINTS = {
+    "ollama",
+    "lmstudio",
+    "vllm",
+    "llamacpp",
+    "llama.cpp",
+    "local",
+}
+
 
 @dataclass
 class RoutingDecision:
@@ -82,6 +91,26 @@ class RoutingDecision:
             "rationale": self.rationale,
             "confidence": self.confidence,
             "factors": self.factors,
+        }
+
+    def to_topology_hints(self) -> Dict[str, Any]:
+        """Return stable provider-routing hints for topology selection."""
+        provider_lower = self.selected_provider.lower()
+        provider_locality = (
+            "local"
+            if any(hint in provider_lower for hint in LOCAL_PROVIDER_HINTS)
+            else "remote"
+        )
+        return {
+            "provider_hint": self.selected_provider,
+            "provider_locality": provider_locality,
+            "fallback_chain": list(self.fallback_chain),
+            "confidence": self.confidence,
+            "health_score": self.factors.get("health"),
+            "resource_score": self.factors.get("resources"),
+            "cost_score": self.factors.get("cost"),
+            "latency_score": self.factors.get("latency"),
+            "performance_score": self.factors.get("performance"),
         }
 
 
@@ -320,6 +349,20 @@ class RoutingDecisionEngine:
             normalized_score = 0.0
 
         return normalized_score, factors
+
+    async def get_topology_provider_hints(
+        self,
+        task_type: str = "default",
+        model_hint: Optional[str] = None,
+        preferred_providers: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Return provider routing hints in a selector-friendly shape."""
+        decision = await self.decide(
+            task_type=task_type,
+            model_hint=model_hint,
+            preferred_providers=preferred_providers,
+        )
+        return decision.to_topology_hints()
 
     async def _score_health(self, provider: str) -> float:
         """Score provider health (0.0 to 1.0).

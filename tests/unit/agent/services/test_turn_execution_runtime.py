@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.services.turn_execution_runtime import TurnExecutor
 from victor.framework.task.protocols import TaskComplexity
 from victor.providers.base import CompletionResponse, Message
@@ -294,3 +295,111 @@ async def test_execute_agentic_loop_restores_state_before_reraising_failure():
     assert tool_context.tool_calls_used == 7
     assert [message.role for message in messages] == ["system", "user"]
     assert [message.content for message in messages] == ["system prompt", "hello"]
+
+
+@pytest.mark.asyncio
+async def test_execute_turn_applies_runtime_overrides_and_restores_state():
+    class FakeToolService:
+        def __init__(self, budget: int):
+            self.budget = budget
+            self.history = []
+
+        def get_tool_budget(self) -> int:
+            return self.budget
+
+        def set_tool_budget(self, budget: int) -> None:
+            self.history.append(budget)
+            self.budget = budget
+
+    tool_service = FakeToolService(budget=8)
+    messages = []
+    observed_tool_contexts = []
+    settings = SimpleNamespace(chat_max_iterations=9)
+    fake_orchestrator = SimpleNamespace(
+        _tool_context_cache=None,
+        code_manager="code-manager",
+        provider="provider",
+        model="model",
+        tools="tool-registry",
+        workflow_registry="workflow-registry",
+        settings=settings,
+        tool_budget=8,
+        _tool_service=tool_service,
+        _tool_pipeline=SimpleNamespace(config=SimpleNamespace(tool_budget=8)),
+    )
+    chat_context = SimpleNamespace(
+        settings=settings,
+        add_message=MagicMock(),
+        conversation=SimpleNamespace(message_count=lambda: 0),
+        messages=messages,
+        _cumulative_token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        _orchestrator=fake_orchestrator,
+    )
+    tool_context = SimpleNamespace(
+        tool_calls_used=0,
+        tool_budget=8,
+        tool_selector=SimpleNamespace(
+            select_tools=AsyncMock(return_value=[{"name": "read"}]),
+            prioritize_by_stage=MagicMock(return_value=[{"name": "read"}]),
+        ),
+        use_semantic_selection=False,
+        _tool_service=tool_service,
+    )
+
+    async def _execute_tool_calls(_tool_calls):
+        observed_tool_contexts.append(AgentOrchestrator._get_tool_context(fake_orchestrator))
+        return [{"tool_name": "read", "success": True}]
+
+    tool_context.execute_tool_calls = AsyncMock(side_effect=_execute_tool_calls)
+    provider_context = SimpleNamespace(
+        provider=SimpleNamespace(supports_tools=MagicMock(return_value=True)),
+        provider_name="ollama",
+        model="test-model",
+        temperature=0.2,
+        max_tokens=1024,
+        thinking=False,
+    )
+    execution_provider = MagicMock()
+    execution_provider.execute_turn = AsyncMock(
+        return_value=CompletionResponse(
+            content="Need to inspect files",
+            role="assistant",
+            tool_calls=[{"name": "read", "arguments": {"path": "victor/framework/agentic_loop.py"}}],
+        )
+    )
+    executor = TurnExecutor(
+        chat_context=chat_context,
+        tool_context=tool_context,
+        provider_context=provider_context,
+        execution_provider=execution_provider,
+    )
+
+    result = await executor.execute_turn(
+        user_message="inspect the runtime path",
+        runtime_context_overrides={
+            "provider_hint": "smart-router",
+            "execution_mode": "team_execution",
+            "topology_action": "team_plan",
+            "tool_budget": 2,
+            "iteration_budget": 3,
+            "formation_hint": "parallel",
+            "max_workers": 2,
+            "topology_metadata": {"source": "unit-test"},
+        },
+    )
+
+    assert result.has_tool_calls is True
+    provider_kwargs = execution_provider.execute_turn.await_args.kwargs
+    assert provider_kwargs["provider_hint"] == "smart-router"
+    assert provider_kwargs["execution_mode"] == "team_execution"
+    assert provider_kwargs["topology_action"] == "team_plan"
+    assert observed_tool_contexts[0]["formation_hint"] == "parallel"
+    assert observed_tool_contexts[0]["max_workers"] == 2
+    assert observed_tool_contexts[0]["tool_budget"] == 2
+    assert fake_orchestrator.tool_budget == 8
+    assert tool_service.budget == 8
+    assert tool_service.history == [2, 8]
+    assert fake_orchestrator._tool_pipeline.config.tool_budget == 8
+    assert settings.chat_max_iterations == 9
+    assert not hasattr(fake_orchestrator, "_runtime_tool_context_overrides")
+    assert not hasattr(chat_context, "_runtime_context_overrides")

@@ -279,20 +279,25 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._shared_context = copy.deepcopy(dict(context))
         self._message_history = []
         start_time = time.time()
+        effective_formation = self._resolve_effective_formation(context)
 
         # Emit start event
         self._emit_team_event(
             "started",
             {
                 "task": task,
-                "formation": self._formation.value,
+                "formation": effective_formation.value,
                 "member_count": len(self._members),
             },
         )
 
         try:
             # Dispatch to formation executor
-            result = await self._execute_formation(task, context)
+            result = await self._execute_formation(
+                task,
+                context,
+                formation_override=effective_formation,
+            )
 
             # Record RL outcome
             duration = time.time() - start_time
@@ -309,7 +314,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
             self._record_team_rl_outcome(
                 team_name=context.get("team_name", "UnifiedTeam"),
-                formation=self._formation.value,
+                formation=effective_formation.value,
                 success=result.get("success", False),
                 quality_score=quality,
                 metadata={
@@ -337,7 +342,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "error": str(e),
                 "member_results": {},
                 "final_output": "",
-                "formation": self._formation.value,
+                "formation": effective_formation.value,
             }
 
     async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
@@ -435,7 +440,12 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     # Formation Executors
     # =========================================================================
 
-    async def _execute_formation(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_formation(
+        self,
+        task: str,
+        context: Dict[str, Any],
+        formation_override: Optional[TeamFormation] = None,
+    ) -> Dict[str, Any]:
         """Execute using formation strategies.
 
         This replaces the old per-formation methods with a single method
@@ -449,20 +459,30 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             Result dictionary
         """
         # Get the formation strategy
-        strategy = self._formations[self._formation]
+        active_formation = formation_override or self._formation
+        strategy = self._formations[active_formation]
 
         # Wrap team members with adapters
-        adapted_members = [_TeamMemberAdapter(m, context) for m in self._members]
-
-        # Create TeamContext
-        # Add explicit manager ID if set (for hierarchical formation)
         shared_state_with_manager = dict(self._shared_context)
         if self._manager is not None:
             shared_state_with_manager["explicit_manager_id"] = self._manager.id
 
+        max_workers = self._extract_max_workers(context, shared_state_with_manager)
+        execution_members = self._limit_execution_members(
+            self._members,
+            active_formation,
+            max_workers,
+        )
+        adapted_members = [_TeamMemberAdapter(m, context) for m in execution_members]
+
+        # Create TeamContext
+        if max_workers is not None:
+            shared_state_with_manager["max_workers"] = max_workers
+        shared_state_with_manager["effective_formation"] = active_formation.value
+
         team_context = TeamContext(
             team_id=context.get("team_name", "UnifiedTeam"),
-            formation=self._formation.value,
+            formation=active_formation.value,
             shared_state=shared_state_with_manager,
             **context,
         )
@@ -499,7 +519,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "success": success,
             "member_results": member_results,
             "final_output": final_output,
-            "formation": self._formation.value,
+            "formation": active_formation.value,
             "total_tool_calls": total_tool_calls,
             "communication_log": self._message_history,
             "shared_context": self._shared_context,
@@ -514,6 +534,55 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 result_dict["consensus_rounds"] = first_metadata["consensus_rounds"]
 
         return result_dict
+
+    def _resolve_effective_formation(self, context: Dict[str, Any]) -> TeamFormation:
+        """Resolve formation override hints without mutating the default formation."""
+        raw_hint = context.get("formation_hint") or context.get("topology_formation_hint")
+        if not raw_hint:
+            return self._formation
+
+        normalized = str(raw_hint).strip().lower()
+        for formation in TeamFormation:
+            if formation.value == normalized:
+                return formation
+        return self._formation
+
+    @staticmethod
+    def _extract_max_workers(
+        context: Dict[str, Any],
+        shared_state: Dict[str, Any],
+    ) -> Optional[int]:
+        """Extract max worker hint from the execution context."""
+        raw_value = context.get("max_workers", shared_state.get("max_workers"))
+        if raw_value is None:
+            return None
+        try:
+            max_workers = int(raw_value)
+        except (TypeError, ValueError):
+            return None
+        return max_workers if max_workers > 0 else None
+
+    def _limit_execution_members(
+        self,
+        members: List["ITeamMember"],
+        formation: TeamFormation,
+        max_workers: Optional[int],
+    ) -> List["ITeamMember"]:
+        """Limit members for a single execution while preserving a hierarchical manager."""
+        if max_workers is None or max_workers >= len(members):
+            return list(members)
+
+        if formation == TeamFormation.HIERARCHICAL and self._manager in members:
+            selected: List["ITeamMember"] = [self._manager]
+            for member in members:
+                if member is self._manager:
+                    continue
+                selected.append(member)
+                if len(selected) >= max_workers:
+                    break
+            return selected
+
+        return list(members[:max_workers])
 
     # =========================================================================
     # Utility Methods

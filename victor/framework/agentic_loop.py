@@ -68,6 +68,10 @@ from victor.agent.turn_policy import (
     SpinDetector,
     SpinState,
 )
+from victor.agent.topology_contract import TopologyAction
+from victor.agent.topology_grounder import GroundedTopologyPlan, TopologyGrounder
+from victor.agent.topology_selector import TopologySelector
+from victor.agent.topology_telemetry import build_topology_telemetry_event
 from victor.core.shared_types import TaskPhase
 from victor.framework.evaluation_nodes import (
     EvaluationDecision,
@@ -462,6 +466,9 @@ class AgenticLoop:
         # Initialize paradigm router for model selection (arXiv:2604.06753)
         self.paradigm_router = get_paradigm_router()
         self.paradigm_router.enabled = self.config.get("enable_paradigm_router", True)
+        self._topology_enabled = self.config.get("enable_topology_routing", True)
+        self._topology_selector = TopologySelector()
+        self._topology_grounder = TopologyGrounder()
 
         # Try to extract turn_executor from orchestrator if not provided
         if self.turn_executor is None and hasattr(orchestrator, "turn_executor"):
@@ -630,6 +637,7 @@ class AgenticLoop:
 
                 # Update task_type from perception for more accurate gating
                 state["perception"] = perception.to_dict()
+                state["iteration"] = i
                 if hasattr(perception, "task_analysis") and perception.task_analysis:
                     state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
 
@@ -646,6 +654,20 @@ class AgenticLoop:
                         f"Papers found: {papers_found} | "
                         f"Iteration: {i}/{effective_max}"
                     )
+
+                if i == 1:
+                    topology_plan = await self._initialize_topology_plan(
+                        query=query,
+                        perception=perception,
+                        state=state,
+                        context=context,
+                        conversation_history=conversation_history,
+                    )
+                    if topology_plan and topology_plan.iteration_budget is not None:
+                        effective_max = min(
+                            effective_max,
+                            max(1, int(topology_plan.iteration_budget)),
+                        )
 
                 # Skip planning stage if in fast-path
                 if not use_llm_planning and skip_reason == "fast_path":
@@ -775,6 +797,30 @@ class AgenticLoop:
                         )
                         logger.info(f"Near completion - extending to {effective_max} iterations")
 
+                if (
+                    state.get("_topology_input_obj") is not None
+                    and state.get("_topology_decision_obj") is not None
+                    and state.get("_topology_plan_obj") is not None
+                    and i == state.get("topology_iteration", 1)
+                    and not state.get("_topology_telemetry_emitted", False)
+                ):
+                    outcome = {
+                        "iteration": i,
+                        "evaluation_decision": evaluation.decision.value,
+                        "evaluation_score": evaluation.score,
+                        "successful_tool_count": getattr(action_result, "successful_tool_count", 0),
+                        "failed_tool_count": getattr(action_result, "failed_tool_count", 0),
+                        "has_tool_calls": bool(getattr(action_result, "has_tool_calls", False)),
+                    }
+                    topology_event = build_topology_telemetry_event(
+                        state["_topology_input_obj"],
+                        state["_topology_decision_obj"],
+                        state["_topology_plan_obj"],
+                        outcome=outcome,
+                    )
+                    state.setdefault("topology_events", []).append(topology_event.to_dict())
+                    state["_topology_telemetry_emitted"] = True
+
                 # DECIDE
                 logger.info(f"[Iteration {i}/{effective_max}] DECIDE: {evaluation.decision}")
                 iteration.stage = LoopStage.DECIDE
@@ -840,6 +886,7 @@ class AgenticLoop:
                     "max_iterations_reached": len(iterations) >= self.max_iterations,
                     "effective_max_iterations": effective_max,
                     "progress_scores": list(self._progress_scores),
+                    "topology_events": list(state.get("topology_events", [])),
                 },
             )
 
@@ -855,6 +902,7 @@ class AgenticLoop:
                 metadata={
                     "error": str(e),
                     "progress_scores": list(self._progress_scores),
+                    "topology_events": list(state.get("topology_events", [])),
                 },
             )
 
@@ -973,6 +1021,140 @@ class AgenticLoop:
 
         # EVALUATE (post-hoc — decisions need full response context)
         logger.debug("[stream] Streaming complete, post-hoc evaluation done")
+
+    async def _initialize_topology_plan(
+        self,
+        query: str,
+        perception: Perception,
+        state: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[GroundedTopologyPlan]:
+        """Build and ground a topology plan for the first runtime iteration."""
+        if not self._topology_enabled or state.get("_topology_plan_obj") is not None:
+            return None
+
+        task_type = str(
+            state.get("task_type")
+            or getattr(getattr(perception, "task_analysis", None), "task_type", "unknown")
+            or "unknown"
+        )
+        task_classification = state.get("_task_classification")
+        default_tool_budget = getattr(task_classification, "tool_budget", None)
+        tool_budget = state.get("tool_budget", default_tool_budget if default_tool_budget else 10)
+        routing_context = dict(context or {})
+        routing_context.setdefault("iteration_budget", state.get("iteration_budget", self.max_iterations))
+        routing_context.setdefault("tool_budget", tool_budget)
+        routing_context.setdefault("available_team_formations", self._default_team_formations())
+
+        provider_hints = await self._get_topology_provider_hints(
+            task_type=task_type,
+            context=routing_context,
+        )
+        if provider_hints:
+            routing_context.update(provider_hints)
+            provider_candidates = []
+            primary_provider = provider_hints.get("provider_hint")
+            if isinstance(primary_provider, str) and primary_provider:
+                provider_candidates.append(primary_provider)
+            for fallback in provider_hints.get("fallback_chain", []):
+                if isinstance(fallback, str) and fallback:
+                    provider_candidates.append(fallback)
+            if provider_candidates:
+                routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
+
+        topology_input = self.paradigm_router.build_topology_input(
+            task_type=task_type,
+            query=query,
+            history_length=len(conversation_history) if conversation_history else 0,
+            query_complexity=self._perception_complexity_score(perception),
+            tool_budget=int(tool_budget) if tool_budget is not None else None,
+            context=routing_context,
+        )
+        topology_decision = self._topology_selector.select(topology_input)
+        topology_plan = self._topology_grounder.ground(topology_decision)
+        topology_overrides = topology_plan.to_context_overrides()
+
+        state["_topology_input_obj"] = topology_input
+        state["_topology_decision_obj"] = topology_decision
+        state["_topology_plan_obj"] = topology_plan
+        state["topology_input"] = topology_input.to_dict()
+        state["topology_decision"] = topology_decision.to_dict()
+        state["topology_plan"] = topology_plan.to_dict()
+        state["topology_overrides"] = topology_overrides
+        state["topology_iteration"] = state.get("iteration", 1)
+        if topology_plan.tool_budget is not None:
+            state["tool_budget"] = topology_plan.tool_budget
+        if topology_plan.iteration_budget is not None:
+            state["iteration_budget"] = topology_plan.iteration_budget
+        if topology_decision.action == TopologyAction.DIRECT_RESPONSE:
+            state["_is_qa_task"] = True
+
+        logger.info(
+            "[Topology] action=%s topology=%s provider=%s formation=%s",
+            topology_decision.action.value,
+            topology_decision.topology.value,
+            topology_plan.provider,
+            topology_plan.formation,
+        )
+        return topology_plan
+
+    async def _get_topology_provider_hints(
+        self,
+        task_type: str,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Fetch provider-routing hints when the active provider exposes them."""
+        if self.turn_executor is None:
+            return {}
+
+        provider_context = getattr(self.turn_executor, "_provider_context", None)
+        if provider_context is None:
+            return {}
+
+        provider = getattr(provider_context, "provider", None)
+        model_hint = getattr(provider_context, "model", None)
+        preferred_providers = context.get("preferred_providers")
+
+        hint_sources = [
+            getattr(provider, "get_topology_provider_hints", None),
+            getattr(getattr(provider, "engine", None), "get_topology_provider_hints", None),
+        ]
+        for get_hints in hint_sources:
+            if not callable(get_hints):
+                continue
+            try:
+                hints = await get_hints(
+                    task_type=task_type,
+                    model_hint=model_hint,
+                    preferred_providers=preferred_providers,
+                )
+            except Exception as exc:
+                logger.debug("Topology provider hints unavailable: %s", exc)
+                continue
+            if isinstance(hints, dict):
+                return hints
+        return {}
+
+    @staticmethod
+    def _perception_complexity_score(perception: Perception) -> Optional[float]:
+        """Convert Perception complexity into a stable numeric score."""
+        complexity = getattr(perception, "complexity", None)
+        if complexity is None:
+            return None
+        complexity_value = getattr(complexity, "value", str(complexity)).lower()
+        if "action" in complexity_value or "complex" in complexity_value or "high" in complexity_value:
+            return 0.8
+        if "medium" in complexity_value or "moderate" in complexity_value:
+            return 0.5
+        return 0.2
+
+    @staticmethod
+    def _default_team_formations() -> List[str]:
+        """Return canonical team formation hints for topology grounding."""
+        from victor.teams.types import TeamFormation
+
+        return [formation.value for formation in TeamFormation]
 
     def _detect_phase(
         self,
@@ -1142,13 +1324,24 @@ class AgenticLoop:
 
             task_classification = state.get("_task_classification")
             is_qa = state.get("_is_qa_task", False)
+            runtime_context_overrides = state.get("topology_overrides")
+            enable_thinking = bool(
+                state.get("enable_thinking")
+                or (
+                    isinstance(runtime_context_overrides, dict)
+                    and runtime_context_overrides.get("execution_mode")
+                    == "escalated_single_agent"
+                )
+            )
 
             turn_result = await self.turn_executor.execute_turn(
                 user_message=query,
                 task_classification=task_classification,
                 is_qa_task=is_qa,
+                enable_thinking=enable_thinking,
                 intent=state.get("perception", {}).get("intent"),
                 temperature_override=state.get("temperature_override"),
+                runtime_context_overrides=runtime_context_overrides,
             )
 
             # Update shared spin detector

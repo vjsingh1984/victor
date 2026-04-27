@@ -65,6 +65,30 @@ class TestRoutingDecision:
         assert data["fallback_chain"] == ["openai"]
         assert data["confidence"] == 0.9
 
+    def test_to_topology_hints(self):
+        """Topology hints should expose stable provider-routing fields."""
+        decision = RoutingDecision(
+            selected_provider="ollama",
+            fallback_chain=["openai"],
+            rationale="Prefer local provider",
+            confidence=0.78,
+            factors={
+                "health": 1.0,
+                "resources": 1.0,
+                "cost": 0.9,
+                "latency": 0.3,
+                "performance": 0.5,
+            },
+        )
+
+        hints = decision.to_topology_hints()
+
+        assert hints["provider_hint"] == "ollama"
+        assert hints["provider_locality"] == "local"
+        assert hints["fallback_chain"] == ["openai"]
+        assert hints["health_score"] == 1.0
+        assert hints["latency_score"] == 0.3
+
 
 class TestRoutingDecisionEngine:
     """Tests for RoutingDecisionEngine."""
@@ -269,6 +293,17 @@ class TestRoutingDecisionEngine:
         score = await engine._score_performance("ollama")
 
         assert score > 0.5  # Should have good score
+
+    @pytest.mark.asyncio
+    async def test_get_topology_provider_hints(self, engine):
+        """Engine should expose selector-friendly provider-routing hints."""
+        hints = await engine.get_topology_provider_hints(task_type="default")
+
+        assert "provider_hint" in hints
+        assert "provider_locality" in hints
+        assert "fallback_chain" in hints
+        assert "health_score" in hints
+        assert "cost_score" in hints
 
 
 class TestSmartRoutingProvider:
