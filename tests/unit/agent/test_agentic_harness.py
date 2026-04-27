@@ -131,6 +131,7 @@ class TestAgenticExecutionTrace:
         assert trace.generated_patch == ""
         assert trace.validation_errors == {}
         assert trace.completion_signals == {}
+        assert trace.topology_events == []
 
     def test_duration_calculation(self):
         """Test trace duration calculation."""
@@ -191,6 +192,14 @@ class TestAgenticExecutionTrace:
             generated_patch="--- a/a.py\n+++ b/a.py",
             validations={"patch_applies": True},
             validation_errors={"tests_pass": "Some tests failed"},
+            topology_events=[
+                {
+                    "action": "team_plan",
+                    "topology": "team",
+                    "execution_mode": "team_execution",
+                    "confidence": 0.83,
+                }
+            ],
         )
         result = trace.to_dict()
 
@@ -208,6 +217,7 @@ class TestAgenticExecutionTrace:
         assert "tests_pass" in result["validation_errors"]
         assert result["total_tool_calls"] == 1
         assert result["successful_tool_calls"] == 1
+        assert result["topology_events"][0]["action"] == "team_plan"
         assert result["files_modified"] == ["a.py"]
 
     def test_to_dict_includes_benchmark_metadata(self):
@@ -368,6 +378,42 @@ class TestAgenticMetrics:
         exported = metrics.to_dict()
         assert exported["summary"]["failure_categories"] == {"test_failure": 1}
         assert exported["tasks"][0]["failure_category"] == "test_failure"
+
+    def test_to_dict_includes_topology_metrics(self):
+        """Topology coverage and reward should be surfaced for agentic tasks."""
+        trace = AgenticExecutionTrace(
+            task_id="test-006",
+            start_time=0.0,
+            benchmark=BenchmarkType.SWE_BENCH.value,
+            turns=3,
+            tool_calls=[EvalToolCall(name="code_search", arguments={}, success=True)],
+            topology_events=[
+                {
+                    "action": "team_plan",
+                    "topology": "team",
+                    "execution_mode": "team_execution",
+                    "formation": "parallel",
+                    "confidence": 0.84,
+                }
+            ],
+        )
+        result = AgenticTaskResult(
+            task_id="test-006",
+            status=TaskStatus.PASSED,
+            trace=trace,
+            benchmark=BenchmarkType.SWE_BENCH,
+            overall_score=0.8,
+        )
+        metrics = AgenticMetrics(total_tasks=1, passed=1, task_results=[result])
+
+        exported = metrics.to_dict()
+
+        assert exported["summary"]["topology_feedback_coverage"] == 1.0
+        assert exported["quality"]["avg_topology_reward"] >= 0.0
+        assert exported["topology"]["topology_actions"] == {"team_plan": 1}
+        assert exported["tasks"][0]["topology_summary"]["final_execution_mode"] == (
+            "team_execution"
+        )
 
 
 class TestPatchApplicationValidator:

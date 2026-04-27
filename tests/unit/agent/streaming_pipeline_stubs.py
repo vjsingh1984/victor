@@ -27,6 +27,10 @@ class DummyStreamContext:
         self.total_tokens = 0
         self.total_accumulated_chars = 0
         self.force_completion = False
+        self.provider_kwargs = {}
+        self.runtime_context_overrides = {}
+        self.topology_events = []
+        self.runtime_override_snapshot = None
 
     def accumulate_content(self, content: str) -> None:
         self.total_accumulated_chars = len(content)

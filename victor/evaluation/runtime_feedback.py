@@ -268,6 +268,17 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             "overconfidence_rate": round(overconfidence_rate, 4),
             "underconfidence_rate": round(underconfidence_rate, 4),
             "task_count": len(tasks),
+            "topology_feedback_coverage": round(
+                float(summary.get("topology_feedback_coverage", 0.0) or 0.0), 4
+            ),
+            "avg_topology_reward": round(
+                float(summary.get("avg_topology_reward", 0.0) or 0.0), 4
+            ),
+            "avg_topology_confidence": round(
+                float(summary.get("avg_topology_confidence", 0.0) or 0.0), 4
+            ),
+            "topology_actions": dict(summary.get("topology_actions") or {}),
+            "topology_execution_modes": dict(summary.get("topology_execution_modes") or {}),
         },
     )
 

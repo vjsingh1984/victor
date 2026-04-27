@@ -5,6 +5,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+from victor.agent.topology_contract import (
+    TopologyAction,
+    TopologyDecision,
+    TopologyDecisionInput,
+    TopologyGroundingRequirements,
+    TopologyKind,
+)
+from victor.agent.topology_grounder import GroundedTopologyPlan
+from victor.framework.task import TaskComplexity
 from victor.providers.base import StreamChunk
 
 
@@ -109,3 +118,157 @@ async def test_service_streaming_runtime_create_stream_context_uses_blocked_thre
     ctx = await runtime._create_stream_context("hello")
 
     assert ctx.max_blocked_before_force == 7
+
+
+@pytest.mark.asyncio
+async def test_service_streaming_runtime_create_stream_context_applies_topology_overrides(
+    monkeypatch,
+):
+    orch = _make_orchestrator_stub()
+    orch.settings = SimpleNamespace(
+        recovery_blocked_consecutive_threshold=7,
+        enable_topology_routing=True,
+    )
+    orch._classify_task_keywords.return_value = {
+        "coarse_task_type": "analysis",
+        "is_analysis_task": True,
+    }
+    orch._tool_planner = SimpleNamespace(infer_goals_from_message=lambda _: ["inspect"])
+    orch.tool_budget = 200
+    orch.tool_calls_used = 0
+    orch._task_completion_detector = None
+    orch.messages = []
+    orch.model = "test-model"
+    orch.provider = SimpleNamespace()
+    orch.task_coordinator = SimpleNamespace(tool_budget=200)
+    orch._tool_service = SimpleNamespace(
+        get_tool_budget=lambda: 200,
+        set_tool_budget=MagicMock(),
+    )
+    orch._tool_pipeline = SimpleNamespace(config=SimpleNamespace(tool_budget=200))
+
+    runtime = ServiceStreamingRuntime(orch)
+    runtime._prepare_stream = AsyncMock(
+        return_value=(
+            SimpleNamespace(),
+            0.0,
+            0.0,
+            {},
+            30,
+            10,
+            0,
+            False,
+            SimpleNamespace(value="analysis"),
+            SimpleNamespace(complexity=TaskComplexity.COMPLEX, task_type="design"),
+            6,
+        )
+    )
+    runtime._get_stream_topology_provider_hints = AsyncMock(
+        return_value={"provider_hint": "smart-router", "fallback_chain": ["smart-router"]}
+    )
+    runtime._paradigm_router = SimpleNamespace(
+        build_topology_input=MagicMock(
+            return_value=TopologyDecisionInput(
+                query="hello",
+                task_type="design",
+                task_complexity="high",
+                tool_budget=6,
+                iteration_budget=3,
+                available_team_formations=["parallel", "hierarchical"],
+                provider_candidates=["smart-router"],
+            )
+        )
+    )
+    runtime._topology_selector = SimpleNamespace(
+        select=MagicMock(
+            return_value=TopologyDecision(
+                action=TopologyAction.TEAM_PLAN,
+                topology=TopologyKind.TEAM,
+                confidence=0.8,
+                rationale="Deep task favors a team plan.",
+                grounding_requirements=TopologyGroundingRequirements(
+                    provider="smart-router",
+                    formation="parallel",
+                    max_workers=3,
+                    tool_budget=4,
+                    iteration_budget=2,
+                ),
+                provider="smart-router",
+                formation="parallel",
+            )
+        )
+    )
+    runtime._topology_grounder = SimpleNamespace(
+        ground=MagicMock(
+            return_value=GroundedTopologyPlan(
+                action=TopologyAction.TEAM_PLAN,
+                topology=TopologyKind.TEAM,
+                execution_mode="team_execution",
+                provider="smart-router",
+                formation="parallel",
+                max_workers=3,
+                tool_budget=4,
+                iteration_budget=2,
+            )
+        )
+    )
+
+    helpers_module = importlib.import_module("victor.agent.services.chat_stream_helpers")
+    emit_mock = AsyncMock(return_value=True)
+    monkeypatch.setattr(helpers_module, "emit_topology_telemetry_event", emit_mock)
+
+    ctx = await runtime._create_stream_context("hello")
+
+    assert ctx.topology_plan["execution_mode"] == "team_execution"
+    assert ctx.provider_kwargs["provider_hint"] == "smart-router"
+    assert ctx.runtime_context_overrides["formation_hint"] == "parallel"
+    assert ctx.tool_budget == 4
+    assert ctx.max_total_iterations == 2
+    assert orch.tool_budget == 4
+    assert orch._runtime_tool_context_overrides["max_workers"] == 3
+    assert len(ctx.topology_events) == 1
+    emit_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(monkeypatch):
+    orch = _make_orchestrator_stub()
+    orch.tool_budget = 9
+    orch.task_coordinator = SimpleNamespace(tool_budget=9)
+    orch._tool_service = SimpleNamespace(
+        get_tool_budget=lambda: 9,
+        set_tool_budget=MagicMock(),
+    )
+    orch._tool_pipeline = SimpleNamespace(config=SimpleNamespace(tool_budget=9))
+    orch._conversation_controller.messages = [SimpleNamespace(content="abc")]
+    orch.has_capability.side_effect = lambda name: name == "current_stream_context"
+
+    runtime = ServiceStreamingRuntime(orch)
+    ctx = SimpleNamespace(
+        cumulative_usage={
+            "prompt_tokens": 3,
+            "completion_tokens": 2,
+            "total_tokens": 5,
+        },
+        runtime_override_snapshot=None,
+    )
+    ctx.runtime_override_snapshot = runtime._apply_stream_runtime_overrides(
+        {"tool_budget": 4, "provider_hint": "smart-router"}
+    )
+    orch.get_capability_value.side_effect = lambda name: ctx if name == "current_stream_context" else None
+    orch._current_stream_context = ctx
+
+    class DummyPipeline:
+        async def run(self, user_message: str, **kwargs):
+            yield StreamChunk(content="service", is_final=True)
+
+    runtime._streaming_pipeline = DummyPipeline()
+
+    chunks = [item async for item in runtime.stream_chat("hello")]
+
+    assert chunks == [StreamChunk(content="service", is_final=True)]
+    assert orch.tool_budget == 9
+    assert orch.task_coordinator.tool_budget == 9
+    assert "_runtime_tool_context_overrides" not in orch.__dict__
+    assert ctx.runtime_override_snapshot is None
+    assert orch._current_stream_context is None

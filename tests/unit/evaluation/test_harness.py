@@ -713,6 +713,42 @@ class TestBenchmarkToolUsageMetrics:
         assert result.code_search_calls == 2
         assert result.graph_calls == 1
 
+    @pytest.mark.asyncio
+    async def test_run_single_task_maps_topology_metadata_from_agent_callback(self):
+        """Dict-returning callbacks should preserve topology events in task metadata."""
+        harness = EvaluationHarness()
+        runner = MockBenchmarkRunner()
+        task = BenchmarkTask(
+            task_id="task-topology",
+            benchmark=BenchmarkType.CUSTOM,
+            description="Topology-aware task",
+        )
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.CUSTOM,
+            model="test-model",
+        )
+
+        async def agent_callback(_task):
+            return {
+                "code": "print('hi')",
+                "tool_calls": 2,
+                "turns": 1,
+                "metadata": {"source": "unit-test"},
+                "topology_events": [
+                    {
+                        "action": "single_agent",
+                        "topology": "single_agent",
+                        "execution_mode": "single_agent",
+                        "confidence": 0.74,
+                    }
+                ],
+            }
+
+        result = await harness._run_single_task(task, runner, agent_callback, config)
+
+        assert result.metadata["source"] == "unit-test"
+        assert result.metadata["topology_events"][0]["action"] == "single_agent"
+
     def test_save_results_persists_code_intelligence_metrics(self, tmp_path):
         """Saved benchmark result JSON should include per-task tool telemetry."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)
@@ -728,6 +764,16 @@ class TestBenchmarkToolUsageMetrics:
                     tool_calls=3,
                     code_search_calls=2,
                     graph_calls=1,
+                    metadata={
+                        "topology_events": [
+                            {
+                                "action": "single_agent",
+                                "topology": "single_agent",
+                                "execution_mode": "single_agent",
+                                "confidence": 0.77,
+                            }
+                        ]
+                    },
                 )
             ],
         )
@@ -737,8 +783,10 @@ class TestBenchmarkToolUsageMetrics:
 
         assert loaded["summary"]["total_code_search_calls"] == 2
         assert loaded["summary"]["total_graph_calls"] == 1
+        assert loaded["summary"]["topology_feedback_coverage"] == 1.0
         assert loaded["tasks"][0]["code_search_calls"] == 2
         assert loaded["tasks"][0]["graph_calls"] == 1
+        assert loaded["tasks"][0]["metadata"]["topology_events"][0]["action"] == "single_agent"
 
     def test_save_results_persists_failure_taxonomy(self, tmp_path):
         """Saved results should include normalized failure category fields."""

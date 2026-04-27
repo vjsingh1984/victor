@@ -71,7 +71,10 @@ from victor.agent.turn_policy import (
 from victor.agent.topology_contract import TopologyAction
 from victor.agent.topology_grounder import GroundedTopologyPlan, TopologyGrounder
 from victor.agent.topology_selector import TopologySelector
-from victor.agent.topology_telemetry import build_topology_telemetry_event
+from victor.agent.topology_telemetry import (
+    build_topology_telemetry_event,
+    emit_topology_telemetry_event,
+)
 from victor.core.shared_types import TaskPhase
 from victor.framework.evaluation_nodes import (
     EvaluationDecision,
@@ -819,6 +822,7 @@ class AgenticLoop:
                         outcome=outcome,
                     )
                     state.setdefault("topology_events", []).append(topology_event.to_dict())
+                    await emit_topology_telemetry_event(topology_event)
                     state["_topology_telemetry_emitted"] = True
 
                 # DECIDE

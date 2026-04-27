@@ -78,6 +78,18 @@ def test_browser_emitter_builds_artifact_with_canonical_payload(tmp_path):
             "missing_answer_phrases": ["settings"],
             "forbidden_action_hits": [],
         },
+        metadata={
+            "topology_events": [
+                {
+                    "action": "team_plan",
+                    "topology": "team",
+                    "execution_mode": "team_execution",
+                    "formation": "parallel",
+                    "provider": "openai",
+                    "confidence": 0.84,
+                }
+            ]
+        },
     )
     evaluation_result = EvaluationResult(config=config, task_results=[task_result])
 
@@ -111,6 +123,13 @@ def test_browser_emitter_builds_artifact_with_canonical_payload(tmp_path):
     )
     assert artifact.record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
         "browser"
+    )
+    assert artifact.record["topology_summary"]["selected_action"] == "team_plan"
+    assert (
+        artifact.record["runtime_evaluation_feedback"]["metadata"]["topology_summary"][
+            "final_execution_mode"
+        ]
+        == "team_execution"
     )
 
 

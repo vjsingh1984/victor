@@ -130,6 +130,15 @@ class StreamingChatContext:
     tool_calls_used: int = 0
     unique_resources: Set[str] = field(default_factory=set)
 
+    # Topology/runtime override tracking
+    runtime_context_overrides: Dict[str, Any] = field(default_factory=dict)
+    provider_kwargs: Dict[str, Any] = field(default_factory=dict)
+    topology_input: Optional[Dict[str, Any]] = None
+    topology_decision: Optional[Dict[str, Any]] = None
+    topology_plan: Optional[Dict[str, Any]] = None
+    topology_events: List[Dict[str, Any]] = field(default_factory=list)
+    runtime_override_snapshot: Optional[Dict[str, Any]] = None
+
     def elapsed_time(self) -> float:
         """Get idle time since last activity (provider response or tool execution)."""
         return time.time() - self.last_activity_time

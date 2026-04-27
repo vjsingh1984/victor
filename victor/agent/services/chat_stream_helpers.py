@@ -9,10 +9,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
 
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
+from victor.agent.paradigm_router import get_paradigm_router
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
+from victor.agent.topology_contract import TopologyAction
+from victor.agent.topology_grounder import TopologyGrounder
+from victor.agent.topology_selector import TopologySelector
+from victor.agent.topology_telemetry import (
+    build_topology_telemetry_event,
+    emit_topology_telemetry_event,
+)
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.core.errors import (
@@ -27,6 +35,7 @@ if TYPE_CHECKING:
     from victor.agent.streaming.context import StreamingChatContext
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
 
 
 class ChatStreamHelperMixin:
@@ -265,8 +274,351 @@ class ChatStreamHelperMixin:
         ctx.tool_budget = orch.tool_budget
         ctx.tool_calls_used = orch.tool_calls_used
         ctx.task_completion_detector = orch._task_completion_detector
+        await self._initialize_stream_topology_context(ctx, user_message)
 
         return ctx
+
+    async def _initialize_stream_topology_context(
+        self,
+        stream_ctx: "StreamingChatContext",
+        user_message: str,
+    ) -> None:
+        """Build and ground a topology plan for the streaming runtime."""
+        if not self._is_stream_topology_enabled() or stream_ctx.topology_plan is not None:
+            return
+
+        orch = self._orchestrator
+        task_classification = stream_ctx.task_classification
+        task_type = str(
+            getattr(task_classification, "task_type", None)
+            or stream_ctx.coarse_task_type
+            or getattr(stream_ctx.unified_task_type, "value", "default")
+            or "default"
+        )
+        tool_budget = (
+            stream_ctx.complexity_tool_budget
+            if stream_ctx.complexity_tool_budget is not None
+            else stream_ctx.tool_budget
+        )
+        if tool_budget is None:
+            tool_budget = getattr(orch, "tool_budget", 10) or 10
+
+        routing_context: Dict[str, Any] = {
+            "iteration_budget": stream_ctx.max_total_iterations,
+            "tool_budget": int(tool_budget),
+            "available_team_formations": self._default_team_formations(),
+        }
+
+        provider_hints = await self._get_stream_topology_provider_hints(
+            task_type=task_type,
+            context=routing_context,
+        )
+        if provider_hints:
+            routing_context.update(provider_hints)
+            provider_candidates: List[str] = []
+            primary_provider = provider_hints.get("provider_hint")
+            if isinstance(primary_provider, str) and primary_provider:
+                provider_candidates.append(primary_provider)
+            for fallback in provider_hints.get("fallback_chain", []):
+                if isinstance(fallback, str) and fallback:
+                    provider_candidates.append(fallback)
+            if provider_candidates:
+                routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
+
+        paradigm_router = getattr(self, "_paradigm_router", None)
+        if paradigm_router is None:
+            paradigm_router = get_paradigm_router()
+            self._paradigm_router = paradigm_router
+
+        topology_selector = getattr(self, "_topology_selector", None)
+        if topology_selector is None:
+            topology_selector = TopologySelector()
+            self._topology_selector = topology_selector
+
+        topology_grounder = getattr(self, "_topology_grounder", None)
+        if topology_grounder is None:
+            topology_grounder = TopologyGrounder()
+            self._topology_grounder = topology_grounder
+
+        topology_input = paradigm_router.build_topology_input(
+            task_type=task_type,
+            query=user_message,
+            history_length=len(getattr(orch, "messages", []) or []),
+            query_complexity=self._stream_query_complexity(stream_ctx),
+            tool_budget=int(tool_budget),
+            context=routing_context,
+        )
+        topology_decision = topology_selector.select(topology_input)
+        topology_plan = topology_grounder.ground(topology_decision)
+        topology_overrides = topology_plan.to_context_overrides()
+
+        stream_ctx.topology_input = topology_input.to_dict()
+        stream_ctx.topology_decision = topology_decision.to_dict()
+        stream_ctx.topology_plan = topology_plan.to_dict()
+        stream_ctx.runtime_context_overrides = dict(topology_overrides)
+        stream_ctx.provider_kwargs = self._stream_provider_call_overrides(topology_overrides)
+
+        if topology_plan.tool_budget is not None:
+            adjusted_tool_budget = max(0, int(topology_plan.tool_budget))
+            stream_ctx.tool_budget = adjusted_tool_budget
+            stream_ctx.complexity_tool_budget = adjusted_tool_budget
+        if topology_plan.iteration_budget is not None:
+            adjusted_iteration_budget = max(1, int(topology_plan.iteration_budget))
+            stream_ctx.max_total_iterations = adjusted_iteration_budget
+            stream_ctx.max_exploration_iterations = min(
+                max(1, stream_ctx.max_exploration_iterations),
+                adjusted_iteration_budget,
+            )
+        if topology_decision.action == TopologyAction.DIRECT_RESPONSE:
+            stream_ctx.is_qa_task = True
+
+        stream_ctx.runtime_override_snapshot = self._apply_stream_runtime_overrides(
+            topology_overrides
+        )
+
+        topology_event = build_topology_telemetry_event(
+            topology_input,
+            topology_decision,
+            grounded_plan=topology_plan,
+            outcome={"status": "planned", "runtime": "streaming"},
+        )
+        stream_ctx.topology_events.append(topology_event.to_dict())
+        await emit_topology_telemetry_event(topology_event)
+
+        logger.info(
+            "[StreamingTopology] action=%s topology=%s provider=%s formation=%s",
+            topology_decision.action.value,
+            topology_decision.topology.value,
+            topology_plan.provider,
+            topology_plan.formation,
+        )
+
+    def _is_stream_topology_enabled(self) -> bool:
+        """Return whether streaming topology routing is enabled."""
+        explicit = getattr(self, "_topology_enabled", None)
+        if explicit is not None:
+            return bool(explicit)
+        settings = getattr(self._orchestrator, "settings", None)
+        if settings is not None and hasattr(settings, "enable_topology_routing"):
+            return bool(getattr(settings, "enable_topology_routing"))
+        return True
+
+    async def _get_stream_topology_provider_hints(
+        self,
+        task_type: str,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Fetch provider-routing hints when the active provider exposes them."""
+        orch = self._orchestrator
+        provider = getattr(orch, "provider", None)
+        model_hint = getattr(orch, "model", None)
+        preferred_providers = context.get("preferred_providers")
+
+        hint_sources = [
+            getattr(provider, "get_topology_provider_hints", None),
+            getattr(getattr(provider, "engine", None), "get_topology_provider_hints", None),
+        ]
+        for get_hints in hint_sources:
+            if not callable(get_hints):
+                continue
+            try:
+                hints = await get_hints(
+                    task_type=task_type,
+                    model_hint=model_hint,
+                    preferred_providers=preferred_providers,
+                )
+            except Exception as exc:
+                logger.debug("Streaming topology provider hints unavailable: %s", exc)
+                continue
+            if isinstance(hints, dict):
+                return hints
+        return {}
+
+    @staticmethod
+    def _stream_query_complexity(stream_ctx: "StreamingChatContext") -> Optional[float]:
+        """Convert streaming task complexity into a stable numeric score."""
+        task_classification = stream_ctx.task_classification
+        complexity = getattr(task_classification, "complexity", None)
+        if complexity is not None:
+            complexity_value = getattr(complexity, "value", str(complexity)).lower()
+            if (
+                "analysis" in complexity_value
+                or "complex" in complexity_value
+                or "high" in complexity_value
+            ):
+                return 0.8
+            if "medium" in complexity_value or "moderate" in complexity_value:
+                return 0.5
+            return 0.2
+
+        if stream_ctx.is_analysis_task or stream_ctx.is_complex_task:
+            return 0.8
+        if stream_ctx.is_action_task:
+            return 0.5
+        return 0.2
+
+    @staticmethod
+    def _default_team_formations() -> List[str]:
+        """Return canonical team formation hints for topology grounding."""
+        from victor.teams.types import TeamFormation
+
+        return [formation.value for formation in TeamFormation]
+
+    @staticmethod
+    def _stream_provider_call_overrides(overrides: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract provider-facing runtime override hints."""
+        provider_keys = (
+            "provider_hint",
+            "execution_mode",
+            "escalation_target",
+            "topology_action",
+            "topology_kind",
+            "topology_metadata",
+        )
+        return {
+            key: value
+            for key, value in overrides.items()
+            if key in provider_keys and value is not None
+        }
+
+    def _apply_stream_runtime_overrides(
+        self,
+        overrides: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Apply temporary runtime overrides for the streaming turn."""
+        if not overrides:
+            return None
+
+        orch = self._orchestrator
+        instance_dict = getattr(orch, "__dict__", {})
+        snapshot: Dict[str, Any] = {
+            "orchestrator_runtime_context": instance_dict.get(
+                "_runtime_tool_context_overrides",
+                _MISSING,
+            ),
+        }
+
+        merged_context: Dict[str, Any] = {}
+        previous_runtime_context = snapshot["orchestrator_runtime_context"]
+        if isinstance(previous_runtime_context, dict):
+            merged_context.update(previous_runtime_context)
+        merged_context.update(overrides)
+        orch._runtime_tool_context_overrides = merged_context
+
+        tool_budget = self._coerce_stream_int_override(overrides.get("tool_budget"))
+        if tool_budget is not None:
+            if hasattr(orch, "tool_budget"):
+                snapshot["orchestrator_tool_budget"] = getattr(orch, "tool_budget", _MISSING)
+                try:
+                    orch.tool_budget = max(0, tool_budget)
+                except Exception:
+                    pass
+
+            task_coordinator = getattr(orch, "task_coordinator", None)
+            if task_coordinator is not None and hasattr(task_coordinator, "tool_budget"):
+                snapshot["task_coordinator_tool_budget"] = getattr(
+                    task_coordinator,
+                    "tool_budget",
+                    _MISSING,
+                )
+                try:
+                    task_coordinator.tool_budget = max(0, tool_budget)
+                except Exception:
+                    pass
+
+            tool_service = getattr(orch, "_tool_service", None)
+            if tool_service is not None and hasattr(tool_service, "get_tool_budget"):
+                snapshot["tool_service_budget"] = tool_service.get_tool_budget()
+                if hasattr(tool_service, "set_tool_budget"):
+                    try:
+                        tool_service.set_tool_budget(max(0, tool_budget))
+                    except Exception:
+                        pass
+
+            tool_pipeline = getattr(orch, "_tool_pipeline", None)
+            pipeline_config = getattr(tool_pipeline, "config", None)
+            if pipeline_config is not None and hasattr(pipeline_config, "tool_budget"):
+                snapshot["pipeline_tool_budget"] = getattr(
+                    pipeline_config,
+                    "tool_budget",
+                    _MISSING,
+                )
+                try:
+                    pipeline_config.tool_budget = max(0, tool_budget)
+                except Exception:
+                    pass
+
+        return snapshot
+
+    def _restore_stream_runtime_overrides(
+        self,
+        snapshot: Optional[Dict[str, Any]],
+    ) -> None:
+        """Restore runtime state after one streaming turn completes."""
+        if not snapshot:
+            return
+
+        orch = self._orchestrator
+        previous_runtime_context = snapshot.get("orchestrator_runtime_context", _MISSING)
+        if previous_runtime_context is _MISSING:
+            if hasattr(orch, "_runtime_tool_context_overrides"):
+                delattr(orch, "_runtime_tool_context_overrides")
+        else:
+            orch._runtime_tool_context_overrides = previous_runtime_context
+
+        previous_orchestrator_budget = snapshot.get("orchestrator_tool_budget", _MISSING)
+        if previous_orchestrator_budget is not _MISSING and hasattr(orch, "tool_budget"):
+            try:
+                orch.tool_budget = previous_orchestrator_budget
+            except Exception:
+                pass
+
+        task_coordinator = getattr(orch, "task_coordinator", None)
+        previous_task_coordinator_budget = snapshot.get("task_coordinator_tool_budget", _MISSING)
+        if (
+            previous_task_coordinator_budget is not _MISSING
+            and task_coordinator is not None
+            and hasattr(task_coordinator, "tool_budget")
+        ):
+            try:
+                task_coordinator.tool_budget = previous_task_coordinator_budget
+            except Exception:
+                pass
+
+        tool_service = getattr(orch, "_tool_service", None)
+        previous_service_budget = snapshot.get("tool_service_budget", _MISSING)
+        if (
+            previous_service_budget is not _MISSING
+            and tool_service is not None
+            and hasattr(tool_service, "set_tool_budget")
+        ):
+            try:
+                tool_service.set_tool_budget(previous_service_budget)
+            except Exception:
+                pass
+
+        tool_pipeline = getattr(orch, "_tool_pipeline", None)
+        pipeline_config = getattr(tool_pipeline, "config", None)
+        previous_pipeline_budget = snapshot.get("pipeline_tool_budget", _MISSING)
+        if (
+            previous_pipeline_budget is not _MISSING
+            and pipeline_config is not None
+            and hasattr(pipeline_config, "tool_budget")
+        ):
+            try:
+                pipeline_config.tool_budget = previous_pipeline_budget
+            except Exception:
+                pass
+
+    @staticmethod
+    def _coerce_stream_int_override(value: Any) -> Optional[int]:
+        """Convert runtime override values into integers when possible."""
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def _prepare_task(
         self, user_message: str, unified_task_type: TrackerTaskType
@@ -542,8 +894,13 @@ class ChatStreamHelperMixin:
                     "If you need to use tools, go ahead. Otherwise, provide a text answer.",
                 )
 
-                provider_kwargs: Dict[str, Any] = {}
-                if orch.thinking:
+                provider_kwargs: Dict[str, Any] = dict(
+                    getattr(stream_ctx, "provider_kwargs", {}) or {}
+                )
+                if (
+                    orch.thinking
+                    or provider_kwargs.get("execution_mode") == "escalated_single_agent"
+                ):
                     provider_kwargs["thinking"] = {
                         "type": "enabled",
                         "budget_tokens": 10000,

@@ -184,6 +184,18 @@ class TestStreamingChatContext:
         assert "cache_read_input_tokens" in ctx.cumulative_usage
         assert ctx.cumulative_usage["prompt_tokens"] == 0
 
+    def test_topology_fields_default_to_empty_or_none(self):
+        """Topology-related streaming state starts with neutral defaults."""
+        ctx = StreamingChatContext(user_message="test")
+
+        assert ctx.runtime_context_overrides == {}
+        assert ctx.provider_kwargs == {}
+        assert ctx.topology_input is None
+        assert ctx.topology_decision is None
+        assert ctx.topology_plan is None
+        assert ctx.topology_events == []
+        assert ctx.runtime_override_snapshot is None
+
 
 class TestCreateStreamContext:
     """Tests for create_stream_context factory function."""

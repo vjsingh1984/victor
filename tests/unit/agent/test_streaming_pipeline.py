@@ -277,6 +277,38 @@ async def test_pipeline_uses_runtime_intelligence_for_budget_reset_and_analysis(
 
 
 @pytest.mark.asyncio
+async def test_pipeline_merges_stream_context_provider_kwargs():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._stream_ctx.provider_kwargs = {
+        "provider_hint": "smart-router",
+        "execution_mode": "escalated_single_agent",
+    }
+    coordinator._stream_provider_response = AsyncMock(
+        return_value=("assistant notes", None, None, False)
+    )
+    coordinator._intent_classification_handler = StubIntentHandler(
+        IntentClassificationResult(
+            chunks=[],
+            action_result={"reason": "finish"},
+            action="finish",
+        )
+    )
+    coordinator._continuation_handler = StubContinuationHandler(
+        StubContinuationResult(chunks=[], state_updates={}, should_return=True)
+    )
+
+    pipeline = StreamingChatPipeline(coordinator)
+
+    async for _ in pipeline.run("hello"):
+        pass
+
+    provider_kwargs = coordinator._stream_provider_response.await_args.kwargs["provider_kwargs"]
+    assert provider_kwargs["provider_hint"] == "smart-router"
+    assert provider_kwargs["execution_mode"] == "escalated_single_agent"
+    assert provider_kwargs["thinking"]["type"] == "enabled"
+
+
+@pytest.mark.asyncio
 async def test_pipeline_resets_streaming_turn_state_before_execution():
     cancel_chunk = StreamChunk(content="", is_final=True)
     coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])

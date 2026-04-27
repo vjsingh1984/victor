@@ -502,8 +502,8 @@ class StreamingChatPipeline:
                 tools = await self._get_tools_cached(orch, stream_ctx.context_msg, goals)
 
             # Prepare optional thinking parameter for providers that support it
-            provider_kwargs = {}
-            if orch.thinking:
+            provider_kwargs = dict(getattr(stream_ctx, "provider_kwargs", {}) or {})
+            if orch.thinking or provider_kwargs.get("execution_mode") == "escalated_single_agent":
                 provider_kwargs["thinking"] = {
                     "type": "enabled",
                     "budget_tokens": 10000,

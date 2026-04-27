@@ -14,6 +14,11 @@
 
 """Tests for topology telemetry payloads."""
 
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
+
 from victor.agent.topology_contract import (
     TopologyAction,
     TopologyDecision,
@@ -25,6 +30,7 @@ from victor.agent.topology_grounder import GroundedTopologyPlan
 from victor.agent.topology_telemetry import (
     TopologyTelemetryEvent,
     build_topology_telemetry_event,
+    emit_topology_telemetry_event,
 )
 
 
@@ -120,3 +126,31 @@ class TestBuildTopologyTelemetryEvent:
         assert event.formation == "hierarchical"
         assert event.fallback_action == "escalate_model"
         assert event.outcome["tool_calls"] == 7
+
+
+@pytest.mark.asyncio
+async def test_emit_topology_telemetry_event_uses_observability_bus(monkeypatch):
+    bus = SimpleNamespace(emit=AsyncMock(return_value=True))
+    events_module = __import__("victor.core.events", fromlist=["get_observability_bus"])
+    monkeypatch.setattr(events_module, "get_observability_bus", lambda: bus)
+
+    event = TopologyTelemetryEvent(
+        query="route query",
+        task_type="analysis",
+        task_complexity="medium",
+        privacy_sensitivity="medium",
+        bandwidth_pressure="low",
+        latency_sensitivity="medium",
+        token_cost_pressure="medium",
+        action="single_agent",
+        topology="single_agent",
+        confidence=0.75,
+        rationale="Balanced task",
+    )
+
+    emitted = await emit_topology_telemetry_event(event)
+
+    assert emitted is True
+    bus.emit.assert_awaited_once()
+    assert bus.emit.await_args.kwargs["topic"] == "topology.decision"
+    assert bus.emit.await_args.kwargs["data"]["category"] == "topology"

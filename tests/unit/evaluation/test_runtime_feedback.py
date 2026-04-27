@@ -38,6 +38,11 @@ def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
             "truth_alignment_rate": 0.8,
             "overconfidence_rate": 0.4,
             "underconfidence_rate": 0.0,
+            "topology_feedback_coverage": 0.5,
+            "avg_topology_reward": 0.64,
+            "avg_topology_confidence": 0.73,
+            "topology_actions": {"team_plan": 1},
+            "topology_execution_modes": {"team_execution": 1},
         },
         "tasks": [
             {
@@ -77,6 +82,11 @@ def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
     assert feedback.metadata["underconfidence_rate"] == pytest.approx(0.0)
     assert feedback.metadata["task_count"] == 2
     assert feedback.metadata["scope"]["provider"] == "anthropic"
+    assert feedback.metadata["topology_feedback_coverage"] == pytest.approx(0.5)
+    assert feedback.metadata["avg_topology_reward"] == pytest.approx(0.64)
+    assert feedback.metadata["avg_topology_confidence"] == pytest.approx(0.73)
+    assert feedback.metadata["topology_actions"] == {"team_plan": 1}
+    assert feedback.metadata["topology_execution_modes"] == {"team_execution": 1}
 
 
 def test_save_and_load_runtime_feedback_round_trip(tmp_path):

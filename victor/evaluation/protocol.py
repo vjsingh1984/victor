@@ -25,6 +25,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from victor.evaluation.topology_feedback import aggregate_topology_feedback
+
 
 @dataclass
 class TokenUsage:
@@ -388,6 +390,7 @@ class TaskResult:
     traceback: str = ""
     failure_category: Optional[BenchmarkFailureCategory] = None
     failure_details: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     failure_diagnosis: Optional[FailureDiagnosis] = None
     confidence_assessment: Optional[ConfidenceAssessment] = None
 
@@ -679,7 +682,7 @@ class EvaluationResult:
                 and confidence.bucket == ConfidenceBucket.LOW
             ):
                 underconfident_passes += 1
-        return {
+        metrics = {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
             "failed": self.failed_tasks,
@@ -712,6 +715,8 @@ class EvaluationResult:
             "overconfidence_rate": overconfident_failures / max(1, self.total_tasks),
             "underconfidence_rate": underconfident_passes / max(1, self.total_tasks),
         }
+        metrics.update(aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks))
+        return metrics
 
 
 def derive_failure_diagnosis(result: TaskResult) -> FailureDiagnosis:

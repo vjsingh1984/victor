@@ -89,10 +89,17 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             async for chunk in pipeline.run(user_message, **kwargs):
                 yield chunk
         finally:
+            ctx = None
             if orch.has_capability("current_stream_context") and orch.get_capability_value(
                 "current_stream_context"
             ):
                 ctx = orch.get_capability_value("current_stream_context")
+            else:
+                instance_dict = getattr(orch, "__dict__", {})
+                if "_current_stream_context" in instance_dict:
+                    ctx = instance_dict.get("_current_stream_context")
+
+            if ctx is not None:
                 if hasattr(ctx, "cumulative_usage"):
                     for key in orch._cumulative_token_usage:
                         if key in ctx.cumulative_usage:
@@ -111,3 +118,10 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                             ctrl.record_actual_usage(prompt_tokens, total_chars)
                         except Exception:
                             pass
+
+                runtime_snapshot = getattr(ctx, "runtime_override_snapshot", None)
+                self._restore_stream_runtime_overrides(runtime_snapshot)
+                ctx.runtime_override_snapshot = None
+
+            if "_current_stream_context" in getattr(orch, "__dict__", {}):
+                orch._current_stream_context = None

@@ -216,7 +216,7 @@ class TestAgenticLoop:
         assert result.success is True
         runtime_intelligence.analyze_turn.assert_awaited_once()
 
-    async def test_run_applies_topology_overrides_and_records_event(self):
+    async def test_run_applies_topology_overrides_and_records_event(self, monkeypatch):
         perception = _make_perception()
         perception.confidence = 0.9
         turn_executor = MagicMock()
@@ -235,6 +235,12 @@ class TestAgenticLoop:
             turn_executor=turn_executor,
             max_iterations=1,
         )
+        agentic_loop_module = __import__(
+            "victor.framework.agentic_loop",
+            fromlist=["emit_topology_telemetry_event"],
+        )
+        emit_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr(agentic_loop_module, "emit_topology_telemetry_event", emit_mock)
         loop._analyze_turn = AsyncMock(return_value=perception)
         loop._plan = AsyncMock(return_value={"steps": ["inspect", "execute"]})
         loop._evaluate = AsyncMock(
@@ -304,6 +310,7 @@ class TestAgenticLoop:
         assert result.metadata["topology_events"][0]["formation"] == "parallel"
         assert result.final_state["topology_plan"]["execution_mode"] == "team_execution"
         assert result.final_state["tool_budget"] == 4
+        emit_mock.assert_awaited_once()
 
     def test_loop_uses_policy_completion_threshold_from_config(self):
         loop = self._make_loop(

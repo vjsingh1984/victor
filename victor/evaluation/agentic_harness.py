@@ -43,6 +43,10 @@ from victor.evaluation.protocol import (
     get_benchmark_metadata,
     is_external_agentic_benchmark,
 )
+from victor.evaluation.topology_feedback import (
+    aggregate_topology_feedback,
+    summarize_topology_feedback,
+)
 from victor.evaluation.test_runners import (
     TestRunnerRegistry,
     TestRunnerConfig,
@@ -117,6 +121,7 @@ class AgenticExecutionTrace:
     validations: dict[str, bool] = field(default_factory=dict)
     validation_errors: dict[str, str] = field(default_factory=dict)
     completion_signals: dict[str, Any] = field(default_factory=dict)
+    topology_events: list[dict[str, Any]] = field(default_factory=list)
 
     # Correction/self-correction metrics
     correction_metrics: dict[str, Any] = field(default_factory=dict)
@@ -211,6 +216,7 @@ class AgenticExecutionTrace:
             "validations": self.validations,
             "validation_errors": self.validation_errors,
             "completion_signals": self.completion_signals,
+            "topology_events": list(self.topology_events),
             "total_tool_calls": self.total_tool_calls,
             "successful_tool_calls": self.successful_tool_calls,
             "code_search_calls": self.code_search_calls,
@@ -370,6 +376,7 @@ class AgenticMetrics:
 
     def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
+        topology_metrics = aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks)
         return {
             "summary": {
                 "total_tasks": self.total_tasks,
@@ -381,6 +388,7 @@ class AgenticMetrics:
                 "benchmarks_evaluated": self.benchmarks_evaluated,
                 "external_benchmark_tasks": self.external_benchmark_task_count,
                 "failure_categories": self.failure_categories,
+                "topology_feedback_coverage": topology_metrics["topology_feedback_coverage"],
             },
             "efficiency": {
                 "total_turns": self.total_turns,
@@ -388,6 +396,7 @@ class AgenticMetrics:
                 "total_tool_calls": self.total_tool_calls,
                 "avg_tool_calls": round(self.avg_tool_calls, 2),
                 "total_time_seconds": round(self.total_time_seconds, 2),
+                "avg_coordination_overhead": topology_metrics["avg_coordination_overhead"],
             },
             "quality": {
                 "avg_patch_score": round(self.avg_patch_score, 4),
@@ -397,6 +406,8 @@ class AgenticMetrics:
                 "avg_completion_precision": round(self.avg_completion_precision, 4),
                 "avg_unsupported_claim_rate": round(self.avg_unsupported_claim_rate, 4),
                 "avg_overall_score": round(self.avg_overall_score, 4),
+                "avg_topology_reward": topology_metrics["avg_topology_reward"],
+                "avg_topology_confidence": topology_metrics["avg_topology_confidence"],
             },
             "correction": {
                 "total_corrections": self.total_corrections,
@@ -406,6 +417,7 @@ class AgenticMetrics:
                 "total_correction_time_seconds": round(self.total_correction_time_seconds, 2),
                 "avg_correction_time": round(self.avg_correction_time, 2),
             },
+            "topology": topology_metrics,
             "tasks": [
                 {
                     "task_id": r.task_id,
@@ -422,6 +434,7 @@ class AgenticMetrics:
                     "completion_precision": round(r.completion_precision, 4),
                     "unsupported_claim_rate": round(r.unsupported_claim_rate, 4),
                     "overall_score": round(r.overall_score, 4),
+                    "topology_summary": summarize_topology_feedback(r),
                 }
                 for r in self.task_results
             ],
@@ -1138,11 +1151,16 @@ class AgenticBenchmarkRunner:
                 result.status = TaskStatus.FAILED
 
             result.failure_category = self._classify_failure_category(result, trace)
+            topology_summary = summarize_topology_feedback(result)
+            if topology_summary is not None:
+                trace.completion_signals.setdefault("topology_summary", topology_summary)
             if result.failure_category is not None:
                 result.failure_details = {
                     "validation_errors": dict(trace.validation_errors),
                     "unsupported_claim_rate": result.unsupported_claim_rate,
                 }
+                if topology_summary is not None:
+                    result.failure_details["topology_summary"] = topology_summary
 
         except asyncio.TimeoutError:
             result.status = TaskStatus.TIMEOUT

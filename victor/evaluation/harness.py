@@ -780,6 +780,7 @@ class EvaluationHarness:
                     "error_message": r.error_message,
                     "failure_category": (r.failure_category.value if r.failure_category else None),
                     "failure_details": r.failure_details,
+                    "metadata": r.metadata,
                     "failure_diagnosis": (
                         r.get_failure_diagnosis().to_dict()
                         if r.get_failure_diagnosis() is not None
@@ -843,6 +844,7 @@ class EvaluationHarness:
                         else None
                     ),
                     failure_details=r.get("failure_details", {}),
+                    metadata=r.get("metadata", {}),
                     failure_diagnosis=(
                         FailureDiagnosis.from_dict(r["failure_diagnosis"])
                         if r.get("failure_diagnosis")
@@ -1231,6 +1233,10 @@ class EvaluationHarness:
                     task_result.turns = partial_data.get("turns", 0)
                     task_result.code_search_calls = partial_data.get("code_search_calls", 0)
                     task_result.graph_calls = partial_data.get("graph_calls", 0)
+                    task_result.metadata = dict(partial_data.get("metadata", {}) or {})
+                    topology_events = partial_data.get("topology_events")
+                    if topology_events:
+                        task_result.metadata["topology_events"] = list(topology_events)
                     task_result.generated_code = partial_data.get("code", "")
                     logger.info(
                         f"Task timed out - partial metrics recovered: "
@@ -1252,6 +1258,10 @@ class EvaluationHarness:
                 task_result.turns = agent_output.get("turns", 0)
                 task_result.code_search_calls = agent_output.get("code_search_calls", 0)
                 task_result.graph_calls = agent_output.get("graph_calls", 0)
+                task_result.metadata = dict(agent_output.get("metadata", {}) or {})
+                topology_events = agent_output.get("topology_events")
+                if topology_events:
+                    task_result.metadata["topology_events"] = list(topology_events)
                 agent_output = agent_output.get("code", "")
 
             # Self-correction loop (if enabled)
@@ -1297,6 +1307,10 @@ class EvaluationHarness:
                 task_result.traceback = eval_result.traceback
                 task_result.failure_category = eval_result.failure_category
                 task_result.failure_details = dict(eval_result.failure_details)
+                task_result.metadata = {
+                    **task_result.metadata,
+                    **dict(eval_result.metadata),
+                }
                 task_result.failure_diagnosis = eval_result.get_failure_diagnosis()
                 task_result.confidence_assessment = eval_result.get_confidence_assessment()
 
@@ -1507,6 +1521,7 @@ class EvaluationHarness:
                     "completion_score": r.completion_score,
                     "failure_category": (r.failure_category.value if r.failure_category else None),
                     "failure_details": r.failure_details,
+                    "metadata": r.metadata,
                     "failure_diagnosis": (
                         r.get_failure_diagnosis().to_dict()
                         if r.get_failure_diagnosis() is not None

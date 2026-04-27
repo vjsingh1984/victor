@@ -459,6 +459,68 @@ class TestEvaluationResult:
         }
         assert metrics["truth_alignment_rate"] == pytest.approx(1.0)
 
+    def test_get_metrics_includes_topology_feedback_summary(self):
+        """Aggregate metrics should expose topology coverage, mix, and reward."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    completion_score=1.0,
+                    tool_calls=4,
+                    turns=2,
+                    metadata={
+                        "topology_events": [
+                            {
+                                "action": "single_agent",
+                                "topology": "single_agent",
+                                "execution_mode": "single_agent",
+                                "provider": "openai",
+                                "confidence": 0.76,
+                            }
+                        ]
+                    },
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    completion_score=0.25,
+                    tool_calls=7,
+                    turns=4,
+                    metadata={
+                        "topology_events": [
+                            {
+                                "action": "team_plan",
+                                "topology": "team",
+                                "execution_mode": "team_execution",
+                                "formation": "parallel",
+                                "provider": "anthropic",
+                                "confidence": 0.86,
+                                "fallback_action": "escalate_model",
+                            }
+                        ]
+                    },
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["tasks_with_topology_feedback"] == 2
+        assert metrics["topology_feedback_coverage"] == pytest.approx(1.0)
+        assert metrics["topology_actions"] == {"single_agent": 1, "team_plan": 1}
+        assert metrics["topology_kinds"] == {"single_agent": 1, "team": 1}
+        assert metrics["topology_execution_modes"] == {
+            "single_agent": 1,
+            "team_execution": 1,
+        }
+        assert 0.0 <= metrics["avg_topology_reward"] <= 1.0
+        assert metrics["topology_fallback_rate"] > 0.0
+
 
 class TestPassAtKResult:
     """Tests for PassAtKResult."""

@@ -23,6 +23,7 @@ from victor.evaluation.runtime_feedback import (
     build_deep_research_validated_session_feedback_payload,
     build_swe_bench_validated_session_feedback_payload,
 )
+from victor.evaluation.topology_feedback import summarize_topology_feedback
 from victor.evaluation.validated_session_truth_naming import (
     ValidatedSessionTruthArtifactNamingPolicy,
     create_default_validated_session_truth_artifact_naming_policy,
@@ -116,6 +117,7 @@ def _artifact_record_from_task_result(
     config = context.config
     if task_result is None or config is None:
         return None
+    topology_summary = summarize_topology_feedback(task_result)
     return {
         "task_id": task_result.task_id,
         "benchmark": config.benchmark.value,
@@ -131,6 +133,7 @@ def _artifact_record_from_task_result(
             task_result.failure_category.value if task_result.failure_category is not None else None
         ),
         "failure_details": dict(task_result.failure_details),
+        "topology_summary": topology_summary,
     }
 
 
@@ -155,6 +158,7 @@ class BrowserValidatedSessionTruthEmitter:
         payload_input = _session_feedback_input(context)
         if payload_input is None:
             return None
+        topology_summary = summarize_topology_feedback(context.task_result)
 
         artifact_path = self._naming_policy.path_for_evaluation_task(
             results_dir=context.results_dir,
@@ -167,6 +171,7 @@ class BrowserValidatedSessionTruthEmitter:
             source_result_path=artifact_path,
             metadata={
                 "source_evaluation_path": str(context.source_result_path),
+                "topology_summary": topology_summary,
                 **context.metadata,
             },
         )
@@ -199,6 +204,7 @@ class DeepResearchValidatedSessionTruthEmitter:
         payload_input = _session_feedback_input(context)
         if payload_input is None:
             return None
+        topology_summary = summarize_topology_feedback(context.task_result)
 
         artifact_path = self._naming_policy.path_for_evaluation_task(
             results_dir=context.results_dir,
@@ -211,6 +217,7 @@ class DeepResearchValidatedSessionTruthEmitter:
             source_result_path=artifact_path,
             metadata={
                 "source_evaluation_path": str(context.source_result_path),
+                "topology_summary": topology_summary,
                 **context.metadata,
             },
         )
