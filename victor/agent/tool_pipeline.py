@@ -450,6 +450,134 @@ class ToolCallResult:
     error_info: Optional["ErrorInfo"] = None
 
 
+def _format_tool_command_value(value: Any) -> str:
+    """Serialize a tool argument value for compact follow-up guidance."""
+    if isinstance(value, str):
+        return json.dumps(value)
+    return repr(value)
+
+
+def _build_tool_follow_up_command(tool_name: str, arguments: Dict[str, Any]) -> str:
+    """Build a compact tool command example for recovery suggestions."""
+    serialized_args = ", ".join(
+        f"{key}={_format_tool_command_value(value)}"
+        for key, value in arguments.items()
+        if value is not None
+    )
+    return f"{tool_name}({serialized_args})"
+
+
+def _build_follow_up_suggestion(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    description: str,
+) -> Dict[str, Any]:
+    """Create a normalized follow-up suggestion payload."""
+    return {
+        "tool": tool_name,
+        "command": _build_tool_follow_up_command(tool_name, arguments),
+        "arguments": arguments,
+        "description": description,
+        "reason": description,
+    }
+
+
+def _build_redundant_call_recovery(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Build actionable recovery guidance for redundant tool calls."""
+    canonical_name = canonicalize_core_tool_name(tool_name.lower())
+    scope_path = str(arguments.get("path") or arguments.get("search_path") or ".")
+    query = arguments.get("query") or arguments.get("pattern")
+    symbol_name = arguments.get("symbol_name")
+    suggestions: List[Dict[str, Any]] = []
+
+    if canonical_name in {"code_search", "semantic_code_search", "grep"}:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "overview",
+                {"path": scope_path, "max_depth": 2},
+                "Inspect the surrounding project structure instead of repeating the same search.",
+            )
+        )
+        if query:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "search", "query": str(query), "path": scope_path, "top_k": 5},
+                    f'Search the graph index for "{query}" instead of repeating the same text search.',
+                )
+            )
+        else:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "overview", "path": scope_path, "top_k": 5},
+                    "Use the graph overview to find the next module or symbol to inspect.",
+                )
+            )
+        message = (
+            f"[The same {_build_tool_follow_up_command(tool_name, arguments)} was already tried "
+            "recently and is unlikely to return new information. Do not repeat the same search "
+            "with identical arguments. Change the query or mode, narrow or broaden the path, or "
+            "switch to structure-aware tools such as overview(...) or graph(...).]"
+        )
+    elif canonical_name == "refs":
+        if symbol_name:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "callers|callees", "node": str(symbol_name), "depth": 2},
+                    f'Explore call relationships for "{symbol_name}" instead of repeating refs().',
+                )
+            )
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "code_search",
+                    {"query": str(symbol_name), "path": scope_path, "mode": "text", "k": 5},
+                    f'Search textually for "{symbol_name}" to find concrete files to read next.',
+                )
+            )
+        else:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "overview",
+                    {"path": scope_path, "max_depth": 2},
+                    "Inspect the project structure to choose a more specific symbol target.",
+                )
+            )
+        message = (
+            f"[The same {_build_tool_follow_up_command(tool_name, arguments)} was already tried "
+            "recently and is unlikely to reveal new references. Do not repeat the same refs() "
+            "scan with identical arguments. Inspect the symbol through graph relationships or "
+            "switch to a more targeted search to identify a concrete file to read.]"
+        )
+    else:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "overview",
+                {"path": scope_path, "max_depth": 2},
+                "Inspect the nearby project structure before choosing a different tool or scope.",
+            )
+        )
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "graph",
+                {"mode": "overview", "path": scope_path, "top_k": 5},
+                "Use the graph overview to identify a higher-value next step.",
+            )
+        )
+        message = (
+            f"[{_build_tool_follow_up_command(tool_name, arguments)} overlaps with a recent call "
+            "and was skipped. Do not repeat the same tool with identical arguments. Change the "
+            "scope or switch to a different discovery tool.]"
+        )
+
+    return {
+        "success": False,
+        "error": message,
+        "metadata": {"follow_up_suggestions": suggestions[:2]},
+    }
+
+
 @dataclass
 class PipelineExecutionResult:
     """Result of executing multiple tool calls."""
@@ -1824,10 +1952,13 @@ class ToolPipeline:
                         f"[Pipeline] Skipping redundant tool call: {tool_name} "
                         f"(semantic overlap with recent calls)"
                     )
+                    recovery_result = _build_redundant_call_recovery(tool_name, normalized_args)
                     return ToolCallResult(
                         tool_name=tool_name,
                         arguments=normalized_args,
-                        success=False,
+                        success=True,
+                        result=recovery_result,
+                        error=recovery_result.get("error"),
                         skipped=True,
                         skip_reason="Redundant call (semantic overlap with recent operations)",
                         normalization_applied=normalization_applied,

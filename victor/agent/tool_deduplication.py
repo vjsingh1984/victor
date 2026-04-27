@@ -241,10 +241,9 @@ class ToolDeduplicationTracker:
                 # Read after read is redundant (unless large file with different offsets)
                 if tool_name == "read" and recent.tool_name == "read":
                     # Allow if different offsets/limits specified
-                    if (
-                        args.get("offset") != recent.args.get("offset")
-                        or args.get("limit") != recent.args.get("limit")
-                    ):
+                    if args.get("offset") != recent.args.get("offset") or args.get(
+                        "limit"
+                    ) != recent.args.get("limit"):
                         return False
                     return self._is_recent_unchanged_read(recent, args)
 

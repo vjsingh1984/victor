@@ -678,9 +678,7 @@ class ResponseSanitizer:
         if not text:
             return []
         return [
-            line.strip()
-            for line in text.splitlines()
-            if self._is_plaintext_tool_command_line(line)
+            line.strip() for line in text.splitlines() if self._is_plaintext_tool_command_line(line)
         ]
 
     def has_tool_format_confusion(self, text: str | None) -> bool:
