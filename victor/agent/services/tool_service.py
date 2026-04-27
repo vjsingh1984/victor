@@ -240,6 +240,10 @@ def process_tool_results_with_context(
         elapsed_ms = call_result.execution_time_ms
         skipped = bool(getattr(call_result, "skipped", False))
         skip_reason = getattr(call_result, "skip_reason", None)
+        outcome_kind = getattr(call_result, "outcome_kind", None)
+        block_source = getattr(call_result, "block_source", None)
+        retryable = getattr(call_result, "retryable", None)
+        user_message = getattr(call_result, "user_message", None)
 
         ctx.executed_tools.append(tool_name)
         if tool_name == "read" and "path" in normalized_args:
@@ -282,7 +286,7 @@ def process_tool_results_with_context(
         if semantic_success:
             error_display = None
         else:
-            error_display = error_msg or skip_reason or "Unknown error"
+            error_display = user_message or error_msg or skip_reason or "Unknown error"
 
         if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
             ctx.usage_logger.set_duration_context(elapsed_ms)
@@ -292,6 +296,10 @@ def process_tool_results_with_context(
                 {
                     "tool_name": tool_name,
                     "success": semantic_success,
+                    "skipped": skipped,
+                    "outcome_kind": outcome_kind,
+                    "block_source": block_source,
+                    "retryable": retryable,
                     "result": output,
                     "error": error_display,
                 },
@@ -329,6 +337,11 @@ def process_tool_results_with_context(
                     "pruning_info": pruning_info,
                     "tool_call_id": call_result.tool_call_id,
                     "content": llm_output,  # Full output sent to LLM
+                    "skipped": skipped,
+                    "outcome_kind": outcome_kind,
+                    "block_source": block_source,
+                    "retryable": retryable,
+                    "user_message": user_message,
                 }
             )
             continue
@@ -351,13 +364,21 @@ def process_tool_results_with_context(
                 )
 
         if isinstance(output, dict):
-            error_output = output
+            error_output = dict(output)
         else:
             error_output = {"error": error_display}
-            if skipped:
-                error_output["skipped"] = True
-                if skip_reason:
-                    error_output["skip_reason"] = skip_reason
+        if skipped:
+            error_output["skipped"] = True
+            if skip_reason:
+                error_output["skip_reason"] = skip_reason
+        if outcome_kind:
+            error_output["outcome_kind"] = outcome_kind
+        if block_source:
+            error_output["block_source"] = block_source
+        if retryable is not None:
+            error_output["retryable"] = retryable
+        if user_message:
+            error_output["user_message"] = user_message
         if ctx.format_tool_output:
             formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
         else:
@@ -386,6 +407,11 @@ def process_tool_results_with_context(
                 "was_pruned": False,
                 "tool_call_id": call_result.tool_call_id,
                 "content": formatted_error,
+                "skipped": skipped,
+                "outcome_kind": outcome_kind,
+                "block_source": block_source,
+                "retryable": retryable,
+                "user_message": user_message,
             }
         )
 

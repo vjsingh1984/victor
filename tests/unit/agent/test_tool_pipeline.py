@@ -111,6 +111,9 @@ class TestExecuteToolCalls:
         result = await pipeline.execute_tool_calls(tool_calls)
         assert result.results[0].skipped is True
         assert "budget" in result.results[0].skip_reason.lower()
+        assert result.results[0].outcome_kind == "budget_exhausted"
+        assert result.results[0].block_source == "tool_budget"
+        assert result.results[0].retryable is False
 
     async def test_unknown_tool_skipped(self, pipeline):
         pipeline.tools.is_tool_enabled.return_value = False
@@ -151,6 +154,20 @@ class TestExecuteToolCalls:
         )
 
         assert "/tmp/f.py:None:None" not in pipeline._read_file_timestamps
+
+    async def test_duplicate_read_sets_structured_skip_metadata(self, pipeline):
+        with patch.object(pipeline, "_is_duplicate_read", return_value=True):
+            result = await pipeline.execute_tool_calls(
+                [{"name": "read", "arguments": {"path": "/tmp/f.py"}}]
+            )
+
+        call_result = result.results[0]
+        assert call_result.skipped is True
+        assert call_result.success is True
+        assert call_result.outcome_kind == "duplicate_read"
+        assert call_result.block_source == "session_read_dedup"
+        assert call_result.retryable is True
+        assert "already read with the same offset/limit" in call_result.user_message
 
 
 class TestLRUToolCache:

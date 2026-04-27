@@ -23,6 +23,10 @@ class FakeCallResult:
     execution_time_ms: float = 100.0
     skipped: bool = False
     skip_reason: Optional[str] = None
+    outcome_kind: Optional[str] = None
+    block_source: Optional[str] = None
+    retryable: Optional[bool] = None
+    user_message: Optional[str] = None
     tool_call_id: Optional[str] = None
 
 
@@ -258,3 +262,40 @@ def test_skipped_tool_uses_skip_reason_instead_of_unknown_error():
     assert "Unknown error" not in results[0]["result"]
     ctx.console.print.assert_called_once()
     assert "Tool call skipped" in ctx.console.print.call_args[0][0]
+
+
+def test_skipped_tool_prefers_structured_user_message_and_metadata():
+    service = _make_service()
+    ctx = _make_ctx(format_tool_output=MagicMock(return_value="formatted skip"))
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="read",
+                success=False,
+                result={"error": "internal duplicate-read block"},
+                error=None,
+                arguments={"path": "victor/core/container.py"},
+                skipped=True,
+                skip_reason="Duplicate file read within session",
+                outcome_kind="duplicate_read",
+                block_source="session_read_dedup",
+                retryable=True,
+                user_message=(
+                    "File 'victor/core/container.py' was already read with the same "
+                    "offset/limit. Choose a different range, file, or tool."
+                ),
+                tool_call_id="call_read_skip_2",
+            )
+        ]
+    )
+
+    results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["success"] is False
+    assert results[0]["error"].startswith("File 'victor/core/container.py' was already read")
+    assert results[0]["outcome_kind"] == "duplicate_read"
+    assert results[0]["block_source"] == "session_read_dedup"
+    assert results[0]["retryable"] is True
+    assert results[0]["user_message"].startswith("File 'victor/core/container.py'")
+    ctx.console.print.assert_called_once()
+    assert "already read with the same offset/limit" in ctx.console.print.call_args[0][0]

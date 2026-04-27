@@ -438,6 +438,10 @@ class ToolCallResult:
     normalization_applied: Optional[str] = None
     skipped: bool = False
     skip_reason: Optional[str] = None
+    outcome_kind: Optional[str] = None
+    block_source: Optional[str] = None
+    retryable: Optional[bool] = None
+    user_message: Optional[str] = None
 
     # Code correction tracking
     code_corrected: bool = False
@@ -448,6 +452,43 @@ class ToolCallResult:
 
     # Structured error information with traceback and metadata
     error_info: Optional["ErrorInfo"] = None
+
+
+def _build_skip_result(
+    *,
+    tool_name: str,
+    arguments: Dict[str, Any],
+    success: bool,
+    skip_reason: str,
+    outcome_kind: str,
+    block_source: str,
+    retryable: bool,
+    user_message: Optional[str] = None,
+    result: Any = None,
+    error: Optional[str] = None,
+    execution_time_ms: float = 0.0,
+    cached: bool = False,
+    normalization_applied: Optional[str] = None,
+    tool_call_id: Optional[str] = None,
+) -> ToolCallResult:
+    """Create a skipped tool-call result with structured block metadata."""
+    return ToolCallResult(
+        tool_name=tool_name,
+        arguments=arguments,
+        success=success,
+        result=result,
+        error=error,
+        execution_time_ms=execution_time_ms,
+        cached=cached,
+        normalization_applied=normalization_applied,
+        skipped=True,
+        skip_reason=skip_reason,
+        outcome_kind=outcome_kind,
+        block_source=block_source,
+        retryable=retryable,
+        user_message=user_message or error or skip_reason,
+        tool_call_id=tool_call_id,
+    )
 
 
 def _format_tool_command_value(value: Any) -> str:
@@ -1415,13 +1456,15 @@ class ToolPipeline:
                 # Generate tool_call_id if not provided
                 if tc_id is None:
                     tc_id = self._generate_tool_call_id(tool_name)
-                call_result = ToolCallResult(
+                call_result = _build_skip_result(
                     tool_name=tool_name,
                     arguments={},
                     success=False,
                     error=tool_call.get("_error", "Unknown tool"),
-                    skipped=True,
                     skip_reason=tool_call.get("_error"),
+                    outcome_kind="invalid_tool_name",
+                    block_source="tool_validation",
+                    retryable=False,
                     tool_call_id=tc_id,
                 )
             else:
@@ -1499,7 +1542,7 @@ class ToolPipeline:
                 # will then skip the entry (no tool_call to respond to per OpenAI spec).
                 dup_call = tool_calls[original_idx] if original_idx < len(tool_calls) else {}
                 dup_tc_id = dup_call.get("id") if isinstance(dup_call, dict) else None
-                dup_result = ToolCallResult(
+                dup_result = _build_skip_result(
                     tool_name=original_result.tool_name,
                     arguments=original_result.arguments,
                     success=original_result.success,
@@ -1507,8 +1550,14 @@ class ToolPipeline:
                     error=original_result.error,
                     execution_time_ms=0.0,  # Deduplicated, no execution time
                     cached=True,  # Mark as effectively cached
-                    skipped=True,
                     skip_reason="Deduplicated (duplicate call in batch)",
+                    outcome_kind="duplicate_in_batch",
+                    block_source="batch_deduplication",
+                    retryable=True,
+                    user_message=(
+                        "This tool call duplicated another call in the same batch, so the "
+                        "existing result was reused."
+                    ),
                     tool_call_id=dup_tc_id,
                 )
                 result.results.append(dup_result)
@@ -1603,12 +1652,14 @@ class ToolPipeline:
             # Quick validation checks
             if not tool_name or not self.is_valid_tool_name(tool_name):
                 skipped_results.append(
-                    ToolCallResult(
+                    _build_skip_result(
                         tool_name=tool_name or "unknown",
                         arguments={},
                         success=False,
-                        skipped=True,
                         skip_reason=f"Invalid tool name: {tool_name}",
+                        outcome_kind="invalid_tool_name",
+                        block_source="validation",
+                        retryable=False,
                     )
                 )
                 continue
@@ -1620,12 +1671,14 @@ class ToolPipeline:
 
             if not self.tools.is_tool_enabled(tool_name):
                 skipped_results.append(
-                    ToolCallResult(
+                    _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
                         success=False,
-                        skipped=True,
                         skip_reason=f"Unknown or disabled tool: {tool_name}",
+                        outcome_kind="tool_unavailable",
+                        block_source="tool_registry",
+                        retryable=False,
                     )
                 )
                 continue
@@ -1635,12 +1688,18 @@ class ToolPipeline:
                 signature = self._get_call_signature(tool_name, normalized_args)
                 if signature in self._failed_signatures:
                     skipped_results.append(
-                        ToolCallResult(
+                        _build_skip_result(
                             tool_name=tool_name,
                             arguments=normalized_args,
                             success=False,
-                            skipped=True,
                             skip_reason="Repeated failing call with same arguments",
+                            outcome_kind="repeated_failure",
+                            block_source="failed_signature_tracker",
+                            retryable=True,
+                            user_message=(
+                                "This exact tool call already failed recently. Change the "
+                                "arguments or choose a different tool."
+                            ),
                         )
                     )
                     continue
@@ -1751,12 +1810,14 @@ class ToolPipeline:
         """
         # Validate structure
         if not isinstance(tool_call, dict):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name="unknown",
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason="Invalid tool call structure (not a dict)",
+                outcome_kind="invalid_tool_call",
+                block_source="validation",
+                retryable=False,
             )
 
         tool_name = tool_call.get("name", "")
@@ -1764,21 +1825,25 @@ class ToolPipeline:
 
         # Validate tool name
         if not tool_name:
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name="unknown",
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason="Tool call missing name",
+                outcome_kind="missing_tool_name",
+                block_source="validation",
+                retryable=False,
             )
 
         if not self.is_valid_tool_name(tool_name):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason=f"Invalid tool name format: {tool_name}",
+                outcome_kind="invalid_tool_name",
+                block_source="validation",
+                retryable=False,
             )
 
         # Check if tool exists
@@ -1787,36 +1852,42 @@ class ToolPipeline:
         )
 
         if not self.tools.is_tool_enabled(tool_name):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 success=False,
-                skipped=True,
                 skip_reason=f"Unknown or disabled tool: {tool_name}",
+                outcome_kind="tool_unavailable",
+                block_source="tool_registry",
+                retryable=False,
             )
 
         # Check permission policy (if configured)
         if self._permission_policy is not None:
             decision = self._permission_policy.authorize(tool_name, normalized_args)
             if not decision.allowed and not decision.needs_prompt:
-                return ToolCallResult(
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=False,
-                    skipped=True,
                     skip_reason=f"Permission denied: {decision.reason}",
+                    outcome_kind="permission_denied",
+                    block_source="permission_policy",
+                    retryable=False,
                 )
             # needs_prompt tools are allowed through — the UI layer
             # handles escalation prompting before reaching the pipeline.
 
         # Check budget
         if self._calls_used >= self.config.tool_budget:
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 success=False,
-                skipped=True,
                 skip_reason="Tool budget exhausted",
+                outcome_kind="budget_exhausted",
+                block_source="tool_budget",
+                retryable=False,
             )
 
         normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
@@ -1917,7 +1988,7 @@ class ToolPipeline:
                     f"[Pipeline] Skipping duplicate read of {file_path} "
                     "(file was read recently in this session)"
                 )
-                return ToolCallResult(
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=True,  # Mark as success but indicate it was cached
@@ -1927,8 +1998,14 @@ class ToolPipeline:
                         "Use a different offset/limit, read a different file, or switch tools "
                         "such as find, code_search, graph, or project_overview.]"
                     ),
-                    skipped=True,
                     skip_reason="Duplicate file read within session",
+                    outcome_kind="duplicate_read",
+                    block_source="session_read_dedup",
+                    retryable=True,
+                    user_message=(
+                        f"File '{file_path}' was already read with the same offset/limit. "
+                        "Choose a different range, file, or tool."
+                    ),
                     normalization_applied=normalization_applied,
                 )
 
@@ -1985,14 +2062,20 @@ class ToolPipeline:
                     normalized_args,
                 )
                 recovery_result = _build_repeated_failure_recovery(tool_name, normalized_args)
-                return ToolCallResult(
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=False,
                     result=recovery_result,
                     error=recovery_result.get("error"),
-                    skipped=True,
                     skip_reason="Repeated failing call with same arguments",
+                    outcome_kind="repeated_failure",
+                    block_source="failed_signature_tracker",
+                    retryable=True,
+                    user_message=(
+                        "This exact tool call already failed recently. Use the recovery "
+                        "guidance or try different arguments."
+                    ),
                     normalization_applied=normalization_applied,
                 )
 
@@ -2005,14 +2088,20 @@ class ToolPipeline:
                         f"(semantic overlap with recent calls)"
                     )
                     recovery_result = _build_redundant_call_recovery(tool_name, normalized_args)
-                    return ToolCallResult(
+                    return _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
                         success=True,
                         result=recovery_result,
                         error=recovery_result.get("error"),
-                        skipped=True,
                         skip_reason="Redundant call (semantic overlap with recent operations)",
+                        outcome_kind="redundant_call",
+                        block_source="semantic_deduplication",
+                        retryable=True,
+                        user_message=(
+                            "This tool call overlaps with recent work. Use the suggested next "
+                            "step instead of repeating it unchanged."
+                        ),
                         normalization_applied=normalization_applied,
                     )
             except (ValueError, TypeError) as e:
@@ -2031,12 +2120,15 @@ class ToolPipeline:
                         f"[Pipeline] Tool '{tool_name}' blocked by middleware: "
                         f"{before_result.error_message}"
                     )
-                    return ToolCallResult(
+                    return _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
                         success=False,
-                        skipped=True,
                         skip_reason=f"Blocked by middleware: {before_result.error_message}",
+                        outcome_kind="middleware_blocked",
+                        block_source="middleware_chain",
+                        retryable=True,
+                        user_message=before_result.error_message,
                         normalization_applied=normalization_applied,
                     )
                 # Apply any argument modifications from middleware
