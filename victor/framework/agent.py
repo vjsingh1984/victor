@@ -930,14 +930,12 @@ class Agent:
             workflows = agent.get_available_workflows()
             print(workflows)  # ['feature_implementation', 'bug_fix', 'code_review']
         """
-        if not self._vertical:
-            return []
+        from victor.framework.team_runtime import resolve_vertical_workflow_catalog
 
-        workflow_provider = self._vertical.get_workflow_provider()
-        if not workflow_provider:
+        workflow_catalog = resolve_vertical_workflow_catalog(self._vertical)
+        if not workflow_catalog.supported or not workflow_catalog.provider_available:
             return []
-
-        return workflow_provider.get_workflow_names()
+        return workflow_catalog.list_names()
 
     def get_available_teams(self) -> List[str]:
         """Get list of available team names from the vertical.

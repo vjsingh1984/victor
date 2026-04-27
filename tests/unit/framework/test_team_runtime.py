@@ -11,6 +11,8 @@ from victor.framework.team_runtime import (
     execute_resolved_team,
     resolve_configured_team,
     resolve_vertical_team_catalog,
+    resolve_vertical_workflow_catalog,
+    VerticalWorkflowCatalog,
 )
 from victor.teams.types import TeamFormation, TeamResult
 
@@ -151,3 +153,123 @@ def test_resolve_vertical_team_catalog_reads_provider_specs():
     assert catalog.has_team_specs is True
     assert catalog.get("feature_team") is feature_team
     assert catalog.list_names() == ["feature_team"]
+
+
+def test_resolve_vertical_workflow_catalog_with_get_workflows():
+    """Test workflow catalog resolution when provider has get_workflows()."""
+    workflow_spec = SimpleNamespace(name="feature_workflow", description="Implement features")
+    vertical = SimpleNamespace(
+        get_workflow_provider=lambda: SimpleNamespace(
+            get_workflows=lambda: {"feature_workflow": workflow_spec}
+        )
+    )
+
+    catalog = resolve_vertical_workflow_catalog(vertical)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is True
+    assert catalog.has_workflow_specs is True
+    assert catalog.get("feature_workflow") is workflow_spec
+    assert catalog.list_names() == ["feature_workflow"]
+
+
+def test_resolve_vertical_workflow_catalog_with_get_workflow_names():
+    """Test workflow catalog resolution when provider has get_workflow_names()."""
+    vertical = SimpleNamespace(
+        get_workflow_provider=lambda: SimpleNamespace(
+            get_workflow_names=lambda: ["feature_workflow", "bug_fix_workflow"]
+        )
+    )
+
+    catalog = resolve_vertical_workflow_catalog(vertical)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is True
+    assert catalog.has_workflow_specs is True
+    # When only names are available, specs are None
+    assert catalog.get("feature_workflow") is None
+    assert set(catalog.list_names()) == {"feature_workflow", "bug_fix_workflow"}
+
+
+def test_resolve_vertical_workflow_catalog_no_provider_method():
+    """Test workflow catalog resolution when provider has no callable methods."""
+    vertical = SimpleNamespace(
+        get_workflow_provider=lambda: SimpleNamespace()  # No get_workflows or get_workflow_names
+    )
+
+    catalog = resolve_vertical_workflow_catalog(vertical)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is False
+    assert catalog.has_workflow_specs is False
+    assert catalog.list_names() == []
+
+
+def test_resolve_vertical_workflow_catalog_no_vertical():
+    """Test workflow catalog resolution when vertical is None."""
+    catalog = resolve_vertical_workflow_catalog(None)
+
+    assert catalog.supported is False
+    assert catalog.provider_available is False
+    assert catalog.has_workflow_specs is False
+    assert catalog.list_names() == []
+
+
+def test_resolve_vertical_workflow_catalog_no_provider():
+    """Test workflow catalog resolution when vertical has no provider."""
+    vertical = SimpleNamespace(get_workflow_provider=lambda: None)
+
+    catalog = resolve_vertical_workflow_catalog(vertical)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is False
+    assert catalog.has_workflow_specs is False
+    assert catalog.list_names() == []
+
+
+def test_resolve_vertical_workflow_catalog_not_supported():
+    """Test workflow catalog resolution when vertical doesn't support workflows."""
+    vertical = SimpleNamespace()  # No get_workflow_provider method
+
+    catalog = resolve_vertical_workflow_catalog(vertical)
+
+    assert catalog.supported is False
+    assert catalog.provider_available is False
+    assert catalog.has_workflow_specs is False
+    assert catalog.list_names() == []
+
+
+def test_vertical_workflow_catalog_frozen():
+    """Test that VerticalWorkflowCatalog is a frozen dataclass."""
+    workflow_spec = SimpleNamespace(name="test_workflow")
+    catalog = VerticalWorkflowCatalog(
+        supported=True,
+        provider_available=True,
+        workflow_specs={"test_workflow": workflow_spec},
+    )
+
+    # Should be frozen - attempting to modify should raise an error
+    with pytest.raises(Exception):  # FrozenInstanceError from dataclasses
+        catalog.supported = False
+
+    with pytest.raises(Exception):
+        catalog.workflow_specs = {}
+
+
+def test_vertical_workflow_catalog_helper_methods():
+    """Test VerticalWorkflowCatalog helper methods."""
+    workflow_specs = {
+        "feature": SimpleNamespace(name="feature"),
+        "bugfix": SimpleNamespace(name="bugfix"),
+        "review": SimpleNamespace(name="review"),
+    }
+    catalog = VerticalWorkflowCatalog(
+        supported=True,
+        provider_available=True,
+        workflow_specs=workflow_specs,
+    )
+
+    assert catalog.has_workflow_specs is True
+    assert catalog.get("feature") is workflow_specs["feature"]
+    assert catalog.get("nonexistent") is None
+    assert set(catalog.list_names()) == {"feature", "bugfix", "review"}

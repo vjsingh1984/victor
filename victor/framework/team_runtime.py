@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Framework-first helpers for resolving and running configured teams."""
+"""Framework-first helpers for resolving and running configured teams and workflows."""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from victor.framework.teams import AgentTeam
 from victor.teams.types import TeamFormation, TeamResult
@@ -95,6 +95,33 @@ class VerticalTeamCatalog:
     def list_names(self) -> list[str]:
         """List configured team names."""
         return list(self.team_specs.keys())
+
+
+@dataclass(frozen=True)
+class VerticalWorkflowCatalog:
+    """Resolved workflow catalog for a framework vertical.
+
+    Similar to VerticalTeamCatalog, this provides a normalized interface
+    for discovering workflows provided by a vertical through the canonical
+    get_workflow_provider() API.
+    """
+
+    supported: bool
+    provider_available: bool
+    workflow_specs: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def has_workflow_specs(self) -> bool:
+        """Whether the catalog contains workflow specs."""
+        return bool(self.workflow_specs)
+
+    def get(self, workflow_name: str) -> Any:
+        """Return a named workflow spec when present."""
+        return self.workflow_specs.get(workflow_name)
+
+    def list_names(self) -> List[str]:
+        """List available workflow names."""
+        return list(self.workflow_specs.keys())
 
 
 def resolve_configured_team(
@@ -263,6 +290,66 @@ def resolve_vertical_team_catalog(vertical: Any) -> VerticalTeamCatalog:
     )
 
 
+def resolve_vertical_workflow_catalog(vertical: Any) -> VerticalWorkflowCatalog:
+    """Resolve workflow specs from a framework vertical through the canonical provider API.
+
+    This function mirrors the behavior of resolve_vertical_team_catalog but for
+    workflows. It checks if the vertical has get_workflow_provider(), retrieves
+    the provider, and calls get_workflows() or get_workflow_names() to build
+    a normalized catalog.
+
+    Args:
+        vertical: A vertical instance or class that may provide workflows
+
+    Returns:
+        VerticalWorkflowCatalog with supported, provider_available, and workflow_specs
+
+    Example:
+        catalog = resolve_vertical_workflow_catalog(MyCodingVertical)
+        if catalog.supported and catalog.provider_available:
+            for name in catalog.list_names():
+                print(f"Workflow: {name}")
+    """
+    if vertical is None or not hasattr(vertical, "get_workflow_provider"):
+        return VerticalWorkflowCatalog(supported=False, provider_available=False)
+
+    workflow_provider = vertical.get_workflow_provider()
+    if workflow_provider is None:
+        return VerticalWorkflowCatalog(supported=True, provider_available=False)
+
+    # Try get_workflows() first (returns Dict[str, Any])
+    get_workflows = getattr(workflow_provider, "get_workflows", None)
+    if callable(get_workflows):
+        try:
+            workflow_specs = get_workflows()
+            if isinstance(workflow_specs, dict):
+                return VerticalWorkflowCatalog(
+                    supported=True,
+                    provider_available=True,
+                    workflow_specs=dict(workflow_specs),
+                )
+        except Exception as exc:
+            logger.debug("Failed to get workflows from provider: %s", exc)
+
+    # Fallback: try get_workflow_names() (returns List[str])
+    # Build a minimal spec dict with names as keys
+    get_workflow_names = getattr(workflow_provider, "get_workflow_names", None)
+    if callable(get_workflow_names):
+        try:
+            workflow_names = get_workflow_names()
+            if isinstance(workflow_names, (list, tuple)):
+                return VerticalWorkflowCatalog(
+                    supported=True,
+                    provider_available=True,
+                    workflow_specs=dict.fromkeys(workflow_names, None),
+                )
+        except Exception as exc:
+            logger.debug("Failed to get workflow names from provider: %s", exc)
+
+    # Provider exists but doesn't have callable methods
+    return VerticalWorkflowCatalog(supported=True, provider_available=False)
+
+
 def _get_team_specs(orchestrator: Any) -> Dict[str, Any]:
     """Read configured team specs from the canonical runtime surfaces."""
     getter = getattr(orchestrator, "get_team_specs", None)
@@ -370,8 +457,10 @@ def _coerce_positive_int(value: Any) -> Optional[int]:
 __all__ = [
     "ResolvedTeamExecutionPlan",
     "VerticalTeamCatalog",
+    "VerticalWorkflowCatalog",
     "execute_resolved_team",
     "resolve_configured_team",
     "resolve_vertical_team_catalog",
+    "resolve_vertical_workflow_catalog",
     "run_configured_team",
 ]
