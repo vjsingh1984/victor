@@ -26,6 +26,9 @@ import logging
 import warnings
 from typing import Any, AsyncIterator, TYPE_CHECKING
 
+from victor.agent.services.chat_compat_telemetry import (
+    record_deprecated_chat_shim_access,
+)
 from victor.providers.base import CompletionResponse, StreamChunk
 from victor.agent.services.protocols.chat_runtime import ExecutionMode
 
@@ -124,16 +127,25 @@ class UnifiedChatCoordinator:
 
         if self._chat_service is not None:
             if execution_mode == ExecutionMode.STREAMING:
+                record_deprecated_chat_shim_access(
+                    "unified_chat_coordinator", "chat", "chat_service_streaming"
+                )
                 return await self._chat_service.chat(
                     user_message,
                     stream=True,
                     use_planning=use_planning,
                 )
+            record_deprecated_chat_shim_access(
+                "unified_chat_coordinator", "chat", "chat_service_sync"
+            )
             return await self._chat_service.chat(
                 user_message,
                 use_planning=use_planning,
             )
 
+        record_deprecated_chat_shim_access(
+            "unified_chat_coordinator", "chat", "missing_runtime"
+        )
         raise RuntimeError(
             "UnifiedChatCoordinator requires a bound ChatService. "
             "Bind ChatService before using deprecated compatibility shims."
@@ -162,10 +174,16 @@ class UnifiedChatCoordinator:
         )
 
         if self._chat_service is not None:
+            record_deprecated_chat_shim_access(
+                "unified_chat_coordinator", "stream_chat", "chat_service"
+            )
             async for chunk in self._chat_service.stream_chat(user_message):
                 yield chunk
             return
 
+        record_deprecated_chat_shim_access(
+            "unified_chat_coordinator", "stream_chat", "missing_runtime"
+        )
         raise RuntimeError(
             "UnifiedChatCoordinator requires a bound ChatService. "
             "Bind ChatService before using deprecated compatibility shims."

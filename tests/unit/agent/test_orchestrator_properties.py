@@ -8,6 +8,18 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from victor.agent.services.chat_compat_telemetry import (
+    get_deprecated_chat_shim_telemetry,
+    reset_deprecated_chat_shim_telemetry,
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_chat_compat_telemetry():
+    reset_deprecated_chat_shim_telemetry()
+    yield
+    reset_deprecated_chat_shim_telemetry()
+
 
 class TestOrchestratorPropertyInstallation:
     """Verify that install_properties populated AgentOrchestrator with the expected properties."""
@@ -290,6 +302,11 @@ class TestOrchestratorPropertyInstallation:
             ),
         ):
             assert orchestrator.unified_chat_coordinator._mock_name == "unified"
+
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["agent_orchestrator.sync_chat_coordinator.compat_property"] == 1
+        assert telemetry["agent_orchestrator.streaming_chat_coordinator.compat_property"] == 1
+        assert telemetry["agent_orchestrator.unified_chat_coordinator.compat_property"] == 1
 
     @pytest.mark.parametrize(
         ("property_name", "backing_attr", "facade_attr", "facade_value_attr"),

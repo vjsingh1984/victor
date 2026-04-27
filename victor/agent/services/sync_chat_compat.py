@@ -25,6 +25,9 @@ import logging
 import warnings
 from typing import Any, Optional, TYPE_CHECKING
 
+from victor.agent.services.chat_compat_telemetry import (
+    record_deprecated_chat_shim_access,
+)
 from victor.framework.task import TaskComplexity
 from victor.providers.base import CompletionResponse
 
@@ -127,6 +130,9 @@ class SyncChatCoordinator:
         )
 
         if self._chat_service is not None:
+            record_deprecated_chat_shim_access(
+                "sync_chat_coordinator", "chat", "chat_service"
+            )
             return await self._chat_service.chat(
                 user_message,
                 use_planning=use_planning,
@@ -134,6 +140,9 @@ class SyncChatCoordinator:
 
         orchestrator = self._orchestrator
         if orchestrator is not None and hasattr(orchestrator, "chat"):
+            record_deprecated_chat_shim_access(
+                "sync_chat_coordinator", "chat", "orchestrator_public"
+            )
             response = await orchestrator.chat(user_message, use_planning=use_planning)
             return self._attach_skill_metadata(
                 response,
@@ -144,6 +153,9 @@ class SyncChatCoordinator:
                 ),
             )
 
+        record_deprecated_chat_shim_access(
+            "sync_chat_coordinator", "chat", "missing_runtime"
+        )
         raise RuntimeError(
             "SyncChatCoordinator has no bound ChatService or orchestrator chat runtime. "
             "Bind ChatService before using deprecated compatibility shims."
@@ -226,12 +238,18 @@ class SyncChatCoordinator:
             CompletionResponse from planning-based execution
         """
         if self._chat_service is not None:
+            record_deprecated_chat_shim_access(
+                "sync_chat_coordinator", "chat_with_planning", "chat_service"
+            )
             return await self._chat_service.chat(user_message, use_planning=True)
 
         # PlanningCoordinator currently requires orchestrator.
         # Deprecated compatibility shims should not bypass the canonical
         # chat service / orchestrator runtime path for planning.
         if self._orchestrator is None:
+            record_deprecated_chat_shim_access(
+                "sync_chat_coordinator", "chat_with_planning", "missing_runtime"
+            )
             raise RuntimeError(
                 "SyncChatCoordinator planning requires a bound ChatService or orchestrator. "
                 "Bind ChatService before using deprecated compatibility shims."
@@ -240,6 +258,9 @@ class SyncChatCoordinator:
         # Import here to avoid circular dependency
         from victor.agent.services.planning_runtime import PlanningCoordinator
 
+        record_deprecated_chat_shim_access(
+            "sync_chat_coordinator", "chat_with_planning", "orchestrator_runtime"
+        )
         planning_coordinator = PlanningCoordinator(self._orchestrator)
 
         # Get task analysis for planning

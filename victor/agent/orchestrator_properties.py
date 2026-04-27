@@ -30,6 +30,10 @@ import logging
 import warnings
 from typing import Any, Optional, TYPE_CHECKING
 
+from victor.agent.services.chat_compat_telemetry import (
+    record_deprecated_chat_shim_access,
+)
+
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
@@ -210,6 +214,9 @@ def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
         DeprecationWarning,
         stacklevel=2,
     )
+    record_deprecated_chat_shim_access(
+        "agent_orchestrator", "sync_chat_coordinator", "compat_property"
+    )
     return _ensure_sync_chat_coordinator(self)
 
 
@@ -238,6 +245,9 @@ def _streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
         DeprecationWarning,
         stacklevel=2,
     )
+    record_deprecated_chat_shim_access(
+        "agent_orchestrator", "streaming_chat_coordinator", "compat_property"
+    )
     return _ensure_streaming_chat_coordinator(self)
 
 
@@ -263,6 +273,9 @@ def _unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
         "Use ChatService instead.",
         DeprecationWarning,
         stacklevel=2,
+    )
+    record_deprecated_chat_shim_access(
+        "agent_orchestrator", "unified_chat_coordinator", "compat_property"
     )
     return _ensure_unified_chat_coordinator(self)
 

@@ -25,6 +25,9 @@ import logging
 import warnings
 from typing import Any, AsyncIterator, TYPE_CHECKING
 
+from victor.agent.services.chat_compat_telemetry import (
+    record_deprecated_chat_shim_access,
+)
 from victor.providers.base import StreamChunk
 
 if TYPE_CHECKING:
@@ -114,10 +117,16 @@ class StreamingChatCoordinator:
         )
 
         if self._chat_service is not None:
+            record_deprecated_chat_shim_access(
+                "streaming_chat_coordinator", "stream_chat", "chat_service"
+            )
             async for chunk in self._chat_service.stream_chat(user_message):
                 yield chunk
             return
 
+        record_deprecated_chat_shim_access(
+            "streaming_chat_coordinator", "stream_chat", "missing_runtime"
+        )
         raise RuntimeError(
             "StreamingChatCoordinator has no bound ChatService. "
             "Bind ChatService before using deprecated compatibility shims."

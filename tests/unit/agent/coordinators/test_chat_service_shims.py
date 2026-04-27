@@ -5,6 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from victor.agent.services.chat_compat_telemetry import (
+    get_deprecated_chat_shim_telemetry,
+    reset_deprecated_chat_shim_telemetry,
+)
 from victor.agent.services.protocols.chat_runtime import ExecutionMode
 from victor.agent.coordinators.streaming_chat_coordinator import (
     StreamingChatCoordinator,
@@ -18,6 +22,13 @@ from victor.providers.base import CompletionResponse, StreamChunk
 def _make_deprecated_chat_coordinator(orchestrator) -> ChatCoordinator:
     with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):
         return ChatCoordinator(orchestrator=orchestrator)
+
+
+@pytest.fixture(autouse=True)
+def _reset_chat_compat_telemetry():
+    reset_deprecated_chat_shim_telemetry()
+    yield
+    reset_deprecated_chat_shim_telemetry()
 
 
 def test_specialized_chat_coordinator_modules_reexport_service_shims():
@@ -69,6 +80,8 @@ async def test_sync_chat_coordinator_delegates_to_bound_chat_service():
 
     assert result is response
     chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["sync_chat_coordinator.chat.chat_service"] == 1
 
 
 @pytest.mark.asyncio
@@ -396,6 +409,8 @@ async def test_chat_coordinator_streaming_prefers_orchestrator_public_runtime():
         chunks = [item async for item in coordinator.stream_chat("hello", mode="test")]
 
     assert chunks == [chunk]
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["chat_coordinator.stream_chat.orchestrator_public"] == 1
 
 
 @pytest.mark.asyncio
@@ -498,3 +513,51 @@ def test_chat_coordinator_turn_executor_requires_bound_chat_service_runtime():
     with pytest.warns(DeprecationWarning, match="ChatCoordinator.turn_executor is deprecated"):
         with pytest.raises(RuntimeError, match="requires a bound ChatService runtime"):
             _ = coordinator.turn_executor
+
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["chat_coordinator.turn_executor.missing_runtime"] == 1
+
+
+@pytest.mark.asyncio
+async def test_streaming_chat_coordinator_missing_runtime_records_telemetry():
+    with pytest.warns(
+        DeprecationWarning,
+        match="StreamingChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = StreamingChatCoordinator(
+            chat_context=MagicMock(),
+            tool_context=MagicMock(),
+            provider_context=MagicMock(),
+        )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="StreamingChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+    ):
+        with pytest.raises(RuntimeError, match="has no bound ChatService"):
+            await anext(coordinator.stream_chat("hello"))
+
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["streaming_chat_coordinator.stream_chat.missing_runtime"] == 1
+
+
+@pytest.mark.asyncio
+async def test_unified_chat_coordinator_streaming_route_records_telemetry():
+    chat_service = AsyncMock()
+    response = CompletionResponse(content="unified", role="assistant")
+    chat_service.chat.return_value = response
+
+    coordinator = UnifiedChatCoordinator(
+        default_mode=ExecutionMode.SYNC,
+        chat_service=chat_service,
+    )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="UnifiedChatCoordinator.chat\\(\\) is deprecated compatibility surface",
+    ):
+        result = await coordinator.chat("hello", mode=ExecutionMode.STREAMING, use_planning=False)
+
+    assert result is response
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["unified_chat_coordinator.chat.chat_service_streaming"] == 1

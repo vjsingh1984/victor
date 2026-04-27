@@ -27,6 +27,9 @@ import logging
 import warnings
 from typing import Any, AsyncIterator, Callable, Optional, TYPE_CHECKING
 
+from victor.agent.services.chat_compat_telemetry import (
+    record_deprecated_chat_shim_access,
+)
 from victor.agent.services.chat_stream_helpers import ChatStreamHelperMixin
 from victor.providers.base import CompletionResponse, StreamChunk
 
@@ -194,8 +197,12 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         chat_service = self._resolve_chat_service()
         if chat_service is not None and hasattr(chat_service, "turn_executor"):
+            record_deprecated_chat_shim_access(
+                "chat_coordinator", "turn_executor", "chat_service"
+            )
             return chat_service.turn_executor
 
+        record_deprecated_chat_shim_access("chat_coordinator", "turn_executor", "missing_runtime")
         raise RuntimeError(
             "ChatCoordinator turn_executor requires a bound ChatService runtime. "
             "Bind ChatService and access ChatService.turn_executor directly."
@@ -232,6 +239,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         chat_service = self._resolve_chat_service()
         if chat_service is not None:
+            record_deprecated_chat_shim_access("chat_coordinator", "chat", "chat_service")
             return await chat_service.chat(
                 user_message,
                 use_planning=use_planning,
@@ -239,8 +247,12 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         runtime_chat = self._get_orchestrator_runtime_helper("chat")
         if callable(runtime_chat):
+            record_deprecated_chat_shim_access(
+                "chat_coordinator", "chat", "orchestrator_public"
+            )
             return await runtime_chat(user_message, use_planning=use_planning)
 
+        record_deprecated_chat_shim_access("chat_coordinator", "chat", "missing_runtime")
         raise RuntimeError(
             "ChatCoordinator has no bound ChatService or orchestrator chat runtime. "
             "Bind ChatService via bind_chat_service()."
@@ -324,12 +336,21 @@ class ChatCoordinator(ChatStreamHelperMixin):
         """
         chat_service = self._resolve_chat_service()
         if chat_service is not None:
+            record_deprecated_chat_shim_access(
+                "chat_coordinator", "chat_with_planning", "chat_service"
+            )
             return await chat_service.chat(user_message, use_planning=True)
 
         runtime_helper = self._get_orchestrator_runtime_helper("_run_planning_chat_runtime")
         if callable(runtime_helper):
+            record_deprecated_chat_shim_access(
+                "chat_coordinator", "chat_with_planning", "orchestrator_runtime"
+            )
             return await runtime_helper(user_message)
 
+        record_deprecated_chat_shim_access(
+            "chat_coordinator", "chat_with_planning", "missing_runtime"
+        )
         raise RuntimeError(
             "ChatCoordinator planning requires a bound ChatService or orchestrator runtime. "
             "Bind ChatService before using deprecated compatibility shims."
@@ -364,16 +385,23 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         chat_service = self._resolve_chat_service()
         if chat_service is not None and hasattr(chat_service, "stream_chat"):
+            record_deprecated_chat_shim_access(
+                "chat_coordinator", "stream_chat", "chat_service"
+            )
             async for chunk in chat_service.stream_chat(user_message, **kwargs):
                 yield chunk
             return
 
         runtime_helper = self._get_orchestrator_runtime_helper("stream_chat")
         if callable(runtime_helper):
+            record_deprecated_chat_shim_access(
+                "chat_coordinator", "stream_chat", "orchestrator_public"
+            )
             async for chunk in runtime_helper(user_message, **kwargs):
                 yield chunk
             return
 
+        record_deprecated_chat_shim_access("chat_coordinator", "stream_chat", "missing_runtime")
         raise RuntimeError(
             "ChatCoordinator has no bound ChatService or streaming runtime. "
             "Bind ChatService or use AgentOrchestrator.stream_chat()."
@@ -430,6 +458,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
             DeprecationWarning,
             stacklevel=2,
         )
+        record_deprecated_chat_shim_access("chat_coordinator", "persist_message", "chat_service")
         from victor.agent.services.chat_service import ChatService
 
         ChatService.persist_message(
