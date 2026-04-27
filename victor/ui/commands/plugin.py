@@ -31,10 +31,11 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from pathlib import Path
 from typing import Optional
+
+from victor.core.async_utils import run_sync
 
 import typer
 from rich.console import Console
@@ -122,7 +123,7 @@ def install_plugin(
     console.print(f"[cyan]Installing plugin from {source}...[/]")
 
     try:
-        plugin = asyncio.run(manager.install_plugin(source, source_type))
+        plugin = run_sync(manager.install_plugin(source, source_type))
     except ManifestValidationError as e:
         console.print("[red]Manifest validation failed:[/]")
         for error in e.errors:

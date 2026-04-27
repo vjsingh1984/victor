@@ -16,11 +16,11 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Optional
 
 import typer
 
+from victor.core.async_utils import run_sync
 from victor.verticals.product_bundle import (
     list_bundles,
     get_bundle,
@@ -58,7 +58,7 @@ def list(
 
             typer.echo(f"\n{bundle_obj.display_name}")
             typer.echo(f"  {bundle_obj.description}")
-            typer.echo(f"\nVerticals:")
+            typer.echo("\nVerticals:")
 
             for vertical_name in bundle_obj.verticals:
                 info = registry.get_vertical(vertical_name)
@@ -104,7 +104,7 @@ def list(
                 if info.capabilities:
                     typer.echo(f"    Capabilities: {', '.join(sorted(info.capabilities))}")
 
-    asyncio.run(_list())
+    run_sync(_list())
 
 
 @app.command()
@@ -168,7 +168,7 @@ def info(
     if bundle_obj.dependencies:
         typer.echo(f"\nBundle Dependencies: {', '.join(bundle_obj.dependencies)}")
 
-    typer.echo(f"\nInstall Command:")
+    typer.echo("\nInstall Command:")
     typer.echo(f"  {bundle_obj.get_install_command()}")
 
     # Check if bundle is available
@@ -176,13 +176,13 @@ def info(
         registry = await get_registry()
 
         if registry.is_bundle_available(bundle):
-            typer.echo(f"\nStatus: ✓ All verticals installed")
+            typer.echo("\nStatus: ✓ All verticals installed")
         else:
             missing = registry.get_missing_verticals_for_bundle(bundle)
             typer.echo(f"\nStatus: ✗ Missing {len(missing)} vertical(s)")
             typer.echo(f"  Missing: {', '.join(missing)}")
 
-    asyncio.run(_check_availability())
+    run_sync(_check_availability())
     typer.echo()
 
 
@@ -213,7 +213,7 @@ def install(
 
     install_cmd = get_install_command(bundle)
 
-    typer.echo(f"\nInstall command:")
+    typer.echo("\nInstall command:")
     typer.echo(f"  {install_cmd}")
 
     if dry_run:
@@ -266,7 +266,7 @@ def check(
                 status_icon = "✓" if info.is_available() else "✗"
                 typer.echo(f"  {status_icon} {info.name}")
 
-    asyncio.run(_check())
+    run_sync(_check())
 
 
 @app.command()
@@ -292,4 +292,4 @@ def capabilities():
             if vertical_names:
                 typer.echo(f"    Provided by: {', '.join(vertical_names)}")
 
-    asyncio.run(_list_capabilities())
+    run_sync(_list_capabilities())
