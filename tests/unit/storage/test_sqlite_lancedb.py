@@ -72,6 +72,12 @@ class TestUnifiedIdHelpers:
         assert "src/foo.py" in sid
         assert "MyClass" in sid
 
+    def test_make_symbol_id_preserves_qualified_symbol_names(self, store):
+        sid = store.make_symbol_id("src/foo.py", "MyClass.run")
+        parsed = store.parse_id(sid)
+        assert parsed.path == "src/foo.py"
+        assert parsed.name == "MyClass.run"
+
     def test_make_file_id(self, store):
         fid = store.make_file_id("src/foo.py")
         assert "src/foo.py" in fid

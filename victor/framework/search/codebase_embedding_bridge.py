@@ -110,6 +110,8 @@ class _BridgeSymbol:
 
     @property
     def qualified_name(self) -> str:
+        if self.parent_symbol and not self.name.startswith(f"{self.parent_symbol}."):
+            return f"{self.parent_symbol}.{self.name}"
         return self.name
 
 

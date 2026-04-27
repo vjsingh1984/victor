@@ -102,8 +102,54 @@ async def test_graph_tool_supports_overview_alias(monkeypatch, tmp_path: Path):
     assert result["success"] is True
     assert result["mode"] == "overview"
     assert result["result"]["stats"]["nodes"] == 7
+    assert result["result"]["symbol_identity_basis"]
     assert "important_symbols" in result["result"]
     assert "important_modules" in result["result"]
+    assert "hub_modules" in result["result"]
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_symbol_rankings_keep_absolute_ids_and_qualified_names(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await store.upsert_nodes(
+        [
+            GraphNode(node_id="symbol:a.py:run", type="function", name="run", file="a.py"),
+            GraphNode(node_id="symbol:b.py:run", type="function", name="run", file="b.py"),
+            GraphNode(node_id="symbol:c.py:caller", type="function", name="caller", file="c.py"),
+        ]
+    )
+    await store.upsert_edges(
+        [
+            GraphEdge(src="symbol:c.py:caller", dst="symbol:a.py:run", type="CALLS"),
+            GraphEdge(src="symbol:c.py:caller", dst="symbol:b.py:run", type="CALLS"),
+        ]
+    )
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="centrality",
+        path=str(tmp_path),
+        top_k=10,
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    run_rows = [item for item in result["result"] if item["name"] == "run"]
+    assert len(run_rows) == 2
+    assert {item["node_id"] for item in run_rows} == {"symbol:a.py:run", "symbol:b.py:run"}
+    assert {item["qualified_name"] for item in run_rows} == {"a.py:run", "b.py:run"}
+    assert {item["module"] for item in run_rows} == {"a", "b"}
 
 
 @pytest.mark.asyncio

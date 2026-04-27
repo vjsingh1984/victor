@@ -13,6 +13,7 @@ from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Se
 from victor.config.settings import get_project_paths, load_settings
 from victor.native.python.graph_algo import connected_components, pagerank, weighted_pagerank
 from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+from victor.storage.unified.protocol import UnifiedId
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.code_search_tool import _get_or_build_index
 from victor.tools.context import ToolExecutionContext
@@ -111,6 +112,7 @@ _SYMBOL_TYPES = {
     "enum",
     "module",
 }
+_SYMBOL_IDENTITY_BASIS = "unique node_id (repo-relative path-qualified symbols)"
 
 
 def _ctx_value(exec_ctx: Optional[Dict[str, Any]], key: str, default: Any = None) -> Any:
@@ -351,12 +353,40 @@ def _module_name_for_node(node: GraphNode) -> Optional[str]:
     return None
 
 
+def _qualified_name_for_node(node: GraphNode) -> str:
+    metadata_name = node.metadata.get("qualified_name")
+    if isinstance(metadata_name, str) and metadata_name:
+        return metadata_name
+
+    try:
+        unified_id = UnifiedId.from_string(node.node_id)
+    except ValueError:
+        unified_id = None
+
+    if unified_id is not None:
+        if unified_id.type == "file":
+            return unified_id.path
+        if unified_id.name:
+            return f"{unified_id.path}:{unified_id.name}"
+        if unified_id.path:
+            return unified_id.path
+
+    module_name = _module_name_for_node(node)
+    if node.type in {"file", "module"}:
+        return node.file or module_name or node.name
+    if node.file:
+        return f"{node.file}:{node.name}"
+    return module_name or node.name
+
+
 def _node_payload(node: GraphNode, **extra: Any) -> Dict[str, Any]:
     payload = {
         "node_id": node.node_id,
         "name": node.name,
+        "qualified_name": _qualified_name_for_node(node),
         "type": node.type,
         "file": node.file,
+        "module": _module_name_for_node(node),
         "line": node.line,
         "end_line": node.end_line,
         "lang": node.lang,
@@ -1286,6 +1316,7 @@ def _build_overview(
     )
     return {
         "stats": _build_stats(loaded),
+        "symbol_identity_basis": _SYMBOL_IDENTITY_BASIS,
         "important_symbols": loaded.analyzer.pagerank(
             edge_types=effective_edge_types,
             top_k=min(top_k, 10),
@@ -1299,6 +1330,11 @@ def _build_overview(
         "important_modules": _rank_projected_modules(
             projected["adjacency"],
             mode="pagerank",
+            top_k=min(top_k, 10),
+        ),
+        "hub_modules": _rank_projected_modules(
+            projected["adjacency"],
+            mode="centrality",
             top_k=min(top_k, 10),
         ),
     }
@@ -1730,6 +1766,7 @@ async def graph(
                 max_callsites=max_callsites,
             )
             result = {
+                "symbol_identity_basis": _SYMBOL_IDENTITY_BASIS,
                 "important_symbols": loaded.analyzer.pagerank(
                     edge_types=effective_edge_types,
                     top_k=min(top_k, 5),
@@ -1743,6 +1780,11 @@ async def graph(
                 "important_modules": _rank_projected_modules(
                     projected["adjacency"],
                     mode="pagerank",
+                    top_k=min(top_k, 5),
+                ),
+                "hub_modules": _rank_projected_modules(
+                    projected["adjacency"],
+                    mode="centrality",
                     top_k=min(top_k, 5),
                 ),
             }

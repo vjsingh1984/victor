@@ -22,6 +22,8 @@ import pytest
 
 from victor.framework.search.codebase_embedding_bridge import (
     STRUCTURAL_CODEBASE_VECTOR_STORE,
+    _BridgeSymbol,
+    _collect_bridge_symbols,
     _resolve_language,
     build_codebase_index_manifest,
     enable_structural_codebase_embeddings,
@@ -186,6 +188,37 @@ def test_resolve_language_honors_explicit_suffix_overrides(tmp_path) -> None:
         language_overrides={".component": "tsx"},
     )
     assert language == "tsx"
+
+
+def test_bridge_symbol_qualified_name_uses_parent_scope() -> None:
+    symbol = _BridgeSymbol(
+        name="run",
+        symbol_type="method",
+        line_start=10,
+        line_end=12,
+        parent_symbol="Agent",
+    )
+
+    assert symbol.qualified_name == "Agent.run"
+
+
+def test_collect_bridge_symbols_preserves_parent_scoped_symbol_identity() -> None:
+    symbols = _collect_bridge_symbols(
+        [
+            {
+                "metadata": {
+                    "symbol_name": "run",
+                    "symbol_type": "method",
+                    "line_number": 10,
+                    "end_line": 12,
+                    "parent_symbol": "Agent",
+                }
+            }
+        ]
+    )
+
+    assert len(symbols) == 1
+    assert symbols[0].qualified_name == "Agent.run"
 
 
 @pytest.mark.asyncio
