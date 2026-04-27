@@ -33,6 +33,7 @@ from victor.evaluation.harness import (
     load_prompt_candidate_evaluation_suite,
     get_harness,
 )
+from victor.evaluation.experiment_memory import ExperimentMemoryStore
 from victor.evaluation.runtime_feedback import load_runtime_evaluation_feedback
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
@@ -1051,6 +1052,90 @@ class TestBenchmarkToolUsageMetrics:
         assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
             "browser"
         )
+
+    def test_save_results_promotes_structured_experiment_memory(self, tmp_path):
+        """Saved results should append a reusable structured experiment-memory record."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        harness._results_dir = tmp_path
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="gpt-5",
+                provider="openai",
+                prompt_candidate_hash="cand-123",
+                prompt_section_name="GROUNDING_RULES",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="guide-1",
+                    status=TaskStatus.FAILED,
+                    completion_score=0.35,
+                    failure_category=BenchmarkFailureCategory.TASK_COMPLETION,
+                    failure_details={
+                        "missing_actions": ["click"],
+                        "optimization_summary": {
+                            "feasible": False,
+                            "reward": 0.22,
+                            "reward_components": {"completion": 0.22},
+                            "feasibility_failures": ["tests_pass", "task_complete"],
+                        },
+                    },
+                    metadata={
+                        "topology_events": [
+                            {
+                                "action": "team_plan",
+                                "topology": "team",
+                                "execution_mode": "team_execution",
+                                "formation": "parallel",
+                                "provider": "openai",
+                                "selection_policy": "learned_close_override",
+                                "confidence": 0.83,
+                            }
+                        ]
+                    },
+                ),
+                TaskResult(
+                    task_id="guide-2",
+                    status=TaskStatus.PASSED,
+                    completion_score=0.92,
+                    failure_details={
+                        "optimization_summary": {
+                            "feasible": True,
+                            "reward": 0.9,
+                            "reward_components": {"completion": 0.9},
+                            "feasibility_failures": [],
+                        }
+                    },
+                    metadata={
+                        "topology_events": [
+                            {
+                                "action": "direct_answer",
+                                "topology": "single_agent",
+                                "execution_mode": "single_agent",
+                                "provider": "openai",
+                                "selection_policy": "heuristic",
+                                "confidence": 0.71,
+                            }
+                        ]
+                    },
+                ),
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+        store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+        matches = store.search("learned override heuristic", provider="openai", limit=1)
+
+        assert "experiment_memory" in loaded
+        assert loaded["experiment_memory"]["scope"]["benchmark"] == "guide"
+        assert loaded["experiment_memory"]["scope"]["provider"] == "openai"
+        assert any(
+            insight["kind"] == "failed_hypothesis"
+            for insight in loaded["experiment_memory"]["insights"]
+        )
+        assert len(store) == 1
+        assert matches[0].scope.prompt_candidate_hash == "cand-123"
 
     def test_save_validated_session_feedbacks_delegates_to_service(self, tmp_path):
         """Harness should delegate session-truth orchestration to the shared service."""

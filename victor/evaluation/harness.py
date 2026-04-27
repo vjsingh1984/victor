@@ -43,6 +43,8 @@ from victor.evaluation.protocol import (
     TaskResult,
     TaskStatus,
 )
+from victor.evaluation.experiment_analyzer import analyze_evaluation_result
+from victor.evaluation.experiment_memory import ExperimentMemoryRecord, ExperimentMemoryStore
 from victor.evaluation.runtime_feedback import (
     build_runtime_evaluation_feedback_payload,
     derive_runtime_evaluation_feedback,
@@ -1496,12 +1498,19 @@ class EvaluationHarness:
             runtime_feedback,
             source_result_path=output_path,
         )
+        experiment_memory = analyze_evaluation_result(
+            result,
+            summary=summary,
+            runtime_feedback=runtime_feedback_payload,
+            source_result_path=output_path,
+        )
 
         # Serialize result
         data = {
             "config": result.config.to_artifact_config(),
             "summary": summary,
             "runtime_evaluation_feedback": runtime_feedback_payload,
+            "experiment_memory": experiment_memory.to_dict(),
             "start_time": result.start_time.isoformat() if result.start_time else None,
             "end_time": result.end_time.isoformat() if result.end_time else None,
             "tasks": [
@@ -1551,6 +1560,7 @@ class EvaluationHarness:
         with open(output_path, "w") as f:
             json.dump(data, f, indent=2)
 
+        self._persist_experiment_memory(experiment_memory)
         self._save_validated_session_feedbacks(
             result,
             source_result_path=output_path,
@@ -1559,6 +1569,16 @@ class EvaluationHarness:
 
         logger.info(f"Results saved to: {output_path}")
         return output_path
+
+    def _persist_experiment_memory(self, record: ExperimentMemoryRecord) -> None:
+        """Append a reusable experiment-memory record for later retrieval."""
+        try:
+            store = ExperimentMemoryStore(
+                persist_path=self._results_dir / "experiment_memory.json",
+            )
+            store.record(record)
+        except Exception as exc:
+            logger.warning("Experiment-memory persistence failed: %s", exc)
 
     def _save_validated_session_feedbacks(
         self,
