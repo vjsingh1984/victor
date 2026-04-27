@@ -15,6 +15,7 @@
 """Unit tests for code_search_tool."""
 
 import asyncio
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -28,6 +29,7 @@ from victor.tools.code_search_tool import (
     _get_or_build_index,
     _literal_search,
     _normalize_search_filters,
+    clear_index_cache,
     code_search,
 )
 from victor.tools.context import ToolExecutionContext
@@ -2419,6 +2421,110 @@ async def test_code_search_caches_index_build_failure_in_plain_dict_fallback(
     assert len(failure_cache) == 1
     cached_entry = next(iter(failure_cache.values()))
     assert cached_entry.value["error"] == "index build failed"
+
+
+@pytest.mark.asyncio
+async def test_code_search_reuses_missing_provider_failure_across_repo_subdirectories(
+    tmp_path, monkeypatch, caplog
+) -> None:
+    """Missing semantic providers should warn once and reuse the cached failure."""
+
+    class _MissingProviderRegistry:
+        def __init__(self) -> None:
+            self.ensure_calls = 0
+            self._factory = None
+
+        def ensure_bootstrapped(self) -> None:
+            self.ensure_calls += 1
+
+        def get(self, protocol: object) -> object:
+            del protocol
+            return self._factory
+
+        def is_enhanced(self, protocol: object) -> bool:
+            del protocol
+            return self._factory is not None
+
+        def register(self, protocol: object, factory: object, status: object) -> None:
+            del protocol, status
+            self._factory = factory
+
+    repo_root = tmp_path / "repo"
+    framework_dir = repo_root / "victor" / "framework"
+    storage_dir = repo_root / "victor" / "storage"
+    framework_dir.mkdir(parents=True)
+    storage_dir.mkdir(parents=True)
+    (framework_dir / "agent.py").write_text("class Agent: ...\n", encoding="utf-8")
+    (storage_dir / "sqlite_store.py").write_text("class SqliteStore: ...\n", encoding="utf-8")
+
+    persist_dir = repo_root / ".victor" / "embeddings"
+    persist_dir.mkdir(parents=True)
+    settings = _settings(
+        codebase_vector_store="lancedb",
+        codebase_embedding_provider="sentence-transformers",
+        codebase_embedding_model="all-MiniLM-L12-v2",
+        codebase_persist_directory=str(persist_dir),
+    )
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+    registry = _MissingProviderRegistry()
+    failure_cache: dict[str, object] = {}
+
+    import victor.config.settings as config_settings_module
+    import victor.core.bootstrap as bootstrap_module
+    import victor.core.capability_registry as capability_registry_module
+
+    monkeypatch.setattr(
+        config_settings_module,
+        "get_project_paths",
+        lambda root=None: SimpleNamespace(
+            project_root=repo_root,
+            project_victor_dir=repo_root / ".victor",
+            embeddings_dir=persist_dir,
+        ),
+    )
+    monkeypatch.setattr(
+        capability_registry_module.CapabilityRegistry,
+        "get_instance",
+        staticmethod(lambda: registry),
+    )
+    monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda *_args: None)
+    monkeypatch.setattr(_get_or_build_index, "_failure_cache", failure_cache, raising=False)
+    clear_index_cache()
+
+    with patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ):
+        with caplog.at_level(logging.INFO, logger="victor.tools.code_search_tool"):
+            first = await code_search(
+                query="embedding store vector search index",
+                path=str(framework_dir),
+                k=5,
+                _exec_ctx={"settings": settings},
+            )
+            second = await code_search(
+                query="SQLite graph store protocol database",
+                path=str(storage_dir),
+                k=5,
+                _exec_ctx={"settings": settings},
+            )
+
+    assert first["fallback"] == "semantic_index_error"
+    assert second["fallback"] == "semantic_index_error"
+    assert registry.ensure_calls == 1
+    warning_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING and "Semantic index build failed" in record.getMessage()
+    ]
+    info_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.INFO
+        and "Semantic index build skipped due to cached recent failure" in record.getMessage()
+    ]
+    assert len(warning_messages) == 1
+    assert len(info_messages) == 1
 
 
 @pytest.mark.asyncio
