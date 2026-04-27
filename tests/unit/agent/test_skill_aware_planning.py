@@ -123,3 +123,52 @@ class TestGenerateSkillAwarePlanPrompt:
         assert "debug" in prompt
         assert "refactor" in prompt
         assert "Fix the auth bug" in prompt
+
+    def test_prompt_includes_selected_skill_sequence(self):
+        from victor.framework.skill_planner import build_skill_aware_plan_prompt
+
+        skills = {
+            "debug": _make_skill("debug", description="Debug tests"),
+            "refactor": _make_skill("refactor", description="Refactor code"),
+        }
+
+        prompt = build_skill_aware_plan_prompt(
+            "Fix the auth bug and clean up the code",
+            skills,
+            selected_skills=["debug", "refactor"],
+            decomposition_confidence=0.72,
+        )
+
+        assert "Suggested ordered skill sequence" in prompt
+        assert "debug -> refactor" in prompt
+        assert "confidence=0.72" in prompt
+
+
+class TestSkillDecomposition:
+    """Shared framework decomposition helper should reuse matcher ordering."""
+
+    def test_build_skill_decomposition_uses_matcher_sequence(self):
+        from victor.framework.skill_planner import SkillDecomposition, build_skill_decomposition
+
+        matcher = MagicMock()
+        matcher.initialized = True
+        matcher.match_multiple_sync.return_value = [
+            (_make_skill("debug", phase="diagnostic"), 0.81),
+            (_make_skill("refactor", phase="action"), 0.63),
+        ]
+
+        result = build_skill_decomposition("fix the failing auth tests", matcher)
+
+        assert result == SkillDecomposition(
+            skills=["debug", "refactor"],
+            confidence=0.72,
+            rationale="Ordered by framework skill matcher phase sequence",
+        )
+
+    def test_build_skill_decomposition_returns_none_when_matcher_unavailable(self):
+        from victor.framework.skill_planner import build_skill_decomposition
+
+        matcher = MagicMock()
+        matcher.initialized = False
+
+        assert build_skill_decomposition("anything", matcher) is None

@@ -1,17 +1,86 @@
-"""Skill-aware task planning — enriches plan steps with matching skills.
+"""Framework-level skill planning helpers.
 
-Maps plan step types and descriptions to registered skills so the agent
-gets skill-specific guidance for each step during plan execution.
+This module keeps skill-aware planning logic in a shared framework surface so
+chat/planning entry points can reuse the same decomposition and prompt-building
+behavior instead of carrying local variants.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 from victor_sdk.skills import SkillDefinition
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SkillDecomposition:
+    """Ordered skill sequence derived from the shared matcher."""
+
+    skills: List[str]
+    confidence: float
+    rationale: str
+
+
+def coerce_skill_catalog(skills: Any) -> Dict[str, SkillDefinition]:
+    """Normalize skill inputs into a name -> definition mapping."""
+    if not skills:
+        return {}
+
+    if isinstance(skills, Mapping):
+        return {
+            str(name): skill
+            for name, skill in skills.items()
+            if isinstance(skill, SkillDefinition)
+        }
+
+    if isinstance(skills, list):
+        return {
+            skill.name: skill
+            for skill in skills
+            if isinstance(skill, SkillDefinition)
+        }
+
+    return {}
+
+
+def build_skill_decomposition(
+    user_request: str,
+    matcher: Any,
+    *,
+    max_skills: int = 3,
+) -> Optional[SkillDecomposition]:
+    """Build an ordered skill sequence from the shared SkillMatcher.
+
+    The matcher already owns the ranking and phase ordering logic. This helper
+    turns those matches into a reusable planning/decomposition artifact.
+    """
+    if matcher is None or not getattr(matcher, "initialized", getattr(matcher, "_initialized", False)):
+        return None
+
+    match_multiple = getattr(matcher, "match_multiple_sync", None)
+    if not callable(match_multiple):
+        return None
+
+    matches = match_multiple(user_request, max_skills=max_skills)
+    if not matches:
+        return None
+
+    ordered_skills = [skill.name for skill, _score in matches]
+    mean_confidence = sum(score for _skill, score in matches) / max(len(matches), 1)
+    rationale = (
+        "Ordered by framework skill matcher phase sequence"
+        if len(ordered_skills) > 1
+        else "Matched primary framework skill"
+    )
+    return SkillDecomposition(
+        skills=ordered_skills,
+        confidence=round(mean_confidence, 3),
+        rationale=rationale,
+    )
 
 
 def enrich_plan_with_skills(
@@ -104,6 +173,9 @@ def _match_skill_for_step(
 def build_skill_aware_plan_prompt(
     user_request: str,
     skills: Dict[str, SkillDefinition],
+    *,
+    selected_skills: Optional[List[str]] = None,
+    decomposition_confidence: Optional[float] = None,
 ) -> str:
     """Build a plan generation prompt that includes available skills.
 
@@ -116,15 +188,26 @@ def build_skill_aware_plan_prompt(
     Returns:
         Prompt string for plan generation
     """
+    normalized_skills = coerce_skill_catalog(skills)
     skill_catalog = "\n".join(
         f"  - {name}: {skill.description} (phase: {getattr(skill, 'phase', 'action')})"
-        for name, skill in sorted(skills.items())
+        for name, skill in sorted(normalized_skills.items())
     )
+    decomposition_hint = ""
+    if selected_skills:
+        decomposition_hint = (
+            "\nSuggested ordered skill sequence from the shared framework matcher:\n"
+            f"  - {' -> '.join(selected_skills)}"
+        )
+        if decomposition_confidence is not None:
+            decomposition_hint += f" (confidence={decomposition_confidence:.2f})"
+        decomposition_hint += "\n"
 
     return (
         f"Generate a structured task plan for the following request.\n\n"
         f"Available skills (use these as step types when applicable):\n"
         f"{skill_catalog}\n\n"
+        f"{decomposition_hint}"
         f"Task: {user_request}\n\n"
         f"Return a JSON plan with steps. Each step can reference a skill "
         f"name as its type if it matches."

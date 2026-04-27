@@ -75,6 +75,16 @@ class SkillMatcher:
         self._use_edge_fallback = use_edge_fallback
         self._initialized = False
 
+    @property
+    def initialized(self) -> bool:
+        """Whether the matcher has loaded and embedded its skill catalog."""
+        return self._initialized
+
+    @property
+    def skills(self) -> Dict[str, SkillDefinition]:
+        """Return a copy of the registered skill catalog keyed by name."""
+        return dict(self._skills)
+
     async def initialize(self, registry: Any) -> None:
         """Pre-embed all skills from the registry.
 
