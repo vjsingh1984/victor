@@ -232,13 +232,26 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
 
 @pytest.mark.asyncio
 async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(monkeypatch):
+    class FakeToolService:
+        def __init__(self, budget: int, used: int = 0):
+            self.budget = budget
+            self.used = used
+            self.history = []
+
+        def get_tool_budget(self) -> int:
+            return max(0, self.budget - self.used)
+
+        def get_remaining_budget(self) -> int:
+            return self.get_tool_budget()
+
+        def set_tool_budget(self, budget: int) -> None:
+            self.history.append(budget)
+            self.budget = budget
+
     orch = _make_orchestrator_stub()
     orch.tool_budget = 9
     orch.task_coordinator = SimpleNamespace(tool_budget=9)
-    orch._tool_service = SimpleNamespace(
-        get_tool_budget=lambda: 9,
-        set_tool_budget=MagicMock(),
-    )
+    orch._tool_service = FakeToolService(budget=9, used=3)
     orch._tool_pipeline = SimpleNamespace(config=SimpleNamespace(tool_budget=9))
     orch._conversation_controller.messages = [SimpleNamespace(content="abc")]
     orch.has_capability.side_effect = lambda name: name == "current_stream_context"
@@ -269,6 +282,8 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     assert chunks == [StreamChunk(content="service", is_final=True)]
     assert orch.tool_budget == 9
     assert orch.task_coordinator.tool_budget == 9
+    assert orch._tool_service.budget == 9
+    assert orch._tool_service.history == [4, 9]
     assert "_runtime_tool_context_overrides" not in orch.__dict__
     assert ctx.runtime_override_snapshot is None
     assert orch._current_stream_context is None

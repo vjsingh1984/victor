@@ -400,7 +400,7 @@ class ChatStreamHelperMixin:
             return bool(explicit)
         settings = getattr(self._orchestrator, "settings", None)
         if settings is not None and hasattr(settings, "enable_topology_routing"):
-            return bool(getattr(settings, "enable_topology_routing"))
+            return bool(settings.enable_topology_routing)
         return True
 
     async def _get_stream_topology_provider_hints(
@@ -528,7 +528,13 @@ class ChatStreamHelperMixin:
 
             tool_service = getattr(orch, "_tool_service", None)
             if tool_service is not None and hasattr(tool_service, "get_tool_budget"):
-                snapshot["tool_service_budget"] = tool_service.get_tool_budget()
+                snapshot["tool_service_budget"] = getattr(
+                    tool_service,
+                    "budget",
+                    tool_service.get_budget_info().get("max")
+                    if hasattr(tool_service, "get_budget_info")
+                    else tool_service.get_tool_budget(),
+                )
                 if hasattr(tool_service, "set_tool_budget"):
                     try:
                         tool_service.set_tool_budget(max(0, tool_budget))
