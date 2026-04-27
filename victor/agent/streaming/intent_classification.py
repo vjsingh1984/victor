@@ -233,11 +233,15 @@ class IntentClassificationHandler:
             IntentClassificationResult with chunks, action_result, and updates.
         """
         result = IntentClassificationResult()
+        tool_format_confusion = False
 
         # Step 1: Yield content to UI
         content_for_intent = full_content or ""
         if full_content:
             sanitized = self._sanitizer.sanitize(full_content)
+            detect_confusion = getattr(self._sanitizer, "has_tool_format_confusion", None)
+            if callable(detect_confusion):
+                tool_format_confusion = bool(detect_confusion(full_content))
             if sanitized:
                 logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
                 result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
@@ -246,6 +250,25 @@ class IntentClassificationHandler:
                     f"Total accumulated content: {stream_ctx.total_accumulated_chars} chars"
                 )
                 result.content_cleared = True
+
+        if tool_format_confusion:
+            logger.warning(
+                "Detected malformed tool-style plaintext in model response; "
+                "finishing early to prevent a continuation loop"
+            )
+            result.add_chunk(
+                self._chunk_generator.generate_content_chunk(
+                    "\n\n[Model emitted malformed tool-style text instead of valid tool "
+                    "calls. Stopping to prevent a loop. Try rerunning or switching provider.]",
+                    is_final=True,
+                )
+            )
+            result.action_result = {
+                "action": "finish",
+                "reason": "Malformed tool-style plaintext detected instead of valid tool calls",
+            }
+            result.action = "finish"
+            return result
 
         # Step 2: Extract intent text (last 500 chars for pattern matching)
         intent_text = content_for_intent

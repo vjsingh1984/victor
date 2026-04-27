@@ -545,6 +545,27 @@ class ResponseSanitizer:
         r"<think>",  # Orphaned Qwen3 thinking open tag
     ]
 
+    # Standalone shell-like command lines emitted as plain text instead of tool calls.
+    # These commonly appear when smaller/local models try to "suggest" commands
+    # rather than using the tool-calling interface.
+    PLAIN_COMMAND_WORDS = frozenset(
+        {"ls", "rg", "grep", "find", "cat", "sed", "head", "tail", "pwd", "read"}
+    )
+    PATHLIKE_HINT_WORDS = frozenset(
+        {
+            "rust",
+            "victor",
+            "tests",
+            "docs",
+            "scripts",
+            "src",
+            "site",
+            "ui",
+            "web",
+            ".victor",
+        }
+    )
+
     # Patterns for invalid/hallucinated tool names
     INVALID_TOOL_PATTERNS: List[str] = [
         r"^example_",
@@ -612,6 +633,66 @@ class ResponseSanitizer:
         cleaned = re.sub(r"<[^>]+>", " ", text)
         return " ".join(cleaned.split())
 
+    def _looks_like_path_fragment(self, token: str) -> bool:
+        normalized = token.strip().strip("`'\"")
+        if not normalized:
+            return False
+        lowered = normalized.lower()
+        if lowered in self.PATHLIKE_HINT_WORDS:
+            return True
+        if normalized.startswith((".", "/", "~")):
+            return True
+        if "/" in normalized or "\\" in normalized:
+            return True
+        return bool(re.search(r"\.[A-Za-z0-9]{1,8}$", normalized))
+
+    def _is_plaintext_tool_command_line(self, line: str) -> bool:
+        normalized = " ".join(line.strip().split())
+        if not normalized or len(normalized) > 80:
+            return False
+        if any(ch in normalized for ch in "(){}[]=:,"):
+            return False
+
+        tokens = normalized.split()
+        if len(tokens) > 3:
+            return False
+
+        command = None
+        arguments: List[str] = []
+        if tokens[0].lower() in self.PLAIN_COMMAND_WORDS:
+            command = tokens[0].lower()
+            arguments = tokens[1:]
+        elif tokens[-1].lower() in self.PLAIN_COMMAND_WORDS:
+            command = tokens[-1].lower()
+            arguments = tokens[:-1]
+        else:
+            return False
+
+        if command == "pwd" and not arguments:
+            return True
+        if not arguments:
+            return False
+        return all(self._looks_like_path_fragment(token) for token in arguments)
+
+    def extract_plaintext_tool_command_lines(self, text: str | None) -> List[str]:
+        if not text:
+            return []
+        return [
+            line.strip()
+            for line in text.splitlines()
+            if self._is_plaintext_tool_command_line(line)
+        ]
+
+    def has_tool_format_confusion(self, text: str | None) -> bool:
+        if not text:
+            return False
+        malformed_lines = self.extract_plaintext_tool_command_lines(text)
+        if not malformed_lines:
+            return False
+        sanitized = self.sanitize(text)
+        removed_ratio = 1.0 - (len(sanitized) / max(len(text), 1))
+        return len(malformed_lines) >= 2 or removed_ratio >= 0.35
+
     def sanitize(self, text: str) -> str:
         """Sanitize model response by removing malformed patterns.
 
@@ -664,6 +745,10 @@ class ResponseSanitizer:
                 continue
             # Skip lines that are just parameter= syntax
             if re.match(r"^(parameter=|<parameter)", stripped):
+                continue
+            # Skip standalone shell-like command lines; these are malformed
+            # plain-text tool intents, not useful user-facing content.
+            if self._is_plaintext_tool_command_line(stripped):
                 continue
             cleaned_lines.append(line)
         text = "\n".join(cleaned_lines)

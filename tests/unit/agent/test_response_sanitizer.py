@@ -196,6 +196,30 @@ class TestResponseSanitizerEdgeCases:
         assert "Data" in result
         assert "End" in result
 
+    def test_sanitize_removes_plaintext_shell_like_command_lines(self, sanitizer):
+        text = (
+            "I'll analyze the codebase structure.\n"
+            "ls rust\n"
+            "scripts ls\n"
+            "victor/core ls\n"
+            "Then I will summarize the findings."
+        )
+        result = sanitizer.sanitize(text)
+        assert "ls rust" not in result
+        assert "scripts ls" not in result
+        assert "victor/core ls" not in result
+        assert "I'll analyze the codebase structure." in result
+        assert "Then I will summarize the findings." in result
+
+    def test_has_tool_format_confusion_detects_plaintext_shell_commands(self, sanitizer):
+        text = (
+            "I'll inspect the repository first.\n"
+            "ls rust\n"
+            "scripts ls\n"
+            "victor/tools ls\n"
+        )
+        assert sanitizer.has_tool_format_confusion(text) is True
+
     def test_sanitize_logs_warning_on_significant_removal(self, sanitizer, caplog):
         """Test warning logged when >50% content removed (covers line 167)."""
         import logging
