@@ -2287,7 +2287,9 @@ async def _run_cli_repl(
         from victor.agent.conversation.types import MessageRole
 
         role_by_value = {role.value: role for role in MessageRole}
-        conversation_data = conversation.to_dict() if hasattr(conversation, "to_dict") else conversation
+        conversation_data = (
+            conversation.to_dict() if hasattr(conversation, "to_dict") else conversation
+        )
         if not isinstance(conversation_data, dict):
             conversation_data = {"messages": []}
 
@@ -2316,7 +2318,9 @@ async def _run_cli_repl(
                 content=str(message.get("content", "")),
                 tool_name=str(message["name"]) if message.get("name") is not None else None,
                 tool_call_id=(
-                    str(message["tool_call_id"]) if message.get("tool_call_id") is not None else None
+                    str(message["tool_call_id"])
+                    if message.get("tool_call_id") is not None
+                    else None
                 ),
                 metadata=metadata or None,
                 tool_calls=tool_calls if isinstance(tool_calls, list) else None,
@@ -2423,7 +2427,9 @@ async def _run_cli_repl(
 
             current_provider = getattr(profile_config, "provider", None)
             if not isinstance(current_provider, str) or not current_provider.strip():
-                current_provider = getattr(getattr(settings, "provider", None), "default_provider", None)
+                current_provider = getattr(
+                    getattr(settings, "provider", None), "default_provider", None
+                )
             current_provider = str(current_provider or "unknown")
 
             current_model = getattr(profile_config, "model", None)

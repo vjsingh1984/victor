@@ -833,7 +833,9 @@ class TestChatReplRendering:
                     chat_module, "_create_cli_prompt_session", return_value=FakePromptSession()
                 ),
                 patch.object(chat_module.console, "print") as mock_print,
-                patch.object(chat_module, "format_exception_for_user", return_value="network error"),
+                patch.object(
+                    chat_module, "format_exception_for_user", return_value="network error"
+                ),
             ):
                 await chat_module._run_cli_repl(
                     agent=agent,
@@ -849,7 +851,9 @@ class TestChatReplRendering:
         assert any("network error" in item.lower() for item in rendered)
         assert any("different provider" in item.lower() for item in rendered)
         assert not any("cannot access local variable 'provider'" in item for item in rendered)
-        assert not any("SQLiteSessionPersistence is deprecated" in str(w.message) for w in caught_warnings)
+        assert not any(
+            "SQLiteSessionPersistence is deprecated" in str(w.message) for w in caught_warnings
+        )
         assert not any(
             "get_sqlite_session_persistence() is deprecated" in str(w.message)
             for w in caught_warnings
