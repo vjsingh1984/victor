@@ -149,6 +149,7 @@ class PlanningGate:
         self._fast_path_count = 0
         self._total_decisions = 0
         self._forced_slow_path_count = 0
+        self._learned_fast_path_count = 0
 
     def should_use_llm_planning(
         self,
@@ -180,6 +181,21 @@ class PlanningGate:
         if not self.enabled:
             return True  # Gate disabled, always use LLM planning
 
+        query_lower = context.get("query", "").lower() if context else ""
+        action_keywords = [
+            "run ",
+            "execute",
+            "create ",
+            "write ",
+            "delete ",
+            "list ",
+            "show ",
+            "get ",
+            "find ",
+            "search ",
+        ]
+        has_action_keyword = any(keyword in query_lower for keyword in action_keywords)
+
         if isinstance(routing_hints, dict) and routing_hints.get("planning_force_llm"):
             reason = str(routing_hints.get("planning_force_reason") or "runtime_feedback")
             logger.info(
@@ -197,6 +213,53 @@ class PlanningGate:
             )
             self._fast_path_count += 1
             return False  # Skip LLM planning
+
+        if isinstance(routing_hints, dict) and routing_hints.get("planning_prefer_fast_path"):
+            tuned_tool_budget = max(
+                1,
+                int(routing_hints.get("planning_fast_path_tool_budget_limit") or 4),
+            )
+            tuned_query_length = max(
+                1,
+                int(routing_hints.get("planning_fast_path_query_length_limit") or 60),
+            )
+            tuned_complexity = float(
+                routing_hints.get("planning_fast_path_complexity_threshold") or 0.3
+            )
+            reason = str(routing_hints.get("planning_prefer_reason") or "runtime_feedback")
+            if task_type in self.FAST_PATTERNS and tool_budget <= tuned_tool_budget:
+                logger.info(
+                    f"[PlanningGate] Learned fast-path override: task_type={task_type} "
+                    f"reason={reason}"
+                )
+                self._fast_path_count += 1
+                self._learned_fast_path_count += 1
+                return False
+            if (
+                query_complexity is not None
+                and query_complexity <= tuned_complexity
+                and tool_budget <= tuned_tool_budget
+            ):
+                logger.info(
+                    f"[PlanningGate] Learned fast-path override: "
+                    f"query_complexity={query_complexity:.2f} reason={reason}"
+                )
+                self._fast_path_count += 1
+                self._learned_fast_path_count += 1
+                return False
+            if (
+                query_length > 0
+                and query_length <= tuned_query_length
+                and has_action_keyword
+                and tool_budget <= tuned_tool_budget
+            ):
+                logger.info(
+                    f"[PlanningGate] Learned fast-path override: short action query "
+                    f"(length={query_length}) reason={reason}"
+                )
+                self._fast_path_count += 1
+                self._learned_fast_path_count += 1
+                return False
 
         # Fast Pattern 1: Simple task types with low tool budget
         if task_type in self.FAST_PATTERNS and tool_budget <= 3:
@@ -218,21 +281,7 @@ class PlanningGate:
 
         # Fast Pattern 3: Short, direct queries
         if query_length > 0 and query_length < 50:
-            # Check for action keywords
-            query_lower = context.get("query", "").lower() if context else ""
-            action_keywords = [
-                "run ",
-                "execute",
-                "create ",
-                "write ",
-                "delete ",
-                "list ",
-                "show ",
-                "get ",
-                "find ",
-                "search ",
-            ]
-            if any(keyword in query_lower for keyword in action_keywords):
+            if has_action_keyword:
                 logger.info(
                     f"[PlanningGate] Fast-path: short action query "
                     f"(length={query_length}, skips LLM planning)"
@@ -261,6 +310,7 @@ class PlanningGate:
         return {
             "fast_path_count": self._fast_path_count,
             "forced_slow_path_count": self._forced_slow_path_count,
+            "learned_fast_path_count": self._learned_fast_path_count,
             "total_decisions": self._total_decisions,
             "fast_path_percentage": fast_path_pct,
         }
@@ -645,6 +695,11 @@ class AgenticLoop:
                     planning_selection_policy = "default_llm_planning"
                     if planning_routing_hints.get("planning_force_llm"):
                         planning_selection_policy = "experiment_forced_slow_path"
+                    elif (
+                        not use_llm_planning
+                        and planning_routing_hints.get("planning_prefer_fast_path")
+                    ):
+                        planning_selection_policy = "heuristic_fast_path"
                     elif not use_llm_planning and skip_reason == "paradigm_router":
                         planning_selection_policy = "paradigm_router_fast_path"
                     elif not use_llm_planning and skip_planning:
@@ -662,6 +717,12 @@ class AgenticLoop:
                                 planning_routing_hints.get("planning_force_llm")
                             ),
                             "force_reason": planning_routing_hints.get("planning_force_reason"),
+                            "preference_reason": planning_routing_hints.get(
+                                "planning_prefer_reason"
+                            ),
+                            "preferred_by_runtime_feedback": bool(
+                                planning_routing_hints.get("planning_prefer_fast_path")
+                            ),
                             "constraint_tags": list(
                                 planning_routing_hints.get("planning_constraint_tags") or []
                             ),
@@ -728,11 +789,15 @@ class AgenticLoop:
                             max(1, int(topology_plan.iteration_budget)),
                         )
 
-                # Skip planning stage if in fast-path
-                if not use_llm_planning and skip_reason == "fast_path":
-                    logger.info(f"[Iteration {i}/{effective_max}] SKIP PLAN (fast-path)")
-                    iteration.plan = None  # No plan needed
-                    state["plan"] = None
+                # Skip planning stage when fast-path routing chooses direct execution
+                if not use_llm_planning:
+                    logger.info(
+                        f"[Iteration {i}/{effective_max}] SKIP PLAN "
+                        f"(reason={skip_reason or 'fast_path'})"
+                    )
+                    plan = self._build_fast_path_plan(perception, state)
+                    iteration.plan = plan
+                    state["plan"] = plan
                 else:
                     # PLAN (use existing PlanningCoordinator if available)
                     logger.info(f"[Iteration {i}/{effective_max}] PLAN")
@@ -781,11 +846,13 @@ class AgenticLoop:
                         if hasattr(perception, "action_intent"):
                             perception.action_intent.stage = target_stage
 
-                # PLAN (use existing PlanningCoordinator if available)
-                logger.info(f"[Iteration {i}/{effective_max}] PLAN")
-                plan = await self._plan(perception, state)
-                iteration.plan = plan
-                state["plan"] = plan
+                plan = state.get("plan")
+                if plan is None:
+                    # PLAN (use existing PlanningCoordinator if available)
+                    logger.info(f"[Iteration {i}/{effective_max}] PLAN")
+                    plan = await self._plan(perception, state)
+                    iteration.plan = plan
+                    state["plan"] = plan
 
                 # ACT
                 logger.info(f"[Iteration {i}/{effective_max}] ACT")
@@ -1388,6 +1455,19 @@ class AgenticLoop:
         # (This would require accessing the tool results from state)
 
         return len(papers)
+
+    @staticmethod
+    def _build_fast_path_plan(
+        perception: Perception,
+        state: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build a minimal execution plan when planning is intentionally skipped."""
+        return {
+            "planning_skipped": True,
+            "query": state.get("query", ""),
+            "task_type": state.get("task_type", "unknown"),
+            "perception": perception.to_dict(),
+        }
 
     async def _plan(
         self,

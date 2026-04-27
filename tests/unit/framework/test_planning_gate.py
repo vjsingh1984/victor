@@ -130,6 +130,29 @@ class TestPlanningGate:
         stats = gate.get_statistics()
         assert stats["forced_slow_path_count"] == 1
 
+    def test_planning_feedback_can_prefer_fast_path_on_close_call(self):
+        """Negative planning bias can widen fast-path thresholds on safe close calls."""
+        gate = PlanningGate(enabled=True)
+
+        result = gate.should_use_llm_planning(
+            task_type="unknown",
+            tool_budget=4,
+            query_complexity=0.34,
+            query_length=60,
+            context={"query": "run the tests"},
+            routing_hints={
+                "planning_prefer_fast_path": True,
+                "planning_prefer_reason": "experiment_policy_bias: heuristic_fast_path",
+                "planning_fast_path_tool_budget_limit": 4,
+                "planning_fast_path_query_length_limit": 70,
+                "planning_fast_path_complexity_threshold": 0.36,
+            },
+        )
+
+        assert result is False, "learned fast-path preference should skip planning"
+        stats = gate.get_statistics()
+        assert stats["learned_fast_path_count"] == 1
+
     def test_complex_task_returns_true(self):
         """Test complex task returns True (use LLM planning)."""
         gate = PlanningGate(enabled=True)

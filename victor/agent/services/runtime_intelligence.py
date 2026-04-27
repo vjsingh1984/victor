@@ -1614,6 +1614,25 @@ class RuntimeIntelligenceService:
             planning_hints["planning_force_reason"] = (
                 "experiment_policy_bias: experiment_forced_slow_path"
             )
+        elif (
+            planning_hints["planning_preferred_policy"] == "heuristic_fast_path"
+            and planning_hints["planning_policy_bias"] <= -0.15
+        ):
+            absolute_bias = min(1.0, abs(float(planning_hints["planning_policy_bias"])))
+            planning_hints["planning_prefer_fast_path"] = True
+            planning_hints["planning_prefer_reason"] = (
+                "experiment_policy_bias: heuristic_fast_path"
+            )
+            planning_hints["planning_fast_path_tool_budget_limit"] = 4 + int(
+                absolute_bias >= 0.6
+            )
+            planning_hints["planning_fast_path_query_length_limit"] = int(
+                round(60 + (20 * absolute_bias))
+            )
+            planning_hints["planning_fast_path_complexity_threshold"] = round(
+                min(0.45, 0.3 + (0.12 * absolute_bias)),
+                4,
+            )
         return planning_hints
 
     def _build_persistable_session_topology_feedback(self) -> Optional[RuntimeEvaluationFeedback]:

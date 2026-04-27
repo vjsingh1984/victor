@@ -391,6 +391,45 @@ class TestAgenticLoop:
         )
         assert planning_scope_context["task_type"] == "action"
 
+    async def test_fast_path_skips_planning_and_uses_direct_execution_plan(self):
+        perception = _make_perception()
+        perception.confidence = 0.9
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            max_iterations=1,
+            config={"enable_topology_routing": False},
+        )
+        loop._analyze_turn = AsyncMock(return_value=perception)
+        loop._plan = AsyncMock(return_value={"steps": ["should-not-run"]})
+        loop._evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=0.81,
+                reason="Fast-path execution completed",
+            )
+        )
+        loop.paradigm_router = MagicMock()
+        loop.paradigm_router.route.return_value = MagicMock(
+            skip_planning=False,
+            paradigm=SimpleNamespace(value="fast"),
+            model_tier=SimpleNamespace(value="small"),
+            max_tokens=1024,
+            confidence=0.71,
+            to_dict=MagicMock(return_value={"paradigm": "fast", "model_tier": "small"}),
+        )
+        loop.runtime_intelligence.get_planning_routing_context = MagicMock(return_value={})
+
+        result = await loop.run(
+            "run the tests",
+            context={"task_type": "action", "tool_budget": 1},
+        )
+
+        assert result.success is True
+        loop._plan.assert_not_awaited()
+        assert result.final_state["plan"]["planning_skipped"] is True
+        assert result.metadata["planning_events"][0]["selection_policy"] == "heuristic_fast_path"
+        assert result.metadata["planning_events"][0]["used_llm_planning"] is False
+
     def test_loop_uses_policy_completion_threshold_from_config(self):
         loop = self._make_loop(
             orchestrator=MagicMock(spec=[]),

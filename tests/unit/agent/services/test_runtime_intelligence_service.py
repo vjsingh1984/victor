@@ -1054,6 +1054,55 @@ def test_runtime_intelligence_exposes_planning_policy_bias_from_experiment_memor
     )
 
 
+def test_runtime_intelligence_exposes_fast_path_preference_from_negative_planning_bias(tmp_path):
+    store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+    store.record(
+        ExperimentMemoryRecord(
+            record_id="guide-memory-4",
+            created_at=40.0,
+            scope=ExperimentScope(
+                benchmark="guide",
+                provider="openai",
+                model="gpt-5",
+            ),
+            summary_metrics={},
+            task_summaries=[],
+            insights=[
+                ExperimentInsight(
+                    kind="failed_hypothesis",
+                    summary="Forced LLM planning underperformed heuristic fast-path for this scope.",
+                    confidence=0.9,
+                    evidence={"completion_delta": -0.31},
+                )
+            ],
+            keywords=["planning", "fast_path", "llm_planning"],
+        )
+    )
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        experiment_memory_path=tmp_path / "experiment_memory.json",
+    )
+
+    planning_hints = service.get_planning_routing_context(
+        query="run the tests",
+        scope_context={"provider": "openai", "model": "gpt-5", "task_type": "action"},
+    )
+
+    assert planning_hints["planning_preferred_policy"] == "heuristic_fast_path"
+    assert planning_hints["planning_policy_bias"] < 0.0
+    assert planning_hints["planning_prefer_fast_path"] is True
+    assert planning_hints["planning_prefer_reason"] == (
+        "experiment_policy_bias: heuristic_fast_path"
+    )
+    assert planning_hints["planning_fast_path_tool_budget_limit"] >= 4
+    assert planning_hints["planning_fast_path_query_length_limit"] > 50
+    assert planning_hints["planning_fast_path_complexity_threshold"] > 0.3
+
+
 def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp_path):
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),
