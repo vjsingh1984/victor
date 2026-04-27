@@ -294,21 +294,20 @@ class AgentRuntimeBootstrapper:
         orchestrator._vertical_context: VerticalContext = create_vertical_context()
         orchestrator._vertical_integration_adapter = VerticalIntegrationAdapter(orchestrator)
 
-        # Lazy coordinator placeholders
+        # Lazy coordinator placeholders must exist before any runtime wiring that
+        # may resolve protocol-based lazy properties.
         orchestrator._mode_workflow_team_coordinator = None
+        orchestrator._turn_executor = None
+        orchestrator._deprecated_sync_chat_coordinator = None
+        orchestrator._deprecated_streaming_chat_coordinator = None
+        orchestrator._deprecated_unified_chat_coordinator = None
+        orchestrator._protocol_adapter = None
 
         # Interaction runtime boundary
         orchestrator._initialize_interaction_runtime()
 
         # Service layer delegation (Strangler Fig pattern)
         orchestrator._initialize_services()
-
-        # Sync/Streaming coordinators (lazy initialization)
-        orchestrator._turn_executor = None
-        orchestrator._deprecated_sync_chat_coordinator = None
-        orchestrator._deprecated_streaming_chat_coordinator = None
-        orchestrator._deprecated_unified_chat_coordinator = None
-        orchestrator._protocol_adapter = None
 
         # Capability registry
         orchestrator.__init_capability_registry__()

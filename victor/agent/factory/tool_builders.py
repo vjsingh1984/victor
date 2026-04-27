@@ -383,13 +383,18 @@ class ToolBuildersMixin:
         if cache_dir:
             cache_dir = Path(cache_dir).expanduser()
         else:
-            cache_dir = get_project_paths().global_cache_dir
+            cache_dir = Path(get_project_paths().global_cache_dir).expanduser()
 
-        cache = ToolCache(
-            ttl=self._tool_setting("tool_cache_ttl", 600),
-            allowlist=self._tool_setting("tool_cache_allowlist", []),
-            cache_config=CacheConfig(disk_path=cache_dir),
-        )
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache = ToolCache(
+                ttl=self._tool_setting("tool_cache_ttl", 600),
+                allowlist=self._tool_setting("tool_cache_allowlist", []),
+                cache_config=CacheConfig(disk_path=cache_dir),
+            )
+        except Exception as exc:
+            logger.warning("Tool cache disabled: failed to initialize %s: %s", cache_dir, exc)
+            return None
         logger.debug(f"ToolCache created with TTL={cache.ttl}s")
         return cache
 

@@ -60,7 +60,7 @@ class TestServiceDelegation:
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ff:
             mock_ff.return_value.is_enabled.return_value = False
             result = await obj.chat("hello")
-        obj._chat_service.chat.assert_called_once_with("hello")
+        obj._chat_service.chat.assert_called_once_with("hello", use_planning=False)
 
     @pytest.mark.asyncio
     async def test_chat_with_planning_delegates(self):

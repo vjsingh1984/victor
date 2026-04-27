@@ -565,6 +565,24 @@ class TestCreateToolCache:
 
         assert cache is None
 
+    def test_create_tool_cache_returns_none_when_initialization_fails(
+        self, factory, mock_settings
+    ):
+        """create_tool_cache degrades gracefully when disk cache init fails."""
+        mock_settings.tool_cache_enabled = True
+        mock_settings.tool_cache_ttl = 600
+        mock_settings.tool_cache_allowlist = []
+
+        with patch("victor.config.settings.get_project_paths") as mock_paths:
+            mock_paths.return_value.global_cache_dir = "/tmp/cache"
+            with patch(
+                "victor.storage.cache.tool_cache.ToolCache",
+                side_effect=OSError("cache init failed"),
+            ):
+                cache = factory.create_tool_cache()
+
+        assert cache is None
+
 
 class TestCreateMemoryComponents:
     """Tests for create_memory_components method."""
