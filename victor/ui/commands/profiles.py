@@ -33,13 +33,13 @@ import yaml
 
 from victor.config.profiles import (
     ProfileLevel,
+    ProfileManager,
     PROFILES,
+    generate_profile_yaml,
     get_profile,
-    list_profiles,
     get_recommended_profile,
     install_profile,
-    get_current_profile,
-    generate_profile_yaml,
+    list_profiles,
 )
 from victor.config.settings import get_project_paths
 
@@ -48,53 +48,19 @@ console = Console()
 
 
 # =============================================================================
-# Helper functions for backward compatibility with tests
+# Helper functions
 # =============================================================================
-
-
-def _load_profiles_yaml(profiles_file: Path) -> Dict[str, Any]:
-    """Load profiles from a YAML file.
-
-    Args:
-        profiles_file: Path to profiles.yaml file
-
-    Returns:
-        Dictionary containing profiles data, or empty dict if file doesn't exist or is invalid
-    """
-    if not profiles_file.exists():
-        return {"profiles": {}}
-
-    try:
-        with open(profiles_file) as f:
-            return yaml.safe_load(f) or {"profiles": {}}
-    except (yaml.YAMLError, IOError, OSError):
-        return {"profiles": {}}
-
-
-def _save_profiles_yaml(profiles_file: Path, data: Dict[str, Any]) -> None:
-    """Save profiles to a YAML file.
-
-    Args:
-        profiles_file: Path to profiles.yaml file
-        data: Dictionary containing profiles data
-
-    Raises:
-        typer.Exit: If file cannot be written
-    """
-    import sys
-
-    try:
-        profiles_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(profiles_file, "w") as f:
-            yaml.safe_dump(data, f, default_flow_style=False)
-    except (IOError, OSError) as e:
-        console.print(f"[red]Error writing profiles file: {e}[/]")
-        raise typer.Exit(1)
 
 
 def _resolve_config_dir(config_dir: Optional[str]) -> Path:
     """Resolve the target config directory through centralized Victor paths."""
     return Path(config_dir) if config_dir else get_project_paths().global_victor_dir
+
+
+def _get_profile_manager(config_dir: Optional[str]) -> ProfileManager:
+    """Get a ProfileManager for the given config directory."""
+    config_path = _resolve_config_dir(config_dir)
+    return ProfileManager.for_config_dir(config_path)
 
 
 @profiles_app.command("list")
@@ -300,8 +266,9 @@ def profile_current(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
 ) -> None:
     """Show the current active profile."""
+    mgr = _get_profile_manager(config_dir)
+    profile_name = mgr.get_current_profile_name()
     config_path = _resolve_config_dir(config_dir)
-    profile_name = get_current_profile(config_path)
 
     if not profile_name:
         console.print("\n[yellow]⚠[/] No profile detected")
@@ -333,10 +300,8 @@ def profile_create(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Create a new custom profile."""
-    config_path = _resolve_config_dir(config_dir)
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name in profiles:
@@ -354,7 +319,11 @@ def profile_create(
 
     profiles[name] = profile_data
     data["profiles"] = profiles
-    _save_profiles_yaml(profiles_file, data)
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
     from victor.ui.emoji import get_icon
 
@@ -372,10 +341,8 @@ def profile_edit(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Edit an existing custom profile."""
-    config_path = _resolve_config_dir(config_dir)
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name not in profiles:
@@ -402,7 +369,11 @@ def profile_edit(
 
     profiles[name].update(updates)
     data["profiles"] = profiles
-    _save_profiles_yaml(profiles_file, data)
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
     console.print(f"[green]✓[/] Updated profile '{name}'")
 
@@ -414,10 +385,8 @@ def profile_delete(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Delete a custom profile."""
-    config_path = _resolve_config_dir(config_dir)
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name not in profiles:
@@ -434,7 +403,11 @@ def profile_delete(
 
     del profiles[name]
     data["profiles"] = profiles
-    _save_profiles_yaml(profiles_file, data)
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
     console.print(f"[green]✓[/] Deleted profile '{name}'")
 
@@ -445,10 +418,8 @@ def profile_set_default(
     config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
 ) -> None:
     """Set a profile as the default."""
-    config_path = _resolve_config_dir(config_dir)
-    profiles_file = config_path / "profiles.yaml"
-
-    data = _load_profiles_yaml(profiles_file)
+    mgr = _get_profile_manager(config_dir)
+    data = mgr.load_profiles()
     profiles = data.get("profiles", {})
 
     if name not in profiles:
@@ -463,7 +434,11 @@ def profile_set_default(
         return
 
     data["default_profile"] = name
-    _save_profiles_yaml(profiles_file, data)
+    try:
+        mgr.save_profiles(data)
+    except IOError as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
     console.print(f"[green]✓[/] Set '{name}' as the default profile")
 

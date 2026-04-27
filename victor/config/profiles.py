@@ -636,3 +636,115 @@ def get_current_profile(config_dir: Optional[Path] = None) -> Optional[str]:
         return "unknown"
     except Exception:
         return None
+
+
+# =============================================================================
+# Profile Manager - Single source of truth for profile operations
+# =============================================================================
+
+
+class ProfileManager:
+    """Manager for configuration profile operations.
+
+    Provides a centralized interface for loading and saving profiles,
+    eliminating duplication between CLI commands and framework code.
+    """
+
+    def __init__(self, config_dir: Optional[Path] = None) -> None:
+        """Initialize the profile manager.
+
+        Args:
+            config_dir: Optional config directory (defaults to ~/.victor)
+        """
+        self._config_dir = _resolve_profile_config_dir(config_dir)
+        self._profiles_path = self._config_dir / "profiles.yaml"
+
+    @property
+    def profiles_path(self) -> Path:
+        """Get the path to the profiles.yaml file."""
+        return self._profiles_path
+
+    def load_profiles(self) -> Dict[str, Any]:
+        """Load profiles from the profiles.yaml file.
+
+        Returns:
+            Dictionary containing profiles data, or empty dict if file doesn't exist or is invalid
+        """
+        if not self._profiles_path.exists():
+            return {"profiles": {}}
+
+        try:
+            import yaml
+
+            with open(self._profiles_path) as f:
+                return yaml.safe_load(f) or {"profiles": {}}
+        except (yaml.YAMLError, IOError, OSError):
+            return {"profiles": {}}
+
+    def save_profiles(self, data: Dict[str, Any]) -> None:
+        """Save profiles to the profiles.yaml file.
+
+        Args:
+            data: Dictionary containing profiles data
+
+        Raises:
+            IOError: If file cannot be written
+        """
+        import yaml
+
+        self._config_dir.mkdir(parents=True, exist_ok=True)
+        with open(self._profiles_path, "w") as f:
+            yaml.safe_dump(data, f, default_flow_style=False)
+
+    def get_current_profile_name(self) -> Optional[str]:
+        """Detect the current profile from profiles.yaml.
+
+        Returns:
+            Profile name if detected, None otherwise
+        """
+        if not self._profiles_path.exists():
+            return None
+
+        try:
+            import yaml
+
+            with open(self._profiles_path) as f:
+                data = yaml.safe_load(f)
+
+            # Try to identify profile from settings
+            settings = data.get("settings", {})
+
+            # Check for characteristic settings
+            max_tools = settings.get("fallback_max_tools", 0)
+            preload = settings.get("framework_preload_enabled", False)
+
+            provider = settings.get("default_provider", "")
+
+            if max_tools == 5 and preload:
+                return "basic"
+            elif max_tools == 10 and preload:
+                return "advanced"
+            elif max_tools == 20 and preload and provider == "openai":
+                return "benchmark"
+            elif max_tools == 20 and preload:
+                return "expert"
+
+            return "unknown"
+        except Exception:
+            return None
+
+    def has_profiles_file(self) -> bool:
+        """Check if the profiles.yaml file exists."""
+        return self._profiles_path.exists()
+
+    @classmethod
+    def for_config_dir(cls, config_dir: Optional[Path] = None) -> "ProfileManager":
+        """Create a ProfileManager for a specific config directory.
+
+        Args:
+            config_dir: Optional config directory path
+
+        Returns:
+            ProfileManager instance
+        """
+        return cls(config_dir=config_dir)
