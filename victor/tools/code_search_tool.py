@@ -2665,10 +2665,16 @@ async def code_search(
         except (asyncio.TimeoutError, Exception) as exc:
             error_msg = str(exc)
             is_cached_failure = _is_recent_cached_failure_error(error_msg)
+            is_missing_provider = _is_missing_semantic_provider_error(error_msg)
             if is_cached_failure:
                 logger.info(
                     "Semantic index build skipped due to cached recent failure (%s), "
                     "falling back to literal search",
+                    exc,
+                )
+            elif is_missing_provider:
+                logger.info(
+                    "Semantic index provider unavailable (%s), falling back to literal search",
                     exc,
                 )
             else:
@@ -2689,7 +2695,7 @@ async def code_search(
                     # Get failure cache (same logic as in _get_or_build_index)
                     failure_cache = _get_index_build_failure_cache(_exec_ctx)
                     _cache_index_build_failure(failure_cache, failure_key, error_msg)
-                    if _is_missing_semantic_provider_error(error_msg):
+                    if is_missing_provider:
                         provider_failure_key = _build_provider_availability_failure_key(
                             root_path, settings
                         )

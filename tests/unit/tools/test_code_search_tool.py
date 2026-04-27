@@ -2390,6 +2390,42 @@ async def test_code_search_reports_non_timeout_index_build_fallback_reason(
 
 
 @pytest.mark.asyncio
+async def test_code_search_logs_missing_provider_fallback_as_info(tmp_path, caplog) -> None:
+    """Missing semantic providers should degrade quietly instead of warning loudly."""
+    exec_ctx = {"settings": _settings()}
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+
+    with (
+        patch(
+            "victor.tools.code_search_tool._get_or_build_index",
+            new=AsyncMock(
+                side_effect=ImportError(
+                    "CodebaseIndex requires a codebase indexing provider "
+                    "(e.g., pip install victor-coding). The provider registers "
+                    "its factory via CapabilityRegistry at bootstrap."
+                )
+            ),
+        ),
+        patch(
+            "victor.tools.code_search_tool._literal_search",
+            new=AsyncMock(return_value=dict(literal_result)),
+        ) as literal_search,
+        caplog.at_level(logging.INFO, logger="victor.tools.code_search_tool"),
+    ):
+        result = await code_search(
+            query="embedding store vector search index",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    literal_search.assert_awaited_once()
+    assert result["fallback"] == "semantic_index_error"
+    assert "Semantic index provider unavailable" in caplog.text
+    assert "Semantic index build failed" not in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_code_search_caches_index_build_failure_in_plain_dict_fallback(
     tmp_path, monkeypatch
 ) -> None:
@@ -2512,20 +2548,20 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
     assert first["fallback"] == "semantic_index_error"
     assert second["fallback"] == "semantic_index_error"
     assert registry.ensure_calls == 1
-    warning_messages = [
+    provider_unavailable_messages = [
         record.getMessage()
         for record in caplog.records
-        if record.levelno == logging.WARNING
-        and "Semantic index build failed" in record.getMessage()
+        if record.levelno == logging.INFO
+        and "Semantic index provider unavailable" in record.getMessage()
     ]
-    info_messages = [
+    cached_failure_messages = [
         record.getMessage()
         for record in caplog.records
         if record.levelno == logging.INFO
         and "Semantic index build skipped due to cached recent failure" in record.getMessage()
     ]
-    assert len(warning_messages) == 1
-    assert len(info_messages) == 1
+    assert len(provider_unavailable_messages) == 1
+    assert len(cached_failure_messages) == 1
 
 
 @pytest.mark.asyncio
