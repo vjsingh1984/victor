@@ -165,6 +165,17 @@ class OrchestratorProtocolAdapter:
         orch = self._orchestrator
         return await orch.execute_tool_calls(tool_calls)
 
+    async def chat(self, user_message: str, use_planning: bool = False) -> Any:
+        """Execute a non-streaming chat turn through the canonical surface."""
+        return await self._orchestrator.chat(
+            user_message,
+            use_planning=use_planning,
+        )
+
+    def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:
+        """Expose the sync chat fallback metadata surface."""
+        return self._orchestrator.get_last_skill_match_info()
+
     # =====================================================================
     # MessageStore Implementation
     # =====================================================================

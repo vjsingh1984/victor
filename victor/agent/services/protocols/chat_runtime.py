@@ -40,6 +40,7 @@ __all__ = [
     "ProviderContextProtocol",
     "ChatOrchestratorProtocol",
     "PlanningContextProtocol",
+    "SyncChatRuntimeProtocol",
 ]
 
 
@@ -223,4 +224,17 @@ class PlanningContextProtocol(Protocol):
 
     async def chat(self, user_message: str, use_planning: bool = False) -> Any:
         """Execute a non-streaming chat turn."""
+        ...
+
+
+@runtime_checkable
+class SyncChatRuntimeProtocol(Protocol):
+    """Fallback runtime surface for deprecated sync chat compatibility."""
+
+    async def chat(self, user_message: str, use_planning: bool = False) -> Any:
+        """Execute a non-streaming chat turn."""
+        ...
+
+    def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:
+        """Return skill metadata for the last completed chat turn."""
         ...

@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         ChatContextProtocol,
         ToolContextProtocol,
         ProviderContextProtocol,
+        SyncChatRuntimeProtocol,
     )
     from victor.agent.services.turn_execution_runtime import TurnExecutor
     from victor.agent.query_classifier import QueryClassifier
@@ -60,7 +61,7 @@ class SyncChatCoordinator:
         tool_context: "ToolContextProtocol",
         provider_context: "ProviderContextProtocol",
         turn_executor: Optional["TurnExecutor"] = None,
-        orchestrator: Any = None,
+        orchestrator: Optional["SyncChatRuntimeProtocol"] = None,
         query_classifier: Optional["QueryClassifier"] = None,
         chat_service: Optional[Any] = None,
     ) -> None:
@@ -72,7 +73,7 @@ class SyncChatCoordinator:
             provider_context: Provider context protocol implementation
             turn_executor: Deprecated compatibility dependency retained for
                 constructor stability. No longer required by the canonical shim path.
-            orchestrator: Optional orchestrator (required for planning path)
+            orchestrator: Optional sync chat runtime surface for fallback compatibility
             query_classifier: Optional query classifier for auto-planning detection
         """
         self._chat_context = chat_context

@@ -6,7 +6,7 @@ definitions onto the AgentOrchestrator class.
 
 import pytest
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from victor.agent.services.chat_compat_telemetry import (
     get_deprecated_chat_shim_telemetry,
@@ -311,6 +311,37 @@ class TestOrchestratorPropertyInstallation:
         assert telemetry["agent_orchestrator.sync_chat_coordinator.compat_property"] == 1
         assert telemetry["agent_orchestrator.streaming_chat_coordinator.compat_property"] == 1
         assert telemetry["agent_orchestrator.unified_chat_coordinator.compat_property"] == 1
+
+    def test_sync_chat_coordinator_helper_passes_protocol_adapter_runtime(self):
+        """Sync chat shim creation should depend on the protocol adapter, not the concrete orchestrator."""
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.orchestrator_properties import _ensure_sync_chat_coordinator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        chat_service = MagicMock(name="chat_service")
+        orchestrator._protocol_adapter = adapter
+        orchestrator._deprecated_sync_chat_coordinator = None
+        orchestrator._chat_service = chat_service
+
+        with (
+            patch("victor.agent.services.sync_chat_compat.SyncChatCoordinator") as coordinator_cls,
+            patch("victor.agent.query_classifier.QueryClassifier") as query_classifier_cls,
+        ):
+            shim = MagicMock(name="sync_chat_shim")
+            coordinator_cls.return_value = shim
+
+            result = _ensure_sync_chat_coordinator(orchestrator)
+
+        assert result is shim
+        assert orchestrator._deprecated_sync_chat_coordinator is shim
+        kwargs = coordinator_cls.call_args.kwargs
+        assert kwargs["chat_context"] is adapter
+        assert kwargs["tool_context"] is adapter
+        assert kwargs["provider_context"] is adapter
+        assert kwargs["orchestrator"] is adapter
+        assert kwargs["chat_service"] is chat_service
+        assert kwargs["query_classifier"] is query_classifier_cls.return_value
 
     @pytest.mark.parametrize(
         ("property_name", "backing_attr", "facade_attr", "facade_value_attr"),

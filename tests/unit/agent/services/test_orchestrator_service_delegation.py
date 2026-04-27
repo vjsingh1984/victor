@@ -295,6 +295,25 @@ class TestAdapterProtocolConformance:
             [{"name": "read", "arguments": {}}]
         )
 
+    @pytest.mark.asyncio
+    async def test_orchestrator_protocol_adapter_exposes_sync_chat_runtime_surface(self):
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+        from victor.agent.services.protocols.chat_runtime import SyncChatRuntimeProtocol
+
+        response = CompletionResponse(content="adapter-chat", role="assistant")
+        orchestrator = MagicMock()
+        orchestrator.chat = AsyncMock(return_value=response)
+        orchestrator.get_last_skill_match_info.return_value = {"skill_match": "python"}
+
+        adapter = OrchestratorProtocolAdapter(orchestrator)
+        result = await adapter.chat("hello", use_planning=True)
+
+        assert isinstance(adapter, SyncChatRuntimeProtocol)
+        assert result is response
+        assert adapter.get_last_skill_match_info() == {"skill_match": "python"}
+        orchestrator.chat.assert_awaited_once_with("hello", use_planning=True)
+        orchestrator.get_last_skill_match_info.assert_called_once_with()
+
     def test_orchestrator_tool_strategy_event_prefers_metrics_service(self):
         orchestrator = object.__new__(AgentOrchestrator)
         orchestrator._metrics_coordinator = MagicMock()

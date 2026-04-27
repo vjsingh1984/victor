@@ -104,6 +104,37 @@ async def test_sync_chat_coordinator_planning_prefers_bound_chat_service():
 
 
 @pytest.mark.asyncio
+async def test_sync_chat_coordinator_chat_prefers_protocol_runtime_and_skill_metadata():
+    response = CompletionResponse(content="runtime", role="assistant", metadata={})
+    runtime = MagicMock()
+    runtime.chat = AsyncMock(return_value=response)
+    runtime.get_last_skill_match_info.return_value = {"skill_match": "python"}
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="SyncChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = SyncChatCoordinator(
+            chat_context=MagicMock(),
+            tool_context=MagicMock(),
+            provider_context=MagicMock(),
+            orchestrator=runtime,
+        )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="SyncChatCoordinator.chat\\(\\) is deprecated compatibility surface",
+    ):
+        result = await coordinator.chat("hello", use_planning=False)
+
+    assert result is response
+    assert result.metadata["skill_match"] == "python"
+    runtime.chat.assert_awaited_once_with("hello", use_planning=False)
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["sync_chat_coordinator.chat.orchestrator_public"] == 1
+
+
+@pytest.mark.asyncio
 async def test_sync_chat_coordinator_planning_requires_canonical_runtime():
     with pytest.warns(
         DeprecationWarning,
