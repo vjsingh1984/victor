@@ -91,6 +91,16 @@ _GRAPH_MODE_ALIAS_NOTES = {
     "top_k": "search (when query/node/file is provided) or pagerank",
 }
 
+_FILE_FALLBACK_DIRECTIONS: Dict[str, GraphDirection] = {
+    "callers": "in",
+    "callees": "out",
+    "trace": "out",
+    "call_flow": "out",
+    "neighbors": "both",
+    "impact": "both",
+    "subgraph": "both",
+}
+
 ALL_EDGE_TYPES = [
     "CALLS",
     "REFERENCES",
@@ -1642,52 +1652,68 @@ async def graph(
         }:
             target_ref = node or source
             if not target_ref:
-                raise ValueError(f"{mode} mode requires node")
-            preferred_types = (
-                {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
-            )
-            resolved_id = loaded.analyzer.resolve_node_id(
-                target_ref, preferred_types=preferred_types
-            )
-            if resolved_id is None:
-                # Suggest similar node names
-                suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
-                error_msg = f"Could not resolve graph node '{target_ref}'"
-                if suggestions:
-                    error_msg += "\n\nDid you mean one of these?\n  - " + "\n  - ".join(
-                        suggestions[:5]
+                if file:
+                    mode = "file_deps"
+                    fallback_direction = _FILE_FALLBACK_DIRECTIONS.get(
+                        requested_mode,
+                        direction if isinstance(direction, str) else direction.value,
                     )
-                raise ValueError(error_msg)
-
-            effective_direction = direction
-            if mode == "callers":
-                effective_direction = "in"
-            elif mode in {"callees", "trace", "call_flow"}:
-                effective_direction = "out"
-            elif mode in {"impact", "subgraph"}:
-                effective_direction = "both"
-
-            base_result = loaded.analyzer.get_neighbors(
-                resolved_id,
-                direction=effective_direction,
-                edge_types=effective_edge_types,
-                max_depth=max(1, depth),
-                node_types=node_types,
-            )
-            if structured:
-                result = _build_structured_neighbors(
-                    loaded.analyzer,
-                    resolved_id,
-                    base_result,
-                    include_modules=include_modules,
-                    include_symbols=include_symbols,
-                    include_calls=include_calls,
-                    include_refs=include_refs,
-                    include_callsites=include_callsites,
-                    max_callsites=max_callsites,
-                )
+                    result = _build_file_dependency_result(
+                        loaded,
+                        file,
+                        direction=fallback_direction,
+                        structured=structured,
+                        include_modules=include_modules,
+                    )
+                    result["recovered_from_mode"] = requested_mode
+                else:
+                    raise ValueError(f"{mode} mode requires node")
             else:
-                result = base_result
+                preferred_types = (
+                    {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+                )
+                resolved_id = loaded.analyzer.resolve_node_id(
+                    target_ref, preferred_types=preferred_types
+                )
+                if resolved_id is None:
+                    # Suggest similar node names
+                    suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
+                    error_msg = f"Could not resolve graph node '{target_ref}'"
+                    if suggestions:
+                        error_msg += "\n\nDid you mean one of these?\n  - " + "\n  - ".join(
+                            suggestions[:5]
+                        )
+                    raise ValueError(error_msg)
+
+                effective_direction = direction
+                if mode == "callers":
+                    effective_direction = "in"
+                elif mode in {"callees", "trace", "call_flow"}:
+                    effective_direction = "out"
+                elif mode in {"impact", "subgraph"}:
+                    effective_direction = "both"
+
+                base_result = loaded.analyzer.get_neighbors(
+                    resolved_id,
+                    direction=effective_direction,
+                    edge_types=effective_edge_types,
+                    max_depth=max(1, depth),
+                    node_types=node_types,
+                )
+                if structured:
+                    result = _build_structured_neighbors(
+                        loaded.analyzer,
+                        resolved_id,
+                        base_result,
+                        include_modules=include_modules,
+                        include_symbols=include_symbols,
+                        include_calls=include_calls,
+                        include_refs=include_refs,
+                        include_callsites=include_callsites,
+                        max_callsites=max_callsites,
+                    )
+                else:
+                    result = base_result
         elif mode == "path":
             if not source or not target:
                 raise ValueError("path mode requires source and target")

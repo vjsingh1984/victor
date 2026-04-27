@@ -387,6 +387,49 @@ async def test_graph_tool_file_dependencies_use_index_metadata(monkeypatch, tmp_
 
 
 @pytest.mark.asyncio
+async def test_graph_tool_call_flow_with_file_falls_back_to_file_dependencies(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    fake_index = SimpleNamespace(
+        graph_store=MemoryGraphStore(),
+        files={
+            "victor/framework/agent.py": SimpleNamespace(
+                path="victor/framework/agent.py",
+                dependencies=["victor/agent/orchestrator.py"],
+            ),
+            "victor/agent/orchestrator.py": SimpleNamespace(
+                path="victor/agent/orchestrator.py",
+                dependencies=[],
+            ),
+        },
+    )
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="call_flow",
+        path=str(tmp_path),
+        file="victor/framework/agent.py",
+        depth=3,
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["requested_mode"] == "call_flow"
+    assert result["mode"] == "file_deps"
+    assert result["result"]["file"] == "victor/framework/agent.py"
+    assert result["result"]["dependencies"] == ["victor/agent/orchestrator.py"]
+    assert result["result"]["recovered_from_mode"] == "call_flow"
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_requires_graph_support(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
