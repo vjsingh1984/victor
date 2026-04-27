@@ -190,6 +190,10 @@ class TestProcessToolResults:
             {
                 "tool_name": "read",
                 "success": True,
+                "skipped": False,
+                "outcome_kind": None,
+                "block_source": None,
+                "retryable": None,
                 "result": "data",
                 "error": None,
             },
