@@ -201,6 +201,9 @@ class OrchestrationFacade:
 
         resolved_deprecated_chat_coordinator = deprecated_chat_coordinator
         if chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "chat_coordinator", "deprecated_input"
+            )
             warnings.warn(
                 "OrchestrationFacade(chat_coordinator=...) is deprecated. "
                 "Use deprecated_chat_coordinator=... or chat_service instead.",
@@ -231,6 +234,11 @@ class OrchestrationFacade:
 
         resolved_deprecated_sync_chat_coordinator = deprecated_sync_chat_coordinator
         if sync_chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade",
+                "sync_chat_coordinator",
+                "deprecated_input",
+            )
             warnings.warn(
                 "OrchestrationFacade(sync_chat_coordinator=...) is deprecated. "
                 "Use deprecated_sync_chat_coordinator=... or chat_service instead.",
@@ -241,6 +249,11 @@ class OrchestrationFacade:
 
         resolved_deprecated_streaming_chat_coordinator = deprecated_streaming_chat_coordinator
         if streaming_chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade",
+                "streaming_chat_coordinator",
+                "deprecated_input",
+            )
             warnings.warn(
                 "OrchestrationFacade(streaming_chat_coordinator=...) is deprecated. "
                 "Use deprecated_streaming_chat_coordinator=... or chat_service instead.",
@@ -251,6 +264,11 @@ class OrchestrationFacade:
 
         resolved_deprecated_unified_chat_coordinator = deprecated_unified_chat_coordinator
         if unified_chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade",
+                "unified_chat_coordinator",
+                "deprecated_input",
+            )
             warnings.warn(
                 "OrchestrationFacade(unified_chat_coordinator=...) is deprecated. "
                 "Use deprecated_unified_chat_coordinator=... or chat_service instead.",
