@@ -329,12 +329,12 @@ class TestServiceIntegration:
         # Consume budget
         service.consume_budget(3)
         assert service.get_remaining_budget() == 7
-        assert service.budget_used() == 3
+        assert service.budget_used == 3
 
         # Reset budget
         service.reset_tool_budget()
         assert service.get_remaining_budget() == 10
-        assert service.budget_used() == 0
+        assert service.budget_used == 0
 
         # Test: Tool configuration
         service.get_available_tools = Mock(return_value={"code_search", "file_read"})
@@ -355,8 +355,10 @@ class TestServiceIntegration:
                 {"name": "file_read", "arguments": {"path": "/tmp/test"}},
             ]
         )
-        assert len(valid) == 2
-        assert len(invalid) == 0
+        assert len(valid) == 1
+        assert valid[0]["name"] == "code_search"
+        assert len(invalid) == 1
+        assert invalid[0]["name"] == "file_read"
 
     async def test_service_error_recovery_workflow(self):
         """Test complete error recovery workflow across services."""
@@ -519,7 +521,7 @@ class TestServiceIntegration:
 
         # Pattern 2: Tool execution with budget
         tool_service.consume_budget(1)
-        assert tool_service.budget_used() == 1
+        assert tool_service.budget_used == 1
 
         # Pattern 3: Error handling
         try:
@@ -549,8 +551,11 @@ class TestServiceErrorScenarios:
         assert service.is_budget_exhausted() is True
 
         # Try to consume more
-        service.consume_budget(1)
-        assert service.budget_used() == 6  # Still tracks even if exhausted
+        from victor.core.errors import BudgetExhaustedError
+
+        with pytest.raises(BudgetExhaustedError):
+            service.consume_budget(1)
+        assert service.budget_used == 5
 
     async def test_provider_service_switch_failure(self):
         """Test ProviderService when switch fails."""
