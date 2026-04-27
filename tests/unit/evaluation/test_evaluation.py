@@ -24,7 +24,10 @@ from victor.evaluation import (
     EvaluationResult,
     TaskResult,
     TaskStatus,
+    aggregate_planning_feedback,
+    extract_planning_events,
     pass_at_k,
+    summarize_planning_feedback,
 )
 from victor.evaluation.code_quality import CodeQualityAnalyzer
 from victor.evaluation.pass_at_k import (
@@ -77,6 +80,13 @@ class TestPassAtK:
         # Low success rate scenario
         result = pass_at_k(n=100, c=5, k=1)
         assert result == pytest.approx(0.05, abs=0.01)
+
+
+def test_public_api_exports_planning_feedback_helpers():
+    """The package-level evaluation API should expose planning feedback helpers."""
+    assert callable(extract_planning_events)
+    assert callable(summarize_planning_feedback)
+    assert callable(aggregate_planning_feedback)
 
     def test_combinations(self):
         """Test combinations calculation."""

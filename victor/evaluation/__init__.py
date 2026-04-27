@@ -118,6 +118,11 @@ from victor.evaluation.services import (
     create_validated_session_truth_service,
     resolve_validated_session_truth_service,
 )
+from victor.evaluation.planning_feedback import (
+    aggregate_planning_feedback,
+    extract_planning_events,
+    summarize_planning_feedback,
+)
 
 # Code generation harness (HumanEval, MBPP - provider-only, no tools)
 from victor.evaluation.code_generation_harness import (
@@ -282,6 +287,10 @@ __all__ = [
     "ValidatedSessionTruthService",
     "create_validated_session_truth_service",
     "resolve_validated_session_truth_service",
+    # Planning feedback helpers
+    "aggregate_planning_feedback",
+    "extract_planning_events",
+    "summarize_planning_feedback",
     # Code generation harness (HumanEval, MBPP - provider-only)
     "CodeGenMetrics",
     "CodeGenResult",

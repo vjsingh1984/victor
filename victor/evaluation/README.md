@@ -179,10 +179,16 @@ victor/evaluation/
 │   └── swebench.py          # SWE-bench runner
 ├── code_generation_harness.py  # Provider-only benchmark runner
 ├── agentic_harness.py       # Tool-enabled benchmark runner
+├── planning_feedback.py     # Planning policy extraction and aggregation
 ├── code_quality.py          # Lint and quality analysis
 ├── pass_at_k.py             # Pass@k calculation
 └── analyzers.py             # Analyzer registry
 ```
+
+Planning feedback is emitted from the agentic loop as `planning_events`, then
+aggregated into benchmark summaries and experiment-memory analysis through
+`aggregate_planning_feedback()`, `summarize_planning_feedback()`, and
+`extract_planning_events()`.
 
 ## Key Learnings from Benchmarking
 
