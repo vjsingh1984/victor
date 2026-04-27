@@ -1834,6 +1834,9 @@ class ConversationStore:
         with sqlite3.connect(self.db_path) as conn:
             # Get or create provider ID
             provider_id = self._get_or_create_provider_id(conn, session.provider)
+            session_columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()
+            }
 
             # Get FK IDs from cached lookups
             model_family_id = self._get_model_family_id(session.model_family)
@@ -1877,6 +1880,11 @@ class ConversationStore:
                     1 if session.is_reasoning else 0,
                 ),
             )
+            if "provider" in session_columns:
+                conn.execute(
+                    "UPDATE sessions SET provider = ? WHERE session_id = ?",
+                    (session.provider, session.session_id),
+                )
 
     # Max chars for tool output content stored in SQLite.
     # Full content is only needed during the active session (in-memory).

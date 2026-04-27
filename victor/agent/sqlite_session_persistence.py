@@ -327,9 +327,12 @@ class SQLiteSessionPersistence:
             Session dictionary or None if not found
         """
         try:
+            session_columns = self._table_columns("sessions")
+            provider_id_select = "provider_id" if "provider_id" in session_columns else "NULL"
             result = self._db.query(
-                """SELECT session_id, created_at, last_activity, provider, model, profile, metadata
-                   FROM sessions WHERE session_id = ?""",
+                f"""SELECT session_id, created_at, last_activity, provider, model, profile, metadata,
+                           {provider_id_select}
+                    FROM sessions WHERE session_id = ?""",
                 (session_id,),
             )
 
@@ -346,25 +349,27 @@ class SQLiteSessionPersistence:
                 except json.JSONDecodeError:
                     logger.warning("Failed to parse session metadata for %s", session_id)
 
-            if metadata_payload:
+            if self._is_serialized_session_payload(metadata_payload):
                 return metadata_payload
 
             messages = self.get_session_messages(session_id)
-            title = self._generate_title({"messages": messages})
+            conversation_messages, preview_messages = self._split_preview_messages(messages)
+            title = self._generate_title({"messages": conversation_messages})
             session_data = {
                 "metadata": {
                     "session_id": row[0],
                     "created_at": row[1],
                     "updated_at": row[2],
                     "model": row[4],
-                    "provider": row[3],
+                    "provider": self._resolve_provider_name(row[3], row[7]),
                     "profile": row[5],
-                    "message_count": len(messages),
+                    "message_count": len(conversation_messages),
                     "title": title,
                     "tags": [],
                 },
                 "conversation": {
-                    "messages": messages,
+                    "messages": conversation_messages,
+                    "preview_messages": preview_messages,
                 },
                 "conversation_state": None,
                 "tool_selection_stats": None,
@@ -391,11 +396,14 @@ class SQLiteSessionPersistence:
             List of session dictionaries with metadata
         """
         try:
+            session_columns = self._table_columns("sessions")
+            provider_id_select = "provider_id" if "provider_id" in session_columns else "NULL"
             result = self._db.query(
-                """SELECT session_id, provider, model, profile, created_at, last_activity, metadata
-                   FROM sessions
-                   ORDER BY created_at DESC
-                   LIMIT ? OFFSET ?""",
+                f"""SELECT session_id, provider, model, profile, created_at, last_activity, metadata,
+                           {provider_id_select}
+                    FROM sessions
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?""",
                 (limit, offset),
             )
 
@@ -409,29 +417,40 @@ class SQLiteSessionPersistence:
                         except json.JSONDecodeError:
                             metadata_payload = {}
 
-                    session_metadata = metadata_payload.get("metadata", {})
-                    preview_messages = metadata_payload.get("conversation", {}).get(
-                        "preview_messages", []
-                    )
-                    count_result = self._db.query(
-                        "SELECT COUNT(*) FROM messages WHERE session_id = ?",
-                        (row[0],),
-                    )
-                    message_count = (
-                        count_result[0][0]
-                        if count_result
-                        else session_metadata.get("message_count", 0)
-                    )
+                    if self._is_serialized_session_payload(metadata_payload):
+                        session_metadata = metadata_payload.get("metadata", {})
+                        preview_messages = metadata_payload.get("conversation", {}).get(
+                            "preview_messages", []
+                        )
+                        count_result = self._db.query(
+                            "SELECT COUNT(*) FROM messages WHERE session_id = ?",
+                            (row[0],),
+                        )
+                        message_count = (
+                            count_result[0][0]
+                            if count_result
+                            else session_metadata.get("message_count", 0)
+                        )
+                        title = session_metadata.get("title", "Untitled Session")
+                        updated_at = session_metadata.get("updated_at", row[5])
+                    else:
+                        session_messages = self.get_session_messages(row[0])
+                        conversation_messages, preview_messages = self._split_preview_messages(
+                            session_messages
+                        )
+                        message_count = len(conversation_messages)
+                        title = self._generate_title({"messages": conversation_messages})
+                        updated_at = row[5]
 
                     sessions.append(
                         {
                             "session_id": row[0],
-                            "title": session_metadata.get("title", "Untitled Session"),
-                            "provider": row[1],
+                            "title": title,
+                            "provider": self._resolve_provider_name(row[1], row[7]),
                             "model": row[2],
                             "profile": row[3],
                             "created_at": row[4],
-                            "updated_at": session_metadata.get("updated_at", row[5]),
+                            "updated_at": updated_at,
                             "message_count": message_count,
                             "preview_count": (
                                 len(preview_messages) if isinstance(preview_messages, list) else 0
@@ -550,6 +569,87 @@ class SQLiteSessionPersistence:
         except Exception as e:
             logger.error(f"Failed to get messages for session {session_id}: {e}")
             return []
+
+    def _resolve_provider_name(self, provider_name: Any, provider_id: Any) -> Optional[str]:
+        """Resolve provider name from either legacy text column or normalized provider table."""
+        if isinstance(provider_name, str) and provider_name.strip():
+            return provider_name
+
+        if provider_id is None or "provider_id" not in self._table_columns("sessions"):
+            return provider_name
+
+        try:
+            result = self._db.query(
+                "SELECT name FROM providers WHERE id = ?",
+                (provider_id,),
+            )
+            if result:
+                resolved = result[0][0]
+                if isinstance(resolved, str) and resolved.strip():
+                    return resolved
+        except Exception:
+            logger.debug("Failed to resolve provider name for provider_id=%s", provider_id)
+
+        return provider_name
+
+    @staticmethod
+    def _is_serialized_session_payload(metadata_payload: Any) -> bool:
+        """Return whether metadata contains the legacy full session envelope."""
+        return (
+            isinstance(metadata_payload, dict)
+            and isinstance(metadata_payload.get("metadata"), dict)
+            and isinstance(metadata_payload.get("conversation"), dict)
+        )
+
+    @staticmethod
+    def _is_preview_message_payload(message: Dict[str, Any]) -> bool:
+        """Return whether a message row represents a replay-only preview sidecar."""
+        if not isinstance(message, dict):
+            return False
+        return bool(message.get("interactive_preview")) or isinstance(
+            message.get("preview_kind"), str
+        )
+
+    def _split_preview_messages(
+        self, messages: List[Dict[str, Any]]
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Split stored messages into provider-facing and replay-only preview buckets."""
+        conversation_messages: List[Dict[str, Any]] = []
+        preview_messages: List[Dict[str, Any]] = []
+
+        for message in messages:
+            if not self._is_preview_message_payload(message):
+                conversation_messages.append(message)
+                continue
+
+            preview_metadata = {
+                key: value
+                for key, value in message.items()
+                if key
+                not in {
+                    "role",
+                    "content",
+                    "created_at",
+                    "name",
+                    "tool_call_id",
+                    "after_message_index",
+                    "interactive_preview",
+                }
+            }
+            after_message_index = message.get("after_message_index")
+            if not isinstance(after_message_index, int) or after_message_index < 0:
+                after_message_index = len(conversation_messages)
+
+            preview_messages.append(
+                {
+                    "role": str(message.get("role", "system")),
+                    "content": str(message.get("content", "")),
+                    "metadata": preview_metadata,
+                    "after_message_index": after_message_index,
+                }
+            )
+
+        return conversation_messages, preview_messages
 
     def _contains_query(self, value: Any, lowered_query: str) -> bool:
         """Recursively search structured session content for a query string."""

@@ -187,3 +187,64 @@ class TestSQLiteSessionPersistenceCompatibility:
                 "after_message_index": 2,
             }
         ]
+
+    def test_legacy_loader_can_resume_canonical_conversation_store_sessions(
+        self, temp_project_db_path: Path
+    ):
+        """Legacy session loader should reconstruct canonical ConversationStore sessions."""
+        from victor.agent.conversation.store import ConversationStore
+        from victor.agent.conversation.types import MessageRole
+
+        store = ConversationStore(db_path=temp_project_db_path)
+        session = store.create_session(
+            session_id="myproj-canonical01",
+            provider="anthropic",
+            model="claude-sonnet-4-20250514",
+            profile="default",
+        )
+        store.add_message(session.session_id, MessageRole.USER, "Show app.py")
+        store.add_message(session.session_id, MessageRole.ASSISTANT, "Here is the current file preview.")
+        store.add_message(
+            session.session_id,
+            MessageRole.SYSTEM,
+            "FILE PREVIEW: app.py",
+            metadata={
+                "interactive_preview": True,
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+                "after_message_index": 2,
+            },
+        )
+
+        persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
+        loaded = persistence.load_session(session.session_id)
+        sessions = persistence.list_sessions()
+        listed = next(s for s in sessions if s["session_id"] == session.session_id)
+
+        assert loaded is not None
+        assert loaded["metadata"]["provider"] == "anthropic"
+        assert loaded["metadata"]["title"] == "Show app.py"
+        messages = loaded["conversation"]["messages"]
+        assert len(messages) == 2
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Show app.py"
+        assert messages[0]["created_at"]
+        assert messages[1]["role"] == "assistant"
+        assert messages[1]["content"] == "Here is the current file preview."
+        assert messages[1]["created_at"]
+
+        preview_messages = loaded["conversation"]["preview_messages"]
+        assert len(preview_messages) == 1
+        preview = preview_messages[0]
+        assert preview["role"] == "system"
+        assert preview["content"] == "FILE PREVIEW: app.py"
+        assert preview["after_message_index"] == 2
+        assert preview["metadata"]["preview_kind"] == "file_preview"
+        assert preview["metadata"]["preview_path"] == "app.py"
+        assert preview["metadata"]["preview_language"] == "python"
+        assert preview["metadata"]["preview_body"] == "print('hello')\n"
+        assert listed["provider"] == "anthropic"
+        assert listed["title"] == "Show app.py"
+        assert listed["preview_count"] == 1

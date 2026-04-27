@@ -2275,6 +2275,70 @@ async def _run_cli_repl(
         # by prompt_toolkit's own prompt re-render.
         event.app.run_in_terminal(renderer_ref.expand_last_output)
 
+    def _autosave_recovery_session(
+        conversation: Any,
+        *,
+        provider: str,
+        model: str,
+        profile_name: str,
+    ) -> str:
+        """Persist recovery sessions via the canonical ConversationStore."""
+        from victor.agent.conversation.store import ConversationStore
+        from victor.agent.conversation.types import MessageRole
+
+        role_by_value = {role.value: role for role in MessageRole}
+        conversation_data = conversation.to_dict() if hasattr(conversation, "to_dict") else conversation
+        if not isinstance(conversation_data, dict):
+            conversation_data = {"messages": []}
+
+        store = ConversationStore()
+        session = store.create_session(
+            provider=provider,
+            model=model,
+            profile=profile_name,
+        )
+
+        for message in conversation_data.get("messages", []):
+            if not isinstance(message, dict):
+                continue
+
+            role_name = str(message.get("role", "assistant"))
+            role = role_by_value.get(role_name, MessageRole.ASSISTANT)
+            metadata = {
+                key: value
+                for key, value in message.items()
+                if key not in {"role", "content", "name", "tool_call_id", "tool_calls"}
+            }
+            tool_calls = message.get("tool_calls")
+            store.add_message(
+                session_id=session.session_id,
+                role=role,
+                content=str(message.get("content", "")),
+                tool_name=str(message["name"]) if message.get("name") is not None else None,
+                tool_call_id=(
+                    str(message["tool_call_id"]) if message.get("tool_call_id") is not None else None
+                ),
+                metadata=metadata or None,
+                tool_calls=tool_calls if isinstance(tool_calls, list) else None,
+            )
+
+        for preview in conversation_data.get("preview_messages", []):
+            if not isinstance(preview, dict):
+                continue
+            preview_metadata = dict(preview.get("metadata", {}) or {})
+            preview_metadata["interactive_preview"] = True
+            preview_metadata["after_message_index"] = preview.get("after_message_index", 0)
+            preview_role_name = str(preview.get("role", "system"))
+            preview_role = role_by_value.get(preview_role_name, MessageRole.SYSTEM)
+            store.add_message(
+                session_id=session.session_id,
+                role=preview_role,
+                content=str(preview.get("content", "")),
+                metadata=preview_metadata,
+            )
+
+        return session.session_id
+
     while True:
         renderer = None
         try:
@@ -2357,6 +2421,16 @@ async def _run_cli_repl(
             error_message = format_exception_for_user(e)
             console.print(f"[bold red]Error:[/]\n{error_message}")
 
+            current_provider = getattr(profile_config, "provider", None)
+            if not isinstance(current_provider, str) or not current_provider.strip():
+                current_provider = getattr(getattr(settings, "provider", None), "default_provider", None)
+            current_provider = str(current_provider or "unknown")
+
+            current_model = getattr(profile_config, "model", None)
+            if not isinstance(current_model, str) or not current_model.strip():
+                current_model = getattr(getattr(settings, "provider", None), "default_model", None)
+            current_model = str(current_model or "unknown")
+
             # Show traceback in debug mode only
             import os  # Import os for getenv
 
@@ -2368,30 +2442,24 @@ async def _run_cli_repl(
             # Save conversation state on error for recovery
             try:
                 if hasattr(agent, "get_conversation_history"):
-                    from victor.agent.sqlite_session_persistence import (
-                        get_sqlite_session_persistence,
-                    )
-
-                    persistence = get_sqlite_session_persistence()
                     conversation = agent.get_conversation_history()
 
-                    # Get current provider/model for context
-                    provider = getattr(profile_config, "provider", "unknown")
-                    model = getattr(profile_config, "model", "unknown")
-
-                    session_id = persistence.save_session(
-                        conversation=conversation,
-                        model=model,
-                        provider=provider,
-                        profile=profile_name,
-                        tags=["error-recovery", "auto-saved"],
+                    session_id = _autosave_recovery_session(
+                        conversation,
+                        model=current_model,
+                        provider=current_provider,
+                        profile_name=profile_name,
                     )
                     console.print(
                         f"\n[dim]💾 Conversation auto-saved. Resume with: victor chat --resume {session_id}[/]"
                     )
-            except Exception:
-                # Silently fail if save doesn't work — error message is more important
-                pass
+            except Exception as save_error:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "Interactive chat error recovery auto-save failed: %s",
+                    save_error,
+                )
 
             # Suggest provider switching for provider-specific errors
             error_str = str(e).lower()
@@ -2407,7 +2475,7 @@ async def _run_cli_repl(
                 ]
             )
 
-            if is_provider_error and provider != "ollama":
+            if is_provider_error and current_provider.lower() != "ollama":
                 console.print(
                     "\n[yellow]💡 Try switching to a different provider:[/]"
                     "\n  [dim]victor chat -p ollama[/]  # Local models (free)[/]"

@@ -10,6 +10,7 @@ import asyncio
 import io
 import logging
 import sys
+import warnings
 from typing import Any
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch, Mock
@@ -794,6 +795,65 @@ class TestChatReplRendering:
             str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args
         ]
         assert not any("dup content" in item for item in rendered)
+
+    @pytest.mark.asyncio
+    async def test_provider_error_recovery_does_not_raise_unbound_provider(self):
+        """Provider failures should still render cleanly when error auto-save fails."""
+        from victor.ui.commands import chat as chat_module
+
+        class FakeKeyBindings:
+            def add(self, *_args, **_kwargs):
+                def decorator(func):
+                    return func
+
+                return decorator
+
+        class FakePromptSession:
+            def __init__(self):
+                self.key_bindings = FakeKeyBindings()
+                self._inputs = iter(["hello", "/exit"])
+
+            async def prompt_async(self, _prompt):
+                return next(self._inputs)
+
+        cmd_handler = MagicMock()
+        cmd_handler.is_command.return_value = False
+        agent = MagicMock()
+        agent.chat = AsyncMock(side_effect=RuntimeError("network error"))
+        agent.get_conversation_history.side_effect = RuntimeError("history unavailable")
+        settings = SimpleNamespace(
+            provider=SimpleNamespace(default_provider="openai", default_model="gpt-5")
+        )
+        profile_config = SimpleNamespace(provider="zai", model="glm-5.1")
+
+        with warnings.catch_warnings(record=True) as caught_warnings:
+            warnings.simplefilter("always")
+            with (
+                patch.object(
+                    chat_module, "_create_cli_prompt_session", return_value=FakePromptSession()
+                ),
+                patch.object(chat_module.console, "print") as mock_print,
+                patch.object(chat_module, "format_exception_for_user", return_value="network error"),
+            ):
+                await chat_module._run_cli_repl(
+                    agent=agent,
+                    settings=settings,
+                    cmd_handler=cmd_handler,
+                    profile_config=profile_config,
+                    stream=False,
+                )
+
+        rendered = [
+            str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args
+        ]
+        assert any("network error" in item.lower() for item in rendered)
+        assert any("different provider" in item.lower() for item in rendered)
+        assert not any("cannot access local variable 'provider'" in item for item in rendered)
+        assert not any("SQLiteSessionPersistence is deprecated" in str(w.message) for w in caught_warnings)
+        assert not any(
+            "get_sqlite_session_persistence() is deprecated" in str(w.message)
+            for w in caught_warnings
+        )
 
 
 # =============================================================================
