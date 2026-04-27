@@ -37,6 +37,10 @@ def test_get_deprecated_chat_compat_report_returns_structured_telemetry():
         "chat_service": 1,
         "lazy_getter": 1,
     }
+    assert report["active_routes"] == [
+        {"route": "chat_service", "count": 1},
+        {"route": "lazy_getter", "count": 1},
+    ]
     assert report["components"]["chat_coordinator"]["surfaces"]["chat"] == {
         "total": 1,
         "routes": {"chat_service": 1},

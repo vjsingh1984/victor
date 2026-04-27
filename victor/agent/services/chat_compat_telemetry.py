@@ -49,6 +49,7 @@ def get_deprecated_chat_shim_report() -> Dict[str, Any]:
         "deprecated_surface_count": 0,
         "components": {},
         "route_totals": {},
+        "active_routes": [],
         "active_surfaces": [],
     }
 
@@ -77,6 +78,13 @@ def get_deprecated_chat_shim_report() -> Dict[str, Any]:
         surface_totals[surface_key] = surface_totals.get(surface_key, 0) + count
 
     report["deprecated_surface_count"] = len(surface_totals)
+    report["active_routes"] = [
+        {"route": route, "count": count}
+        for route, count in sorted(
+            report["route_totals"].items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+    ]
     report["active_surfaces"] = [
         {"surface": surface, "count": count}
         for surface, count in sorted(
