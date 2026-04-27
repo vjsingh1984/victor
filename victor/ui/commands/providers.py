@@ -8,6 +8,7 @@ from rich.table import Table
 from victor.core.async_utils import run_sync
 from victor.providers.registry import ProviderRegistry
 from victor.providers.health import ProviderHealthChecker
+from victor.ui.json_utils import create_json_option, print_json_data
 
 providers_app = typer.Typer(name="provider", help="List and manage providers.")
 console = Console()
@@ -108,7 +109,7 @@ def check_provider(
         False, "--connectivity", "-c", help="Perform connectivity test (slower)"
     ),
     timeout: float = typer.Option(5.0, help="Timeout for connectivity check (seconds)"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ):
     """Check if a provider is properly configured.
 
@@ -145,9 +146,7 @@ async def _check_provider_async(
     )
 
     if json_output:
-        import json
-
-        console.print(json.dumps(result.to_dict(), indent=2))
+        print_json_data(result.to_dict())
         return
 
     # Display results in a nice format
