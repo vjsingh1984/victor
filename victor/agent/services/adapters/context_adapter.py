@@ -97,6 +97,10 @@ class ContextServiceAdapter:
         if retain_system and hasattr(self._conversation_controller, "ensure_system_message"):
             self._conversation_controller.ensure_system_message()
 
+    def manages_conversation_controller(self, controller: Any) -> bool:
+        """Return whether this adapter owns the provided conversation controller."""
+        return self._conversation_controller is controller
+
     def get_max_tokens(self) -> int:
         """Return the approximate max token budget from controller configuration."""
         config = getattr(self._conversation_controller, "config", None)

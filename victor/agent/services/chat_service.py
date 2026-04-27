@@ -334,6 +334,9 @@ class ChatService:
         """
         self._logger.debug("Resetting conversation")
         self._context.clear_messages(retain_system=True)
+        manages_controller = getattr(self._context, "manages_conversation_controller", None)
+        if callable(manages_controller) and manages_controller(self._conversation):
+            return
         self._conversation.reset()
 
     def is_healthy(self) -> bool:
