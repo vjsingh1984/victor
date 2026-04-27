@@ -2672,7 +2672,9 @@ async def code_search(
                     exc,
                 )
             else:
-                logger.warning("Semantic index build failed (%s), falling back to literal search", exc)
+                logger.warning(
+                    "Semantic index build failed (%s), falling back to literal search", exc
+                )
 
             # Cache the failure for 1 hour to prevent repeated attempts
             if not is_cached_failure:

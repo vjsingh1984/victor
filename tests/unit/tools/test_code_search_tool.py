@@ -2515,7 +2515,8 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
     warning_messages = [
         record.getMessage()
         for record in caplog.records
-        if record.levelno == logging.WARNING and "Semantic index build failed" in record.getMessage()
+        if record.levelno == logging.WARNING
+        and "Semantic index build failed" in record.getMessage()
     ]
     info_messages = [
         record.getMessage()
