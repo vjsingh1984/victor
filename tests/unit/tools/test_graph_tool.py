@@ -548,6 +548,53 @@ async def test_graph_tool_falls_back_to_project_graph_store(monkeypatch, tmp_pat
     assert stats["result"]["edges"] == 7
 
 
+@pytest.mark.asyncio
+async def test_graph_tool_stats_uses_project_db_fast_path(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = SqliteGraphStore(tmp_path)
+    await _seed_graph(store)
+
+    async def _unexpected_load(*args, **kwargs):
+        raise AssertionError("stats fast path should not materialize the full graph")
+
+    monkeypatch.setattr(graph_tool_module, "_load_graph", _unexpected_load)
+
+    result = await graph_tool_module.graph(mode="stats", path=str(tmp_path))
+
+    assert result["success"] is True
+    assert result["mode"] == "stats"
+    assert result["result"]["nodes"] == 7
+    assert result["result"]["edges"] == 7
+    assert result["result"]["node_types"]["function"] == 3
+    assert result["result"]["edge_types"]["CALLS"] == 2
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_query_uses_project_db_fast_path(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = SqliteGraphStore(tmp_path)
+    await _seed_graph(store)
+
+    async def _unexpected_load(*args, **kwargs):
+        raise AssertionError("query fast path should not materialize the full graph")
+
+    monkeypatch.setattr(graph_tool_module, "_load_graph", _unexpected_load)
+
+    result = await graph_tool_module.graph(
+        mode="query",
+        path=str(tmp_path),
+        query="SELECT type, COUNT(*) AS count FROM graph_node GROUP BY type ORDER BY type",
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "query"
+    assert result["result"]["success"] is True
+    assert result["result"]["row_count"] >= 1
+    assert any(row["type"] == "function" and row["count"] == 3 for row in result["result"]["results"])
+
+
 def test_graph_tool_is_available_with_persisted_project_graph(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 

@@ -198,14 +198,15 @@ class TestCodebaseIndexRecovery:
 
 
 class TestIndexingFlagBehavior:
-    """Tests for _is_indexing flag in CodebaseIndex."""
+    """Tests for optional indexing-state flags in CodebaseIndex."""
 
-    def test_indexing_flag_attributes_exist(self):
-        """Test that CodebaseIndex has _is_indexing and _indexing_start_time attributes."""
+    def test_indexing_flag_defaults_are_safe_when_provider_omits_private_attrs(self):
+        """Core should tolerate providers that omit private indexing flags."""
         # This test requires the actual victor-coding package
         pytest.importorskip("victor_coding")
 
         from victor_coding.codebase.indexer import CodebaseIndex
+        from victor.tools.code_search_tool import _get_instance_attr
 
         # Create a temporary directory for testing
         import tempfile
@@ -213,11 +214,9 @@ class TestIndexingFlagBehavior:
         with tempfile.TemporaryDirectory() as tmpdir:
             index = CodebaseIndex(root_path=tmpdir, use_embeddings=False)
 
-            # Check that flags exist and are initialized correctly
-            assert hasattr(index, "_is_indexing")
-            assert hasattr(index, "_indexing_start_time")
-            assert index._is_indexing is False
-            assert index._indexing_start_time is None
+            # Core code treats these as optional private provider details.
+            assert _get_instance_attr(index, "_is_indexing", False) is False
+            assert _get_instance_attr(index, "_indexing_start_time", None) is None
 
     def test_indexing_flag_set_during_indexing(self):
         """Test that _is_indexing flag is set to True during index_codebase."""

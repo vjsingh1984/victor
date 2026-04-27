@@ -795,6 +795,15 @@ def _project_graph_has_data(root_path: Path) -> bool:
     return node_count > 0 or edge_count > 0
 
 
+def _ensure_project_graph_ready(root_path: Path) -> None:
+    try:
+        ensure_project_graph_enriched(root_path)
+    except Exception as exc:  # pragma: no cover - defensive logging only
+        logger.warning(
+            "[graph] Failed to enrich persisted project graph for %s: %s", root_path, exc
+        )
+
+
 def _graph_tool_is_available() -> bool:
     try:
         if _has_enhanced_codebase_index_provider():
@@ -912,12 +921,7 @@ async def _load_graph_from_project_store(root_path: Path) -> LoadedGraph:
     if node_count == 0 and edge_count == 0:
         raise RuntimeError("Project graph database is empty")
 
-    try:
-        ensure_project_graph_enriched(root_path)
-    except Exception as exc:  # pragma: no cover - defensive logging only
-        logger.warning(
-            "[graph] Failed to enrich persisted project graph for %s: %s", root_path, exc
-        )
+    _ensure_project_graph_ready(root_path)
 
     graph_store = SqliteGraphStore(root_path)
     fallback_index = SimpleNamespace(graph_store=graph_store, files={})
@@ -1225,6 +1229,14 @@ async def _run_graph_sql_query(
     Returns:
         Dict with query results and metadata
     """
+    return await _run_graph_sql_query_for_root(loaded.root_path, sql)
+
+
+async def _run_graph_sql_query_for_root(
+    root_path: Path,
+    sql: str,
+) -> Dict[str, Any]:
+    """Execute a raw SQL query against the persisted project graph database."""
     from victor.core.database import get_project_database
 
     # Security: strictly enforce read-only SELECT queries
@@ -1246,8 +1258,8 @@ async def _run_graph_sql_query(
             }
 
     try:
-        # Get project database using the root from LoadedGraph
-        project_db = get_project_database(loaded.root_path)
+        _ensure_project_graph_ready(root_path)
+        project_db = get_project_database(root_path)
 
         # Execute query
         start_time = time.perf_counter()
@@ -1270,6 +1282,40 @@ async def _run_graph_sql_query(
             "error": f"SQL execution failed: {str(e)}",
             "success": False,
         }
+
+
+def _build_stats_from_project_store(root_path: Path) -> Dict[str, Any]:
+    """Build graph stats directly from persisted SQLite graph tables."""
+    from victor.core.database import get_project_database
+
+    _ensure_project_graph_ready(root_path)
+    project_db = get_project_database(root_path)
+    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+        raise RuntimeError("Project graph tables are unavailable")
+
+    node_row = project_db.query_one("SELECT COUNT(*) FROM graph_node")
+    edge_row = project_db.query_one("SELECT COUNT(*) FROM graph_edge")
+    node_types = {
+        str(row["type"]): int(row["count"])
+        for row in project_db.query(
+            "SELECT type, COUNT(*) AS count FROM graph_node GROUP BY type ORDER BY type"
+        )
+    }
+    edge_types = {
+        str(row["type"]): int(row["count"])
+        for row in project_db.query(
+            "SELECT type, COUNT(*) AS count FROM graph_edge GROUP BY type ORDER BY type"
+        )
+    }
+
+    return {
+        "nodes": int(node_row[0]) if node_row is not None else 0,
+        "edges": int(edge_row[0]) if edge_row is not None else 0,
+        "node_types": node_types,
+        "edge_types": edge_types,
+        "root_path": str(root_path),
+        "rebuilt": False,
+    }
 
 
 async def _find_semantic_relationships(
@@ -1688,6 +1734,28 @@ async def graph(
         query=query,
     )
     try:
+        if not reindex and normalized_mode == "stats" and _project_graph_has_data(root_path):
+            return {
+                "success": True,
+                "mode": "stats",
+                "requested_mode": requested_mode,
+                "root_path": str(root_path),
+                "rebuilt": False,
+                "result": _build_stats_from_project_store(root_path),
+            }
+
+        if not reindex and normalized_mode == GraphMode.QUERY and _project_graph_has_data(root_path):
+            if not query:
+                raise ValueError("query mode requires a SQL SELECT statement")
+            return {
+                "success": True,
+                "mode": GraphMode.QUERY,
+                "requested_mode": requested_mode,
+                "root_path": str(root_path),
+                "rebuilt": False,
+                "result": await _run_graph_sql_query_for_root(root_path, query),
+            }
+
         loaded = await _load_graph(path, reindex=reindex, exec_ctx=_exec_ctx)
 
         # Handle pipe-separated modes (e.g., "callers|callees")
