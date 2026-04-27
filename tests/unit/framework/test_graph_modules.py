@@ -607,6 +607,13 @@ class TestGraphStoreProtocol:
             assert method in methods or hasattr(GraphStoreProtocol, method)
 
 
+class TestGraphModuleExports:
+    def test_graph_package_exports_traversal_direction_type(self):
+        from victor.storage.graph import GraphTraversalDirection
+
+        assert GraphTraversalDirection is not None
+
+
 class TestGraphEdgeTypes:
     """Tests for graph edge type constants."""
 

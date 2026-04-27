@@ -183,6 +183,7 @@ def build_codebase_index_manifest(embedding_config: Mapping[str, Any]) -> dict[s
         "chunking_strategy": _normalized_chunking_strategy(extra_config),
         "chunk_size": int(extra_config.get("chunk_size", DEFAULT_CODEBASE_CHUNK_SIZE)),
         "chunk_overlap": int(extra_config.get("chunk_overlap", DEFAULT_CODEBASE_CHUNK_OVERLAP)),
+        "language_overrides": _normalized_language_overrides(extra_config),
     }
 
 

@@ -137,9 +137,12 @@ def test_codebase_index_manifest_round_trip(tmp_path) -> None:
                 "code_chunking_strategy": "tree_sitter_structural",
                 "chunk_size": 500,
                 "chunk_overlap": 50,
+                "language_overrides": {"component": "tsx", ".astro": "html"},
             },
         }
     )
+
+    assert manifest["language_overrides"] == {".component": "tsx", ".astro": "html"}
 
     write_codebase_index_manifest(tmp_path, manifest)
     assert has_compatible_codebase_index_manifest(tmp_path, manifest) is True
@@ -147,6 +150,10 @@ def test_codebase_index_manifest_round_trip(tmp_path) -> None:
     changed_manifest = dict(manifest)
     changed_manifest["embedding_model"] = "other-model"
     assert has_compatible_codebase_index_manifest(tmp_path, changed_manifest) is False
+
+    changed_language_manifest = dict(manifest)
+    changed_language_manifest["language_overrides"] = {".component": "svelte"}
+    assert has_compatible_codebase_index_manifest(tmp_path, changed_language_manifest) is False
 
 
 def test_enable_structural_codebase_embeddings_rewrites_vector_store(monkeypatch) -> None:
