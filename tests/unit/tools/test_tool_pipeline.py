@@ -344,6 +344,36 @@ class TestToolPipeline:
         assert suggestions[1]["arguments"]["query"] == "BaseProvider"
         assert mock_executor.execute.call_count == 1
 
+    @pytest.mark.asyncio
+    async def test_repeated_failing_read_skip_includes_recovery_payload(self, mock_tool_registry):
+        """Repeated failing calls should expose a real recovery payload instead of a blank skip."""
+        mock_executor = MagicMock()
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_executor,
+            config=ToolPipelineConfig(enable_idempotent_caching=False),
+        )
+        tool_args = {"path": "victor/core/container.py", "offset": 0, "limit": 100}
+        signature = pipeline._get_call_signature("read", tool_args)
+        pipeline._failed_signatures.add(signature)
+
+        result = await pipeline.execute_tool_calls(
+            [{"name": "read", "arguments": tool_args}],
+            {},
+        )
+
+        assert result.skipped_calls == 1
+        skipped = result.results[0]
+        assert skipped.skipped is True
+        assert skipped.skip_reason == "Repeated failing call with same arguments"
+        assert skipped.error is not None
+        assert "already failed earlier in this session" in skipped.error
+        assert skipped.result["success"] is False
+        suggestions = skipped.result["metadata"]["follow_up_suggestions"]
+        assert suggestions
+        assert suggestions[0]["tool"] in {"overview", "graph"}
+        assert mock_executor.execute.call_count == 0
+
     def test_reset(self, pipeline):
         """Test resetting pipeline state."""
         pipeline._calls_used = 5

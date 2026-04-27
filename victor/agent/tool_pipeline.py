@@ -578,6 +578,24 @@ def _build_redundant_call_recovery(tool_name: str, arguments: Dict[str, Any]) ->
     }
 
 
+def _build_repeated_failure_recovery(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Build recovery guidance for a call that already failed with the same arguments."""
+    recovery = _build_redundant_call_recovery(tool_name, arguments)
+    original_error = recovery.get("error", "")
+    repeated_message = (
+        f"[{_build_tool_follow_up_command(tool_name, arguments)} already failed earlier in this "
+        "session with the same arguments. Do not repeat the same failing call. Change the path, "
+        "query, or tool choice before retrying.]"
+    )
+    if original_error:
+        repeated_message = f"{repeated_message}\n{original_error}"
+    return {
+        "success": False,
+        "error": repeated_message,
+        "metadata": recovery.get("metadata", {}),
+    }
+
+
 @dataclass
 class PipelineExecutionResult:
     """Result of executing multiple tool calls."""
@@ -1935,10 +1953,18 @@ class ToolPipeline:
         if self.config.enable_failed_signature_tracking:
             signature = self._get_call_signature(tool_name, normalized_args)
             if signature in self._failed_signatures:
+                logger.info(
+                    "[Pipeline] Skipping repeated failing call: %s(%s)",
+                    tool_name,
+                    normalized_args,
+                )
+                recovery_result = _build_repeated_failure_recovery(tool_name, normalized_args)
                 return ToolCallResult(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=False,
+                    result=recovery_result,
+                    error=recovery_result.get("error"),
                     skipped=True,
                     skip_reason="Repeated failing call with same arguments",
                     normalization_applied=normalization_applied,

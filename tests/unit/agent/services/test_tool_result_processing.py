@@ -22,6 +22,7 @@ class FakeCallResult:
     arguments: Optional[Dict[str, Any]] = None
     execution_time_ms: float = 100.0
     skipped: bool = False
+    skip_reason: Optional[str] = None
     tool_call_id: Optional[str] = None
 
 
@@ -230,3 +231,30 @@ def test_semantic_failure_preserves_follow_up_suggestions():
             "description": "Use a supported overview mode.",
         }
     ]
+
+
+def test_skipped_tool_uses_skip_reason_instead_of_unknown_error():
+    service = _make_service()
+    ctx = _make_ctx(format_tool_output=MagicMock(return_value="formatted skip"))
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="read",
+                success=False,
+                result=None,
+                error=None,
+                arguments={"path": "victor/core/container.py"},
+                skipped=True,
+                skip_reason="Repeated failing call with same arguments",
+                tool_call_id="call_read_skip_1",
+            )
+        ]
+    )
+
+    results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["success"] is False
+    assert results[0]["error"] == "Repeated failing call with same arguments"
+    assert "Unknown error" not in results[0]["result"]
+    ctx.console.print.assert_called_once()
+    assert "Tool call skipped" in ctx.console.print.call_args[0][0]

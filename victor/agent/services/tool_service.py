@@ -238,6 +238,8 @@ def process_tool_results_with_context(
         success = call_result.success
         error_msg = call_result.error
         elapsed_ms = call_result.execution_time_ms
+        skipped = bool(getattr(call_result, "skipped", False))
+        skip_reason = getattr(call_result, "skip_reason", None)
 
         ctx.executed_tools.append(tool_name)
         if tool_name == "read" and "path" in normalized_args:
@@ -277,7 +279,10 @@ def process_tool_results_with_context(
             semantic_success = False
             error_msg = output.get("error", "Operation returned success=False")
 
-        error_display = None if semantic_success else (error_msg or "Unknown error")
+        if semantic_success:
+            error_display = None
+        else:
+            error_display = error_msg or skip_reason or "Unknown error"
 
         if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
             ctx.usage_logger.set_duration_context(elapsed_ms)
@@ -328,8 +333,9 @@ def process_tool_results_with_context(
             )
             continue
 
-        sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
-        ctx.failed_tool_signatures.add(sig)
+        if not skipped:
+            sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
+            ctx.failed_tool_signatures.add(sig)
 
         _not_found = "not found" in str(error_display).lower()
         _shown_key = f"notfound:{tool_name}" if _not_found else None
@@ -337,13 +343,21 @@ def process_tool_results_with_context(
             if _shown_key and len(ctx.shown_tool_errors) < 500:
                 ctx.shown_tool_errors.add(_shown_key)
             if ctx.console and ctx.presentation:
+                prefix = "Tool call skipped" if skipped else "Tool execution failed"
                 ctx.console.print(
                     f"[red]{ctx.presentation.icon('error', with_color=False)} "
-                    f"Tool execution failed: {error_display}[/] "
+                    f"{prefix}: {error_display}[/] "
                     f"[dim]({elapsed_ms:.0f}ms)[/dim]"
                 )
 
-        error_output = output if isinstance(output, dict) else {"error": error_display}
+        if isinstance(output, dict):
+            error_output = output
+        else:
+            error_output = {"error": error_display}
+            if skipped:
+                error_output["skipped"] = True
+                if skip_reason:
+                    error_output["skip_reason"] = skip_reason
         if ctx.format_tool_output:
             formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
         else:
