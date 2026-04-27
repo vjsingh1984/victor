@@ -49,6 +49,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from victor.core.async_utils import run_sync
+from victor.ui.errors import print_error
 
 workflow_app = typer.Typer(
     name="workflow",
@@ -81,11 +82,11 @@ def _load_workflow_file(workflow_path: Path) -> dict:
     from victor.workflows.definition import WorkflowDefinition
 
     if not workflow_path.exists():
-        console.print(f"[bold red]Error:[/] Workflow file not found: {workflow_path}")
+        print_error(f"Workflow file not found: {workflow_path}")
         raise typer.Exit(1)
 
     if workflow_path.suffix not in {".yaml", ".yml"}:
-        console.print(f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}")
+        print_error(f"File must be .yaml or .yml: {workflow_path}")
         raise typer.Exit(1)
 
     try:
@@ -98,13 +99,13 @@ def _load_workflow_file(workflow_path: Path) -> dict:
             workflows = {loaded.name: loaded}
 
         if not workflows:
-            console.print("[bold red]Error:[/] No workflows found in file")
+            print_error("No workflows found in file")
             raise typer.Exit(1)
 
         return workflows
 
     except YAMLWorkflowError as e:
-        console.print(f"[bold red]Error:[/] Failed to parse workflow: {e}")
+        print_error(f"Failed to parse workflow: {e}")
         raise typer.Exit(1)
 
 
