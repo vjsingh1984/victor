@@ -52,6 +52,7 @@ def get_deprecated_chat_shim_report() -> Dict[str, Any]:
         "active_components": [],
         "active_routes": [],
         "active_surfaces": [],
+        "removal_candidates": [],
     }
 
     surface_totals: Dict[str, int] = {}
@@ -100,6 +101,24 @@ def get_deprecated_chat_shim_report() -> Dict[str, Any]:
             key=lambda item: (-item[1], item[0]),
         )
     ]
+    removal_candidates = [
+        {
+            "surface": f"{component}.{surface}",
+            "count": surface_data["total"],
+            "routes": dict(
+                sorted(
+                    surface_data["routes"].items(),
+                    key=lambda item: (-item[1], item[0]),
+                )
+            ),
+        }
+        for component, component_data in report["components"].items()
+        for surface, surface_data in component_data["surfaces"].items()
+    ]
+    report["removal_candidates"] = sorted(
+        removal_candidates,
+        key=lambda item: (item["count"], item["surface"]),
+    )
     return report
 
 

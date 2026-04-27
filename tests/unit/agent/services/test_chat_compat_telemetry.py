@@ -33,6 +33,7 @@ def test_chat_compat_telemetry_is_empty_after_reset():
         "active_components": [],
         "active_routes": [],
         "active_surfaces": [],
+        "removal_candidates": [],
     }
     assert has_deprecated_chat_shim_usage() is False
 
@@ -87,6 +88,23 @@ def test_chat_compat_telemetry_report_groups_by_component_surface_and_route():
         {"surface": "chat_coordinator.chat", "count": 2},
         {"surface": "chat_coordinator.stream_chat", "count": 1},
         {"surface": "orchestration_facade.chat_coordinator", "count": 1},
+    ]
+    assert report["removal_candidates"] == [
+        {
+            "surface": "chat_coordinator.stream_chat",
+            "count": 1,
+            "routes": {"orchestrator_public": 1},
+        },
+        {
+            "surface": "orchestration_facade.chat_coordinator",
+            "count": 1,
+            "routes": {"lazy_getter": 1},
+        },
+        {
+            "surface": "chat_coordinator.chat",
+            "count": 2,
+            "routes": {"chat_service": 2},
+        },
     ]
     assert has_deprecated_chat_shim_usage() is True
 

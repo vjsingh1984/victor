@@ -53,6 +53,18 @@ def test_get_deprecated_chat_compat_report_returns_structured_telemetry():
         "total": 1,
         "routes": {"lazy_getter": 1},
     }
+    assert report["removal_candidates"] == [
+        {
+            "surface": "chat_coordinator.chat",
+            "count": 1,
+            "routes": {"chat_service": 1},
+        },
+        {
+            "surface": "orchestration_facade.chat_coordinator",
+            "count": 1,
+            "routes": {"lazy_getter": 1},
+        },
+    ]
 
 
 def test_has_deprecated_chat_compat_usage_reflects_telemetry_state():
