@@ -373,7 +373,9 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
         if not inline_match:
             return []
 
-        return [candidate.strip() for candidate in inline_match.group(1).split(",") if candidate.strip()]
+        return [
+            candidate.strip() for candidate in inline_match.group(1).split(",") if candidate.strip()
+        ]
 
     def _choose_best_suggested_path(
         self, original_path: str, suggestions: List[str], tool_name: str

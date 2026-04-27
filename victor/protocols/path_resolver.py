@@ -693,7 +693,9 @@ class PathResolver(IPathResolver):
             and candidate.suffix == ".py"
             and candidate.name not in preferred_names
         )
-        suggestions.extend(self._to_relative_display_path(candidate) for candidate in other_candidates)
+        suggestions.extend(
+            self._to_relative_display_path(candidate) for candidate in other_candidates
+        )
         return suggestions[:limit]
 
     def _to_relative_display_path(self, path: Path) -> str:
