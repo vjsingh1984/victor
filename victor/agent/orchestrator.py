@@ -4835,7 +4835,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Delegate to LifecycleManager for shutdown
         await self._lifecycle_manager.shutdown()
+
+        observability = getattr(self, "observability", None)
+        event_bus = getattr(observability, "event_bus", None)
+        if event_bus is not None and hasattr(event_bus, "disconnect"):
+            try:
+                await event_bus.disconnect()
+            except Exception as e:
+                logger.debug("Observability event bus shutdown skipped: %s", e)
         logger.info("AgentOrchestrator shutdown complete")
+
+    async def close(self) -> None:
+        """Compatibility alias for shutdown."""
+        await self.shutdown()
 
     # =========================================================================
     # Protocol Conformance Methods (OrchestratorProtocol)

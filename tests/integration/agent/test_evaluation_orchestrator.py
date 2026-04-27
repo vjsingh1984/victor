@@ -374,11 +374,12 @@ class TestEvaluationOrchestrator:
                             assert progress.stage == EvaluationStage.COMPLETED
                             assert progress.score is not None
                             assert progress.execution_trace is not None
-                            mock_save_feedback.assert_called_once_with(
-                                "test-001",
-                                mock_validation_result,
-                                score=mock_score,
-                            )
+                            mock_save_feedback.assert_called_once()
+                            save_args, save_kwargs = mock_save_feedback.call_args
+                            assert save_args == ("test-001", mock_validation_result)
+                            assert save_kwargs["score"] == mock_score
+                            assert "metadata" in save_kwargs
+                            assert "prompt_optimization" in save_kwargs["metadata"]
 
     @pytest.mark.asyncio
     async def test_run_task_environment_failure(self):

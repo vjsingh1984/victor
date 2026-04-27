@@ -201,6 +201,11 @@ class ToolPredictor:
             f"success={self.config.success_weight})"
         )
 
+    @property
+    def cooccurrence_tracker(self) -> Optional[Any]:
+        """Compatibility accessor for the internal co-occurrence tracker."""
+        return self._cooccurrence_tracker
+
     def predict_tools(
         self,
         task_description: str,

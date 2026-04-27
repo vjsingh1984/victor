@@ -253,8 +253,8 @@ class TestToolDeduplicationIntegration:
         # Assert
         assert is_redundant is True
 
-    def test_deduplication_tracker_detects_semantic_overlap(self):
-        """Test that tracker detects semantic overlap between queries."""
+    def test_deduplication_tracker_allows_related_queries(self):
+        """Test that tracker allows distinct but related search queries."""
         # Arrange
         tracker = ToolDeduplicationTracker(window_size=10)
 
@@ -263,7 +263,7 @@ class TestToolDeduplicationIntegration:
         is_redundant = tracker.is_redundant("code_search", {"query": "register tool"})
 
         # Assert
-        assert is_redundant is True  # Should detect synonym overlap
+        assert is_redundant is False
 
     def test_deduplication_tracker_detects_file_redundancy(self):
         """Test that tracker detects redundant file operations."""

@@ -984,8 +984,15 @@ class OllamaProvider(BaseProvider):
         """
         message = chunk_data.get("message", {})
         content = message.get("content", "")
+        thinking = message.get("thinking")
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
         is_done = chunk_data.get("done", False)
+        metadata = {"reasoning_content": thinking} if thinking else None
+
+        # Some local reasoning models stream tokens via `thinking` with empty `content`.
+        # Mirror the non-streaming fallback so callers don't receive a blank response.
+        if not content and thinking:
+            content = thinking
 
         # Fallback: Check if this is a final chunk with JSON tool call in content
         # (for models without native tool calling support)
@@ -1005,6 +1012,7 @@ class OllamaProvider(BaseProvider):
             tool_calls=tool_calls,
             stop_reason=chunk_data.get("done_reason") if is_done else None,
             is_final=is_done,
+            metadata=metadata,
         )
 
     async def list_models(self) -> List[Dict[str, Any]]:

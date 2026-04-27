@@ -70,6 +70,8 @@ class AgentFactory:
         profile: str = "default",
         provider: Optional[str] = None,
         model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
         vertical: Optional[Union[Type, str]] = None,
         thinking: bool = False,
         session_id: Optional[str] = None,
@@ -81,6 +83,8 @@ class AgentFactory:
         self._profile = profile
         self._provider = provider
         self._model = model
+        self._temperature = temperature
+        self._max_tokens = max_tokens
         self._thinking = thinking
         self._session_id = session_id or str(uuid.uuid4())
         self._enable_observability = enable_observability
@@ -94,6 +98,58 @@ class AgentFactory:
         # Resolve vertical from string or class
         self._vertical = self._resolve_vertical(vertical)
 
+    def _apply_profile_overrides(self) -> None:
+        """Make explicit SDK overrides visible to the profile-based creation path."""
+        if (
+            self._provider is None
+            and self._model is None
+            and self._temperature is None
+            and self._max_tokens is None
+        ):
+            return
+
+        from victor.config.settings import ProfileConfig
+
+        profiles = dict(self._settings.load_profiles())
+        base_profile = profiles.get(self._profile)
+        profile_payload: Dict[str, Any] = (
+            base_profile.model_dump() if base_profile is not None else {}
+        )
+
+        effective_provider = self._provider or profile_payload.get("provider")
+        effective_model = (
+            self._model
+            or profile_payload.get("model")
+            or getattr(getattr(self._settings, "provider", None), "default_model", None)
+        )
+
+        if not effective_provider or not effective_model:
+            raise InitializationError(
+                stage="profile",
+                message="Explicit provider/model overrides require a resolvable provider and model.",
+                suggestions=["Pass both provider and model explicitly."],
+            )
+
+        profile_payload.update(
+            {
+                "provider": effective_provider,
+                "model": effective_model,
+                "temperature": (
+                    self._temperature
+                    if self._temperature is not None
+                    else profile_payload.get("temperature", 0.7)
+                ),
+                "max_tokens": (
+                    self._max_tokens
+                    if self._max_tokens is not None
+                    else profile_payload.get("max_tokens", 4096)
+                ),
+            }
+        )
+
+        profiles[self._profile] = ProfileConfig(**profile_payload)
+        self._settings.load_profiles = lambda: profiles
+
     async def create(self) -> "AgentOrchestrator":
         """Create a fully configured orchestrator.
 
@@ -105,6 +161,8 @@ class AgentFactory:
         """
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.core.bootstrap import ensure_bootstrapped
+
+        self._apply_profile_overrides()
 
         # Step 1: Pre-flight validation
         issues = self.validate()

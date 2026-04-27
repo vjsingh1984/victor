@@ -126,8 +126,13 @@ class SqliteGraphStore(GraphStoreProtocol):
         self._ensure_schema()
 
     async def close(self) -> None:
-        """Close underlying database connection."""
-        self._db.close()
+        """Release store resources without closing the shared project database.
+
+        ``ProjectDatabaseManager`` is a shared singleton per project path.
+        Closing it here invalidates other live components on the same thread.
+        Test isolation and process shutdown already clean up the shared manager.
+        """
+        logger.debug("SqliteGraphStore close skipped shared project database shutdown")
 
     def _connect(self) -> sqlite3.Connection:
         """Get database connection."""

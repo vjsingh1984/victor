@@ -8,6 +8,7 @@ Priority 3 Feature Integration:
 
 from typing import Any, Dict, List, Optional, Set
 
+from victor.agent.planning.cooccurrence_tracker import CooccurrenceTracker
 from victor.agent.planning.tool_predictor import ToolPredictor
 from victor.agent.usage_analytics import UsageAnalytics
 from victor.framework.rl.base import RLOutcome, RLRecommendation
@@ -54,10 +55,36 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
         )
 
         # Integrate ToolPredictor from Priority 3
-        self.predictor = ToolPredictor()
+        self.predictor = ToolPredictor(cooccurrence_tracker=CooccurrenceTracker())
 
         # Integrate UsageAnalytics (singleton)
         self.analytics = UsageAnalytics.get_instance()
+
+    @staticmethod
+    def _make_recommendation(
+        *,
+        key: str,
+        value: str,
+        confidence: float,
+        reason: str,
+        sample_size: int,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> RLRecommendation:
+        payload = dict(metadata or {})
+        payload.update(
+            {
+                "learner_name": "tool_selector",
+                "recommendation_type": "tool_usage",
+                "key": key,
+            }
+        )
+        return RLRecommendation(
+            value=value,
+            confidence=confidence,
+            reason=reason,
+            sample_size=sample_size,
+            metadata=payload,
+        )
 
     def learn(self, outcomes: List[RLOutcome]) -> List[RLRecommendation]:
         """Learn from tool execution outcomes using predictor and analytics.
@@ -93,20 +120,21 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
         for tool_name in tool_names:
             # Get insights from UsageAnalytics
             insights = self.analytics.get_tool_insights(tool_name)
+            execution_count = int(insights.get("execution_count", insights.get("total_executions", 0)))
 
             # Create recommendation based on success rate
             if insights["success_rate"] > 0.7:
                 # High success rate - recommend using
                 recommendations.append(
-                    RLRecommendation(
-                        learner_name="tool_selector",
-                        recommendation_type="tool_usage",
+                    self._make_recommendation(
                         key=tool_name,
                         value="use",
                         confidence=insights["success_rate"],
+                        reason=f"{tool_name} succeeds frequently in recent executions",
+                        sample_size=execution_count,
                         metadata={
                             "avg_execution_ms": insights["avg_execution_ms"],
-                            "sample_size": insights["execution_count"],
+                            "sample_size": execution_count,
                             "reason": "high_success_rate",
                         },
                     )
@@ -114,15 +142,15 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
             elif insights["success_rate"] < 0.3:
                 # Low success rate - recommend avoiding
                 recommendations.append(
-                    RLRecommendation(
-                        learner_name="tool_selector",
-                        recommendation_type="tool_usage",
+                    self._make_recommendation(
                         key=tool_name,
                         value="avoid",
                         confidence=1.0 - insights["success_rate"],
+                        reason=f"{tool_name} is underperforming in recent executions",
+                        sample_size=execution_count,
                         metadata={
                             "avg_execution_ms": insights["avg_execution_ms"],
-                            "sample_size": insights["execution_count"],
+                            "sample_size": execution_count,
                             "reason": "low_success_rate",
                         },
                     )

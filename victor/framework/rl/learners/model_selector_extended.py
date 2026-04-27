@@ -56,6 +56,32 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
         # Integrate HybridDecisionService from Priority 1
         self.decision_service = HybridDecisionService()
 
+    @staticmethod
+    def _make_recommendation(
+        *,
+        key: str,
+        value: str,
+        confidence: float,
+        reason: str,
+        sample_size: int,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> RLRecommendation:
+        payload = dict(metadata or {})
+        payload.update(
+            {
+                "learner_name": "model_selector",
+                "recommendation_type": "decision_threshold",
+                "key": key,
+            }
+        )
+        return RLRecommendation(
+            value=value,
+            confidence=confidence,
+            reason=reason,
+            sample_size=sample_size,
+            metadata=payload,
+        )
+
     def learn(self, outcomes: List[RLOutcome]) -> List[RLRecommendation]:
         """Learn from model selection outcomes using hybrid decision service.
 
@@ -83,12 +109,12 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
             if not used_llm and success and decision_latency_ms < 100:
                 # Fast path worked well - reinforce
                 recommendations.append(
-                    RLRecommendation(
-                        learner_name="model_selector",
-                        recommendation_type="decision_threshold",
+                    self._make_recommendation(
                         key="fast_path_confidence",
                         value="increase",
                         confidence=0.8,
+                        reason="Fast-path decisions succeeded with low latency",
+                        sample_size=1,
                         metadata={
                             "decision_latency_ms": decision_latency_ms,
                             "used_llm": used_llm,
@@ -101,12 +127,12 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
             elif used_llm and success:
                 # LLM path was necessary - adjust threshold
                 recommendations.append(
-                    RLRecommendation(
-                        learner_name="model_selector",
-                        recommendation_type="decision_threshold",
+                    self._make_recommendation(
                         key="llm_fallback_threshold",
                         value="decrease",
                         confidence=0.7,
+                        reason="LLM fallback was required for successful completion",
+                        sample_size=1,
                         metadata={
                             "reason": "llm_was_required",
                             "confidence": confidence,
@@ -131,12 +157,26 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
         """
         from victor.agent.decisions.schemas import DecisionType
 
-        # Use hybrid decision service
-        decision = self.decision_service.decide_sync(
-            decision_type=DecisionType.MODEL_SELECTION, context={"task_type": task_type, **context}
-        )
+        if hasattr(DecisionType, "MODEL_SELECTION"):
+            decision = self.decision_service.decide_sync(
+                decision_type=DecisionType.MODEL_SELECTION,
+                context={"task_type": task_type, **context},
+            )
+            model_name = getattr(getattr(decision, "result", None), "model_name", None)
+            if isinstance(model_name, str) and model_name:
+                return model_name
 
-        return decision.result.model_name
+        for key in ("preferred_model", "model", "default_model"):
+            value = context.get(key)
+            if isinstance(value, str) and value:
+                return value
+
+        complexity = str(context.get("complexity", "")).lower()
+        if complexity in {"low", "simple"}:
+            return "fast"
+        if complexity in {"high", "complex"}:
+            return "balanced"
+        return "balanced"
 
     def get_decision_stats(self) -> Dict[str, Any]:
         """Get decision statistics from hybrid service.

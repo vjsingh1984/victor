@@ -35,7 +35,7 @@ class TestToolOutputAccuracy:
         large_output = "\n".join([f"Line {i}" for i in range(100)])
 
         # Format and prune
-        formatted, llm_output, was_pruned, pruning_info = format_and_prune_tool_output(
+        preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
             tool_name="test_tool",
             arguments={"query": "test"},
             output=large_output,
@@ -48,8 +48,9 @@ class TestToolOutputAccuracy:
         assert "Line 99" in llm_output, "LLM output must contain last line"
         assert llm_output.count("Line ") >= 100, "LLM output should have all 100 lines"
 
-        # formatted and llm_output are the same (full output)
-        assert formatted == llm_output, "Formatted and LLM output should be identical (both full)"
+        # Full output and llm_output are the same (full output)
+        assert full_output == llm_output, "Full output and LLM output should be identical"
+        assert isinstance(preview_output, str)
 
         # was_pruned indicates whether user preview would be truncated
         # but llm_output should ALWAYS be full
@@ -61,7 +62,7 @@ class TestToolOutputAccuracy:
         # Create large output that will be pruned for preview
         large_output = "\n".join([f"Content line {i}" for i in range(500)])
 
-        formatted, llm_output, was_pruned, pruning_info = format_and_prune_tool_output(
+        preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
             tool_name="read",
             arguments={"path": "large_file.txt"},
             output=large_output,
@@ -79,6 +80,8 @@ class TestToolOutputAccuracy:
         if was_pruned:
             # If preview was pruned, verify it's only for display
             assert pruning_info is not None
+            assert preview_output != ""
+        assert isinstance(full_output, str)
             # pruning_info.lines_returned < 500  # Preview truncated
 
         # 4. Most important: LLM output contains ALL original content
@@ -98,15 +101,16 @@ class TestToolOutputAccuracy:
         def formatter(_tool, _args, output):
             return json.dumps(output, sort_keys=True)
 
-        formatted, llm_output, _, _ = format_and_prune_tool_output(
+        preview_output, llm_output, full_output, _, _ = format_and_prune_tool_output(
             tool_name="code_search",
             arguments={"query": "main"},
             output=structured_output,
             formatter=formatter,
         )
 
-        assert '"formatted_results"' in formatted
-        assert '"contains_markup"' in formatted
+        assert '"formatted_results"' in preview_output
+        assert '"contains_markup"' in preview_output
+        assert '"formatted_results"' in full_output
         assert '"formatted_results"' not in llm_output
         assert '"contains_markup"' not in llm_output
         assert '"results"' in llm_output
@@ -118,7 +122,7 @@ class TestToolOutputAccuracy:
         # Small output - won't be pruned
         small_output = "Small result"
 
-        formatted, llm_output, was_pruned_small, _ = format_and_prune_tool_output(
+        preview_output, llm_output, _, was_pruned_small, _ = format_and_prune_tool_output(
             tool_name="test",
             arguments={},
             output=small_output,
@@ -126,7 +130,7 @@ class TestToolOutputAccuracy:
 
         # Large output - will be pruned for preview only
         large_output = "\n".join([f"Line {i}" for i in range(1000)])
-        formatted, llm_output, was_pruned_large, _ = format_and_prune_tool_output(
+        preview_output, llm_output, _, was_pruned_large, _ = format_and_prune_tool_output(
             tool_name="test",
             arguments={},
             output=large_output,
@@ -239,15 +243,16 @@ class TestBackwardCompatibility:
         """Verify format_and_prune_tool_output return type hasn't changed."""
         from victor.agent.services.tool_service import format_and_prune_tool_output
 
-        formatted, llm_output, was_pruned, pruning_info = format_and_prune_tool_output(
+        preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
             tool_name="test",
             arguments={},
             output="test output",
         )
 
-        # Return type should be: (str, str, bool, Optional[Any])
-        assert isinstance(formatted, str)
+        # Return type should be: (preview, llm_output, full_output, was_pruned, pruning_info)
+        assert isinstance(preview_output, str)
         assert isinstance(llm_output, str)
+        assert isinstance(full_output, str)
         assert isinstance(was_pruned, bool)
         # pruning_info can be None or PruningInfo object
 

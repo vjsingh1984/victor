@@ -108,6 +108,24 @@ class RLRecommendation:
     is_baseline: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def learner_name(self) -> Optional[str]:
+        """Compatibility accessor for extended learners."""
+        value = self.metadata.get("learner_name")
+        return value if isinstance(value, str) else None
+
+    @property
+    def recommendation_type(self) -> Optional[str]:
+        """Compatibility accessor for extended learners."""
+        value = self.metadata.get("recommendation_type")
+        return value if isinstance(value, str) else None
+
+    @property
+    def key(self) -> Optional[str]:
+        """Compatibility accessor for extended learners."""
+        value = self.metadata.get("key")
+        return value if isinstance(value, str) else None
+
     def __str__(self) -> str:
         """Human-readable representation."""
         baseline_str = " (baseline)" if self.is_baseline else ""

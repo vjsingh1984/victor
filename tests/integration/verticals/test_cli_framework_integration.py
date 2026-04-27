@@ -275,9 +275,10 @@ class TestCLIFrameworkIntegration:
 
             # Emit session start
             shim.emit_session_start({"mode": "integration_test"})
-            shim._observability.on_session_start.assert_called_once_with(
-                {"mode": "integration_test"}
-            )
+            shim._observability.on_session_start.assert_called_once()
+            start_payload = shim._observability.on_session_start.call_args.args[0]
+            assert start_payload["mode"] == "integration_test"
+            assert start_payload["session_id"] == "test-session-123"
 
             # Emit session end
             shim.emit_session_end(tool_calls=5, duration_seconds=10.0, success=True)

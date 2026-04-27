@@ -200,6 +200,7 @@ class UsageAnalytics:
         error_type: Optional[str] = None,
         context_tokens: int = 0,
         query_hash: Optional[str] = None,
+        error: Optional[Any] = None,
     ) -> None:
         """Record a tool execution for analytics.
 
@@ -210,7 +211,11 @@ class UsageAnalytics:
             error_type: Error type if failed (e.g., "ValueError", "Timeout")
             context_tokens: Number of context tokens at time of call
             query_hash: Hash of the query (for pattern detection)
+            error: Backward-compatible alias for ``error_type``
         """
+        if error_type is None and error is not None:
+            error_type = error if isinstance(error, str) else type(error).__name__
+
         record = ToolExecutionRecord(
             timestamp=time.time(),
             success=success,
@@ -637,6 +642,8 @@ class UsageAnalytics:
 
             agg = self._tool_aggregates[tool_name]
             insights = dict(agg)
+            if "execution_count" not in insights:
+                insights["execution_count"] = agg.get("total_executions", 0)
 
             # Add recommendations
             recommendations = []

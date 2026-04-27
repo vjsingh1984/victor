@@ -125,7 +125,7 @@ class DebounceConfig:
                 enable_metadata_fingerprinting=debouncing_settings.session_start_metadata_fingerprinting,
                 track_session_lifecycle=debouncing_settings.session_start_track_lifecycle,
             )
-        except (AttributeError, TypeError):
+        except (AttributeError, TypeError, ValueError):
             # Fallback to defaults
             return cls()
 

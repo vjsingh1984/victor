@@ -234,6 +234,8 @@ class Agent:
                 profile=profile or "default",
                 provider=provider,
                 model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
                 vertical=vertical,
                 thinking=thinking,
                 session_id=session_id,
@@ -993,6 +995,8 @@ class Agent:
         # Clean up orchestrator
         if hasattr(self._orchestrator, "close"):
             await self._orchestrator.close()
+        elif hasattr(self._orchestrator, "shutdown"):
+            await self._orchestrator.shutdown()
         self._orchestrator = None  # Prevent __del__ warning after proper close
 
     async def __aenter__(self) -> "Agent":

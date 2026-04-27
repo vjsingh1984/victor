@@ -554,7 +554,7 @@ class TestPresetAgentCustomization:
 
         # Extended has new tools
         assert "deploy_script" in custom_coder.capabilities.tools
-        assert "edit_file" in custom_coder.capabilities.tools  # Still has original
+        assert "edit" in custom_coder.capabilities.tools  # Still has original
         assert custom_coder.capabilities.can_browse_web is True
 
     def test_extend_preset_with_constraints(self):

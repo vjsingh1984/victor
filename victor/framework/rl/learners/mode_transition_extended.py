@@ -59,6 +59,32 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
         self.phase_detector = PhaseDetector()
         self.transition_detector = PhaseTransitionDetector()
 
+    @staticmethod
+    def _make_recommendation(
+        *,
+        key: str,
+        value: str,
+        confidence: float,
+        reason: str,
+        sample_size: int,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> RLRecommendation:
+        payload = dict(metadata or {})
+        payload.update(
+            {
+                "learner_name": "mode_transition",
+                "recommendation_type": "phase_transition",
+                "key": key,
+            }
+        )
+        return RLRecommendation(
+            value=value,
+            confidence=confidence,
+            reason=reason,
+            sample_size=sample_size,
+            metadata=payload,
+        )
+
     def learn(self, outcomes: List[RLOutcome]) -> List[RLRecommendation]:
         """Learn from mode transitions using phase detection.
 
@@ -86,12 +112,12 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             if detected_phase and transition_successful:
                 # Reinforce successful phase pattern
                 recommendations.append(
-                    RLRecommendation(
-                        learner_name="mode_transition",
-                        recommendation_type="phase_transition",
+                    self._make_recommendation(
                         key=f"to_{detected_phase}",
                         value="allow",
                         confidence=0.9,
+                        reason=f"Transition to {detected_phase} succeeded",
+                        sample_size=1,
                         metadata={
                             "detected_phase": detected_phase,
                             "from_phase": from_phase,
@@ -105,12 +131,12 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             elif detected_phase and not transition_successful:
                 # Discourage problematic transition
                 recommendations.append(
-                    RLRecommendation(
-                        learner_name="mode_transition",
-                        recommendation_type="phase_transition",
+                    self._make_recommendation(
                         key=f"to_{detected_phase}",
                         value="avoid",
                         confidence=0.7,
+                        reason=f"Transition to {detected_phase} failed",
+                        sample_size=1,
                         metadata={
                             "reason": "transition_failed",
                             "detected_phase": detected_phase,
@@ -153,9 +179,11 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
         Returns:
             True if transition should be allowed
         """
-        return self.transition_detector.should_transition(
-            old_phase=current_phase, new_phase=new_phase
-        )
+        if self.transition_detector.get_current_phase() != current_phase:
+            self.transition_detector._current_phase = current_phase
+            self.transition_detector._last_transition_time = 0.0
+
+        return self.transition_detector.should_transition(new_phase)
 
     def get_phase_statistics(self) -> Dict[str, Any]:
         """Get phase detection statistics.

@@ -556,6 +556,28 @@ class RLCoordinator:
 
         logger.info(f"RL: Coordinator initialized with unified database at {self.db_path}")
 
+    def _ensure_db_connection(self) -> None:
+        """Reacquire a usable SQLite connection if the cached one was closed.
+
+        Integration tests reset global database singletons between test cases.
+        The RL coordinator is a separate singleton and can outlive that reset,
+        leaving cached learner instances and the raw SQLite connection stale.
+        """
+        if self._is_closed:
+            raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
+
+        try:
+            self.db.execute("SELECT 1")
+            return
+        except Exception:
+            logger.info("RL: Reopening coordinator database connection")
+
+        self.db = self._db_manager.get_connection()
+        self._learners.clear()
+        self._ensure_core_tables()
+        self._migrate_add_repo_id()
+        self._migrate_add_phase1_columns()
+
     def _ensure_core_tables(self) -> None:
         """Create core tables for telemetry and cross-learner analysis."""
         cursor = self.db.cursor()
@@ -734,6 +756,8 @@ class RLCoordinator:
         Returns:
             Learner instance or None if unknown or not in active_learners
         """
+        self._ensure_db_connection()
+
         if name in self._learners:
             return self._learners[name]
 
@@ -933,6 +957,7 @@ class RLCoordinator:
             outcome: Outcome data
             vertical: Which vertical this came from (coding, devops, data_science)
         """
+        self._ensure_db_connection()
         outcome.vertical = vertical
 
         # Filter test fixture tools from RL recording
@@ -1017,6 +1042,7 @@ class RLCoordinator:
             metadata: Optional additional metadata dict
         """
         try:
+            self._ensure_db_connection()
             import json
 
             cursor = self.db.cursor()
@@ -1072,6 +1098,7 @@ class RLCoordinator:
         Returns:
             Recommendation with value and confidence, or None if no data
         """
+        self._ensure_db_connection()
         learner = self.get_learner(learner_name)
         if not learner:
             logger.debug(f"RL: Unknown learner '{learner_name}', no recommendation")
@@ -1985,8 +2012,10 @@ def get_rl_coordinator() -> RLCoordinator:
         Global coordinator singleton
     """
     global _rl_coordinator
-    if _rl_coordinator is None:
+    if _rl_coordinator is None or _rl_coordinator.is_closed:
         _rl_coordinator = RLCoordinator()
+    else:
+        _rl_coordinator._ensure_db_connection()
     return _rl_coordinator
 
 
@@ -2006,7 +2035,9 @@ async def get_rl_coordinator_async() -> RLCoordinator:
         Global coordinator singleton
     """
     global _rl_coordinator
-    if _rl_coordinator is None:
+    if _rl_coordinator is None or _rl_coordinator.is_closed:
         # Initialize in thread to avoid blocking event loop
         _rl_coordinator = await asyncio.to_thread(RLCoordinator)
+    else:
+        await asyncio.to_thread(_rl_coordinator._ensure_db_connection)
     return _rl_coordinator
