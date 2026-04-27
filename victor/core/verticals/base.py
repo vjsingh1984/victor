@@ -75,7 +75,11 @@ from victor_sdk.core.types import Tier
 
 # Import SDK base class for dependency inversion
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
-from victor.core.verticals.manifest_contract import get_or_create_vertical_manifest
+from victor.core.verticals.manifest_contract import (
+    VerticalRuntimeProvenance,
+    get_or_create_vertical_manifest,
+    get_vertical_runtime_provenance,
+)
 
 # Import focused capability providers for SRP compliance
 from victor.core.verticals.metadata import VerticalMetadataProvider
@@ -827,9 +831,10 @@ class VerticalRegistry:
     CURRENT_API_VERSION: ClassVar[int] = SDK_CURRENT_API_VERSION
 
     @classmethod
-    def _is_contrib_module(cls, module_path: str) -> bool:
-        """Check if a module path belongs to a built-in contrib vertical."""
-        return "verticals.contrib" in module_path
+    def _is_contrib_vertical(cls, vertical: Type[VerticalBase]) -> bool:
+        """Return True when *vertical* is marked as a contrib vertical."""
+
+        return get_vertical_runtime_provenance(vertical) is VerticalRuntimeProvenance.CONTRIB
 
     @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
@@ -869,8 +874,8 @@ class VerticalRegistry:
             existing = cls._registry[name]
             existing_module = getattr(existing, "__module__", "<unknown>")
             if existing is not vertical:
-                existing_is_contrib = cls._is_contrib_module(existing_module)
-                new_is_contrib = cls._is_contrib_module(new_module)
+                existing_is_contrib = cls._is_contrib_vertical(existing)
+                new_is_contrib = cls._is_contrib_vertical(vertical)
 
                 if not existing_is_contrib and new_is_contrib:
                     # External already registered; contrib trying to overwrite — skip

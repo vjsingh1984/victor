@@ -58,7 +58,9 @@ from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.compatibility_gate import VerticalCompatibilityGate
 from victor.core.verticals.framework_version import get_framework_version
 from victor.core.verticals.manifest_contract import (
+    VerticalRuntimeProvenance,
     get_or_create_vertical_manifest,
+    get_vertical_runtime_provenance,
     get_vertical_runtime_metadata,
 )
 from victor_sdk.discovery import collect_verticals_from_candidate
@@ -190,9 +192,15 @@ class VerticalLoader:
             if vertical is not None and ep_vertical is not None and vertical is not ep_vertical:
                 reg_module = getattr(vertical, "__module__", "")
                 ep_module = getattr(ep_vertical, "__module__", "")
-                is_expected_override = ("verticals.contrib" in reg_module) != (
-                    "verticals.contrib" in ep_module
+                reg_is_contrib = (
+                    get_vertical_runtime_provenance(vertical)
+                    is VerticalRuntimeProvenance.CONTRIB
                 )
+                ep_is_contrib = (
+                    get_vertical_runtime_provenance(ep_vertical)
+                    is VerticalRuntimeProvenance.CONTRIB
+                )
+                is_expected_override = reg_is_contrib != ep_is_contrib
                 if not is_expected_override:
                     logger.warning(
                         "Vertical '%s' registered via both VerticalRegistry (%s) and "
@@ -202,8 +210,15 @@ class VerticalLoader:
                         f"{vertical.__module__}.{vertical.__qualname__}",
                         f"{ep_vertical.__module__}.{ep_vertical.__qualname__}",
                     )
-                elif "verticals.contrib" in reg_module and "verticals.contrib" not in ep_module:
+                elif reg_is_contrib and not ep_is_contrib:
                     vertical = ep_vertical
+                elif not reg_is_contrib and ep_is_contrib:
+                    logger.debug(
+                        "Retaining non-contrib vertical '%s' from %s over contrib entry point %s.",
+                        name,
+                        reg_module,
+                        ep_module,
+                    )
 
             if vertical is None:
                 vertical = ep_vertical
@@ -540,8 +555,14 @@ class VerticalLoader:
             if existing is not None and existing is not vertical_cls:
                 existing_module = getattr(existing, "__module__", "")
                 new_module = getattr(vertical_cls, "__module__", "")
-                existing_is_contrib = "verticals.contrib" in existing_module
-                new_is_contrib = "verticals.contrib" in new_module
+                existing_is_contrib = (
+                    get_vertical_runtime_provenance(existing)
+                    is VerticalRuntimeProvenance.CONTRIB
+                )
+                new_is_contrib = (
+                    get_vertical_runtime_provenance(vertical_cls)
+                    is VerticalRuntimeProvenance.CONTRIB
+                )
                 if not existing_is_contrib and new_is_contrib:
                     continue
                 if existing_is_contrib == new_is_contrib:
@@ -614,8 +635,14 @@ class VerticalLoader:
                     if existing is not None and existing is not vertical_cls:
                         existing_module = getattr(existing, "__module__", "")
                         new_module = getattr(vertical_cls, "__module__", "")
-                        existing_is_contrib = "verticals.contrib" in existing_module
-                        new_is_contrib = "verticals.contrib" in new_module
+                        existing_is_contrib = (
+                            get_vertical_runtime_provenance(existing)
+                            is VerticalRuntimeProvenance.CONTRIB
+                        )
+                        new_is_contrib = (
+                            get_vertical_runtime_provenance(vertical_cls)
+                            is VerticalRuntimeProvenance.CONTRIB
+                        )
                         if not existing_is_contrib and new_is_contrib:
                             # External already registered; skip contrib
                             continue

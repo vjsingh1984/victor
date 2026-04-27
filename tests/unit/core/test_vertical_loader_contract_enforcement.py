@@ -10,6 +10,10 @@ import pytest
 from victor.core import tool_dependency_loader
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.manifest_contract import (
+    VerticalRuntimeProvenance,
+    set_vertical_runtime_provenance,
+)
 from victor.core.verticals.vertical_loader import VerticalLoader
 from victor.framework import entry_point_loader
 from victor_sdk import VerticalBase as SdkVerticalBase
@@ -546,6 +550,52 @@ def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):
     assert VerticalRegistry.get(existing_name) is existing_vertical
 
     VerticalRegistry.unregister(existing_name)
+
+
+def test_vertical_registry_prefers_explicit_external_provenance_over_contrib() -> None:
+    """Registry conflict resolution should use explicit provenance metadata."""
+    vertical_name = "provenance_conflict_vertical"
+    VerticalRegistry.unregister(vertical_name)
+
+    contrib_vertical = _make_vertical(vertical_name, api_version=1)
+    contrib_vertical.__module__ = "victor.runtime.shadowed"
+    set_vertical_runtime_provenance(contrib_vertical, VerticalRuntimeProvenance.CONTRIB)
+
+    external_vertical = _make_vertical(vertical_name, api_version=1)
+    external_vertical.__module__ = "victor.verticals.contrib.shadowed_external"
+    set_vertical_runtime_provenance(external_vertical, VerticalRuntimeProvenance.EXTERNAL)
+
+    VerticalRegistry.register(contrib_vertical)
+    VerticalRegistry.register(external_vertical)
+
+    assert VerticalRegistry.get(vertical_name) is external_vertical
+
+    VerticalRegistry.unregister(vertical_name)
+
+
+def test_loader_resolve_prefers_explicit_external_provenance(monkeypatch) -> None:
+    """Resolve should honor explicit provenance instead of module-path heuristics."""
+    loader = VerticalLoader()
+    vertical_name = "resolve_provenance_vertical"
+    VerticalRegistry.unregister(vertical_name)
+
+    registered_vertical = _make_vertical(vertical_name, api_version=1)
+    registered_vertical.__module__ = "victor.runtime.shadowed"
+    set_vertical_runtime_provenance(registered_vertical, VerticalRuntimeProvenance.CONTRIB)
+    VerticalRegistry.register(registered_vertical)
+
+    entry_point_vertical = _make_vertical(vertical_name, api_version=1)
+    entry_point_vertical.__module__ = "victor.verticals.contrib.entrypoint_shadow"
+    set_vertical_runtime_provenance(entry_point_vertical, VerticalRuntimeProvenance.EXTERNAL)
+
+    monkeypatch.setattr(loader, "_get_vertical_entry_points", lambda force_refresh=False: {})
+    monkeypatch.setattr(loader, "_import_from_entrypoint", lambda *_args, **_kwargs: entry_point_vertical)
+
+    resolved = loader.resolve(vertical_name)
+
+    assert resolved is ensure_runtime_vertical(entry_point_vertical)
+
+    VerticalRegistry.unregister(vertical_name)
 
 
 def test_discovery_stats_include_dependency_and_entry_point_snapshots(monkeypatch):

@@ -8,6 +8,7 @@ even when a vertical was registered through older paths.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from enum import Enum
 import logging
 from typing import Any, Optional, Type
 
@@ -20,14 +21,76 @@ from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
 logger = logging.getLogger(__name__)
 
+_VERTICAL_RUNTIME_PROVENANCE_ATTR = "_victor_runtime_provenance"
+
+
+class VerticalRuntimeProvenance(str, Enum):
+    """Runtime origin metadata for conflict resolution and diagnostics."""
+
+    BUILTIN = "builtin"
+    CONTRIB = "contrib"
+    EXTERNAL = "external"
+
+
+def infer_vertical_runtime_provenance(vertical_class: Type[Any]) -> VerticalRuntimeProvenance:
+    """Infer runtime provenance from module layout as a compatibility fallback."""
+
+    module_path = getattr(vertical_class, "__module__", "")
+    if "verticals.contrib" in module_path:
+        return VerticalRuntimeProvenance.CONTRIB
+    if module_path.startswith("victor."):
+        return VerticalRuntimeProvenance.BUILTIN
+    return VerticalRuntimeProvenance.EXTERNAL
+
+
+def set_vertical_runtime_provenance(
+    vertical_class: Type[Any],
+    provenance: VerticalRuntimeProvenance | str,
+) -> VerticalRuntimeProvenance:
+    """Persist explicit runtime provenance on a vertical class."""
+
+    normalized = _coerce_vertical_runtime_provenance(provenance)
+    if normalized is None:
+        raise ValueError(f"Unsupported vertical runtime provenance: {provenance!r}")
+    setattr(vertical_class, _VERTICAL_RUNTIME_PROVENANCE_ATTR, normalized.value)
+    return normalized
+
+
+def get_vertical_runtime_provenance(vertical_class: Type[Any]) -> VerticalRuntimeProvenance:
+    """Return explicit runtime provenance, inferring and caching when absent."""
+
+    candidate = getattr(vertical_class, _VERTICAL_RUNTIME_PROVENANCE_ATTR, None)
+    normalized = _coerce_vertical_runtime_provenance(candidate)
+    if normalized is not None:
+        return normalized
+
+    inferred = infer_vertical_runtime_provenance(vertical_class)
+    setattr(vertical_class, _VERTICAL_RUNTIME_PROVENANCE_ATTR, inferred.value)
+    return inferred
+
+
+def _coerce_vertical_runtime_provenance(
+    candidate: Any,
+) -> Optional[VerticalRuntimeProvenance]:
+    """Normalize arbitrary provenance values into the runtime enum."""
+
+    if isinstance(candidate, VerticalRuntimeProvenance):
+        return candidate
+    if isinstance(candidate, str):
+        try:
+            return VerticalRuntimeProvenance(candidate)
+        except ValueError:
+            return None
+    return None
+
 
 def infer_plugin_namespace(vertical_class: Type[Any]) -> str:
     """Infer a default plugin namespace from the class module path."""
 
-    module_path = getattr(vertical_class, "__module__", "")
-    if "verticals.contrib" in module_path:
+    provenance = get_vertical_runtime_provenance(vertical_class)
+    if provenance is VerticalRuntimeProvenance.CONTRIB:
         return "contrib"
-    if module_path.startswith("victor."):
+    if provenance is VerticalRuntimeProvenance.BUILTIN:
         return "default"
     return "external"
 
@@ -91,19 +154,23 @@ def get_vertical_runtime_metadata(vertical_class: Type[Any]) -> dict[str, str]:
 
     manifest = get_or_create_vertical_manifest(vertical_class)
     if manifest is None:
+        provenance = get_vertical_runtime_provenance(vertical_class)
         return {
             "vertical_name": getattr(
                 vertical_class, "name", getattr(vertical_class, "__name__", "")
             ),
             "vertical_manifest_version": getattr(vertical_class, "version", "1.0.0"),
             "vertical_plugin_namespace": infer_plugin_namespace(vertical_class),
+            "vertical_runtime_provenance": provenance.value,
         }
 
+    provenance = get_vertical_runtime_provenance(vertical_class)
     return {
         "vertical_name": manifest.name,
         "vertical_manifest_version": manifest.version,
         "vertical_plugin_namespace": manifest.plugin_namespace
         or infer_plugin_namespace(vertical_class),
+        "vertical_runtime_provenance": provenance.value,
     }
 
 
@@ -246,3 +313,5 @@ def _apply_manifest_defaults(vertical_class: Type[Any], manifest: ExtensionManif
         manifest.api_version = int(1 if api_version is None else api_version)
     if not getattr(manifest, "plugin_namespace", None):
         manifest.plugin_namespace = infer_plugin_namespace(vertical_class)
+    # Persist once so the registry/loader stop depending on module-path parsing.
+    get_vertical_runtime_provenance(vertical_class)
