@@ -143,3 +143,14 @@ def test_deprecated_unified_chat_coordinator_is_not_wired_to_nested_chat_shims()
     )
     assert "_ensure_sync_chat_coordinator(self)" not in source
     assert "_ensure_streaming_chat_coordinator(self)" not in source
+
+
+def test_runtime_bootstrapper_does_not_bind_deprecated_chat_shim_getters_to_facade() -> None:
+    source = _method_source(
+        "victor/agent/runtime/bootstrapper.py",
+        "AgentRuntimeBootstrapper",
+        "create_facades",
+    )
+    assert "get_sync_chat_coordinator=" not in source
+    assert "get_streaming_chat_coordinator=" not in source
+    assert "get_unified_chat_coordinator=" not in source
