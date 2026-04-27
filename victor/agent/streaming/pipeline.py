@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from types import SimpleNamespace
 from typing import Any, AsyncIterator, List, Optional
 
 from victor.agent.output_deduplicator import OutputDeduplicator
@@ -580,6 +581,7 @@ class StreamingChatPipeline:
             tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
 
             # Task Completion Detection Enhancement
+            forced_task_completion = False
             if orch._task_completion_detector and full_content:
                 from victor.agent.task_completion import CompletionConfidence
 
@@ -591,6 +593,7 @@ class StreamingChatPipeline:
                         "Task completion: HIGH confidence detected (active signal), "
                         "forcing completion NOW (immediate stop, skip continuation)"
                     )
+                    forced_task_completion = True
                     stream_ctx.force_completion = True
                     stream_ctx.skip_continuation = (
                         True  # NEW: Prevent continuation strategy override
@@ -621,7 +624,7 @@ class StreamingChatPipeline:
             from victor.agent.continuation_strategy import ContinuationStrategy
             from victor.tools.tool_names import get_all_canonical_names, TOOL_ALIASES
 
-            if full_content and not tool_calls:
+            if full_content and not tool_calls and not forced_task_completion:
                 all_tool_names = get_all_canonical_names() | set(TOOL_ALIASES.keys())
                 mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
                     full_content, list(all_tool_names), TOOL_ALIASES
@@ -644,12 +647,15 @@ class StreamingChatPipeline:
                     )
 
             # Use recovery integration to detect and handle failures
-            recovery_action = await orch._handle_recovery_with_integration(
-                stream_ctx=stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                mentioned_tools=mentioned_tools_detected or None,
-            )
+            if forced_task_completion and not tool_calls:
+                recovery_action = SimpleNamespace(action="continue")
+            else:
+                recovery_action = await orch._handle_recovery_with_integration(
+                    stream_ctx=stream_ctx,
+                    full_content=full_content,
+                    tool_calls=tool_calls,
+                    mentioned_tools=mentioned_tools_detected or None,
+                )
 
             # Apply recovery action if not just "continue"
             if recovery_action.action != "continue":
@@ -664,7 +670,7 @@ class StreamingChatPipeline:
 
             # Spin detection for ALL paths (via shared SpinDetector)
             _pipeline_obj = getattr(orch, "_tool_pipeline", None)
-            if _pipeline_obj and getattr(
+            if tool_calls and _pipeline_obj and getattr(
                 _pipeline_obj,
                 "last_batch_effectively_blocked",
                 getattr(_pipeline_obj, "last_batch_all_skipped", False),
@@ -695,19 +701,27 @@ class StreamingChatPipeline:
                 sanitized = orch.sanitizer.sanitize(visible_content)
                 if sanitized:
                     orch.add_message("assistant", sanitized, tool_calls=tool_calls)
-                    # Only yield here when tool_calls are present — the intent
-                    # classification handler (Step 1) is skipped for tool-call
-                    # turns and yields nothing, so we must display the content.
-                    # For non-tool turns, intent classification yields it at
-                    # classify_and_determine_action() to avoid double display.
-                    if tool_calls:
-                        yield orch._chunk_generator.generate_content_chunk(sanitized)
+                    # Only yield here when tool_calls are present, or when we
+                    # forced task completion and are deliberately bypassing
+                    # continuation/intent handling for this final answer.
+                    if tool_calls or (forced_task_completion and not tool_calls):
+                        yield orch._chunk_generator.generate_content_chunk(
+                            sanitized,
+                            is_final=forced_task_completion and not tool_calls,
+                        )
+                        if forced_task_completion and not tool_calls:
+                            return
                 else:
                     plain_text = orch.sanitizer.strip_markup(visible_content)
                     if plain_text:
                         orch.add_message("assistant", plain_text, tool_calls=tool_calls)
-                        if tool_calls:
-                            yield orch._chunk_generator.generate_content_chunk(plain_text)
+                        if tool_calls or (forced_task_completion and not tool_calls):
+                            yield orch._chunk_generator.generate_content_chunk(
+                                plain_text,
+                                is_final=forced_task_completion and not tool_calls,
+                            )
+                            if forced_task_completion and not tool_calls:
+                                return
             elif tool_calls:
                 # OpenAI spec: assistant message with tool_calls must be in
                 # conversation even when content is empty. Without this,
@@ -770,7 +784,7 @@ class StreamingChatPipeline:
             # Spin detection via shared SpinDetector (consistent with batch path)
             _all_tools_blocked = False
             _pipeline_obj = getattr(orch, "_tool_pipeline", None)
-            if _pipeline_obj and getattr(
+            if tool_calls and _pipeline_obj and getattr(
                 _pipeline_obj,
                 "last_batch_effectively_blocked",
                 getattr(_pipeline_obj, "last_batch_all_skipped", False),

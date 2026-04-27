@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from victor.agent.task_completion import CompletionConfidence
 from victor.agent.streaming.intent_classification import IntentClassificationResult
 from victor.core.completion_markers import SUMMARY_MARKER
 from victor.agent.streaming.pipeline import StreamingChatPipeline
@@ -445,3 +446,62 @@ async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_c
         coordinator._intent_classification_handler.calls[0]["full_content"]
         == f"{SUMMARY_MARKER} Key findings"
     )
+
+
+@pytest.mark.asyncio
+async def test_pipeline_forced_completion_bypasses_recovery_and_stale_blocked_state():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._provider_response = (
+        f"{SUMMARY_MARKER} Final findings mention graph and metrics but are complete.",
+        None,
+        None,
+        False,
+    )
+
+    class _HighConfidenceDetector:
+        def __init__(self) -> None:
+            self._state = SimpleNamespace(
+                last_summary=f"{SUMMARY_MARKER} Final findings mention graph and metrics but are complete."
+            )
+            self.analyzed = None
+
+        def analyze_response(self, content: str) -> None:
+            self.analyzed = content
+
+        def get_completion_confidence(self):
+            return CompletionConfidence.HIGH
+
+    detector = _HighConfidenceDetector()
+    recovery_mock = AsyncMock(return_value=SimpleNamespace(action="continue"))
+    coordinator._orchestrator._task_completion_detector = detector
+    coordinator._orchestrator._tool_pipeline = SimpleNamespace(
+        last_batch_effectively_blocked=True,
+        last_batch_all_skipped=True,
+    )
+    coordinator._orchestrator._handle_recovery_with_integration = recovery_mock
+    coordinator._orchestrator._conversation_controller = SimpleNamespace(
+        persist_compaction_summary=MagicMock(),
+        inject_compaction_context=MagicMock(),
+    )
+    coordinator._intent_classification_handler = StubIntentHandler(
+        IntentClassificationResult(chunks=[], action_result={"reason": "finish"}, action="finish")
+    )
+    coordinator._continuation_handler = StubContinuationHandler(
+        StubContinuationResult(chunks=[], state_updates={}, should_return=True)
+    )
+
+    pipeline = StreamingChatPipeline(coordinator)
+    chunks = []
+    async for chunk in pipeline.run("summarize architecture"):
+        chunks.append(chunk)
+
+    assert [chunk.content for chunk in chunks] == [
+        "Final findings mention graph and metrics but are complete."
+    ]
+    assert chunks[0].is_final is True
+    assert detector.analyzed == (
+        f"{SUMMARY_MARKER} Final findings mention graph and metrics but are complete."
+    )
+    recovery_mock.assert_not_awaited()
+    assert coordinator._intent_classification_handler.calls == []
+    assert coordinator._continuation_handler.calls == []
