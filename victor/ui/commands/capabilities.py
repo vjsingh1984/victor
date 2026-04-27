@@ -41,6 +41,7 @@ class CapabilityManifest:
     personas: List[str] = field(default_factory=list)
     teams: List[str] = field(default_factory=list)
     chains: List[str] = field(default_factory=list)
+    workflows: List[str] = field(default_factory=list)
     handlers: List[str] = field(default_factory=list)
     task_types: List[str] = field(default_factory=list)
     providers: List[str] = field(default_factory=list)
@@ -55,6 +56,7 @@ class CapabilityManifest:
             "personas": self.personas,
             "teams": self.teams,
             "chains": self.chains,
+            "workflows": self.workflows,
             "handlers": self.handlers,
             "task_types": self.task_types,
             "providers": self.providers,
@@ -65,6 +67,7 @@ class CapabilityManifest:
                 "total_personas": len(self.personas),
                 "total_teams": len(self.teams),
                 "total_chains": len(self.chains),
+                "total_workflows": len(self.workflows),
                 "total_providers": len(self.providers),
             },
         }
@@ -102,6 +105,9 @@ class CapabilityDiscovery:
         # Discover chains/workflows
         manifest.chains = self._discover_chains()
 
+        # Discover workflows from provider registry
+        manifest.workflows = self._discover_workflows()
+
         # Discover handlers
         manifest.handlers = self._discover_handlers()
 
@@ -135,6 +141,16 @@ class CapabilityDiscovery:
             result["chains"] = registry.list_chains(vertical=vertical)
         except Exception:
             result["chains"] = []
+
+        try:
+            from victor.framework.providers.protocol import get_provider_registry
+
+            provider_registry = get_provider_registry()
+            all_workflows = provider_registry.get_all_workflows()
+            vertical_workflows = all_workflows.get(vertical, {})
+            result["workflows"] = list(vertical_workflows.keys())
+        except Exception:
+            result["workflows"] = []
 
         try:
             from victor.framework.team_registry import get_team_registry
@@ -227,6 +243,22 @@ class CapabilityDiscovery:
 
             registry = get_chain_registry()
             return registry.list_chains()
+        except Exception:
+            return []
+
+    def _discover_workflows(self) -> List[str]:
+        """Discover all workflow specs from provider registry."""
+        try:
+            from victor.framework.providers.protocol import get_provider_registry
+
+            provider_registry = get_provider_registry()
+            all_workflows = provider_registry.get_all_workflows()
+            # Flatten the dict of vertical_name -> workflows into a list
+            workflow_names = []
+            for vertical, workflows in all_workflows.items():
+                for name in workflows.keys():
+                    workflow_names.append(f"{vertical}:{name}")
+            return workflow_names
         except Exception:
             return []
 
@@ -373,9 +405,14 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
         ", ".join(manifest.teams[:3]) + ("..." if len(manifest.teams) > 3 else ""),
     )
     summary_table.add_row(
-        "Chains/Workflows",
+        "Chains",
         str(len(manifest.chains)),
         ", ".join(manifest.chains[:3]) + ("..." if len(manifest.chains) > 3 else ""),
+    )
+    summary_table.add_row(
+        "Workflows",
+        str(len(manifest.workflows)),
+        ", ".join(manifest.workflows[:3]) + ("..." if len(manifest.workflows) > 3 else ""),
     )
     summary_table.add_row(
         "Task Types",
@@ -401,6 +438,7 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     console.print("  [cyan]victor capabilities tools[/cyan]      - List all tools")
     console.print("  [cyan]victor capabilities verticals[/cyan]  - List all verticals")
     console.print("  [cyan]victor capabilities providers[/cyan]  - List all providers")
+    console.print("  [cyan]victor capabilities workflows[/cyan]  - List all workflows")
     console.print("  [cyan]victor capabilities --vertical coding[/cyan] - Filter by vertical")
     console.print()
 
@@ -589,3 +627,40 @@ def list_personas(
     console.print()
     console.print(f"[dim]Total: {len(personas)} personas[/dim]")
     console.print()
+
+
+@capabilities_app.command("workflows")
+def list_workflows(
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+) -> None:
+    """List all available workflow specs from provider registry."""
+    discovery = get_capability_discovery()
+
+    if vertical:
+        data = discovery.discover_by_vertical(vertical)
+        workflows = data.get("workflows", [])
+    else:
+        manifest = discovery.discover_all()
+        workflows = manifest.workflows
+
+    if json_output:
+        import json
+
+        console.print(json.dumps({"workflows": workflows, "vertical": vertical}, indent=2))
+        return
+
+    console.print()
+    title = "[bold cyan]Available Workflows"
+    if vertical:
+        title += f" ({vertical})"
+    title += "[/bold cyan]"
+    console.print(Panel.fit(title, border_style="cyan"))
+    console.print()
+
+    for w in sorted(workflows):
+        console.print(f"  [cyan]{w}[/cyan]")
+    console.print()
+    console.print(f"[dim]Total: {len(workflows)} workflows[/dim]")
+    console.print()
+
