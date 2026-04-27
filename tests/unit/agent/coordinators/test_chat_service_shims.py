@@ -269,6 +269,44 @@ def test_unified_chat_coordinator_constructor_warns_without_chat_service():
 
 
 @pytest.mark.asyncio
+async def test_unified_chat_coordinator_requires_bound_chat_service_for_chat():
+    with pytest.warns(
+        DeprecationWarning,
+        match="UnifiedChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = UnifiedChatCoordinator(
+            sync_coordinator=MagicMock(),
+            streaming_coordinator=MagicMock(),
+        )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="UnifiedChatCoordinator.chat\\(\\) is deprecated compatibility surface",
+    ):
+        with pytest.raises(RuntimeError, match="requires a bound ChatService"):
+            await coordinator.chat("hello", mode=ExecutionMode.SYNC, use_planning=False)
+
+
+@pytest.mark.asyncio
+async def test_unified_chat_coordinator_requires_bound_chat_service_for_streaming():
+    with pytest.warns(
+        DeprecationWarning,
+        match="UnifiedChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = UnifiedChatCoordinator(
+            sync_coordinator=MagicMock(),
+            streaming_coordinator=MagicMock(),
+        )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="UnifiedChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+    ):
+        with pytest.raises(RuntimeError, match="requires a bound ChatService"):
+            await anext(coordinator.stream_chat("hello"))
+
+
+@pytest.mark.asyncio
 async def test_chat_coordinator_planning_prefers_orchestrator_runtime_helper():
     response = CompletionResponse(content="planned", role="assistant")
     orchestrator = MagicMock()

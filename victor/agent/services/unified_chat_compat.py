@@ -95,8 +95,8 @@ class UnifiedChatCoordinator:
         """Execute chat in specified mode.
 
         Compatibility entry point for legacy callers. When a ``ChatService`` is
-        bound, this method delegates there first and uses the deprecated sync or
-        streaming coordinators only as fallback adapters.
+        bound, this method delegates there directly. Deprecated compatibility
+        shims no longer own fallback execution.
 
         Args:
             user_message: User's message
@@ -109,7 +109,7 @@ class UnifiedChatCoordinator:
         Note:
             - SYNC mode: prefers ``ChatService.chat()``
             - STREAMING mode: prefers ``ChatService.chat(..., stream=True)``
-            - AUTO mode: falls back to the configured compatibility default
+            - AUTO mode: resolves to the configured default mode for service delegation
         """
         warnings.warn(
             "UnifiedChatCoordinator.chat() is deprecated compatibility surface. "
@@ -132,30 +132,10 @@ class UnifiedChatCoordinator:
                 use_planning=use_planning,
             )
 
-        if execution_mode == ExecutionMode.STREAMING:
-            # Streaming mode: collect all chunks and return aggregated response
-            content_parts = []
-            final_response: CompletionResponse | None = None
-
-            async for chunk in self._streaming.stream_chat(user_message):
-                if chunk.content:
-                    content_parts.append(chunk.content)
-                if chunk.finish_reason:
-                    # Create response from final chunk
-                    final_response = CompletionResponse(
-                        content="".join(content_parts),
-                        role=chunk.role or "assistant",
-                        tool_calls=chunk.tool_calls,
-                    )
-
-            return final_response or CompletionResponse(
-                content="",
-                role="assistant",
-                tool_calls=None,
-            )
-
-        # Default to sync mode (direct path)
-        return await self._sync.chat(user_message, use_planning=use_planning)
+        raise RuntimeError(
+            "UnifiedChatCoordinator requires a bound ChatService. "
+            "Bind ChatService before using deprecated compatibility shims."
+        )
 
     async def stream_chat(
         self,
@@ -164,8 +144,7 @@ class UnifiedChatCoordinator:
         """Execute chat with streaming response.
 
         Compatibility convenience wrapper that always requests streaming. When a
-        ``ChatService`` is bound, it forwards there first and otherwise falls
-        back to the deprecated streaming coordinator shim.
+        ``ChatService`` is bound, it forwards there directly.
 
         Args:
             user_message: User's message
@@ -185,8 +164,10 @@ class UnifiedChatCoordinator:
                 yield chunk
             return
 
-        async for chunk in self._streaming.stream_chat(user_message):
-            yield chunk
+        raise RuntimeError(
+            "UnifiedChatCoordinator requires a bound ChatService. "
+            "Bind ChatService before using deprecated compatibility shims."
+        )
 
     # =====================================================================
     # Private Methods
