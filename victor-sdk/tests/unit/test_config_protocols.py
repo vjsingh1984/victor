@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 
 from victor_sdk.verticals.protocols.config import (
     ApiKeyProviderProtocol,
@@ -22,67 +23,72 @@ class TestProjectPathsData:
 
     def test_derived_victor_dir(self):
         p = ProjectPathsData(project_root="/home/user/project")
-        assert p.victor_dir == "/home/user/project/.victor"
+        assert p.victor_dir == Path("/home/user/project/.victor")
 
     def test_derived_logs_dir(self):
         p = ProjectPathsData(project_root="/home/user/project")
-        assert p.logs_dir == "/home/user/project/.victor/logs"
+        assert p.logs_dir == Path("/home/user/project/.victor/logs")
 
     def test_custom_victor_dir(self):
         p = ProjectPathsData(project_root="/proj", victor_dir_name=".myvictor")
-        assert p.victor_dir == "/proj/.myvictor"
+        assert p.victor_dir == Path("/proj/.myvictor")
 
     def test_existing_properties(self):
         """All existing properties return correct paths."""
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.embeddings_dir == "/home/user/project/.victor/embeddings"
-        assert paths.graph_dir == "/home/user/project/.victor/graph"
-        assert paths.sessions_dir == "/home/user/project/.victor/sessions"
+        assert paths.embeddings_dir == Path("/home/user/project/.victor/embeddings")
+        assert paths.graph_dir == Path("/home/user/project/.victor/graph")
+        assert paths.sessions_dir == Path("/home/user/project/.victor/sessions")
 
     def test_backups_dir(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.backups_dir == "/home/user/project/.victor/backups"
+        assert paths.backups_dir == Path("/home/user/project/.victor/backups")
 
     def test_changes_dir(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.changes_dir == "/home/user/project/.victor/changes"
+        assert paths.changes_dir == Path("/home/user/project/.victor/changes")
 
     def test_conversation_db(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        # Database consolidation: conversation_db is now an alias for project.db
-        assert paths.conversation_db == "/home/user/project/.victor/project.db"
+        assert paths.project_db == Path("/home/user/project/.victor/project.db")
+        assert paths.project_db.parent == Path("/home/user/project/.victor")
+        # Database consolidation: conversation_db is now an alias for project_db
+        assert paths.conversation_db == Path("/home/user/project/.victor/project.db")
+        assert paths.conversation_db.parent == Path("/home/user/project/.victor")
+        assert paths.conversation_db == paths.project_db
 
     def test_conversations_export_dir(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.conversations_export_dir == "/home/user/project/.victor/conversations"
+        assert paths.conversations_export_dir == Path("/home/user/project/.victor/conversations")
 
     def test_index_metadata(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.index_metadata == "/home/user/project/.victor/index_metadata.json"
+        assert paths.index_metadata == Path("/home/user/project/.victor/index_metadata.json")
 
     def test_mcp_config(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.mcp_config == "/home/user/project/.victor/mcp.yaml"
+        assert paths.mcp_config == Path("/home/user/project/.victor/mcp.yaml")
 
     def test_project_context_file(self):
         paths = ProjectPathsData(project_root="/home/user/project")
-        assert paths.project_context_file == "/home/user/project/.victor/init.md"
+        assert paths.project_context_file == Path("/home/user/project/.victor/init.md")
 
     def test_project_context_file_custom(self):
         paths = ProjectPathsData(
             project_root="/home/user/project",
             context_file_name="custom.md",
         )
-        assert paths.project_context_file == "/home/user/project/.victor/custom.md"
+        assert paths.project_context_file == Path("/home/user/project/.victor/custom.md")
 
     def test_custom_victor_dir_name_with_new_paths(self):
         paths = ProjectPathsData(
             project_root="/home/user/project",
             victor_dir_name=".custom_victor",
         )
-        assert paths.backups_dir == "/home/user/project/.custom_victor/backups"
-        # Database consolidation: conversation_db is now an alias for project.db
-        assert paths.conversation_db == "/home/user/project/.custom_victor/project.db"
+        assert paths.backups_dir == Path("/home/user/project/.custom_victor/backups")
+        assert paths.project_db == Path("/home/user/project/.custom_victor/project.db")
+        # Database consolidation: conversation_db is now an alias for project_db
+        assert paths.conversation_db == Path("/home/user/project/.custom_victor/project.db")
 
 
 class TestSettingsProviderProtocol:

@@ -10,6 +10,7 @@ All types are plain dataclasses/protocols with zero dependencies.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional, Protocol, runtime_checkable
 
 
@@ -21,14 +22,16 @@ class ProjectPathsData:
     Derives standard subdirectory paths from project_root.
 
     Database Consolidation:
-        conversation_db is now an alias for project.db (consolidated database)
-        Returns path to project-specific database containing conversations, graph, entities
+        project_db is the canonical project-local database path.
+        conversation_db remains a backward-compatible alias for older verticals.
+        Both point to the same project-specific database containing conversations,
+        graph, and entities.
 
     Usage:
         from victor_sdk.verticals.protocols import ProjectPathsData
 
         paths = ProjectPathsData(project_root="/home/user/project")
-        db_path = paths.conversation_db  # "/home/user/project/.victor/project.db"
+        db_path = paths.project_db  # Path("/home/user/project/.victor/project.db")
     """
 
     project_root: str
@@ -36,68 +39,76 @@ class ProjectPathsData:
     context_file_name: str = "init.md"
 
     @property
-    def victor_dir(self) -> str:
+    def victor_dir(self) -> Path:
         """Get project-local .victor directory."""
-        return f"{self.project_root}/{self.victor_dir_name}"
+        return Path(self.project_root) / self.victor_dir_name
 
     @property
-    def logs_dir(self) -> str:
+    def logs_dir(self) -> Path:
         """Get project-local logs directory."""
-        return f"{self.victor_dir}/logs"
+        return self.victor_dir / "logs"
 
     @property
-    def embeddings_dir(self) -> str:
+    def embeddings_dir(self) -> Path:
         """Get project-local embeddings directory."""
-        return f"{self.victor_dir}/embeddings"
+        return self.victor_dir / "embeddings"
 
     @property
-    def graph_dir(self) -> str:
+    def graph_dir(self) -> Path:
         """Get project-local graph directory."""
-        return f"{self.victor_dir}/graph"
+        return self.victor_dir / "graph"
 
     @property
-    def sessions_dir(self) -> str:
+    def sessions_dir(self) -> Path:
         """Get project-local sessions directory."""
-        return f"{self.victor_dir}/sessions"
+        return self.victor_dir / "sessions"
 
     @property
-    def backups_dir(self) -> str:
+    def backups_dir(self) -> Path:
         """Get project-local backups directory."""
-        return f"{self.victor_dir}/backups"
+        return self.victor_dir / "backups"
 
     @property
-    def changes_dir(self) -> str:
+    def changes_dir(self) -> Path:
         """Get project-local changes (undo/redo) directory."""
-        return f"{self.victor_dir}/changes"
+        return self.victor_dir / "changes"
 
     @property
-    def conversation_db(self) -> str:
-        """Get project-local conversation database path.
+    def project_db(self) -> Path:
+        """Get canonical project-local database path.
 
-        Database consolidation: Now returns path to project.db (consolidated database).
-        This property is an alias for backward compatibility.
+        Returns the consolidated project database containing conversations,
+        graph, entities, and other project-scoped state.
         """
-        return f"{self.victor_dir}/project.db"
+        return self.victor_dir / "project.db"
 
     @property
-    def conversations_export_dir(self) -> str:
+    def conversation_db(self) -> Path:
+        """Get backward-compatible alias for the consolidated project database.
+
+        Deprecated in favor of project_db.
+        """
+        return self.project_db
+
+    @property
+    def conversations_export_dir(self) -> Path:
         """Get project-local conversations export directory."""
-        return f"{self.victor_dir}/conversations"
+        return self.victor_dir / "conversations"
 
     @property
-    def index_metadata(self) -> str:
+    def index_metadata(self) -> Path:
         """Get codebase index metadata file path."""
-        return f"{self.victor_dir}/index_metadata.json"
+        return self.victor_dir / "index_metadata.json"
 
     @property
-    def mcp_config(self) -> str:
+    def mcp_config(self) -> Path:
         """Get project-local MCP configuration file."""
-        return f"{self.victor_dir}/mcp.yaml"
+        return self.victor_dir / "mcp.yaml"
 
     @property
-    def project_context_file(self) -> str:
+    def project_context_file(self) -> Path:
         """Get project context file path (.victor/init.md by default)."""
-        return f"{self.victor_dir}/{self.context_file_name}"
+        return self.victor_dir / self.context_file_name
 
 
 @runtime_checkable
