@@ -155,20 +155,6 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         return None
 
-    def _get_orchestrator_runtime_property(self, name: str) -> Any:
-        """Resolve a real orchestrator property without MagicMock false-positives."""
-        orch = self._orchestrator
-
-        instance_dict = getattr(orch, "__dict__", None)
-        if instance_dict and name in instance_dict:
-            return instance_dict.get(name)
-
-        type_attr = getattr(type(orch), name, None)
-        if isinstance(type_attr, property):
-            return getattr(orch, name)
-
-        return None
-
     def _get_orchestrator_callable(self, name: str) -> Any:
         """Resolve a real orchestrator callable without MagicMock false-positives."""
         orch = self._orchestrator
@@ -210,13 +196,9 @@ class ChatCoordinator(ChatStreamHelperMixin):
         if chat_service is not None and hasattr(chat_service, "turn_executor"):
             return chat_service.turn_executor
 
-        orchestrator_executor = self._get_orchestrator_runtime_property("turn_executor")
-        if orchestrator_executor is not None:
-            return orchestrator_executor
-
         raise RuntimeError(
-            "ChatCoordinator has no bound runtime turn executor. "
-            "Bind ChatService or access the orchestrator runtime directly."
+            "ChatCoordinator turn_executor requires a bound ChatService runtime. "
+            "Bind ChatService and access ChatService.turn_executor directly."
         )
 
     async def chat(

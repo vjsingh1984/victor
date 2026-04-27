@@ -252,7 +252,7 @@ class TestChatServiceShim:
         coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         with pytest.warns(DeprecationWarning, match="ChatCoordinator.turn_executor is deprecated"):
-            with pytest.raises(RuntimeError, match="no bound runtime turn executor"):
+            with pytest.raises(RuntimeError, match="requires a bound ChatService runtime"):
                 _ = coordinator.turn_executor
 
 
@@ -351,20 +351,18 @@ class TestStreamingShimBehavior:
         assert results == [chunk]
 
     @pytest.mark.asyncio
-    async def test_stream_chat_prefers_service_streaming_runtime_getter(self, mock_orchestrator):
-        """Shim delegates to orchestrator._get_service_streaming_runtime when wired."""
+    async def test_stream_chat_prefers_orchestrator_public_runtime(self, mock_orchestrator):
+        """Shim delegates to orchestrator.stream_chat when no ChatService is bound."""
         from victor.providers.base import StreamChunk
 
         chunk = StreamChunk(content="runtime", role="assistant")
-        runtime = MagicMock()
 
         async def _stream_chat(user_message: str, **kwargs):
             assert user_message == "hello"
             assert kwargs == {"mode": "test"}
             yield chunk
 
-        runtime.stream_chat = _stream_chat
-        mock_orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
+        mock_orchestrator.stream_chat = _stream_chat
         coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         with pytest.warns(
@@ -374,17 +372,15 @@ class TestStreamingShimBehavior:
             results = [c async for c in coordinator.stream_chat("hello", mode="test")]
 
         assert results == [chunk]
-        mock_orchestrator._get_service_streaming_runtime.assert_called_once_with()
 
     @pytest.mark.asyncio
-    async def test_stream_chat_prefers_service_runtime_over_legacy_compatibility_hook(
+    async def test_stream_chat_prefers_public_runtime_over_internal_compatibility_hooks(
         self, mock_orchestrator
     ):
-        """Shim uses service runtime before the legacy compatibility hook."""
+        """Shim uses orchestrator.stream_chat before deprecated internal hooks."""
         from victor.providers.base import StreamChunk
 
         chunk = StreamChunk(content="runtime", role="assistant")
-        runtime = MagicMock()
 
         async def _runtime_stream_chat(user_message: str, **kwargs):
             assert user_message == "hello"
@@ -394,8 +390,10 @@ class TestStreamingShimBehavior:
         async def _legacy_stream_chat(user_message: str, **kwargs):
             raise AssertionError("legacy compatibility hook should not run")
 
-        runtime.stream_chat = _runtime_stream_chat
-        mock_orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
+        mock_orchestrator.stream_chat = _runtime_stream_chat
+        mock_orchestrator._get_service_streaming_runtime = MagicMock(
+            side_effect=AssertionError("internal streaming runtime getter should not run")
+        )
         mock_orchestrator._stream_chat_runtime = _legacy_stream_chat
         coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
@@ -406,15 +404,14 @@ class TestStreamingShimBehavior:
             results = [c async for c in coordinator.stream_chat("hello", mode="test")]
 
         assert results == [chunk]
-        mock_orchestrator._get_service_streaming_runtime.assert_called_once_with()
+        mock_orchestrator._get_service_streaming_runtime.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_stream_chat_prefers_bound_chat_service_over_other_paths(self, mock_orchestrator):
-        """Shim uses bound ChatService before service runtime and the legacy compatibility hook."""
+        """Shim uses bound ChatService before orchestrator runtime and internal hooks."""
         from victor.providers.base import StreamChunk
 
         chunk = StreamChunk(content="service", role="assistant")
-        runtime = MagicMock()
         chat_service = MagicMock()
 
         async def _service_stream_chat(user_message: str, **kwargs):
@@ -429,8 +426,10 @@ class TestStreamingShimBehavior:
             raise AssertionError("legacy compatibility hook should not run")
 
         chat_service.stream_chat = _service_stream_chat
-        runtime.stream_chat = _runtime_stream_chat
-        mock_orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
+        mock_orchestrator.stream_chat = _runtime_stream_chat
+        mock_orchestrator._get_service_streaming_runtime = MagicMock(
+            side_effect=AssertionError("internal streaming runtime getter should not run")
+        )
         mock_orchestrator._stream_chat_runtime = _legacy_stream_chat
         coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
         coordinator.bind_chat_service(chat_service)

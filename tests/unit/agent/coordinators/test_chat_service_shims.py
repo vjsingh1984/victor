@@ -507,22 +507,9 @@ async def test_chat_coordinator_uses_bound_chat_service_getter():
     chat_service.chat.assert_awaited_once_with("hello", use_planning=False)
 
 
-def test_chat_coordinator_turn_executor_prefers_orchestrator_runtime_property():
-    class OrchestratorStub:
-        def __init__(self):
-            self._turn_executor = None
-
-        @property
-        def turn_executor(self):
-            if self._turn_executor is None:
-                self._turn_executor = MagicMock(name="orchestrator_executor")
-            return self._turn_executor
-
-    orchestrator = OrchestratorStub()
-    coordinator = _make_deprecated_chat_coordinator(orchestrator)
+def test_chat_coordinator_turn_executor_requires_bound_chat_service_runtime():
+    coordinator = _make_deprecated_chat_coordinator(MagicMock())
 
     with pytest.warns(DeprecationWarning, match="ChatCoordinator.turn_executor is deprecated"):
-        result = coordinator.turn_executor
-
-    assert result is orchestrator._turn_executor
-    assert coordinator._turn_executor is None
+        with pytest.raises(RuntimeError, match="requires a bound ChatService runtime"):
+            _ = coordinator.turn_executor
