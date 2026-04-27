@@ -227,14 +227,17 @@ class ToolObservabilityHandler:
         Returns:
             Dict with execution counts and budget usage
         """
+        budget_used = self._coordinator.budget_used
+        budget_total = self._coordinator.budget
+        budget_remaining = self._coordinator.get_remaining_budget()
         return {
             "total_executions": self._coordinator._execution_count,
-            "budget_used": self._coordinator._budget_used,
-            "budget_total": self._coordinator._total_budget,
-            "budget_remaining": self._coordinator.get_remaining_budget(),
+            "budget_used": budget_used,
+            "budget_total": budget_total,
+            "budget_remaining": budget_remaining,
             "budget_utilization": (
-                self._coordinator._budget_used / self._coordinator._total_budget
-                if self._coordinator._total_budget > 0
+                budget_used / budget_total
+                if budget_total > 0
                 else 0
             ),
             "executed_tools": list(self._coordinator._executed_tools),
@@ -255,8 +258,8 @@ class ToolObservabilityHandler:
             "selection": self.get_selection_stats(),
             "execution": self.get_execution_stats(),
             "budget": {
-                "total": self._coordinator._total_budget,
-                "used": self._coordinator._budget_used,
+                "total": self._coordinator.budget,
+                "used": self._coordinator.budget_used,
                 "remaining": self._coordinator.get_remaining_budget(),
             },
         }

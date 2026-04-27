@@ -302,11 +302,76 @@ class ToolCoordinator:
     # Budget Management
     # =====================================================================
 
+    def _get_bound_budget_info(self) -> Optional[Dict[str, Any]]:
+        """Return normalized budget metadata from a bound ToolService, if available."""
+        if self._tool_service is None or not hasattr(self._tool_service, "get_budget_info"):
+            return None
+        budget_info = self._tool_service.get_budget_info()
+        return budget_info if isinstance(budget_info, dict) else None
+
+    def _get_bound_remaining_budget(self) -> Optional[int]:
+        """Return the remaining budget from a bound ToolService, if available."""
+        if self._tool_service is None:
+            return None
+        if hasattr(self._tool_service, "get_remaining_budget"):
+            remaining = self._tool_service.get_remaining_budget()
+            if isinstance(remaining, int):
+                return max(0, remaining)
+        if hasattr(self._tool_service, "get_tool_budget"):
+            remaining = self._tool_service.get_tool_budget()
+            if isinstance(remaining, int):
+                return max(0, remaining)
+        return None
+
+    def _get_bound_total_budget(self) -> Optional[int]:
+        """Return the total budget from a bound ToolService, if available."""
+        if self._tool_service is None:
+            return None
+        total_budget = getattr(self._tool_service, "budget", None)
+        if isinstance(total_budget, int):
+            return max(0, total_budget)
+
+        budget_info = self._get_bound_budget_info()
+        if budget_info is not None:
+            total_budget = budget_info.get("max")
+            if isinstance(total_budget, int):
+                return max(0, total_budget)
+
+            budget_used = budget_info.get("used")
+        else:
+            budget_used = getattr(self._tool_service, "budget_used", None)
+
+        remaining = self._get_bound_remaining_budget()
+        if isinstance(remaining, int) and isinstance(budget_used, int):
+            return max(0, remaining + budget_used)
+        return None
+
+    def _get_bound_budget_used(self) -> Optional[int]:
+        """Return the used budget from a bound ToolService, if available."""
+        if self._tool_service is None:
+            return None
+        budget_used = getattr(self._tool_service, "budget_used", None)
+        if isinstance(budget_used, int):
+            return max(0, budget_used)
+
+        budget_info = self._get_bound_budget_info()
+        if budget_info is not None:
+            budget_used = budget_info.get("used")
+            if isinstance(budget_used, int):
+                return max(0, budget_used)
+
+        total_budget = self._get_bound_total_budget()
+        remaining = self._get_bound_remaining_budget()
+        if isinstance(total_budget, int) and isinstance(remaining, int):
+            return max(0, total_budget - remaining)
+        return None
+
     @property
     def budget(self) -> int:
         """Get the total tool budget."""
-        if self._tool_service is not None and hasattr(self._tool_service, "get_tool_budget"):
-            return self._tool_service.get_tool_budget()
+        total_budget = self._get_bound_total_budget()
+        if total_budget is not None:
+            return total_budget
         return self._total_budget
 
     @budget.setter
@@ -320,10 +385,9 @@ class ToolCoordinator:
     @property
     def budget_used(self) -> int:
         """Get the number of budget units used."""
-        if self._tool_service is not None and hasattr(self._tool_service, "get_tool_budget"):
-            total_budget = self._tool_service.get_tool_budget()
-            remaining = self._tool_service.get_remaining_budget()
-            return max(0, total_budget - remaining)
+        budget_used = self._get_bound_budget_used()
+        if budget_used is not None:
+            return budget_used
         return self._budget_used
 
     @property
@@ -337,8 +401,9 @@ class ToolCoordinator:
         Returns:
             Number of tool calls remaining
         """
-        if self._tool_service is not None and hasattr(self._tool_service, "get_remaining_budget"):
-            return self._tool_service.get_remaining_budget()
+        remaining = self._get_bound_remaining_budget()
+        if remaining is not None:
+            return remaining
         if self._budget_manager:
             return self._budget_manager.get_remaining_tool_calls()
         return self._budget_controller.get_remaining()
@@ -411,6 +476,9 @@ class ToolCoordinator:
         Returns:
             True if no budget remaining
         """
+        remaining = self._get_bound_remaining_budget()
+        if remaining is not None:
+            return remaining <= 0
         if self._budget_manager:
             return self.get_remaining_budget() <= 0
         return self._budget_controller.is_exhausted()

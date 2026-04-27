@@ -179,6 +179,42 @@ class TestToolCoordinator:
         assert coordinator.get_enabled_tools() == {"read", "grep"}
         service.get_enabled_tools.assert_called_once_with()
 
+    def test_bound_tool_service_budget_properties_use_live_totals(self, coordinator):
+        """Bound coordinators should expose total and used budget from ToolService."""
+
+        class BoundToolService:
+            budget = 10
+            budget_used = 4
+
+            def get_tool_budget(self):
+                return 6
+
+            def get_remaining_budget(self):
+                return 6
+
+        coordinator.bind_tool_service(BoundToolService())
+
+        assert coordinator.budget == 10
+        assert coordinator.budget_used == 4
+        assert coordinator.get_remaining_budget() == 6
+
+    def test_bound_tool_service_budget_exhaustion_uses_live_remaining_budget(self, coordinator):
+        """Bound coordinators should not rely on stale local exhaustion state."""
+
+        class ExhaustedToolService:
+            budget = 5
+            budget_used = 5
+
+            def get_tool_budget(self):
+                return 0
+
+            def get_remaining_budget(self):
+                return 0
+
+        coordinator.bind_tool_service(ExhaustedToolService())
+
+        assert coordinator.is_budget_exhausted() is True
+
     def test_consume_budget(self, coordinator):
         """Test budget consumption."""
         coordinator.consume_budget(5)
@@ -314,6 +350,30 @@ class TestToolCoordinator:
         assert stats["budget_used"] == 5
         assert stats["budget_total"] == 25
         assert stats["budget_remaining"] == 20
+
+    def test_bound_tool_service_execution_stats_use_live_budget_values(self, coordinator):
+        """Execution stats should reflect the bound ToolService budget state."""
+
+        class BoundToolService:
+            budget = 12
+            budget_used = 5
+
+            def get_tool_budget(self):
+                return 7
+
+            def get_remaining_budget(self):
+                return 7
+
+        coordinator.bind_tool_service(BoundToolService())
+
+        stats = coordinator._observability.get_execution_stats()
+        usage_stats = coordinator._observability.get_tool_usage_stats()
+
+        assert stats["budget_used"] == 5
+        assert stats["budget_total"] == 12
+        assert stats["budget_remaining"] == 7
+        assert stats["budget_utilization"] == pytest.approx(5 / 12)
+        assert usage_stats["budget"] == {"total": 12, "used": 5, "remaining": 7}
 
     def test_budget_warning_callback(self, mock_pipeline, mock_registry):
         """Test budget warning callback."""
