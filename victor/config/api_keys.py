@@ -758,6 +758,90 @@ class APIKeyManager:
 
         return sorted(configured)
 
+    def get_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get detailed status of all providers including configuration source.
+
+        Returns a dictionary mapping provider names to status information:
+        - configured: bool - whether the provider has a key configured
+        - source: str - "env", "keyring", "file", or None
+
+        Returns:
+            Dict mapping provider name to status dict
+        """
+        status: Dict[str, Dict[str, Any]] = {}
+
+        # Check all providers
+        for provider, env_var in PROVIDER_ENV_VARS.items():
+            # Skip aliases - we'll add them later
+            if provider in LOCAL_PROVIDERS:
+                continue
+
+            provider_status = {"configured": False, "source": None, "env_var": env_var}
+
+            # Check environment first (highest priority)
+            if os.environ.get(env_var):
+                provider_status["configured"] = True
+                provider_status["source"] = "env"
+            # Check keyring
+            elif _KEYRING_AVAILABLE and _get_key_from_keyring(provider):
+                provider_status["configured"] = True
+                provider_status["source"] = "keyring"
+            # Check file
+            elif self.keys_file.exists():
+                try:
+                    with open(self.keys_file, "r") as f:
+                        data = yaml.safe_load(f) or {}
+                    api_keys = data.get("api_keys", data)
+                    if api_keys.get(provider):
+                        provider_status["configured"] = True
+                        provider_status["source"] = "file"
+                except Exception:
+                    pass
+
+            status[provider] = provider_status
+
+        return status
+
+    def get_services_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get detailed status of all external services including configuration source.
+
+        Returns a dictionary mapping service names to status information:
+        - configured: bool - whether the service has a key configured
+        - source: str - "env", "keyring", "file", or None
+
+        Returns:
+            Dict mapping service name to status dict
+        """
+        status: Dict[str, Dict[str, Any]] = {}
+
+        # Check all services
+        for service, env_var in SERVICE_ENV_VARS.items():
+            service_status = {"configured": False, "source": None, "env_var": env_var}
+
+            # Check environment first (highest priority)
+            if os.environ.get(env_var):
+                service_status["configured"] = True
+                service_status["source"] = "env"
+            # Check keyring
+            elif _KEYRING_AVAILABLE and _get_key_from_keyring(f"service_{service}"):
+                service_status["configured"] = True
+                service_status["source"] = "keyring"
+            # Check file
+            elif self.keys_file.exists():
+                try:
+                    with open(self.keys_file, "r") as f:
+                        data = yaml.safe_load(f) or {}
+                    services = data.get("services", {})
+                    if services.get(service):
+                        service_status["configured"] = True
+                        service_status["source"] = "file"
+                except Exception:
+                    pass
+
+            status[service] = service_status
+
+        return status
+
     def clear_cache(self) -> None:
         """Securely clear all cached keys from memory."""
         for secure_str in self._cache.values():

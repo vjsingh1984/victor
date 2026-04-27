@@ -23,31 +23,10 @@ from victor.config.api_keys import (
     set_service_key,
     delete_service_key_from_keyring,
 )
+from victor.providers.registry import ProviderRegistry
 
 keys_app = typer.Typer(name="keys", help="Manage API keys for cloud providers.")
 
-# Aliases map to their primary provider (matching providers.py)
-PROVIDER_ALIASES = {
-    "grok": "xai",
-    "kimi": "moonshot",
-    "vertexai": "vertex",
-    "azure-openai": "azure",
-    "aws": "bedrock",
-    "hf": "huggingface",
-    "zhipuai": "zai",
-    "zhipu": "zai",
-}
-
-# Primary provider to aliases mapping (for display)
-PROVIDER_ALIAS_DISPLAY = {
-    "xai": "grok",
-    "moonshot": "kimi",
-    "vertex": "vertexai",
-    "azure": "azure-openai",
-    "bedrock": "aws",
-    "huggingface": "hf",
-    "zai": "zhipuai, zhipu",
-}
 console = Console()
 
 
@@ -239,8 +218,18 @@ def _set_key(provider: str, keyring: bool):
 
 
 def _list_keys():
-    # Default: list configured providers with source info
-    configured = get_configured_providers()
+    """List configured providers with source info using APIKeyManager.get_status()."""
+    manager = APIKeyManager()
+    provider_status = manager.get_status()
+    provider_aliases = ProviderRegistry.get_aliases()
+
+    # Build primary to aliases mapping for display
+    primary_to_aliases: dict[str, list[str]] = {}
+    for alias, primary in provider_aliases.items():
+        if alias != primary:  # Don't count self-mapping
+            if primary not in primary_to_aliases:
+                primary_to_aliases[primary] = []
+            primary_to_aliases[primary].append(alias)
 
     table = Table(title="API Keys Status", show_header=True)
     table.add_column("Provider", style="cyan")
@@ -249,43 +238,43 @@ def _list_keys():
     table.add_column("Env Var")
     table.add_column("Aliases", style="dim")
 
-    # Filter out aliases, show only primary providers
-    primary_providers = {k: v for k, v in PROVIDER_ENV_VARS.items() if k not in PROVIDER_ALIASES}
+    # Get primary providers only (exclude local providers from listing)
+    primary_providers = {
+        k: v for k, v in PROVIDER_ENV_VARS.items()
+        if k not in {"ollama", "lmstudio", "vllm"}
+    }
 
+    configured_count = 0
     for prov, env_var in sorted(primary_providers.items()):
-        # Determine source - check both primary and alias
-        source = "[dim]--[/]"
-        is_configured = prov in configured
+        # Get status from manager
+        status_info = provider_status.get(prov, {})
+        is_configured = status_info.get("configured", False)
+        source = status_info.get("source")
 
-        # Check alias too (e.g., grok for xai)
-        alias = PROVIDER_ALIAS_DISPLAY.get(prov)
-        if alias and alias in configured:
-            is_configured = True
+        if is_configured:
+            configured_count += 1
 
-        if os.environ.get(env_var):
-            source = "[green]env[/]"
-        elif is_keyring_available() and _get_key_from_keyring(prov):
-            source = "[blue]keyring[/]"
-        elif is_configured:
-            source = "[yellow]file[/]"
+        # Format source for display
+        source_display = "[dim]--[/]"
+        if source == "env":
+            source_display = "[green]env[/]"
+        elif source == "keyring":
+            source_display = "[blue]keyring[/]"
+        elif source == "file":
+            source_display = "[yellow]file[/]"
 
-        status = "[green]✓ Configured[/]" if is_configured else "[dim]Not set[/]"
-        aliases = PROVIDER_ALIAS_DISPLAY.get(prov, "")
-        table.add_row(prov, status, source, env_var, aliases)
+        status_display = "[green]✓ Configured[/]" if is_configured else "[dim]Not set[/]"
+        aliases = ", ".join(sorted(primary_to_aliases.get(prov, [])))
+        table.add_row(prov, status_display, source_display, env_var, aliases)
 
     console.print(table)
 
     # Count stats
-    configured_count = sum(
-        1
-        for p in primary_providers
-        if p in configured or PROVIDER_ALIAS_DISPLAY.get(p, "") in configured
-    )
     total_count = len(primary_providers)
-    alias_count = len(PROVIDER_ALIASES)
+    total_aliases = sum(len(aliases) for aliases in primary_to_aliases.values())
 
     console.print(
-        f"\n[dim]Configured: {configured_count}/{total_count} providers ({alias_count} aliases hidden)[/]"
+        f"\n[dim]Configured: {configured_count}/{total_count} providers ({total_aliases} aliases hidden)[/]"
     )
 
     # Show keyring status
@@ -296,7 +285,7 @@ def _list_keys():
     console.print(f"[dim]Keyring:[/] {backend_name} {keyring_status}")
     console.print(f"[dim]Keys file:[/] {DEFAULT_KEYS_FILE}")
 
-    if not configured:
+    if not configured_count:
         console.print()
         console.print("[yellow]No API keys configured.[/]")
         console.print("  [cyan]victor keys --setup[/]          Create template file")
@@ -366,8 +355,9 @@ def _delete_service_keyring(service_name: str):
 
 
 def _list_services():
-    """List configured external services."""
-    configured = get_configured_services()
+    """List configured external services using APIKeyManager.get_services_status()."""
+    manager = APIKeyManager()
+    services_status = manager.get_services_status()
 
     table = Table(title="External Service API Keys Status", show_header=True)
     table.add_column("Service", style="cyan")
@@ -393,26 +383,32 @@ def _list_services():
         "geocoding": "Geocoding services",
     }
 
+    configured_count = 0
     for svc, env_var in sorted(SERVICE_ENV_VARS.items()):
-        # Determine source
-        source = "[dim]--[/]"
-        is_configured = svc in configured
+        # Get status from manager
+        status_info = services_status.get(svc, {})
+        is_configured = status_info.get("configured", False)
+        source = status_info.get("source")
 
-        if os.environ.get(env_var):
-            source = "[green]env[/]"
-        elif is_keyring_available() and _get_key_from_keyring(f"service_{svc}"):
-            source = "[blue]keyring[/]"
-        elif is_configured:
-            source = "[yellow]file[/]"
+        if is_configured:
+            configured_count += 1
 
-        status = "[green]✓ Configured[/]" if is_configured else "[dim]Not set[/]"
+        # Format source for display
+        source_display = "[dim]--[/]"
+        if source == "env":
+            source_display = "[green]env[/]"
+        elif source == "keyring":
+            source_display = "[blue]keyring[/]"
+        elif source == "file":
+            source_display = "[yellow]file[/]"
+
+        status_display = "[green]✓ Configured[/]" if is_configured else "[dim]Not set[/]"
         description = service_descriptions.get(svc, "")
-        table.add_row(svc, status, source, env_var, description)
+        table.add_row(svc, status_display, source_display, env_var, description)
 
     console.print(table)
 
     # Count stats
-    configured_count = len(configured)
     total_count = len(SERVICE_ENV_VARS)
 
     console.print(f"\n[dim]Configured: {configured_count}/{total_count} services[/]")
@@ -424,7 +420,7 @@ def _list_services():
     )
     console.print(f"[dim]Keyring:[/] {backend_name} {keyring_status}")
 
-    if not configured:
+    if not configured_count:
         console.print()
         console.print("[yellow]No service API keys configured.[/]")
         console.print(
