@@ -211,6 +211,9 @@ class TestOrchestrationFacadeProperties:
         ):
             facade = OrchestrationFacade(get_chat_coordinator=lambda: chat)
 
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.get_chat_coordinator.deprecated_input"] == 1
+
         with pytest.warns(
             DeprecationWarning,
             match="OrchestrationFacade.chat_coordinator is deprecated",
@@ -368,6 +371,9 @@ class TestOrchestrationFacadeProperties:
         ):
             facade = OrchestrationFacade(get_sync_chat_coordinator=lambda: sync)
 
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.get_sync_chat_coordinator.deprecated_input"] == 1
+
         with pytest.warns(
             DeprecationWarning,
             match="OrchestrationFacade.sync_chat_coordinator is deprecated",
@@ -399,6 +405,12 @@ class TestOrchestrationFacadeProperties:
         ):
             facade = OrchestrationFacade(get_streaming_chat_coordinator=lambda: streaming)
 
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert (
+            telemetry["orchestration_facade.get_streaming_chat_coordinator.deprecated_input"]
+            == 1
+        )
+
         with pytest.warns(
             DeprecationWarning,
             match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
@@ -429,6 +441,9 @@ class TestOrchestrationFacadeProperties:
             match="OrchestrationFacade\\(get_unified_chat_coordinator=...\\) is deprecated",
         ):
             facade = OrchestrationFacade(get_unified_chat_coordinator=lambda: unified)
+
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.get_unified_chat_coordinator.deprecated_input"] == 1
 
         with pytest.warns(
             DeprecationWarning,
