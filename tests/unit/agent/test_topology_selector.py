@@ -171,3 +171,312 @@ class TestTopologySelector:
         assert decision.score_breakdown
         assert "single_agent" in decision.score_breakdown
         assert "escalate_model" in decision.score_breakdown
+
+    def test_learned_override_can_shift_close_decision_toward_learned_action(self):
+        """High-agreement learned feedback may override a close heuristic call."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="investigate an intermittent issue",
+                task_type="analysis",
+                task_complexity="medium",
+                confidence_hint=0.52,
+                tool_budget=6,
+                expected_depth="medium",
+                expected_breadth="low",
+                observability_level="medium",
+                latency_sensitivity="medium",
+                prior_failures=1,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.ESCALATE_MODEL
+        assert decision.topology == TopologyKind.ESCALATED_SINGLE_AGENT
+        assert decision.fallback_action == TopologyAction.SINGLE_AGENT
+        assert decision.telemetry_tags["selection_policy"] == "learned_close_override"
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == "static"
+        assert decision.telemetry_tags["heuristic_action"] == "single_agent"
+        assert decision.telemetry_tags["learned_action"] == "escalate_model"
+        assert decision.grounding_requirements.metadata["selection_policy"] == (
+            "learned_close_override"
+        )
+        assert decision.grounding_requirements.metadata["learned_override_effective_score_gap"] == (
+            0.1
+        )
+        assert "overrode the close heuristic preference" in decision.rationale
+
+    def test_feedback_hints_prefer_provider_and_formation_when_supported(self):
+        """Learned provider and formation hints should be honored when valid."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="redesign the orchestration architecture",
+                task_type="design",
+                task_complexity="high",
+                confidence_hint=0.6,
+                tool_budget=12,
+                iteration_budget=3,
+                expected_depth="high",
+                expected_breadth="medium",
+                observability_level="medium",
+                latency_sensitivity="low",
+                available_team_formations=["parallel", "hierarchical", "adaptive"],
+                provider_candidates=["openai", "anthropic"],
+                context={
+                    "learned_provider_hint": "anthropic",
+                    "learned_formation_hint": "parallel",
+                    "learned_topology_action": "team_plan",
+                    "learned_topology_kind": "team",
+                    "learned_topology_support": 0.8,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.TEAM_PLAN
+        assert decision.provider == "anthropic"
+        assert decision.formation == "parallel"
+
+    def test_low_agreement_feedback_does_not_override_base_action(self):
+        """Low-agreement learned hints should not override the base heuristic action."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="rename this variable",
+                task_type="edit",
+                task_complexity="low",
+                confidence_hint=0.7,
+                expected_depth="low",
+                expected_breadth="low",
+                observability_level="high",
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "parallel_exploration",
+                    "learned_topology_kind": "parallel_exploration",
+                    "learned_topology_support": 0.95,
+                    "learned_topology_action_agreement": 0.4,
+                    "learned_topology_kind_agreement": 0.4,
+                    "learned_topology_conflict_score": 0.8,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.SINGLE_AGENT
+        assert decision.provider == "ollama"
+
+    def test_low_agreement_feedback_does_not_override_provider_or_formation(self):
+        """Low-agreement provider and formation hints should fall back to heuristics."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="redesign the orchestration architecture",
+                task_type="design",
+                task_complexity="high",
+                confidence_hint=0.6,
+                tool_budget=12,
+                iteration_budget=3,
+                expected_depth="high",
+                expected_breadth="medium",
+                observability_level="medium",
+                latency_sensitivity="low",
+                available_team_formations=["parallel", "hierarchical", "adaptive"],
+                provider_candidates=["openai", "anthropic"],
+                context={
+                    "learned_provider_hint": "anthropic",
+                    "learned_formation_hint": "parallel",
+                    "learned_topology_action": "team_plan",
+                    "learned_topology_kind": "team",
+                    "learned_topology_support": 0.9,
+                    "learned_provider_agreement": 0.45,
+                    "learned_formation_agreement": 0.48,
+                    "learned_topology_conflict_score": 0.7,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.TEAM_PLAN
+        assert decision.provider == "openai"
+        assert decision.formation == "hierarchical"
+
+    def test_high_agreement_feedback_does_not_override_when_gap_is_not_close(self):
+        """Learned policy should not override when heuristic preference is decisive."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="rename this variable",
+                task_type="edit",
+                task_complexity="low",
+                confidence_hint=0.7,
+                expected_depth="low",
+                expected_breadth="low",
+                observability_level="high",
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "parallel_exploration",
+                    "learned_topology_kind": "parallel_exploration",
+                    "learned_topology_support": 0.95,
+                    "learned_topology_action_agreement": 0.92,
+                    "learned_topology_kind_agreement": 0.92,
+                    "learned_topology_conflict_score": 0.05,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.SINGLE_AGENT
+        assert decision.telemetry_tags["selection_policy"] == "heuristic"
+        assert decision.telemetry_tags["heuristic_action"] == "single_agent"
+        assert "learned_action" not in decision.telemetry_tags
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == "static"
+
+    def test_positive_override_reward_delta_relaxes_gap_threshold(self):
+        """Positive reward history should widen the close-call gap threshold."""
+        selector = TopologySelector()
+
+        baseline = selector.select(
+            TopologyDecisionInput(
+                query="probe reward-tuned close call",
+                task_type="analysis",
+                task_complexity="low",
+                confidence_hint=0.45,
+                tool_budget=4,
+                expected_depth="low",
+                expected_breadth="medium",
+                observability_level="medium",
+                latency_sensitivity="low",
+                prior_failures=2,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                },
+            )
+        )
+        tuned = selector.select(
+            TopologyDecisionInput(
+                query="probe reward-tuned close call",
+                task_type="analysis",
+                task_complexity="low",
+                confidence_hint=0.45,
+                tool_budget=4,
+                expected_depth="low",
+                expected_breadth="medium",
+                observability_level="medium",
+                latency_sensitivity="low",
+                prior_failures=2,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                    "learned_override_policy_reward_delta": 0.25,
+                    "learned_override_policy_count": 4,
+                    "heuristic_policy_count": 4,
+                },
+            )
+        )
+
+        assert baseline.action == TopologyAction.SINGLE_AGENT
+        assert tuned.action == TopologyAction.ESCALATE_MODEL
+        assert tuned.fallback_action == TopologyAction.SINGLE_AGENT
+        assert tuned.telemetry_tags["selection_policy"] == "learned_close_override"
+        assert tuned.telemetry_tags["learned_override_threshold_profile"] == "adaptive_positive"
+        assert tuned.grounding_requirements.metadata["learned_override_effective_score_gap"] == (
+            0.175
+        )
+
+    def test_negative_override_reward_delta_tightens_learned_close_override(self):
+        """Mildly negative reward history should tighten, not only hard-disable, overrides."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="investigate an intermittent issue",
+                task_type="analysis",
+                task_complexity="medium",
+                confidence_hint=0.52,
+                tool_budget=6,
+                expected_depth="medium",
+                expected_breadth="low",
+                observability_level="medium",
+                latency_sensitivity="medium",
+                prior_failures=1,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                    "learned_override_policy_reward_delta": -0.12,
+                    "learned_override_policy_count": 4,
+                    "heuristic_policy_count": 4,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.SINGLE_AGENT
+        assert decision.fallback_action == TopologyAction.ESCALATE_MODEL
+        assert decision.telemetry_tags["selection_policy"] == "heuristic"
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == "adaptive_negative"
+        assert decision.grounding_requirements.metadata["learned_override_effective_score_gap"] == (
+            0.064
+        )
+
+    def test_strongly_negative_reward_delta_hard_disables_learned_close_override(self):
+        """Severely negative reward history should still hard-disable learned overrides."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="investigate an intermittent issue",
+                task_type="analysis",
+                task_complexity="medium",
+                confidence_hint=0.52,
+                tool_budget=6,
+                expected_depth="medium",
+                expected_breadth="low",
+                observability_level="medium",
+                latency_sensitivity="medium",
+                prior_failures=1,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                    "learned_override_policy_reward_delta": -0.25,
+                    "learned_override_policy_count": 4,
+                    "heuristic_policy_count": 4,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.SINGLE_AGENT
+        assert decision.telemetry_tags["selection_policy"] == "heuristic"
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == (
+            "adaptive_disabled_negative"
+        )
+        assert decision.grounding_requirements.metadata["learned_override_disabled"] is True

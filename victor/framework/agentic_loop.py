@@ -823,6 +823,29 @@ class AgenticLoop:
                     )
                     state.setdefault("topology_events", []).append(topology_event.to_dict())
                     await emit_topology_telemetry_event(topology_event)
+                    if hasattr(self.runtime_intelligence, "record_topology_outcome"):
+                        try:
+                            tool_call_count = getattr(action_result, "tool_calls_count", None)
+                            if tool_call_count is None:
+                                tool_call_count = (
+                                    getattr(action_result, "successful_tool_count", 0)
+                                    + getattr(action_result, "failed_tool_count", 0)
+                                )
+                            self.runtime_intelligence.record_topology_outcome(
+                                {
+                                    "status": self._topology_feedback_status(
+                                        evaluation.decision
+                                    ),
+                                    "completion_score": evaluation.score,
+                                    "tool_calls": tool_call_count,
+                                    "turns": i,
+                                    "topology_events": list(
+                                        state.get("topology_events", [])
+                                    ),
+                                }
+                            )
+                        except Exception as exc:
+                            logger.debug("Failed to record topology runtime outcome: %s", exc)
                     state["_topology_telemetry_emitted"] = True
 
                 # DECIDE
@@ -1052,6 +1075,14 @@ class AgenticLoop:
         )
         routing_context.setdefault("tool_budget", tool_budget)
         routing_context.setdefault("available_team_formations", self._default_team_formations())
+        if hasattr(self.runtime_intelligence, "get_topology_routing_context"):
+            try:
+                learned_topology_context = self.runtime_intelligence.get_topology_routing_context()
+            except Exception as exc:
+                logger.debug("Runtime intelligence topology routing hints unavailable: %s", exc)
+            else:
+                if learned_topology_context:
+                    routing_context.update(learned_topology_context)
 
         provider_hints = await self._get_topology_provider_hints(
             task_type=task_type,
@@ -1165,6 +1196,15 @@ class AgenticLoop:
         from victor.teams.types import TeamFormation
 
         return [formation.value for formation in TeamFormation]
+
+    @staticmethod
+    def _topology_feedback_status(decision: EvaluationDecision) -> str:
+        """Map loop evaluation decisions into topology feedback statuses."""
+        if decision == EvaluationDecision.COMPLETE:
+            return "completed"
+        if decision == EvaluationDecision.FAIL:
+            return "failed"
+        return "resolved"
 
     def _detect_phase(
         self,

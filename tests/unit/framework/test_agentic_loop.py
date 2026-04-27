@@ -298,6 +298,14 @@ class TestAgenticLoop:
         )
         loop._topology_selector.select = MagicMock(return_value=topology_decision)
         loop._topology_grounder.ground = MagicMock(return_value=topology_plan)
+        loop.runtime_intelligence.get_topology_routing_context = MagicMock(
+            return_value={
+                "learned_topology_action": "team_plan",
+                "learned_provider_hint": "anthropic",
+                "learned_topology_support": 0.7,
+            }
+        )
+        loop.runtime_intelligence.record_topology_outcome = MagicMock()
 
         result = await loop.run("Fix the bug")
 
@@ -310,6 +318,13 @@ class TestAgenticLoop:
         assert result.metadata["topology_events"][0]["formation"] == "parallel"
         assert result.final_state["topology_plan"]["execution_mode"] == "team_execution"
         assert result.final_state["tool_budget"] == 4
+        topology_context = loop.paradigm_router.build_topology_input.call_args.kwargs["context"]
+        assert topology_context["learned_topology_action"] == "team_plan"
+        assert topology_context["learned_provider_hint"] == "anthropic"
+        loop.runtime_intelligence.record_topology_outcome.assert_called_once()
+        feedback_payload = loop.runtime_intelligence.record_topology_outcome.call_args.args[0]
+        assert feedback_payload["status"] == "completed"
+        assert feedback_payload["completion_score"] == pytest.approx(0.92)
         emit_mock.assert_awaited_once()
 
     def test_loop_uses_policy_completion_threshold_from_config(self):

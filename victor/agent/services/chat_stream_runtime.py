@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Optional
 
 from victor.agent.services.chat_stream_helpers import ChatStreamHelperMixin
 
@@ -71,6 +71,62 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             )
         return self._streaming_pipeline
 
+    @staticmethod
+    def _coerce_unit_float(value: Any, default: float = 0.0) -> float:
+        """Normalize optional quality values into the canonical [0, 1] range."""
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return default
+        return max(0.0, min(1.0, numeric))
+
+    def _build_stream_topology_feedback_payload(
+        self,
+        ctx: Any,
+        *,
+        failed: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Build a live topology-feedback payload from the completed stream context."""
+        topology_events = list(getattr(ctx, "topology_events", []) or [])
+        if not topology_events:
+            return None
+
+        quality_score = self._coerce_unit_float(getattr(ctx, "last_quality_score", 0.0))
+        has_substantial_content = False
+        if hasattr(ctx, "has_substantial_content"):
+            try:
+                has_substantial_content = bool(ctx.has_substantial_content())
+            except Exception:
+                has_substantial_content = False
+
+        if failed:
+            status = "error"
+        elif quality_score >= 0.7:
+            status = "completed"
+        elif has_substantial_content or quality_score >= 0.45:
+            status = "resolved"
+        else:
+            status = "failed"
+
+        outcome = {
+            "status": status,
+            "completion_score": quality_score,
+            "tool_calls": getattr(ctx, "tool_calls_used", 0),
+            "turns": getattr(ctx, "total_iterations", 0),
+            "runtime": "streaming",
+            "force_completion": bool(getattr(ctx, "force_completion", False)),
+            "has_substantial_content": has_substantial_content,
+        }
+        topology_events[-1]["outcome"] = dict(outcome)
+
+        return {
+            "status": status,
+            "completion_score": quality_score,
+            "tool_calls": outcome["tool_calls"],
+            "turns": outcome["turns"],
+            "topology_events": topology_events,
+        }
+
     async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator["StreamChunk"]:
         """Stream a response through the canonical service-owned pipeline."""
         _ = kwargs.pop("_preserve_iteration", None)
@@ -84,10 +140,14 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
         orch = self._orchestrator
         pipeline = self.get_pipeline()
+        pipeline_failed = False
 
         try:
             async for chunk in pipeline.run(user_message, **kwargs):
                 yield chunk
+        except Exception:
+            pipeline_failed = True
+            raise
         finally:
             ctx = None
             if orch.has_capability("current_stream_context") and orch.get_capability_value(
@@ -118,6 +178,27 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                             ctrl.record_actual_usage(prompt_tokens, total_chars)
                         except Exception:
                             pass
+
+                topology_feedback_payload = self._build_stream_topology_feedback_payload(
+                    ctx,
+                    failed=pipeline_failed,
+                )
+                if topology_feedback_payload is not None:
+                    ctx.topology_events = list(topology_feedback_payload["topology_events"])
+                    runtime_intelligence = getattr(orch, "_runtime_intelligence", None)
+                    if (
+                        runtime_intelligence is not None
+                        and hasattr(runtime_intelligence, "record_topology_outcome")
+                    ):
+                        try:
+                            runtime_intelligence.record_topology_outcome(
+                                topology_feedback_payload
+                            )
+                        except Exception as exc:
+                            logger.debug(
+                                "Failed to record streaming topology runtime outcome: %s",
+                                exc,
+                            )
 
                 runtime_snapshot = getattr(ctx, "runtime_override_snapshot", None)
                 self._restore_stream_runtime_overrides(runtime_snapshot)

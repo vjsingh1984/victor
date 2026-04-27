@@ -141,6 +141,16 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
     orch.model = "test-model"
     orch.provider = SimpleNamespace()
     orch.task_coordinator = SimpleNamespace(tool_budget=200)
+    orch._runtime_intelligence = SimpleNamespace(
+        get_topology_routing_context=MagicMock(
+            return_value={
+                "learned_topology_action": "team_plan",
+                "learned_provider_hint": "anthropic",
+                "learned_formation_hint": "parallel",
+                "learned_topology_support": 0.75,
+            }
+        )
+    )
     orch._tool_service = SimpleNamespace(
         get_tool_budget=lambda: 200,
         set_tool_budget=MagicMock(),
@@ -227,6 +237,9 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
     assert orch.tool_budget == 4
     assert orch._runtime_tool_context_overrides["max_workers"] == 3
     assert len(ctx.topology_events) == 1
+    topology_context = runtime._paradigm_router.build_topology_input.call_args.kwargs["context"]
+    assert topology_context["learned_topology_action"] == "team_plan"
+    assert topology_context["learned_provider_hint"] == "anthropic"
     emit_mock.assert_awaited_once()
 
 
@@ -254,6 +267,7 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     orch._tool_service = FakeToolService(budget=9, used=3)
     orch._tool_pipeline = SimpleNamespace(config=SimpleNamespace(tool_budget=9))
     orch._conversation_controller.messages = [SimpleNamespace(content="abc")]
+    orch._runtime_intelligence = SimpleNamespace(record_topology_outcome=MagicMock())
     orch.has_capability.side_effect = lambda name: name == "current_stream_context"
 
     runtime = ServiceStreamingRuntime(orch)
@@ -263,6 +277,22 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
             "completion_tokens": 2,
             "total_tokens": 5,
         },
+        last_quality_score=0.81,
+        topology_events=[
+            {
+                "action": "team_plan",
+                "topology": "team",
+                "execution_mode": "team_execution",
+                "provider": "smart-router",
+                "formation": "parallel",
+                "confidence": 0.82,
+                "outcome": {"status": "planned"},
+            }
+        ],
+        total_iterations=2,
+        tool_calls_used=4,
+        force_completion=False,
+        has_substantial_content=lambda: True,
         runtime_override_snapshot=None,
     )
     ctx.runtime_override_snapshot = runtime._apply_stream_runtime_overrides(
@@ -285,5 +315,10 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     assert orch._tool_service.budget == 9
     assert orch._tool_service.history == [4, 9]
     assert "_runtime_tool_context_overrides" not in orch.__dict__
+    orch._runtime_intelligence.record_topology_outcome.assert_called_once()
+    feedback_payload = orch._runtime_intelligence.record_topology_outcome.call_args.args[0]
+    assert feedback_payload["status"] == "completed"
+    assert feedback_payload["completion_score"] == pytest.approx(0.81)
+    assert ctx.topology_events[-1]["outcome"]["runtime"] == "streaming"
     assert ctx.runtime_override_snapshot is None
     assert orch._current_stream_context is None

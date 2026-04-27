@@ -308,6 +308,18 @@ class ChatStreamHelperMixin:
             "tool_budget": int(tool_budget),
             "available_team_formations": self._default_team_formations(),
         }
+        runtime_intelligence = getattr(orch, "_runtime_intelligence", None)
+        if (
+            runtime_intelligence is not None
+            and hasattr(runtime_intelligence, "get_topology_routing_context")
+        ):
+            try:
+                learned_topology_context = runtime_intelligence.get_topology_routing_context()
+            except Exception as exc:
+                logger.debug("Streaming topology feedback hints unavailable: %s", exc)
+            else:
+                if learned_topology_context:
+                    routing_context.update(learned_topology_context)
 
         provider_hints = await self._get_stream_topology_provider_hints(
             task_type=task_type,

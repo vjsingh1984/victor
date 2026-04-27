@@ -439,6 +439,242 @@ def test_runtime_intelligence_loads_persisted_evaluation_feedback(tmp_path):
     )
 
 
+def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.74,
+            enhanced_progress_threshold=0.58,
+            minimum_supported_evidence_score=0.86,
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "topology_feedback_coverage": 0.64,
+                "avg_topology_reward": 0.71,
+                "avg_topology_confidence": 0.79,
+                "topology_final_actions": {"team_plan": 5, "single_agent": 2},
+                "topology_final_kinds": {"team": 5, "single_agent": 2},
+                "topology_execution_modes": {"team_execution": 5},
+                "topology_providers": {"anthropic": 4, "openai": 1},
+                "topology_formations": {"hierarchical": 3, "parallel": 2},
+                "topology_selection_policies": {"heuristic": 2, "learned_close_override": 3},
+                "topology_selection_policy_reward_totals": {
+                    "heuristic": 1.1,
+                    "learned_close_override": 2.4,
+                },
+            },
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    feedback = service.get_topology_routing_feedback()
+    hints = service.get_topology_routing_context()
+
+    assert feedback is not None
+    assert feedback.preferred_action == "team_plan"
+    assert feedback.preferred_topology == "team"
+    assert feedback.preferred_provider == "anthropic"
+    assert feedback.preferred_formation == "hierarchical"
+    assert feedback.support > 0.0
+    assert hints["learned_topology_action"] == "team_plan"
+    assert hints["learned_topology_kind"] == "team"
+    assert hints["learned_provider_hint"] == "anthropic"
+    assert hints["learned_formation_hint"] == "hierarchical"
+    assert hints["learned_override_policy_count"] == 3
+    assert hints["heuristic_policy_count"] == 2
+    assert hints["learned_override_policy_reward"] == pytest.approx(0.8)
+    assert hints["heuristic_policy_reward"] == pytest.approx(0.55)
+    assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.25)
+
+
+def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp_path):
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+    payload = {
+        "status": "completed",
+        "completion_score": 0.83,
+        "tool_calls": 3,
+        "turns": 2,
+        "topology_events": [
+            {
+                "action": "team_plan",
+                "topology": "team",
+                "execution_mode": "team_execution",
+                "provider": "anthropic",
+                "formation": "hierarchical",
+                "confidence": 0.78,
+                "outcome": {"runtime": "batch"},
+            }
+        ],
+    }
+
+    first_feedback = service.record_topology_outcome(payload)
+
+    assert first_feedback is not None
+    assert first_feedback.observation_count == 1
+    assert service.get_topology_routing_context() == {}
+
+    second_feedback = service.record_topology_outcome(payload)
+    hints = service.get_topology_routing_context()
+
+    assert second_feedback is not None
+    assert second_feedback.observation_count == 2
+    assert second_feedback.preferred_action == "team_plan"
+    assert second_feedback.preferred_topology == "team"
+    assert hints["learned_topology_action"] == "team_plan"
+    assert hints["learned_provider_hint"] == "anthropic"
+    assert hints["learned_topology_observation_count"] == 2
+
+
+def test_runtime_intelligence_reloads_scoped_live_topology_feedback_across_sessions(tmp_path):
+    scope = RuntimeEvaluationFeedbackScope(
+        project="codingagent",
+        provider="openai",
+        model="gpt-5",
+        task_type="edit",
+    )
+    feedback_path = tmp_path / "runtime_evaluation_feedback.json"
+    payload = {
+        "status": "completed",
+        "completion_score": 0.84,
+        "tool_calls": 4,
+        "turns": 2,
+        "topology_events": [
+            {
+                "action": "team_plan",
+                "topology": "team",
+                "execution_mode": "team_execution",
+                "provider": "anthropic",
+                "formation": "parallel",
+                "confidence": 0.8,
+                "outcome": {"runtime": "batch"},
+            }
+        ],
+    }
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+        evaluation_feedback_scope=scope,
+    )
+
+    service.record_topology_outcome(payload)
+    service.record_topology_outcome(payload)
+
+    persisted_files = list(tmp_path.glob("runtime_topology_feedback.*.json"))
+    assert len(persisted_files) == 1
+
+    reloaded = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+        evaluation_feedback_scope=scope,
+    )
+    hints = reloaded.get_topology_routing_context()
+
+    assert hints["learned_topology_action"] == "team_plan"
+    assert hints["learned_topology_kind"] == "team"
+    assert hints["learned_provider_hint"] == "anthropic"
+    assert hints["learned_formation_hint"] == "parallel"
+    assert hints["learned_topology_observation_count"] >= 2
+
+
+def test_runtime_intelligence_with_conflicted_feedback_withholds_soft_hints(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.74,
+            enhanced_progress_threshold=0.58,
+            minimum_supported_evidence_score=0.86,
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "topology_feedback_coverage": 0.78,
+                "avg_topology_reward": 0.74,
+                "avg_topology_confidence": 0.79,
+                "topology_final_actions": {"team_plan": 5, "single_agent": 4},
+                "topology_final_kinds": {"team": 5, "single_agent": 4},
+                "topology_execution_modes": {"team_execution": 5, "single_agent": 4},
+                "topology_providers": {"anthropic": 5, "openai": 4},
+                "topology_formations": {"parallel": 5, "hierarchical": 4},
+                "task_count": 9,
+            },
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    feedback = service.get_topology_routing_feedback()
+    hints = service.get_topology_routing_context()
+
+    assert feedback is not None
+    assert feedback.action_agreement == pytest.approx(5 / 9, rel=1e-3)
+    assert feedback.conflict_score > 0.4
+    assert hints["learned_topology_support"] > 0.0
+    assert hints["learned_topology_conflict_score"] > 0.4
+    assert "learned_topology_action" not in hints
+    assert "learned_provider_hint" not in hints
+    assert "learned_formation_hint" not in hints
+
+
+@pytest.mark.asyncio
+async def test_analyze_turn_includes_topology_feedback_metadata(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.74,
+            enhanced_progress_threshold=0.58,
+            minimum_supported_evidence_score=0.86,
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "topology_feedback_coverage": 0.61,
+                "avg_topology_reward": 0.68,
+                "topology_final_actions": {"single_agent": 3},
+                "topology_final_kinds": {"single_agent": 3},
+            },
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+    perception = SimpleNamespace(task_analysis=MagicMock(task_type="edit"), confidence=0.81)
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=SimpleNamespace(
+            perceive=AsyncMock(return_value=perception),
+            evaluation_policy=RuntimeEvaluationPolicy(),
+            config={},
+        ),
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    snapshot = await service.analyze_turn("Fix the bug")
+
+    assert snapshot.metadata["topology_feedback"]["preferred_action"] == "single_agent"
+    assert snapshot.metadata["topology_routing_hints"]["learned_topology_action"] == (
+        "single_agent"
+    )
+
+
 def test_from_container_merges_persisted_feedback_before_decision_service_feedback(tmp_path):
     from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
 

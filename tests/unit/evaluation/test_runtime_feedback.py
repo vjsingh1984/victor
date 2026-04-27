@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 
 from victor.evaluation.runtime_feedback import (
+    AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE,
+    SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE,
     RuntimeEvaluationFeedbackScope,
     build_browser_validated_session_feedback_payload,
     build_deep_research_validated_session_feedback_payload,
@@ -13,6 +15,7 @@ from victor.evaluation.runtime_feedback import (
     build_validated_session_feedback_payload,
     derive_runtime_evaluation_feedback,
     load_runtime_evaluation_feedback,
+    save_session_topology_runtime_feedback,
     save_runtime_evaluation_feedback,
 )
 from victor.evaluation.baseline_validator import (
@@ -87,6 +90,9 @@ def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
     assert feedback.metadata["avg_topology_confidence"] == pytest.approx(0.73)
     assert feedback.metadata["topology_actions"] == {"team_plan": 1}
     assert feedback.metadata["topology_execution_modes"] == {"team_execution": 1}
+    assert feedback.metadata["topology_selection_policies"] == {}
+    assert feedback.metadata["avg_topology_reward_by_selection_policy"] == {}
+    assert feedback.metadata["topology_learned_override_reward_delta"] is None
 
 
 def test_save_and_load_runtime_feedback_round_trip(tmp_path):
@@ -184,6 +190,9 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
                         "validated_evaluation_truth": True,
                         "truth_alignment_rate": 0.95,
                         "task_count": 24,
+                        "topology_feedback_coverage": 0.25,
+                        "avg_topology_reward": 0.52,
+                        "topology_actions": {"single_agent": 2},
                         "saved_at": "2026-04-01T00:00:00+00:00",
                     },
                 }
@@ -202,6 +211,9 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
                         "validated_evaluation_truth": True,
                         "truth_alignment_rate": 0.88,
                         "task_count": 12,
+                        "topology_feedback_coverage": 0.9,
+                        "avg_topology_reward": 0.79,
+                        "topology_actions": {"team_plan": 3},
                         "saved_at": "2026-04-25T00:00:00+00:00",
                     },
                 }
@@ -237,6 +249,9 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
     assert loaded.metadata["aggregated_artifact_count"] == 2
     assert loaded.metadata["excluded_artifact_count"] == 1
     assert loaded.metadata["freshest_saved_at"] == "2026-04-25T00:00:00+00:00"
+    assert loaded.metadata["topology_feedback_coverage"] is not None
+    assert loaded.metadata["avg_topology_reward"] is not None
+    assert loaded.metadata["topology_actions"]
 
 
 def test_load_runtime_feedback_prefers_directory_aggregate_over_stale_canonical_file(tmp_path):
@@ -359,6 +374,275 @@ def test_load_runtime_feedback_prefers_project_model_task_adjacent_artifacts(tmp
         "workflow": None,
         "tags": [],
     }
+
+
+def test_load_runtime_feedback_overlays_scoped_live_topology_feedback(tmp_path):
+    scope = RuntimeEvaluationFeedbackScope(
+        project="codingagent",
+        provider="openai",
+        model="gpt-5",
+        task_type="edit",
+    )
+    canonical_path = tmp_path / "runtime_evaluation_feedback.json"
+    canonical_path.write_text(
+        json.dumps(
+            build_validated_session_feedback_payload(
+                RuntimeEvaluationFeedback(
+                    completion_threshold=0.82,
+                    enhanced_progress_threshold=0.67,
+                    minimum_supported_evidence_score=0.88,
+                ),
+                scope=scope,
+                metadata={
+                    "truth_alignment_rate": 0.9,
+                    "task_count": 8,
+                    "topology_feedback_coverage": 0.4,
+                    "avg_topology_reward": 0.56,
+                    "avg_topology_confidence": 0.61,
+                    "topology_final_actions": {"single_agent": 2},
+                    "topology_final_kinds": {"single_agent": 2},
+                    "topology_execution_modes": {"single_agent": 2},
+                    "saved_at": "2026-04-20T00:00:00+00:00",
+                },
+            )
+        )
+    )
+    save_session_topology_runtime_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "topology_feedback_coverage": 1.0,
+                "avg_topology_reward": 0.88,
+                "avg_topology_confidence": 0.81,
+                "topology_actions": {"team_plan": 4},
+                "topology_final_actions": {"team_plan": 4},
+                "topology_kinds": {"team": 4},
+                "topology_final_kinds": {"team": 4},
+                "topology_execution_modes": {"team_execution": 4},
+                "topology_providers": {"anthropic": 4},
+                "topology_formations": {"parallel": 4},
+                "task_count": 4,
+            }
+        ),
+        base_path=canonical_path,
+        scope=scope,
+    )
+
+    loaded = load_runtime_evaluation_feedback(canonical_path, scope=scope)
+
+    assert loaded is not None
+    assert loaded.completion_threshold == pytest.approx(0.82)
+    assert loaded.metadata["topology_final_actions"]["team_plan"] > 0.0
+    assert loaded.metadata["topology_providers"]["anthropic"] > 0.0
+    assert SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE in loaded.metadata["topology_feedback_sources"]
+    assert loaded.metadata["topology_feedback_live_artifact_count"] == 1
+
+
+def test_load_runtime_feedback_scopes_live_topology_overlay_to_matching_scope(tmp_path):
+    target_scope = RuntimeEvaluationFeedbackScope(
+        project="codingagent",
+        provider="openai",
+        model="gpt-5",
+        task_type="edit",
+    )
+    other_scope = RuntimeEvaluationFeedbackScope(
+        project="other-project",
+        provider="anthropic",
+        model="claude-sonnet",
+        task_type="analysis",
+    )
+    feedback_path = tmp_path / "runtime_evaluation_feedback.json"
+
+    save_session_topology_runtime_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "topology_feedback_coverage": 1.0,
+                "avg_topology_reward": 0.86,
+                "avg_topology_confidence": 0.79,
+                "topology_actions": {"team_plan": 3},
+                "topology_final_actions": {"team_plan": 3},
+                "topology_kinds": {"team": 3},
+                "topology_final_kinds": {"team": 3},
+                "topology_execution_modes": {"team_execution": 3},
+                "task_count": 3,
+            }
+        ),
+        base_path=feedback_path,
+        scope=target_scope,
+    )
+    save_session_topology_runtime_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "topology_feedback_coverage": 1.0,
+                "avg_topology_reward": 0.92,
+                "avg_topology_confidence": 0.84,
+                "topology_actions": {"single_agent": 5},
+                "topology_final_actions": {"single_agent": 5},
+                "topology_kinds": {"single_agent": 5},
+                "topology_final_kinds": {"single_agent": 5},
+                "topology_execution_modes": {"single_agent": 5},
+                "task_count": 5,
+            }
+        ),
+        base_path=feedback_path,
+        scope=other_scope,
+    )
+
+    loaded = load_runtime_evaluation_feedback(feedback_path, scope=target_scope)
+
+    assert loaded is not None
+    assert loaded.completion_threshold is None
+    assert loaded.metadata["source"] == AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+    assert loaded.metadata["topology_final_actions"]["team_plan"] > 0.0
+    assert loaded.metadata["topology_final_actions"].get("single_agent", 0.0) < (
+        loaded.metadata["topology_final_actions"]["team_plan"]
+    )
+    assert loaded.metadata["topology_scope_target"]["project"] == "codingagent"
+
+
+def test_load_runtime_feedback_decays_stale_live_topology_feedback(tmp_path):
+    scope = RuntimeEvaluationFeedbackScope(
+        project="codingagent",
+        provider="openai",
+        model="gpt-5",
+        task_type="edit",
+    )
+    canonical_path = tmp_path / "runtime_evaluation_feedback.json"
+    canonical_path.write_text(
+        json.dumps(
+            build_validated_session_feedback_payload(
+                RuntimeEvaluationFeedback(
+                    completion_threshold=0.8,
+                    enhanced_progress_threshold=0.64,
+                    minimum_supported_evidence_score=0.87,
+                ),
+                scope=scope,
+                metadata={
+                    "truth_alignment_rate": 0.91,
+                    "task_count": 3,
+                    "topology_feedback_coverage": 0.72,
+                    "avg_topology_reward": 0.77,
+                    "avg_topology_confidence": 0.74,
+                    "topology_actions": {"single_agent": 3},
+                    "topology_final_actions": {"single_agent": 3},
+                    "topology_kinds": {"single_agent": 3},
+                    "topology_final_kinds": {"single_agent": 3},
+                    "saved_at": "2026-04-26T00:00:00+00:00",
+                },
+            )
+        )
+    )
+    live_path = save_session_topology_runtime_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "topology_feedback_coverage": 1.0,
+                "avg_topology_reward": 0.92,
+                "avg_topology_confidence": 0.86,
+                "topology_actions": {"team_plan": 100},
+                "topology_final_actions": {"team_plan": 100},
+                "topology_kinds": {"team": 100},
+                "topology_final_kinds": {"team": 100},
+                "topology_execution_modes": {"team_execution": 100},
+                "task_count": 100,
+            }
+        ),
+        base_path=canonical_path,
+        scope=scope,
+    )
+    live_payload = json.loads(live_path.read_text())
+    live_payload["metadata"]["saved_at"] = "2026-03-01T00:00:00+00:00"
+    live_path.write_text(json.dumps(live_payload))
+
+    loaded = load_runtime_evaluation_feedback(canonical_path, scope=scope)
+
+    assert loaded is not None
+    assert loaded.metadata["topology_final_actions"]["single_agent"] > (
+        loaded.metadata["topology_final_actions"].get("team_plan", 0.0)
+    )
+
+
+def test_load_runtime_feedback_reports_topology_conflict_metrics_for_split_feedback(tmp_path):
+    scope = RuntimeEvaluationFeedbackScope(
+        project="codingagent",
+        provider="openai",
+        model="gpt-5",
+        task_type="edit",
+    )
+    feedback_path = tmp_path / "runtime_evaluation_feedback.json"
+
+    save_session_topology_runtime_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "topology_feedback_coverage": 1.0,
+                "avg_topology_reward": 0.84,
+                "avg_topology_confidence": 0.81,
+                "topology_actions": {"team_plan": 5, "single_agent": 4},
+                "topology_final_actions": {"team_plan": 5, "single_agent": 4},
+                "topology_kinds": {"team": 5, "single_agent": 4},
+                "topology_final_kinds": {"team": 5, "single_agent": 4},
+                "topology_execution_modes": {"team_execution": 5, "single_agent": 4},
+                "topology_providers": {"anthropic": 5, "openai": 4},
+                "topology_formations": {"parallel": 5, "hierarchical": 4},
+                "task_count": 9,
+            }
+        ),
+        base_path=feedback_path,
+        scope=scope,
+    )
+
+    loaded = load_runtime_evaluation_feedback(feedback_path, scope=scope)
+
+    assert loaded is not None
+    assert loaded.metadata["source"] == AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+    assert loaded.metadata["topology_action_agreement"] == pytest.approx(5 / 9, rel=1e-3)
+    assert loaded.metadata["topology_kind_agreement"] == pytest.approx(5 / 9, rel=1e-3)
+    assert loaded.metadata["topology_provider_agreement"] == pytest.approx(5 / 9, rel=1e-3)
+    assert loaded.metadata["topology_formation_agreement"] == pytest.approx(5 / 9, rel=1e-3)
+    assert loaded.metadata["topology_conflict_score"] > 0.4
+
+
+def test_load_runtime_feedback_aggregates_selection_policy_reward_metrics(tmp_path):
+    scope = RuntimeEvaluationFeedbackScope(
+        project="codingagent",
+        provider="openai",
+        model="gpt-5",
+        task_type="edit",
+    )
+    feedback_path = tmp_path / "runtime_evaluation_feedback.json"
+
+    save_session_topology_runtime_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "topology_feedback_coverage": 1.0,
+                "avg_topology_reward": 0.82,
+                "avg_topology_confidence": 0.79,
+                "topology_actions": {"team_plan": 3},
+                "topology_final_actions": {"team_plan": 3},
+                "topology_kinds": {"team": 3},
+                "topology_final_kinds": {"team": 3},
+                "topology_execution_modes": {"team_execution": 3},
+                "topology_selection_policies": {
+                    "heuristic": 2,
+                    "learned_close_override": 3,
+                },
+                "topology_selection_policy_reward_totals": {
+                    "heuristic": 1.1,
+                    "learned_close_override": 2.4,
+                },
+                "task_count": 5,
+            }
+        ),
+        base_path=feedback_path,
+        scope=scope,
+    )
+
+    loaded = load_runtime_evaluation_feedback(feedback_path, scope=scope)
+
+    assert loaded is not None
+    assert loaded.metadata["avg_topology_reward_by_selection_policy"] == {
+        "heuristic": 0.55,
+        "learned_close_override": 0.8,
+    }
+    assert loaded.metadata["topology_learned_override_reward_delta"] == pytest.approx(0.25)
 
 
 def test_build_swe_bench_validated_session_feedback_payload_uses_real_validator_outputs():

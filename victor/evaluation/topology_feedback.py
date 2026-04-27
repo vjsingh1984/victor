@@ -93,6 +93,10 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
         "execution_mode": _coerce_optional_text(event.get("execution_mode")),
         "provider": _coerce_optional_text(event.get("provider")),
         "formation": _coerce_optional_text(event.get("formation")),
+        "selection_policy": _coerce_optional_text(event.get("selection_policy"))
+        or _coerce_optional_text(
+            _extract_mapping(event, "telemetry_tags").get("selection_policy")
+        ),
         "fallback_action": _coerce_optional_text(event.get("fallback_action")),
         "confidence": _coerce_float(event.get("confidence")) or 0.0,
         "outcome": dict(event.get("outcome") or {})
@@ -151,6 +155,7 @@ def extract_topology_events(value: Any) -> list[dict[str, Any]]:
             event.get("execution_mode"),
             event.get("provider"),
             event.get("formation"),
+            event.get("selection_policy"),
             event.get("fallback_action"),
             event.get("confidence"),
             tuple(sorted((event.get("outcome") or {}).items())),
@@ -203,6 +208,9 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
     )
     provider_counts = Counter(event["provider"] for event in events if event.get("provider"))
     formation_counts = Counter(event["formation"] for event in events if event.get("formation"))
+    selection_policy_counts = Counter(
+        event["selection_policy"] for event in events if event.get("selection_policy")
+    )
 
     average_confidence = sum(event["confidence"] for event in events) / len(events)
     max_confidence = max(event["confidence"] for event in events)
@@ -247,6 +255,8 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
         "final_provider": last_event.get("provider"),
         "selected_formation": first_event.get("formation"),
         "final_formation": last_event.get("formation"),
+        "selected_selection_policy": first_event.get("selection_policy"),
+        "final_selection_policy": last_event.get("selection_policy"),
         "avg_confidence": round(average_confidence, 4),
         "max_confidence": round(max_confidence, 4),
         "fallback_count": fallback_count,
@@ -264,6 +274,7 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
         "execution_modes": dict(execution_counts),
         "providers": dict(provider_counts),
         "formations": dict(formation_counts),
+        "selection_policies": dict(selection_policy_counts),
     }
 
 
@@ -290,6 +301,10 @@ def aggregate_topology_feedback(
             "topology_execution_modes": {},
             "topology_providers": {},
             "topology_formations": {},
+            "topology_selection_policies": {},
+            "topology_selection_policy_reward_totals": {},
+            "avg_topology_reward_by_selection_policy": {},
+            "topology_learned_override_reward_delta": None,
         }
 
     selected_actions = Counter(
@@ -315,7 +330,39 @@ def aggregate_topology_feedback(
     formations = Counter(
         summary["final_formation"] for summary in summaries if summary.get("final_formation")
     )
+    selection_policies = Counter(
+        summary["final_selection_policy"]
+        for summary in summaries
+        if summary.get("final_selection_policy")
+    )
     task_count = total_tasks if total_tasks is not None else len(summaries)
+    selection_policy_reward_totals: dict[str, float] = {}
+    for summary in summaries:
+        selection_policy = summary.get("final_selection_policy")
+        if not selection_policy:
+            continue
+        selection_policy_reward_totals[selection_policy] = round(
+            selection_policy_reward_totals.get(selection_policy, 0.0) + summary["topology_reward"],
+            4,
+        )
+    avg_reward_by_selection_policy = {
+        policy: round(
+            selection_policy_reward_totals[policy] / max(1, count),
+            4,
+        )
+        for policy, count in selection_policies.items()
+        if count > 0 and policy in selection_policy_reward_totals
+    }
+    learned_override_reward_delta: Optional[float] = None
+    if (
+        "learned_close_override" in avg_reward_by_selection_policy
+        and "heuristic" in avg_reward_by_selection_policy
+    ):
+        learned_override_reward_delta = round(
+            avg_reward_by_selection_policy["learned_close_override"]
+            - avg_reward_by_selection_policy["heuristic"],
+            4,
+        )
 
     return {
         "tasks_with_topology_feedback": len(summaries),
@@ -340,6 +387,10 @@ def aggregate_topology_feedback(
         "topology_execution_modes": dict(execution_modes),
         "topology_providers": dict(providers),
         "topology_formations": dict(formations),
+        "topology_selection_policies": dict(selection_policies),
+        "topology_selection_policy_reward_totals": dict(selection_policy_reward_totals),
+        "avg_topology_reward_by_selection_policy": dict(avg_reward_by_selection_policy),
+        "topology_learned_override_reward_delta": learned_override_reward_delta,
     }
 
 

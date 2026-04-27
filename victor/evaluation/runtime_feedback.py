@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import re
 from dataclasses import dataclass, field
@@ -24,12 +25,52 @@ VALIDATED_RUNTIME_FEEDBACK_SOURCES = {
     "validated_evaluation_truth_feedback",
 }
 AGGREGATED_RUNTIME_FEEDBACK_SOURCE = "validated_evaluation_truth_aggregate"
+SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = "session_topology_runtime_feedback"
+AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = (
+    "session_topology_runtime_feedback_aggregate"
+)
 FRESHNESS_HALF_LIFE_DAYS = 14.0
+SESSION_TOPOLOGY_FRESHNESS_HALF_LIFE_DAYS = 5.0
 VALIDATED_RUNTIME_FEEDBACK_SOURCE_TRUST = {
     "benchmark_truth_feedback": 1.0,
     "validated_evaluation_truth_feedback": 0.95,
     "validated_session_truth_feedback": 0.85,
 }
+RUNTIME_FEEDBACK_SOURCE_TRUST = {
+    **VALIDATED_RUNTIME_FEEDBACK_SOURCE_TRUST,
+    AGGREGATED_RUNTIME_FEEDBACK_SOURCE: 0.95,
+    SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE: 0.35,
+    AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE: 0.35,
+}
+RUNTIME_TOPOLOGY_FEEDBACK_FILENAME_PREFIX = "runtime_topology_feedback"
+TOPOLOGY_RUNTIME_FEEDBACK_SOURCES = {
+    *VALIDATED_RUNTIME_FEEDBACK_SOURCES,
+    AGGREGATED_RUNTIME_FEEDBACK_SOURCE,
+    SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE,
+    AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE,
+}
+TOPOLOGY_RUNTIME_METADATA_KEYS = (
+    "topology_feedback_coverage",
+    "avg_topology_reward",
+    "avg_topology_confidence",
+    "topology_observation_count",
+    "topology_actions",
+    "topology_final_actions",
+    "topology_kinds",
+    "topology_final_kinds",
+    "topology_execution_modes",
+    "topology_providers",
+    "topology_formations",
+    "topology_selection_policies",
+    "topology_selection_policy_reward_totals",
+    "avg_topology_reward_by_selection_policy",
+    "topology_learned_override_reward_delta",
+    "topology_action_agreement",
+    "topology_kind_agreement",
+    "topology_provider_agreement",
+    "topology_formation_agreement",
+    "topology_conflict_score",
+)
 SCOPE_FIELD_WEIGHTS = {
     "project": 4.0,
     "model": 3.5,
@@ -117,6 +158,15 @@ def get_runtime_evaluation_feedback_path(base_dir: Optional[Path] = None) -> Pat
         return get_victor_dir() / "evaluations" / RUNTIME_EVALUATION_FEEDBACK_FILENAME
     except ImportError:
         return Path.home() / ".victor" / "evaluations" / RUNTIME_EVALUATION_FEEDBACK_FILENAME
+
+
+def _resolve_feedback_base_dir(target: Optional[Path]) -> Path:
+    """Resolve the directory used for scoped runtime-feedback artifacts."""
+    target_path = Path(target) if target is not None else get_runtime_evaluation_feedback_path()
+    feedback_dir = _resolve_feedback_directory(target_path)
+    if feedback_dir is not None:
+        return feedback_dir
+    return target_path.parent
 
 
 def _coerce_optional_text(value: Any) -> Optional[str]:
@@ -279,6 +329,16 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             ),
             "topology_actions": dict(summary.get("topology_actions") or {}),
             "topology_execution_modes": dict(summary.get("topology_execution_modes") or {}),
+            "topology_selection_policies": dict(summary.get("topology_selection_policies") or {}),
+            "topology_selection_policy_reward_totals": dict(
+                summary.get("topology_selection_policy_reward_totals") or {}
+            ),
+            "avg_topology_reward_by_selection_policy": dict(
+                summary.get("avg_topology_reward_by_selection_policy") or {}
+            ),
+            "topology_learned_override_reward_delta": _coerce_float(
+                summary.get("topology_learned_override_reward_delta")
+            ),
         },
     )
 
@@ -381,6 +441,86 @@ def build_validated_session_feedback_payload(
         source_result_path=source_result_path,
         saved_at=saved_at,
     )
+
+
+def _runtime_feedback_scope_storage_key(scope: Any) -> str:
+    """Return a stable storage key for a scoped runtime-feedback artifact."""
+    resolved_scope = RuntimeEvaluationFeedbackScope.from_value(scope)
+    if resolved_scope.is_empty():
+        return "global"
+    encoded = json.dumps(
+        resolved_scope.to_dict(),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha1(encoded).hexdigest()[:16]
+
+
+def get_session_topology_runtime_feedback_path(
+    *,
+    base_path: Optional[Path] = None,
+    scope: Optional[Any] = None,
+) -> Path:
+    """Return the scoped persistence path for live topology runtime feedback."""
+    base_dir = _resolve_feedback_base_dir(base_path)
+    scope_key = _runtime_feedback_scope_storage_key(scope)
+    return base_dir / f"{RUNTIME_TOPOLOGY_FEEDBACK_FILENAME_PREFIX}.{scope_key}.json"
+
+
+def build_session_topology_runtime_feedback_payload(
+    feedback: RuntimeEvaluationFeedback,
+    *,
+    scope: Optional[Any],
+    metadata: Optional[Mapping[str, Any]] = None,
+    source: str = SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE,
+    source_result_path: Optional[Path] = None,
+    saved_at: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Build a scoped live-topology feedback payload for cross-session reuse."""
+    resolved_scope = RuntimeEvaluationFeedbackScope.from_value(scope)
+    payload_metadata = dict(feedback.metadata or {})
+    payload_metadata.update(dict(metadata or {}))
+    payload_metadata.update(
+        {
+            "source": source,
+            "validated_evaluation_truth": False,
+            "truth_validation_mode": "live_session_topology",
+            "scope": resolved_scope.to_dict(),
+            "topology_feedback_only": True,
+        }
+    )
+    return build_runtime_evaluation_feedback_payload(
+        RuntimeEvaluationFeedback(
+            completion_threshold=feedback.completion_threshold,
+            enhanced_progress_threshold=feedback.enhanced_progress_threshold,
+            minimum_supported_evidence_score=feedback.minimum_supported_evidence_score,
+            metadata=payload_metadata,
+        ),
+        source_result_path=source_result_path,
+        saved_at=saved_at,
+    )
+
+
+def save_session_topology_runtime_feedback(
+    feedback: RuntimeEvaluationFeedback,
+    *,
+    base_path: Optional[Path] = None,
+    scope: Optional[Any] = None,
+    source_result_path: Optional[Path] = None,
+) -> Path:
+    """Persist scoped live-topology runtime feedback without changing thresholds."""
+    target_path = get_session_topology_runtime_feedback_path(
+        base_path=base_path,
+        scope=scope,
+    )
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = build_session_topology_runtime_feedback_payload(
+        feedback,
+        scope=scope,
+        source_result_path=source_result_path,
+    )
+    target_path.write_text(json.dumps(payload, indent=2))
+    return target_path
 
 
 def build_swe_bench_validated_session_feedback_payload(
@@ -898,7 +1038,7 @@ def _load_feedback_payloads_from_directory(base_dir: Path) -> list[dict[str, Any
 
 
 def _source_trust_weight(source: Optional[str]) -> float:
-    return VALIDATED_RUNTIME_FEEDBACK_SOURCE_TRUST.get(str(source or ""), 0.75)
+    return RUNTIME_FEEDBACK_SOURCE_TRUST.get(str(source or ""), 0.75)
 
 
 def _scope_similarity_weight(
@@ -955,9 +1095,18 @@ def _feedback_weight(
     target_scope: Optional[RuntimeEvaluationFeedbackScope] = None,
 ) -> float:
     metadata = dict(payload.get("metadata") or {})
+    is_live_topology_feedback = (
+        metadata.get("source") == SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+        or metadata.get("topology_feedback_only") is True
+    )
     saved_at = _parse_timestamp(metadata.get("saved_at")) or reference_time
     age_days = max(0.0, (reference_time - saved_at).total_seconds() / 86400.0)
-    recency_weight = math.pow(0.5, age_days / FRESHNESS_HALF_LIFE_DAYS)
+    half_life_days = (
+        SESSION_TOPOLOGY_FRESHNESS_HALF_LIFE_DAYS
+        if is_live_topology_feedback
+        else FRESHNESS_HALF_LIFE_DAYS
+    )
+    recency_weight = math.pow(0.5, age_days / max(half_life_days, 1e-9))
     truth_alignment = _clamp(
         float(metadata.get("truth_alignment_rate", 0.75) or 0.75),
         0.25,
@@ -967,8 +1116,10 @@ def _feedback_weight(
     coverage_weight = min(3.0, 0.75 + (math.sqrt(task_count) / 4.0))
     trust_weight = _source_trust_weight(metadata.get("source"))
     scope_weight = _scope_similarity_weight(metadata.get("scope"), target_scope)
+    minimum_weight = 0.005 if is_live_topology_feedback else 0.05
     return max(
-        0.05, recency_weight * truth_alignment * coverage_weight * trust_weight * scope_weight
+        minimum_weight,
+        recency_weight * truth_alignment * coverage_weight * trust_weight * scope_weight,
     )
 
 
@@ -981,6 +1132,76 @@ def _select_metadata(values: list[Any], *, fallback: Any = None) -> Any:
         if value not in unique:
             unique.append(value)
     return unique[0] if len(unique) == 1 else fallback
+
+
+def _average_mapping_from_totals(
+    counts: Mapping[str, Any],
+    totals: Mapping[str, Any],
+) -> dict[str, float]:
+    averages: dict[str, float] = {}
+    for key, count_value in counts.items():
+        label = str(key).strip()
+        if not label:
+            continue
+        try:
+            count = float(count_value)
+            total = float(totals.get(label, 0.0))
+        except (TypeError, ValueError):
+            continue
+        if count <= 0.0:
+            continue
+        averages[label] = round(total / count, 4)
+    return averages
+
+
+def _selection_policy_reward_delta(averages: Mapping[str, Any]) -> Optional[float]:
+    try:
+        learned = float(averages["learned_close_override"])
+        heuristic = float(averages["heuristic"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return round(learned - heuristic, 4)
+
+
+def _distribution_agreement(distribution: Any) -> Optional[float]:
+    if not isinstance(distribution, Mapping):
+        return None
+    total = 0.0
+    dominant = 0.0
+    for value in distribution.values():
+        try:
+            count = float(value)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0.0:
+            continue
+        total += count
+        dominant = max(dominant, count)
+    if total <= 0.0:
+        return None
+    return round(dominant / total, 4)
+
+
+def _topology_conflict_score(
+    *,
+    action_agreement: Optional[float],
+    topology_agreement: Optional[float],
+    provider_agreement: Optional[float],
+    formation_agreement: Optional[float],
+) -> Optional[float]:
+    weighted_agreements = [
+        (action_agreement, 0.35),
+        (topology_agreement, 0.30),
+        (provider_agreement, 0.20),
+        (formation_agreement, 0.15),
+    ]
+    usable = [(value, weight) for value, weight in weighted_agreements if value is not None]
+    if not usable:
+        return None
+    weighted_consensus = sum(value * weight for value, weight in usable) / sum(
+        weight for _, weight in usable
+    )
+    return round(_clamp(1.0 - weighted_consensus, 0.0, 1.0), 4)
 
 
 def _aggregate_feedback_payloads(
@@ -1022,7 +1243,44 @@ def _aggregate_feedback_payloads(
         denominator = sum(weight for _, weight in weighted_pairs)
         return round(numerator / max(denominator, 1e-9), 4)
 
+    def weighted_metadata_average(field_name: str) -> Optional[float]:
+        weighted_pairs = [
+            (float(metadata[field_name]), weight)
+            for metadata, weight in zip(metadata_list, weights)
+            if metadata.get(field_name) is not None
+        ]
+        if not weighted_pairs:
+            return None
+        numerator = sum(value * weight for value, weight in weighted_pairs)
+        denominator = sum(weight for _, weight in weighted_pairs)
+        return round(numerator / max(denominator, 1e-9), 4)
+
+    def weighted_distribution(field_name: str) -> dict[str, float]:
+        aggregated: dict[str, float] = {}
+        for metadata, weight in zip(metadata_list, weights):
+            distribution = metadata.get(field_name) or {}
+            if not isinstance(distribution, Mapping):
+                continue
+            for key, value in distribution.items():
+                label = str(key).strip()
+                if not label:
+                    continue
+                try:
+                    count = float(value)
+                except (TypeError, ValueError):
+                    continue
+                aggregated[label] = round(aggregated.get(label, 0.0) + (count * weight), 4)
+        return aggregated
+
     metadata_list = [dict(payload.get("metadata") or {}) for payload in validated_payloads]
+    selection_policy_counts = weighted_distribution("topology_selection_policies")
+    selection_policy_reward_totals = weighted_distribution(
+        "topology_selection_policy_reward_totals"
+    )
+    avg_reward_by_selection_policy = _average_mapping_from_totals(
+        selection_policy_counts,
+        selection_policy_reward_totals,
+    )
     scope_scores = [
         _scope_similarity_weight(metadata.get("scope"), selected_scope)
         for metadata in metadata_list
@@ -1073,6 +1331,22 @@ def _aggregate_feedback_payloads(
                 / max(sum(weights), 1e-9),
                 4,
             ),
+            "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
+            "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
+            "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
+            "topology_actions": weighted_distribution("topology_actions"),
+            "topology_final_actions": weighted_distribution("topology_final_actions"),
+            "topology_kinds": weighted_distribution("topology_kinds"),
+            "topology_final_kinds": weighted_distribution("topology_final_kinds"),
+            "topology_execution_modes": weighted_distribution("topology_execution_modes"),
+            "topology_providers": weighted_distribution("topology_providers"),
+            "topology_formations": weighted_distribution("topology_formations"),
+            "topology_selection_policies": selection_policy_counts,
+            "topology_selection_policy_reward_totals": selection_policy_reward_totals,
+            "avg_topology_reward_by_selection_policy": avg_reward_by_selection_policy,
+            "topology_learned_override_reward_delta": _selection_policy_reward_delta(
+                avg_reward_by_selection_policy
+            ),
             "task_count": sum(task_counts),
             "scope_selection_strategy": (
                 "scoped_relevance_recency_reliability_weighted"
@@ -1086,6 +1360,205 @@ def _aggregate_feedback_payloads(
             "saved_at": _format_timestamp(freshest_saved_at or reference_time),
             "source_result_path": freshest_metadata.get("source_result_path"),
         },
+    )
+
+
+def _load_session_topology_feedback_payloads_from_directory(base_dir: Path) -> list[dict[str, Any]]:
+    """Load persisted scoped live-topology artifacts from the feedback directory."""
+    payloads: list[dict[str, Any]] = []
+    pattern = f"{RUNTIME_TOPOLOGY_FEEDBACK_FILENAME_PREFIX}.*.json"
+    for result_path in sorted(base_dir.glob(pattern)):
+        payload = _load_feedback_payload_file(result_path)
+        if payload is not None:
+            payloads.append(payload)
+    return payloads
+
+
+def _has_topology_runtime_metadata(metadata: Mapping[str, Any]) -> bool:
+    """Return whether metadata carries any topology-routing statistics."""
+    return any(metadata.get(field_name) not in (None, {}, []) for field_name in TOPOLOGY_RUNTIME_METADATA_KEYS)
+
+
+def _aggregate_topology_feedback_metadata(
+    payloads: list[dict[str, Any]],
+    *,
+    scope: Optional[Any] = None,
+) -> Optional[dict[str, Any]]:
+    """Aggregate topology metadata across validated and live scoped feedback artifacts."""
+    if not payloads:
+        return None
+
+    topology_payloads = []
+    for payload in payloads:
+        metadata = dict(payload.get("metadata") or {})
+        if metadata.get("source") not in TOPOLOGY_RUNTIME_FEEDBACK_SOURCES:
+            continue
+        if not _has_topology_runtime_metadata(metadata):
+            continue
+        topology_payloads.append(payload)
+
+    if not topology_payloads:
+        return None
+
+    selected_scope = RuntimeEvaluationFeedbackScope.from_value(scope)
+    saved_at_values = [
+        _parse_timestamp(dict(payload.get("metadata") or {}).get("saved_at"))
+        for payload in topology_payloads
+    ]
+    resolved_saved_at_values = [value for value in saved_at_values if value is not None]
+    reference_time = max(resolved_saved_at_values, default=datetime.now(timezone.utc))
+    weights = [
+        _feedback_weight(payload, reference_time, target_scope=selected_scope)
+        for payload in topology_payloads
+    ]
+    metadata_list = [dict(payload.get("metadata") or {}) for payload in topology_payloads]
+
+    def weighted_metadata_average(field_name: str) -> Optional[float]:
+        weighted_pairs = [
+            (float(metadata[field_name]), weight)
+            for metadata, weight in zip(metadata_list, weights)
+            if metadata.get(field_name) is not None
+        ]
+        if not weighted_pairs:
+            return None
+        numerator = sum(value * weight for value, weight in weighted_pairs)
+        denominator = sum(weight for _, weight in weighted_pairs)
+        return round(numerator / max(denominator, 1e-9), 4)
+
+    def weighted_distribution(field_name: str) -> dict[str, float]:
+        aggregated: dict[str, float] = {}
+        for metadata, weight in zip(metadata_list, weights):
+            distribution = metadata.get(field_name) or {}
+            if not isinstance(distribution, Mapping):
+                continue
+            for key, value in distribution.items():
+                label = str(key).strip()
+                if not label:
+                    continue
+                try:
+                    count = float(value)
+                except (TypeError, ValueError):
+                    continue
+                aggregated[label] = round(aggregated.get(label, 0.0) + (count * weight), 4)
+        return aggregated
+
+    action_distribution = weighted_distribution("topology_actions")
+    final_action_distribution = weighted_distribution("topology_final_actions")
+    topology_distribution = weighted_distribution("topology_kinds")
+    final_topology_distribution = weighted_distribution("topology_final_kinds")
+    execution_mode_distribution = weighted_distribution("topology_execution_modes")
+    provider_distribution = weighted_distribution("topology_providers")
+    formation_distribution = weighted_distribution("topology_formations")
+    selection_policy_distribution = weighted_distribution("topology_selection_policies")
+    selection_policy_reward_totals = weighted_distribution(
+        "topology_selection_policy_reward_totals"
+    )
+    avg_reward_by_selection_policy = _average_mapping_from_totals(
+        selection_policy_distribution,
+        selection_policy_reward_totals,
+    )
+    action_agreement = _distribution_agreement(final_action_distribution or action_distribution)
+    topology_agreement = _distribution_agreement(
+        final_topology_distribution or topology_distribution
+    )
+    provider_agreement = _distribution_agreement(provider_distribution)
+    formation_agreement = _distribution_agreement(formation_distribution)
+    conflict_score = _topology_conflict_score(
+        action_agreement=action_agreement,
+        topology_agreement=topology_agreement,
+        provider_agreement=provider_agreement,
+        formation_agreement=formation_agreement,
+    )
+
+    scope_scores = [
+        _scope_similarity_weight(metadata.get("scope"), selected_scope)
+        for metadata in metadata_list
+    ]
+    sources = [
+        str(metadata.get("source"))
+        for metadata in metadata_list
+        if metadata.get("source") is not None
+    ]
+    freshest_saved_at = max(resolved_saved_at_values, default=None)
+    oldest_saved_at = min(resolved_saved_at_values, default=None)
+    live_count = sum(
+        1
+        for metadata in metadata_list
+        if metadata.get("source") == SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE
+    )
+    validated_count = sum(
+        1
+        for metadata in metadata_list
+        if metadata.get("source") in VALIDATED_RUNTIME_FEEDBACK_SOURCES
+        or metadata.get("source") == AGGREGATED_RUNTIME_FEEDBACK_SOURCE
+    )
+
+    return {
+        "source": AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE,
+        "topology_feedback_sources": list(dict.fromkeys(sources)),
+        "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
+        "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
+        "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
+        "topology_observation_count": (
+            weighted_metadata_average("topology_observation_count")
+            or weighted_metadata_average("task_count")
+        ),
+        "topology_actions": action_distribution,
+        "topology_final_actions": final_action_distribution,
+        "topology_kinds": topology_distribution,
+        "topology_final_kinds": final_topology_distribution,
+        "topology_execution_modes": execution_mode_distribution,
+        "topology_providers": provider_distribution,
+        "topology_formations": formation_distribution,
+        "topology_selection_policies": selection_policy_distribution,
+        "topology_selection_policy_reward_totals": selection_policy_reward_totals,
+        "avg_topology_reward_by_selection_policy": avg_reward_by_selection_policy,
+        "topology_learned_override_reward_delta": _selection_policy_reward_delta(
+            avg_reward_by_selection_policy
+        ),
+        "topology_action_agreement": action_agreement,
+        "topology_kind_agreement": topology_agreement,
+        "topology_provider_agreement": provider_agreement,
+        "topology_formation_agreement": formation_agreement,
+        "topology_conflict_score": conflict_score,
+        "topology_feedback_artifact_count": len(topology_payloads),
+        "topology_feedback_live_artifact_count": live_count,
+        "topology_feedback_validated_artifact_count": validated_count,
+        "topology_scope_selection_strategy": (
+            "scoped_relevance_recency_reliability_weighted"
+            if not selected_scope.is_empty()
+            else "recency_reliability_weighted"
+        ),
+        "topology_scope_target": None if selected_scope.is_empty() else selected_scope.to_dict(),
+        "topology_best_scope_match_score": round(max(scope_scores, default=1.0), 4),
+        "topology_freshest_saved_at": _format_timestamp(freshest_saved_at),
+        "topology_oldest_saved_at": _format_timestamp(oldest_saved_at),
+    }
+
+
+def _merge_runtime_feedback_with_topology_metadata(
+    feedback: RuntimeEvaluationFeedback,
+    topology_metadata: Optional[Mapping[str, Any]],
+) -> RuntimeEvaluationFeedback:
+    """Overlay aggregated topology metadata without changing calibration thresholds."""
+    if not topology_metadata:
+        return feedback
+
+    metadata = dict(feedback.metadata or {})
+    for key, value in topology_metadata.items():
+        if key == "source":
+            continue
+        if value in (None, "", {}, []):
+            continue
+        metadata[key] = value
+    if metadata.get("source") is None and topology_metadata.get("source") is not None:
+        metadata["source"] = topology_metadata.get("source")
+
+    return RuntimeEvaluationFeedback(
+        completion_threshold=feedback.completion_threshold,
+        enhanced_progress_threshold=feedback.enhanced_progress_threshold,
+        minimum_supported_evidence_score=feedback.minimum_supported_evidence_score,
+        metadata=metadata,
     )
 
 
@@ -1141,16 +1614,29 @@ def load_runtime_evaluation_feedback(
     target_path = Path(path) if path is not None else get_runtime_evaluation_feedback_path()
     feedback_dir = _resolve_feedback_directory(target_path)
     if feedback_dir is not None:
+        payloads = _load_feedback_payloads_from_directory(feedback_dir)
+        topology_metadata = _aggregate_topology_feedback_metadata(
+            payloads + _load_session_topology_feedback_payloads_from_directory(feedback_dir),
+            scope=scope,
+        )
         aggregate = _aggregate_feedback_payloads(
-            _load_feedback_payloads_from_directory(feedback_dir),
+            payloads,
             scope=scope,
         )
         if aggregate is not None:
-            return aggregate
+            return _merge_runtime_feedback_with_topology_metadata(
+                aggregate,
+                topology_metadata,
+            )
         if target_path.exists():
             payload = _load_feedback_payload_file(target_path)
             if payload is not None:
-                return RuntimeEvaluationFeedback.from_dict(payload)
+                return _merge_runtime_feedback_with_topology_metadata(
+                    RuntimeEvaluationFeedback.from_dict(payload),
+                    topology_metadata,
+                )
+        if topology_metadata is not None:
+            return RuntimeEvaluationFeedback(metadata=dict(topology_metadata))
         return None
 
     if not target_path.exists():
