@@ -60,6 +60,26 @@ class TestTaskCompletionWithoutService:
         detector.analyze_response("Let me think about this")
         assert detector.get_completion_confidence() == CompletionConfidence.NONE
 
+    def test_framework_completion_signal_reused_for_structured_code_output(self):
+        detector = TaskCompletionDetector()
+        detector.analyze_intent("Create a cache_manager.py file")
+
+        detector.analyze_response(
+            "Here is the implementation:\n\n```python\nclass CacheManager:\n    pass\n```"
+        )
+
+        assert detector._last_framework_signal is not None
+        assert detector._last_framework_signal.has_complete_code is True
+        assert detector.get_completion_confidence() == CompletionConfidence.LOW
+
+    def test_framework_continuation_signal_detected_for_contextual_phrase(self):
+        detector = TaskCompletionDetector()
+        detector.analyze_intent("Analyze the architecture")
+
+        detector.analyze_response("Let me know if you'd like me to compare more tradeoffs.")
+
+        assert detector._state.continuation_requests >= 1
+
 
 class TestTaskCompletionWithLLMService:
     """Test LLM augmentation in task completion detection."""

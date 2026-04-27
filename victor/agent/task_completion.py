@@ -370,6 +370,8 @@ class TaskCompletionDetector:
         self._state = TaskCompletionState()
         self._decision_service = decision_service
         self._runtime_intelligence = runtime_intelligence
+        self._framework_keyword_detector: Any = None
+        self._last_framework_signal: Any = None
         # Lazy init for backward compatibility
         if presentation is None:
             from victor.agent.presentation import create_presentation_adapter
@@ -412,6 +414,85 @@ class TaskCompletionDetector:
         if self._runtime_intelligence is not None:
             return True
         return self._decision_service is not None
+
+    def _get_framework_keyword_detector(self) -> Any:
+        """Lazily resolve the shared framework completion signal detector."""
+        if self._framework_keyword_detector is not None:
+            return self._framework_keyword_detector
+
+        try:
+            from victor.framework.context_aware_keyword_detector import (
+                ContextAwareKeywordDetector,
+            )
+
+            self._framework_keyword_detector = ContextAwareKeywordDetector()
+        except Exception:
+            self._framework_keyword_detector = False
+        return self._framework_keyword_detector
+
+    def _resolve_framework_task_type(self) -> str:
+        """Map expected deliverables into the framework completion task taxonomy."""
+        deliverables = list(self._state.expected_deliverables)
+        if not deliverables:
+            deliverables = [deliverable.type for deliverable in self._state.completed_deliverables]
+
+        if any(
+            deliverable in {DeliverableType.FILE_CREATED, DeliverableType.FILE_MODIFIED}
+            for deliverable in deliverables
+        ):
+            return "code_generation"
+        if DeliverableType.CODE_EXECUTED in deliverables:
+            return "testing"
+        if DeliverableType.PLAN_PROVIDED in deliverables:
+            return "analysis"
+        if DeliverableType.ANALYSIS_PROVIDED in deliverables:
+            return "analysis"
+        if DeliverableType.ANSWER_PROVIDED in deliverables:
+            return "search"
+        return "unknown"
+
+    def _should_use_framework_completion_detection(self, response_text: str) -> bool:
+        """Gate framework completion signals to contexts with enough structure."""
+        task_type = self._resolve_framework_task_type()
+        if task_type != "unknown":
+            return True
+        return "```" in response_text or "##" in response_text
+
+    def _apply_framework_completion_signal(self, response_text: str) -> None:
+        """Augment detector state with the shared framework completion signal path."""
+        if not self._should_use_framework_completion_detection(response_text):
+            self._last_framework_signal = None
+            return
+
+        detector = self._get_framework_keyword_detector()
+        if not detector:
+            self._last_framework_signal = None
+            return
+
+        try:
+            signal = detector.detect_completion(
+                response=response_text,
+                task_type=self._resolve_framework_task_type(),
+                requirements=None,
+            )
+        except Exception:
+            logger.debug("Framework completion signal detection failed", exc_info=True)
+            self._last_framework_signal = None
+            return
+
+        self._last_framework_signal = signal
+
+        if signal.is_continuation_request:
+            self._state.continuation_requests += 1
+            logger.debug("Framework continuation signal detected")
+            return
+
+        if signal.has_completion_indicator and not self._state.completion_signals:
+            self._state.completion_signals.add("framework:completion")
+            logger.debug(
+                "Framework completion signal detected (confidence=%.2f)",
+                signal.confidence,
+            )
 
     def _decide_sync(
         self,
@@ -604,6 +685,11 @@ class TaskCompletionDetector:
                 )
                 break
 
+        # Shared framework completion detector augmentation. This keeps legacy
+        # callers on TaskCompletionDetector while reusing framework-level
+        # completion heuristics when task context is available.
+        self._apply_framework_completion_signal(response_text)
+
         # LLM augmentation: if no active signal found and service available,
         # consult LLM for completion detection (gated by decision chain)
         if (
@@ -790,6 +876,7 @@ class TaskCompletionDetector:
     def reset(self) -> None:
         """Reset state for new task."""
         self._state = TaskCompletionState()
+        self._last_framework_signal = None
         logger.debug("Task completion detector reset")
 
     def clear_active_signal(self) -> None:
@@ -955,7 +1042,8 @@ class TaskCompletionDetector:
         if self._state.completion_signals:
             # Check if signals are only passive phrases (not active)
             has_only_passive = all(
-                signal.startswith("passive:") for signal in self._state.completion_signals
+                signal.startswith(("passive:", "framework:"))
+                for signal in self._state.completion_signals
             )
             if has_only_passive:
                 return CompletionConfidence.LOW
