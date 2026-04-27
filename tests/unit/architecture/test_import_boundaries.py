@@ -240,6 +240,45 @@ class TestCanonicalProtocolImports:
         if errors:
             pytest.fail("\n".join(errors))
 
+
+class TestPresentationBoundaries:
+    """Verify agent/core layers do not depend directly on UI emoji helpers."""
+
+    _ALLOWED_UI_EMOJI_IMPORTERS = {
+        Path("victor/agent/presentation/emoji_adapter.py"),
+    }
+
+    def test_agent_and_core_use_presentation_boundary_for_emoji(self) -> None:
+        roots = [Path("victor/agent"), Path("victor/core")]
+        errors = []
+
+        for root in roots:
+            if not root.exists():
+                continue
+            for py_file in root.rglob("*.py"):
+                if "__pycache__" in str(py_file):
+                    continue
+                rel_path = py_file.as_posix()
+                if Path(rel_path) in self._ALLOWED_UI_EMOJI_IMPORTERS:
+                    continue
+
+                lines = py_file.read_text(encoding="utf-8").splitlines()
+                for line_no, line in enumerate(lines, 1):
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        continue
+                    if (
+                        stripped.startswith("from victor.ui.emoji import")
+                        or stripped.startswith("import victor.ui.emoji")
+                    ):
+                        errors.append(
+                            f"{rel_path}:{line_no} imports victor.ui.emoji directly; "
+                            "use PresentationProtocol / EmojiPresentationAdapter boundary instead"
+                        )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
     def test_no_test_imports_from_teams_protocols(self) -> None:
         """Tests should also import team protocols from the canonical module."""
         tests_path = Path("tests")

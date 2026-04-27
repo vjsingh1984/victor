@@ -13,6 +13,7 @@ from victor.config.settings import (
 )
 from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
+from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
 from victor.core.utils.capability_loader import load_codebase_analyzer_attr
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
@@ -587,6 +588,18 @@ providers:
             except ImportError:
                 console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
                 return
+
+            try:
+                stats = ensure_project_graph_enriched(Path.cwd())
+                if stats.total_edges:
+                    console.print(
+                        "[dim]  Enriched graph with synthetic architecture edges "
+                        f"(implements={stats.implements_edges}, "
+                        f"decorates={stats.decorates_edges}, "
+                        f"registers={stats.registers_edges})[/]"
+                    )
+            except Exception as exc:
+                console.print(f"[yellow]![/] Graph enrichment skipped: {exc}")
 
             if update and existing_content:
                 from victor.ui.slash.commands.codebase import InitCommand

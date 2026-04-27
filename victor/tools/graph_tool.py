@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Set
 
 from victor.config.settings import get_project_paths, load_settings
+from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
 from victor.native.python.graph_algo import connected_components, pagerank, weighted_pagerank
 from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
 from victor.storage.unified.protocol import UnifiedId
@@ -869,6 +870,11 @@ async def _load_graph_from_project_store(root_path: Path) -> LoadedGraph:
     edge_count = int(edge_row[0]) if edge_row is not None else 0
     if node_count == 0 and edge_count == 0:
         raise RuntimeError("Project graph database is empty")
+
+    try:
+        ensure_project_graph_enriched(root_path)
+    except Exception as exc:  # pragma: no cover - defensive logging only
+        logger.warning("[graph] Failed to enrich persisted project graph for %s: %s", root_path, exc)
 
     graph_store = SqliteGraphStore(root_path)
     fallback_index = SimpleNamespace(graph_store=graph_store, files={})

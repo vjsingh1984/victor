@@ -39,11 +39,8 @@ Backend Options:
     # Default: SQLite + LanceDB (local, air-gapped compatible)
     store = create_symbol_store(backend="sqlite+lancedb")
 
-    # PostgreSQL + pgvector (single store, cloud-ready)
-    store = create_symbol_store(backend="postgres+pgvector", connection_string="...")
-
-    # LanceDB only (vectors + metadata in single store)
-    store = create_symbol_store(backend="lancedb")
+    # Planned: ProximaDB single-engine backend
+    store = create_symbol_store(backend="proximadb")
 """
 
 from victor.storage.unified.protocol import (

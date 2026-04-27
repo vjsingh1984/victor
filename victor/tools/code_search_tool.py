@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
+from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
 from victor.framework.enrichment.file_patterns import CODE_PATTERNS
 from victor.framework.search import (
     CODEBASE_INDEX_MANIFEST_NAME,
@@ -417,6 +418,14 @@ async def _finalize_index_storage(index: Any) -> None:
         await get_stats()
     except Exception as exc:
         logger.debug("Failed to finalize structural code_search provider writes: %s", exc)
+
+
+def _ensure_graph_enrichment_for_root(root: Path, latest_mtime: Optional[float]) -> None:
+    """Persist synthetic architecture edges alongside the indexed project graph."""
+    try:
+        ensure_project_graph_enriched(root, latest_mtime=latest_mtime)
+    except Exception as exc:  # pragma: no cover - defensive logging only
+        logger.warning("[code_search] Graph enrichment failed for %s: %s", root, exc)
 
 
 async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> bool:
@@ -1907,6 +1916,7 @@ async def _get_or_build_index(
             # No files changed, use cache directly
             # Subscribe to file watcher for auto-invalidation (only once per index)
             await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
+            _ensure_graph_enrichment_for_root(root, latest)
 
             return cached_index, False
         else:
@@ -1940,6 +1950,7 @@ async def _get_or_build_index(
 
                 # Subscribe to file watcher if not already subscribed
                 await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
+                _ensure_graph_enrichment_for_root(root, latest)
 
                 return cached_index, False
             else:
@@ -1953,6 +1964,7 @@ async def _get_or_build_index(
                     logger.info(
                         f"[code_search] Incremental refresh complete for {root} (inside lock)"
                     )
+                    _ensure_graph_enrichment_for_root(root, latest)
                     return cached_index, False
 
         # Build index with exclusive access to this path
@@ -2009,6 +2021,7 @@ async def _get_or_build_index(
             logger.warning(
                 "Failed to write code_search index manifest to %s: %s", persist_path, exc
             )
+        _ensure_graph_enrichment_for_root(root, latest)
 
         index_cache[str(root)] = {
             "index": index,

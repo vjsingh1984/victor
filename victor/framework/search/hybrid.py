@@ -320,7 +320,7 @@ def create_hybrid_search_engine(
         Configured HybridSearchEngine instance
 
     Example:
-        >>> engine = create_hybrid_search_engine(semantic_weight=0.7, keyword_weight=0.3)
+        >>> engine = create_hybrid_search_engine(semantic_weight=0.6, keyword_weight=0.4)
         >>> hybrid_results = engine.combine_results(semantic_results, keyword_results)
     """
     # Normalize weights to sum to 1.0
