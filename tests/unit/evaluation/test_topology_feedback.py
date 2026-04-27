@@ -1,3 +1,5 @@
+import pytest
+
 from victor.evaluation.topology_feedback import (
     aggregate_topology_feedback,
     extract_topology_events,
@@ -126,3 +128,91 @@ def test_aggregate_topology_feedback_reports_coverage_and_action_mix():
     assert metrics["avg_topology_reward_by_selection_policy"]["learned_close_override"] >= 0.0
     assert metrics["topology_learned_override_reward_delta"] is not None
     assert 0.0 <= metrics["avg_topology_reward"] <= 1.0
+
+
+def test_aggregate_topology_feedback_reports_optimization_policy_deltas():
+    task_results = [
+        {
+            "status": "passed",
+            "metadata": {
+                "topology_events": [
+                    {
+                        "action": "single_agent",
+                        "topology": "single_agent",
+                        "execution_mode": "single_agent",
+                        "confidence": 0.78,
+                        "telemetry_tags": {"selection_policy": "heuristic"},
+                    }
+                ]
+            },
+            "optimization_summary": {
+                "feasible": True,
+                "reward": 0.55,
+                "reward_components": {"overall_score": 0.55},
+                "feasibility_failures": [],
+            },
+        },
+        {
+            "status": "passed",
+            "metadata": {
+                "topology_events": [
+                    {
+                        "action": "team_plan",
+                        "topology": "team",
+                        "execution_mode": "team_execution",
+                        "formation": "parallel",
+                        "confidence": 0.84,
+                        "telemetry_tags": {"selection_policy": "learned_close_override"},
+                    }
+                ]
+            },
+            "optimization_summary": {
+                "feasible": True,
+                "reward": 0.82,
+                "reward_components": {"overall_score": 0.82},
+                "feasibility_failures": [],
+            },
+        },
+        {
+            "status": "failed",
+            "metadata": {
+                "topology_events": [
+                    {
+                        "action": "team_plan",
+                        "topology": "team",
+                        "execution_mode": "team_execution",
+                        "formation": "parallel",
+                        "confidence": 0.72,
+                        "telemetry_tags": {"selection_policy": "learned_close_override"},
+                    }
+                ]
+            },
+            "optimization_summary": {
+                "feasible": False,
+                "reward": 0.31,
+                "reward_components": {"overall_score": 0.31},
+                "feasibility_failures": ["tests_pass"],
+            },
+        },
+    ]
+
+    metrics = aggregate_topology_feedback(task_results, total_tasks=3)
+
+    assert metrics["topology_selection_policy_optimization_counts"] == {
+        "heuristic": 1,
+        "learned_close_override": 2,
+    }
+    assert metrics["avg_topology_optimization_reward_by_selection_policy"] == {
+        "heuristic": 0.55,
+        "learned_close_override": 0.565,
+    }
+    assert metrics["topology_selection_policy_feasible_counts"] == {
+        "heuristic": 1,
+        "learned_close_override": 1,
+    }
+    assert metrics["topology_selection_policy_feasibility_rates"] == {
+        "heuristic": 1.0,
+        "learned_close_override": 0.5,
+    }
+    assert metrics["topology_learned_override_optimization_reward_delta"] == pytest.approx(0.015)
+    assert metrics["topology_learned_override_feasibility_delta"] == pytest.approx(-0.5)

@@ -480,3 +480,81 @@ class TestTopologySelector:
             "adaptive_disabled_negative"
         )
         assert decision.grounding_requirements.metadata["learned_override_disabled"] is True
+
+    def test_positive_optimization_reward_delta_takes_precedence_for_tuning(self):
+        """PR2 optimization reward should tune overrides ahead of topology-only reward history."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="probe reward-tuned close call",
+                task_type="analysis",
+                task_complexity="low",
+                confidence_hint=0.45,
+                tool_budget=4,
+                expected_depth="low",
+                expected_breadth="medium",
+                observability_level="medium",
+                latency_sensitivity="low",
+                prior_failures=2,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                    "learned_override_policy_reward_delta": -0.1,
+                    "learned_override_policy_optimization_reward_delta": 0.25,
+                    "learned_override_policy_count": 4,
+                    "heuristic_policy_count": 4,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.ESCALATE_MODEL
+        assert decision.telemetry_tags["selection_policy"] == "learned_close_override"
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == "adaptive_positive"
+        assert decision.grounding_requirements.metadata[
+            "learned_override_policy_optimization_reward_delta"
+        ] == 0.25
+
+    def test_negative_feasibility_delta_hard_disables_learned_close_override(self):
+        """Feasibility regressions should disable learned overrides even with positive reward."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="investigate an intermittent issue",
+                task_type="analysis",
+                task_complexity="medium",
+                confidence_hint=0.52,
+                tool_budget=6,
+                expected_depth="medium",
+                expected_breadth="low",
+                observability_level="medium",
+                latency_sensitivity="medium",
+                prior_failures=1,
+                provider_candidates=["ollama", "openai"],
+                context={
+                    "learned_topology_action": "escalate_model",
+                    "learned_topology_kind": "escalated_single_agent",
+                    "learned_topology_support": 0.9,
+                    "learned_topology_action_agreement": 0.88,
+                    "learned_topology_kind_agreement": 0.88,
+                    "learned_topology_conflict_score": 0.1,
+                    "learned_override_policy_optimization_reward_delta": 0.2,
+                    "learned_override_policy_feasibility_delta": -0.3,
+                    "learned_override_policy_count": 4,
+                    "heuristic_policy_count": 4,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.SINGLE_AGENT
+        assert decision.telemetry_tags["selection_policy"] == "heuristic"
+        assert decision.telemetry_tags["learned_override_threshold_profile"] == (
+            "adaptive_disabled_feasibility"
+        )
+        assert decision.grounding_requirements.metadata["learned_override_disabled"] is True

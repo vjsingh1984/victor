@@ -126,6 +126,27 @@ def _extract_topology_summary_mapping(value: Any) -> Optional[dict[str, Any]]:
     return None
 
 
+def _extract_optimization_summary_mapping(value: Any) -> Optional[dict[str, Any]]:
+    if isinstance(value, Mapping):
+        summary = value.get("optimization_summary")
+        if isinstance(summary, Mapping):
+            return dict(summary)
+    else:
+        summary = getattr(value, "optimization_summary", None)
+        if isinstance(summary, Mapping):
+            return dict(summary)
+    for container_name in ("metadata", "failure_details", "completion_signals"):
+        container = _extract_value(value, container_name)
+        if isinstance(container, Mapping):
+            summary = container.get("optimization_summary")
+            if isinstance(summary, Mapping):
+                return dict(summary)
+    trace = _extract_value(value, "trace")
+    if trace is not None and trace is not value:
+        return _extract_optimization_summary_mapping(trace)
+    return None
+
+
 def extract_topology_events(value: Any) -> list[dict[str, Any]]:
     """Extract normalized topology events from task, trace, or payload objects."""
     events: list[dict[str, Any]] = []
@@ -278,14 +299,48 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
     }
 
 
+def summarize_optimization_feedback(value: Any) -> Optional[dict[str, Any]]:
+    """Return a task-level optimization summary when present on task artifacts."""
+    existing_summary = _extract_optimization_summary_mapping(value)
+    if not existing_summary:
+        return None
+
+    feasible = bool(existing_summary.get("feasible", False))
+    reward = _coerce_float(existing_summary.get("reward"))
+    if reward is None:
+        return None
+
+    reward_components = {
+        str(key): float(component_value)
+        for key, component_value in dict(existing_summary.get("reward_components") or {}).items()
+        if _coerce_float(component_value) is not None
+    }
+    feasibility_failures = [
+        str(failure)
+        for failure in list(existing_summary.get("feasibility_failures") or [])
+        if str(failure).strip()
+    ]
+    return {
+        "feasible": feasible,
+        "reward": round(reward, 4),
+        "reward_components": reward_components,
+        "feasibility_failures": feasibility_failures,
+    }
+
+
 def aggregate_topology_feedback(
     values: Iterable[Any],
     *,
     total_tasks: Optional[int] = None,
 ) -> dict[str, Any]:
     """Aggregate topology summaries across benchmark task results."""
-    summaries = [summary for value in values if (summary := summarize_topology_feedback(value))]
-    if not summaries:
+    entries = [
+        (summary, summarize_optimization_feedback(value))
+        for value in values
+        if (summary := summarize_topology_feedback(value))
+    ]
+    summaries = [summary for summary, _ in entries]
+    if not entries:
         count = total_tasks or 0
         return {
             "tasks_with_topology_feedback": 0,
@@ -305,6 +360,13 @@ def aggregate_topology_feedback(
             "topology_selection_policy_reward_totals": {},
             "avg_topology_reward_by_selection_policy": {},
             "topology_learned_override_reward_delta": None,
+            "topology_selection_policy_optimization_counts": {},
+            "topology_selection_policy_optimization_reward_totals": {},
+            "avg_topology_optimization_reward_by_selection_policy": {},
+            "topology_selection_policy_feasible_counts": {},
+            "topology_selection_policy_feasibility_rates": {},
+            "topology_learned_override_optimization_reward_delta": None,
+            "topology_learned_override_feasibility_delta": None,
         }
 
     selected_actions = Counter(
@@ -337,6 +399,9 @@ def aggregate_topology_feedback(
     )
     task_count = total_tasks if total_tasks is not None else len(summaries)
     selection_policy_reward_totals: dict[str, float] = {}
+    selection_policy_optimization_counts: dict[str, int] = {}
+    selection_policy_optimization_reward_totals: dict[str, float] = {}
+    selection_policy_feasible_counts: dict[str, int] = {}
     for summary in summaries:
         selection_policy = summary.get("final_selection_policy")
         if not selection_policy:
@@ -345,6 +410,22 @@ def aggregate_topology_feedback(
             selection_policy_reward_totals.get(selection_policy, 0.0) + summary["topology_reward"],
             4,
         )
+    for summary, optimization_summary in entries:
+        selection_policy = summary.get("final_selection_policy")
+        if not selection_policy or optimization_summary is None:
+            continue
+        selection_policy_optimization_counts[selection_policy] = (
+            selection_policy_optimization_counts.get(selection_policy, 0) + 1
+        )
+        selection_policy_optimization_reward_totals[selection_policy] = round(
+            selection_policy_optimization_reward_totals.get(selection_policy, 0.0)
+            + float(optimization_summary["reward"]),
+            4,
+        )
+        if optimization_summary.get("feasible"):
+            selection_policy_feasible_counts[selection_policy] = (
+                selection_policy_feasible_counts.get(selection_policy, 0) + 1
+            )
     avg_reward_by_selection_policy = {
         policy: round(
             selection_policy_reward_totals[policy] / max(1, count),
@@ -352,6 +433,24 @@ def aggregate_topology_feedback(
         )
         for policy, count in selection_policies.items()
         if count > 0 and policy in selection_policy_reward_totals
+    }
+    avg_optimization_reward_by_selection_policy = {
+        policy: round(
+            selection_policy_optimization_reward_totals[policy]
+            / max(1, selection_policy_optimization_counts[policy]),
+            4,
+        )
+        for policy in selection_policy_optimization_reward_totals
+        if selection_policy_optimization_counts.get(policy, 0) > 0
+    }
+    selection_policy_feasibility_rates = {
+        policy: round(
+            selection_policy_feasible_counts.get(policy, 0)
+            / max(1, selection_policy_optimization_counts[policy]),
+            4,
+        )
+        for policy in selection_policy_optimization_counts
+        if selection_policy_optimization_counts[policy] > 0
     }
     learned_override_reward_delta: Optional[float] = None
     if (
@@ -361,6 +460,26 @@ def aggregate_topology_feedback(
         learned_override_reward_delta = round(
             avg_reward_by_selection_policy["learned_close_override"]
             - avg_reward_by_selection_policy["heuristic"],
+            4,
+        )
+    learned_override_optimization_reward_delta: Optional[float] = None
+    if (
+        "learned_close_override" in avg_optimization_reward_by_selection_policy
+        and "heuristic" in avg_optimization_reward_by_selection_policy
+    ):
+        learned_override_optimization_reward_delta = round(
+            avg_optimization_reward_by_selection_policy["learned_close_override"]
+            - avg_optimization_reward_by_selection_policy["heuristic"],
+            4,
+        )
+    learned_override_feasibility_delta: Optional[float] = None
+    if (
+        "learned_close_override" in selection_policy_feasibility_rates
+        and "heuristic" in selection_policy_feasibility_rates
+    ):
+        learned_override_feasibility_delta = round(
+            selection_policy_feasibility_rates["learned_close_override"]
+            - selection_policy_feasibility_rates["heuristic"],
             4,
         )
 
@@ -391,11 +510,29 @@ def aggregate_topology_feedback(
         "topology_selection_policy_reward_totals": dict(selection_policy_reward_totals),
         "avg_topology_reward_by_selection_policy": dict(avg_reward_by_selection_policy),
         "topology_learned_override_reward_delta": learned_override_reward_delta,
+        "topology_selection_policy_optimization_counts": dict(
+            selection_policy_optimization_counts
+        ),
+        "topology_selection_policy_optimization_reward_totals": dict(
+            selection_policy_optimization_reward_totals
+        ),
+        "avg_topology_optimization_reward_by_selection_policy": dict(
+            avg_optimization_reward_by_selection_policy
+        ),
+        "topology_selection_policy_feasible_counts": dict(selection_policy_feasible_counts),
+        "topology_selection_policy_feasibility_rates": dict(
+            selection_policy_feasibility_rates
+        ),
+        "topology_learned_override_optimization_reward_delta": (
+            learned_override_optimization_reward_delta
+        ),
+        "topology_learned_override_feasibility_delta": learned_override_feasibility_delta,
     }
 
 
 __all__ = [
     "aggregate_topology_feedback",
     "extract_topology_events",
+    "summarize_optimization_feedback",
     "summarize_topology_feedback",
 ]

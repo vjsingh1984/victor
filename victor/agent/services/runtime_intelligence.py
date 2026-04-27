@@ -132,6 +132,9 @@ class TopologyRoutingFeedback:
     formation_distribution: Dict[str, float] = field(default_factory=dict)
     selection_policy_distribution: Dict[str, float] = field(default_factory=dict)
     selection_policy_reward_totals: Dict[str, float] = field(default_factory=dict)
+    selection_policy_optimization_counts: Dict[str, float] = field(default_factory=dict)
+    selection_policy_optimization_reward_totals: Dict[str, float] = field(default_factory=dict)
+    selection_policy_feasible_counts: Dict[str, float] = field(default_factory=dict)
     selection_policy_scope_metrics: Dict[str, Dict[str, Dict[str, Any]]] = field(
         default_factory=dict
     )
@@ -220,6 +223,60 @@ class TopologyRoutingFeedback:
             return None
         return round(learned - heuristic, 4)
 
+    @property
+    def avg_optimization_reward_by_selection_policy(self) -> Dict[str, float]:
+        """Return average optimization reward grouped by topology selection policy."""
+        averages: Dict[str, float] = {}
+        for policy, count_value in self.selection_policy_optimization_counts.items():
+            try:
+                count = float(count_value)
+                reward_total = float(
+                    self.selection_policy_optimization_reward_totals.get(policy, 0.0)
+                )
+            except (TypeError, ValueError):
+                continue
+            if count <= 0.0:
+                continue
+            averages[policy] = round(reward_total / count, 4)
+        return averages
+
+    @property
+    def feasibility_rate_by_selection_policy(self) -> Dict[str, float]:
+        """Return feasibility rate grouped by topology selection policy."""
+        rates: Dict[str, float] = {}
+        for policy, count_value in self.selection_policy_optimization_counts.items():
+            try:
+                count = float(count_value)
+                feasible_count = float(self.selection_policy_feasible_counts.get(policy, 0.0))
+            except (TypeError, ValueError):
+                continue
+            if count <= 0.0:
+                continue
+            rates[policy] = round(feasible_count / count, 4)
+        return rates
+
+    @property
+    def learned_override_optimization_reward_delta(self) -> Optional[float]:
+        """Compare learned-close overrides against heuristic policy using PR2 reward."""
+        averages = self.avg_optimization_reward_by_selection_policy
+        try:
+            learned = float(averages["learned_close_override"])
+            heuristic = float(averages["heuristic"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        return round(learned - heuristic, 4)
+
+    @property
+    def learned_override_feasibility_delta(self) -> Optional[float]:
+        """Compare learned-close overrides against heuristic policy using feasibility rate."""
+        rates = self.feasibility_rate_by_selection_policy
+        try:
+            learned = float(rates["learned_close_override"])
+            heuristic = float(rates["heuristic"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        return round(learned - heuristic, 4)
+
     def to_metadata(self) -> Dict[str, Any]:
         """Serialize the learned topology preference for logs and snapshots."""
         return {
@@ -248,6 +305,23 @@ class TopologyRoutingFeedback:
             "selection_policy_reward_totals": dict(self.selection_policy_reward_totals),
             "avg_reward_by_selection_policy": dict(self.avg_reward_by_selection_policy),
             "learned_override_reward_delta": self.learned_override_reward_delta,
+            "selection_policy_optimization_counts": dict(
+                self.selection_policy_optimization_counts
+            ),
+            "selection_policy_optimization_reward_totals": dict(
+                self.selection_policy_optimization_reward_totals
+            ),
+            "avg_optimization_reward_by_selection_policy": dict(
+                self.avg_optimization_reward_by_selection_policy
+            ),
+            "selection_policy_feasible_counts": dict(self.selection_policy_feasible_counts),
+            "feasibility_rate_by_selection_policy": dict(
+                self.feasibility_rate_by_selection_policy
+            ),
+            "learned_override_optimization_reward_delta": (
+                self.learned_override_optimization_reward_delta
+            ),
+            "learned_override_feasibility_delta": self.learned_override_feasibility_delta,
             "selection_policy_scope_metrics": dict(self.selection_policy_scope_metrics),
         }
 
@@ -297,6 +371,30 @@ class TopologyRoutingFeedback:
         if selection_policy_metrics.get("learned_override_policy_reward_delta") is not None:
             routing_context["learned_override_policy_reward_delta"] = (
                 selection_policy_metrics["learned_override_policy_reward_delta"]
+            )
+        if selection_policy_metrics.get("learned_override_policy_optimization_reward") is not None:
+            routing_context["learned_override_policy_optimization_reward"] = (
+                selection_policy_metrics["learned_override_policy_optimization_reward"]
+            )
+        if selection_policy_metrics.get("heuristic_policy_optimization_reward") is not None:
+            routing_context["heuristic_policy_optimization_reward"] = (
+                selection_policy_metrics["heuristic_policy_optimization_reward"]
+            )
+        if selection_policy_metrics.get("learned_override_policy_optimization_reward_delta") is not None:
+            routing_context["learned_override_policy_optimization_reward_delta"] = (
+                selection_policy_metrics["learned_override_policy_optimization_reward_delta"]
+            )
+        if selection_policy_metrics.get("learned_override_policy_feasibility_rate") is not None:
+            routing_context["learned_override_policy_feasibility_rate"] = (
+                selection_policy_metrics["learned_override_policy_feasibility_rate"]
+            )
+        if selection_policy_metrics.get("heuristic_policy_feasibility_rate") is not None:
+            routing_context["heuristic_policy_feasibility_rate"] = (
+                selection_policy_metrics["heuristic_policy_feasibility_rate"]
+            )
+        if selection_policy_metrics.get("learned_override_policy_feasibility_delta") is not None:
+            routing_context["learned_override_policy_feasibility_delta"] = (
+                selection_policy_metrics["learned_override_policy_feasibility_delta"]
             )
         if selection_policy_metrics.get("scope_dimension") is not None:
             routing_context["learned_override_policy_scope_dimension"] = selection_policy_metrics[
@@ -399,13 +497,37 @@ class TopologyRoutingFeedback:
                 continue
             policy_counts = dict(bucket.get("policy_counts") or {})
             avg_reward_by_policy = dict(bucket.get("avg_reward_by_policy") or {})
+            avg_optimization_reward_by_policy = dict(
+                bucket.get("avg_optimization_reward_by_policy") or {}
+            )
+            feasibility_rate_by_policy = dict(bucket.get("feasibility_rate_by_policy") or {})
             learned_override_reward = avg_reward_by_policy.get("learned_close_override")
             heuristic_reward = avg_reward_by_policy.get("heuristic")
             learned_override_reward_delta = bucket.get("learned_override_reward_delta")
+            learned_override_optimization_reward = avg_optimization_reward_by_policy.get(
+                "learned_close_override"
+            )
+            heuristic_optimization_reward = avg_optimization_reward_by_policy.get("heuristic")
+            learned_override_optimization_reward_delta = bucket.get(
+                "learned_override_optimization_reward_delta"
+            )
+            learned_override_feasibility_rate = feasibility_rate_by_policy.get(
+                "learned_close_override"
+            )
+            heuristic_feasibility_rate = feasibility_rate_by_policy.get("heuristic")
+            learned_override_feasibility_delta = bucket.get(
+                "learned_override_feasibility_delta"
+            )
             if (
                 learned_override_reward is None
                 and heuristic_reward is None
                 and learned_override_reward_delta is None
+                and learned_override_optimization_reward is None
+                and heuristic_optimization_reward is None
+                and learned_override_optimization_reward_delta is None
+                and learned_override_feasibility_rate is None
+                and heuristic_feasibility_rate is None
+                and learned_override_feasibility_delta is None
             ):
                 continue
             return {
@@ -422,6 +544,20 @@ class TopologyRoutingFeedback:
                     "heuristic",
                 ),
                 "learned_override_policy_reward_delta": learned_override_reward_delta,
+                "learned_override_policy_optimization_reward": (
+                    learned_override_optimization_reward
+                ),
+                "heuristic_policy_optimization_reward": heuristic_optimization_reward,
+                "learned_override_policy_optimization_reward_delta": (
+                    learned_override_optimization_reward_delta
+                ),
+                "learned_override_policy_feasibility_rate": (
+                    learned_override_feasibility_rate
+                ),
+                "heuristic_policy_feasibility_rate": heuristic_feasibility_rate,
+                "learned_override_policy_feasibility_delta": (
+                    learned_override_feasibility_delta
+                ),
             }
 
         return {
@@ -436,6 +572,24 @@ class TopologyRoutingFeedback:
             ),
             "heuristic_policy_count": self._effective_policy_count("heuristic"),
             "learned_override_policy_reward_delta": self.learned_override_reward_delta,
+            "learned_override_policy_optimization_reward": (
+                self.avg_optimization_reward_by_selection_policy.get("learned_close_override")
+            ),
+            "heuristic_policy_optimization_reward": (
+                self.avg_optimization_reward_by_selection_policy.get("heuristic")
+            ),
+            "learned_override_policy_optimization_reward_delta": (
+                self.learned_override_optimization_reward_delta
+            ),
+            "learned_override_policy_feasibility_rate": (
+                self.feasibility_rate_by_selection_policy.get("learned_close_override")
+            ),
+            "heuristic_policy_feasibility_rate": (
+                self.feasibility_rate_by_selection_policy.get("heuristic")
+            ),
+            "learned_override_policy_feasibility_delta": (
+                self.learned_override_feasibility_delta
+            ),
         }
 
 
@@ -798,6 +952,15 @@ class RuntimeIntelligenceService:
         selection_policy_reward_totals = cls._normalize_distribution(
             metadata.get("topology_selection_policy_reward_totals") or {}
         )
+        selection_policy_optimization_counts = cls._normalize_distribution(
+            metadata.get("topology_selection_policy_optimization_counts") or {}
+        )
+        selection_policy_optimization_reward_totals = cls._normalize_distribution(
+            metadata.get("topology_selection_policy_optimization_reward_totals") or {}
+        )
+        selection_policy_feasible_counts = cls._normalize_distribution(
+            metadata.get("topology_selection_policy_feasible_counts") or {}
+        )
         selection_policy_scope_metrics = dict(
             metadata.get("topology_selection_policy_scope_metrics") or {}
         )
@@ -857,6 +1020,9 @@ class RuntimeIntelligenceService:
             formation_distribution=formation_distribution,
             selection_policy_distribution=selection_policy_distribution,
             selection_policy_reward_totals=selection_policy_reward_totals,
+            selection_policy_optimization_counts=selection_policy_optimization_counts,
+            selection_policy_optimization_reward_totals=selection_policy_optimization_reward_totals,
+            selection_policy_feasible_counts=selection_policy_feasible_counts,
             selection_policy_scope_metrics=selection_policy_scope_metrics,
         )
 
@@ -934,6 +1100,18 @@ class RuntimeIntelligenceService:
             persisted.selection_policy_reward_totals,
             session.selection_policy_reward_totals,
         )
+        selection_policy_optimization_counts = cls._merge_distributions(
+            persisted.selection_policy_optimization_counts,
+            session.selection_policy_optimization_counts,
+        )
+        selection_policy_optimization_reward_totals = cls._merge_distributions(
+            persisted.selection_policy_optimization_reward_totals,
+            session.selection_policy_optimization_reward_totals,
+        )
+        selection_policy_feasible_counts = cls._merge_distributions(
+            persisted.selection_policy_feasible_counts,
+            session.selection_policy_feasible_counts,
+        )
         selection_policy_scope_metrics = dict(persisted.selection_policy_scope_metrics)
         for dimension, entries in session.selection_policy_scope_metrics.items():
             if not isinstance(entries, dict):
@@ -951,6 +1129,18 @@ class RuntimeIntelligenceService:
                     dict(existing_bucket.get("policy_reward_totals") or {}),
                     dict(bucket.get("policy_reward_totals") or {}),
                 )
+                merged_policy_optimization_counts = cls._merge_distributions(
+                    dict(existing_bucket.get("policy_optimization_counts") or {}),
+                    dict(bucket.get("policy_optimization_counts") or {}),
+                )
+                merged_policy_optimization_reward_totals = cls._merge_distributions(
+                    dict(existing_bucket.get("policy_optimization_reward_totals") or {}),
+                    dict(bucket.get("policy_optimization_reward_totals") or {}),
+                )
+                merged_policy_feasible_counts = cls._merge_distributions(
+                    dict(existing_bucket.get("policy_feasible_counts") or {}),
+                    dict(bucket.get("policy_feasible_counts") or {}),
+                )
                 avg_reward_by_policy: Dict[str, float] = {}
                 for policy, count_value in merged_policy_counts.items():
                     try:
@@ -961,6 +1151,28 @@ class RuntimeIntelligenceService:
                     if count <= 0.0:
                         continue
                     avg_reward_by_policy[policy] = round(reward_total / count, 4)
+                avg_optimization_reward_by_policy: Dict[str, float] = {}
+                for policy, count_value in merged_policy_optimization_counts.items():
+                    try:
+                        count = float(count_value)
+                        reward_total = float(
+                            merged_policy_optimization_reward_totals.get(policy, 0.0)
+                        )
+                    except (TypeError, ValueError):
+                        continue
+                    if count <= 0.0:
+                        continue
+                    avg_optimization_reward_by_policy[policy] = round(reward_total / count, 4)
+                feasibility_rate_by_policy: Dict[str, float] = {}
+                for policy, count_value in merged_policy_optimization_counts.items():
+                    try:
+                        count = float(count_value)
+                        feasible_count = float(merged_policy_feasible_counts.get(policy, 0.0))
+                    except (TypeError, ValueError):
+                        continue
+                    if count <= 0.0:
+                        continue
+                    feasibility_rate_by_policy[policy] = round(feasible_count / count, 4)
                 learned_override_reward_delta = None
                 try:
                     learned_override_reward_delta = round(
@@ -970,11 +1182,40 @@ class RuntimeIntelligenceService:
                     )
                 except (KeyError, TypeError, ValueError):
                     learned_override_reward_delta = None
+                learned_override_optimization_reward_delta = None
+                try:
+                    learned_override_optimization_reward_delta = round(
+                        float(avg_optimization_reward_by_policy["learned_close_override"])
+                        - float(avg_optimization_reward_by_policy["heuristic"]),
+                        4,
+                    )
+                except (KeyError, TypeError, ValueError):
+                    learned_override_optimization_reward_delta = None
+                learned_override_feasibility_delta = None
+                try:
+                    learned_override_feasibility_delta = round(
+                        float(feasibility_rate_by_policy["learned_close_override"])
+                        - float(feasibility_rate_by_policy["heuristic"]),
+                        4,
+                    )
+                except (KeyError, TypeError, ValueError):
+                    learned_override_feasibility_delta = None
                 dimension_bucket[label] = {
                     "policy_counts": merged_policy_counts,
                     "policy_reward_totals": merged_policy_reward_totals,
+                    "policy_optimization_counts": merged_policy_optimization_counts,
+                    "policy_optimization_reward_totals": (
+                        merged_policy_optimization_reward_totals
+                    ),
+                    "policy_feasible_counts": merged_policy_feasible_counts,
                     "avg_reward_by_policy": avg_reward_by_policy,
                     "learned_override_reward_delta": learned_override_reward_delta,
+                    "avg_optimization_reward_by_policy": avg_optimization_reward_by_policy,
+                    "feasibility_rate_by_policy": feasibility_rate_by_policy,
+                    "learned_override_optimization_reward_delta": (
+                        learned_override_optimization_reward_delta
+                    ),
+                    "learned_override_feasibility_delta": learned_override_feasibility_delta,
                 }
 
         def weighted_average(first: float, second: float) -> float:
@@ -1012,6 +1253,9 @@ class RuntimeIntelligenceService:
             formation_distribution=formation_distribution,
             selection_policy_distribution=selection_policy_distribution,
             selection_policy_reward_totals=selection_policy_reward_totals,
+            selection_policy_optimization_counts=selection_policy_optimization_counts,
+            selection_policy_optimization_reward_totals=selection_policy_optimization_reward_totals,
+            selection_policy_feasible_counts=selection_policy_feasible_counts,
             selection_policy_scope_metrics=selection_policy_scope_metrics,
         )
 
@@ -1107,10 +1351,31 @@ class RuntimeIntelligenceService:
                 "topology_selection_policy_reward_totals": dict(
                     feedback.selection_policy_reward_totals
                 ),
+                "topology_selection_policy_optimization_counts": dict(
+                    feedback.selection_policy_optimization_counts
+                ),
+                "topology_selection_policy_optimization_reward_totals": dict(
+                    feedback.selection_policy_optimization_reward_totals
+                ),
+                "topology_selection_policy_feasible_counts": dict(
+                    feedback.selection_policy_feasible_counts
+                ),
                 "avg_topology_reward_by_selection_policy": dict(
                     feedback.avg_reward_by_selection_policy
                 ),
                 "topology_learned_override_reward_delta": feedback.learned_override_reward_delta,
+                "avg_topology_optimization_reward_by_selection_policy": dict(
+                    feedback.avg_optimization_reward_by_selection_policy
+                ),
+                "topology_selection_policy_feasibility_rates": dict(
+                    feedback.feasibility_rate_by_selection_policy
+                ),
+                "topology_learned_override_optimization_reward_delta": (
+                    feedback.learned_override_optimization_reward_delta
+                ),
+                "topology_learned_override_feasibility_delta": (
+                    feedback.learned_override_feasibility_delta
+                ),
                 "topology_selection_policy_scope_metrics": dict(
                     feedback.selection_policy_scope_metrics
                 ),

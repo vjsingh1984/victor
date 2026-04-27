@@ -53,6 +53,13 @@ TOPOLOGY_RUNTIME_METADATA_KEYS = (
     "topology_feedback_coverage",
     "avg_topology_reward",
     "avg_topology_confidence",
+    "optimization_feasible_tasks",
+    "optimization_infeasible_tasks",
+    "optimization_feasibility_rate",
+    "avg_optimization_reward",
+    "avg_feasible_optimization_reward",
+    "avg_infeasible_optimization_reward",
+    "optimization_gate_failures",
     "topology_observation_count",
     "topology_actions",
     "topology_final_actions",
@@ -65,6 +72,13 @@ TOPOLOGY_RUNTIME_METADATA_KEYS = (
     "topology_selection_policy_reward_totals",
     "avg_topology_reward_by_selection_policy",
     "topology_learned_override_reward_delta",
+    "topology_selection_policy_optimization_counts",
+    "topology_selection_policy_optimization_reward_totals",
+    "avg_topology_optimization_reward_by_selection_policy",
+    "topology_selection_policy_feasible_counts",
+    "topology_selection_policy_feasibility_rates",
+    "topology_learned_override_optimization_reward_delta",
+    "topology_learned_override_feasibility_delta",
     "topology_selection_policy_scope_metrics",
     "topology_action_agreement",
     "topology_kind_agreement",
@@ -233,7 +247,15 @@ def _extract_task_entries(
     payload = dict(result_or_payload or {})
     tasks = list(payload.get("tasks") or payload.get("task_results") or [])
     summary = dict(payload.get("summary") or {})
+    for section_name in ("quality", "optimization", "topology"):
+        section_payload = payload.get(section_name)
+        if isinstance(section_payload, Mapping):
+            summary.update(dict(section_payload))
     config = dict(payload.get("config") or {})
+    if not config:
+        for field_name in ("benchmark", "model", "provider"):
+            if payload.get(field_name) is not None:
+                config[field_name] = payload.get(field_name)
     return tasks, summary, config
 
 
@@ -296,6 +318,41 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
         evidence_threshold += min(0.05, overconfidence_rate * 0.10)
     evidence_threshold = _clamp(evidence_threshold, 0.55, 0.95)
 
+    topology_selection_policy_optimization_counts = dict(
+        summary.get("topology_selection_policy_optimization_counts") or {}
+    )
+    topology_selection_policy_optimization_reward_totals = dict(
+        summary.get("topology_selection_policy_optimization_reward_totals") or {}
+    )
+    avg_topology_optimization_reward_by_selection_policy = dict(
+        summary.get("avg_topology_optimization_reward_by_selection_policy") or {}
+    )
+    if (
+        not avg_topology_optimization_reward_by_selection_policy
+        and topology_selection_policy_optimization_counts
+        and topology_selection_policy_optimization_reward_totals
+    ):
+        avg_topology_optimization_reward_by_selection_policy = _average_mapping_from_totals(
+            topology_selection_policy_optimization_counts,
+            topology_selection_policy_optimization_reward_totals,
+        )
+    topology_selection_policy_feasible_counts = dict(
+        summary.get("topology_selection_policy_feasible_counts") or {}
+    )
+    topology_selection_policy_feasibility_rates = dict(
+        summary.get("topology_selection_policy_feasibility_rates") or {}
+    )
+    if not topology_selection_policy_feasibility_rates and topology_selection_policy_optimization_counts:
+        topology_selection_policy_feasibility_rates = {
+            str(policy): round(
+                float(topology_selection_policy_feasible_counts.get(policy, 0.0))
+                / max(1.0, float(count_value)),
+                4,
+            )
+            for policy, count_value in topology_selection_policy_optimization_counts.items()
+            if float(count_value) > 0.0
+        }
+
     return RuntimeEvaluationFeedback(
         completion_threshold=round(threshold, 4),
         enhanced_progress_threshold=round(progress_threshold, 4),
@@ -339,6 +396,78 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             ),
             "topology_learned_override_reward_delta": _coerce_float(
                 summary.get("topology_learned_override_reward_delta")
+            ),
+            "optimization_feasible_tasks": int(
+                summary.get("optimization_feasible_tasks", summary.get("feasible_tasks", 0)) or 0
+            ),
+            "optimization_infeasible_tasks": int(
+                summary.get(
+                    "optimization_infeasible_tasks",
+                    summary.get("infeasible_tasks", 0),
+                )
+                or 0
+            ),
+            "optimization_feasibility_rate": round(
+                float(
+                    summary.get(
+                        "optimization_feasibility_rate",
+                        summary.get("feasibility_rate", 0.0),
+                    )
+                    or 0.0
+                ),
+                4,
+            ),
+            "avg_optimization_reward": round(
+                float(summary.get("avg_optimization_reward", summary.get("avg_reward", 0.0)) or 0.0),
+                4,
+            ),
+            "avg_feasible_optimization_reward": round(
+                float(
+                    summary.get(
+                        "avg_feasible_optimization_reward",
+                        summary.get("avg_feasible_reward", 0.0),
+                    )
+                    or 0.0
+                ),
+                4,
+            ),
+            "avg_infeasible_optimization_reward": round(
+                float(
+                    summary.get(
+                        "avg_infeasible_optimization_reward",
+                        summary.get("avg_infeasible_reward", 0.0),
+                    )
+                    or 0.0
+                ),
+                4,
+            ),
+            "optimization_gate_failures": dict(
+                summary.get("optimization_gate_failures", summary.get("gate_failures")) or {}
+            ),
+            "topology_selection_policy_optimization_counts": (
+                topology_selection_policy_optimization_counts
+            ),
+            "topology_selection_policy_optimization_reward_totals": (
+                topology_selection_policy_optimization_reward_totals
+            ),
+            "avg_topology_optimization_reward_by_selection_policy": (
+                avg_topology_optimization_reward_by_selection_policy
+            ),
+            "topology_selection_policy_feasible_counts": (
+                topology_selection_policy_feasible_counts
+            ),
+            "topology_selection_policy_feasibility_rates": (
+                topology_selection_policy_feasibility_rates
+            ),
+            "topology_learned_override_optimization_reward_delta": (
+                _coerce_float(summary.get("topology_learned_override_optimization_reward_delta"))
+                or _selection_policy_reward_delta(
+                    avg_topology_optimization_reward_by_selection_policy
+                )
+            ),
+            "topology_learned_override_feasibility_delta": (
+                _coerce_float(summary.get("topology_learned_override_feasibility_delta"))
+                or _selection_policy_reward_delta(topology_selection_policy_feasibility_rates)
             ),
         },
     )
@@ -1197,6 +1326,9 @@ def _merge_selection_policy_scope_bucket(
     label: str,
     policy_counts: Mapping[str, Any],
     policy_reward_totals: Mapping[str, Any],
+    policy_optimization_counts: Mapping[str, Any],
+    policy_optimization_reward_totals: Mapping[str, Any],
+    policy_feasible_counts: Mapping[str, Any],
 ) -> None:
     """Merge one scoped policy-metrics bucket into the aggregate structure."""
     bucket = scope_metrics[dimension].setdefault(
@@ -1204,6 +1336,9 @@ def _merge_selection_policy_scope_bucket(
         {
             "policy_counts": {},
             "policy_reward_totals": {},
+            "policy_optimization_counts": {},
+            "policy_optimization_reward_totals": {},
+            "policy_feasible_counts": {},
         },
     )
     for policy, count_value in policy_counts.items():
@@ -1232,6 +1367,48 @@ def _merge_selection_policy_scope_bucket(
             continue
         bucket["policy_reward_totals"][policy_name] = round(
             bucket["policy_reward_totals"].get(policy_name, 0.0) + reward_total,
+            4,
+        )
+    for policy, count_value in policy_optimization_counts.items():
+        policy_name = str(policy).strip()
+        if not policy_name:
+            continue
+        try:
+            count = float(count_value)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0.0:
+            continue
+        bucket["policy_optimization_counts"][policy_name] = round(
+            bucket["policy_optimization_counts"].get(policy_name, 0.0) + count,
+            4,
+        )
+    for policy, reward_value in policy_optimization_reward_totals.items():
+        policy_name = str(policy).strip()
+        if not policy_name:
+            continue
+        try:
+            reward_total = float(reward_value)
+        except (TypeError, ValueError):
+            continue
+        if reward_total <= 0.0:
+            continue
+        bucket["policy_optimization_reward_totals"][policy_name] = round(
+            bucket["policy_optimization_reward_totals"].get(policy_name, 0.0) + reward_total,
+            4,
+        )
+    for policy, count_value in policy_feasible_counts.items():
+        policy_name = str(policy).strip()
+        if not policy_name:
+            continue
+        try:
+            count = float(count_value)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0.0:
+            continue
+        bucket["policy_feasible_counts"][policy_name] = round(
+            bucket["policy_feasible_counts"].get(policy_name, 0.0) + count,
             4,
         )
 
@@ -1264,15 +1441,43 @@ def _build_selection_policy_scope_metrics(
                         label=normalized_label,
                         policy_counts=dict(bucket.get("policy_counts") or {}),
                         policy_reward_totals=dict(bucket.get("policy_reward_totals") or {}),
+                        policy_optimization_counts=dict(
+                            bucket.get("policy_optimization_counts") or {}
+                        ),
+                        policy_optimization_reward_totals=dict(
+                            bucket.get("policy_optimization_reward_totals") or {}
+                        ),
+                        policy_feasible_counts=dict(bucket.get("policy_feasible_counts") or {}),
                     )
 
         selection_policy_counts = metadata.get("topology_selection_policies") or {}
         selection_policy_reward_totals = metadata.get("topology_selection_policy_reward_totals") or {}
+        selection_policy_optimization_counts = (
+            metadata.get("topology_selection_policy_optimization_counts") or {}
+        )
+        selection_policy_optimization_reward_totals = (
+            metadata.get("topology_selection_policy_optimization_reward_totals") or {}
+        )
+        selection_policy_feasible_counts = (
+            metadata.get("topology_selection_policy_feasible_counts") or {}
+        )
         if not isinstance(selection_policy_counts, Mapping):
             selection_policy_counts = {}
         if not isinstance(selection_policy_reward_totals, Mapping):
             selection_policy_reward_totals = {}
-        if not selection_policy_counts and not selection_policy_reward_totals:
+        if not isinstance(selection_policy_optimization_counts, Mapping):
+            selection_policy_optimization_counts = {}
+        if not isinstance(selection_policy_optimization_reward_totals, Mapping):
+            selection_policy_optimization_reward_totals = {}
+        if not isinstance(selection_policy_feasible_counts, Mapping):
+            selection_policy_feasible_counts = {}
+        if (
+            not selection_policy_counts
+            and not selection_policy_reward_totals
+            and not selection_policy_optimization_counts
+            and not selection_policy_optimization_reward_totals
+            and not selection_policy_feasible_counts
+        ):
             continue
 
         for dimension in scope_metrics:
@@ -1287,21 +1492,50 @@ def _build_selection_policy_scope_metrics(
                 label=label,
                 policy_counts=selection_policy_counts,
                 policy_reward_totals=selection_policy_reward_totals,
+                policy_optimization_counts=selection_policy_optimization_counts,
+                policy_optimization_reward_totals=selection_policy_optimization_reward_totals,
+                policy_feasible_counts=selection_policy_feasible_counts,
             )
 
     for dimension, entries in scope_metrics.items():
         for label, bucket in entries.items():
             policy_counts = dict(bucket.get("policy_counts") or {})
             policy_reward_totals = dict(bucket.get("policy_reward_totals") or {})
+            policy_optimization_counts = dict(bucket.get("policy_optimization_counts") or {})
+            policy_optimization_reward_totals = dict(
+                bucket.get("policy_optimization_reward_totals") or {}
+            )
+            policy_feasible_counts = dict(bucket.get("policy_feasible_counts") or {})
             avg_reward_by_policy = _average_mapping_from_totals(
                 policy_counts,
                 policy_reward_totals,
             )
             bucket["policy_counts"] = policy_counts
             bucket["policy_reward_totals"] = policy_reward_totals
+            bucket["policy_optimization_counts"] = policy_optimization_counts
+            bucket["policy_optimization_reward_totals"] = policy_optimization_reward_totals
+            bucket["policy_feasible_counts"] = policy_feasible_counts
             bucket["avg_reward_by_policy"] = avg_reward_by_policy
             bucket["learned_override_reward_delta"] = _selection_policy_reward_delta(
                 avg_reward_by_policy
+            )
+            bucket["avg_optimization_reward_by_policy"] = _average_mapping_from_totals(
+                policy_optimization_counts,
+                policy_optimization_reward_totals,
+            )
+            bucket["feasibility_rate_by_policy"] = {
+                policy: round(
+                    float(policy_feasible_counts.get(policy, 0.0)) / max(1.0, float(count_value)),
+                    4,
+                )
+                for policy, count_value in policy_optimization_counts.items()
+                if float(count_value) > 0.0
+            }
+            bucket["learned_override_optimization_reward_delta"] = _selection_policy_reward_delta(
+                bucket["avg_optimization_reward_by_policy"]
+            )
+            bucket["learned_override_feasibility_delta"] = _selection_policy_reward_delta(
+                bucket["feasibility_rate_by_policy"]
             )
     return scope_metrics
 
@@ -1420,10 +1654,32 @@ def _aggregate_feedback_payloads(
     selection_policy_reward_totals = weighted_distribution(
         "topology_selection_policy_reward_totals"
     )
+    optimization_gate_failures = weighted_distribution("optimization_gate_failures")
+    selection_policy_optimization_counts = weighted_distribution(
+        "topology_selection_policy_optimization_counts"
+    )
+    selection_policy_optimization_reward_totals = weighted_distribution(
+        "topology_selection_policy_optimization_reward_totals"
+    )
+    selection_policy_feasible_counts = weighted_distribution(
+        "topology_selection_policy_feasible_counts"
+    )
     avg_reward_by_selection_policy = _average_mapping_from_totals(
         selection_policy_counts,
         selection_policy_reward_totals,
     )
+    avg_optimization_reward_by_selection_policy = _average_mapping_from_totals(
+        selection_policy_optimization_counts,
+        selection_policy_optimization_reward_totals,
+    )
+    selection_policy_feasibility_rates = {
+        policy: round(
+            float(selection_policy_feasible_counts.get(policy, 0.0)) / max(1.0, float(count_value)),
+            4,
+        )
+        for policy, count_value in selection_policy_optimization_counts.items()
+        if float(count_value) > 0.0
+    }
     selection_policy_scope_metrics = _build_selection_policy_scope_metrics(
         metadata_list,
         weights,
@@ -1481,6 +1737,21 @@ def _aggregate_feedback_payloads(
             "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
             "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
             "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
+            "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
+            "optimization_infeasible_tasks": weighted_metadata_average(
+                "optimization_infeasible_tasks"
+            ),
+            "optimization_feasibility_rate": weighted_metadata_average(
+                "optimization_feasibility_rate"
+            ),
+            "avg_optimization_reward": weighted_metadata_average("avg_optimization_reward"),
+            "avg_feasible_optimization_reward": weighted_metadata_average(
+                "avg_feasible_optimization_reward"
+            ),
+            "avg_infeasible_optimization_reward": weighted_metadata_average(
+                "avg_infeasible_optimization_reward"
+            ),
+            "optimization_gate_failures": optimization_gate_failures,
             "topology_actions": weighted_distribution("topology_actions"),
             "topology_final_actions": weighted_distribution("topology_final_actions"),
             "topology_kinds": weighted_distribution("topology_kinds"),
@@ -1493,6 +1764,23 @@ def _aggregate_feedback_payloads(
             "avg_topology_reward_by_selection_policy": avg_reward_by_selection_policy,
             "topology_learned_override_reward_delta": _selection_policy_reward_delta(
                 avg_reward_by_selection_policy
+            ),
+            "topology_selection_policy_optimization_counts": (
+                selection_policy_optimization_counts
+            ),
+            "topology_selection_policy_optimization_reward_totals": (
+                selection_policy_optimization_reward_totals
+            ),
+            "avg_topology_optimization_reward_by_selection_policy": (
+                avg_optimization_reward_by_selection_policy
+            ),
+            "topology_selection_policy_feasible_counts": selection_policy_feasible_counts,
+            "topology_selection_policy_feasibility_rates": selection_policy_feasibility_rates,
+            "topology_learned_override_optimization_reward_delta": (
+                _selection_policy_reward_delta(avg_optimization_reward_by_selection_policy)
+            ),
+            "topology_learned_override_feasibility_delta": _selection_policy_reward_delta(
+                selection_policy_feasibility_rates
             ),
             "topology_selection_policy_scope_metrics": selection_policy_scope_metrics,
             "task_count": sum(task_counts),
@@ -1601,10 +1889,32 @@ def _aggregate_topology_feedback_metadata(
     selection_policy_reward_totals = weighted_distribution(
         "topology_selection_policy_reward_totals"
     )
+    optimization_gate_failures = weighted_distribution("optimization_gate_failures")
+    selection_policy_optimization_counts = weighted_distribution(
+        "topology_selection_policy_optimization_counts"
+    )
+    selection_policy_optimization_reward_totals = weighted_distribution(
+        "topology_selection_policy_optimization_reward_totals"
+    )
+    selection_policy_feasible_counts = weighted_distribution(
+        "topology_selection_policy_feasible_counts"
+    )
     avg_reward_by_selection_policy = _average_mapping_from_totals(
         selection_policy_distribution,
         selection_policy_reward_totals,
     )
+    avg_optimization_reward_by_selection_policy = _average_mapping_from_totals(
+        selection_policy_optimization_counts,
+        selection_policy_optimization_reward_totals,
+    )
+    selection_policy_feasibility_rates = {
+        policy: round(
+            float(selection_policy_feasible_counts.get(policy, 0.0)) / max(1.0, float(count_value)),
+            4,
+        )
+        for policy, count_value in selection_policy_optimization_counts.items()
+        if float(count_value) > 0.0
+    }
     selection_policy_scope_metrics = _build_selection_policy_scope_metrics(
         metadata_list,
         weights,
@@ -1651,6 +1961,21 @@ def _aggregate_topology_feedback_metadata(
         "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
         "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
         "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
+        "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
+        "optimization_infeasible_tasks": weighted_metadata_average(
+            "optimization_infeasible_tasks"
+        ),
+        "optimization_feasibility_rate": weighted_metadata_average(
+            "optimization_feasibility_rate"
+        ),
+        "avg_optimization_reward": weighted_metadata_average("avg_optimization_reward"),
+        "avg_feasible_optimization_reward": weighted_metadata_average(
+            "avg_feasible_optimization_reward"
+        ),
+        "avg_infeasible_optimization_reward": weighted_metadata_average(
+            "avg_infeasible_optimization_reward"
+        ),
+        "optimization_gate_failures": optimization_gate_failures,
         "topology_observation_count": (
             weighted_metadata_average("topology_observation_count")
             or weighted_metadata_average("task_count")
@@ -1667,6 +1992,21 @@ def _aggregate_topology_feedback_metadata(
         "avg_topology_reward_by_selection_policy": avg_reward_by_selection_policy,
         "topology_learned_override_reward_delta": _selection_policy_reward_delta(
             avg_reward_by_selection_policy
+        ),
+        "topology_selection_policy_optimization_counts": selection_policy_optimization_counts,
+        "topology_selection_policy_optimization_reward_totals": (
+            selection_policy_optimization_reward_totals
+        ),
+        "avg_topology_optimization_reward_by_selection_policy": (
+            avg_optimization_reward_by_selection_policy
+        ),
+        "topology_selection_policy_feasible_counts": selection_policy_feasible_counts,
+        "topology_selection_policy_feasibility_rates": selection_policy_feasibility_rates,
+        "topology_learned_override_optimization_reward_delta": (
+            _selection_policy_reward_delta(avg_optimization_reward_by_selection_policy)
+        ),
+        "topology_learned_override_feasibility_delta": _selection_policy_reward_delta(
+            selection_policy_feasibility_rates
         ),
         "topology_selection_policy_scope_metrics": selection_policy_scope_metrics,
         "topology_action_agreement": action_agreement,

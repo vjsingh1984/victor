@@ -46,6 +46,7 @@ class TopologySelectorConfig:
     learned_override_margin: float = 0.01
     learned_override_min_policy_count: int = 2
     learned_override_disable_reward_delta: float = -0.2
+    learned_override_disable_feasibility_delta: float = -0.2
     learned_override_reward_delta_cap: float = 0.25
     learned_override_score_gap_tuning_gain: float = 0.3
     learned_override_support_tuning_gain: float = 0.2
@@ -64,6 +65,8 @@ class LearnedOverrideThresholds:
     min_agreement: float
     max_conflict: float
     reward_delta: Optional[float] = None
+    optimization_reward_delta: Optional[float] = None
+    feasibility_delta: Optional[float] = None
     reward_evidence: int = 0
     profile: str = "static"
     disabled: bool = False
@@ -590,6 +593,12 @@ class TopologySelector:
         reward_delta = self._coerce_optional_float(
             context.get("learned_override_policy_reward_delta")
         )
+        optimization_reward_delta = self._coerce_optional_float(
+            context.get("learned_override_policy_optimization_reward_delta")
+        )
+        feasibility_delta = self._coerce_optional_float(
+            context.get("learned_override_policy_feasibility_delta")
+        )
         reward_evidence = min(
             self._coerce_non_negative_int(context.get("learned_override_policy_count")),
             self._coerce_non_negative_int(context.get("heuristic_policy_count")),
@@ -600,24 +609,59 @@ class TopologySelector:
             min_agreement=self.config.learned_override_min_agreement,
             max_conflict=self.config.learned_override_max_conflict,
             reward_delta=reward_delta,
+            optimization_reward_delta=optimization_reward_delta,
+            feasibility_delta=feasibility_delta,
             reward_evidence=reward_evidence,
         )
-        if reward_delta is None or reward_evidence < self.config.learned_override_min_policy_count:
+        effective_reward_delta = (
+            optimization_reward_delta if optimization_reward_delta is not None else reward_delta
+        )
+        if (
+            effective_reward_delta is None
+            and feasibility_delta is None
+        ) or reward_evidence < self.config.learned_override_min_policy_count:
             return thresholds
-        if reward_delta <= self.config.learned_override_disable_reward_delta:
+        if (
+            feasibility_delta is not None
+            and feasibility_delta <= self.config.learned_override_disable_feasibility_delta
+        ):
             return LearnedOverrideThresholds(
                 score_gap=thresholds.score_gap,
                 min_support=thresholds.min_support,
                 min_agreement=thresholds.min_agreement,
                 max_conflict=thresholds.max_conflict,
                 reward_delta=reward_delta,
+                optimization_reward_delta=optimization_reward_delta,
+                feasibility_delta=feasibility_delta,
+                reward_evidence=reward_evidence,
+                profile="adaptive_disabled_feasibility",
+                disabled=True,
+            )
+        if (
+            effective_reward_delta is not None
+            and effective_reward_delta <= self.config.learned_override_disable_reward_delta
+        ):
+            return LearnedOverrideThresholds(
+                score_gap=thresholds.score_gap,
+                min_support=thresholds.min_support,
+                min_agreement=thresholds.min_agreement,
+                max_conflict=thresholds.max_conflict,
+                reward_delta=reward_delta,
+                optimization_reward_delta=optimization_reward_delta,
+                feasibility_delta=feasibility_delta,
                 reward_evidence=reward_evidence,
                 profile="adaptive_disabled_negative",
                 disabled=True,
             )
 
+        tuning_signal = effective_reward_delta if effective_reward_delta is not None else 0.0
+        if feasibility_delta is not None:
+            if effective_reward_delta is None:
+                tuning_signal = feasibility_delta
+            else:
+                tuning_signal = (effective_reward_delta * 0.7) + (feasibility_delta * 0.3)
         bounded_delta = self._clamp_float(
-            reward_delta,
+            tuning_signal,
             -self.config.learned_override_reward_delta_cap,
             self.config.learned_override_reward_delta_cap,
         )
@@ -647,6 +691,8 @@ class TopologySelector:
                 0.6,
             ),
             reward_delta=reward_delta,
+            optimization_reward_delta=optimization_reward_delta,
+            feasibility_delta=feasibility_delta,
             reward_evidence=reward_evidence,
             profile=(
                 "adaptive_positive"
@@ -673,6 +719,16 @@ class TopologySelector:
         if thresholds.reward_delta is not None:
             metadata["learned_override_policy_reward_delta"] = round(
                 thresholds.reward_delta,
+                4,
+            )
+        if thresholds.optimization_reward_delta is not None:
+            metadata["learned_override_policy_optimization_reward_delta"] = round(
+                thresholds.optimization_reward_delta,
+                4,
+            )
+        if thresholds.feasibility_delta is not None:
+            metadata["learned_override_policy_feasibility_delta"] = round(
+                thresholds.feasibility_delta,
                 4,
             )
         if thresholds.reward_evidence > 0:
@@ -819,6 +875,8 @@ class TopologySelector:
             "learned_override_effective_min_agreement",
             "learned_override_effective_max_conflict",
             "learned_override_policy_reward_delta",
+            "learned_override_policy_optimization_reward_delta",
+            "learned_override_policy_feasibility_delta",
             "learned_override_policy_evidence",
             "learned_override_disabled",
         ):

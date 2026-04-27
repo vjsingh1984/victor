@@ -460,6 +460,18 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                     "heuristic": 1.1,
                     "learned_close_override": 2.4,
                 },
+                "topology_selection_policy_optimization_counts": {
+                    "heuristic": 2,
+                    "learned_close_override": 3,
+                },
+                "topology_selection_policy_optimization_reward_totals": {
+                    "heuristic": 1.0,
+                    "learned_close_override": 2.7,
+                },
+                "topology_selection_policy_feasible_counts": {
+                    "heuristic": 1,
+                    "learned_close_override": 3,
+                },
                 "topology_selection_policy_scope_metrics": {
                     "task_type": {
                         "edit": {
@@ -468,11 +480,33 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                                 "heuristic": 0.9,
                                 "learned_close_override": 1.4,
                             },
+                            "policy_optimization_counts": {
+                                "heuristic": 2,
+                                "learned_close_override": 2,
+                            },
+                            "policy_optimization_reward_totals": {
+                                "heuristic": 0.7,
+                                "learned_close_override": 1.6,
+                            },
+                            "policy_feasible_counts": {
+                                "heuristic": 1,
+                                "learned_close_override": 2,
+                            },
                             "avg_reward_by_policy": {
                                 "heuristic": 0.45,
                                 "learned_close_override": 0.7,
                             },
                             "learned_override_reward_delta": 0.25,
+                            "avg_optimization_reward_by_policy": {
+                                "heuristic": 0.35,
+                                "learned_close_override": 0.8,
+                            },
+                            "feasibility_rate_by_policy": {
+                                "heuristic": 0.5,
+                                "learned_close_override": 1.0,
+                            },
+                            "learned_override_optimization_reward_delta": 0.45,
+                            "learned_override_feasibility_delta": 0.5,
                         }
                     },
                     "provider": {
@@ -482,11 +516,33 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                                 "heuristic": 1.2,
                                 "learned_close_override": 2.4,
                             },
+                            "policy_optimization_counts": {
+                                "heuristic": 3,
+                                "learned_close_override": 3,
+                            },
+                            "policy_optimization_reward_totals": {
+                                "heuristic": 1.2,
+                                "learned_close_override": 2.55,
+                            },
+                            "policy_feasible_counts": {
+                                "heuristic": 1,
+                                "learned_close_override": 3,
+                            },
                             "avg_reward_by_policy": {
                                 "heuristic": 0.4,
                                 "learned_close_override": 0.8,
                             },
                             "learned_override_reward_delta": 0.4,
+                            "avg_optimization_reward_by_policy": {
+                                "heuristic": 0.4,
+                                "learned_close_override": 0.85,
+                            },
+                            "feasibility_rate_by_policy": {
+                                "heuristic": 0.3333,
+                                "learned_close_override": 1.0,
+                            },
+                            "learned_override_optimization_reward_delta": 0.45,
+                            "learned_override_feasibility_delta": 0.6667,
                         }
                     },
                     "model_family": {
@@ -496,11 +552,33 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                                 "heuristic": 1.6,
                                 "learned_close_override": 4.25,
                             },
+                            "policy_optimization_counts": {
+                                "heuristic": 4,
+                                "learned_close_override": 5,
+                            },
+                            "policy_optimization_reward_totals": {
+                                "heuristic": 1.8,
+                                "learned_close_override": 4.6,
+                            },
+                            "policy_feasible_counts": {
+                                "heuristic": 2,
+                                "learned_close_override": 5,
+                            },
                             "avg_reward_by_policy": {
                                 "heuristic": 0.4,
                                 "learned_close_override": 0.85,
                             },
                             "learned_override_reward_delta": 0.45,
+                            "avg_optimization_reward_by_policy": {
+                                "heuristic": 0.45,
+                                "learned_close_override": 0.92,
+                            },
+                            "feasibility_rate_by_policy": {
+                                "heuristic": 0.5,
+                                "learned_close_override": 1.0,
+                            },
+                            "learned_override_optimization_reward_delta": 0.47,
+                            "learned_override_feasibility_delta": 0.5,
                         }
                     },
                 },
@@ -548,6 +626,12 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
     assert hints["learned_override_policy_reward"] == pytest.approx(0.85)
     assert hints["heuristic_policy_reward"] == pytest.approx(0.4)
     assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.45)
+    assert hints["learned_override_policy_optimization_reward"] == pytest.approx(0.92)
+    assert hints["heuristic_policy_optimization_reward"] == pytest.approx(0.45)
+    assert hints["learned_override_policy_optimization_reward_delta"] == pytest.approx(0.47)
+    assert hints["learned_override_policy_feasibility_rate"] == pytest.approx(1.0)
+    assert hints["heuristic_policy_feasibility_rate"] == pytest.approx(0.5)
+    assert hints["learned_override_policy_feasibility_delta"] == pytest.approx(0.5)
 
 
 def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_path):
@@ -569,6 +653,18 @@ def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_
                     "heuristic": 1.1,
                     "learned_close_override": 2.4,
                 },
+                "topology_selection_policy_optimization_counts": {
+                    "heuristic": 2,
+                    "learned_close_override": 2,
+                },
+                "topology_selection_policy_optimization_reward_totals": {
+                    "heuristic": 0.8,
+                    "learned_close_override": 1.6,
+                },
+                "topology_selection_policy_feasible_counts": {
+                    "heuristic": 1,
+                    "learned_close_override": 2,
+                },
                 "topology_selection_policy_scope_metrics": {
                     "task_type": {
                         "analysis": {
@@ -577,11 +673,33 @@ def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_
                                 "heuristic": 0.8,
                                 "learned_close_override": 1.6,
                             },
+                            "policy_optimization_counts": {
+                                "heuristic": 2,
+                                "learned_close_override": 2,
+                            },
+                            "policy_optimization_reward_totals": {
+                                "heuristic": 0.8,
+                                "learned_close_override": 1.7,
+                            },
+                            "policy_feasible_counts": {
+                                "heuristic": 1,
+                                "learned_close_override": 2,
+                            },
                             "avg_reward_by_policy": {
                                 "heuristic": 0.4,
                                 "learned_close_override": 0.8,
                             },
                             "learned_override_reward_delta": 0.4,
+                            "avg_optimization_reward_by_policy": {
+                                "heuristic": 0.4,
+                                "learned_close_override": 0.85,
+                            },
+                            "feasibility_rate_by_policy": {
+                                "heuristic": 0.5,
+                                "learned_close_override": 1.0,
+                            },
+                            "learned_override_optimization_reward_delta": 0.45,
+                            "learned_override_feasibility_delta": 0.5,
                         }
                     }
                 },
@@ -603,6 +721,8 @@ def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_
     assert hints["learned_override_policy_scope_dimension"] == "task_type"
     assert hints["learned_override_policy_scope_label"] == "analysis"
     assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.4)
+    assert hints["learned_override_policy_optimization_reward_delta"] == pytest.approx(0.45)
+    assert hints["learned_override_policy_feasibility_delta"] == pytest.approx(0.5)
 
 
 def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp_path):

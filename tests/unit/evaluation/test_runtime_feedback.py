@@ -95,6 +95,87 @@ def test_derive_runtime_feedback_raises_threshold_for_overconfident_failures():
     assert feedback.metadata["topology_learned_override_reward_delta"] is None
 
 
+def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization_metrics():
+    payload = {
+        "summary": {
+            "total_tasks": 2,
+            "optimization_feasible_tasks": 1,
+            "optimization_infeasible_tasks": 1,
+            "optimization_feasibility_rate": 0.5,
+            "topology_feedback_coverage": 1.0,
+        },
+        "quality": {
+            "avg_topology_reward": 0.73,
+            "avg_topology_confidence": 0.81,
+            "avg_optimization_reward": 0.64,
+            "avg_feasible_optimization_reward": 0.82,
+            "avg_infeasible_optimization_reward": 0.46,
+        },
+        "optimization": {
+            "gate_failures": {"tests_pass": 1},
+            "feasible_tasks": 1,
+            "infeasible_tasks": 1,
+            "avg_reward": 0.64,
+            "avg_feasible_reward": 0.82,
+            "avg_infeasible_reward": 0.46,
+        },
+        "topology": {
+            "topology_actions": {"single_agent": 1, "team_plan": 1},
+            "topology_execution_modes": {"single_agent": 1, "team_execution": 1},
+            "topology_selection_policies": {"heuristic": 1, "learned_close_override": 1},
+            "topology_selection_policy_reward_totals": {
+                "heuristic": 0.61,
+                "learned_close_override": 0.85,
+            },
+            "topology_selection_policy_optimization_counts": {
+                "heuristic": 1,
+                "learned_close_override": 1,
+            },
+            "topology_selection_policy_optimization_reward_totals": {
+                "heuristic": 0.46,
+                "learned_close_override": 0.82,
+            },
+            "topology_selection_policy_feasible_counts": {
+                "heuristic": 0,
+                "learned_close_override": 1,
+            },
+            "topology_selection_policy_feasibility_rates": {
+                "heuristic": 0.0,
+                "learned_close_override": 1.0,
+            },
+            "topology_learned_override_reward_delta": 0.24,
+            "topology_learned_override_optimization_reward_delta": 0.36,
+            "topology_learned_override_feasibility_delta": 1.0,
+        },
+        "tasks": [
+            {"status": "passed"},
+            {"status": "failed"},
+        ],
+    }
+
+    feedback = derive_runtime_evaluation_feedback(payload)
+
+    assert feedback.metadata["optimization_feasible_tasks"] == 1
+    assert feedback.metadata["optimization_infeasible_tasks"] == 1
+    assert feedback.metadata["optimization_feasibility_rate"] == pytest.approx(0.5)
+    assert feedback.metadata["avg_optimization_reward"] == pytest.approx(0.64)
+    assert feedback.metadata["avg_feasible_optimization_reward"] == pytest.approx(0.82)
+    assert feedback.metadata["avg_infeasible_optimization_reward"] == pytest.approx(0.46)
+    assert feedback.metadata["optimization_gate_failures"] == {"tests_pass": 1}
+    assert feedback.metadata["topology_selection_policy_optimization_counts"] == {
+        "heuristic": 1,
+        "learned_close_override": 1,
+    }
+    assert feedback.metadata["avg_topology_optimization_reward_by_selection_policy"] == {
+        "heuristic": 0.46,
+        "learned_close_override": 0.82,
+    }
+    assert feedback.metadata["topology_learned_override_optimization_reward_delta"] == pytest.approx(
+        0.36
+    )
+    assert feedback.metadata["topology_learned_override_feasibility_delta"] == pytest.approx(1.0)
+
+
 def test_save_and_load_runtime_feedback_round_trip(tmp_path):
     feedback = RuntimeEvaluationFeedback(
         completion_threshold=0.77,
@@ -628,6 +709,18 @@ def test_load_runtime_feedback_aggregates_selection_policy_reward_metrics(tmp_pa
                     "heuristic": 1.1,
                     "learned_close_override": 2.4,
                 },
+                "topology_selection_policy_optimization_counts": {
+                    "heuristic": 2,
+                    "learned_close_override": 3,
+                },
+                "topology_selection_policy_optimization_reward_totals": {
+                    "heuristic": 1.04,
+                    "learned_close_override": 2.43,
+                },
+                "topology_selection_policy_feasible_counts": {
+                    "heuristic": 1,
+                    "learned_close_override": 3,
+                },
                 "task_count": 5,
             }
         ),
@@ -652,9 +745,27 @@ def test_load_runtime_feedback_aggregates_selection_policy_reward_metrics(tmp_pa
         "heuristic": 0.55,
         "learned_close_override": 0.8,
     }
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"]["openai"][
+        "avg_optimization_reward_by_policy"
+    ] == {
+        "heuristic": 0.52,
+        "learned_close_override": 0.81,
+    }
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"]["openai"][
+        "feasibility_rate_by_policy"
+    ] == {
+        "heuristic": 0.5,
+        "learned_close_override": 1.0,
+    }
     assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"]["gpt"][
         "policy_counts"
     ] == {"heuristic": 2.0, "learned_close_override": 3.0}
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"]["gpt"][
+        "learned_override_optimization_reward_delta"
+    ] == pytest.approx(0.29)
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"]["gpt"][
+        "learned_override_feasibility_delta"
+    ] == pytest.approx(0.5)
 
 
 def test_build_swe_bench_validated_session_feedback_payload_uses_real_validator_outputs():
