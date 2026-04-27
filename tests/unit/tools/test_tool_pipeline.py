@@ -379,7 +379,9 @@ class TestToolPipeline:
         assert pipeline.last_batch_effectively_blocked is False
 
     @pytest.mark.asyncio
-    async def test_unknown_tool_skip_still_counts_as_effectively_blocked(self, pipeline, mock_tool_registry):
+    async def test_unknown_tool_skip_still_counts_as_effectively_blocked(
+        self, pipeline, mock_tool_registry
+    ):
         """Non-informative skipped batches should continue to count as blocked."""
         mock_tool_registry.is_tool_enabled.return_value = False
 
