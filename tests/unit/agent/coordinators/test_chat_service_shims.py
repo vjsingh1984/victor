@@ -283,6 +283,30 @@ async def test_chat_coordinator_planning_prefers_orchestrator_runtime_helper():
 
 
 @pytest.mark.asyncio
+async def test_chat_coordinator_planning_prefers_bound_chat_service():
+    response = CompletionResponse(content="planned-service", role="assistant")
+    orchestrator = MagicMock()
+    chat_service = MagicMock()
+    chat_service.chat = AsyncMock(return_value=response)
+
+    coordinator = _make_deprecated_chat_coordinator(orchestrator)
+    coordinator.bind_chat_service(chat_service)
+
+    result = await coordinator._chat_with_planning("hello")
+
+    assert result is response
+    chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
+
+
+@pytest.mark.asyncio
+async def test_chat_coordinator_planning_requires_canonical_runtime():
+    coordinator = _make_deprecated_chat_coordinator(MagicMock())
+
+    with pytest.raises(RuntimeError, match="planning requires a bound ChatService or orchestrator runtime"):
+        await coordinator._chat_with_planning("hello")
+
+
+@pytest.mark.asyncio
 async def test_chat_coordinator_context_limits_prefer_orchestrator_runtime_helper():
     chunk = StreamChunk(content="done", is_final=True)
     orchestrator = MagicMock()

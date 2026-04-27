@@ -340,36 +340,18 @@ class ChatCoordinator(ChatStreamHelperMixin):
         Returns:
             CompletionResponse from planning-based execution
         """
-        orch = self._orchestrator
+        chat_service = self._resolve_chat_service()
+        if chat_service is not None:
+            return await chat_service.chat(user_message, use_planning=True)
+
         runtime_helper = self._get_orchestrator_runtime_helper("_run_planning_chat_runtime")
         if callable(runtime_helper):
             return await runtime_helper(user_message)
 
-        from victor.agent.services.planning_runtime import PlanningCoordinator
-
-        if self._planning_coordinator is None:
-            # Lazy initialization
-            self._planning_coordinator = PlanningCoordinator(orch)
-
-        # Get task analysis for planning
-        task_analysis = orch.task_analyzer.analyze(user_message)
-
-        # Use planning coordinator
-        response = await self._planning_coordinator.chat_with_planning(
-            user_message,
-            task_analysis=task_analysis,
+        raise RuntimeError(
+            "ChatCoordinator planning requires a bound ChatService or orchestrator runtime. "
+            "Bind ChatService before using deprecated compatibility shims."
         )
-
-        # Add messages to conversation history
-        if not orch._system_added:
-            orch.conversation.ensure_system_prompt()
-            orch._system_added = True
-
-        orch.add_message("user", user_message)
-        if response.content:
-            orch.add_message("assistant", response.content)
-
-        return response
 
     async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
