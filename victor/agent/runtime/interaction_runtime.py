@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
+
+if TYPE_CHECKING:
+    from victor.agent.services.protocols.chat_runtime import ChatCompatRuntimeProtocol
 
 
 @dataclass(frozen=True)
@@ -27,7 +30,7 @@ class InteractionRuntimeComponents:
 
 def create_chat_coordinator_shim(
     *,
-    orchestrator: Any,
+    runtime: "ChatCompatRuntimeProtocol",
     chat_service: Optional[Any] = None,
     get_chat_service: Optional[Any] = None,
 ) -> LazyRuntimeProxy[Any]:
@@ -46,7 +49,9 @@ def create_chat_coordinator_shim(
         )
         from victor.agent.services.chat_compat import ChatCoordinator
 
-        coordinator = ChatCoordinator(orchestrator)
+        # The service-first shim binds ChatService immediately, so the adapter only
+        # needs the public compatibility runtime surface here.
+        coordinator = ChatCoordinator(cast(Any, runtime))
         if get_chat_service is not None and hasattr(coordinator, "bind_chat_service_getter"):
             coordinator.bind_chat_service_getter(get_chat_service)
         elif chat_service is not None and hasattr(coordinator, "bind_chat_service"):
@@ -151,7 +156,7 @@ def create_session_coordinator_shim(
 
 def create_interaction_runtime_components(
     *,
-    orchestrator: Any,
+    enabled_tools: Optional[Any],
     factory: Any,
     tool_pipeline: Any,
     tool_registry: Any,
@@ -205,9 +210,8 @@ def create_interaction_runtime_components(
             argument_normalizer=argument_normalizer,
         )
 
-    orch_tools = getattr(orchestrator, "_enabled_tools", None)
-    if orch_tools and hasattr(resolved_tool_service, "set_enabled_tools"):
-        resolved_tool_service.set_enabled_tools(orch_tools)
+    if enabled_tools and hasattr(resolved_tool_service, "set_enabled_tools"):
+        resolved_tool_service.set_enabled_tools(enabled_tools)
 
     resolved_session_service = session_service
     if resolved_session_service is None:

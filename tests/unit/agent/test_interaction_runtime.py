@@ -14,8 +14,6 @@ from victor.agent.runtime.interaction_runtime import (
 
 
 def test_create_interaction_runtime_components_lazy_materialization():
-    orchestrator = MagicMock()
-    orchestrator._enabled_tools = None
     tool_pipeline = MagicMock()
     tool_registry = MagicMock()
     tool_executor = MagicMock()
@@ -39,7 +37,7 @@ def test_create_interaction_runtime_components_lazy_materialization():
     session_service = MagicMock()
     factory = MagicMock()
     runtime = create_interaction_runtime_components(
-        orchestrator=orchestrator,
+        enabled_tools=None,
         factory=factory,
         tool_pipeline=tool_pipeline,
         tool_registry=tool_registry,
@@ -87,6 +85,55 @@ def test_create_interaction_runtime_components_lazy_materialization():
     # (protocol-based injection — no orchestrator reference passed)
 
 
+def test_create_interaction_runtime_components_sets_enabled_tools_without_orchestrator():
+    tool_pipeline = MagicMock()
+    tool_registry = MagicMock()
+    tool_executor = MagicMock()
+    tool_cache = MagicMock()
+    tool_selector = MagicMock()
+    mode_controller = MagicMock()
+    argument_normalizer = MagicMock()
+    session_state_manager = MagicMock()
+    lifecycle_manager = MagicMock()
+    memory_manager = MagicMock()
+    checkpoint_manager = MagicMock()
+    cost_tracker = MagicMock()
+    conversation_controller = MagicMock()
+    streaming_coordinator = MagicMock()
+    tool_service = MagicMock()
+
+    runtime = create_interaction_runtime_components(
+        enabled_tools={"read", "edit"},
+        factory=MagicMock(),
+        tool_pipeline=tool_pipeline,
+        tool_registry=tool_registry,
+        tool_executor=tool_executor,
+        tool_cache=tool_cache,
+        tool_budget=25,
+        tool_selector=tool_selector,
+        tool_access_controller=MagicMock(),
+        mode_controller=mode_controller,
+        argument_normalizer=argument_normalizer,
+        session_state_manager=session_state_manager,
+        lifecycle_manager=lifecycle_manager,
+        memory_manager=memory_manager,
+        memory_session_id="mem-123",
+        checkpoint_manager=checkpoint_manager,
+        cost_tracker=cost_tracker,
+        conversation_controller=conversation_controller,
+        streaming_coordinator=streaming_coordinator,
+        provider_service=MagicMock(),
+        chat_service=MagicMock(),
+        context_service=MagicMock(),
+        recovery_service=MagicMock(),
+        tool_service=tool_service,
+        session_service=MagicMock(),
+    )
+
+    assert runtime.tool_service is tool_service
+    tool_service.set_enabled_tools.assert_called_once_with({"read", "edit"})
+
+
 def test_create_session_coordinator_shim_lazy_materialization():
     lifecycle_manager = MagicMock()
     memory_manager = MagicMock()
@@ -126,7 +173,7 @@ def test_create_session_coordinator_shim_lazy_materialization():
 
 
 def test_create_chat_coordinator_shim_lazy_materialization():
-    orchestrator = MagicMock()
+    runtime = MagicMock()
     chat_service = MagicMock()
     get_chat_service = MagicMock(return_value=chat_service)
 
@@ -135,7 +182,7 @@ def test_create_chat_coordinator_shim_lazy_materialization():
         chat_cls.return_value = chat_coordinator
 
         shim = create_chat_coordinator_shim(
-            orchestrator=orchestrator,
+            runtime=runtime,
             get_chat_service=get_chat_service,
         )
 
@@ -145,7 +192,7 @@ def test_create_chat_coordinator_shim_lazy_materialization():
             assert shim.get_instance() is chat_coordinator
 
         warn.assert_called_once()
-        chat_cls.assert_called_once_with(orchestrator)
+        chat_cls.assert_called_once_with(runtime)
         chat_coordinator.bind_chat_service_getter.assert_called_once_with(get_chat_service)
         get_chat_service.assert_not_called()
 

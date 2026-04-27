@@ -53,6 +53,11 @@ class TestProtocolImports:
 
         assert issubclass(ChatOrchestratorProtocol, Protocol)
 
+    def test_chat_compat_runtime_protocol_importable(self):
+        from victor.agent.services.protocols.chat_runtime import ChatCompatRuntimeProtocol
+
+        assert issubclass(ChatCompatRuntimeProtocol, Protocol)
+
     def test_chat_orchestrator_protocol_is_runtime_checkable(self):
         from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
@@ -61,12 +66,14 @@ class TestProtocolImports:
 
     def test_importable_from_service_protocol_package(self):
         from victor.agent.services.protocols import (
+            ChatCompatRuntimeProtocol,
             ChatContextProtocol,
             ChatOrchestratorProtocol,
             ProviderContextProtocol,
             ToolContextProtocol,
         )
 
+        assert ChatCompatRuntimeProtocol is not None
         assert ChatContextProtocol is not None
         assert ChatOrchestratorProtocol is not None
         assert ProviderContextProtocol is not None

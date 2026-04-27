@@ -31,9 +31,10 @@ New high-level application code should still prefer `ChatServiceProtocol`,
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, runtime_checkable
 
 __all__ = [
+    "ChatCompatRuntimeProtocol",
     "ExecutionMode",
     "ChatContextProtocol",
     "ToolContextProtocol",
@@ -50,6 +51,30 @@ class ExecutionMode(Enum):
     SYNC = "sync"
     STREAMING = "streaming"
     AUTO = "auto"
+
+
+@runtime_checkable
+class ChatCompatRuntimeProtocol(Protocol):
+    """Public runtime surface for the deprecated ChatCoordinator shim path."""
+
+    async def chat(self, user_message: str, use_planning: bool = False) -> Any:
+        """Execute a non-streaming chat turn."""
+        ...
+
+    def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator[Any]:
+        """Execute a streaming chat turn."""
+        ...
+
+    async def _handle_context_and_iteration_limits_runtime(
+        self,
+        user_message: str,
+        max_total_iterations: int,
+        max_context: int,
+        total_iterations: int,
+        last_quality_score: float,
+    ) -> tuple[bool, Optional[Any]]:
+        """Handle context and iteration limits via the canonical runtime surface."""
+        ...
 
 
 class ChatContextProtocol(Protocol):

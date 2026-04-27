@@ -30,7 +30,7 @@ this implementation for compatibility.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import asyncio
@@ -170,6 +170,28 @@ class OrchestratorProtocolAdapter:
         return await self._orchestrator.chat(
             user_message,
             use_planning=use_planning,
+        )
+
+    async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator[Any]:
+        """Execute a streaming chat turn through the canonical surface."""
+        async for chunk in self._orchestrator.stream_chat(user_message, **kwargs):
+            yield chunk
+
+    async def _handle_context_and_iteration_limits_runtime(
+        self,
+        user_message: str,
+        max_total_iterations: int,
+        max_context: int,
+        total_iterations: int,
+        last_quality_score: float,
+    ) -> tuple[bool, Optional[Any]]:
+        """Delegate context/iteration limit handling to the canonical runtime."""
+        return await self._orchestrator._handle_context_and_iteration_limits_runtime(
+            user_message,
+            max_total_iterations,
+            max_context,
+            total_iterations,
+            last_quality_score,
         )
 
     def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:

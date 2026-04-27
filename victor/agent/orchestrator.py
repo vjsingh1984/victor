@@ -606,7 +606,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         self._interaction_runtime = create_interaction_runtime_components(
-            orchestrator=self,
+            enabled_tools=getattr(self, "_enabled_tools", None),
             factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
@@ -646,7 +646,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             session_service=self._session_service,
         )
         self._deprecated_chat_coordinator = create_chat_coordinator_shim(
-            orchestrator=self,
+            runtime=self.protocol_adapter,
             get_chat_service=lambda: getattr(self, "_chat_service", None),
         )
         self._deprecated_tool_coordinator = create_tool_coordinator_shim(
