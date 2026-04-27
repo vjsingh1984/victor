@@ -160,21 +160,34 @@ class ContextService:
             "total_tokens_saved": 0,
         }
 
+    @staticmethod
+    def _message_value(message: Any, key: str, default: Any = None) -> Any:
+        """Read a field from either dict-backed or attribute-backed messages."""
+        if isinstance(message, dict):
+            return message.get(key, default)
+        return getattr(message, key, default)
+
     async def get_context_metrics(self) -> ContextMetricsImpl:
         """Get current context metrics.
 
         Returns:
             ContextMetrics with current context information
         """
-        total_tokens = sum(self._estimate_tokens(getattr(m, "content", "")) for m in self._messages)
+        total_tokens = sum(self._estimate_tokens(self._message_value(m, "content", "")) for m in self._messages)
 
-        user_count = sum(1 for m in self._messages if getattr(m, "role", "") == "user")
-        assistant_count = sum(1 for m in self._messages if getattr(m, "role", "") == "assistant")
-        tool_count = sum(1 for m in self._messages if getattr(m, "role", "") == "tool")
+        user_count = sum(1 for m in self._messages if self._message_value(m, "role", "") == "user")
+        assistant_count = sum(
+            1 for m in self._messages if self._message_value(m, "role", "") == "assistant"
+        )
+        tool_count = sum(1 for m in self._messages if self._message_value(m, "role", "") == "tool")
 
         system_tokens = self._estimate_tokens(
             next(
-                (m.content for m in self._messages if getattr(m, "role", "") == "system"),
+                (
+                    self._message_value(m, "content", "")
+                    for m in self._messages
+                    if self._message_value(m, "role", "") == "system"
+                ),
                 "",
             )
         )
@@ -225,12 +238,18 @@ class ContextService:
 
         return removed
 
-    def add_message(self, message: "Message") -> None:
+    def add_message(self, message: Optional["Message"] = None, **kwargs: Any) -> None:
         """Add a message to the context.
 
         Args:
             message: Message to add
         """
+        if message is None:
+            if not kwargs:
+                raise ValueError("message or keyword fields are required")
+            message = kwargs
+        elif kwargs:
+            raise TypeError("Use either a message object or keyword fields, not both")
         self._messages.append(message)
 
     def add_messages(self, messages: List["Message"]) -> None:
@@ -258,7 +277,7 @@ class ContextService:
         messages = self._messages
 
         if role:
-            messages = [m for m in messages if getattr(m, "role", "") == role]
+            messages = [m for m in messages if self._message_value(m, "role", "") == role]
 
         if limit:
             messages = messages[-limit:]
@@ -272,7 +291,7 @@ class ContextService:
             retain_system: If True, retain system prompt
         """
         if retain_system:
-            system_messages = [m for m in self._messages if getattr(m, "role", "") == "system"]
+            system_messages = [m for m in self._messages if self._message_value(m, "role", "") == "system"]
             self._messages = system_messages
         else:
             self._messages.clear()

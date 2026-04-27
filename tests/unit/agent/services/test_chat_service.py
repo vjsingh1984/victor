@@ -21,7 +21,7 @@ from unittest import mock
 import pytest
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
-from victor.providers.base import CompletionResponse
+from victor.providers.base import CompletionResponse, StreamChunk
 
 # =============================================================================
 # Mock Dependencies
@@ -65,9 +65,16 @@ class MockToolService:
     def __init__(self):
         self.healthy = True
         self.tools_executed = []
+        self.turn_resets = 0
 
     def is_healthy(self):
         return self.healthy
+
+    def start_new_turn(self):
+        self.turn_resets += 1
+
+    def reset_tool_budget(self):
+        self.turn_resets += 1
 
     async def execute_tool(self, tool_name, arguments):
         from victor.tools.base import ToolResult
@@ -271,6 +278,39 @@ class TestChatServiceReset(BaseChatServiceTest):
         assert service._conversation.reset_count == 1
 
 
+class TestChatServiceDictBasedContext(BaseChatServiceTest):
+    """Direct ChatService paths should support dict-based ContextServiceProtocol writes."""
+
+    @pytest.mark.asyncio
+    async def test_chat_records_user_and_assistant_messages_in_dict_based_context(self):
+        service = self._create_test_service()
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
+        service._run_agentic_loop = mock.AsyncMock(return_value=response)
+
+        result = await service.chat("hello")
+
+        assert result is response
+        assert [message["role"] for message in service._context.messages] == ["user", "assistant"]
+        assert [message["content"] for message in service._context.messages] == ["hello", "done"]
+
+    def test_add_tool_result_supports_dict_based_context_protocol(self):
+        service = self._create_test_service()
+        result = mock.MagicMock(output="tool output", error=None)
+
+        service._add_tool_result_to_context(
+            "read",
+            result,
+            tool_call_id="call-1",
+            formatted_content="formatted output",
+        )
+
+        tool_message = service._context.messages[-1]
+        assert tool_message["role"] == "tool"
+        assert tool_message["content"] == "formatted output"
+        assert tool_message["tool_call_id"] == "call-1"
+        assert tool_message["name"] == "read"
+
+
 class TestChatServiceControllerBackedContext(BaseChatServiceTest):
     """Direct ChatService paths should share conversation state with controller-backed context."""
 
@@ -338,6 +378,89 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
         assert controller.reset.call_count == 1
         assert [message.role for message in controller.messages] == ["system"]
         assert [message.content for message in controller.messages] == ["system prompt"]
+
+    @pytest.mark.asyncio
+    async def test_chat_replenishes_tool_budget_per_prompt_and_preserves_usage_stats(self):
+        from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+        from victor.tools.base import ToolResult
+
+        tool_executor = mock.Mock()
+        tool_executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        tool_service = ToolService(
+            config=ToolServiceConfig(default_tool_budget=1, enable_caching=False),
+            tool_selector=mock.Mock(),
+            tool_executor=tool_executor,
+            tool_registrar=mock.Mock(),
+        )
+
+        service = ChatService(
+            config=ChatServiceConfig(),
+            provider_service=MockProviderService(),
+            tool_service=tool_service,
+            context_service=MockContextService(),
+            recovery_service=MockRecoveryService(),
+            conversation_controller=MockConversationController(),
+            streaming_coordinator=MockStreamingCoordinator(),
+        )
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                await tool_service.execute_tool("read", {"prompt": user_message})
+                return CompletionResponse(
+                    content=f"done:{user_message}",
+                    role="assistant",
+                    stop_reason="stop",
+                )
+
+        service.bind_runtime_components(turn_executor=_TurnExecutor())
+
+        first = await service.chat("first prompt")
+        second = await service.chat("second prompt")
+
+        assert first.content == "done:first prompt"
+        assert second.content == "done:second prompt"
+        assert tool_service.budget_used == 1
+        assert tool_service.get_tool_usage_stats()["total_calls"] == 2
+        assert tool_executor.execute.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_replenishes_tool_budget_per_prompt_and_preserves_usage_stats(self):
+        from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+        from victor.tools.base import ToolResult
+
+        tool_executor = mock.Mock()
+        tool_executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        tool_service = ToolService(
+            config=ToolServiceConfig(default_tool_budget=1, enable_caching=False),
+            tool_selector=mock.Mock(),
+            tool_executor=tool_executor,
+            tool_registrar=mock.Mock(),
+        )
+
+        service = ChatService(
+            config=ChatServiceConfig(),
+            provider_service=MockProviderService(),
+            tool_service=tool_service,
+            context_service=MockContextService(),
+            recovery_service=MockRecoveryService(),
+            conversation_controller=MockConversationController(),
+            streaming_coordinator=MockStreamingCoordinator(),
+        )
+
+        async def _stream_handler(user_message, **kwargs):
+            await tool_service.execute_tool("read", {"prompt": user_message})
+            yield StreamChunk(content=f"done:{user_message}", is_final=True)
+
+        service.bind_runtime_components(stream_chat_handler=_stream_handler)
+
+        first = [chunk async for chunk in service.stream_chat("first prompt")]
+        second = [chunk async for chunk in service.stream_chat("second prompt")]
+
+        assert [chunk.content for chunk in first] == ["done:first prompt"]
+        assert [chunk.content for chunk in second] == ["done:second prompt"]
+        assert tool_service.budget_used == 1
+        assert tool_service.get_tool_usage_stats()["total_calls"] == 2
+        assert tool_executor.execute.await_count == 2
 
     def test_chat_service_declares_single_keyword_based_context_helpers(self):
         source = inspect.getsource(ChatService)

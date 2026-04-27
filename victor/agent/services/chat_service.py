@@ -26,6 +26,7 @@ This service handles:
 
 from __future__ import annotations
 
+import inspect
 import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional
@@ -126,6 +127,7 @@ class ChatService:
         self._planning_handler: Optional[Callable[[str], Any]] = None
         self._stream_chat_handler: Optional[Callable[..., AsyncIterator[Any]]] = None
         self._context_limit_handler: Optional[Callable[..., Any]] = None
+        self._context_accepts_keyword_messages: Optional[bool] = None
 
         # Initialize metrics tracking
         self._metrics: Dict[str, Any] = {
@@ -189,6 +191,10 @@ class ChatService:
             ContextOverflowError: If context exceeds limits
         """
         use_planning = kwargs.pop("use_planning", False)
+        preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
+
+        if not preserve_turn_state:
+            self._prepare_new_turn()
 
         if self._turn_executor is not None and not stream:
             if use_planning is False:
@@ -213,7 +219,11 @@ class ChatService:
             if stream:
                 # For streaming, we aggregate the stream into a final response
                 chunks = []
-                async for chunk in self.stream_chat(user_message, **kwargs):
+                async for chunk in self.stream_chat(
+                    user_message,
+                    _preserve_turn_state=True,
+                    **kwargs,
+                ):
                     chunks.append(chunk)
 
                 # Aggregate chunks into completion response
@@ -238,7 +248,12 @@ class ChatService:
             recovery_context = self._build_recovery_context(e)
             if await self._recovery.execute_recovery(recovery_context):
                 # Retry after recovery
-                return await self.chat(user_message, stream=stream, **kwargs)
+                return await self.chat(
+                    user_message,
+                    stream=stream,
+                    _preserve_turn_state=True,
+                    **kwargs,
+                )
 
             # Recovery failed, re-raise
             raise
@@ -262,6 +277,10 @@ class ChatService:
             ProviderError: If the provider fails during streaming
             ToolExecutionError: If tool execution fails critically
         """
+        preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
+        if not preserve_turn_state:
+            self._prepare_new_turn()
+
         if self._stream_chat_handler is not None:
             async for chunk in self._stream_chat_handler(user_message, **kwargs):
                 yield chunk
@@ -297,6 +316,7 @@ class ChatService:
                 # Retry after recovery (preserving iteration if we were preserving)
                 async for chunk in self.stream_chat(
                     user_message,
+                    _preserve_turn_state=True,
                     _preserve_iteration=preserve_iteration,
                     _current_iteration=current_iteration,
                 ):
@@ -661,7 +681,7 @@ class ChatService:
 
         if self._context:
             try:
-                self._context.add_message(
+                self._write_message_to_context(
                     role="tool",
                     content=content,
                     tool_call_id=tool_call_id
@@ -1394,7 +1414,7 @@ class ChatService:
         """
         if self._context:
             try:
-                self._context.add_message(
+                self._write_message_to_context(
                     role="user",
                     content=content,
                     metadata=metadata or {},
@@ -1426,7 +1446,7 @@ class ChatService:
         """
         if self._context:
             try:
-                self._context.add_message(
+                self._write_message_to_context(
                     role="assistant",
                     content=content,
                     tool_calls=tool_calls,
@@ -1434,6 +1454,55 @@ class ChatService:
                 )
             except Exception as e:
                 self._logger.warning(f"Failed to add assistant message to context: {e}")
+
+    def _write_message_to_context(self, role: str, content: str, **payload: Any) -> None:
+        """Write a normalized message to either keyword- or dict-based context services."""
+        add_message = getattr(self._context, "add_message", None)
+        if add_message is None:
+            raise AttributeError("Context service does not provide add_message()")
+
+        if self._context_uses_keyword_messages():
+            add_message(role=role, content=content, **payload)
+            return
+
+        normalized_payload = {key: value for key, value in payload.items() if value is not None}
+        add_message({"role": role, "content": content, **normalized_payload})
+
+    def _context_uses_keyword_messages(self) -> bool:
+        """Detect whether the bound context service expects keyword-based message writes."""
+        if self._context_accepts_keyword_messages is not None:
+            return self._context_accepts_keyword_messages
+
+        add_message = getattr(self._context, "add_message", None)
+        if add_message is None:
+            self._context_accepts_keyword_messages = False
+            return False
+
+        try:
+            signature = inspect.signature(add_message)
+        except (TypeError, ValueError):
+            self._context_accepts_keyword_messages = True
+            return True
+
+        parameter_names = {
+            parameter.name
+            for parameter in signature.parameters.values()
+            if parameter.kind
+            in (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+        }
+        accepts_kwargs = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in signature.parameters.values()
+        )
+
+        self._context_accepts_keyword_messages = accepts_kwargs or {
+            "role",
+            "content",
+        }.issubset(parameter_names)
+        return self._context_accepts_keyword_messages
 
     def handle_chat_error(
         self,
@@ -1519,6 +1588,17 @@ class ChatService:
 
         # Fallback: return as-is
         return tool_args, "direct"
+
+    def _prepare_new_turn(self) -> None:
+        """Reset per-prompt execution state before a new user turn."""
+        start_new_turn = getattr(self._tools, "start_new_turn", None)
+        if callable(start_new_turn):
+            start_new_turn()
+            return
+
+        reset_tool_budget = getattr(self._tools, "reset_tool_budget", None)
+        if callable(reset_tool_budget):
+            reset_tool_budget()
 
     # ==========================================================================
     # Turn Executor Property
