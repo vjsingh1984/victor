@@ -281,6 +281,38 @@ class TestMemoryGraphStore:
         assert len(edges) >= 1
 
     @pytest.mark.asyncio
+    async def test_get_neighbors_returns_incoming_and_outgoing_edges(self, store, sample_nodes):
+        """Test default neighbor traversal includes both edge directions."""
+        await store.upsert_nodes(sample_nodes)
+        await store.upsert_edges(
+            [
+                GraphEdge(src="n1", dst="n2", type="CALLS", weight=1.0),
+                GraphEdge(src="n2", dst="n3", type="REFERENCES", weight=0.5),
+            ]
+        )
+        edges = await store.get_neighbors("n2")
+        assert {(edge.src, edge.dst, edge.type) for edge in edges} == {
+            ("n1", "n2", "CALLS"),
+            ("n2", "n3", "REFERENCES"),
+        }
+
+    @pytest.mark.asyncio
+    async def test_get_neighbors_respects_direction_and_depth(self, store, sample_nodes):
+        """Test directional traversal can walk multiple hops."""
+        await store.upsert_nodes(sample_nodes)
+        await store.upsert_edges(
+            [
+                GraphEdge(src="n1", dst="n2", type="CALLS", weight=1.0),
+                GraphEdge(src="n2", dst="n3", type="CALLS", weight=1.0),
+            ]
+        )
+        outgoing = await store.get_neighbors("n1", direction="out", max_depth=2)
+        incoming = await store.get_neighbors("n3", direction="in", max_depth=2)
+
+        assert {(edge.src, edge.dst) for edge in outgoing} == {("n1", "n2"), ("n2", "n3")}
+        assert {(edge.src, edge.dst) for edge in incoming} == {("n1", "n2"), ("n2", "n3")}
+
+    @pytest.mark.asyncio
     async def test_get_neighbors_with_edge_types(self, store, sample_nodes, sample_edges):
         """Test getting neighbors filtered by edge type."""
         await store.upsert_nodes(sample_nodes)

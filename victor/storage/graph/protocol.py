@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Protocol
+from typing import Any, Dict, Iterable, List, Literal, Protocol
+
+
+GraphTraversalDirection = Literal["out", "in", "both"]
 
 
 @dataclass
@@ -46,7 +49,12 @@ class GraphStoreProtocol(Protocol):
     async def upsert_edges(self, edges: Iterable[GraphEdge]) -> None: ...
 
     async def get_neighbors(
-        self, node_id: str, edge_types: Iterable[str] | None = None, max_depth: int = 1
+        self,
+        node_id: str,
+        edge_types: Iterable[str] | None = None,
+        *,
+        direction: GraphTraversalDirection = "both",
+        max_depth: int = 1,
     ) -> List[GraphEdge]: ...
 
     async def find_nodes(

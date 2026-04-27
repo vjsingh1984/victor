@@ -60,7 +60,6 @@ class GraphManager:
     """
 
     _instance: Optional["GraphManager"] = None
-    _lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self):
         """Initialize GraphManager."""

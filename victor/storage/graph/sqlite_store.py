@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, TYPE_CHECKING
 
 from victor.core.schema import Tables
-from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+from victor.storage.graph.protocol import (
+    GraphEdge,
+    GraphNode,
+    GraphStoreProtocol,
+    GraphTraversalDirection,
+)
 
 if TYPE_CHECKING:
     from victor.core.database import ProjectDatabaseManager
@@ -234,30 +239,100 @@ class SqliteGraphStore(GraphStoreProtocol):
         self,
         node_id: str,
         edge_types: Optional[Iterable[str]] = None,
+        *,
+        direction: GraphTraversalDirection = "both",
         max_depth: int = 1,
     ) -> List[GraphEdge]:
-        params: list[Any] = [node_id]
-        type_clause = ""
-        if edge_types:
-            placeholders = ",".join("?" for _ in edge_types)
-            type_clause = f" AND type IN ({placeholders})"
-            params.extend(edge_types)
-        query = (
-            f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE} WHERE src=?{type_clause}"
-        )
+        if direction not in {"out", "in", "both"}:
+            raise ValueError(f"Unsupported graph traversal direction: {direction}")
+        if max_depth < 1:
+            return []
+
+        allowed_types = list(edge_types) if edge_types else []
+        frontier = {node_id}
+        visited_nodes = {node_id}
+        seen_edges: Dict[tuple[str, str, str], GraphEdge] = {}
+
         async with self._lock:
             conn = self._connect()
-            cur = conn.execute(query, params)
-            return [
+            for _depth in range(max_depth):
+                traversed_edges: List[tuple[GraphEdge, str]] = []
+
+                if direction in {"out", "both"}:
+                    traversed_edges.extend(
+                        self._select_frontier_edges(
+                            conn,
+                            frontier=frontier,
+                            edge_types=allowed_types,
+                            node_column="src",
+                            neighbor_column="dst",
+                        )
+                    )
+                if direction in {"in", "both"}:
+                    traversed_edges.extend(
+                        self._select_frontier_edges(
+                            conn,
+                            frontier=frontier,
+                            edge_types=allowed_types,
+                            node_column="dst",
+                            neighbor_column="src",
+                        )
+                    )
+
+                next_frontier: set[str] = set()
+                for edge, neighbor_id in traversed_edges:
+                    seen_edges[(edge.src, edge.dst, edge.type)] = edge
+                    next_frontier.add(neighbor_id)
+
+                next_frontier -= visited_nodes
+                if not next_frontier:
+                    break
+                visited_nodes.update(next_frontier)
+                frontier = next_frontier
+
+        return sorted(seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type))
+
+    def _select_frontier_edges(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        frontier: set[str],
+        edge_types: list[str],
+        node_column: str,
+        neighbor_column: str,
+    ) -> List[tuple[GraphEdge, str]]:
+        if not frontier:
+            return []
+
+        frontier_params = list(frontier)
+        frontier_placeholders = ",".join("?" for _ in frontier_params)
+        params: list[Any] = frontier_params
+        type_clause = ""
+
+        if edge_types:
+            type_placeholders = ",".join("?" for _ in edge_types)
+            type_clause = f" AND type IN ({type_placeholders})"
+            params.extend(edge_types)
+
+        query = f"""
+            SELECT src, dst, type, weight, metadata, {neighbor_column}
+            FROM {_EDGE_TABLE}
+            WHERE {node_column} IN ({frontier_placeholders}){type_clause}
+        """
+        cur = conn.execute(query, params)
+        return [
+            (
                 GraphEdge(
                     src=row[0],
                     dst=row[1],
                     type=row[2],
                     weight=row[3],
                     metadata=json.loads(row[4]) if row[4] else {},
-                )
-                for row in cur.fetchall()
-            ]
+                ),
+                row[5],
+            )
+            for row in cur.fetchall()
+        ]
 
     def _row_to_node(self, row: tuple) -> GraphNode:
         """Convert a database row to a GraphNode."""

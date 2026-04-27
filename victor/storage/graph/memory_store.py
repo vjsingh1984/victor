@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional
 
-from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+from victor.storage.graph.protocol import (
+    GraphEdge,
+    GraphNode,
+    GraphStoreProtocol,
+    GraphTraversalDirection,
+)
 
 
 class MemoryGraphStore(GraphStoreProtocol):
@@ -32,14 +37,44 @@ class MemoryGraphStore(GraphStoreProtocol):
         self,
         node_id: str,
         edge_types: Optional[Iterable[str]] = None,
+        *,
+        direction: GraphTraversalDirection = "both",
         max_depth: int = 1,
     ) -> List[GraphEdge]:
-        types = set(edge_types) if edge_types else None
-        return [
-            edge
-            for (src, _dst, etype), edge in self._edges.items()
-            if src == node_id and (types is None or etype in types)
-        ]
+        if direction not in {"out", "in", "both"}:
+            raise ValueError(f"Unsupported graph traversal direction: {direction}")
+        if max_depth < 1:
+            return []
+
+        allowed_types = set(edge_types) if edge_types else None
+        frontier = {node_id}
+        visited_nodes = {node_id}
+        seen_edges: Dict[tuple[str, str, str], GraphEdge] = {}
+
+        for _depth in range(max_depth):
+            next_frontier: set[str] = set()
+            for edge in self._edges.values():
+                if allowed_types is not None and edge.type not in allowed_types:
+                    continue
+
+                traversed = False
+                if direction in {"out", "both"} and edge.src in frontier:
+                    traversed = True
+                    next_frontier.add(edge.dst)
+                if direction in {"in", "both"} and edge.dst in frontier:
+                    traversed = True
+                    next_frontier.add(edge.src)
+
+                if traversed:
+                    seen_edges[(edge.src, edge.dst, edge.type)] = edge
+
+            next_frontier -= visited_nodes
+            if not next_frontier:
+                break
+            visited_nodes.update(next_frontier)
+            frontier = next_frontier
+
+        return sorted(seen_edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type))
 
     async def find_nodes(
         self,

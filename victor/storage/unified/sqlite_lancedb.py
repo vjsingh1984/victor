@@ -607,13 +607,13 @@ class SqliteLanceDBStore:
         edges = await self._graph_store.get_neighbors(
             unified_id,
             edge_types=["CALLS"],
+            direction="in",
             max_depth=max_depth,
         )
 
-        # Get incoming edges (callers)
-        caller_ids = [e.src for e in edges if e.dst == unified_id]
+        caller_ids = {e.src for e in edges if e.src != unified_id}
         callers = []
-        for cid in caller_ids:
+        for cid in sorted(caller_ids):
             symbol = await self.get_symbol(cid)
             if symbol:
                 callers.append(symbol)
@@ -632,13 +632,13 @@ class SqliteLanceDBStore:
         edges = await self._graph_store.get_neighbors(
             unified_id,
             edge_types=["CALLS"],
+            direction="out",
             max_depth=max_depth,
         )
 
-        # Get outgoing edges (callees)
-        callee_ids = [e.dst for e in edges if e.src == unified_id]
+        callee_ids = {e.dst for e in edges if e.dst != unified_id}
         callees = []
-        for cid in callee_ids:
+        for cid in sorted(callee_ids):
             symbol = await self.get_symbol(cid)
             if symbol:
                 callees.append(symbol)
@@ -657,6 +657,7 @@ class SqliteLanceDBStore:
         edges = await self._graph_store.get_neighbors(
             unified_id,
             edge_types=edge_types,
+            direction="both",
         )
 
         results = []

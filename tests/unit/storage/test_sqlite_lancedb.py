@@ -131,3 +131,59 @@ class TestCombineScores:
             graph_weight=0.3,
         )
         assert score == 0.0
+
+
+class TestGraphQueries:
+    @pytest.mark.asyncio
+    async def test_get_callers_uses_incoming_multi_hop_traversal(self, store):
+        store._initialized = True
+        store.get_symbol = AsyncMock(
+            side_effect=[
+                MagicMock(unified_id="b"),
+                MagicMock(unified_id="c"),
+            ]
+        )
+        store._graph_store = MagicMock()
+        store._graph_store.get_neighbors = AsyncMock(
+            return_value=[
+                MagicMock(src="b", dst="target", type="CALLS"),
+                MagicMock(src="c", dst="b", type="CALLS"),
+            ]
+        )
+
+        callers = await store.get_callers("target", max_depth=2)
+
+        store._graph_store.get_neighbors.assert_awaited_once_with(
+            "target",
+            edge_types=["CALLS"],
+            direction="in",
+            max_depth=2,
+        )
+        assert [caller.unified_id for caller in callers] == ["b", "c"]
+
+    @pytest.mark.asyncio
+    async def test_get_callees_uses_outgoing_multi_hop_traversal(self, store):
+        store._initialized = True
+        store.get_symbol = AsyncMock(
+            side_effect=[
+                MagicMock(unified_id="b"),
+                MagicMock(unified_id="c"),
+            ]
+        )
+        store._graph_store = MagicMock()
+        store._graph_store.get_neighbors = AsyncMock(
+            return_value=[
+                MagicMock(src="target", dst="b", type="CALLS"),
+                MagicMock(src="b", dst="c", type="CALLS"),
+            ]
+        )
+
+        callees = await store.get_callees("target", max_depth=2)
+
+        store._graph_store.get_neighbors.assert_awaited_once_with(
+            "target",
+            edge_types=["CALLS"],
+            direction="out",
+            max_depth=2,
+        )
+        assert [callee.unified_id for callee in callees] == ["b", "c"]

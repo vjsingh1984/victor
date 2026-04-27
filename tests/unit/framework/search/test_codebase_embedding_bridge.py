@@ -22,6 +22,7 @@ import pytest
 
 from victor.framework.search.codebase_embedding_bridge import (
     STRUCTURAL_CODEBASE_VECTOR_STORE,
+    _resolve_language,
     build_codebase_index_manifest,
     enable_structural_codebase_embeddings,
     get_structural_codebase_embedding_provider_class,
@@ -168,6 +169,16 @@ def test_enable_structural_codebase_embeddings_rewrites_vector_store(monkeypatch
 
     assert config["vector_store"] == STRUCTURAL_CODEBASE_VECTOR_STORE
     assert config["extra_config"]["upstream_vector_store"] == "lancedb"
+
+
+def test_resolve_language_honors_explicit_suffix_overrides(tmp_path) -> None:
+    full_path = tmp_path / "sample.component"
+    language = _resolve_language(
+        full_path,
+        documents=[],
+        language_overrides={".component": "tsx"},
+    )
+    assert language == "tsx"
 
 
 @pytest.mark.asyncio

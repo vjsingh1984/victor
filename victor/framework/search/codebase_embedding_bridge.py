@@ -140,6 +140,25 @@ def _normalized_chunking_strategy(extra_config: Mapping[str, Any]) -> str:
     )
 
 
+def _normalized_language_overrides(extra_config: Mapping[str, Any]) -> dict[str, str]:
+    raw_overrides = extra_config.get("language_overrides", {})
+    if not isinstance(raw_overrides, Mapping):
+        return {}
+
+    normalized: dict[str, str] = {}
+    for suffix, language in raw_overrides.items():
+        if not isinstance(suffix, str) or not isinstance(language, str):
+            continue
+        cleaned_suffix = suffix.strip().lower()
+        cleaned_language = language.strip()
+        if not cleaned_suffix or not cleaned_language:
+            continue
+        if not cleaned_suffix.startswith("."):
+            cleaned_suffix = f".{cleaned_suffix}"
+        normalized[cleaned_suffix] = cleaned_language
+    return normalized
+
+
 def build_codebase_index_manifest(embedding_config: Mapping[str, Any]) -> dict[str, Any]:
     """Build a compact persistence fingerprint for a codebase embedding config."""
 
@@ -309,6 +328,7 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
                 persist_directory=getattr(config, "persist_directory", None),
             )
             self._chunking_strategy = _normalized_chunking_strategy(self._extra_config)
+            self._language_overrides = _normalized_language_overrides(self._extra_config)
             self._chunk_size = int(
                 self._extra_config.get("chunk_size", DEFAULT_CODEBASE_CHUNK_SIZE)
             )
@@ -526,7 +546,11 @@ def get_structural_codebase_embedding_provider_class() -> Optional[type[Any]]:
                 return []
 
             symbols = _collect_bridge_symbols(documents)
-            language = _resolve_language(full_path, documents)
+            language = _resolve_language(
+                full_path,
+                documents,
+                language_overrides=self._language_overrides,
+            )
             parse_context = _build_tree_sitter_parse_context(
                 file_path=str(full_path),
                 content=content,
@@ -626,12 +650,22 @@ def _collect_bridge_symbols(documents: list[dict[str, Any]]) -> list[_BridgeSymb
     return sorted(symbols, key=lambda item: (item.line_start, item.line_end, item.name))
 
 
-def _resolve_language(full_path: Path, documents: list[dict[str, Any]]) -> str:
+def _resolve_language(
+    full_path: Path,
+    documents: list[dict[str, Any]],
+    *,
+    language_overrides: Optional[Mapping[str, str]] = None,
+) -> str:
     for document in documents:
         metadata = document.get("metadata", {})
         language = metadata.get("language")
         if isinstance(language, str) and language:
             return language
+
+    if language_overrides:
+        override = language_overrides.get(full_path.suffix.lower())
+        if isinstance(override, str) and override:
+            return override
 
     try:
         from victor.core.capability_registry import CapabilityRegistry
