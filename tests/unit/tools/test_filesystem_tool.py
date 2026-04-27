@@ -97,9 +97,8 @@ async def test_read_file_not_found_prefers_package_file_suggestions(tmp_path, mo
 
     message = str(exc_info.value)
     assert "victor/core/registry/base.py" in message
-    assert (
-        message.index("victor/core/registry/base.py")
-        < message.index("victor/core/registry_base.py")
+    assert message.index("victor/core/registry/base.py") < message.index(
+        "victor/core/registry_base.py"
     )
 
 
