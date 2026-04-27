@@ -19,6 +19,17 @@ from unittest.mock import MagicMock
 
 from victor.agent.facades.orchestration_facade import OrchestrationFacade
 from victor.agent.facades.protocols import OrchestrationFacadeProtocol
+from victor.agent.services.chat_compat_telemetry import (
+    get_deprecated_chat_shim_telemetry,
+    reset_deprecated_chat_shim_telemetry,
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_chat_compat_telemetry():
+    reset_deprecated_chat_shim_telemetry()
+    yield
+    reset_deprecated_chat_shim_telemetry()
 
 
 class TestOrchestrationFacadeInit:
@@ -329,6 +340,8 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.sync_chat_coordinator
 
         assert coordinator._mock_name == "sync"
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.sync_chat_coordinator.direct_slot"] == 1
 
     def test_sync_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """Sync chat coordinator compatibility accessor resolves lazily when needed."""
@@ -342,6 +355,8 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.sync_chat_coordinator
 
         assert coordinator is sync
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.sync_chat_coordinator.lazy_getter"] == 1
 
     def test_streaming_chat_coordinator_property_is_deprecated(self, facade):
         """Streaming chat coordinator remains available as a deprecated shim."""
@@ -352,6 +367,8 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.streaming_chat_coordinator
 
         assert coordinator._mock_name == "streaming_chat"
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.streaming_chat_coordinator.direct_slot"] == 1
 
     def test_streaming_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """Streaming chat coordinator compatibility accessor resolves lazily when needed."""
@@ -365,6 +382,8 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.streaming_chat_coordinator
 
         assert coordinator is streaming
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.streaming_chat_coordinator.lazy_getter"] == 1
 
     def test_unified_chat_coordinator_property_is_deprecated(self, facade):
         """Unified chat coordinator remains available as a deprecated shim."""
@@ -375,6 +394,8 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.unified_chat_coordinator
 
         assert coordinator._mock_name == "unified"
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.unified_chat_coordinator.direct_slot"] == 1
 
     def test_unified_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """Unified chat coordinator compatibility accessor resolves lazily when needed."""
@@ -388,6 +409,20 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.unified_chat_coordinator
 
         assert coordinator is unified
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.unified_chat_coordinator.lazy_getter"] == 1
+
+    def test_deprecated_chat_compat_properties_record_missing_surface_access(self):
+        facade = OrchestrationFacade()
+
+        assert facade.sync_chat_coordinator is None
+        assert facade.streaming_chat_coordinator is None
+        assert facade.unified_chat_coordinator is None
+
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.sync_chat_coordinator.missing_surface"] == 1
+        assert telemetry["orchestration_facade.streaming_chat_coordinator.missing_surface"] == 1
+        assert telemetry["orchestration_facade.unified_chat_coordinator.missing_surface"] == 1
 
     def test_old_sync_chat_coordinator_kwarg_warns(self):
         with pytest.warns(

@@ -29,6 +29,10 @@ import logging
 import warnings
 from typing import Any, Callable, Optional
 
+from victor.agent.services.chat_compat_telemetry import (
+    record_deprecated_chat_shim_access,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -360,17 +364,26 @@ class OrchestrationFacade:
     @property
     def sync_chat_coordinator(self) -> Optional[Any]:
         """Deprecated sync chat coordinator compatibility shim."""
+        route = "direct_slot"
         if (
             self._deprecated_sync_chat_coordinator is None
             and self._get_sync_chat_coordinator is not None
         ):
             self._deprecated_sync_chat_coordinator = self._get_sync_chat_coordinator()
+            route = "lazy_getter"
         if self._deprecated_sync_chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "sync_chat_coordinator", route
+            )
             warnings.warn(
                 "OrchestrationFacade.sync_chat_coordinator is deprecated. "
                 "Use OrchestrationFacade.chat_service instead.",
                 DeprecationWarning,
                 stacklevel=2,
+            )
+        else:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "sync_chat_coordinator", "missing_surface"
             )
         return self._deprecated_sync_chat_coordinator
 
@@ -382,17 +395,26 @@ class OrchestrationFacade:
     @property
     def streaming_chat_coordinator(self) -> Optional[Any]:
         """Deprecated streaming chat coordinator compatibility shim."""
+        route = "direct_slot"
         if (
             self._deprecated_streaming_chat_coordinator is None
             and self._get_streaming_chat_coordinator is not None
         ):
             self._deprecated_streaming_chat_coordinator = self._get_streaming_chat_coordinator()
+            route = "lazy_getter"
         if self._deprecated_streaming_chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "streaming_chat_coordinator", route
+            )
             warnings.warn(
                 "OrchestrationFacade.streaming_chat_coordinator is deprecated. "
                 "Use OrchestrationFacade.chat_service instead.",
                 DeprecationWarning,
                 stacklevel=2,
+            )
+        else:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "streaming_chat_coordinator", "missing_surface"
             )
         return self._deprecated_streaming_chat_coordinator
 
@@ -404,17 +426,26 @@ class OrchestrationFacade:
     @property
     def unified_chat_coordinator(self) -> Optional[Any]:
         """Deprecated unified chat coordinator compatibility shim."""
+        route = "direct_slot"
         if (
             self._deprecated_unified_chat_coordinator is None
             and self._get_unified_chat_coordinator is not None
         ):
             self._deprecated_unified_chat_coordinator = self._get_unified_chat_coordinator()
+            route = "lazy_getter"
         if self._deprecated_unified_chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "unified_chat_coordinator", route
+            )
             warnings.warn(
                 "OrchestrationFacade.unified_chat_coordinator is deprecated. "
                 "Use OrchestrationFacade.chat_service instead.",
                 DeprecationWarning,
                 stacklevel=2,
+            )
+        else:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "unified_chat_coordinator", "missing_surface"
             )
         return self._deprecated_unified_chat_coordinator
 
