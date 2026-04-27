@@ -230,6 +230,26 @@ async def test_pipeline_uses_runtime_intelligence_for_budget_reset_and_analysis(
 
 
 @pytest.mark.asyncio
+async def test_pipeline_resets_streaming_turn_state_before_execution():
+    cancel_chunk = StreamChunk(content="", is_final=True)
+    coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
+    coordinator._orchestrator.tool_calls_used = 9
+    coordinator._orchestrator._tool_pipeline = SimpleNamespace(reset=MagicMock())
+    coordinator._orchestrator._task_completion_detector = SimpleNamespace(reset=MagicMock())
+
+    pipeline = StreamingChatPipeline(coordinator)
+
+    chunks = []
+    async for chunk in pipeline.run("hello"):
+        chunks.append(chunk)
+
+    assert chunks == [cancel_chunk]
+    assert coordinator._orchestrator.tool_calls_used == 0
+    coordinator._orchestrator._tool_pipeline.reset.assert_called_once_with()
+    coordinator._orchestrator._task_completion_detector.reset.assert_called_once_with()
+
+
+@pytest.mark.asyncio
 async def test_pipeline_passes_history_to_runtime_intelligence():
     cancel_chunk = StreamChunk(content="", is_final=True)
     coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
@@ -446,6 +466,50 @@ async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_c
         coordinator._intent_classification_handler.calls[0]["full_content"]
         == f"{SUMMARY_MARKER} Key findings"
     )
+
+
+@pytest.mark.asyncio
+async def test_pipeline_does_not_force_completion_when_high_confidence_response_has_tool_calls():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._provider_response = (
+        f"{SUMMARY_MARKER} I need one more read before I can answer.",
+        [{"name": "read", "arguments": {"path": "victor/agent/streaming/pipeline.py"}}],
+        None,
+        False,
+    )
+    detector = SimpleNamespace(
+        _state=SimpleNamespace(last_summary="I need one more read before I can answer."),
+        reset=MagicMock(),
+        analyze_response=MagicMock(),
+        get_completion_confidence=MagicMock(return_value=CompletionConfidence.HIGH),
+    )
+    coordinator._orchestrator._task_completion_detector = detector
+    coordinator._orchestrator._conversation_controller = SimpleNamespace(
+        persist_compaction_summary=MagicMock(),
+        inject_compaction_context=MagicMock(),
+    )
+    exec_result = StubToolExecutionResult(
+        chunks=[StreamChunk(content="tool-result", is_final=True)],
+        tool_calls_executed=1,
+        should_return=True,
+    )
+    coordinator._tool_execution_handler = StubToolExecutionHandler(exec_result)
+
+    pipeline = StreamingChatPipeline(coordinator)
+
+    chunks = []
+    async for chunk in pipeline.run("finish the analysis"):
+        chunks.append(chunk.content)
+
+    assert chunks == ["I need one more read before I can answer.", "tool-result"]
+    assert coordinator._stream_ctx.force_completion is False
+    detector.analyze_response.assert_called_once_with(
+        f"{SUMMARY_MARKER} I need one more read before I can answer."
+    )
+    detector.get_completion_confidence.assert_called_once_with()
+    coordinator._orchestrator._conversation_controller.persist_compaction_summary.assert_not_called()
+    coordinator._orchestrator._conversation_controller.inject_compaction_context.assert_not_called()
+    assert len(coordinator._tool_execution_handler.calls) == 1
 
 
 @pytest.mark.asyncio

@@ -122,6 +122,44 @@ class StreamingChatPipeline:
         self._prev_visible_content = normalized_key
         return display_content
 
+    def _reset_streaming_turn_state(self, orch: Any) -> None:
+        """Reset per-turn state shared across streaming iterations."""
+        self._last_tool_context = None
+        self._last_tools = None
+
+        if hasattr(orch, "tool_calls_used"):
+            orch.tool_calls_used = 0
+
+        tool_pipeline = getattr(orch, "_tool_pipeline", None)
+        reset_pipeline = getattr(tool_pipeline, "reset", None)
+        if callable(reset_pipeline):
+            reset_pipeline()
+
+        detector = getattr(orch, "_task_completion_detector", None)
+        reset_detector = getattr(detector, "reset", None)
+        if callable(reset_detector):
+            reset_detector()
+
+    @staticmethod
+    def _clear_deferred_active_completion_signal(detector: Any) -> None:
+        """Clear a completion marker that arrived alongside additional tool calls."""
+        clear_active_signal = getattr(detector, "clear_active_signal", None)
+        if callable(clear_active_signal):
+            clear_active_signal()
+            return
+
+        state = getattr(detector, "_state", None)
+        if state is None:
+            return
+
+        if hasattr(state, "active_signal_detected"):
+            state.active_signal_detected = False
+
+        signals = getattr(state, "completion_signals", None)
+        if isinstance(signals, set):
+            signals_to_keep = {signal for signal in signals if not str(signal).startswith("active:")}
+            state.completion_signals = signals_to_keep
+
     @staticmethod
     def _serialize_conversation_message(message: Any) -> dict[str, Any] | None:
         """Normalize a conversation message into a mapping for perception services."""
@@ -200,6 +238,8 @@ class StreamingChatPipeline:
         orch = runtime_owner._orchestrator
         recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
         create_recovery_context = orch.create_recovery_context
+
+        self._reset_streaming_turn_state(orch)
 
         # Initialize and prepare using StreamingChatContext
         stream_ctx = await runtime_owner._create_stream_context(user_message, **kwargs)
@@ -589,29 +629,39 @@ class StreamingChatPipeline:
                 confidence = orch._task_completion_detector.get_completion_confidence()
 
                 if confidence == CompletionConfidence.HIGH:
-                    logger.info(
-                        "Task completion: HIGH confidence detected (active signal), "
-                        "forcing completion NOW (immediate stop, skip continuation)"
-                    )
-                    forced_task_completion = True
-                    stream_ctx.force_completion = True
-                    stream_ctx.skip_continuation = (
-                        True  # NEW: Prevent continuation strategy override
-                    )
-                    # Persist VICTOR_SUMMARY text as a compaction summary so it
-                    # survives context compaction and is injected into the next turn.
-                    last_summary = getattr(
-                        orch._task_completion_detector._state, "last_summary", ""
-                    )
-                    if last_summary and hasattr(orch, "_conversation_controller"):
-                        try:
-                            orch._conversation_controller.persist_compaction_summary(
-                                last_summary, []
-                            )
-                            orch._conversation_controller.inject_compaction_context()
-                            logger.info("VICTOR_SUMMARY persisted for next-turn context injection")
-                        except Exception as _e:
-                            logger.debug(f"Failed to persist VICTOR_SUMMARY: {_e}")
+                    if tool_calls:
+                        logger.info(
+                            "Task completion: HIGH confidence marker deferred because "
+                            "response still contains %d tool call(s)",
+                            len(tool_calls),
+                        )
+                        self._clear_deferred_active_completion_signal(
+                            orch._task_completion_detector
+                        )
+                    else:
+                        logger.info(
+                            "Task completion: HIGH confidence detected (active signal), "
+                            "forcing completion NOW (immediate stop, skip continuation)"
+                        )
+                        forced_task_completion = True
+                        stream_ctx.force_completion = True
+                        stream_ctx.skip_continuation = (
+                            True  # NEW: Prevent continuation strategy override
+                        )
+                        # Persist VICTOR_SUMMARY text as a compaction summary so it
+                        # survives context compaction and is injected into the next turn.
+                        last_summary = getattr(
+                            orch._task_completion_detector._state, "last_summary", ""
+                        )
+                        if last_summary and hasattr(orch, "_conversation_controller"):
+                            try:
+                                orch._conversation_controller.persist_compaction_summary(
+                                    last_summary, []
+                                )
+                                orch._conversation_controller.inject_compaction_context()
+                                logger.info("VICTOR_SUMMARY persisted for next-turn context injection")
+                            except Exception as _e:
+                                logger.debug(f"Failed to persist VICTOR_SUMMARY: {_e}")
                 elif confidence == CompletionConfidence.MEDIUM:
                     logger.info(
                         "Task completion: MEDIUM confidence detected (file mods + passive signal)"

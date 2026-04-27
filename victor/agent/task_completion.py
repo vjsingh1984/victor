@@ -786,6 +786,17 @@ class TaskCompletionDetector:
         self._state = TaskCompletionState()
         logger.debug("Task completion detector reset")
 
+    def clear_active_signal(self) -> None:
+        """Clear an active completion marker while preserving other task state."""
+        if not self._state.active_signal_detected and not self._state.completion_signals:
+            return
+
+        self._state.active_signal_detected = False
+        self._state.completion_signals = {
+            signal for signal in self._state.completion_signals if not signal.startswith("active:")
+        }
+        logger.debug("Task completion detector active signal cleared")
+
     def configure_for_complexity(self, complexity: str) -> None:
         """Configure completion limits based on task complexity.
 
