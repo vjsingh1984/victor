@@ -23,6 +23,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
 
+from victor.ui.json_utils import create_json_option, print_json_data
+
 capabilities_app = typer.Typer(
     name="capability",
     help="Discover Victor's capabilities: tools, verticals, personas, teams, and more.",
@@ -321,9 +323,7 @@ def capabilities_main(
     vertical: Optional[str] = typer.Option(
         None, "--vertical", "-v", help="Filter by vertical (e.g., coding, devops)"
     ),
-    json_output: bool = typer.Option(
-        False, "--json", "-j", help="Output as JSON for programmatic use"
-    ),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Discover all Victor capabilities.
 
@@ -340,17 +340,13 @@ def capabilities_main(
     if vertical:
         manifest = discovery.discover_by_vertical(vertical)
         if json_output:
-            import json
-
-            console.print(json.dumps(manifest, indent=2))
+            print_json_data(manifest)
         else:
             _display_vertical_capabilities(vertical, manifest)
     else:
         manifest = discovery.discover_all()
         if json_output:
-            import json
-
-            console.print(json.dumps(manifest.to_dict(), indent=2))
+            print_json_data(manifest.to_dict())
         else:
             _display_full_capabilities(manifest)
 
@@ -472,21 +468,19 @@ def _display_vertical_capabilities(vertical: str, manifest: Dict[str, Any]) -> N
 @capabilities_app.command("tools")
 def list_tools(
     category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available tools."""
     discovery = get_capability_discovery()
     manifest = discovery.discover_all()
 
     if json_output:
-        import json
-
         data = {
             "tools": manifest.tools,
             "categories": manifest.tool_categories,
             "total": len(manifest.tools),
         }
-        console.print(json.dumps(data, indent=2))
+        print_json_data(data)
         return
 
     console.print()
@@ -509,16 +503,14 @@ def list_tools(
 
 @capabilities_app.command("verticals")
 def list_verticals(
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available verticals."""
     discovery = get_capability_discovery()
     manifest = discovery.discover_all()
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"verticals": manifest.verticals}, indent=2))
+        print_json_data({"verticals": manifest.verticals})
         return
 
     console.print()
@@ -534,16 +526,14 @@ def list_verticals(
 
 @capabilities_app.command("providers")
 def list_providers(
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available LLM providers."""
     discovery = get_capability_discovery()
     manifest = discovery.discover_all()
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"providers": manifest.providers}, indent=2))
+        print_json_data({"providers": manifest.providers})
         return
 
     console.print()
@@ -560,7 +550,7 @@ def list_providers(
 @capabilities_app.command("teams")
 def list_teams(
     vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available team configurations."""
     discovery = get_capability_discovery()
@@ -573,9 +563,7 @@ def list_teams(
         teams = manifest.teams
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"teams": teams, "vertical": vertical}, indent=2))
+        print_json_data({"teams": teams, "vertical": vertical})
         return
 
     console.print()
@@ -596,7 +584,7 @@ def list_teams(
 @capabilities_app.command("personas")
 def list_personas(
     vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available personas."""
     discovery = get_capability_discovery()
@@ -609,9 +597,7 @@ def list_personas(
         personas = manifest.personas
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"personas": personas, "vertical": vertical}, indent=2))
+        print_json_data({"personas": personas, "vertical": vertical})
         return
 
     console.print()
@@ -632,7 +618,7 @@ def list_personas(
 @capabilities_app.command("workflows")
 def list_workflows(
     vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available workflow specs from provider registry."""
     discovery = get_capability_discovery()
@@ -645,9 +631,7 @@ def list_workflows(
         workflows = manifest.workflows
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"workflows": workflows, "vertical": vertical}, indent=2))
+        print_json_data({"workflows": workflows, "vertical": vertical})
         return
 
     console.print()
