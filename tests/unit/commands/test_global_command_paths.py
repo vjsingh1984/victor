@@ -114,8 +114,7 @@ def test_ab_list_experiments_uses_global_victor_dir_by_default(tmp_path):
     db_path = global_dir / "ab_tests.db"
 
     with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE experiments (
                 experiment_id TEXT PRIMARY KEY,
                 name TEXT,
@@ -124,8 +123,7 @@ def test_ab_list_experiments_uses_global_victor_dir_by_default(tmp_path):
                 started_at REAL,
                 completed_at REAL
             )
-            """
-        )
+            """)
         conn.execute(
             """
             INSERT INTO experiments (
