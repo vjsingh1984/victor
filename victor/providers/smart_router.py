@@ -97,9 +97,7 @@ class RoutingDecision:
         """Return stable provider-routing hints for topology selection."""
         provider_lower = self.selected_provider.lower()
         provider_locality = (
-            "local"
-            if any(hint in provider_lower for hint in LOCAL_PROVIDER_HINTS)
-            else "remote"
+            "local" if any(hint in provider_lower for hint in LOCAL_PROVIDER_HINTS) else "remote"
         )
         return {
             "provider_hint": self.selected_provider,

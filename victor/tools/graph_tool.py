@@ -1744,7 +1744,11 @@ async def graph(
                 "result": _build_stats_from_project_store(root_path),
             }
 
-        if not reindex and normalized_mode == GraphMode.QUERY and _project_graph_has_data(root_path):
+        if (
+            not reindex
+            and normalized_mode == GraphMode.QUERY
+            and _project_graph_has_data(root_path)
+        ):
             if not query:
                 raise ValueError("query mode requires a SQL SELECT statement")
             return {
