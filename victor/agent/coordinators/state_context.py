@@ -36,7 +36,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 if TYPE_CHECKING:
     from victor.providers.base import Message, ToolCall
@@ -106,7 +106,9 @@ class ContextSnapshot:
     capabilities: Dict[str, Any]  # Capability flags and values
 
     # Timestamp
-    snapshot_timestamp: float = field(default_factory=lambda: datetime.utcnow().timestamp())
+    snapshot_timestamp: float = field(
+        default_factory=lambda: datetime.now(timezone.utc).timestamp()
+    )
 
     def get_state(self, key: str, default: Any = None) -> Any:
         """Get a state value, checking conversation state first.

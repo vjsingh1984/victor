@@ -55,10 +55,11 @@ def _make_ctx(**overrides) -> ToolResultContext:
 
 class TestProcessToolResults:
     def _make_coordinator(self):
-        return ToolCoordinator(
-            tool_pipeline=MagicMock(),
-            tool_registry=MagicMock(),
-        )
+        with pytest.warns(DeprecationWarning, match="ToolCoordinator is deprecated"):
+            return ToolCoordinator(
+                tool_pipeline=MagicMock(),
+                tool_registry=MagicMock(),
+            )
 
     def test_empty_results(self):
         coord = self._make_coordinator()
