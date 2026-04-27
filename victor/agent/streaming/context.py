@@ -90,7 +90,7 @@ class StreamingChatContext:
 
     # Blocked attempts tracking
     consecutive_blocked_attempts: int = 0
-    max_blocked_before_force: int = 3
+    max_blocked_before_force: int = 4
 
     # Garbage detection
     garbage_detected: bool = False

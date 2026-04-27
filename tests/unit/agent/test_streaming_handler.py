@@ -150,8 +150,8 @@ class TestCheckForceCompletion:
         """Returns result when blocked attempts exceed threshold."""
         ctx = StreamingChatContext(
             user_message="test",
-            consecutive_blocked_attempts=3,
-            max_blocked_before_force=3,
+            consecutive_blocked_attempts=4,
+            max_blocked_before_force=4,
         )
         result = handler.check_force_completion(ctx)
         assert result is not None
@@ -165,7 +165,7 @@ class TestHandleBlockedAttempts:
         ctx = StreamingChatContext(
             user_message="test",
             consecutive_blocked_attempts=1,
-            max_blocked_before_force=3,
+            max_blocked_before_force=4,
         )
         result = handler.handle_blocked_attempts(ctx)
         assert result is None
@@ -175,8 +175,8 @@ class TestHandleBlockedAttempts:
         """Returns result and resets counter at threshold."""
         ctx = StreamingChatContext(
             user_message="test",
-            consecutive_blocked_attempts=2,
-            max_blocked_before_force=3,
+            consecutive_blocked_attempts=3,
+            max_blocked_before_force=4,
         )
         result = handler.handle_blocked_attempts(ctx)
         assert result is not None
