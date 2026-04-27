@@ -670,10 +670,14 @@ class StreamingChatPipeline:
 
             # Spin detection for ALL paths (via shared SpinDetector)
             _pipeline_obj = getattr(orch, "_tool_pipeline", None)
-            if tool_calls and _pipeline_obj and getattr(
-                _pipeline_obj,
-                "last_batch_effectively_blocked",
-                getattr(_pipeline_obj, "last_batch_all_skipped", False),
+            if (
+                tool_calls
+                and _pipeline_obj
+                and getattr(
+                    _pipeline_obj,
+                    "last_batch_effectively_blocked",
+                    getattr(_pipeline_obj, "last_batch_all_skipped", False),
+                )
             ):
                 _spin.record_turn(has_tool_calls=True, all_blocked=True)
                 logger.info(f"[spin-check] all_blocked=True state={_spin.state.value}")
@@ -784,10 +788,14 @@ class StreamingChatPipeline:
             # Spin detection via shared SpinDetector (consistent with batch path)
             _all_tools_blocked = False
             _pipeline_obj = getattr(orch, "_tool_pipeline", None)
-            if tool_calls and _pipeline_obj and getattr(
-                _pipeline_obj,
-                "last_batch_effectively_blocked",
-                getattr(_pipeline_obj, "last_batch_all_skipped", False),
+            if (
+                tool_calls
+                and _pipeline_obj
+                and getattr(
+                    _pipeline_obj,
+                    "last_batch_effectively_blocked",
+                    getattr(_pipeline_obj, "last_batch_all_skipped", False),
+                )
             ):
                 _all_tools_blocked = True
 

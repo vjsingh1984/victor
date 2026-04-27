@@ -2185,10 +2185,14 @@ class ToolPipeline:
                 recovery_tool_name = tool_name
                 recovery_args = normalized_args
 
-                if recovery.action in {
-                    RecoveryAction.RETRY_WITH_INFERRED,
-                    RecoveryAction.RETRY_WITH_DEFAULTS,
-                } and recovery.modified_args:
+                if (
+                    recovery.action
+                    in {
+                        RecoveryAction.RETRY_WITH_INFERRED,
+                        RecoveryAction.RETRY_WITH_DEFAULTS,
+                    }
+                    and recovery.modified_args
+                ):
                     recovery_args = recovery.modified_args
                     logger.info(
                         "[Pipeline] Retrying %s with recovered arguments: %s",
@@ -2205,10 +2209,7 @@ class ToolPipeline:
                             fallback_name,
                         )
 
-                if (
-                    recovery_tool_name != tool_name
-                    or recovery_args is not normalized_args
-                ):
+                if recovery_tool_name != tool_name or recovery_args is not normalized_args:
                     try:
                         recovered_exec_result = await asyncio.wait_for(
                             self.executor.execute(

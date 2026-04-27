@@ -418,7 +418,9 @@ async def test_graph_tool_file_deps_with_directory_path_falls_back_to_overview(
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_file_deps_with_file_path_uses_path_as_subject(monkeypatch, tmp_path: Path):
+async def test_graph_tool_file_deps_with_file_path_uses_path_as_subject(
+    monkeypatch, tmp_path: Path
+):
     from victor.tools import graph_tool as graph_tool_module
 
     fake_index = SimpleNamespace(
