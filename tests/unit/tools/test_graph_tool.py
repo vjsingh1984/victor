@@ -387,6 +387,74 @@ async def test_graph_tool_file_dependencies_use_index_metadata(monkeypatch, tmp_
 
 
 @pytest.mark.asyncio
+async def test_graph_tool_file_deps_with_directory_path_falls_back_to_overview(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="file_deps",
+        path="victor/framework",
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["requested_mode"] == "file_deps"
+    assert result["mode"] == "overview"
+    assert result["result"]["recovered_from_mode"] == "file_deps"
+    assert result["result"]["recovered_from_path"] == "victor/framework"
+    assert result["result"]["stats"]["nodes"] == 7
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_file_deps_with_file_path_uses_path_as_subject(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    fake_index = SimpleNamespace(
+        graph_store=MemoryGraphStore(),
+        files={
+            "agent.py": SimpleNamespace(
+                path="agent.py",
+                dependencies=["orchestrator.py"],
+            ),
+            "orchestrator.py": SimpleNamespace(path="orchestrator.py", dependencies=[]),
+        },
+    )
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="file_deps",
+        path="victor/framework/agent.py",
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["requested_mode"] == "file_deps"
+    assert result["mode"] == "file_deps"
+    assert result["result"]["file"] == "agent.py"
+    assert result["result"]["dependencies"] == ["orchestrator.py"]
+    assert result["result"]["recovered_from_mode"] == "file_deps"
+    assert result["result"]["recovered_from_path"] == "victor/framework/agent.py"
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_call_flow_with_file_falls_back_to_file_dependencies(
     monkeypatch, tmp_path: Path
 ):

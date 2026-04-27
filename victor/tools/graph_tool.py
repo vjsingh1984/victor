@@ -766,6 +766,66 @@ def _resolve_root_path(path: str) -> Path:
     return root_path
 
 
+def _resolve_requested_subject_path(path: str) -> Path:
+    requested = Path(path)
+    if requested.is_absolute():
+        return requested.resolve()
+    return (Path(get_project_paths().project_root) / requested).resolve()
+
+
+def _recover_file_deps_without_file(
+    *,
+    loaded: LoadedGraph,
+    requested_path: str,
+    requested_mode: str,
+    direction: GraphDirection,
+    structured: bool,
+    include_modules: bool,
+    top_k: int,
+    effective_edge_types: Optional[List[str]],
+    only_runtime: bool,
+    include_callsites: bool,
+    max_callsites: int,
+) -> tuple[str, Dict[str, Any]]:
+    """Recover file dependency requests when models overload `path` as the subject."""
+    if not requested_path or requested_path == ".":
+        raise ValueError("file_deps mode requires file")
+
+    requested_location = _resolve_requested_subject_path(requested_path)
+    requested_ref = Path(requested_path)
+    if requested_ref.suffix:
+        file_ref = requested_path
+        if requested_location.is_relative_to(loaded.root_path):
+            file_ref = requested_location.relative_to(loaded.root_path).as_posix()
+        else:
+            parent_ref = requested_ref.parent.as_posix()
+            if parent_ref and loaded.root_path.as_posix().endswith(parent_ref):
+                file_ref = requested_ref.name
+
+        result = _build_file_dependency_result(
+            loaded,
+            file_ref,
+            direction=direction,
+            structured=structured,
+            include_modules=include_modules,
+        )
+        result["recovered_from_mode"] = requested_mode
+        result["recovered_from_path"] = requested_path
+        return "file_deps", result
+
+    result = _build_overview(
+        loaded,
+        top_k=top_k,
+        effective_edge_types=effective_edge_types,
+        only_runtime=only_runtime,
+        include_callsites=include_callsites,
+        max_callsites=max_callsites,
+    )
+    result["recovered_from_mode"] = requested_mode
+    result["recovered_from_path"] = requested_path
+    return "overview", result
+
+
 async def _materialize_loaded_graph(
     root_path: Path,
     *,
@@ -1771,14 +1831,27 @@ async def graph(
                 result["callsites"] = projected["callsites"]
         elif mode == "file_deps":
             if not file:
-                raise ValueError("file_deps mode requires file")
-            result = _build_file_dependency_result(
-                loaded,
-                file,
-                direction=direction,
-                structured=structured,
-                include_modules=include_modules,
-            )
+                mode, result = _recover_file_deps_without_file(
+                    loaded=loaded,
+                    requested_path=path,
+                    requested_mode=requested_mode,
+                    direction=direction,
+                    structured=structured,
+                    include_modules=include_modules,
+                    top_k=top_k,
+                    effective_edge_types=effective_edge_types,
+                    only_runtime=only_runtime,
+                    include_callsites=include_callsites,
+                    max_callsites=max_callsites,
+                )
+            else:
+                result = _build_file_dependency_result(
+                    loaded,
+                    file,
+                    direction=direction,
+                    structured=structured,
+                    include_modules=include_modules,
+                )
         elif mode == "clusters":
             adjacency = {
                 node_id: [
