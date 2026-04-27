@@ -30,6 +30,7 @@ def test_chat_compat_telemetry_is_empty_after_reset():
         "deprecated_surface_count": 0,
         "components": {},
         "route_totals": {},
+        "active_components": [],
         "active_routes": [],
         "active_surfaces": [],
     }
@@ -51,6 +52,10 @@ def test_chat_compat_telemetry_report_groups_by_component_surface_and_route():
         "lazy_getter": 1,
         "orchestrator_public": 1,
     }
+    assert report["active_components"] == [
+        {"component": "chat_coordinator", "count": 3},
+        {"component": "orchestration_facade", "count": 1},
+    ]
     assert report["active_routes"] == [
         {"route": "chat_service", "count": 2},
         {"route": "lazy_getter", "count": 1},
