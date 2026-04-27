@@ -167,28 +167,18 @@ class ChatService:
     async def chat(
         self, user_message: str, *, stream: bool = False, **kwargs
     ) -> "CompletionResponse":
-        """Process chat message with agentic loop.
-
-        This is the main entry point for chat operations. It coordinates
-        the agentic loop which:
-        1. Processes the user message
-        2. Selects appropriate tools
-        3. Executes tools as needed
-        4. Generates the final response
-        5. Handles recovery from errors
+        """Process a chat message through the bound canonical runtime.
 
         Args:
             user_message: The user's input message
-            stream: If True, return a streaming response
-            **kwargs: Additional options (temperature, max_tokens, etc.)
+            stream: If True, aggregate the bound streaming runtime
+            **kwargs: Runtime options, including planning controls
 
         Returns:
             CompletionResponse with the generated response
 
         Raises:
-            ProviderError: If the provider fails critically
-            ToolExecutionError: If tool execution fails critically
-            ContextOverflowError: If context exceeds limits
+            RuntimeError: If the canonical runtime collaborators are not bound
         """
         use_planning = kwargs.pop("use_planning", False)
         preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
@@ -196,135 +186,54 @@ class ChatService:
         if not preserve_turn_state:
             self._prepare_new_turn()
 
-        if self._turn_executor is not None and not stream:
-            if use_planning is False:
-                return await self._turn_executor.execute_agentic_loop(user_message)
-            if self._planning_handler is not None and (
-                use_planning is True or use_planning is None
+        if stream:
+            chunks = []
+            async for chunk in self.stream_chat(
+                user_message,
+                _preserve_turn_state=True,
+                **kwargs,
             ):
-                return await self._planning_handler(user_message)
-            return await self._turn_executor.execute_agentic_loop(user_message)
+                chunks.append(chunk)
+            return self._aggregate_chunks(chunks)
 
-        self._logger.debug(f"Starting chat for message: {user_message[:50]}...")
+        if self._planning_handler is not None and (use_planning is True or use_planning is None):
+            return await self._planning_handler(user_message)
 
-        try:
-            # Add user message to context
-            self._add_user_message_to_context(user_message)
-
-            # Check context overflow before processing
-            if await self._context.check_context_overflow():
-                await self._context.compact_context()
-
-            # Run agentic loop
-            if stream:
-                # For streaming, we aggregate the stream into a final response
-                chunks = []
-                async for chunk in self.stream_chat(
-                    user_message,
-                    _preserve_turn_state=True,
-                    **kwargs,
-                ):
-                    chunks.append(chunk)
-
-                # Aggregate chunks into completion response
-                return self._aggregate_chunks(chunks)
-
-            # Non-streaming path
-            response = await self._run_agentic_loop(user_message, **kwargs)
-
-            # Add assistant response to context
-            self._add_assistant_message_to_context(
-                response.content,
-                tool_calls=response.tool_calls,
-                metadata=getattr(response, "metadata", None),
+        executor = self._turn_executor
+        if executor is None or not hasattr(executor, "execute_agentic_loop"):
+            raise RuntimeError(
+                "ChatService runtime is not bound: "
+                "turn_executor.execute_agentic_loop is required for chat()."
             )
 
-            return response
-
-        except Exception as e:
-            self._logger.error(f"Chat failed: {e}")
-
-            # Attempt recovery
-            recovery_context = self._build_recovery_context(e)
-            if await self._recovery.execute_recovery(recovery_context):
-                # Retry after recovery
-                return await self.chat(
-                    user_message,
-                    stream=stream,
-                    _preserve_turn_state=True,
-                    **kwargs,
-                )
-
-            # Recovery failed, re-raise
-            raise
+        return await executor.execute_agentic_loop(user_message)
 
     async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
-        """Stream chat response in chunks.
-
-        Provides incremental response chunks as they're generated,
-        enabling real-time feedback and better UX.
+        """Stream a chat response through the bound canonical runtime.
 
         Args:
             user_message: The user's input message
-            **kwargs: Additional options for the chat, including:
-                - _preserve_iteration: If True, preserve iteration count from failed attempt
-                - _current_iteration: Current iteration count to preserve
+            **kwargs: Additional runtime options
 
         Yields:
             StreamChunk objects with incremental response content
 
         Raises:
-            ProviderError: If the provider fails during streaming
-            ToolExecutionError: If tool execution fails critically
+            RuntimeError: If the canonical streaming runtime is not bound
         """
         preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
         if not preserve_turn_state:
             self._prepare_new_turn()
 
-        if self._stream_chat_handler is not None:
-            async for chunk in self._stream_chat_handler(user_message, **kwargs):
-                yield chunk
-            return
-
-        # Check if this is a fallback from AgenticLoop failure
-        preserve_iteration = kwargs.pop("_preserve_iteration", False)
-        current_iteration = kwargs.pop("_current_iteration", 0)
-
-        # Guard was previously `current_iteration > 0` which is always False because
-        # unified_tracker.iteration_count (productive tool calls) is 0 at the first loop
-        # iteration — before any tools complete. The boolean flag is the correct signal.
-        if preserve_iteration:
-            self._logger.info(
-                "[Fallback mode] Preserving conversation state after AgenticLoop failure"
+        handler = self._stream_chat_handler
+        if handler is None:
+            raise RuntimeError(
+                "ChatService runtime is not bound: "
+                "stream_chat_handler is required for stream_chat()."
             )
-            # Store current iteration for ChatCoordinator to use
-            kwargs["_fallback_iteration"] = current_iteration
 
-        self._logger.debug(f"Starting stream chat for: {user_message[:50]}...")
-
-        try:
-            # Run agentic loop with streaming
-            async for chunk in self._run_agentic_loop(user_message, **kwargs):
-                yield chunk
-
-        except Exception as e:
-            self._logger.error(f"Stream chat failed: {e}")
-
-            # Attempt recovery
-            recovery_context = self._build_recovery_context(e)
-            if await self._recovery.execute_recovery(recovery_context):
-                # Retry after recovery (preserving iteration if we were preserving)
-                async for chunk in self.stream_chat(
-                    user_message,
-                    _preserve_turn_state=True,
-                    _preserve_iteration=preserve_iteration,
-                    _current_iteration=current_iteration,
-                ):
-                    yield chunk
-                return
-
-            # Recovery failed, re-raise
-            raise
+        async for chunk in handler(user_message, **kwargs):
+            yield chunk
 
     async def chat_with_planning(
         self,
@@ -496,69 +405,11 @@ class ChatService:
     # ==========================================================================
 
     async def _run_agentic_loop(self, user_message: str, **kwargs) -> "CompletionResponse":
-        """Run the agentic loop for chat processing.
-
-        The agentic loop handles tool execution and response generation
-        until completion or max iterations is reached.
-
-        Args:
-            user_message: The user's input message
-            **kwargs: Additional options
-
-        Returns:
-            CompletionResponse with the final response
-        """
-        from victor.providers.base import CompletionResponse
-
-        iterations = 0
-        continuation_count = 0
-
-        while iterations < self._config.max_iterations:
-            iterations += 1
-
-            # Get messages from context
-            messages = self._context.get_messages()
-
-            # Get completion from provider
-            response = await self._get_completion(messages, **kwargs)
-
-            # Check if response is complete
-            if self._is_response_complete(response):
-                return response
-
-            # Check for tool calls
-            if self._has_tool_calls(response):
-                # Execute tools
-                await self._execute_tool_calls(response.tool_calls)
-
-                # Add assistant message with tool calls to context
-                self._add_assistant_message_to_context(
-                    response.content,
-                    tool_calls=response.tool_calls,
-                    metadata=getattr(response, "metadata", None),
-                )
-
-                # Continue loop for next iteration
-                continue
-
-            # Check for continuation needed
-            if self._needs_continuation(response):
-                continuation_count += 1
-                if continuation_count >= self._config.max_continuation_prompts:
-                    # Force completion after max continuations
-                    break
-
-                # Add continuation prompt
-                continuation = await self._create_continuation_prompt(response)
-                self._add_user_message_to_context(continuation)
-                continue
-
-            # Response is complete
-            return response
-
-        # Max iterations reached, return last response
-        self._logger.warning(f"Max iterations ({self._config.max_iterations}) reached")
-        return response
+        """Legacy ChatService-owned loop removed in favor of bound runtimes."""
+        raise RuntimeError(
+            "ChatService no longer owns an internal agentic loop. "
+            "Bind a turn_executor via bind_runtime_components()."
+        )
 
     # NOTE: Orchestrator now wires the canonical service/runtime path directly.
     # ServiceStreamingRuntime owns StreamingChatPipeline + AgenticLoop
@@ -1605,17 +1456,11 @@ class ChatService:
     # ==========================================================================
 
     @property
-    def turn_executor(self) -> "ChatService":
-        """Get the turn executor for chat operations.
-
-        In the service-based architecture, the ChatService itself
-        acts as the turn executor for single-turn execution.
-
-        Returns:
-            Self (ChatService instance)
-
-        Example:
-            executor = service.turn_executor
-            response = await executor.chat("Hello")
-        """
-        return self._turn_executor or self
+    def turn_executor(self) -> Any:
+        """Get the bound turn executor for compatibility callers."""
+        if self._turn_executor is None:
+            raise RuntimeError(
+                "ChatService runtime is not bound: "
+                "turn_executor is unavailable until bind_runtime_components()."
+            )
+        return self._turn_executor

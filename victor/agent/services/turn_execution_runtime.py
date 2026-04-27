@@ -247,6 +247,7 @@ class TurnExecutor:
                 else _MISSING
             ),
             "chat_context_system_added": getattr(self._chat_context, "_system_added", _MISSING),
+            "tool_calls_used": getattr(self._tool_context, "tool_calls_used", _MISSING),
         }
 
     def _restore_agentic_loop_state(self, snapshot: Dict[str, Any]) -> None:
@@ -272,6 +273,10 @@ class TurnExecutor:
         else:
             self._chat_context._system_added = chat_context_system_added
 
+        tool_calls_used = snapshot.get("tool_calls_used", _MISSING)
+        if tool_calls_used is not _MISSING and hasattr(self._tool_context, "tool_calls_used"):
+            self._tool_context.tool_calls_used = tool_calls_used
+
     async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Execute tool calls through the canonical tool-context surface."""
         return await self._tool_context.execute_tool_calls(tool_calls)
@@ -285,12 +290,7 @@ class TurnExecutor:
         user_message: str,
         max_iterations: int = 25,
     ) -> CompletionResponse:
-        """Execute the full agentic loop.
-
-        When USE_AGENTIC_LOOP flag is enabled (default), delegates to
-        AgenticLoop for enhanced execution with perception, evaluation,
-        progress tracking, and adaptive termination. Falls back to the
-        legacy while-loop when disabled.
+        """Execute the full agentic loop via the canonical AgenticLoop runtime.
 
         Args:
             user_message: Initial user message
@@ -307,205 +307,11 @@ class TurnExecutor:
         self._chat_context.add_message("user", user_message)
         agentic_loop_state = self._snapshot_agentic_loop_state()
 
-        # Phase 10: Delegate to AgenticLoop when enabled (Strangler Fig)
         try:
-            from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
-
-            if get_feature_flag_manager().is_enabled(FeatureFlag.USE_AGENTIC_LOOP):
-                return await self._execute_via_agentic_loop(user_message, max_iterations)
-        except Exception as e:
+            return await self._execute_via_agentic_loop(user_message, max_iterations)
+        except Exception:
             self._restore_agentic_loop_state(agentic_loop_state)
-            logger.warning(f"AgenticLoop delegation failed, falling back to legacy loop: {e}")
-
-        # Initialize tracking for this conversation turn
-        self._tool_context.tool_calls_used = 0
-        failure_context = ToolFailureContext()
-        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
-        iteration = 0
-
-        # Classify task complexity for appropriate budgeting
-        task_classification = self._provider_context.task_classifier.classify(user_message)
-        # Ensure at least 1 iteration is always allowed
-        task_iteration_budget = max(task_classification.tool_budget * 2, 1)
-        iteration_budget = min(
-            task_iteration_budget,  # Allow 2x budget for iterations; always run at least one model turn
-            max_iterations_setting,
-            max_iterations,
-        )
-
-        # Parallel exploration for complex tasks (before agentic loop)
-        await self._run_parallel_exploration(user_message, task_classification)
-
-        # Detect Q&A-style messages that don't need tools.
-        # If the model answers without tool calls on the first turn, accept it
-        # immediately instead of nudging for tool usage.
-        is_qa_task = self._is_question_only(user_message)
-
-        # Agentic loop: continue until no tool calls or budget exhausted
-        # Uses shared turn_policy constants for consistency with AgenticLoop
-        from victor.agent.turn_policy import (
-            SpinDetector as _SpinDetector,
-            NudgePolicy as _NudgePolicy,
-            SpinState as _SpinState,
-            MAX_NO_TOOL_TURNS as _MAX_NO_TOOL_TURNS,
-            MAX_ALL_BLOCKED as _MAX_ALL_BLOCKED,
-            READ_ONLY_TOOLS as _READ_ONLY_TOOLS,
-        )
-
-        final_response: Optional[CompletionResponse] = None
-        spin = _SpinDetector()
-        nudge_policy = _NudgePolicy()
-
-        while iteration < iteration_budget:
-            iteration += 1
-
-            # Get tool definitions if provider supports them.
-            # Skip tools entirely for Q&A tasks — sending 48 tool schemas
-            # to a local model adds massive latency (68s vs 2s on gemma4:31b).
-            tools = None
-            if (
-                not is_qa_task
-                and self._provider_context.provider.supports_tools()
-                and self._tool_context.tool_calls_used < self._tool_context.tool_budget
-            ):
-                tools = await self._select_tools_for_turn(user_message)
-
-            # Prepare optional thinking parameter
-            provider_kwargs = {}
-            if self._provider_context.thinking:
-                provider_kwargs["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": 10000,
-                }
-
-            # Check context and compact before API call to prevent overflow
-            await self._check_context_compaction(user_message, task_classification)
-
-            # Get response from provider
-            response = await self._execute_model_turn(tools=tools, **provider_kwargs)
-
-            # Accumulate token usage
-            self._accumulate_token_usage(response)
-
-            # Add assistant response to history if has content
-            if response.content:
-                self._chat_context.add_message("assistant", response.content)
-
-                # Check compaction after adding assistant response
-                await self._check_context_compaction(user_message, task_classification)
-
-            # Check if model wants to use tools
-            if response.tool_calls:
-                turn_tools = {tc.get("name", "") for tc in response.tool_calls}
-
-                # Handle tool calls and track results
-                tool_results = await self._execute_tool_calls(response.tool_calls)
-
-                # Update failure context and record for real-time failure hints
-                for result in tool_results:
-                    if result.get("success"):
-                        failure_context.successful_tools.append(result)
-                    else:
-                        failure_context.failed_tools.append(result)
-                        failure_context.last_error = result.get("error")
-                        _orch = getattr(self, "_orchestrator", None) or getattr(
-                            self._chat_context, "_orchestrator", None
-                        )
-                        _injector = (
-                            getattr(_orch, "_optimization_injector", None) if _orch else None
-                        )
-                        if _injector and result.get("error"):
-                            _injector.record_failure(
-                                result.get("tool_name", "unknown"),
-                                result["error"],
-                            )
-
-                # Spin detection via shared SpinDetector
-                _pipeline = getattr(self._tool_context, "_tool_pipeline", None)
-                if _pipeline is None:
-                    _orch = getattr(self, "_orchestrator", None) or getattr(
-                        self._chat_context, "_orchestrator", None
-                    )
-                    if _orch:
-                        _pipeline = getattr(_orch, "_tool_pipeline", None)
-                _all_blocked = bool(
-                    _pipeline
-                    and getattr(
-                        _pipeline,
-                        "last_batch_effectively_blocked",
-                        getattr(_pipeline, "last_batch_all_skipped", False),
-                    )
-                )
-
-                spin.record_turn(
-                    has_tool_calls=True,
-                    all_blocked=_all_blocked,
-                    tool_names=turn_tools,
-                    tool_count=len(response.tool_calls),
-                )
-
-                # Inject nudges via shared NudgePolicy
-                nudge_decision = nudge_policy.evaluate(spin)
-                if nudge_decision.should_inject:
-                    self._chat_context.add_message(nudge_decision.role, nudge_decision.message)
-                    logger.info(f"[nudge] {nudge_decision.nudge_type.value}")
-
-                # Check for spin termination
-                if spin.state == _SpinState.TERMINATED:
-                    logger.warning(
-                        "[spin-detect] Terminated: blocked=%d, no_tool=%d",
-                        spin.consecutive_all_blocked,
-                        spin.consecutive_no_tool_turns,
-                    )
-                    final_response = response
-                    break
-
-                # Continue loop to get follow-up response
-                continue
-
-            # No tool calls — record in spin detector
-            spin.record_turn(has_tool_calls=False)
-
-            if spin.state == _SpinState.TERMINATED:
-                logger.warning(
-                    "Agent stuck: %d turns without tool calls, breaking loop",
-                    spin.consecutive_no_tool_turns,
-                )
-                final_response = response
-                break
-
-            if spin.state == _SpinState.WARNING and tools:
-                # Inject nudge and budget warning via shared policy
-                nudge_decision = nudge_policy.evaluate(spin)
-                if nudge_decision.should_inject:
-                    self._chat_context.add_message(nudge_decision.role, nudge_decision.message)
-                budget_warning = nudge_policy.budget_warning(iteration, iteration_budget)
-                if budget_warning.should_inject:
-                    self._chat_context.add_message(budget_warning.role, budget_warning.message)
-                continue
-
-            # First turn with no tool calls — allow it (model may be
-            # providing a final answer after successfully using tools)
-            if self._tool_context.tool_calls_used > 0:
-                final_response = response
-                break
-
-            # Q&A shortcut: if the message is a question/display-only task
-            # and the model answered with content, accept it immediately.
-            # This avoids wasting 2+ extra LLM calls nudging for tool usage
-            # on prompts like "What is 2+2?" or "Explain X".
-            if is_qa_task and response.content:
-                logger.info("Q&A shortcut: accepting first response for question-only task")
-                final_response = response
-                break
-
-            # No tools ever called — continue to give the model another chance
-            continue
-
-        # Ensure we have a complete response
-        final_response = await self._ensure_complete_response(final_response, failure_context)
-
-        return final_response
+            raise
 
     async def execute_single_turn(
         self,

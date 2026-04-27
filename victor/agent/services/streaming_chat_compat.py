@@ -118,42 +118,10 @@ class StreamingChatCoordinator:
                 yield chunk
             return
 
-        # Ensure system prompt is included once at start of conversation
-        self._chat_context.conversation.ensure_system_prompt()
-        self._chat_context._system_added = True
-
-        # Add user message to history
-        self._chat_context.add_message("user", user_message)
-
-        # Check for cancellation before starting
-        if self._provider_context._check_cancellation():
-            logger.debug("Stream cancelled before starting")
-            return
-
-        # Get tool definitions if provider supports them
-        tools = None
-        if (
-            self._provider_context.provider.supports_tools()
-            and self._tool_context.tool_calls_used < self._tool_context.tool_budget
-        ):
-            tools = await self._select_tools_for_turn(user_message)
-
-        # Prepare optional thinking parameter
-        provider_kwargs = {}
-        if self._provider_context.thinking:
-            provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-
-        # Stream response from provider
-        async for chunk in self._stream_from_provider(
-            user_message=user_message,
-            tools=tools,
-            **provider_kwargs,
-        ):
-            # Emit event if event emitter is available
-            if self._event_emitter:
-                await self._event_emitter.emit_async("stream_chunk", {"chunk": chunk})
-
-            yield chunk
+        raise RuntimeError(
+            "StreamingChatCoordinator has no bound ChatService. "
+            "Bind ChatService before using deprecated compatibility shims."
+        )
 
     # =====================================================================
     # Private Methods

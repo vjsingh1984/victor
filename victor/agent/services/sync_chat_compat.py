@@ -130,44 +130,18 @@ class SyncChatCoordinator:
                 use_planning=use_planning,
             )
 
-        # Skill auto-selection (shared logic lives on orchestrator)
-        if self._orchestrator and hasattr(self._orchestrator, "apply_skill_for_turn"):
-            self._orchestrator.apply_skill_for_turn(user_message)
-
-        # Reset manual skill flag after use
-        if getattr(self._orchestrator, "manual_skill_active", False):
-            self._orchestrator.manual_skill_active = False
-
-        # Auto-detect planning via QueryClassifier when use_planning is None
-        if use_planning is None:
-            if self._query_classifier:
-                classification = self._query_classifier.classify(user_message)
-                # Update system prompt with task-aware guidance
-                if self._orchestrator and hasattr(
-                    self._orchestrator, "update_system_prompt_for_query"
-                ):
-                    self._orchestrator.update_system_prompt_for_query(classification)
-                if classification.should_plan:
-                    response = await self._chat_with_planning(user_message)
-                    return self._attach_skill_metadata(
-                        response, self._orchestrator.get_last_skill_match_info()
-                    )
-            else:
-                # Fallback to keyword heuristic
-                if self._should_use_planning(user_message):
-                    response = await self._chat_with_planning(user_message)
-                    return self._attach_skill_metadata(
-                        response, self._orchestrator.get_last_skill_match_info()
-                    )
-        elif use_planning and self._should_use_planning(user_message):
-            response = await self._chat_with_planning(user_message)
+        orchestrator = self._orchestrator
+        if orchestrator is not None and hasattr(orchestrator, "chat"):
+            response = await orchestrator.chat(user_message, use_planning=use_planning)
             return self._attach_skill_metadata(
-                response, self._orchestrator.get_last_skill_match_info()
+                response,
+                orchestrator.get_last_skill_match_info() if hasattr(orchestrator, "get_last_skill_match_info") else None,
             )
 
-        # Use execution coordinator for agentic loop
-        response = await self._turn_executor.execute_agentic_loop(user_message)
-        return self._attach_skill_metadata(response, self._orchestrator.get_last_skill_match_info())
+        raise RuntimeError(
+            "SyncChatCoordinator has no bound ChatService or orchestrator chat runtime. "
+            "Bind ChatService before using deprecated compatibility shims."
+        )
 
     # =====================================================================
     # Private Methods

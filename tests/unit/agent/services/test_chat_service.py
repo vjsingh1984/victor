@@ -279,13 +279,20 @@ class TestChatServiceReset(BaseChatServiceTest):
 
 
 class TestChatServiceDictBasedContext(BaseChatServiceTest):
-    """Direct ChatService paths should support dict-based ContextServiceProtocol writes."""
+    """Bound runtimes should support dict-based ContextServiceProtocol writes."""
 
     @pytest.mark.asyncio
     async def test_chat_records_user_and_assistant_messages_in_dict_based_context(self):
         service = self._create_test_service()
         response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
-        service._run_agentic_loop = mock.AsyncMock(return_value=response)
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                service._context.add_message({"role": "user", "content": user_message})
+                service._context.add_message({"role": "assistant", "content": response.content})
+                return response
+
+        service.bind_runtime_components(turn_executor=_TurnExecutor())
 
         result = await service.chat("hello")
 
@@ -312,7 +319,7 @@ class TestChatServiceDictBasedContext(BaseChatServiceTest):
 
 
 class TestChatServiceControllerBackedContext(BaseChatServiceTest):
-    """Direct ChatService paths should share conversation state with controller-backed context."""
+    """Bound runtimes should share conversation state with controller-backed context."""
 
     def _create_controller_backed_service(self):
         from victor.agent.conversation.controller import ConversationController
@@ -341,7 +348,14 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
     async def test_chat_records_user_and_assistant_messages_in_controller_backed_context(self):
         service, controller = self._create_controller_backed_service()
         response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
-        service._run_agentic_loop = mock.AsyncMock(return_value=response)
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                controller.add_message("user", user_message)
+                controller.add_message("assistant", response.content)
+                return response
+
+        service.bind_runtime_components(turn_executor=_TurnExecutor())
 
         result = await service.chat("hello")
 

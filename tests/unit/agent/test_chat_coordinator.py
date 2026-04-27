@@ -248,28 +248,12 @@ class TestChatServiceShim:
         assert result is response
         chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
 
-    def test_turn_executor_warns_when_materializing_legacy_fallback(self, mock_orchestrator):
-        fake_executor = MagicMock(name="legacy_executor")
+    def test_turn_executor_requires_bound_runtime(self, mock_orchestrator):
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
-        with (
-            patch(
-                "victor.agent.services.orchestrator_protocol_adapter.OrchestratorProtocolAdapter",
-                return_value=MagicMock(name="adapter"),
-            ),
-            patch(
-                "victor.agent.services.turn_execution_runtime.TurnExecutor",
-                return_value=fake_executor,
-            ),
-        ):
-            coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
-
-            with pytest.warns(DeprecationWarning) as caught:
-                result = coordinator.turn_executor
-
-        assert result is fake_executor
-        messages = [str(item.message) for item in caught]
-        assert any("ChatCoordinator.turn_executor is deprecated" in message for message in messages)
-        assert any("materializing a legacy local TurnExecutor" in message for message in messages)
+        with pytest.warns(DeprecationWarning, match="ChatCoordinator.turn_executor is deprecated"):
+            with pytest.raises(RuntimeError, match="no bound runtime turn executor"):
+                _ = coordinator.turn_executor
 
 
 class TestGetRateLimitWaitTime:
@@ -461,15 +445,10 @@ class TestStreamingShimBehavior:
         mock_orchestrator._get_service_streaming_runtime.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_stream_chat_falls_back_to_legacy_compatibility_hook(self, mock_orchestrator):
-        """Shim preserves the legacy compatibility hook as the final fallback."""
-        from victor.providers.base import StreamChunk
-
-        chunk = StreamChunk(content="legacy", role="assistant")
-
+    async def test_stream_chat_requires_service_runtime_not_legacy_hook(self, mock_orchestrator):
+        """Shim no longer preserves the legacy _stream_chat_runtime fallback hook."""
         async def _runtime(user_message: str, **kwargs):
-            assert user_message == "hello"
-            yield chunk
+            yield MagicMock()
 
         mock_orchestrator._stream_chat_runtime = _runtime
         coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
@@ -478,21 +457,17 @@ class TestStreamingShimBehavior:
             DeprecationWarning,
             match="ChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
         ):
-            results = [c async for c in coordinator.stream_chat("hello")]
-        assert results == [chunk]
+            with pytest.raises(RuntimeError, match="no bound ChatService or streaming runtime"):
+                _ = [c async for c in coordinator.stream_chat("hello")]
 
     @pytest.mark.asyncio
-    async def test_stream_chat_warns_when_no_runtime_path(self, mock_orchestrator):
-        """Shim emits DeprecationWarning and yields nothing when runtime not wired."""
-        import warnings as _warnings
+    async def test_stream_chat_raises_when_no_runtime_path(self, mock_orchestrator):
+        """Shim fails fast when no ChatService or service runtime is wired."""
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
-        with _warnings.catch_warnings(record=True) as caught:
-            _warnings.simplefilter("always")
-            coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
-            results = [c async for c in coordinator.stream_chat("hello")]
-
-        assert results == []
-        deprecation_messages = [
-            str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)
-        ]
-        assert any("service streaming runtime" in m for m in deprecation_messages)
+        with pytest.warns(
+            DeprecationWarning,
+            match="ChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+        ):
+            with pytest.raises(RuntimeError, match="no bound ChatService or streaming runtime"):
+                _ = [c async for c in coordinator.stream_chat("hello")]

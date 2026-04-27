@@ -214,35 +214,10 @@ class ChatCoordinator(ChatStreamHelperMixin):
         if orchestrator_executor is not None:
             return orchestrator_executor
 
-        if self._turn_executor is None:
-            warnings.warn(
-                "ChatCoordinator.turn_executor is materializing a legacy local "
-                "TurnExecutor because no ChatService or orchestrator runtime "
-                "executor is bound. This fallback is deprecated compatibility "
-                "behavior.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from victor.agent.services.turn_execution_runtime import (
-                TurnExecutor,
-            )
-
-            # Create protocol adapter for orchestrator
-            from victor.agent.services.orchestrator_protocol_adapter import (
-                OrchestratorProtocolAdapter,
-            )
-
-            adapter = OrchestratorProtocolAdapter(self._orchestrator)
-
-            # Initialize execution coordinator with protocol-based dependencies
-            self._turn_executor = TurnExecutor(
-                chat_context=adapter,
-                tool_context=adapter,
-                provider_context=adapter,
-                execution_provider=adapter,
-                token_tracker=self._token_tracker,
-            )
-        return self._turn_executor
+        raise RuntimeError(
+            "ChatCoordinator has no bound runtime turn executor. "
+            "Bind ChatService or access the orchestrator runtime directly."
+        )
 
     async def chat(
         self,
@@ -280,25 +255,14 @@ class ChatCoordinator(ChatStreamHelperMixin):
                 use_planning=use_planning,
             )
 
-        warnings.warn(
-            "ChatCoordinator.chat() called without a bound ChatService. "
-            "Bind via bind_chat_service() or migrate to ChatService directly.",
-            DeprecationWarning,
-            stacklevel=2,
+        runtime_chat = self._get_orchestrator_runtime_helper("chat")
+        if callable(runtime_chat):
+            return await runtime_chat(user_message, use_planning=use_planning)
+
+        raise RuntimeError(
+            "ChatCoordinator has no bound ChatService or orchestrator chat runtime. "
+            "Bind ChatService via bind_chat_service()."
         )
-
-        # If planning is explicitly disabled, skip planning check
-        if use_planning is False:
-            return await self.turn_executor.execute_agentic_loop(user_message)
-
-        # Check if we should use planning for this task (explicit or auto-detected)
-        if (use_planning is True or use_planning is None) and self._should_use_planning(
-            user_message
-        ):
-            return await self._chat_with_planning(user_message)
-
-        # Default: delegate to execution coordinator for agentic loop
-        return await self.turn_executor.execute_agentic_loop(user_message)
 
     def _should_use_planning(self, user_message: str) -> bool:
         """Determine if planning should be used for this task.
@@ -450,22 +414,15 @@ class ChatCoordinator(ChatStreamHelperMixin):
                     yield chunk
                 return
 
-        # Preserve the coordinator-era hook only for callers that still wire it
-        # directly. The canonical runtime path is the service-owned runtime.
-        runtime_helper = self._get_orchestrator_runtime_helper("_stream_chat_runtime")
+        runtime_helper = self._get_orchestrator_runtime_helper("stream_chat")
         if callable(runtime_helper):
             async for chunk in runtime_helper(user_message, **kwargs):
                 yield chunk
             return
 
-        warnings.warn(
-            "ChatCoordinator.stream_chat() called without a bound ChatService, "
-            "service streaming runtime, or legacy compatibility hook "
-            "(_stream_chat_runtime). "
-            "This shim no longer owns streaming execution. "
-            "Ensure ServiceStreamingRuntime is registered on the orchestrator.",
-            DeprecationWarning,
-            stacklevel=2,
+        raise RuntimeError(
+            "ChatCoordinator has no bound ChatService or streaming runtime. "
+            "Ensure ServiceStreamingRuntime is registered on the orchestrator."
         )
 
     # =====================================================================

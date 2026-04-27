@@ -1,6 +1,6 @@
-"""Tests for auto-planning integration — Layer 3 of agentic execution quality."""
+"""Tests for deprecated auto-planning shim delegation."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -41,22 +41,19 @@ def _make_coordinator(query_classifier=None, orchestrator=None):
         complexity=TaskComplexity.MEDIUM,
     )
 
-    mock_exec = AsyncMock()
-    mock_exec.execute_agentic_loop = AsyncMock(return_value=MagicMock(content="direct response"))
+    chat_service = AsyncMock()
+    chat_service.chat = AsyncMock(return_value=MagicMock(content="direct response"))
 
-    with pytest.warns(
-        DeprecationWarning,
-        match="SyncChatCoordinator without a bound ChatService is deprecated",
-    ):
-        coordinator = SyncChatCoordinator(
-            chat_context=mock_chat_ctx,
-            tool_context=mock_tool_ctx,
-            provider_context=mock_provider_ctx,
-            turn_executor=mock_exec,
-            orchestrator=orchestrator or MagicMock(),
-            query_classifier=query_classifier,
-        )
-    return coordinator, mock_exec
+    coordinator = SyncChatCoordinator(
+        chat_context=mock_chat_ctx,
+        tool_context=mock_tool_ctx,
+        provider_context=mock_provider_ctx,
+        turn_executor=AsyncMock(),
+        orchestrator=orchestrator or MagicMock(),
+        query_classifier=query_classifier,
+        chat_service=chat_service,
+    )
+    return coordinator, chat_service
 
 
 class TestAutoPlanning:
@@ -68,46 +65,46 @@ class TestAutoPlanning:
             return await coordinator.chat(user_message, use_planning=use_planning)
 
     @pytest.mark.asyncio
-    async def test_auto_none_complex_query_activates_planning(self):
+    async def test_auto_none_preserves_auto_planning_request_for_chat_service(self):
         mock_classifier = MagicMock(spec=QueryClassifier)
         mock_classifier.classify.return_value = _make_classification(
             QueryType.IMPLEMENTATION, should_plan=True
         )
-        coordinator, mock_exec = _make_coordinator(query_classifier=mock_classifier)
+        coordinator, chat_service = _make_coordinator(query_classifier=mock_classifier)
 
-        with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
-            mock_plan.return_value = MagicMock(content="planned response")
-            result = await self._chat(coordinator, "Implement JWT auth", use_planning=None)
-            mock_plan.assert_called_once()
+        await self._chat(coordinator, "Implement JWT auth", use_planning=None)
+
+        chat_service.chat.assert_awaited_once_with("Implement JWT auth", use_planning=None)
 
     @pytest.mark.asyncio
-    async def test_auto_none_simple_query_no_planning(self):
+    async def test_auto_none_simple_query_still_delegates_to_chat_service(self):
         mock_classifier = MagicMock(spec=QueryClassifier)
         mock_classifier.classify.return_value = _make_classification(
             QueryType.QUICK_QUESTION,
             should_plan=False,
             complexity=TaskComplexity.SIMPLE,
         )
-        coordinator, mock_exec = _make_coordinator(query_classifier=mock_classifier)
-        result = await self._chat(coordinator, "What is Python?", use_planning=None)
-        mock_exec.execute_agentic_loop.assert_called_once()
+        coordinator, chat_service = _make_coordinator(query_classifier=mock_classifier)
+
+        await self._chat(coordinator, "What is Python?", use_planning=None)
+
+        chat_service.chat.assert_awaited_once_with("What is Python?", use_planning=None)
 
     @pytest.mark.asyncio
-    async def test_explicit_true_always_plans(self):
-        coordinator, _ = _make_coordinator()
-        with patch.object(coordinator, "_should_use_planning", return_value=True):
-            with patch.object(
-                coordinator, "_chat_with_planning", new_callable=AsyncMock
-            ) as mock_plan:
-                mock_plan.return_value = MagicMock(content="planned")
-                await self._chat(coordinator, "anything", use_planning=True)
-                mock_plan.assert_called_once()
+    async def test_explicit_true_passes_through_to_chat_service(self):
+        coordinator, chat_service = _make_coordinator()
+
+        await self._chat(coordinator, "anything", use_planning=True)
+
+        chat_service.chat.assert_awaited_once_with("anything", use_planning=True)
 
     @pytest.mark.asyncio
-    async def test_explicit_false_never_plans(self):
-        coordinator, mock_exec = _make_coordinator()
+    async def test_explicit_false_passes_through_to_chat_service(self):
+        coordinator, chat_service = _make_coordinator()
         await self._chat(coordinator, "Implement complex auth system", use_planning=False)
-        mock_exec.execute_agentic_loop.assert_called_once()
+        chat_service.chat.assert_awaited_once_with(
+            "Implement complex auth system", use_planning=False
+        )
 
     def test_classifier_injected_via_constructor(self):
         mock_classifier = MagicMock(spec=QueryClassifier)
@@ -115,26 +112,9 @@ class TestAutoPlanning:
         assert coordinator._query_classifier is mock_classifier
 
     @pytest.mark.asyncio
-    async def test_fallback_to_keyword_heuristic(self):
-        # No classifier → existing keyword-based _should_use_planning behavior
-        coordinator, _ = _make_coordinator(query_classifier=None)
-        # Without classifier, use_planning=None falls back to keyword heuristic
-        with patch.object(coordinator, "_should_use_planning", return_value=False):
-            with patch.object(
-                coordinator, "_chat_with_planning", new_callable=AsyncMock
-            ) as mock_plan:
-                await self._chat(coordinator, "analyze architecture", use_planning=None)
-                mock_plan.assert_not_called()
+    async def test_no_classifier_still_delegates_to_chat_service(self):
+        coordinator, chat_service = _make_coordinator(query_classifier=None)
 
-    @pytest.mark.asyncio
-    async def test_classification_passed_to_planning_coordinator(self):
-        mock_classifier = MagicMock(spec=QueryClassifier)
-        classification = _make_classification(QueryType.IMPLEMENTATION, should_plan=True)
-        mock_classifier.classify.return_value = classification
-        coordinator, _ = _make_coordinator(query_classifier=mock_classifier)
+        await self._chat(coordinator, "analyze architecture", use_planning=None)
 
-        with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
-            mock_plan.return_value = MagicMock(content="planned")
-            await self._chat(coordinator, "Implement feature X", use_planning=None)
-            # Verify the planning method was called
-            mock_plan.assert_called_once()
+        chat_service.chat.assert_awaited_once_with("analyze architecture", use_planning=None)

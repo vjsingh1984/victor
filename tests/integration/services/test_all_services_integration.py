@@ -30,7 +30,7 @@ class TestServiceIntegration:
     async def test_complete_chat_flow_with_all_services(self):
         """Test complete chat flow using all services."""
         from victor.agent.services.tool_service import ToolService, ToolServiceConfig
-        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.chat_service import ChatService, ChatServiceConfig
         from victor.agent.services.session_service import SessionService
         from victor.agent.services.provider_service import ProviderService
         from victor.agent.services.recovery_service import RecoveryService
@@ -50,11 +50,16 @@ class TestServiceIntegration:
         provider = Mock()
         recovery = Mock()
         context = Mock()
+        conversation_controller = Mock()
+        streaming_coordinator = Mock()
         chat_service = ChatService(
-            provider=provider,
-            recovery=recovery,
-            context=context,
-            tools=tool_service,
+            config=ChatServiceConfig(),
+            provider_service=provider,
+            recovery_service=recovery,
+            context_service=context,
+            tool_service=tool_service,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
         )
 
         state_manager = Mock()
@@ -73,13 +78,14 @@ class TestServiceIntegration:
             health_checker=health_checker,
         )
 
-        recovery_config = Mock()
-        recovery_service = RecoveryService(config=recovery_config)
+        recovery_service = RecoveryService()
+        assert provider_service is not None
+        assert recovery_service is not None
 
         # Test: Create session
         session_id = await session_service.create_session()
         assert session_id is not None
-        assert session_service.is_active()
+        assert session_service.is_active
 
         # Test: Add user message to chat
         chat_service._add_user_message_to_context("Hello, world!")
@@ -102,7 +108,7 @@ class TestServiceIntegration:
 
         # Test: End session
         await session_service.end_session()
-        assert not session_service.is_active()
+        assert not session_service.is_active
 
     async def test_session_service_lifecycle_complete(self):
         """Test complete SessionService lifecycle."""
@@ -255,7 +261,7 @@ class TestServiceIntegration:
 
     def test_chat_service_context_and_error_handling(self):
         """Test ChatService context management and error handling."""
-        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.chat_service import ChatService, ChatServiceConfig
 
         # Create service
         provider = Mock()
@@ -264,6 +270,8 @@ class TestServiceIntegration:
 
         context = Mock()
         context.add_message = Mock()
+        conversation_controller = Mock()
+        streaming_coordinator = Mock()
 
         tool_service = Mock()
         tool_service.normalize_tool_arguments = Mock(
@@ -271,10 +279,13 @@ class TestServiceIntegration:
         )
 
         service = ChatService(
-            provider=provider,
-            recovery=recovery,
-            context=context,
-            tools=tool_service,
+            config=ChatServiceConfig(),
+            provider_service=provider,
+            recovery_service=recovery,
+            context_service=context,
+            tool_service=tool_service,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
         )
 
         # Test: Add user message
@@ -289,7 +300,9 @@ class TestServiceIntegration:
 
         # Test: Add tool result
         service._add_tool_result_to_context(
-            "test_tool", "Result", error=None, metadata={"test": "meta"}
+            "test_tool",
+            MagicMock(output="Result", error=None),
+            formatted_content="Result",
         )
         assert context.add_message.call_count == 3
 
@@ -609,13 +622,16 @@ class TestServiceErrorScenarios:
 
     def test_chat_service_error_without_recovery(self):
         """Test ChatService when recovery service not available."""
-        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.chat_service import ChatService, ChatServiceConfig
 
         service = ChatService(
-            provider=Mock(),
-            recovery=None,  # No recovery service
-            context=Mock(),
-            tools=Mock(),
+            config=ChatServiceConfig(),
+            provider_service=Mock(),
+            recovery_service=None,  # No recovery service
+            context_service=Mock(),
+            tool_service=Mock(),
+            conversation_controller=Mock(),
+            streaming_coordinator=Mock(),
         )
 
         # Test: Handle error without recovery

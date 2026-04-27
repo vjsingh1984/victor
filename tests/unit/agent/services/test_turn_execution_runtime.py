@@ -230,7 +230,7 @@ async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
 
 
 @pytest.mark.asyncio
-async def test_execute_agentic_loop_restores_state_before_legacy_fallback():
+async def test_execute_agentic_loop_restores_state_before_reraising_failure():
     messages = []
 
     class FakeConversation:
@@ -275,10 +275,6 @@ async def test_execute_agentic_loop_restores_state_before_legacy_fallback():
     executor._run_parallel_exploration = AsyncMock()
     executor._check_context_compaction = AsyncMock()
 
-    legacy_response = CompletionResponse(content="legacy done", role="assistant")
-    executor._execute_model_turn = AsyncMock(return_value=legacy_response)
-    executor._ensure_complete_response = AsyncMock(return_value=legacy_response)
-
     loop_instance = MagicMock()
 
     async def _loop_run(query: str, context=None, conversation_history=None):
@@ -289,16 +285,12 @@ async def test_execute_agentic_loop_restores_state_before_legacy_fallback():
 
     loop_instance.run = AsyncMock(side_effect=_loop_run)
 
-    flag_manager = MagicMock()
-    flag_manager.is_enabled.return_value = True
-
     with (
-        patch("victor.core.feature_flags.get_feature_flag_manager", return_value=flag_manager),
         patch("victor.framework.agentic_loop.AgenticLoop", return_value=loop_instance),
+        pytest.raises(RuntimeError, match="delegated loop failed mid-turn"),
     ):
-        result = await executor.execute_agentic_loop("hello", max_iterations=5)
+        await executor.execute_agentic_loop("hello", max_iterations=5)
 
-    assert result is legacy_response
-    assert tool_context.tool_calls_used == 0
-    assert [message.role for message in messages] == ["system", "user", "assistant"]
-    assert [message.content for message in messages] == ["system prompt", "hello", "legacy done"]
+    assert tool_context.tool_calls_used == 7
+    assert [message.role for message in messages] == ["system", "user"]
+    assert [message.content for message in messages] == ["system prompt", "hello"]
