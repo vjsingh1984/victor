@@ -22,11 +22,10 @@ import pytest
 from unittest.mock import Mock, MagicMock, AsyncMock
 from typing import Dict, Any
 
-
-@pytest.mark.asyncio
 class TestServiceIntegration:
     """Integration tests for all services."""
 
+    @pytest.mark.asyncio
     async def test_complete_chat_flow_with_all_services(self):
         """Test complete chat flow using all services."""
         from victor.agent.services.tool_service import ToolService, ToolServiceConfig
@@ -110,6 +109,7 @@ class TestServiceIntegration:
         await session_service.end_session()
         assert not session_service.is_active
 
+    @pytest.mark.asyncio
     async def test_session_service_lifecycle_complete(self):
         """Test complete SessionService lifecycle."""
         from victor.agent.services.session_service import SessionService
@@ -136,7 +136,7 @@ class TestServiceIntegration:
         # Test: Create session
         session_id = await service.create_session(metadata={"project": "test"})
         assert session_id is not None
-        assert service.is_active() is True
+        assert service.is_active is True
 
         # Test: Update token usage
         service.update_token_usage(100, 50)
@@ -148,12 +148,13 @@ class TestServiceIntegration:
 
         # Test: Reset session
         await service.reset_session()
-        assert service.is_active() is True  # Still active after reset
+        assert service.is_active is True  # Still active after reset
 
         # Test: End session
         await service.end_session()
-        assert service.is_active() is False
+        assert service.is_active is False
 
+    @pytest.mark.asyncio
     async def test_provider_service_switching_and_health(self):
         """Test ProviderService switching and health checks."""
         from victor.agent.services.provider_service import ProviderService
@@ -224,7 +225,11 @@ class TestServiceIntegration:
         config.retry_config.max_delay = 60.0
         config.retry_config.strategy = "exponential"
 
-        service = RecoveryService(config=config)
+        service = RecoveryService(
+            max_retry_attempts=config.retry_config.max_attempts,
+            base_retry_delay=config.retry_config.base_delay,
+            max_retry_delay=config.retry_config.max_delay,
+        )
 
         # Test: Can retry
         error = Exception("Temporary error")
@@ -245,7 +250,7 @@ class TestServiceIntegration:
 
         # Test: Should switch provider
         should_switch = service.should_switch_provider(
-            current_provider="anthropic", error_type="rate_limit_error", consecutive_failures=3
+            current_provider="anthropic", error_type="rate_limit", consecutive_failures=3
         )
         assert should_switch is True
 
@@ -373,10 +378,11 @@ class TestServiceIntegration:
         assert len(invalid) == 1
         assert invalid[0]["name"] == "file_read"
 
+    @pytest.mark.asyncio
     async def test_service_error_recovery_workflow(self):
         """Test complete error recovery workflow across services."""
         from victor.agent.services.tool_service import ToolService, ToolServiceConfig
-        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.chat_service import ChatService, ChatServiceConfig
         from victor.agent.services.provider_service import ProviderService
         from victor.agent.services.recovery_service import RecoveryService
 
@@ -392,11 +398,17 @@ class TestServiceIntegration:
         provider = Mock()
         recovery = Mock()
         recovery.should_attempt_recovery = Mock(return_value=True)
+        context = Mock()
+        conversation_controller = Mock()
+        streaming_coordinator = Mock()
         chat_service = ChatService(
-            provider=provider,
-            recovery=recovery,
-            context=Mock(),
-            tools=tool_service,
+            config=ChatServiceConfig(),
+            provider_service=provider,
+            recovery_service=recovery,
+            context_service=context,
+            tool_service=tool_service,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
         )
 
         registry = Mock()
@@ -405,8 +417,7 @@ class TestServiceIntegration:
             health_checker=Mock(),
         )
 
-        recovery_config = Mock()
-        recovery_service = RecoveryService(config=recovery_config)
+        recovery_service = RecoveryService()
 
         # Simulate error scenario
         error = Exception("Rate limit exceeded")
@@ -420,33 +431,34 @@ class TestServiceIntegration:
             primary_provider="anthropic", fallback_providers=["openai"]
         )
 
-        should_switch = recovery_service.should_switch_provider("anthropic", "rate_limit_error", 3)
+        should_switch = recovery_service.should_switch_provider("anthropic", "rate_limit", 3)
         assert should_switch is True
 
         # Test: Provider service switches
         next_provider = recovery_service.get_next_provider("anthropic")
         assert next_provider == "openai"
 
-    def test_session_persistence_and_serialization(self):
+    @pytest.mark.asyncio
+    async def test_session_persistence_and_serialization(self):
         """Test session persistence and serialization."""
         from victor.agent.services.session_service import SessionService
 
         # Create service
         state_manager = Mock()
-        state_manager.session_id = "test_session"
-        state_manager.is_active = True
+        state_manager.reset = Mock()
         state_manager.tool_calls_used = 5
-        state_manager.update_token_usage = Mock()
-        state_manager._token_usage = {"input": 100, "output": 50}
+        state_manager.get_token_usage = Mock(return_value={"input": 100, "output": 50})
 
         lifecycle_manager = Mock()
         memory_manager = Mock()
+        memory_manager.create_session = Mock(return_value="memory_test_session")
 
         service = SessionService(
             session_state_manager=state_manager,
             lifecycle_manager=lifecycle_manager,
             memory_manager=memory_manager,
         )
+        await service.create_session(session_id="test_session")
 
         # Test: Serialize to dict
         data = service.to_dict()
@@ -457,12 +469,12 @@ class TestServiceIntegration:
 
         # Test: Deserialize from dict
         restored_service = SessionService.from_dict(data)
-        assert restored_service.session_id() == "test_session"
+        assert restored_service.session_id == "test_session"
 
     def test_all_services_health_checks(self):
         """Test health checks across all services."""
         from victor.agent.services.tool_service import ToolService, ToolServiceConfig
-        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.chat_service import ChatService, ChatServiceConfig
         from victor.agent.services.session_service import SessionService
         from victor.agent.services.provider_service import ProviderService
         from victor.agent.services.recovery_service import RecoveryService
@@ -477,10 +489,13 @@ class TestServiceIntegration:
         tool_service._executor = Mock()  # Make it healthy
 
         chat_service = ChatService(
-            provider=Mock(),
-            recovery=Mock(),
-            context=Mock(),
-            tools=Mock(),
+            config=ChatServiceConfig(),
+            provider_service=Mock(),
+            recovery_service=Mock(),
+            context_service=Mock(),
+            tool_service=Mock(),
+            conversation_controller=Mock(),
+            streaming_coordinator=Mock(),
         )
 
         state_manager = Mock()
@@ -498,19 +513,20 @@ class TestServiceIntegration:
             health_checker=Mock(),
         )
 
-        recovery_service = RecoveryService(config=Mock())
+        recovery_service = RecoveryService()
 
         # Test: All services are healthy
         assert tool_service.is_healthy() is True
         assert chat_service.is_healthy() is True
-        assert session_service.is_healthy() is False  # No current provider
+        assert session_service.is_healthy() is True
         assert provider_service.is_healthy() is False  # No current provider
         assert recovery_service.is_healthy() is True
 
+    @pytest.mark.asyncio
     async def test_service_interaction_patterns(self):
         """Test common interaction patterns between services."""
         from victor.agent.services.tool_service import ToolService, ToolServiceConfig
-        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.chat_service import ChatService, ChatServiceConfig
 
         # Create services
         tool_config = ToolServiceConfig()
@@ -522,10 +538,13 @@ class TestServiceIntegration:
         )
 
         chat_service = ChatService(
-            provider=Mock(),
-            recovery=Mock(),
-            context=Mock(),
-            tools=tool_service,
+            config=ChatServiceConfig(),
+            provider_service=Mock(),
+            recovery_service=Mock(),
+            context_service=Mock(),
+            tool_service=tool_service,
+            conversation_controller=Mock(),
+            streaming_coordinator=Mock(),
         )
 
         # Pattern 1: ChatService delegates to ToolService
@@ -570,6 +589,7 @@ class TestServiceErrorScenarios:
             service.consume_budget(1)
         assert service.budget_used == 5
 
+    @pytest.mark.asyncio
     async def test_provider_service_switch_failure(self):
         """Test ProviderService when switch fails."""
         from victor.agent.services.provider_service import ProviderService
@@ -613,7 +633,7 @@ class TestServiceErrorScenarios:
         config.retry_config = Mock()
         config.retry_config.max_attempts = 3
 
-        service = RecoveryService(config=config)
+        service = RecoveryService(max_retry_attempts=config.retry_config.max_attempts)
 
         # Test: Cannot retry after max attempts
         error = Exception("Persistent error")

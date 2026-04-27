@@ -1,0 +1,85 @@
+# Copyright 2026 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+
+"""Architecture guardrails for the canonical chat runtime path."""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _read(relative_path: str) -> str:
+    return (REPO_ROOT / relative_path).read_text()
+
+
+def _method_source(relative_path: str, class_name: str, method_name: str) -> str:
+    source = _read(relative_path)
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name == method_name:
+                    segment = ast.get_source_segment(source, child)
+                    if segment is None:
+                        raise AssertionError(
+                            f"Could not recover source for {class_name}.{method_name} in {relative_path}"
+                        )
+                    return segment
+    raise AssertionError(f"Method {class_name}.{method_name} not found in {relative_path}")
+
+
+def test_orchestrator_public_chat_entrypoints_delegate_to_chat_service() -> None:
+    source = _read("victor/agent/orchestrator.py")
+    assert "async def _chat_via_agentic_loop" not in source
+
+    chat_source = _method_source("victor/agent/orchestrator.py", "AgentOrchestrator", "chat")
+    assert "_chat_service.chat(" in chat_source
+    assert "AgenticLoop" not in chat_source
+
+    stream_source = _method_source(
+        "victor/agent/orchestrator.py", "AgentOrchestrator", "stream_chat"
+    )
+    assert "_chat_service.stream_chat(" in stream_source
+    assert "AgenticLoop" not in stream_source
+    assert "_get_service_streaming_runtime" not in stream_source
+
+
+def test_chat_service_no_longer_owns_loop_execution() -> None:
+    chat_source = _method_source("victor/agent/services/chat_service.py", "ChatService", "chat")
+    stream_source = _method_source("victor/agent/services/chat_service.py", "ChatService", "stream_chat")
+    loop_guard_source = _method_source(
+        "victor/agent/services/chat_service.py", "ChatService", "_run_agentic_loop"
+    )
+
+    assert "_run_agentic_loop(" not in chat_source
+    assert "_run_agentic_loop(" not in stream_source
+    assert "raise RuntimeError" in loop_guard_source
+    assert "while " not in loop_guard_source
+    assert "_get_completion(" not in loop_guard_source
+
+
+def test_deprecated_chat_shims_do_not_materialize_local_chat_loops() -> None:
+    chat_source = _method_source("victor/agent/services/chat_compat.py", "ChatCoordinator", "chat")
+    turn_executor_source = _method_source(
+        "victor/agent/services/chat_compat.py", "ChatCoordinator", "turn_executor"
+    )
+    sync_source = _method_source(
+        "victor/agent/services/sync_chat_compat.py", "SyncChatCoordinator", "chat"
+    )
+    streaming_source = _method_source(
+        "victor/agent/services/streaming_chat_compat.py",
+        "StreamingChatCoordinator",
+        "stream_chat",
+    )
+
+    assert "execute_agentic_loop(" not in chat_source
+    assert "materializing a legacy local" not in turn_executor_source
+    assert "execute_agentic_loop(" not in sync_source
+    assert "_stream_from_provider(" not in streaming_source
+    assert "raise RuntimeError" in streaming_source
