@@ -335,6 +335,58 @@ class TestAgenticLoop:
         assert feedback_payload["completion_score"] == pytest.approx(0.92)
         emit_mock.assert_awaited_once()
 
+    async def test_experiment_memory_planning_hints_can_override_fast_path(self):
+        perception = _make_perception()
+        perception.confidence = 0.9
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            max_iterations=1,
+            config={"enable_topology_routing": False},
+        )
+        loop._analyze_turn = AsyncMock(return_value=perception)
+        loop._plan = AsyncMock(return_value={"steps": ["verify tests", "execute"]})
+        loop._evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=0.89,
+                reason="Forced planning handled experiment constraints",
+            )
+        )
+        loop.paradigm_router = MagicMock()
+        loop.paradigm_router.route.return_value = MagicMock(
+            skip_planning=False,
+            paradigm=SimpleNamespace(value="fast"),
+            model_tier=SimpleNamespace(value="small"),
+            max_tokens=1024,
+            confidence=0.73,
+            to_dict=MagicMock(return_value={"paradigm": "fast", "model_tier": "small"}),
+        )
+        loop.runtime_intelligence.get_planning_routing_context = MagicMock(
+            return_value={
+                "planning_force_llm": True,
+                "planning_force_reason": "experiment_constraints: tests_pass",
+                "planning_constraint_tags": ["tests_pass"],
+                "planning_experiment_support": 0.3333,
+            }
+        )
+
+        result = await loop.run(
+            "run the tests",
+            context={"task_type": "action", "tool_budget": 1},
+        )
+
+        assert result.success is True
+        assert loop._plan.await_count >= 1
+        assert result.final_state["plan"]["steps"] == ["verify tests", "execute"]
+        assert result.final_state["planning_routing_hints"]["planning_force_llm"] is True
+        assert result.metadata["planning_routing_hints"]["planning_force_reason"] == (
+            "experiment_constraints: tests_pass"
+        )
+        planning_scope_context = (
+            loop.runtime_intelligence.get_planning_routing_context.call_args.kwargs["scope_context"]
+        )
+        assert planning_scope_context["task_type"] == "action"
+
     def test_loop_uses_policy_completion_threshold_from_config(self):
         loop = self._make_loop(
             orchestrator=MagicMock(spec=[]),

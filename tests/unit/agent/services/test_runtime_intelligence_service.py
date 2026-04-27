@@ -944,6 +944,59 @@ def test_runtime_intelligence_exposes_experiment_memory_routing_hints(tmp_path):
     assert "Tighten learned override thresholds" in hints["experiment_memory_next_candidate_hints"][0]
 
 
+def test_runtime_intelligence_exposes_planning_force_hints_from_experiment_constraints(
+    tmp_path,
+):
+    store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+    store.record(
+        ExperimentMemoryRecord(
+            record_id="guide-memory-2",
+            created_at=20.0,
+            scope=ExperimentScope(
+                benchmark="guide",
+                provider="openai",
+                model="gpt-5",
+            ),
+            summary_metrics={},
+            task_summaries=[],
+            insights=[
+                ExperimentInsight(
+                    kind="environment_constraint",
+                    summary="Repeated hard constraint failure: tests_pass.",
+                    confidence=0.82,
+                    evidence={"gate_failure": "tests_pass", "count": 3},
+                ),
+                ExperimentInsight(
+                    kind="next_candidate",
+                    summary="Verify tests_pass before widening topology.",
+                    confidence=0.74,
+                ),
+            ],
+            keywords=["tests_pass", "guide"],
+        )
+    )
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        experiment_memory_path=tmp_path / "experiment_memory.json",
+    )
+
+    hints = service.get_planning_routing_context(
+        query="run the tests",
+        scope_context={"provider": "openai", "model": "gpt-5", "task_type": "action"},
+    )
+
+    assert hints["planning_force_llm"] is True
+    assert hints["planning_force_reason"] == "experiment_constraints: tests_pass"
+    assert hints["planning_constraint_tags"] == ["tests_pass"]
+    assert hints["planning_experiment_support"] > 0.0
+    assert hints["planning_match_count"] == 1
+    assert "Verify tests_pass before widening topology." in hints["planning_next_candidate_hints"][0]
+
+
 def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp_path):
     service = RuntimeIntelligenceService(
         task_analyzer=MagicMock(),

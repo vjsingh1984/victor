@@ -148,6 +148,7 @@ class PlanningGate:
         self.enabled = enabled
         self._fast_path_count = 0
         self._total_decisions = 0
+        self._forced_slow_path_count = 0
 
     def should_use_llm_planning(
         self,
@@ -157,6 +158,7 @@ class PlanningGate:
         query_length: int = 0,
         context: Optional[Dict[str, Any]] = None,
         skip_planning: bool = False,
+        routing_hints: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Determine if LLM planning is needed or if rule-based fast-path suffices.
 
@@ -167,6 +169,7 @@ class PlanningGate:
             query_length: Length of query in characters
             context: Optional execution context
             skip_planning: Task type hint flag to skip planning
+            routing_hints: Optional learned runtime hints that may override heuristics
 
         Returns:
             False if task can proceed without LLM planning (fast-path)
@@ -176,6 +179,15 @@ class PlanningGate:
 
         if not self.enabled:
             return True  # Gate disabled, always use LLM planning
+
+        if isinstance(routing_hints, dict) and routing_hints.get("planning_force_llm"):
+            reason = str(routing_hints.get("planning_force_reason") or "runtime_feedback")
+            logger.info(
+                f"[PlanningGate] Slow-path override: task_type={task_type} "
+                f"reason={reason} (forces LLM planning)"
+            )
+            self._forced_slow_path_count += 1
+            return True
 
         # Fast Pattern 0: Task type hint explicitly requests skip planning
         if skip_planning:
@@ -248,6 +260,7 @@ class PlanningGate:
         )
         return {
             "fast_path_count": self._fast_path_count,
+            "forced_slow_path_count": self._forced_slow_path_count,
             "total_decisions": self._total_decisions,
             "fast_path_percentage": fast_path_pct,
         }
@@ -568,6 +581,7 @@ class AgenticLoop:
                     # For now, use heuristics from query and context
                     task_type = context.get("task_type", "unknown") if context else "unknown"
                     tool_budget = context.get("tool_budget", 10) if context else 10
+                    planning_routing_hints: Dict[str, Any] = {}
 
                     # Try to get query complexity from perception if available
                     # Otherwise use simple heuristics
@@ -587,6 +601,18 @@ class AgenticLoop:
                             if temp_override is not None:
                                 state["temperature_override"] = temp_override
 
+                    if hasattr(self.runtime_intelligence, "get_planning_routing_context"):
+                        planning_routing_hints = self.runtime_intelligence.get_planning_routing_context(
+                            query=query,
+                            scope_context={
+                                **(context or {}),
+                                "task_type": task_type,
+                                "tool_budget": tool_budget,
+                            },
+                        )
+                        if planning_routing_hints:
+                            state["planning_routing_hints"] = dict(planning_routing_hints)
+
                     # Check with planning gate
                     use_llm_planning = self.planning_gate.should_use_llm_planning(
                         task_type=task_type,
@@ -595,6 +621,7 @@ class AgenticLoop:
                         query_length=len(query),
                         context={**context, "query": query} if context else {"query": query},
                         skip_planning=skip_planning,  # Pass TaskTypeHint skip flag
+                        routing_hints=planning_routing_hints,
                     )
 
                     # Get routing decision from paradigm router (arXiv:2604.06753)
@@ -913,6 +940,7 @@ class AgenticLoop:
                     "max_iterations_reached": len(iterations) >= self.max_iterations,
                     "effective_max_iterations": effective_max,
                     "progress_scores": list(self._progress_scores),
+                    "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
                     "topology_events": list(state.get("topology_events", [])),
                 },
             )
@@ -929,6 +957,7 @@ class AgenticLoop:
                 metadata={
                     "error": str(e),
                     "progress_scores": list(self._progress_scores),
+                    "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
                     "topology_events": list(state.get("topology_events", [])),
                 },
             )

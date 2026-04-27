@@ -1539,6 +1539,47 @@ class RuntimeIntelligenceService:
             "experiment_memory_record_ids": record_ids[:3],
         }
 
+    def get_planning_routing_context(
+        self,
+        *,
+        query: Optional[str] = None,
+        scope_context: Optional[Dict[str, Any]] = None,
+        limit: int = 3,
+    ) -> Dict[str, Any]:
+        """Return planning-gate hints distilled from experiment memory."""
+        experiment_hints = self.get_experiment_routing_context(
+            query=query,
+            scope_context=scope_context,
+            limit=limit,
+        )
+        if not experiment_hints:
+            return {}
+
+        constraint_tags = [
+            str(tag).strip()
+            for tag in list(experiment_hints.get("experiment_memory_constraint_tags") or [])
+            if str(tag).strip()
+        ]
+        next_candidate_hints = [
+            str(item).strip()
+            for item in list(experiment_hints.get("experiment_memory_next_candidate_hints") or [])
+            if str(item).strip()
+        ]
+        planning_hints: Dict[str, Any] = {
+            "planning_match_count": int(experiment_hints.get("experiment_memory_match_count") or 0),
+            "planning_experiment_support": float(
+                experiment_hints.get("experiment_memory_support") or 0.0
+            ),
+            "planning_constraint_tags": constraint_tags,
+            "planning_next_candidate_hints": next_candidate_hints[:2],
+        }
+        if constraint_tags:
+            planning_hints["planning_force_llm"] = True
+            planning_hints["planning_force_reason"] = (
+                f"experiment_constraints: {', '.join(constraint_tags[:2])}"
+            )
+        return planning_hints
+
     def _build_persistable_session_topology_feedback(self) -> Optional[RuntimeEvaluationFeedback]:
         """Build the scoped live-topology feedback payload for persistence."""
         feedback = self._session_topology_routing_feedback

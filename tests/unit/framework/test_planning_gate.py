@@ -111,6 +111,25 @@ class TestPlanningGate:
 
         assert result is True, "disabled gate should always use LLM planning"
 
+    def test_planning_feedback_can_force_llm_planning_over_fast_path(self):
+        """Experiment-memory constraints can veto fast-path planning skips."""
+        gate = PlanningGate(enabled=True)
+
+        result = gate.should_use_llm_planning(
+            task_type="create_simple",
+            tool_budget=2,
+            query_complexity=None,
+            query_length=20,
+            routing_hints={
+                "planning_force_llm": True,
+                "planning_force_reason": "experiment_constraints: tests_pass",
+            },
+        )
+
+        assert result is True, "planning constraints should force LLM planning"
+        stats = gate.get_statistics()
+        assert stats["forced_slow_path_count"] == 1
+
     def test_complex_task_returns_true(self):
         """Test complex task returns True (use LLM planning)."""
         gate = PlanningGate(enabled=True)
