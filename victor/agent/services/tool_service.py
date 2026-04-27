@@ -427,10 +427,10 @@ class ToolServiceConfig:
 
 
 class BudgetManager:
-    """Manages tool budget for a session.
+    """Manages executable tool budget for the current turn.
 
-    Tracks tool calls and enforces budget limits to prevent
-    excessive tool usage in loops.
+    Tracks tool calls and enforces limits to prevent excessive
+    tool usage inside a single agentic turn or prompt cycle.
 
     Attributes:
         max_budget: Maximum tool calls allowed
@@ -666,7 +666,7 @@ class ToolService:
             yield result
 
     def get_tool_budget(self) -> int:
-        """Get the remaining tool budget.
+        """Get the remaining executable tool budget for the current turn.
 
         Returns:
             Number of remaining tool calls allowed
@@ -710,10 +710,21 @@ class ToolService:
             "budget_used": self._budget_manager.calls_made,
         }
 
-    def reset_tool_budget(self) -> None:
-        """Reset the tool budget to initial limit.
+    def start_new_turn(self) -> None:
+        """Reset per-turn budget while preserving cumulative usage stats.
 
-        Useful for starting new sessions or after testing.
+        Interactive chat sessions should replenish executable tool budget for
+        each new user prompt, but cross-turn analytics should remain intact.
+        """
+        self._budget_manager.reset()
+        self._logger.debug("Tool turn budget reset")
+
+    def reset_tool_budget(self) -> None:
+        """Fully reset tool budget and usage stats to initial state.
+
+        Useful for starting a fresh session, test isolation, or explicit
+        operator-driven recovery where cumulative usage analytics should be
+        cleared along with the budget.
         """
         self._budget_manager.reset()
         self._usage_stats.clear()
@@ -860,9 +871,13 @@ class ToolService:
 
         remaining = self.get_remaining_budget()
         if amount > remaining:
-            from victor.agent.tools.errors import BudgetExhaustedError
+            from victor.core.errors import BudgetExhaustedError
 
-            raise BudgetExhaustedError(f"Insufficient budget: need {amount}, have {remaining}")
+            raise BudgetExhaustedError(
+                f"Insufficient budget: need {amount}, have {remaining}",
+                budget=self._budget_manager.max_budget,
+                used=self._budget_manager.calls_made,
+            )
 
         self._budget_manager.record_usage(amount)
 

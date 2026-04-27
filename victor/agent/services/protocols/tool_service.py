@@ -179,10 +179,10 @@ class ToolServiceProtocol(Protocol):
         ...
 
     def get_tool_budget(self) -> int:
-        """Get the remaining tool budget.
+        """Get the remaining executable tool budget for the current turn.
 
-        The tool budget limits the number of tool calls per session
-        to prevent infinite loops and excessive API usage.
+        The executable budget limits the number of tool calls inside the
+        current prompt/turn to prevent loops and excessive API usage.
 
         Returns:
             Number of remaining tool calls allowed
@@ -225,12 +225,12 @@ class ToolServiceProtocol(Protocol):
         ...
 
     def reset_tool_budget(self) -> None:
-        """Reset the tool budget to initial limit.
+        """Fully reset the tool budget to its initial limit.
 
         Useful for:
         - Starting new sessions
         - Testing and development
-        - Recovery from budget exhaustion
+        - Explicit recovery from budget exhaustion
         """
         ...
 
