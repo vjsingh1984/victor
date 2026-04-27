@@ -46,8 +46,6 @@ class ContextServiceAdapter:
     ) -> int:
         """Compact context via the context compactor."""
         if self._context_compactor is None:
-            if hasattr(self._conversation_controller, "compact_history"):
-                return self._conversation_controller.compact_history(keep_recent=min_messages)
             return 0
         result = await self._context_compactor.check_and_compact()
         return result if isinstance(result, int) else 0
