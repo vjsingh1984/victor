@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -24,7 +23,10 @@ def _method_source(relative_path: str, class_name: str, method_name: str) -> str
     for node in tree.body:
         if isinstance(node, ast.ClassDef) and node.name == class_name:
             for child in node.body:
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name == method_name:
+                if (
+                    isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and child.name == method_name
+                ):
                     segment = ast.get_source_segment(source, child)
                     if segment is None:
                         raise AssertionError(
@@ -66,7 +68,9 @@ def test_orchestrator_public_chat_entrypoints_delegate_to_chat_service() -> None
 
 def test_chat_service_no_longer_owns_loop_execution() -> None:
     chat_source = _method_source("victor/agent/services/chat_service.py", "ChatService", "chat")
-    stream_source = _method_source("victor/agent/services/chat_service.py", "ChatService", "stream_chat")
+    stream_source = _method_source(
+        "victor/agent/services/chat_service.py", "ChatService", "stream_chat"
+    )
     loop_guard_source = _method_source(
         "victor/agent/services/chat_service.py", "ChatService", "_run_agentic_loop"
     )
@@ -130,3 +134,12 @@ def test_deprecated_sync_chat_coordinator_is_not_wired_to_turn_executor() -> Non
         "_ensure_sync_chat_coordinator",
     )
     assert "turn_executor=self.turn_executor" not in source
+
+
+def test_deprecated_unified_chat_coordinator_is_not_wired_to_nested_chat_shims() -> None:
+    source = _function_source(
+        "victor/agent/orchestrator_properties.py",
+        "_ensure_unified_chat_coordinator",
+    )
+    assert "_ensure_sync_chat_coordinator(self)" not in source
+    assert "_ensure_streaming_chat_coordinator(self)" not in source

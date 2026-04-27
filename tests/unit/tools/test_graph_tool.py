@@ -592,7 +592,9 @@ async def test_graph_tool_query_uses_project_db_fast_path(monkeypatch, tmp_path:
     assert result["mode"] == "query"
     assert result["result"]["success"] is True
     assert result["result"]["row_count"] >= 1
-    assert any(row["type"] == "function" and row["count"] == 3 for row in result["result"]["results"])
+    assert any(
+        row["type"] == "function" and row["count"] == 3 for row in result["result"]["results"]
+    )
 
 
 def test_graph_tool_is_available_with_persisted_project_graph(monkeypatch, tmp_path: Path):

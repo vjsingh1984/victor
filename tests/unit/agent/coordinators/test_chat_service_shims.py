@@ -230,15 +230,11 @@ async def test_streaming_chat_coordinator_tool_calls_require_canonical_tool_cont
 
 @pytest.mark.asyncio
 async def test_unified_chat_coordinator_delegates_to_bound_chat_service():
-    sync = MagicMock()
-    streaming = MagicMock()
     chat_service = AsyncMock()
     response = CompletionResponse(content="unified", role="assistant")
     chat_service.chat.return_value = response
 
     coordinator = UnifiedChatCoordinator(
-        sync_coordinator=sync,
-        streaming_coordinator=streaming,
         default_mode=ExecutionMode.SYNC,
         chat_service=chat_service,
     )
@@ -258,10 +254,7 @@ def test_unified_chat_coordinator_constructor_warns_without_chat_service():
         DeprecationWarning,
         match="UnifiedChatCoordinator without a bound ChatService is deprecated",
     ):
-        UnifiedChatCoordinator(
-            sync_coordinator=MagicMock(),
-            streaming_coordinator=MagicMock(),
-        )
+        UnifiedChatCoordinator()
 
 
 @pytest.mark.asyncio
@@ -270,10 +263,7 @@ async def test_unified_chat_coordinator_requires_bound_chat_service_for_chat():
         DeprecationWarning,
         match="UnifiedChatCoordinator without a bound ChatService is deprecated",
     ):
-        coordinator = UnifiedChatCoordinator(
-            sync_coordinator=MagicMock(),
-            streaming_coordinator=MagicMock(),
-        )
+        coordinator = UnifiedChatCoordinator()
 
     with pytest.warns(
         DeprecationWarning,
@@ -289,10 +279,7 @@ async def test_unified_chat_coordinator_requires_bound_chat_service_for_streamin
         DeprecationWarning,
         match="UnifiedChatCoordinator without a bound ChatService is deprecated",
     ):
-        coordinator = UnifiedChatCoordinator(
-            sync_coordinator=MagicMock(),
-            streaming_coordinator=MagicMock(),
-        )
+        coordinator = UnifiedChatCoordinator()
 
     with pytest.warns(
         DeprecationWarning,
@@ -336,7 +323,9 @@ async def test_chat_coordinator_planning_prefers_bound_chat_service():
 async def test_chat_coordinator_planning_requires_canonical_runtime():
     coordinator = _make_deprecated_chat_coordinator(MagicMock())
 
-    with pytest.raises(RuntimeError, match="planning requires a bound ChatService or orchestrator runtime"):
+    with pytest.raises(
+        RuntimeError, match="planning requires a bound ChatService or orchestrator runtime"
+    ):
         await coordinator._chat_with_planning("hello")
 
 

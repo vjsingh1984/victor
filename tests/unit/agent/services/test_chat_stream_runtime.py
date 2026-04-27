@@ -90,19 +90,21 @@ async def test_service_streaming_runtime_create_stream_context_uses_blocked_thre
     orch._task_completion_detector = None
 
     runtime = ServiceStreamingRuntime(orch)
-    runtime._prepare_stream = AsyncMock(return_value=(
-        SimpleNamespace(),
-        0.0,
-        0.0,
-        {},
-        30,
-        10,
-        0,
-        False,
-        SimpleNamespace(value="default"),
-        None,
-        None,
-    ))
+    runtime._prepare_stream = AsyncMock(
+        return_value=(
+            SimpleNamespace(),
+            0.0,
+            0.0,
+            {},
+            30,
+            10,
+            0,
+            False,
+            SimpleNamespace(value="default"),
+            None,
+            None,
+        )
+    )
 
     ctx = await runtime._create_stream_context("hello")
 

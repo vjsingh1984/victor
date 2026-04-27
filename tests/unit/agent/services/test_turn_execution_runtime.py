@@ -364,7 +364,9 @@ async def test_execute_turn_applies_runtime_overrides_and_restores_state():
         return_value=CompletionResponse(
             content="Need to inspect files",
             role="assistant",
-            tool_calls=[{"name": "read", "arguments": {"path": "victor/framework/agentic_loop.py"}}],
+            tool_calls=[
+                {"name": "read", "arguments": {"path": "victor/framework/agentic_loop.py"}}
+            ],
         )
     )
     executor = TurnExecutor(

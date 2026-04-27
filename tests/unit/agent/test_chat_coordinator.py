@@ -446,6 +446,7 @@ class TestStreamingShimBehavior:
     @pytest.mark.asyncio
     async def test_stream_chat_requires_service_runtime_not_legacy_hook(self, mock_orchestrator):
         """Shim no longer preserves the legacy _stream_chat_runtime fallback hook."""
+
         async def _runtime(user_message: str, **kwargs):
             yield MagicMock()
 
