@@ -58,6 +58,11 @@ class TestProtocolImports:
 
         assert issubclass(ChatCompatRuntimeProtocol, Protocol)
 
+    def test_planning_context_protocol_importable(self):
+        from victor.agent.services.protocols.chat_runtime import PlanningContextProtocol
+
+        assert issubclass(PlanningContextProtocol, Protocol)
+
     def test_chat_orchestrator_protocol_is_runtime_checkable(self):
         from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
@@ -205,6 +210,14 @@ class TestProtocolCompleteness:
         from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         assert hasattr(ChatOrchestratorProtocol, "create_recovery_context")
+
+    def test_planning_context_declares_planning_runtime_members(self):
+        from victor.agent.services.protocols.chat_runtime import PlanningContextProtocol
+
+        assert hasattr(PlanningContextProtocol, "profile")
+        assert hasattr(PlanningContextProtocol, "planning_model_override")
+        assert hasattr(PlanningContextProtocol, "_system_prompt_override")
+        assert hasattr(PlanningContextProtocol, "set_system_prompt")
 
     def test_provider_context_declares_provider_members(self):
         from victor.agent.services.protocols.chat_runtime import ProviderContextProtocol

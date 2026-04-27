@@ -3475,7 +3475,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         planning_coordinator = getattr(self, "_service_planning_coordinator", None)
         if planning_coordinator is None:
-            planning_coordinator = PlanningCoordinator(self)
+            planning_coordinator = PlanningCoordinator(self.protocol_adapter)
             self._service_planning_coordinator = planning_coordinator
 
         task_analysis = self.task_analyzer.analyze(user_message)

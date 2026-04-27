@@ -430,6 +430,25 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.max_tokens
 
     @property
+    def profile(self) -> Any:
+        """Get active profile configuration if available."""
+        return getattr(self._orchestrator, "profile", None)
+
+    @property
+    def planning_model_override(self) -> Any:
+        """Get CLI planning model override if available."""
+        return getattr(self._orchestrator, "_planning_model_override", None)
+
+    @property
+    def _system_prompt_override(self) -> Any:
+        """Get the current temporary system prompt override, if any."""
+        return getattr(self._orchestrator, "_system_prompt_override", None)
+
+    def set_system_prompt(self, prompt: str) -> None:
+        """Set a temporary system prompt override for planning helpers."""
+        self._orchestrator.set_system_prompt(prompt)
+
+    @property
     def thinking(self) -> Any:
         """Get thinking configuration."""
         return self._orchestrator.thinking

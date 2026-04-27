@@ -353,6 +353,33 @@ class TestAdapterProtocolConformance:
             1,
             0.8,
         )
+
+    def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+        from victor.agent.services.protocols.chat_runtime import PlanningContextProtocol
+
+        provider = MagicMock(name="provider")
+        profile = MagicMock(name="profile")
+        orchestrator = MagicMock()
+        orchestrator.provider = provider
+        orchestrator.model = "gpt-test"
+        orchestrator.max_tokens = 2048
+        orchestrator.profile = profile
+        orchestrator._planning_model_override = "openai:o4-mini"
+        orchestrator._system_prompt_override = "original system prompt"
+
+        adapter = OrchestratorProtocolAdapter(orchestrator)
+        adapter.set_system_prompt("new system prompt")
+
+        assert isinstance(adapter, PlanningContextProtocol)
+        assert adapter.provider is provider
+        assert adapter.model == "gpt-test"
+        assert adapter.max_tokens == 2048
+        assert adapter.profile is profile
+        assert adapter.planning_model_override == "openai:o4-mini"
+        assert adapter._system_prompt_override == "original system prompt"
+        orchestrator.set_system_prompt.assert_called_once_with("new system prompt")
+
     def test_orchestrator_tool_strategy_event_prefers_metrics_service(self):
         orchestrator = object.__new__(AgentOrchestrator)
         orchestrator._metrics_coordinator = MagicMock()
@@ -622,6 +649,37 @@ class TestChatServiceBootstrapLaziness:
         obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
+
+    @pytest.mark.asyncio
+    async def test_run_planning_chat_runtime_constructs_planning_coordinator_with_protocol_adapter(
+        self,
+    ):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        protocol_adapter = MagicMock(name="protocol_adapter")
+        planning_response = CompletionResponse(content="planned", role="assistant")
+        planning_instance = MagicMock(name="planning_coordinator")
+        planning_instance.chat_with_planning = AsyncMock(return_value=planning_response)
+
+        obj._protocol_adapter = protocol_adapter
+        obj._service_planning_coordinator = None
+        obj._task_analyzer = MagicMock()
+        obj._task_analyzer.analyze.return_value = "task-analysis"
+        obj._get_conversation_message_count = MagicMock(side_effect=[0, 1])
+
+        with patch("victor.agent.services.planning_runtime.PlanningCoordinator") as planning_cls:
+            planning_cls.return_value = planning_instance
+
+            response = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
+
+        assert response is planning_response
+        assert obj._service_planning_coordinator is planning_instance
+        planning_cls.assert_called_once_with(protocol_adapter)
+        planning_instance.chat_with_planning.assert_awaited_once_with(
+            "plan this",
+            task_analysis="task-analysis",
+        )
 
     @pytest.mark.asyncio
     async def test_planning_handler_skips_duplicate_turn_recording_after_direct_chat_fallback(self):

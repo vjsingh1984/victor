@@ -247,8 +247,27 @@ class PlanningContextProtocol(Protocol):
         """Maximum tokens for completion."""
         ...
 
+    @property
+    def profile(self) -> Any:
+        """Optional profile carrying planning model/provider overrides."""
+        ...
+
+    @property
+    def planning_model_override(self) -> Any:
+        """Optional CLI override for planning model/provider routing."""
+        ...
+
+    @property
+    def _system_prompt_override(self) -> Any:
+        """Current temporary system prompt override, if any."""
+        ...
+
     async def chat(self, user_message: str, use_planning: bool = False) -> Any:
         """Execute a non-streaming chat turn."""
+        ...
+
+    def set_system_prompt(self, prompt: str) -> None:
+        """Set a temporary system prompt override for planning."""
         ...
 
 
