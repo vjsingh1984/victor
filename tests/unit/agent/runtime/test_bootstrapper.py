@@ -129,10 +129,13 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["context_service"] is getattr(orch, "_context_service", None)
         assert kwargs["provider_service"] is getattr(orch, "_provider_service", None)
         assert kwargs["recovery_service"] is getattr(orch, "_recovery_service", None)
-        assert callable(kwargs["get_chat_coordinator"])
+        assert kwargs["deprecated_chat_coordinator"] is getattr(
+            orch, "_deprecated_chat_coordinator", None
+        )
         assert callable(kwargs["get_tool_coordinator"])
         assert callable(kwargs["get_session_coordinator"])
         assert kwargs["turn_executor"] is orch._turn_executor
+        assert "get_chat_coordinator" not in kwargs
         assert "get_sync_chat_coordinator" not in kwargs
         assert "get_streaming_chat_coordinator" not in kwargs
         assert "get_unified_chat_coordinator" not in kwargs
@@ -159,7 +162,7 @@ class TestAgentRuntimeBootstrapper:
         )
         orch._factory.create_safety_state_passed_coordinator.assert_called_once_with()
 
-    def test_create_facades_binds_deprecated_chat_tool_session_getters_to_slots(self):
+    def test_create_facades_binds_deprecated_chat_slot_and_tool_session_getters(self):
         orch = self._make_mock_orchestrator()
         orch._deprecated_chat_coordinator = sentinel.chat_coordinator
         orch._deprecated_tool_coordinator = sentinel.tool_coordinator
@@ -171,7 +174,8 @@ class TestAgentRuntimeBootstrapper:
 
             kwargs = facade_cls.call_args.kwargs
 
-            assert kwargs["get_chat_coordinator"]() is sentinel.chat_coordinator
+            assert kwargs["deprecated_chat_coordinator"] is sentinel.chat_coordinator
+            assert "get_chat_coordinator" not in kwargs
             assert kwargs["get_tool_coordinator"]() is sentinel.tool_coordinator
             assert kwargs["get_session_coordinator"]() is sentinel.session_coordinator
 

@@ -153,6 +153,7 @@ def test_runtime_bootstrapper_does_not_bind_deprecated_chat_shim_getters_to_faca
         "AgentRuntimeBootstrapper",
         "create_facades",
     )
+    assert "get_chat_coordinator=" not in source
     assert "get_sync_chat_coordinator=" not in source
     assert "get_streaming_chat_coordinator=" not in source
     assert "get_unified_chat_coordinator=" not in source

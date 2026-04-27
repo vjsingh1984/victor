@@ -168,7 +168,7 @@ class AgentRuntimeBootstrapper:
                 context_service=getattr(orchestrator, "_context_service", None),
                 provider_service=getattr(orchestrator, "_provider_service", None),
                 recovery_service=getattr(orchestrator, "_recovery_service", None),
-                get_chat_coordinator=lambda: getattr(
+                deprecated_chat_coordinator=getattr(
                     orchestrator, "_deprecated_chat_coordinator", None
                 ),
                 get_tool_coordinator=lambda: getattr(
