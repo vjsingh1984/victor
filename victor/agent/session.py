@@ -407,6 +407,9 @@ def get_session_manager() -> SessionPersistence:
     Note: Function name kept for backward compatibility.
     """
     global _default_persistence
-    if _default_persistence is None:
+    from victor.config.settings import get_project_paths
+
+    current_session_dir = get_project_paths().sessions_dir
+    if _default_persistence is None or _default_persistence.session_dir != current_session_dir:
         _default_persistence = SessionPersistence()
     return _default_persistence
