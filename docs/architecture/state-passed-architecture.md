@@ -385,10 +385,10 @@ def test_coordinator():
 victor/agent/coordinators/
 ├── state_context.py                      # Core abstractions
 ├── example_state_passed_coordinator.py   # Example implementation
-├── chat_coordinator.py                   # [TODO: Refactor]
+├── chat_coordinator.py                   # Deprecated shim over service-first runtime
 ├── planning_coordinator.py               # [TODO: Refactor]
 ├── execution_coordinator.py              # [TODO: Refactor]
-└── sync_chat_coordinator.py              # [TODO: Refactor]
+└── sync_chat_coordinator.py              # Deprecated shim over service-first runtime
 
 tests/unit/agent/coordinators/
 └── test_state_context.py                 # 34 comprehensive tests
@@ -404,14 +404,16 @@ tests/unit/agent/coordinators/
 - [x] Create comprehensive unit tests (34 tests)
 - [x] Document the pattern
 
-### Phase 2: Gradual Migration (FUTURE)
-- [ ] Refactor `chat_coordinator.py`
-  - Replace orchestrator reference with ContextSnapshot
-  - Return CoordinatorResult instead of direct mutation
-  - Update tests
+### Phase 2: Gradual Migration (UPDATED 2026-04-27)
+- [x] Collapse `chat_coordinator.py` into a deprecated shim over `ChatService`
+  - Canonical runtime ownership moved to `ChatService`
+  - Deprecated compatibility surface now delegates to service/orchestrator public entrypoints
+  - Architecture tests guard against reintroducing local loop ownership
 - [ ] Refactor `planning_coordinator.py`
 - [ ] Refactor `execution_coordinator.py`
-- [ ] Refactor `sync_chat_coordinator.py`
+- [x] Collapse `sync_chat_coordinator.py` into a deprecated shim over `ChatService`
+  - Canonical runtime ownership moved to `ChatService`
+  - Planning path now routes through `ChatService.chat(..., use_planning=True)` or orchestrator public chat
 - [ ] Update orchestrator integration points
 
 ### Phase 3: Validation (FUTURE)
@@ -482,12 +484,13 @@ tests/unit/agent/coordinators/
 | Example Coordinator | ✅ Complete | Demonstrates the pattern |
 | Unit Tests | ✅ Complete | 34 tests, all passing |
 | Documentation | ✅ Complete | This document |
-| Chat Coordinator | ⏳ Pending | Migration not started |
+| Chat Coordinator | ✅ Complete | Deprecated shim; live path owned by `ChatService` |
+| Sync Chat Coordinator | ✅ Complete | Deprecated shim; live path owned by `ChatService` |
 | Planning Coordinator | ⏳ Pending | Migration not started |
 | Execution Coordinator | ⏳ Pending | Migration not started |
 
-**Overall Progress**: Foundation complete. Ready for incremental coordinator migration when needed.
+**Overall Progress**: Foundation complete. Chat and sync chat have already been collapsed into shim-only compatibility layers; future state-passed work should focus on coordinators that still own live behavior.
 
 ---
 
-**Next Steps**: When the team is ready, begin gradual migration starting with the simplest coordinator (likely `sync_chat_coordinator.py` or a subset of `chat_coordinator.py`). Use `example_state_passed_coordinator.py` as a reference.
+**Next Steps**: Keep chat and sync chat shim-only, continue deleting dead compatibility paths, and use `example_state_passed_coordinator.py` as the reference for coordinators that still need true state-passed migration.

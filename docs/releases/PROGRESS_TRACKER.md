@@ -70,12 +70,12 @@
 
 | Coordinator | Status |
 |-------------|--------|
-| chat_coordinator.py | NOT STARTED (current protocol-based design is good) |
+| chat_coordinator.py | COMPLETE (service-first runtime; deprecated shim only) |
 | planning_coordinator.py | NOT STARTED |
 | execution_coordinator.py | NOT STARTED |
-| sync_chat_coordinator.py | NOT STARTED |
+| sync_chat_coordinator.py | COMPLETE (service-first runtime; deprecated shim only) |
 
-**Guidance**: Use state-passed for new coordinators. Existing well-decoupled coordinators (Chat, Tool, Metrics, Exploration) don't need migration.
+**Guidance**: Use state-passed for new coordinators. Chat and sync chat no longer own live runtime behavior and should continue shrinking as compatibility shims rather than being re-expanded as coordinator-owned execution paths.
 
 ---
 
