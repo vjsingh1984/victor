@@ -71,12 +71,29 @@ class TestRecoverySettings:
     def test_blocked_total_threshold_validation(self):
         """Test blocked total threshold validation."""
         # Valid threshold
-        settings = RecoverySettings(recovery_blocked_total_threshold=1)
+        settings = RecoverySettings(
+            recovery_blocked_consecutive_threshold=1,
+            recovery_blocked_total_threshold=1,
+        )
         assert settings.recovery_blocked_total_threshold == 1
 
         # Invalid threshold (zero)
         with pytest.raises(ValueError, match="recovery_blocked_total_threshold must be >= 1"):
             RecoverySettings(recovery_blocked_total_threshold=0)
+
+    def test_blocked_total_threshold_must_not_be_lower_than_consecutive(self):
+        """Total blocked threshold should be at least the consecutive threshold."""
+        with pytest.raises(
+            ValueError,
+            match=(
+                "recovery_blocked_total_threshold must be >= "
+                "recovery_blocked_consecutive_threshold"
+            ),
+        ):
+            RecoverySettings(
+                recovery_blocked_consecutive_threshold=5,
+                recovery_blocked_total_threshold=4,
+            )
 
 
 class TestAnalyticsSettings:

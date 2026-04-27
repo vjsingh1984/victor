@@ -7,7 +7,7 @@ This module contains settings for:
 - Continuation prompt management
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from victor.core.loop_thresholds import (
     DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
@@ -122,6 +122,14 @@ class RecoverySettings(BaseModel):
         """
         if v < 1:
             raise ValueError("recovery_blocked_total_threshold must be >= 1")
-        # Note: Can't validate against consecutive_threshold here since we don't have access to it
-        # This will be validated in a model_validator in Settings
         return v
+
+    @model_validator(mode="after")
+    def validate_blocked_threshold_relationship(self) -> "RecoverySettings":
+        """Ensure blocked recovery thresholds remain internally consistent."""
+        if self.recovery_blocked_total_threshold < self.recovery_blocked_consecutive_threshold:
+            raise ValueError(
+                "recovery_blocked_total_threshold must be >= "
+                "recovery_blocked_consecutive_threshold"
+            )
+        return self
