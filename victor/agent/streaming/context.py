@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
+from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.agent.stream_handler import StreamMetrics
 from victor.agent.unified_classifier import ClassifierTaskType
 
@@ -90,7 +91,7 @@ class StreamingChatContext:
 
     # Blocked attempts tracking
     consecutive_blocked_attempts: int = 0
-    max_blocked_before_force: int = 4
+    max_blocked_before_force: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 
     # Garbage detection
     garbage_detected: bool = False

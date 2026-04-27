@@ -21,8 +21,8 @@ class TestRecoverySettings:
         settings = RecoverySettings()
 
         assert settings.recovery_empty_response_threshold == 5
-        assert settings.recovery_blocked_consecutive_threshold == 6
-        assert settings.recovery_blocked_total_threshold == 9
+        assert settings.recovery_blocked_consecutive_threshold == 4
+        assert settings.recovery_blocked_total_threshold == 6
         assert settings.chat_max_iterations == 50
         assert settings.max_consecutive_tool_calls == 20
         assert settings.max_continuation_prompts == 3

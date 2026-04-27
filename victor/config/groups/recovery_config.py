@@ -9,6 +9,11 @@ This module contains settings for:
 
 from pydantic import BaseModel, Field, field_validator
 
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+)
+
 
 class RecoverySettings(BaseModel):
     """Recovery and loop detection settings.
@@ -29,8 +34,8 @@ class RecoverySettings(BaseModel):
 
     # Loop detection patience: How many consecutive blocked attempts before forcing completion
     # This is separate from the per-task loop_repeat_threshold (which controls when to warn/block)
-    recovery_blocked_consecutive_threshold: int = 6
-    recovery_blocked_total_threshold: int = 9
+    recovery_blocked_consecutive_threshold: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
+    recovery_blocked_total_threshold: int = DEFAULT_BLOCKED_TOTAL_THRESHOLD
 
     # ==========================================================================
     # Chat Iteration Limits

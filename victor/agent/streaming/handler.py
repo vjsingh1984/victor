@@ -43,6 +43,10 @@ from victor.agent.streaming.iteration import (
     create_continue_result,
     create_force_completion_result,
 )
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+)
 from victor.providers.base import StreamChunk
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
@@ -519,8 +523,8 @@ class StreamingChatHandler:
         self,
         ctx: StreamingChatContext,
         all_blocked: bool,
-        consecutive_limit: int = 4,
-        total_limit: int = 6,
+        consecutive_limit: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+        total_limit: int = DEFAULT_BLOCKED_TOTAL_THRESHOLD,
     ) -> Optional[IterationResult]:
         """Check if blocked tool attempts have exceeded thresholds.
 

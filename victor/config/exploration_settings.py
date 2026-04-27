@@ -6,6 +6,11 @@ from typing import Dict
 
 from pydantic import BaseModel, Field
 
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+)
+
 
 class ExplorationSettings(BaseModel):
     """Exploration iteration limits, recovery, and continuation prompts."""
@@ -18,8 +23,8 @@ class ExplorationSettings(BaseModel):
     max_research_iterations: int = 6
     min_content_threshold: int = 150
     recovery_empty_response_threshold: int = 5
-    recovery_blocked_consecutive_threshold: int = 6
-    recovery_blocked_total_threshold: int = 9
+    recovery_blocked_consecutive_threshold: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
+    recovery_blocked_total_threshold: int = DEFAULT_BLOCKED_TOTAL_THRESHOLD
     max_continuation_prompts_default: int = 3
     max_continuation_prompts_action: int = 5
     max_continuation_prompts_analysis: int = 6

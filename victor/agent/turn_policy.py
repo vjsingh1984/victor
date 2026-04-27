@@ -31,6 +31,8 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
+
+from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,7 @@ logger = logging.getLogger(__name__)
 MAX_NO_TOOL_TURNS = 3
 """Maximum consecutive turns without tool calls before termination."""
 
-MAX_ALL_BLOCKED = 4
+MAX_ALL_BLOCKED = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 """Maximum consecutive turns where all tool calls are dedup-blocked."""
 
 NUDGE_THRESHOLD = 2

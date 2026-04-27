@@ -42,6 +42,10 @@ if TYPE_CHECKING:
 
 from victor.providers.base import StreamChunk
 from victor.core.events import ObservabilityBus
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -402,8 +406,16 @@ class StreamingRecoveryCoordinator:
         if service is not None:
             return service.check_blocked_threshold(ctx, all_blocked)
 
-        consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
-        total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
+        consecutive_limit = getattr(
+            self.settings,
+            "recovery_blocked_consecutive_threshold",
+            DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+        )
+        total_limit = getattr(
+            self.settings,
+            "recovery_blocked_total_threshold",
+            DEFAULT_BLOCKED_TOTAL_THRESHOLD,
+        )
 
         result = self.streaming_handler.check_blocked_threshold(
             ctx.streaming_context, all_blocked, consecutive_limit, total_limit
