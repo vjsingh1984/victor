@@ -1193,9 +1193,19 @@ async def _find_semantic_relationships(
     logger.info(f"[graph] Searching for semantic matches for '{target_node.name}'")
 
     # 2. Search for similar nodes using CodebaseIndex
+    semantic_search = getattr(loaded.index, "semantic_search", None)
+    if not callable(semantic_search):
+        return {
+            "focus_node": _node_payload(target_node),
+            "potential_relationships": [],
+            "threshold_used": threshold,
+            "total_discovered": 0,
+            "semantic_search_available": False,
+        }
+
     try:
         # Use existing semantic search infrastructure
-        search_results = await loaded.index.semantic_search(
+        search_results = await semantic_search(
             query=anchor_text,
             max_results=limit * 3,  # Over-fetch for filtering
             similarity_threshold=threshold,
@@ -1258,6 +1268,7 @@ async def _find_semantic_relationships(
         ),
         "threshold_used": threshold,
         "total_discovered": len(relationships),
+        "semantic_search_available": True,
     }
 
 

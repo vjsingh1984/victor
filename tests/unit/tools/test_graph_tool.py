@@ -431,3 +431,35 @@ async def test_graph_tool_falls_back_to_project_graph_store(monkeypatch, tmp_pat
     assert stats["mode"] == "stats"
     assert stats["result"]["nodes"] == 7
     assert stats["result"]["edges"] == 7
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_semantic_mode_gracefully_skips_when_index_has_no_semantic_search(
+    monkeypatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    with caplog.at_level("WARNING", logger="victor.tools.graph_tool"):
+        result = await graph_tool_module.graph(
+            mode="semantic",
+            node="start",
+            path=str(tmp_path),
+            top_k=5,
+            _exec_ctx=exec_ctx,
+        )
+
+    assert result["success"] is True
+    assert result["result"]["semantic_search_available"] is False
+    assert result["result"]["potential_relationships"] == []
+    assert "Semantic search failed during discovery" not in caplog.text
