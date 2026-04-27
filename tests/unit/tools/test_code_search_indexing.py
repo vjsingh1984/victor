@@ -96,8 +96,10 @@ class _SerialIndexLockRegistry(_FakeIndexLockRegistry):
 
 
 class _FakeCapabilityRegistry:
-    def __init__(self, factory: object) -> None:
+    def __init__(self, factory: object, *, enhanced: bool = True) -> None:
         self._factory = factory
+        self._enhanced = enhanced
+        self.register_calls: list[tuple[object, object, object]] = []
 
     def ensure_bootstrapped(self) -> None:
         return None
@@ -108,7 +110,91 @@ class _FakeCapabilityRegistry:
 
     def is_enhanced(self, protocol: object) -> bool:
         del protocol
-        return True
+        return self._enhanced
+
+    def register(self, protocol: object, factory: object, status: object) -> None:
+        self._factory = factory
+        self._enhanced = True
+        self.register_calls.append((protocol, factory, status))
+
+
+class TestCodebaseIndexRecovery:
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_recovers_factory_via_importlib_fallback(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(tmp_path / "embeddings"),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        class FakeCodebaseIndex:
+            def __init__(self, root_path: str, **kwargs) -> None:
+                self.root_path = root_path
+                self.kwargs = kwargs
+                self.index_codebase = AsyncMock()
+                self._is_indexed = False
+
+        fake_registry = _FakeCapabilityRegistry(None, enhanced=False)
+        fake_cache: dict[str, dict[str, object]] = {}
+
+        import victor.core.bootstrap as bootstrap_module
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        def _fake_import_module(module_path: str):
+            if module_path == "victor_coding.codebase.indexer":
+                return SimpleNamespace(CodebaseIndex=FakeCodebaseIndex)
+            raise ImportError(module_path)
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: fake_registry),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda _: None)
+        monkeypatch.setattr(code_search_tool_module.importlib, "import_module", _fake_import_module)
+        monkeypatch.setattr(
+            code_search_tool_module, "has_persisted_codebase_index_data", lambda _path: False
+        )
+        monkeypatch.setattr(
+            code_search_tool_module, "_ensure_graph_enrichment_for_root", lambda *_args: None
+        )
+        monkeypatch.setattr(
+            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+        )
+        monkeypatch.setattr(_get_or_build_index, "_failure_cache", {}, raising=False)
+
+        clear_index_cache()
+        index, rebuilt = await _get_or_build_index(root=root, settings=settings)
+
+        assert isinstance(index, FakeCodebaseIndex)
+        assert rebuilt is True
+        assert index.root_path == str(root)
+        index.index_codebase.assert_awaited_once()
+        assert len(fake_registry.register_calls) == 1
 
 
 class TestIndexingFlagBehavior:

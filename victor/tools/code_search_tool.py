@@ -1,5 +1,6 @@
 import asyncio
 import fnmatch
+import importlib
 import importlib.util
 import logging
 import os
@@ -426,6 +427,33 @@ def _ensure_graph_enrichment_for_root(root: Path, latest_mtime: Optional[float])
         ensure_project_graph_enriched(root, latest_mtime=latest_mtime)
     except Exception as exc:  # pragma: no cover - defensive logging only
         logger.warning("[code_search] Graph enrichment failed for %s: %s", root, exc)
+
+
+def _load_codebase_index_factory_via_importlib() -> Optional[Any]:
+    """Load a CodebaseIndex factory via runtime import fallback paths."""
+
+    class _ImportedCodebaseIndexFactory:
+        def __init__(self, index_cls: Any) -> None:
+            self._index_cls = index_cls
+
+        def create(self, root_path: str, **kwargs: Any) -> Any:
+            return self._index_cls(root_path=root_path, **kwargs)
+
+    for module_path in (
+        "victor_coding.codebase.indexer",
+        "victor.verticals.contrib.coding.codebase.indexer",
+    ):
+        try:
+            module = importlib.import_module(module_path)
+        except ImportError:
+            continue
+
+        index_cls = getattr(module, "CodebaseIndex", None)
+        if index_cls is None:
+            continue
+        return _ImportedCodebaseIndexFactory(index_cls)
+
+    return None
 
 
 async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> bool:
@@ -1860,19 +1888,16 @@ async def _get_or_build_index(
         # Recovery 2: direct import — bypasses plugin→vertical→capability chain entirely.
         # This handles cases where the plugin chain fails silently (DEBUG-level exception
         # swallowing in _auto_register_vertical_capabilities) but the package IS installed.
-        try:
-            from victor.core.capability_registry import CapabilityStatus
-            from victor.core.search.indexer import EnhancedCodebaseIndexFactory
+        from victor.core.capability_registry import CapabilityStatus
 
-            factory = EnhancedCodebaseIndexFactory()
+        factory = _load_codebase_index_factory_via_importlib()
+        if factory is not None:
             registry.register(CodebaseIndexFactoryProtocol, factory, CapabilityStatus.ENHANCED)
             _index_factory = factory
             logger.info(
-                "[code_search] Recovered CodebaseIndex factory via direct import "
+                "[code_search] Recovered CodebaseIndex factory via importlib fallback "
                 "(victor-coding is installed, plugin chain failed)"
             )
-        except ImportError:
-            pass  # victor-coding genuinely not installed
 
     if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
         if importlib.util.find_spec("victor_coding") is not None:
