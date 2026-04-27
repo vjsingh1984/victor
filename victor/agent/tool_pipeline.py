@@ -2182,31 +2182,58 @@ class ToolPipeline:
                 recovery = recover_from_error(
                     Exception(exec_result.error), tool_name, normalized_args
                 )
-                if recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
+                recovery_tool_name = tool_name
+                recovery_args = normalized_args
+
+                if recovery.action in {
+                    RecoveryAction.RETRY_WITH_INFERRED,
+                    RecoveryAction.RETRY_WITH_DEFAULTS,
+                } and recovery.modified_args:
+                    recovery_args = recovery.modified_args
+                    logger.info(
+                        "[Pipeline] Retrying %s with recovered arguments: %s",
+                        tool_name,
+                        recovery_args,
+                    )
+                elif recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
                     fallback_name = recovery.fallback_tool
                     if self.tools.is_tool_enabled(fallback_name):
-                        logger.info(f"[Pipeline] Falling back from {tool_name} to {fallback_name}")
-                        try:
-                            fb_result = await asyncio.wait_for(
-                                self.executor.execute(
-                                    tool_name=fallback_name,
-                                    arguments=normalized_args,
-                                    context=context,
-                                ),
-                                timeout=self.config.per_tool_timeout_seconds,
-                            )
-                        except asyncio.TimeoutError:
-                            fb_result = None
-                        if fb_result is not None and fb_result.success:
-                            call_result = ToolCallResult(
-                                tool_name=fallback_name,
-                                arguments=normalized_args,
-                                success=fb_result.success,
-                                result=fb_result.result,
-                                error=fb_result.error,
-                                execution_time_ms=((time.monotonic() - start_time) * 1000),
-                                error_info=fb_result.error_info,  # Preserve from fallback
-                            )
+                        recovery_tool_name = fallback_name
+                        logger.info(
+                            "[Pipeline] Falling back from %s to %s",
+                            tool_name,
+                            fallback_name,
+                        )
+
+                if (
+                    recovery_tool_name != tool_name
+                    or recovery_args is not normalized_args
+                ):
+                    try:
+                        recovered_exec_result = await asyncio.wait_for(
+                            self.executor.execute(
+                                tool_name=recovery_tool_name,
+                                arguments=recovery_args,
+                                context=context,
+                            ),
+                            timeout=self._get_tool_timeout(recovery_tool_name),
+                        )
+                    except asyncio.TimeoutError:
+                        recovered_exec_result = None
+
+                    if recovered_exec_result is not None and recovered_exec_result.success:
+                        call_result = ToolCallResult(
+                            tool_name=recovery_tool_name,
+                            arguments=recovery_args,
+                            success=recovered_exec_result.success,
+                            result=recovered_exec_result.result,
+                            error=recovered_exec_result.error,
+                            execution_time_ms=((time.monotonic() - start_time) * 1000),
+                            normalization_applied=normalization_applied,
+                            code_corrected=code_corrected,
+                            code_validation_errors=code_validation_errors,
+                            error_info=recovered_exec_result.error_info,
+                        )
             except Exception as e:
                 logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")
 

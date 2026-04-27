@@ -228,6 +228,53 @@ class TestToolPipeline:
         assert "Deduplicated" in result.results[1].skip_reason
 
     @pytest.mark.asyncio
+    async def test_file_not_found_recovery_retries_with_suggested_path(
+        self, pipeline, mock_tool_executor
+    ):
+        """Read failures with concrete suggestions should retry transparently."""
+        mock_tool_executor.execute = AsyncMock(
+            side_effect=[
+                ToolExecutionResult(
+                    tool_name="read",
+                    success=False,
+                    result=None,
+                    error=(
+                        "File not found: victor/core/registry.py\n"
+                        "Did you mean one of these?\n"
+                        "  - victor/core/registry/base.py\n"
+                        "  - victor/core/registry/__init__.py"
+                    ),
+                ),
+                ToolExecutionResult(
+                    tool_name="read",
+                    success=True,
+                    result="[File: victor/core/registry/base.py]",
+                    error=None,
+                ),
+            ]
+        )
+
+        tool_calls = [
+            {
+                "name": "read",
+                "arguments": {"path": "victor/core/registry.py", "limit": 100, "offset": 0},
+            }
+        ]
+
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.total_calls == 1
+        assert result.successful_calls == 1
+        assert result.failed_calls == 0
+        assert result.results[0].success is True
+        assert result.results[0].arguments["path"] == "victor/core/registry/base.py"
+        assert result.results[0].result == "[File: victor/core/registry/base.py]"
+        assert mock_tool_executor.execute.await_count == 2
+        retry_call = mock_tool_executor.execute.await_args_list[1]
+        assert retry_call.kwargs["tool_name"] == "read"
+        assert retry_call.kwargs["arguments"]["path"] == "victor/core/registry/base.py"
+
+    @pytest.mark.asyncio
     async def test_argument_normalization(self, pipeline, mock_tool_executor):
         """Test that string arguments are normalized."""
         tool_calls = [{"name": "test_tool", "arguments": '{"path": "test.py"}'}]
