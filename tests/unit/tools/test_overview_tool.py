@@ -57,6 +57,13 @@ class TestToolRegistration:
         entry = registry._entries["project_overview"]
         assert entry.name == "project_overview"
 
+    def test_private_directory_summary_helper_not_registered(self):
+        """Internal directory summary helper should not be exposed as a tool."""
+        from victor.tools.metadata_registry import get_global_registry
+
+        registry = get_global_registry()
+        assert "_get_directory_summaries" not in registry._entries
+
     def test_tool_metadata_attributes(self):
         """Test that tool has correct metadata attributes."""
         from victor.tools.metadata_registry import get_global_registry

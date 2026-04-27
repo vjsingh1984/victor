@@ -19,7 +19,7 @@ tool_tiers:
   - read
   - shell
   - code_search
-  - _get_directory_summaries
+  - overview
   - edit
   - find
   - ls
@@ -27,7 +27,6 @@ tool_tiers:
   - test
   - write
   COMPACT:
-  - overview
   - refs
   - git_status
   - git_diff
@@ -62,7 +61,7 @@ provider_tiers:
     - code_search
     - edit
     - write
-    - _get_directory_summaries
+    - overview
     - symbol
     - find
     - test

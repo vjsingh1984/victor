@@ -64,6 +64,61 @@ def test_normalize_search_filters_trims_text_fields_and_extensions() -> None:
     )
 
 
+def test_normalize_search_filters_accepts_dict_input() -> None:
+    """Runtime dict payloads should be coerced into SearchFilters."""
+    normalized = _normalize_search_filters(
+        {
+            "file_pattern": "  src/*.py  ",
+            "symbol": "  parse_json  ",
+            "language": "  python  ",
+            "extensions": [" py ", " .js "],
+        }
+    )
+
+    assert normalized == SearchFilters(
+        file_pattern="src/*.py",
+        symbol="parse_json",
+        language="python",
+        extensions=["py", ".js"],
+    )
+
+
+def test_normalize_search_filters_ignores_unsupported_string_shorthand(caplog) -> None:
+    """Invalid string shorthand should be ignored instead of crashing."""
+    normalized = _normalize_search_filters("symbol")
+
+    assert normalized is None
+    assert "Ignoring unsupported string filters" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_code_search_ignores_invalid_string_filters_in_text_mode(tmp_path) -> None:
+    """String filter shorthands should not crash runtime code_search execution."""
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/parser.py", "score": 1, "snippet": "def parse_json(data): ..."}],
+        "count": 1,
+        "mode": "literal",
+    }
+
+    with patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parse_json",
+            path=str(tmp_path),
+            k=5,
+            mode="text",
+            filters="symbol",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once()
+    assert result["success"] is True
+    assert result["count"] == 1
+
+
 def test_build_codebase_embedding_config_forwards_existing_search_settings(tmp_path) -> None:
     """Embedding config should propagate dimension, batch size, and extra options."""
     settings = _settings(

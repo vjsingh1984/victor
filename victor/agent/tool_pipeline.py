@@ -62,6 +62,7 @@ from victor.agent.synthesis_checkpoint import (
     CompositeSynthesisCheckpoint,
     get_checkpoint_for_complexity,
 )
+from victor.agent.file_state import capture_file_state, normalize_file_path
 from victor.config.tool_selection_defaults import (
     ToolPipelineDefaults,
     IdempotentTools,
@@ -604,6 +605,8 @@ class ToolPipeline:
         # File read timestamp tracking for deduplication (prompting loop fix)
         # Prevents re-reading identical files within TTL window
         self._read_file_timestamps: Dict[str, float] = {}
+        self._read_file_paths: Dict[str, str] = {}
+        self._read_file_snapshots: Dict[str, Any] = {}
 
         # Observability: pre-execution intent logging (LogAct-inspired)
         self._observability_bus: Optional[Any] = None
@@ -1098,22 +1101,54 @@ class ToolPipeline:
         if file_path not in self._read_file_timestamps:
             return False
         age = time.monotonic() - self._read_file_timestamps[file_path]
-        return age < max_age_seconds
+        if age >= max_age_seconds:
+            return False
 
-    def record_file_read(self, read_key: str) -> None:
+        current_path = self._read_file_paths.get(file_path, file_path)
+        previous_snapshot = self._read_file_snapshots.get(file_path)
+        current_snapshot = capture_file_state(current_path)
+        if previous_snapshot is None and current_snapshot is None:
+            return True
+        if previous_snapshot is None or current_snapshot is None:
+            return False
+        return previous_snapshot == current_snapshot
+
+    def record_file_read(self, read_key: str, file_path: Optional[str] = None) -> None:
         """Record that a file was read.
 
         Updates the timestamp for deduplication tracking.
 
         Args:
             read_key: Deduplication key for the file read, including offset/limit
+            file_path: Actual file path associated with the read key
         """
         # Evict oldest entries if at capacity (prevent unbounded growth)
         if len(self._read_file_timestamps) >= 2000:
             oldest_key = next(iter(self._read_file_timestamps))
             del self._read_file_timestamps[oldest_key]
+            self._read_file_paths.pop(oldest_key, None)
+            self._read_file_snapshots.pop(oldest_key, None)
         self._read_file_timestamps[read_key] = time.monotonic()
+        actual_path = file_path or read_key
+        self._read_file_paths[read_key] = actual_path
+        self._read_file_snapshots[read_key] = capture_file_state(actual_path)
         logger.debug(f"Recorded file read: {read_key}")
+
+    def _clear_read_tracking_for_file(self, file_path: str) -> None:
+        """Clear read-tracking entries for a file after it changes."""
+        normalized_target = normalize_file_path(file_path)
+        if not normalized_target:
+            return
+
+        stale_keys = [
+            read_key
+            for read_key, tracked_path in self._read_file_paths.items()
+            if normalize_file_path(tracked_path) == normalized_target
+        ]
+        for read_key in stale_keys:
+            self._read_file_timestamps.pop(read_key, None)
+            self._read_file_paths.pop(read_key, None)
+            self._read_file_snapshots.pop(read_key, None)
 
     def deduplicate_tool_calls(
         self,
@@ -1725,12 +1760,7 @@ class ToolPipeline:
         if canonical_core_tool in {"edit", "write"}:
             edited_path = normalized_args.get("path") or normalized_args.get("file_path")
             if edited_path:
-                # Clear all cached reads for this file (any offset/limit)
-                stale_keys = [
-                    k for k in self._read_file_timestamps if k.startswith(f"{edited_path}:")
-                ]
-                for k in stale_keys:
-                    del self._read_file_timestamps[k]
+                self._clear_read_tracking_for_file(edited_path)
 
         # Code correction middleware - validate and fix code arguments
         code_corrected = False
@@ -2050,7 +2080,7 @@ class ToolPipeline:
             if file_path:
                 offset = normalized_args.get("offset")
                 limit = normalized_args.get("limit")
-                self.record_file_read(f"{file_path}:{offset}:{limit}")
+                self.record_file_read(f"{file_path}:{offset}:{limit}", file_path=file_path)
 
         # Track failed signatures
         if not exec_result.success and self.config.enable_failed_signature_tracking:

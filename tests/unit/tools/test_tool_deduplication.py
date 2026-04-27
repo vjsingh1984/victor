@@ -1,5 +1,6 @@
 """Unit tests for tool call deduplication tracker."""
 
+import os
 import pytest
 import time
 
@@ -179,6 +180,25 @@ class TestFileRedundancy:
 
         tracker.add_call("read_file", {"path": "foo.py", "offset": 0})
         is_dup = tracker.is_redundant("read_file", {"path": "foo.py", "offset": 100})
+
+        assert is_dup is False
+
+    def test_read_file_after_external_change_not_redundant(self, tmp_path):
+        """A reread should be allowed when the file changed on disk."""
+        tracker = ToolDeduplicationTracker()
+
+        file_path = tmp_path / "foo.py"
+        file_path.write_text("print('before')\n")
+        tracker.add_call("read_file", {"path": str(file_path)})
+
+        file_stat = file_path.stat()
+        file_path.write_text("print('after')\n")
+        os.utime(
+            file_path,
+            ns=(file_stat.st_atime_ns, max(file_stat.st_mtime_ns + 1_000_000, time.time_ns())),
+        )
+
+        is_dup = tracker.is_redundant("read_file", {"path": str(file_path)})
 
         assert is_dup is False
 

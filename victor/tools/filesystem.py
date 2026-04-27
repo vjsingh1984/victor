@@ -2614,42 +2614,6 @@ IMPORTANT_DOC_PATTERNS = [
 ]
 
 
-@tool(
-    category="filesystem",
-    priority=Priority.HIGH,  # Useful for initial exploration
-    access_mode=AccessMode.READONLY,  # Only reads directory structure
-    danger_level=DangerLevel.SAFE,  # No side effects
-    # Registry-driven metadata for tool selection and loop detection
-    progress_params=["path", "max_depth"],  # Params indicating exploration progress
-    stages=[
-        "initial",
-        "planning",
-        "reading",
-        "analysis",
-    ],  # Best used at start of conversation
-    task_types=["analysis", "search"],  # Task types for classification-aware selection
-    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
-    keywords=[
-        "overview",
-        "project",
-        "structure",
-        "explore",
-        "summary",
-        "codebase",
-        "architecture",
-    ],
-    use_cases=[
-        "getting a project overview",
-        "understanding codebase structure",
-        "finding important files",
-        "initial exploration",
-    ],
-    examples=[
-        "show me the project overview",
-        "what's in this codebase",
-        "explore the project structure",
-    ],
-)
 async def _get_directory_summaries(root: Path, directory_paths: List[str]) -> Dict[str, str]:
     """Get summaries for directories based on symbol index.
 

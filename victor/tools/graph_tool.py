@@ -62,6 +62,8 @@ class GraphMode(str, Enum):
     """
 
     FIND = "find"  # Find nodes by query
+    SEARCH = "search"  # Alias for find
+    OVERVIEW = "overview"  # High-level graph summary
     NEIGHBORS = "neighbors"  # Get neighboring nodes
     PAGERANK = "pagerank"  # Calculate PageRank scores
     CENTRALITY = "centrality"  # Calculate centrality measures
@@ -190,6 +192,13 @@ class GraphAnalyzer:
 
         normalized = reference.strip().strip("`'\"")
         lowered = normalized.lower()
+        compound_matches = self._resolve_compound_reference(
+            normalized,
+            lowered=lowered,
+            preferred_types=preferred_types,
+        )
+        if compound_matches:
+            return compound_matches[0]
         candidates = list(self._name_index.get(lowered, ()))
 
         normalized_file = _normalize_relpath(normalized)
@@ -216,6 +225,45 @@ class GraphAnalyzer:
 
         candidates = sorted(dict.fromkeys(candidates), key=_score)
         return candidates[0]
+
+    def _resolve_compound_reference(
+        self,
+        normalized: str,
+        *,
+        lowered: str,
+        preferred_types: Optional[Set[str]] = None,
+    ) -> List[str]:
+        """Resolve references like ``path/to/file.py:SymbolName``."""
+        if ":" not in normalized:
+            return []
+
+        file_ref, _, symbol_ref = normalized.rpartition(":")
+        if not file_ref or not symbol_ref:
+            return []
+
+        normalized_file = _normalize_relpath(file_ref)
+        symbol_lower = symbol_ref.strip().lower()
+        if not symbol_lower:
+            return []
+
+        matches: List[str] = []
+        for node in self.nodes.values():
+            if node.name.lower() != symbol_lower:
+                continue
+            node_file = _normalize_relpath(node.file)
+            if node_file == normalized_file or node_file.endswith(normalized_file):
+                matches.append(node.node_id)
+
+        if preferred_types:
+            matches.sort(
+                key=lambda node_id: (
+                    0 if self.nodes[node_id].type in preferred_types else 1,
+                    node_id,
+                )
+            )
+        else:
+            matches.sort()
+        return matches
 
     def search(
         self,
@@ -1008,6 +1056,42 @@ def _build_stats(loaded: LoadedGraph) -> Dict[str, Any]:
     }
 
 
+def _build_overview(
+    loaded: LoadedGraph,
+    *,
+    top_k: int,
+    effective_edge_types: Optional[List[str]],
+    only_runtime: bool,
+    include_callsites: bool,
+    max_callsites: int,
+) -> Dict[str, Any]:
+    """Build a high-level graph overview for exploratory requests."""
+    projected = _project_module_adjacency(
+        loaded.analyzer,
+        only_runtime=only_runtime,
+        include_callsites=include_callsites,
+        max_callsites=max_callsites,
+    )
+    return {
+        "stats": _build_stats(loaded),
+        "important_symbols": loaded.analyzer.pagerank(
+            edge_types=effective_edge_types,
+            top_k=min(top_k, 10),
+            node_types=set(_SYMBOL_TYPES),
+        ),
+        "hub_symbols": loaded.analyzer.degree_centrality(
+            top_k=min(top_k, 10),
+            edge_types=effective_edge_types,
+            node_types=set(_SYMBOL_TYPES),
+        ),
+        "important_modules": _rank_projected_modules(
+            projected["adjacency"],
+            mode="pagerank",
+            top_k=min(top_k, 10),
+        ),
+    }
+
+
 async def _handle_multi_mode(
     loaded: Any,
     mode_str: str,
@@ -1243,7 +1327,16 @@ async def graph(
         effective_edge_types = edge_types or default_edge_types
         node_types = _node_type_filter(mode, files_only=files_only, modules_only=modules_only)
 
-        if mode == "stats":
+        if mode == "overview":
+            result = _build_overview(
+                loaded,
+                top_k=top_k,
+                effective_edge_types=effective_edge_types,
+                only_runtime=only_runtime,
+                include_callsites=include_callsites,
+                max_callsites=max_callsites,
+            )
+        elif mode == "stats":
             result = _build_stats(loaded)
         elif mode == "search":
             # Alias for 'find' mode - more intuitive for users

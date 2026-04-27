@@ -612,10 +612,42 @@ def _literal_fallback_mode_override(
     return None
 
 
-def _normalize_search_filters(filters: Optional[SearchFilters]) -> Optional[SearchFilters]:
+def _normalize_search_filters(filters: Optional[Any]) -> Optional[SearchFilters]:
     """Trim user-provided filter text without mutating the original filter object."""
 
     if filters is None:
+        return None
+
+    if isinstance(filters, dict):
+        filters = SearchFilters(
+            file_pattern=filters.get("file_pattern"),
+            symbol=filters.get("symbol"),
+            language=filters.get("language"),
+            test_only=filters.get("test_only"),
+            extensions=filters.get("extensions"),
+        )
+    elif isinstance(filters, str):
+        shorthand = filters.strip()
+        if not shorthand:
+            return None
+        lowered = shorthand.lower()
+        if lowered in {"test", "tests", "test_only"}:
+            filters = SearchFilters(test_only=True)
+        elif lowered in {"python", "javascript", "typescript", "go", "rust", "java"}:
+            filters = SearchFilters(language=lowered)
+        elif any(ch in shorthand for ch in "*?[]/\\") or "." in shorthand:
+            filters = SearchFilters(file_pattern=shorthand)
+        else:
+            logger.warning(
+                "Ignoring unsupported string filters=%r for code_search; expected SearchFilters or dict",
+                filters,
+            )
+            return None
+    elif not isinstance(filters, SearchFilters):
+        logger.warning(
+            "Ignoring unsupported filters type %s for code_search",
+            type(filters).__name__,
+        )
         return None
 
     def _normalize_optional_text(value: Optional[str]) -> Optional[str]:

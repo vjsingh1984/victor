@@ -79,6 +79,63 @@ async def test_graph_tool_stats_and_path(monkeypatch, tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_graph_tool_supports_overview_alias(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="overview",
+        path=str(tmp_path),
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "overview"
+    assert result["result"]["stats"]["nodes"] == 7
+    assert "important_symbols" in result["result"]
+    assert "important_modules" in result["result"]
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_resolves_file_scoped_symbol_reference(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="neighbors",
+        path=str(tmp_path),
+        node="a.py:start",
+        direction="out",
+        depth=1,
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["result"]["source"] == "symbol:a.py:start"
+    assert result["result"]["total_neighbors"] == 1
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_file_dependencies_use_index_metadata(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 

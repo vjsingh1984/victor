@@ -68,7 +68,7 @@ class TestProviderToolTierAssignments:
         assert get_provider_tool_tier("test", "edge") == "STUB"
         assert get_provider_tool_tier("symbol", "edge") == "STUB"
         assert get_provider_tool_tier("find", "edge") == "STUB"
-        assert get_provider_tool_tier("_get_directory_summaries", "edge") == "STUB"
+        assert get_provider_tool_tier("overview", "edge") == "STUB"
 
     def test_standard_tier_full_tools(self):
         """Test standard tier FULL tool assignments."""
@@ -104,14 +104,13 @@ class TestProviderToolTierAssignments:
         assert get_provider_tool_tier("test", "large") == "FULL"
         assert get_provider_tool_tier("symbol", "large") == "FULL"
         assert get_provider_tool_tier("find", "large") == "FULL"
-        assert get_provider_tool_tier("_get_directory_summaries", "large") == "FULL"
+        assert get_provider_tool_tier("overview", "large") == "FULL"
 
     def test_large_tier_stub_tools(self):
         """Test large tier STUB tool assignments."""
         # Specialty tools should be STUB for large models
         assert get_provider_tool_tier("refs", "large") == "STUB"
         assert get_provider_tool_tier("workflow", "large") == "STUB"
-        assert get_provider_tool_tier("overview", "large") == "STUB"
 
 
 class TestBackwardCompatibility:
@@ -126,7 +125,7 @@ class TestBackwardCompatibility:
         assert get_tool_tier("code_search") == "FULL"
         assert get_tool_tier("edit") == "FULL"
         assert get_tool_tier("write") == "FULL"
-        assert get_tool_tier("_get_directory_summaries") == "FULL"
+        assert get_tool_tier("overview") == "FULL"
         assert get_tool_tier("symbol") == "FULL"
         assert get_tool_tier("find") == "FULL"
         assert get_tool_tier("test") == "FULL"

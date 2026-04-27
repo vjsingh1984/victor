@@ -24,9 +24,12 @@ Examples of redundancy:
 """
 
 import logging
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional, Set
+
+from victor.agent.file_state import FileStateSnapshot, capture_file_state
 from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
@@ -42,7 +45,8 @@ class TrackedToolCall:
 
     tool_name: str
     args: Dict[str, Any]
-    timestamp: float = field(default_factory=lambda: __import__("time").time())
+    timestamp: float = field(default_factory=time.time)
+    file_state: Optional[FileStateSnapshot] = None
 
 
 class ToolDeduplicationTracker:
@@ -51,17 +55,24 @@ class ToolDeduplicationTracker:
     Uses semantic similarity and argument overlap to identify redundant calls.
     """
 
-    def __init__(self, window_size: int = 10, similarity_threshold: float = 0.7):
+    def __init__(
+        self,
+        window_size: int = 10,
+        similarity_threshold: float = 0.7,
+        read_redundancy_ttl_seconds: float = 300.0,
+    ):
         """Initialize deduplication tracker.
 
         Args:
             window_size: Number of recent tool calls to track
             similarity_threshold: Threshold for considering calls similar (0.0-1.0)
+            read_redundancy_ttl_seconds: Only dedup unchanged rereads within this TTL window
         """
         from victor.core.utils.content_hasher import ContentHasher
 
         self.window_size = window_size
         self.similarity_threshold = similarity_threshold
+        self.read_redundancy_ttl_seconds = read_redundancy_ttl_seconds
         self.recent_calls: Deque[TrackedToolCall] = deque(maxlen=window_size)
         # Use ContentHasher for consistent hashing across components
         # Tool calls need exact matching (no normalization) for precise deduplication
@@ -97,7 +108,12 @@ class ToolDeduplicationTracker:
             args: Tool arguments
         """
         canonical_tool_name = get_canonical_name(tool_name)
-        call = TrackedToolCall(tool_name=canonical_tool_name, args=args)
+        file_state = None
+        if canonical_tool_name == "read":
+            file_state = capture_file_state(
+                args.get("path") or args.get("file_path") or args.get("file")
+            )
+        call = TrackedToolCall(tool_name=canonical_tool_name, args=args, file_state=file_state)
         self.recent_calls.append(call)
         logger.debug(f"Tracking tool call: {canonical_tool_name}({self._format_args(args)})")
 
@@ -120,9 +136,9 @@ class ToolDeduplicationTracker:
         # Check for exact duplicates
         for recent in self.recent_calls:
             if recent.tool_name == canonical_tool_name and recent.args == args:
+                if canonical_tool_name == "read":
+                    return self._is_recent_unchanged_read(recent, args)
                 if explain:
-                    import time
-
                     logger.info(
                         f"Redundant tool call detected: {canonical_tool_name}({self._format_args(args)}) "
                         f"was called {(time.time() - recent.timestamp):.1f}s ago"
@@ -224,12 +240,28 @@ class ToolDeduplicationTracker:
             if path == recent_path:
                 # Read after read is redundant (unless large file with different offsets)
                 if tool_name == "read" and recent.tool_name == "read":
-                    # Allow if different offsets specified
-                    if args.get("offset") != recent.args.get("offset"):
+                    # Allow if different offsets/limits specified
+                    if (
+                        args.get("offset") != recent.args.get("offset")
+                        or args.get("limit") != recent.args.get("limit")
+                    ):
                         return False
-                    return True
+                    return self._is_recent_unchanged_read(recent, args)
 
         return False
+
+    def _is_recent_unchanged_read(self, recent: TrackedToolCall, args: Dict[str, Any]) -> bool:
+        """Only deduplicate rereads when the file snapshot is unchanged."""
+        if (time.time() - recent.timestamp) >= self.read_redundancy_ttl_seconds:
+            return False
+
+        current_path = args.get("path") or args.get("file_path") or args.get("file")
+        current_state = capture_file_state(current_path)
+        if recent.file_state is None and current_state is None:
+            return True
+        if recent.file_state is None or current_state is None:
+            return False
+        return recent.file_state == current_state
 
     def _check_list_redundancy(self, tool_name: str, args: Dict[str, Any]) -> bool:
         """Check if list/directory operation is redundant.
