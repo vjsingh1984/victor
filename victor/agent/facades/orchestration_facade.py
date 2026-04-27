@@ -463,7 +463,16 @@ class OrchestrationFacade:
 
     @sync_chat_coordinator.setter
     def sync_chat_coordinator(self, value: Any) -> None:
-        """Update the sync chat coordinator."""
+        """Update the deprecated sync chat coordinator shim."""
+        record_deprecated_chat_shim_access(
+            "orchestration_facade", "sync_chat_coordinator", "setter"
+        )
+        warnings.warn(
+            "OrchestrationFacade.sync_chat_coordinator is deprecated. "
+            "Set deprecated_sync_chat_coordinator or use chat_service instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._deprecated_sync_chat_coordinator = value
 
     @property
@@ -494,7 +503,16 @@ class OrchestrationFacade:
 
     @streaming_chat_coordinator.setter
     def streaming_chat_coordinator(self, value: Any) -> None:
-        """Update the streaming chat coordinator."""
+        """Update the deprecated streaming chat coordinator shim."""
+        record_deprecated_chat_shim_access(
+            "orchestration_facade", "streaming_chat_coordinator", "setter"
+        )
+        warnings.warn(
+            "OrchestrationFacade.streaming_chat_coordinator is deprecated. "
+            "Set deprecated_streaming_chat_coordinator or use chat_service instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._deprecated_streaming_chat_coordinator = value
 
     @property
@@ -525,7 +543,16 @@ class OrchestrationFacade:
 
     @unified_chat_coordinator.setter
     def unified_chat_coordinator(self, value: Any) -> None:
-        """Update the unified chat coordinator."""
+        """Update the deprecated unified chat coordinator shim."""
+        record_deprecated_chat_shim_access(
+            "orchestration_facade", "unified_chat_coordinator", "setter"
+        )
+        warnings.warn(
+            "OrchestrationFacade.unified_chat_coordinator is deprecated. "
+            "Set deprecated_unified_chat_coordinator or use chat_service instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._deprecated_unified_chat_coordinator = value
 
     @property

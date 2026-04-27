@@ -591,6 +591,45 @@ class TestOrchestrationFacadeProperties:
         facade.turn_executor = new_coord
         assert facade.turn_executor is new_coord
 
+    def test_sync_chat_coordinator_setter_warns_and_records_telemetry(self, facade):
+        new_sync = MagicMock(name="new_sync")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.sync_chat_coordinator is deprecated",
+        ):
+            facade.sync_chat_coordinator = new_sync
+
+        assert facade._deprecated_sync_chat_coordinator is new_sync
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.sync_chat_coordinator.setter"] == 1
+
+    def test_streaming_chat_coordinator_setter_warns_and_records_telemetry(self, facade):
+        new_streaming = MagicMock(name="new_streaming")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
+        ):
+            facade.streaming_chat_coordinator = new_streaming
+
+        assert facade._deprecated_streaming_chat_coordinator is new_streaming
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.streaming_chat_coordinator.setter"] == 1
+
+    def test_unified_chat_coordinator_setter_warns_and_records_telemetry(self, facade):
+        new_unified = MagicMock(name="new_unified")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.unified_chat_coordinator is deprecated",
+        ):
+            facade.unified_chat_coordinator = new_unified
+
+        assert facade._deprecated_unified_chat_coordinator is new_unified
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.unified_chat_coordinator.setter"] == 1
+
     def test_intelligent_integration_setter(self, facade):
         """IntelligentIntegration setter updates the integration."""
         new_int = MagicMock(name="new_int")
