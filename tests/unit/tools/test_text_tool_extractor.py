@@ -256,6 +256,33 @@ line3')"""
         assert result.tool_calls == []
         assert result.warnings
 
+    def test_explanatory_inline_graph_examples_are_ignored_without_warnings(self):
+        """Narrative citations like Source: graph(...) should not trigger tool parsing."""
+        content = "Source: graph(mode=overview) and graph(mode=stats)"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"graph"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings == []
+
+    def test_inline_helper_calls_in_explanatory_prose_are_ignored(self):
+        """Implementation notes should not turn helper() mentions into tool calls."""
+        content = "_load_graph() calls _get_or_build_index() from code_search_tool"
+        result = self.extractor.extract_from_text(content)
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings == []
+
+    def test_malformed_imperative_tool_call_still_emits_warning(self):
+        """Malformed tool-intent text should still surface a parse warning."""
+        content = "I'll use graph: graph(mode=overview)"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"graph"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings
+
 
 class TestFallbackParsingMixinIntegration:
     """Tests for FallbackParsingMixin integration with text extraction."""
@@ -297,6 +324,23 @@ class TestFallbackParsingMixinIntegration:
 
         assert result.tool_calls
         assert result.tool_calls[0].name == "read"
+
+    def test_parse_from_content_ignores_explanatory_graph_examples(self):
+        """Fallback parsing should not treat analytical citations as tool requests."""
+        from victor.agent.tool_calling.base import FallbackParsingMixin
+
+        class TestMixin(FallbackParsingMixin):
+            pass
+
+        mixin = TestMixin()
+        result = mixin.parse_from_content(
+            "Source: graph(mode=overview) and graph(mode=stats)",
+            valid_tool_names={"graph"},
+        )
+
+        assert result.tool_calls == []
+        assert result.warnings == []
+        assert "Source: graph(mode=overview)" in result.remaining_content
 
     def test_openai_adapter_fallback(self):
         """Test that OpenAI adapter falls back to content parsing."""

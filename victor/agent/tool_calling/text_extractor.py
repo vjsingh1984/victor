@@ -53,6 +53,16 @@ from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 logger = logging.getLogger(__name__)
 
+_TOOL_INTENT_PREFIX_RE = re.compile(
+    r"""
+    (?:
+        \b(?:let\ me|i(?:'| wi)?ll|use|call|invoke|run|execute|try|check|inspect)\b
+        .*[:\-]\s*
+    )$
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
 
 @dataclass
 class ExtractedToolCall:
@@ -230,6 +240,7 @@ class PythonCallExtractor:
             name = match.group("name")
             canonical_name = canonicalize_core_tool_name(name)
             args_str = match.group("args")
+            intent_context = self._has_tool_intent_context(content, match.start(), match.end())
 
             if self._is_definition_context(content, match.start()):
                 continue
@@ -247,14 +258,23 @@ class PythonCallExtractor:
                 continue
 
             # Parse arguments
-            parsed_args, parse_warning = self._parse_arguments(args_str)
+            parsed_args, parse_warning = self._parse_arguments(
+                args_str,
+                log_warning=intent_context,
+            )
             if parse_warning:
-                warnings.append(f"{name}: {parse_warning}")
+                if intent_context:
+                    warnings.append(f"{name}: {parse_warning}")
                 # Still try to use partial results
                 if not parsed_args:
                     continue
 
             parsed_args = self._canonicalize_arguments(canonical_name, parsed_args)
+
+            # Ignore incidental zero-arg references embedded in prose such as
+            # implementation notes like "_helper()" or headings like "tool()".
+            if not parsed_args and not intent_context:
+                continue
 
             # Calculate confidence based on various factors
             confidence = self._calculate_confidence(canonical_name, parsed_args, filter_names)
@@ -292,6 +312,34 @@ class PythonCallExtractor:
         line_start = content.rfind("\n", 0, start_pos) + 1
         prefix = content[line_start:start_pos].strip()
         return prefix.endswith("def") or prefix.endswith("async def") or prefix.endswith("class")
+
+    def _has_tool_intent_context(self, content: str, start_pos: int, end_pos: int) -> bool:
+        """Return True when text around a match looks like an actual tool request."""
+        line_start = content.rfind("\n", 0, start_pos) + 1
+        line_end = content.find("\n", end_pos)
+        if line_end == -1:
+            line_end = len(content)
+
+        before = content[line_start:start_pos]
+        after = content[end_pos:line_end]
+        stripped_before = before.strip()
+        stripped_after = after.strip()
+
+        # Ignore inline code spans and markdown examples.
+        if before.count("`") % 2 == 1:
+            return False
+
+        # Bare tool call on its own line, optionally under a bullet.
+        if not stripped_before:
+            return not stripped_after
+        if re.fullmatch(r"(?:[-*+]|\d+\.)", stripped_before):
+            return not stripped_after
+
+        # Imperative lead-ins like "Let me use:" or "I'll run:".
+        if _TOOL_INTENT_PREFIX_RE.search(stripped_before):
+            return True
+
+        return False
 
     def _is_likely_tool_name(
         self,
@@ -422,7 +470,12 @@ class PythonCallExtractor:
 
         return normalized
 
-    def _parse_arguments(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _parse_arguments(
+        self,
+        args_str: str,
+        *,
+        log_warning: bool = True,
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse Python-style keyword arguments from a string.
 
         Handles formats like:
@@ -464,7 +517,7 @@ class PythonCallExtractor:
             pass  # Fall through to regex parsing
 
         # Method 2: Regex-based parsing (fallback)
-        return self._parse_arguments_regex(args_str)
+        return self._parse_arguments_regex(args_str, log_warning=log_warning)
 
     def _ast_to_value(self, node: ast.AST) -> Any:
         """Convert AST node to Python value.
@@ -499,7 +552,12 @@ class PythonCallExtractor:
         else:
             raise ValueError(f"Unsupported AST node: {type(node).__name__}")
 
-    def _parse_arguments_regex(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _parse_arguments_regex(
+        self,
+        args_str: str,
+        *,
+        log_warning: bool = True,
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse arguments using regex (fallback method).
 
         Args:
@@ -553,11 +611,12 @@ class PythonCallExtractor:
                 "or unresolved identifiers"
             )
 
-            logger.warning(warning)
+            if log_warning:
+                logger.warning(warning)
 
-            # Log for debugging
-            logger.debug(f"Failed parse - original args_str: {args_str}")
-            logger.debug("Attempted parse methods: regex, ast")
+                # Log for debugging
+                logger.debug(f"Failed parse - original args_str: {args_str}")
+                logger.debug("Attempted parse methods: regex, ast")
 
         return args_dict, warning
 
