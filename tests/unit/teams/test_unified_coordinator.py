@@ -55,6 +55,36 @@ class MockTeamMember:
         return None
 
 
+class StructuredMember(MockTeamMember):
+    """Mock member that returns structured execution metadata."""
+
+    def __init__(
+        self,
+        member_id: str,
+        output: str = "Done",
+        *,
+        changed_files: Optional[list[str]] = None,
+        success: bool = True,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(member_id, output=output)
+        self._changed_files = list(changed_files or [])
+        self._success = success
+        self._metadata = dict(metadata or {})
+        self.seen_contexts: list[Dict[str, Any]] = []
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        self.seen_contexts.append(dict(context))
+        return {
+            "success": self._success,
+            "output": self._output,
+            "changed_files": list(self._changed_files),
+            "metadata": dict(self._metadata),
+            "tool_calls_used": 2,
+            "discoveries": [f"handled:{self._id}"],
+        }
+
+
 class FailingMember(MockTeamMember):
     """Mock member that always fails."""
 
@@ -237,6 +267,61 @@ class TestErrorHandling:
         assert result["success"] is False
         assert result["member_results"]["m1"].success is True
         assert result["member_results"]["m2"].success is False
+
+    @pytest.mark.asyncio
+    async def test_structured_member_outputs_feed_worktree_plan_and_merge_analysis(self):
+        """Structured member outputs should drive isolation metadata and merge analysis."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        planner = StructuredMember("planner", "Planned", changed_files=["src/auth/service.py"])
+        tester = StructuredMember("tester", "Tested", changed_files=["tests/auth/test_service.py"])
+        coordinator.add_member(planner)
+        coordinator.add_member(tester)
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task(
+            "Implement auth flow",
+            {
+                "team_name": "feature_team",
+                "worktree_isolation": True,
+                "repo_root": "/repo/project",
+                "member_write_scopes": {
+                    "planner": ["src/auth"],
+                    "tester": ["tests/auth"],
+                },
+                "shared_readonly_paths": ["docs"],
+            },
+        )
+
+        assert result["success"] is True
+        assert result["merge_risk_level"] == "low"
+        assert result["worktree_plan"]["team_name"] == "feature_team"
+        assert planner.seen_contexts[0]["isolation_mode"] == "worktree"
+        assert planner.seen_contexts[0]["workspace_root"].endswith("feature_team-planner")
+        assert result["member_results"]["planner"].metadata["worktree_assignment"]["member_id"] == (
+            "planner"
+        )
+        assert result["merge_analysis"]["member_changed_files"]["tester"] == [
+            "tests/auth/test_service.py"
+        ]
+
+    @pytest.mark.asyncio
+    async def test_structured_failure_payload_marks_member_failed(self):
+        """Structured failure payloads should be preserved without raising."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(
+            StructuredMember(
+                "m1",
+                output="",
+                success=False,
+                metadata={"failure_stage": "merge"},
+            )
+        )
+
+        result = await coordinator.execute_task("Test", {})
+
+        assert result["success"] is False
+        assert result["member_results"]["m1"].success is False
+        assert result["member_results"]["m1"].metadata["failure_stage"] == "merge"
 
 
 class TestBroadcast:

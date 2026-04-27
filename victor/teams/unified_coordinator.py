@@ -39,7 +39,7 @@ import asyncio
 import copy
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.coordination.formations import (
@@ -58,6 +58,8 @@ from victor.teams.types import (
     TeamFormation,
     TeamResult,
 )
+from victor.teams.merge_analyzer import MergeAnalyzer
+from victor.teams.worktree_runtime import WorktreeExecutionPlan, WorktreeIsolationPlanner
 
 if TYPE_CHECKING:
     from victor.protocols.team import ITeamMember
@@ -77,9 +79,15 @@ class _TeamMemberAdapter:
     but ITeamMember uses execute_task(task, context) -> str.
     """
 
-    def __init__(self, member: "ITeamMember", coordinator_context: Dict[str, Any]):
+    def __init__(
+        self,
+        member: "ITeamMember",
+        coordinator_context: Dict[str, Any],
+        member_context: Optional[Dict[str, Any]] = None,
+    ):
         self._member = member
         self._context = coordinator_context
+        self._member_context = dict(member_context or {})
         self.id = member.id
 
     @property
@@ -89,13 +97,11 @@ class _TeamMemberAdapter:
 
     async def execute(self, task: AgentMessage, context: TeamContext) -> MemberResult:
         """Execute task using ITeamMember interface."""
-        import time
-
         start_time = time.time()
 
         try:
             # Merge TeamContext.shared_state into coordinator context
-            merged_context = {**self._context, **context.shared_state}
+            merged_context = {**self._context, **context.shared_state, **self._member_context}
 
             # Preserve caller-owned mutable context objects when present so
             # external observers can track execution side effects without
@@ -110,16 +116,35 @@ class _TeamMemberAdapter:
                     merged_context[key] = value
 
             # Call ITeamMember's execute_task
-            output = await self._member.execute_task(task.content, merged_context)
+            raw_output = await self._member.execute_task(task.content, merged_context)
 
             duration = time.time() - start_time
+            (
+                success,
+                output,
+                error,
+                metadata,
+                tool_calls_used,
+                discoveries,
+                duration_override,
+            ) = self._normalize_execution_result(raw_output)
+            metadata.setdefault("task", task.content)
+            if "worktree_assignment" in self._member_context and "worktree_assignment" not in metadata:
+                metadata["worktree_assignment"] = self._member_context["worktree_assignment"]
+            if "claimed_paths" in self._member_context and "claimed_paths" not in metadata:
+                metadata["claimed_paths"] = list(self._member_context["claimed_paths"])
+            if "readonly_paths" in self._member_context and "readonly_paths" not in metadata:
+                metadata["readonly_paths"] = list(self._member_context["readonly_paths"])
 
             return MemberResult(
                 member_id=self._member.id,
-                success=True,
+                success=success,
                 output=output,
-                duration_seconds=duration,
-                metadata={"task": task.content},
+                error=error,
+                duration_seconds=duration_override if duration_override is not None else duration,
+                metadata=metadata,
+                tool_calls_used=tool_calls_used,
+                discoveries=discoveries,
             )
         except Exception as e:
             duration = time.time() - start_time
@@ -131,6 +156,42 @@ class _TeamMemberAdapter:
                 duration_seconds=duration,
                 metadata={"task": task.content},
             )
+
+    @staticmethod
+    def _normalize_execution_result(
+        raw_output: Any,
+    ) -> tuple[bool, str, Optional[str], Dict[str, Any], int, List[str], Optional[float]]:
+        """Normalize string or mapping member outputs into MemberResult fields."""
+        if not isinstance(raw_output, Mapping):
+            return True, "" if raw_output is None else str(raw_output), None, {}, 0, [], None
+
+        success = bool(raw_output.get("success", True))
+        output_value = (
+            raw_output.get("output")
+            or raw_output.get("final_output")
+            or raw_output.get("content")
+            or ""
+        )
+        error = str(raw_output.get("error")) if raw_output.get("error") is not None else None
+        metadata = dict(raw_output.get("metadata", {}) or {})
+        for key in ("changed_files", "files_touched", "modified_files", "claimed_paths", "readonly_paths"):
+            if raw_output.get(key) is not None and key not in metadata:
+                metadata[key] = raw_output.get(key)
+
+        discoveries = list(raw_output.get("discoveries") or [])
+        tool_calls_raw = raw_output.get("tool_calls_used", raw_output.get("tool_calls", 0))
+        try:
+            tool_calls_used = int(tool_calls_raw or 0)
+        except (TypeError, ValueError):
+            tool_calls_used = 0
+
+        duration_raw = raw_output.get("duration_seconds")
+        try:
+            duration_override = float(duration_raw) if duration_raw is not None else None
+        except (TypeError, ValueError):
+            duration_override = None
+
+        return success, str(output_value), error, metadata, tool_calls_used, discoveries, duration_override
 
 
 class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
@@ -163,6 +224,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         enable_observability: bool = True,
         enable_rl: bool = True,
         lightweight_mode: bool = False,
+        worktree_planner: Optional[Any] = None,
+        merge_analyzer: Optional[Any] = None,
     ) -> None:
         """Initialize the unified coordinator.
 
@@ -194,6 +257,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._message_history: List[AgentMessage] = []
         self._message_lock = asyncio.Lock()
         self._shared_context: Dict[str, Any] = {}
+        self._worktree_planner = worktree_planner or WorktreeIsolationPlanner()
+        self._merge_analyzer = merge_analyzer or MergeAnalyzer()
 
         # LSP capability for language intelligence
         self._lsp: Optional[Any] = None
@@ -473,12 +538,30 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             active_formation,
             max_workers,
         )
-        adapted_members = [_TeamMemberAdapter(m, context) for m in execution_members]
+        worktree_plan = self._plan_worktree_execution(
+            execution_members,
+            context=context,
+            formation=active_formation,
+        )
+        member_context_overrides = (
+            {
+                assignment.member_id: assignment.to_context_overrides()
+                for assignment in worktree_plan.assignments
+            }
+            if worktree_plan is not None
+            else {}
+        )
+        adapted_members = [
+            _TeamMemberAdapter(m, context, member_context_overrides.get(m.id))
+            for m in execution_members
+        ]
 
         # Create TeamContext
         if max_workers is not None:
             shared_state_with_manager["max_workers"] = max_workers
         shared_state_with_manager["effective_formation"] = active_formation.value
+        if worktree_plan is not None:
+            shared_state_with_manager["worktree_plan"] = worktree_plan.to_dict()
 
         team_context = TeamContext(
             team_id=context.get("team_name", "UnifiedTeam"),
@@ -532,8 +615,45 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 result_dict["consensus_achieved"] = first_metadata["consensus_achieved"]
             if "consensus_rounds" in first_metadata:
                 result_dict["consensus_rounds"] = first_metadata["consensus_rounds"]
+        if worktree_plan is not None:
+            result_dict["worktree_plan"] = worktree_plan.to_dict()
+        merge_analysis = self._analyze_merge(member_results, worktree_plan=worktree_plan)
+        if merge_analysis is not None:
+            result_dict["merge_analysis"] = merge_analysis.to_dict()
+            result_dict["merge_risk_level"] = merge_analysis.risk_level.value
 
         return result_dict
+
+    def _plan_worktree_execution(
+        self,
+        members: List["ITeamMember"],
+        *,
+        context: Dict[str, Any],
+        formation: TeamFormation,
+    ) -> Optional[WorktreeExecutionPlan]:
+        planner = getattr(self._worktree_planner, "plan", None)
+        if not callable(planner):
+            return None
+        try:
+            return planner(members, context=context, formation=formation)
+        except Exception as exc:
+            logger.debug("Worktree planning failed; continuing without isolation: %s", exc)
+            return None
+
+    def _analyze_merge(
+        self,
+        member_results: Dict[str, MemberResult],
+        *,
+        worktree_plan: Optional[WorktreeExecutionPlan],
+    ) -> Optional[Any]:
+        analyzer = getattr(self._merge_analyzer, "analyze", None)
+        if not callable(analyzer):
+            return None
+        try:
+            return analyzer(member_results, worktree_plan=worktree_plan)
+        except Exception as exc:
+            logger.debug("Merge analysis failed; continuing without merge metadata: %s", exc)
+            return None
 
     def _resolve_effective_formation(self, context: Dict[str, Any]) -> TeamFormation:
         """Resolve formation override hints without mutating the default formation."""
