@@ -74,6 +74,24 @@ class OrchestratorProtocolAdapter:
         """
         self._orchestrator = orchestrator
 
+    def __getattr__(self, name: str) -> Any:
+        """Proxy unresolved compatibility/runtime attributes to the host orchestrator."""
+        return getattr(self._orchestrator, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Proxy unresolved compatibility/runtime state writes to the host orchestrator."""
+        if name == "_orchestrator" or hasattr(type(self), name):
+            object.__setattr__(self, name, value)
+            return
+        setattr(self._orchestrator, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        """Proxy unresolved compatibility/runtime state deletes to the host orchestrator."""
+        if name == "_orchestrator" or hasattr(type(self), name):
+            object.__delattr__(self, name)
+            return
+        delattr(self._orchestrator, name)
+
     # =====================================================================
     # ExecutionProvider Implementation
     # =====================================================================

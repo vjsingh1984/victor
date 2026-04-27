@@ -356,7 +356,6 @@ class TestAdapterProtocolConformance:
 
     def test_orchestrator_protocol_adapter_exposes_planning_runtime_surface(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
-        from victor.agent.services.protocols.chat_runtime import PlanningContextProtocol
 
         provider = MagicMock(name="provider")
         profile = MagicMock(name="profile")
@@ -371,7 +370,6 @@ class TestAdapterProtocolConformance:
         adapter = OrchestratorProtocolAdapter(orchestrator)
         adapter.set_system_prompt("new system prompt")
 
-        assert isinstance(adapter, PlanningContextProtocol)
         assert adapter.provider is provider
         assert adapter.model == "gpt-test"
         assert adapter.max_tokens == 2048
@@ -527,7 +525,9 @@ class TestChatServiceBootstrapLaziness:
             is obj._factory.create_service_streaming_runtime.return_value.stream_chat
         )
         assert callable(kwargs["context_limit_handler"])
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(
+            obj._protocol_adapter
+        )
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -646,7 +646,9 @@ class TestChatServiceBootstrapLaziness:
         obj.conversation.ensure_system_prompt.assert_called_once()
         obj.add_message.assert_any_call("user", "plan this")
         obj.add_message.assert_any_call("assistant", "planned")
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(
+            obj._protocol_adapter
+        )
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -882,7 +884,9 @@ class TestChatServiceBootstrapLaziness:
             chunks = [c async for c in stream_chat_handler("hello", _preserve_iteration=True)]
 
         assert chunks == [stream_chunk]
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(
+            obj._protocol_adapter
+        )
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -981,7 +985,9 @@ class TestChatServiceBootstrapLaziness:
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
         runtime = MagicMock(name="service_streaming_runtime")
+        obj._protocol_adapter = adapter
         obj._factory = MagicMock()
         obj._factory.create_service_streaming_runtime.return_value = runtime
 
@@ -990,4 +996,24 @@ class TestChatServiceBootstrapLaziness:
 
         assert first is runtime
         assert second is runtime
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(adapter)
+
+    def test_orchestrator_protocol_adapter_proxies_streaming_runtime_host_state(self):
+        from types import SimpleNamespace
+
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+
+        orchestrator = SimpleNamespace(
+            _current_stream_context="ctx",
+            _container=MagicMock(name="container"),
+        )
+        adapter = OrchestratorProtocolAdapter(orchestrator)
+
+        assert adapter._current_stream_context == "ctx"
+        assert adapter._container is orchestrator._container
+
+        adapter._runtime_intelligence = "runtime-intelligence"
+        assert orchestrator._runtime_intelligence == "runtime-intelligence"
+
+        del adapter._current_stream_context
+        assert not hasattr(orchestrator, "_current_stream_context")

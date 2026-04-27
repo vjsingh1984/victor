@@ -3660,11 +3660,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if runtime is None:
             factory = getattr(self, "_factory", None)
             if factory is not None and hasattr(factory, "create_service_streaming_runtime"):
-                runtime = factory.create_service_streaming_runtime(self)
+                runtime = factory.create_service_streaming_runtime(self.protocol_adapter)
             else:
                 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 
-                runtime = ServiceStreamingRuntime(self)
+                runtime = ServiceStreamingRuntime(self.protocol_adapter)
             self._service_streaming_runtime = runtime
         return runtime
 
