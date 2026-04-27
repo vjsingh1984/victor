@@ -58,7 +58,6 @@ async def test_sync_chat_coordinator_delegates_to_bound_chat_service():
         chat_context=MagicMock(),
         tool_context=MagicMock(),
         provider_context=MagicMock(),
-        turn_executor=MagicMock(),
         chat_service=chat_service,
     )
 
@@ -82,7 +81,6 @@ async def test_sync_chat_coordinator_planning_prefers_bound_chat_service():
         chat_context=MagicMock(),
         tool_context=MagicMock(),
         provider_context=MagicMock(),
-        turn_executor=MagicMock(),
         chat_service=chat_service,
     )
 
@@ -102,7 +100,6 @@ async def test_sync_chat_coordinator_planning_requires_canonical_runtime():
             chat_context=MagicMock(),
             tool_context=MagicMock(),
             provider_context=MagicMock(),
-            turn_executor=MagicMock(),
         )
 
     with pytest.raises(RuntimeError, match="planning requires a bound ChatService or orchestrator"):
@@ -118,7 +115,6 @@ def test_sync_chat_coordinator_constructor_warns_without_chat_service():
             chat_context=MagicMock(),
             tool_context=MagicMock(),
             provider_context=MagicMock(),
-            turn_executor=MagicMock(),
         )
 
 

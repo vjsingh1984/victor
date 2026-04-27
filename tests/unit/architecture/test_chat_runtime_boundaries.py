@@ -34,6 +34,20 @@ def _method_source(relative_path: str, class_name: str, method_name: str) -> str
     raise AssertionError(f"Method {class_name}.{method_name} not found in {relative_path}")
 
 
+def _function_source(relative_path: str, function_name: str) -> str:
+    source = _read(relative_path)
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
+            segment = ast.get_source_segment(source, node)
+            if segment is None:
+                raise AssertionError(
+                    f"Could not recover source for function {function_name} in {relative_path}"
+                )
+            return segment
+    raise AssertionError(f"Function {function_name} not found in {relative_path}")
+
+
 def test_orchestrator_public_chat_entrypoints_delegate_to_chat_service() -> None:
     source = _read("victor/agent/orchestrator.py")
     assert "async def _chat_via_agentic_loop" not in source
@@ -108,3 +122,11 @@ def test_deprecated_chat_shims_do_not_materialize_local_chat_loops() -> None:
     assert "_streaming.stream_chat(" not in unified_stream_source
     assert "raise RuntimeError" in unified_chat_source
     assert "raise RuntimeError" in unified_stream_source
+
+
+def test_deprecated_sync_chat_coordinator_is_not_wired_to_turn_executor() -> None:
+    source = _function_source(
+        "victor/agent/orchestrator_properties.py",
+        "_ensure_sync_chat_coordinator",
+    )
+    assert "turn_executor=self.turn_executor" not in source

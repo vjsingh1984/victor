@@ -195,7 +195,6 @@ def _ensure_sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
-            turn_executor=self.turn_executor,
             orchestrator=self,
             query_classifier=QueryClassifier(),
             chat_service=getattr(self, "_chat_service", None),

@@ -47,7 +47,8 @@ class SyncChatCoordinator:
         chat_context: Protocol providing conversation/message access
         tool_context: Protocol providing tool selection/execution
         provider_context: Protocol providing LLM provider access
-        turn_executor: Legacy turn executor compatibility dependency
+        turn_executor: Deprecated legacy compatibility dependency. Unused by the
+            canonical service-bound shim path.
     """
 
     def __init__(
@@ -55,7 +56,7 @@ class SyncChatCoordinator:
         chat_context: "ChatContextProtocol",
         tool_context: "ToolContextProtocol",
         provider_context: "ProviderContextProtocol",
-        turn_executor: "TurnExecutor",
+        turn_executor: Optional["TurnExecutor"] = None,
         orchestrator: Any = None,
         query_classifier: Optional["QueryClassifier"] = None,
         chat_service: Optional[Any] = None,
@@ -66,7 +67,8 @@ class SyncChatCoordinator:
             chat_context: Chat context protocol implementation
             tool_context: Tool context protocol implementation
             provider_context: Provider context protocol implementation
-            turn_executor: Execution coordinator for agentic loop
+            turn_executor: Deprecated compatibility dependency retained for
+                constructor stability. No longer required by the canonical shim path.
             orchestrator: Optional orchestrator (required for planning path)
             query_classifier: Optional query classifier for auto-planning detection
         """
