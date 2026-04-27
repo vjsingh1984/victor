@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from unittest.mock import Mock
 
 from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
 
@@ -60,6 +61,7 @@ if TYPE_CHECKING:
     from victor.agent.services.protocols import ToolPlanningRuntimeProtocol as ToolPlannerProtocol
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
 
 
 class ToolBuildersMixin:
@@ -73,6 +75,25 @@ class ToolBuildersMixin:
         - self.container: DI container
         - self.mode_controller: property from ModeAwareMixin
     """
+
+    @staticmethod
+    def _resolve_setting_value(source: Any, name: str, default: Any = _MISSING) -> Any:
+        """Return a concrete setting value while ignoring auto-created mock attributes."""
+        if source is None:
+            return default
+
+        value = getattr(source, name, default)
+        if isinstance(value, Mock) and name not in getattr(source, "__dict__", {}):
+            return default
+        return value
+
+    def _tool_setting(self, name: str, default: Any) -> Any:
+        """Resolve a tool setting from nested ToolSettings or legacy flat settings."""
+        tool_settings = self._resolve_setting_value(self.settings, "tools", None)
+        nested_value = self._resolve_setting_value(tool_settings, name, _MISSING)
+        if nested_value is not _MISSING:
+            return nested_value
+        return self._resolve_setting_value(self.settings, name, default)
 
     def create_tool_registry(self) -> "ToolRegistry":
         """Create tool registry for managing available tools.
@@ -241,9 +262,8 @@ class ToolBuildersMixin:
             pass  # Permission system is optional
 
         # Read cross-turn dedup settings from ToolSettings
-        tool_settings = getattr(self.settings, "tools", None)
-        cross_turn_enabled = getattr(tool_settings, "cross_turn_dedup_enabled", True)
-        cross_turn_ttl = float(getattr(tool_settings, "cross_turn_dedup_ttl", 300))
+        cross_turn_enabled = self._tool_setting("cross_turn_dedup_enabled", True)
+        cross_turn_ttl = float(self._tool_setting("cross_turn_dedup_ttl", 300))
 
         pipeline = ToolPipeline(
             tool_registry=tools,
@@ -313,18 +333,18 @@ class ToolBuildersMixin:
         # has access to max_tool_schema_tokens, schema_promotion_threshold,
         # and max_mcp_tools_per_turn without a separate settings reference.
         merged_config = dict(tool_selection)
-        tool_settings = getattr(self.settings, "tools", None)
+        tool_settings = self._resolve_setting_value(self.settings, "tools", None)
         if tool_settings is not None:
             if "max_tool_schema_tokens" not in merged_config:
-                merged_config["max_tool_schema_tokens"] = getattr(
+                merged_config["max_tool_schema_tokens"] = self._resolve_setting_value(
                     tool_settings, "max_tool_schema_tokens", 0
                 )
             if "schema_promotion_threshold" not in merged_config:
-                merged_config["schema_promotion_threshold"] = getattr(
+                merged_config["schema_promotion_threshold"] = self._resolve_setting_value(
                     tool_settings, "schema_promotion_threshold", 0.8
                 )
             if "max_mcp_tools_per_turn" not in merged_config:
-                merged_config["max_mcp_tools_per_turn"] = getattr(
+                merged_config["max_mcp_tools_per_turn"] = self._resolve_setting_value(
                     tool_settings, "max_mcp_tools_per_turn", 12
                 )
 
@@ -350,14 +370,7 @@ class ToolBuildersMixin:
         Returns:
             ToolCache instance or None if disabled
         """
-        tool_settings = getattr(self.settings, "tools", None)
-
-        def _tool_setting(name: str, default: Any) -> Any:
-            if tool_settings is not None and hasattr(tool_settings, name):
-                return getattr(tool_settings, name)
-            return getattr(self.settings, name, default)
-
-        if not _tool_setting("tool_cache_enabled", True):
+        if not self._tool_setting("tool_cache_enabled", True):
             return None
 
         from victor.storage.cache.config import CacheConfig
@@ -373,8 +386,8 @@ class ToolBuildersMixin:
             cache_dir = get_project_paths().global_cache_dir
 
         cache = ToolCache(
-            ttl=_tool_setting("tool_cache_ttl", 600),
-            allowlist=_tool_setting("tool_cache_allowlist", []),
+            ttl=self._tool_setting("tool_cache_ttl", 600),
+            allowlist=self._tool_setting("tool_cache_allowlist", []),
             cache_config=CacheConfig(disk_path=cache_dir),
         )
         logger.debug(f"ToolCache created with TTL={cache.ttl}s")
