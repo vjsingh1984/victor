@@ -266,15 +266,16 @@ def process_tool_results_with_context(
 
         follow_up_suggestions = None
         semantic_success = success
-        if success and isinstance(output, dict) and output.get("success") is False:
-            semantic_success = False
-            error_msg = output.get("error", "Operation returned success=False")
-        elif success and isinstance(output, dict):
+        if isinstance(output, dict):
             metadata = output.get("metadata")
             if isinstance(metadata, dict):
                 suggestions = metadata.get("follow_up_suggestions")
                 if isinstance(suggestions, list) and suggestions:
                     follow_up_suggestions = suggestions
+
+        if success and isinstance(output, dict) and output.get("success") is False:
+            semantic_success = False
+            error_msg = output.get("error", "Operation returned success=False")
 
         error_display = None if semantic_success else (error_msg or "Unknown error")
 
@@ -367,6 +368,7 @@ def process_tool_results_with_context(
                 "error": error_display,
                 "result": formatted_error,
                 "full_result": formatted_error,
+                "follow_up_suggestions": follow_up_suggestions,
                 "was_pruned": False,
                 "tool_call_id": call_result.tool_call_id,
                 "content": formatted_error,

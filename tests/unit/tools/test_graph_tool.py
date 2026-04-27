@@ -165,6 +165,95 @@ async def test_graph_tool_supports_top_k_alias_for_search_queries(monkeypatch, t
 
 
 @pytest.mark.asyncio
+async def test_graph_tool_accepts_enum_mode_values(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode=graph_tool_module.GraphMode.STATS,
+        path=str(tmp_path),
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["requested_mode"] == "stats"
+    assert result["mode"] == "stats"
+    assert result["result"]["nodes"] == 7
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_unsupported_mode_returns_follow_up_suggestions(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="hubs",
+        query="start",
+        path=str(tmp_path),
+        top_k=5,
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is False
+    assert result["requested_mode"] == "hubs"
+    assert "metadata" in result
+    suggestions = result["metadata"]["follow_up_suggestions"]
+    assert suggestions
+    assert any('graph(mode="search"' in suggestion["command"] for suggestion in suggestions)
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_unresolved_node_returns_follow_up_suggestions(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="neighbors",
+        node="missing_symbol",
+        path=str(tmp_path),
+        depth=2,
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is False
+    suggestions = result["metadata"]["follow_up_suggestions"]
+    assert suggestions
+    assert suggestions[0]["command"].startswith('graph(mode="search"')
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_resolves_file_scoped_symbol_reference(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 

@@ -231,7 +231,9 @@ class LiveDisplayRenderer:
                         preview_text = "\n".join(preview.lines)
                     else:
                         # Escape markup to prevent rendering issues
-                        preview_text = "\n".join(_markup_escape(l) for l in preview.lines)
+                        preview_text = "\n".join(
+                            _markup_escape(line_text) for line_text in preview.lines
+                        )
 
                     render_tool_preview(
                         self.console,
@@ -256,7 +258,7 @@ class LiveDisplayRenderer:
         }
 
         # Show follow-up suggestions
-        if success and follow_up_suggestions:
+        if follow_up_suggestions:
             for suggestion in follow_up_suggestions[:2]:
                 if not isinstance(suggestion, dict):
                     continue

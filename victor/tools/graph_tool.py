@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections import defaultdict, deque
@@ -124,6 +125,13 @@ def _normalize_relpath(file_path: str) -> str:
     return file_path.replace("\\", "/").strip()
 
 
+def _graph_mode_value(mode: str | GraphMode) -> str:
+    """Return the string value for a graph mode enum or raw string."""
+    if isinstance(mode, GraphMode):
+        return mode.value
+    return str(mode).strip()
+
+
 def _normalize_graph_mode_alias(
     mode: str | GraphMode,
     *,
@@ -134,7 +142,7 @@ def _normalize_graph_mode_alias(
     query: Optional[str] = None,
 ) -> str:
     """Map common model-invented graph mode aliases to canonical modes."""
-    raw_mode = str(mode).strip().lower()
+    raw_mode = _graph_mode_value(mode).strip().lower()
     if not raw_mode:
         return GraphMode.NEIGHBORS.value
 
@@ -161,6 +169,153 @@ def _normalize_graph_mode_alias(
         return GraphMode.PAGERANK.value
 
     return raw_mode
+
+
+def _format_tool_command_value(value: Any) -> str:
+    """Format a tool argument value for a follow-up command string."""
+    if isinstance(value, Enum):
+        value = value.value
+    if isinstance(value, str):
+        return json.dumps(value)
+    return repr(value)
+
+
+def _build_tool_follow_up_command(tool_name: str, arguments: Dict[str, Any]) -> str:
+    """Build a compact follow-up command string."""
+    serialized_args = ", ".join(
+        f"{key}={_format_tool_command_value(value)}"
+        for key, value in arguments.items()
+        if value is not None
+    )
+    return f"{tool_name}({serialized_args})"
+
+
+def _build_follow_up_suggestion(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    description: str,
+) -> Dict[str, Any]:
+    """Create a normalized follow-up suggestion payload."""
+    return {
+        "tool": tool_name,
+        "command": _build_tool_follow_up_command(tool_name, arguments),
+        "arguments": arguments,
+        "description": description,
+        "reason": description,
+    }
+
+
+def _build_graph_error_follow_up_suggestions(
+    *,
+    path: str,
+    requested_mode: str,
+    normalized_mode: str,
+    node: Optional[str],
+    source: Optional[str],
+    target: Optional[str],
+    file: Optional[str],
+    query: Optional[str],
+    depth: int,
+    top_k: int,
+    unavailable: bool = False,
+    unresolved_node: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Build structured follow-up suggestions for recoverable graph failures."""
+    suggestions: List[Dict[str, Any]] = []
+    search_seed = unresolved_node or query or node or source or target or file
+    effective_top_k = max(1, min(top_k, 10))
+
+    if unavailable:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "project_overview",
+                {"path": path, "max_depth": 2},
+                "Inspect the project structure without relying on the graph index.",
+            )
+        )
+        if search_seed:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "code_search",
+                    {
+                        "query": search_seed,
+                        "path": path,
+                        "mode": "text",
+                        "k": effective_top_k,
+                    },
+                    f'Search code textually for "{search_seed}" while graph indexing is unavailable.',
+                )
+            )
+        return suggestions
+
+    if normalized_mode != requested_mode:
+        canonical_args: Dict[str, Any] = {"mode": normalized_mode, "path": path}
+        if normalized_mode in {"search", "find"}:
+            canonical_args["query"] = search_seed
+            canonical_args["top_k"] = effective_top_k
+        elif normalized_mode in {
+            "neighbors",
+            "callers",
+            "callees",
+            "trace",
+            "call_flow",
+            "impact",
+            "subgraph",
+        }:
+            canonical_args["node"] = node or source or target
+            canonical_args["depth"] = depth
+        elif normalized_mode == "file_deps":
+            canonical_args["file"] = file
+        elif normalized_mode not in {"stats"}:
+            canonical_args["top_k"] = effective_top_k
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "graph",
+                canonical_args,
+                f'Use the supported graph mode "{normalized_mode}" instead of "{requested_mode}".',
+            )
+        )
+
+    if search_seed:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "graph",
+                {"mode": "search", "query": search_seed, "path": path, "top_k": effective_top_k},
+                f'Search the graph index for matches to "{search_seed}".',
+            )
+        )
+    elif not suggestions:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "graph",
+                {"mode": "overview", "path": path, "top_k": effective_top_k},
+                "Start with a supported graph overview of the codebase.",
+            )
+        )
+
+    return suggestions[:2]
+
+
+def _graph_error_response(
+    *,
+    requested_mode: str,
+    mode: str,
+    error: str,
+    suggestions: Optional[List[Dict[str, Any]]] = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build a structured graph error response."""
+    response: Dict[str, Any] = {
+        "success": False,
+        "mode": mode,
+        "requested_mode": requested_mode,
+        "error": error,
+    }
+    if suggestions:
+        response["metadata"] = {"follow_up_suggestions": suggestions}
+    if extra:
+        response.update(extra)
+    return response
 
 
 def _unsupported_graph_mode_error(mode: str) -> str:
@@ -1356,16 +1511,16 @@ async def graph(
             # Non-fatal: log warning but continue
             logger.warning(f"[graph] Failed to subscribe to file watcher: {e}")
 
+    requested_mode = _graph_mode_value(mode)
+    normalized_mode = _normalize_graph_mode_alias(
+        mode,
+        node=node,
+        source=source,
+        target=target,
+        file=file,
+        query=query,
+    )
     try:
-        requested_mode = str(mode)
-        normalized_mode = _normalize_graph_mode_alias(
-            mode,
-            node=node,
-            source=source,
-            target=target,
-            file=file,
-            query=query,
-        )
         loaded = await _load_graph(path, reindex=reindex, exec_ctx=_exec_ctx)
 
         # Handle pipe-separated modes (e.g., "callers|callees")
@@ -1638,37 +1793,88 @@ async def graph(
     except (ImportError, RuntimeError) as exc:
         # CodebaseIndex provider not installed or not bootstrapped —
         # return helpful guidance instead of a confusing error the LLM retries.
-        return {
-            "success": False,
-            "mode": mode,
-            "error": str(exc),
-            "suggestion": (
-                "The graph tool requires a codebase indexing provider. "
-                "Use code_search, overview, ls, or read tools for code exploration instead. "
-                "To enable graph analysis: pip install victor-coding"
+        return _graph_error_response(
+            requested_mode=requested_mode,
+            mode=normalized_mode,
+            error=str(exc),
+            suggestions=_build_graph_error_follow_up_suggestions(
+                path=path,
+                requested_mode=requested_mode,
+                normalized_mode=normalized_mode,
+                node=node,
+                source=source,
+                target=target,
+                file=file,
+                query=query,
+                depth=depth,
+                top_k=top_k,
+                unavailable=True,
             ),
-            "unavailable": True,
-        }
+            extra={
+                "suggestion": (
+                    "The graph tool requires a codebase indexing provider. "
+                    "Use code_search, overview, ls, or read tools for code exploration instead. "
+                    "To enable graph analysis: pip install victor-coding"
+                ),
+                "unavailable": True,
+            },
+        )
     except Exception as exc:
         error_msg = str(exc)
         # Detect CodebaseIndex-related errors even if not ImportError
         if "CodebaseIndex" in error_msg or "codebase indexing" in error_msg:
-            return {
-                "success": False,
-                "mode": mode,
-                "error": error_msg,
-                "suggestion": (
-                    "The graph tool requires a codebase indexing provider. "
-                    "Use code_search, overview, ls, or read tools instead. "
-                    "To enable graph analysis: pip install victor-coding"
+            return _graph_error_response(
+                requested_mode=requested_mode,
+                mode=normalized_mode,
+                error=error_msg,
+                suggestions=_build_graph_error_follow_up_suggestions(
+                    path=path,
+                    requested_mode=requested_mode,
+                    normalized_mode=normalized_mode,
+                    node=node,
+                    source=source,
+                    target=target,
+                    file=file,
+                    query=query,
+                    depth=depth,
+                    top_k=top_k,
+                    unavailable=True,
                 ),
-                "unavailable": True,
-            }
-        return {
-            "success": False,
-            "mode": mode,
-            "error": error_msg,
-        }
+                extra={
+                    "suggestion": (
+                        "The graph tool requires a codebase indexing provider. "
+                        "Use code_search, overview, ls, or read tools instead. "
+                        "To enable graph analysis: pip install victor-coding"
+                    ),
+                    "unavailable": True,
+                },
+            )
+
+        unresolved_node = None
+        if error_msg.startswith("Could not resolve graph node '"):
+            unresolved_node = error_msg.split("Could not resolve graph node '", 1)[1].split(
+                "'",
+                1,
+            )[0]
+
+        return _graph_error_response(
+            requested_mode=requested_mode,
+            mode=normalized_mode,
+            error=error_msg,
+            suggestions=_build_graph_error_follow_up_suggestions(
+                path=path,
+                requested_mode=requested_mode,
+                normalized_mode=normalized_mode,
+                node=node,
+                source=source,
+                target=target,
+                file=file,
+                query=query,
+                depth=depth,
+                top_k=top_k,
+                unresolved_node=unresolved_node,
+            ),
+        )
 
 
 # =============================================================================

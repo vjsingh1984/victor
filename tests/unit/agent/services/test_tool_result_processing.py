@@ -192,3 +192,41 @@ def test_mutating_tools_keep_full_display_output_even_when_preview_pruning_enabl
     assert results[0]["result"] == formatted_output
     assert results[0]["full_result"] == formatted_output
     assert results[0]["content"] == formatted_output
+
+
+def test_semantic_failure_preserves_follow_up_suggestions():
+    service = _make_service()
+    ctx = _make_ctx(format_tool_output=MagicMock(return_value="formatted error"))
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="graph",
+                success=True,
+                result={
+                    "success": False,
+                    "error": "Unsupported graph mode: hubs",
+                    "metadata": {
+                        "follow_up_suggestions": [
+                            {
+                                "command": 'graph(mode="overview", path=".", top_k=10)',
+                                "description": "Use a supported overview mode.",
+                            }
+                        ]
+                    },
+                },
+                arguments={"mode": "hubs"},
+                tool_call_id="call_graph_1",
+            )
+        ]
+    )
+
+    results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["success"] is False
+    assert results[0]["error"] == "Unsupported graph mode: hubs"
+    assert results[0]["follow_up_suggestions"] == [
+        {
+            "command": 'graph(mode="overview", path=".", top_k=10)',
+            "description": "Use a supported overview mode.",
+        }
+    ]
