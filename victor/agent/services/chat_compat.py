@@ -341,18 +341,18 @@ class ChatCoordinator(ChatStreamHelperMixin):
             )
             return await chat_service.chat(user_message, use_planning=True)
 
-        runtime_helper = self._get_orchestrator_runtime_helper("_run_planning_chat_runtime")
+        runtime_helper = self._get_orchestrator_runtime_helper("chat")
         if callable(runtime_helper):
             record_deprecated_chat_shim_access(
-                "chat_coordinator", "chat_with_planning", "orchestrator_runtime"
+                "chat_coordinator", "chat_with_planning", "orchestrator_public"
             )
-            return await runtime_helper(user_message)
+            return await runtime_helper(user_message, use_planning=True)
 
         record_deprecated_chat_shim_access(
             "chat_coordinator", "chat_with_planning", "missing_runtime"
         )
         raise RuntimeError(
-            "ChatCoordinator planning requires a bound ChatService or orchestrator runtime. "
+            "ChatCoordinator planning requires a bound ChatService or orchestrator chat runtime. "
             "Bind ChatService before using deprecated compatibility shims."
         )
 

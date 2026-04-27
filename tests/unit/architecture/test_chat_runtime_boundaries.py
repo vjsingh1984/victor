@@ -113,12 +113,14 @@ def test_deprecated_chat_shims_do_not_materialize_local_chat_loops() -> None:
 
     assert "execute_agentic_loop(" not in chat_source
     assert "PlanningCoordinator(" not in chat_planning_source
+    assert "_run_planning_chat_runtime" not in chat_planning_source
     assert "_get_service_streaming_runtime" not in chat_stream_source
     assert "_stream_chat_runtime" not in chat_stream_source
     assert "_get_orchestrator_runtime_property(" not in turn_executor_source
     assert "materializing a legacy local" not in turn_executor_source
     assert "execute_agentic_loop(" not in sync_source
     assert "execute_agentic_loop(" not in sync_planning_source
+    assert "PlanningCoordinator(" not in sync_planning_source
     assert "_stream_from_provider(" not in streaming_source
     assert "raise RuntimeError" in streaming_source
     assert "_sync.chat(" not in unified_chat_source

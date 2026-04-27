@@ -303,17 +303,19 @@ async def test_unified_chat_coordinator_requires_bound_chat_service_for_streamin
 
 
 @pytest.mark.asyncio
-async def test_chat_coordinator_planning_prefers_orchestrator_runtime_helper():
+async def test_chat_coordinator_planning_prefers_orchestrator_public_chat():
     response = CompletionResponse(content="planned", role="assistant")
     orchestrator = MagicMock()
-    orchestrator._run_planning_chat_runtime = AsyncMock(return_value=response)
+    orchestrator.chat = AsyncMock(return_value=response)
 
     coordinator = _make_deprecated_chat_coordinator(orchestrator)
 
     result = await coordinator._chat_with_planning("hello")
 
     assert result is response
-    orchestrator._run_planning_chat_runtime.assert_awaited_once_with("hello")
+    orchestrator.chat.assert_awaited_once_with("hello", use_planning=True)
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["chat_coordinator.chat_with_planning.orchestrator_public"] == 1
 
 
 @pytest.mark.asyncio
@@ -337,9 +339,36 @@ async def test_chat_coordinator_planning_requires_canonical_runtime():
     coordinator = _make_deprecated_chat_coordinator(MagicMock())
 
     with pytest.raises(
-        RuntimeError, match="planning requires a bound ChatService or orchestrator runtime"
+        RuntimeError, match="planning requires a bound ChatService or orchestrator chat runtime"
     ):
         await coordinator._chat_with_planning("hello")
+
+
+@pytest.mark.asyncio
+async def test_sync_chat_coordinator_planning_prefers_orchestrator_public_chat():
+    response = CompletionResponse(content="planned-sync", role="assistant", metadata={})
+    orchestrator = MagicMock()
+    orchestrator.chat = AsyncMock(return_value=response)
+    orchestrator.get_last_skill_match_info.return_value = {"skill_match": "python"}
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="SyncChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = SyncChatCoordinator(
+            chat_context=MagicMock(),
+            tool_context=MagicMock(),
+            provider_context=MagicMock(),
+            orchestrator=orchestrator,
+        )
+
+    result = await coordinator._chat_with_planning("hello")
+
+    assert result is response
+    assert result.metadata["skill_match"] == "python"
+    orchestrator.chat.assert_awaited_once_with("hello", use_planning=True)
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["sync_chat_coordinator.chat_with_planning.orchestrator_public"] == 1
 
 
 @pytest.mark.asyncio

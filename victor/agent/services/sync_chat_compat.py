@@ -243,9 +243,6 @@ class SyncChatCoordinator:
             )
             return await self._chat_service.chat(user_message, use_planning=True)
 
-        # PlanningCoordinator currently requires orchestrator.
-        # Deprecated compatibility shims should not bypass the canonical
-        # chat service / orchestrator runtime path for planning.
         if self._orchestrator is None:
             record_deprecated_chat_shim_access(
                 "sync_chat_coordinator", "chat_with_planning", "missing_runtime"
@@ -255,33 +252,21 @@ class SyncChatCoordinator:
                 "Bind ChatService before using deprecated compatibility shims."
             )
 
-        # Import here to avoid circular dependency
-        from victor.agent.services.planning_runtime import PlanningCoordinator
-
         record_deprecated_chat_shim_access(
-            "sync_chat_coordinator", "chat_with_planning", "orchestrator_runtime"
+            "sync_chat_coordinator", "chat_with_planning", "orchestrator_public"
         )
-        planning_coordinator = PlanningCoordinator(self._orchestrator)
-
-        # Get task analysis for planning
-        task_analysis = self._provider_context.task_analyzer.analyze(user_message)
-
-        # Use planning coordinator
-        response = await planning_coordinator.chat_with_planning(
+        response = await self._orchestrator.chat(
             user_message,
-            task_analysis=task_analysis,
+            use_planning=True,
         )
-
-        # Add messages to conversation history
-        if not self._chat_context._system_added:
-            self._chat_context.conversation.ensure_system_prompt()
-            self._chat_context._system_added = True
-
-        self._chat_context.add_message("user", user_message)
-        if response.content:
-            self._chat_context.add_message("assistant", response.content)
-
-        return response
+        return self._attach_skill_metadata(
+            response,
+            (
+                self._orchestrator.get_last_skill_match_info()
+                if hasattr(self._orchestrator, "get_last_skill_match_info")
+                else None
+            ),
+        )
 
 
 __all__ = [
