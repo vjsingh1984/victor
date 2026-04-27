@@ -107,6 +107,64 @@ async def test_graph_tool_supports_overview_alias(monkeypatch, tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_graph_tool_supports_hub_analysis_alias(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="hub_analysis",
+        path=str(tmp_path),
+        top_k=20,
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["requested_mode"] == "hub_analysis"
+    assert result["mode"] == "overview"
+    assert result["result"]["stats"]["nodes"] == 7
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_supports_top_k_alias_for_search_queries(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+
+    exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
+
+    result = await graph_tool_module.graph(
+        mode="top_k",
+        query="start",
+        path=str(tmp_path),
+        top_k=5,
+        _exec_ctx=exec_ctx,
+    )
+
+    assert result["success"] is True
+    assert result["requested_mode"] == "top_k"
+    assert result["mode"] == "search"
+    assert result["result"]["matches"]
+    assert result["result"]["matches"][0]["node_id"] == "symbol:a.py:start"
+
+
+@pytest.mark.asyncio
 async def test_graph_tool_resolves_file_scoped_symbol_reference(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 

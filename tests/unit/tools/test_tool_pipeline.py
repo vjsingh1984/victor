@@ -239,6 +239,22 @@ class TestToolPipeline:
         call_args = mock_tool_executor.execute.call_args
         assert isinstance(call_args.kwargs["arguments"], dict)
 
+    @pytest.mark.asyncio
+    async def test_duplicate_read_skip_result_includes_next_step_guidance(self, pipeline):
+        """Duplicate read skips should tell the model how to recover productively."""
+        tool_calls = [{"name": "read", "arguments": {"path": "victor/tools/graph_tool.py"}}]
+
+        with patch.object(pipeline, "_is_duplicate_read", return_value=True):
+            result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.skipped_calls == 1
+        skipped = result.results[0]
+        assert skipped.skipped is True
+        assert skipped.skip_reason == "Duplicate file read within session"
+        assert "Do not repeat the same read(path, offset, limit)" in skipped.result
+        assert "code_search" in skipped.result
+        assert "project_overview" in skipped.result
+
     def test_reset(self, pipeline):
         """Test resetting pipeline state."""
         pipeline._calls_used = 5

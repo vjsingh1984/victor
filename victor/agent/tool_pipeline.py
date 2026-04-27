@@ -1749,8 +1749,12 @@ class ToolPipeline:
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=True,  # Mark as success but indicate it was cached
-                    result=f"[File '{file_path}' was already read in this session - "
-                    "content unchanged. See previous read result.]",
+                    result=(
+                        f"[File '{file_path}' was already read in this session and "
+                        "content is unchanged. Do not repeat the same read(path, offset, limit). "
+                        "Use a different offset/limit, read a different file, or switch tools "
+                        "such as find, code_search, graph, or project_overview.]"
+                    ),
                     skipped=True,
                     skip_reason="Duplicate file read within session",
                     normalization_applied=normalization_applied,

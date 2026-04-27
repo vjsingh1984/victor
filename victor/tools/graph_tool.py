@@ -84,6 +84,11 @@ class GraphMode(str, Enum):
     QUERY = "query"  # Direct SQL query mode
 
 
+_GRAPH_MODE_ALIAS_NOTES = {
+    "hub_analysis": "overview",
+    "top_k": "search (when query/node/file is provided) or pagerank",
+}
+
 ALL_EDGE_TYPES = [
     "CALLS",
     "REFERENCES",
@@ -117,6 +122,58 @@ def _ctx_value(exec_ctx: Optional[Dict[str, Any]], key: str, default: Any = None
 
 def _normalize_relpath(file_path: str) -> str:
     return file_path.replace("\\", "/").strip()
+
+
+def _normalize_graph_mode_alias(
+    mode: str | GraphMode,
+    *,
+    node: Optional[str] = None,
+    source: Optional[str] = None,
+    target: Optional[str] = None,
+    file: Optional[str] = None,
+    query: Optional[str] = None,
+) -> str:
+    """Map common model-invented graph mode aliases to canonical modes."""
+    raw_mode = str(mode).strip().lower()
+    if not raw_mode:
+        return GraphMode.NEIGHBORS.value
+
+    if "|" in raw_mode:
+        normalized_parts = [
+            _normalize_graph_mode_alias(
+                part,
+                node=node,
+                source=source,
+                target=target,
+                file=file,
+                query=query,
+            )
+            for part in raw_mode.split("|")
+            if part.strip()
+        ]
+        return "|".join(normalized_parts)
+
+    if raw_mode == "hub_analysis":
+        return GraphMode.OVERVIEW.value
+    if raw_mode == "top_k":
+        if query or node or file:
+            return GraphMode.SEARCH.value
+        return GraphMode.PAGERANK.value
+
+    return raw_mode
+
+
+def _unsupported_graph_mode_error(mode: str) -> str:
+    """Build a user/model-facing unsupported mode error with recovery hints."""
+    supported_modes = ", ".join(sorted(graph_mode.value for graph_mode in GraphMode))
+    alias_notes = "; ".join(
+        f"{alias} -> {target}" for alias, target in sorted(_GRAPH_MODE_ALIAS_NOTES.items())
+    )
+    return (
+        f"Unsupported graph mode: {mode}. "
+        f"Supported modes: {supported_modes}. "
+        f"Common aliases: {alias_notes}."
+    )
 
 
 def _module_name_from_file(file_path: str) -> str:
@@ -1273,6 +1330,14 @@ async def graph(
 ) -> Dict[str, Any]:
     """Analyze the indexed code graph using the active SQLite + LanceDB code index.
 
+    Valid modes include: overview, stats, search/find, neighbors, callers, callees,
+    trace, path, pagerank, centrality, patterns, clusters, semantic, query, and
+    module/file dependency variants.
+
+    Common alias recovery is supported for model-generated variants such as:
+    - hub_analysis -> overview
+    - top_k -> search (when a query/node/file is supplied) or pagerank
+
     Enhanced with file watching for automatic cache invalidation.
     """
     # Subscribe to file watcher for automatic cache invalidation (only once per root)
@@ -1292,14 +1357,23 @@ async def graph(
             logger.warning(f"[graph] Failed to subscribe to file watcher: {e}")
 
     try:
+        requested_mode = str(mode)
+        normalized_mode = _normalize_graph_mode_alias(
+            mode,
+            node=node,
+            source=source,
+            target=target,
+            file=file,
+            query=query,
+        )
         loaded = await _load_graph(path, reindex=reindex, exec_ctx=_exec_ctx)
 
         # Handle pipe-separated modes (e.g., "callers|callees")
         # Expand into multiple results combined
-        if "|" in str(mode):
+        if "|" in normalized_mode:
             return await _handle_multi_mode(
                 loaded=loaded,
-                mode_str=str(mode),
+                mode_str=normalized_mode,
                 path=path,
                 node=node,
                 source=source,
@@ -1322,6 +1396,8 @@ async def graph(
                 max_callsites=max_callsites,
                 _exec_ctx=_exec_ctx,
             )
+
+        mode = normalized_mode
 
         default_edge_types = _default_edge_types(mode, only_runtime=only_runtime)
         effective_edge_types = edge_types or default_edge_types
@@ -1547,11 +1623,12 @@ async def graph(
                 raise ValueError("query mode requires a SQL SELECT statement")
             result = await _run_graph_sql_query(loaded, query)
         else:
-            raise ValueError(f"Unsupported graph mode: {mode}")
+            raise ValueError(_unsupported_graph_mode_error(str(mode)))
 
         graph_result = {
             "success": True,
             "mode": mode,
+            "requested_mode": requested_mode,
             "root_path": str(loaded.root_path),
             "rebuilt": loaded.rebuilt,
             "result": result,
