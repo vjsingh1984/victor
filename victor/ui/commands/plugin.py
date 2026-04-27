@@ -32,7 +32,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -40,6 +39,8 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.table import Table
+
+from victor.ui.json_utils import create_json_option, print_json_data
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def list_plugins(
         None, "--type", "-t", help="Filter by type: vertical, external, plugin"
     ),
     enabled_only: bool = typer.Option(False, "--enabled", help="Show only enabled plugins"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all plugins (verticals, external plugins, and entry-point plugins)."""
     from victor.core.plugins.registry import PluginRegistry
@@ -78,7 +79,7 @@ def list_plugins(
         entries = [e for e in entries if e["enabled"]]
 
     if json_output:
-        console.print_json(json.dumps(entries, indent=2))
+        print_json_data({"plugins": entries, "count": len(entries)})
         return
 
     if not entries:
@@ -210,7 +211,7 @@ def disable_plugin(
 @plugin_app.command("info")
 def plugin_info(
     plugin_id: str = typer.Argument(help="Plugin ID to inspect"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show detailed information about a plugin."""
     manager = _get_manager()
@@ -247,7 +248,7 @@ def plugin_info(
                 "post_tool_use": manifest.hooks.post_tool_use,
             },
         }
-        console.print_json(json.dumps(data, indent=2))
+        print_json_data(data)
         return
 
     console.print(f"[bold]{manifest.name}[/] v{manifest.version}")
