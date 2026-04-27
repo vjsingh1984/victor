@@ -876,27 +876,23 @@ class Agent:
             )
         """
         from victor.framework.teams import AgentTeam
+        from victor.framework.team_runtime import resolve_vertical_team_catalog
 
         # Check if vertical is configured
         if not self._vertical:
             raise AgentError("No vertical configured. Create agent with vertical= parameter.")
 
-        # Get team specs using ISP-compliant provider pattern (LSP fix)
-        if not hasattr(self._vertical, "get_team_spec_provider"):
+        team_catalog = resolve_vertical_team_catalog(self._vertical)
+        if not team_catalog.supported:
             raise AgentError(f"Vertical '{self._vertical.name}' does not support teams.")
-
-        team_provider = self._vertical.get_team_spec_provider()
-        if not team_provider or not hasattr(team_provider, "get_team_specs"):
+        if not team_catalog.provider_available:
             raise AgentError(f"Vertical '{self._vertical.name}' does not provide team specs.")
-
-        team_specs = team_provider.get_team_specs()
-        if not team_specs:
+        if not team_catalog.has_team_specs:
             raise AgentError(f"Vertical '{self._vertical.name}' has no team specs defined.")
 
-        # Get the team specification
-        team_spec = team_specs.get(team_name)
+        team_spec = team_catalog.get(team_name)
         if not team_spec:
-            available = list(team_specs.keys())
+            available = team_catalog.list_names()
             raise AgentError(f"Team '{team_name}' not found. " f"Available: {', '.join(available)}")
 
         # Create and run team
@@ -953,22 +949,12 @@ class Agent:
             teams = agent.get_available_teams()
             print(teams)  # ['feature_team', 'bug_fix_team', 'review_team']
         """
-        if not self._vertical:
-            return []
+        from victor.framework.team_runtime import resolve_vertical_team_catalog
 
-        # All verticals use ISP-compliant provider pattern
-        if not hasattr(self._vertical, "get_team_spec_provider"):
+        team_catalog = resolve_vertical_team_catalog(self._vertical)
+        if not team_catalog.supported or not team_catalog.provider_available:
             return []
-
-        team_provider = self._vertical.get_team_spec_provider()
-        if not team_provider or not hasattr(team_provider, "get_team_specs"):
-            return []
-
-        team_specs = team_provider.get_team_specs()
-        if not team_specs:
-            return []
-
-        return list(team_specs.keys())
+        return team_catalog.list_names()
 
     # =========================================================================
     # Lifecycle

@@ -704,8 +704,22 @@ class EvaluationHarness:
         except ImportError:
             self._results_dir = Path.home() / ".victor" / "evaluations"
             self._checkpoint_dir = checkpoint_dir or Path.home() / ".victor" / "checkpoints"
-        self._results_dir.mkdir(parents=True, exist_ok=True)
-        self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self._results_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.warning(
+                "Failed to prepare evaluation results directory %s: %s",
+                self._results_dir,
+                exc,
+            )
+        try:
+            self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.warning(
+                "Failed to prepare evaluation checkpoint directory %s: %s",
+                self._checkpoint_dir,
+                exc,
+            )
 
     def register_runner(self, runner: BaseBenchmarkRunner) -> None:
         """Register a benchmark runner.
@@ -797,9 +811,14 @@ class EvaluationHarness:
 
         # Atomic write with temp file
         temp_path = checkpoint_path.with_suffix(".tmp")
-        with open(temp_path, "w") as f:
-            json.dump(checkpoint_data, f, indent=2)
-        temp_path.rename(checkpoint_path)
+        try:
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(temp_path, "w") as f:
+                json.dump(checkpoint_data, f, indent=2)
+            temp_path.rename(checkpoint_path)
+        except OSError as exc:
+            logger.warning("Failed to save checkpoint %s: %s", checkpoint_path, exc)
+            return
 
         logger.debug(f"Checkpoint saved: {len(completed_results)} tasks completed")
 
@@ -877,9 +896,12 @@ class EvaluationHarness:
 
     def _clear_checkpoint(self, checkpoint_path: Path) -> None:
         """Remove checkpoint file after successful completion."""
-        if checkpoint_path.exists():
-            checkpoint_path.unlink()
-            logger.debug("Checkpoint cleared")
+        try:
+            if checkpoint_path.exists():
+                checkpoint_path.unlink()
+                logger.debug("Checkpoint cleared")
+        except OSError as exc:
+            logger.warning("Failed to clear checkpoint %s: %s", checkpoint_path, exc)
 
     async def run_evaluation(
         self,
@@ -1569,15 +1591,23 @@ class EvaluationHarness:
             ],
         }
 
-        with open(output_path, "w") as f:
-            json.dump(data, f, indent=2)
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError as exc:
+            logger.warning("Failed to save evaluation results to %s: %s", output_path, exc)
+            return output_path
 
         self._persist_experiment_memory(experiment_memory)
-        self._save_validated_session_feedbacks(
-            result,
-            source_result_path=output_path,
-            summary=summary,
-        )
+        try:
+            self._save_validated_session_feedbacks(
+                result,
+                source_result_path=output_path,
+                summary=summary,
+            )
+        except Exception as exc:
+            logger.warning("Validated session-truth persistence failed: %s", exc)
 
         logger.info(f"Results saved to: {output_path}")
         return output_path
