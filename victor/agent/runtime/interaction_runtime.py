@@ -66,7 +66,7 @@ def create_chat_coordinator_shim(
 
 def create_tool_coordinator_shim(
     *,
-    orchestrator: Any,
+    enabled_tools: Optional[Any],
     tool_pipeline: Any,
     tool_registry: Any,
     tool_selector: Any,
@@ -79,8 +79,6 @@ def create_tool_coordinator_shim(
     This helper is intentionally separate from ``InteractionRuntimeComponents``
     so the main interaction runtime contract stays service-first.
     """
-
-    orch_tools = getattr(orchestrator, "_enabled_tools", None)
 
     def _build_tool_coordinator() -> Any:
         warnings.warn(
@@ -101,8 +99,8 @@ def create_tool_coordinator_shim(
         coordinator.set_mode_controller(mode_controller)
         if tool_service is not None:
             coordinator.bind_tool_service(tool_service)
-        if orch_tools:
-            coordinator.set_enabled_tools(orch_tools)
+        if enabled_tools:
+            coordinator.set_enabled_tools(enabled_tools)
         return coordinator
 
     return LazyRuntimeProxy(

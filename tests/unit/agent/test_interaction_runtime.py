@@ -198,8 +198,6 @@ def test_create_chat_coordinator_shim_lazy_materialization():
 
 
 def test_create_tool_coordinator_shim_lazy_materialization():
-    orchestrator = MagicMock()
-    orchestrator._enabled_tools = None
     tool_pipeline = MagicMock()
     tool_registry = MagicMock()
     tool_selector = MagicMock()
@@ -212,7 +210,7 @@ def test_create_tool_coordinator_shim_lazy_materialization():
         tool_cls.return_value = tool_coordinator
 
         shim = create_tool_coordinator_shim(
-            orchestrator=orchestrator,
+            enabled_tools=None,
             tool_pipeline=tool_pipeline,
             tool_registry=tool_registry,
             tool_selector=tool_selector,
@@ -236,3 +234,32 @@ def test_create_tool_coordinator_shim_lazy_materialization():
         )
         tool_coordinator.set_mode_controller.assert_called_once_with(mode_controller)
         tool_coordinator.bind_tool_service.assert_called_once_with(tool_service)
+        tool_coordinator.set_enabled_tools.assert_not_called()
+
+
+def test_create_tool_coordinator_shim_sets_enabled_tools_without_orchestrator():
+    tool_pipeline = MagicMock()
+    tool_registry = MagicMock()
+    tool_selector = MagicMock()
+    tool_access_controller = MagicMock()
+    mode_controller = MagicMock()
+    tool_service = MagicMock()
+
+    with patch("victor.agent.services.tool_compat.ToolCoordinator") as tool_cls:
+        tool_coordinator = MagicMock()
+        tool_cls.return_value = tool_coordinator
+
+        shim = create_tool_coordinator_shim(
+            enabled_tools={"read", "edit"},
+            tool_pipeline=tool_pipeline,
+            tool_registry=tool_registry,
+            tool_selector=tool_selector,
+            tool_access_controller=tool_access_controller,
+            mode_controller=mode_controller,
+            tool_service=tool_service,
+        )
+
+        with patch("warnings.warn"):
+            assert shim.get_instance() is tool_coordinator
+
+        tool_coordinator.set_enabled_tools.assert_called_once_with({"read", "edit"})
