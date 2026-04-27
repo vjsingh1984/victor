@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from enum import Enum
+import importlib.util
 import logging
+from pathlib import Path
 from typing import Any, Optional, Type
 
 from victor_sdk.verticals.manifest import (
@@ -22,6 +24,7 @@ from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 logger = logging.getLogger(__name__)
 
 _VERTICAL_RUNTIME_PROVENANCE_ATTR = "_victor_runtime_provenance"
+_VERTICAL_PACKAGE_MANIFEST = "victor-vertical.toml"
 
 
 class VerticalRuntimeProvenance(str, Enum):
@@ -103,7 +106,8 @@ def get_or_create_vertical_manifest(
     Preference order:
     1. Explicit ``_victor_manifest`` attached by decorators/registration
     2. Overridden ``get_manifest()``
-    3. Synthesized manifest from structural class metadata
+    3. Package sidecar ``victor-vertical.toml``
+    4. Synthesized manifest from structural class metadata
     """
 
     candidate = getattr(vertical_class, "_victor_manifest", None)
@@ -135,7 +139,11 @@ def get_or_create_vertical_manifest(
             )
             return None
     else:
-        manifest = _synthesize_manifest(vertical_class)
+        manifest = load_vertical_package_manifest_for_module(
+            getattr(vertical_class, "__module__", "")
+        )
+        if manifest is None:
+            manifest = _synthesize_manifest(vertical_class)
 
     if manifest is None:
         return None
@@ -178,6 +186,99 @@ def _has_custom_manifest(vertical_class: Type[Any]) -> bool:
     """Return True if the class overrides the SDK manifest hook."""
 
     return "get_manifest" in getattr(vertical_class, "__dict__", {})
+
+
+def load_vertical_package_manifest_for_module(module_name: str) -> Optional[ExtensionManifest]:
+    """Load a sidecar package manifest for *module_name* without importing it.
+
+    The canonical package-level metadata file is ``victor-vertical.toml``.
+    This helper resolves the owning package path from import metadata, loads
+    the sidecar if present, and normalizes it into an ``ExtensionManifest``.
+    """
+
+    manifest_path = _find_vertical_package_manifest_path(module_name)
+    if manifest_path is None:
+        return None
+
+    try:
+        from victor.core.verticals.package_schema import VerticalPackageMetadata
+
+        metadata = VerticalPackageMetadata.from_toml(manifest_path)
+    except Exception as exc:
+        logger.debug(
+            "Failed to load package manifest for module '%s' from %s: %s",
+            module_name,
+            manifest_path,
+            exc,
+        )
+        return None
+
+    provides: set[ExtensionType] = set()
+    class_spec = getattr(metadata, "class_spec", None)
+    if class_spec is not None:
+        if getattr(class_spec, "provides_tools", None):
+            provides.add(ExtensionType.TOOLS)
+        if getattr(class_spec, "provides_workflows", None):
+            provides.add(ExtensionType.WORKFLOWS)
+        if getattr(class_spec, "provides_capabilities", None):
+            provides.add(ExtensionType.CAPABILITIES)
+
+    dependencies = getattr(getattr(metadata, "dependencies", None), "verticals", []) or []
+    manifest = ExtensionManifest(
+        name=str(metadata.name),
+        version=str(metadata.version),
+        min_framework_version=str(metadata.requires_victor),
+        provides=provides,
+        extension_dependencies=[
+            ExtensionDependency(extension_name=str(dependency_name))
+            for dependency_name in dependencies
+            if dependency_name
+        ],
+        # Let runtime defaults derive the namespace from the actual class provenance.
+        plugin_namespace="",
+    )
+    logger.debug("Loaded package manifest for module '%s' from %s", module_name, manifest_path)
+    return manifest
+
+
+def _find_vertical_package_manifest_path(module_name: str) -> Optional[Path]:
+    """Return the first sidecar manifest path associated with *module_name*."""
+
+    for candidate in _iter_vertical_package_manifest_candidates(module_name):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _iter_vertical_package_manifest_candidates(module_name: str) -> Iterable[Path]:
+    """Yield candidate sidecar manifest paths for *module_name*."""
+
+    if not module_name:
+        return ()
+
+    package_name = module_name.split(".", 1)[0]
+    if not package_name:
+        return ()
+
+    try:
+        spec = importlib.util.find_spec(package_name)
+    except (ImportError, ModuleNotFoundError, ValueError) as exc:
+        logger.debug("Unable to resolve package spec for module '%s': %s", module_name, exc)
+        return ()
+
+    if spec is None:
+        return ()
+
+    candidates: list[Path] = []
+    search_locations = list(spec.submodule_search_locations or [])
+    for location in search_locations:
+        candidates.append(Path(location) / _VERTICAL_PACKAGE_MANIFEST)
+
+    origin = getattr(spec, "origin", None)
+    if isinstance(origin, str) and origin not in {"built-in", "frozen"}:
+        candidates.append(Path(origin).resolve().parent / _VERTICAL_PACKAGE_MANIFEST)
+
+    return tuple(dict.fromkeys(candidates))
 
 
 def _manifest_from_mapping(

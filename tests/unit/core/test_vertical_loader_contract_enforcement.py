@@ -17,7 +17,7 @@ from victor.core.verticals.manifest_contract import (
 from victor.core.verticals.vertical_loader import VerticalLoader
 from victor.framework import entry_point_loader
 from victor_sdk import VerticalBase as SdkVerticalBase
-from victor_sdk.verticals.manifest import ExtensionManifest
+from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
 
 
 def _make_vertical(name: str, api_version: int):
@@ -596,6 +596,36 @@ def test_loader_resolve_prefers_explicit_external_provenance(monkeypatch) -> Non
     assert resolved is ensure_runtime_vertical(entry_point_vertical)
 
     VerticalRegistry.unregister(vertical_name)
+
+
+def test_loader_rejects_incompatible_package_manifest_before_import(monkeypatch):
+    """Package sidecar manifests should be validated before entry-point import."""
+    loader = VerticalLoader()
+    vertical_name = "preflight_vertical"
+    VerticalRegistry.unregister(vertical_name)
+
+    monkeypatch.setattr(
+        loader,
+        "_get_vertical_entry_points",
+        lambda force_refresh=False: {vertical_name: "fake.vertical.plugin:plugin"},
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.load_vertical_package_manifest_for_module",
+        lambda module_name: ExtensionManifest(
+            name=vertical_name,
+            version="1.0.0",
+            min_framework_version=">=999.0.0",
+            provides={ExtensionType.TOOLS},
+        ),
+    )
+    monkeypatch.setattr(
+        loader,
+        "_load_entry_point",
+        lambda *_args, **_kwargs: pytest.fail("entry point should not be imported"),
+    )
+
+    with pytest.raises(ValueError, match=vertical_name):
+        loader.load(vertical_name)
 
 
 def test_discovery_stats_include_dependency_and_entry_point_snapshots(monkeypatch):

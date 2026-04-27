@@ -62,6 +62,7 @@ from victor.core.verticals.manifest_contract import (
     get_or_create_vertical_manifest,
     get_vertical_runtime_provenance,
     get_vertical_runtime_metadata,
+    load_vertical_package_manifest_for_module,
 )
 from victor_sdk.discovery import collect_verticals_from_candidate
 
@@ -187,7 +188,9 @@ class VerticalLoader:
         """
         with self._lock:
             vertical = VerticalRegistry.get(name)
-            ep_vertical = self._import_from_entrypoint(name)
+            ep_vertical = None
+            if self._should_consider_entry_point(vertical):
+                ep_vertical = self._import_from_entrypoint(name)
 
             if vertical is not None and ep_vertical is not None and vertical is not ep_vertical:
                 reg_module = getattr(vertical, "__module__", "")
@@ -225,6 +228,19 @@ class VerticalLoader:
 
             return ensure_runtime_vertical(vertical) if vertical is not None else None
 
+    def _should_consider_entry_point(
+        self,
+        registered_vertical: Optional[Type[VerticalBase]],
+    ) -> bool:
+        """Return True when entry-point resolution can still affect the outcome."""
+
+        if registered_vertical is None:
+            return True
+        return (
+            get_vertical_runtime_provenance(registered_vertical)
+            is VerticalRuntimeProvenance.CONTRIB
+        )
+
     def _import_from_entrypoint(self, name: str) -> Optional[Type[VerticalBase]]:
         """Import a vertical from entry points.
 
@@ -239,14 +255,12 @@ class VerticalLoader:
             if cached is not None:
                 return cached
 
-        ep_entries = self._get_vertical_entry_points()
-        entry_name = name if name in ep_entries else None
-        if entry_name is None:
-            entry_name = next((key for key in ep_entries if key.lower() == name.lower()), None)
-        if entry_name is None:
+        entry_match = self._get_matching_vertical_entry_point(name)
+        if entry_match is None:
             return None
 
-        value = ep_entries[entry_name]
+        entry_name, value = entry_match
+        self._preflight_entry_point_manifest(entry_name, value)
         candidate = self._load_entry_point(entry_name, value)
         try:
             discovered_verticals = self._collect_validated_verticals(candidate, entry_name)
@@ -270,6 +284,48 @@ class VerticalLoader:
                     None,
                 )
             return requested
+        return None
+
+    def _get_matching_vertical_entry_point(self, name: str) -> Optional[Tuple[str, str]]:
+        """Return the canonical entry-point name/value pair for *name*."""
+
+        ep_entries = self._get_vertical_entry_points()
+        entry_name = name if name in ep_entries else None
+        if entry_name is None:
+            entry_name = next((key for key in ep_entries if key.lower() == name.lower()), None)
+        if entry_name is None:
+            return None
+        return entry_name, ep_entries[entry_name]
+
+    def _preflight_entry_point_manifest(self, name: str, value: str) -> None:
+        """Validate package-level manifest metadata before importing a plugin module."""
+
+        module_name = self._parse_entry_point_module_name(value)
+        if module_name is None:
+            return
+
+        manifest = load_vertical_package_manifest_for_module(module_name)
+        if manifest is None:
+            return
+
+        report = VerticalCompatibilityGate().assess_manifest(manifest)
+        for warning in report.warnings:
+            logger.warning(
+                "Package manifest negotiation warning for entry point '%s': %s",
+                name,
+                warning,
+            )
+        report.raise_if_incompatible()
+
+    def _parse_entry_point_module_name(self, value: str) -> Optional[str]:
+        """Extract the module portion from a setuptools entry-point value."""
+
+        if ":" in value:
+            module_name, _attr_name = value.split(":", 1)
+            return module_name or None
+        if "." in value:
+            module_name, _attr_name = value.rsplit(".", 1)
+            return module_name or None
         return None
 
     def _get_vertical_entry_points(self, force_refresh: bool = False) -> Dict[str, str]:
@@ -624,6 +680,7 @@ class VerticalLoader:
         """
         for name, value in ep_entries.items():
             try:
+                self._preflight_entry_point_manifest(name, value)
                 candidate = self._load_entry_point(name, value)
                 discovered_verticals = self._collect_validated_verticals(candidate, name)
                 if not discovered_verticals:
