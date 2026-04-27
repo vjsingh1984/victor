@@ -8,9 +8,7 @@ def test_sdk_project_paths_return_path_objects_for_filesystem_consumers() -> Non
 
     assert isinstance(paths.victor_dir, Path)
     assert isinstance(paths.project_db, Path)
-    assert isinstance(paths.conversation_db, Path)
     assert isinstance(paths.project_context_file, Path)
     assert paths.project_db.parent == paths.victor_dir
-    assert paths.conversation_db.parent == paths.victor_dir
     assert paths.project_context_file.parent == paths.victor_dir
-    assert paths.conversation_db == paths.project_db
+    assert not hasattr(paths, "conversation_db")

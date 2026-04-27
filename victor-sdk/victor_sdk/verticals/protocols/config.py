@@ -23,9 +23,8 @@ class ProjectPathsData:
 
     Database Consolidation:
         project_db is the canonical project-local database path.
-        conversation_db remains a backward-compatible alias for older verticals.
-        Both point to the same project-specific database containing conversations,
-        graph, and entities.
+        It points to the consolidated project-specific database containing
+        conversations, graph, and entities.
 
     Usage:
         from victor_sdk.verticals.protocols import ProjectPathsData
@@ -81,14 +80,6 @@ class ProjectPathsData:
         graph, entities, and other project-scoped state.
         """
         return self.victor_dir / "project.db"
-
-    @property
-    def conversation_db(self) -> Path:
-        """Get backward-compatible alias for the consolidated project database.
-
-        Deprecated in favor of project_db.
-        """
-        return self.project_db
 
     @property
     def conversations_export_dir(self) -> Path:

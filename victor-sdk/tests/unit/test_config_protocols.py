@@ -52,10 +52,7 @@ class TestProjectPathsData:
         paths = ProjectPathsData(project_root="/home/user/project")
         assert paths.project_db == Path("/home/user/project/.victor/project.db")
         assert paths.project_db.parent == Path("/home/user/project/.victor")
-        # Database consolidation: conversation_db is now an alias for project_db
-        assert paths.conversation_db == Path("/home/user/project/.victor/project.db")
-        assert paths.conversation_db.parent == Path("/home/user/project/.victor")
-        assert paths.conversation_db == paths.project_db
+        assert not hasattr(paths, "conversation_db")
 
     def test_conversations_export_dir(self):
         paths = ProjectPathsData(project_root="/home/user/project")
@@ -87,8 +84,7 @@ class TestProjectPathsData:
         )
         assert paths.backups_dir == Path("/home/user/project/.custom_victor/backups")
         assert paths.project_db == Path("/home/user/project/.custom_victor/project.db")
-        # Database consolidation: conversation_db is now an alias for project_db
-        assert paths.conversation_db == Path("/home/user/project/.custom_victor/project.db")
+        assert not hasattr(paths, "conversation_db")
 
 
 class TestSettingsProviderProtocol:
