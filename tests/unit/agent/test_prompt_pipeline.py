@@ -263,6 +263,41 @@ class TestComposeTurnPrefix:
             },
         }
 
+    def test_runtime_intelligence_supplies_experiment_memory_prompt_guidance(self):
+        """Experiment-memory prompt guidance is injected and recorded in metadata."""
+        from victor.agent.services.runtime_intelligence import PromptOptimizationBundle
+
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.get_prompt_optimization_bundle.return_value = PromptOptimizationBundle(
+            experiment_guidance=[
+                "Experiment constraint from similar runs: satisfy tests_pass before broadening the plan.",
+                "Experiment-guided next candidate: Use read_file before execute_bash.",
+            ],
+            experiment_memory_hints={
+                "experiment_memory_match_count": 2,
+                "experiment_memory_record_ids": ["exp-1", "exp-2"],
+            },
+        )
+        pipeline = _make_pipeline(runtime_intelligence=runtime_intelligence)
+        ctx = self._make_turn_context()
+
+        prefix = pipeline.compose_turn_prefix("Fix the bug", ctx)
+
+        assert "Experiment constraint from similar runs" in prefix
+        assert "Experiment-guided next candidate" in prefix
+        assert ctx.prompt_optimization_metadata == {
+            "entries": [],
+            "by_section": {},
+            "experiment_memory": {
+                "experiment_memory_match_count": 2,
+                "experiment_memory_record_ids": ["exp-1", "exp-2"],
+                "prompt_guidance": [
+                    "Experiment constraint from similar runs: satisfy tests_pass before broadening the plan.",
+                    "Experiment-guided next candidate: Use read_file before execute_bash.",
+                ],
+            },
+        }
+
     def test_credit_in_prefix_tier_a(self):
         """Tier A: credit guidance goes in user prefix (not system prompt)."""
         pipeline = _make_pipeline(provider=_make_provider(api_cache=True))

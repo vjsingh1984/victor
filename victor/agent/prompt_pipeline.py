@@ -500,6 +500,11 @@ class UnifiedPromptPipeline:
                     "failure_hint",
                     self._canonicalize_system_guidance_text(optimization_bundle.failure_hint),
                 )
+            for index, guidance in enumerate(optimization_bundle.experiment_guidance):
+                add_block(
+                    f"experiment_guidance_{index}",
+                    self._canonicalize_system_guidance_text(guidance),
+                )
 
         # 4. Active skill prompt
         add_block("active_skill_prompt", turn_context.active_skill_prompt)

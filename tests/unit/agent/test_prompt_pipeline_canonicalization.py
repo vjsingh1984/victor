@@ -16,6 +16,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from victor.agent.services.runtime_intelligence import PromptOptimizationBundle
+
 
 def _make_provider(api_cache: bool = False, kv_cache: bool = False) -> MagicMock:
     provider = MagicMock()
@@ -128,3 +130,21 @@ class TestPromptPipelineCanonicalization:
         assert "\n- shell: low effectiveness" in prefix
         assert "\n- ls: reliable" in prefix
         assert "\n- shell: unreliable" in prefix
+
+    def test_experiment_memory_guidance_is_canonicalized_before_injection(self):
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.get_prompt_optimization_bundle.return_value = PromptOptimizationBundle(
+            experiment_guidance=[
+                "Experiment-guided next candidate: Use read_file after list_directory, then execute_bash for pytest.",
+            ],
+            experiment_memory_hints={"experiment_memory_match_count": 1},
+        )
+        pipeline = _make_pipeline(runtime_intelligence=runtime_intelligence)
+        ctx = _make_turn_context()
+
+        prefix = pipeline.compose_turn_prefix("Fix the bug", ctx)
+
+        assert "read_file" not in prefix
+        assert "list_directory" not in prefix
+        assert "execute_bash" not in prefix
+        assert "Use read after ls, then shell for pytest." in prefix

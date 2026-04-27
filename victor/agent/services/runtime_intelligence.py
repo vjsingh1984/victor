@@ -84,6 +84,8 @@ class PromptOptimizationBundle:
     few_shots: Optional[str] = None
     failure_hint: Optional[str] = None
     identities: List[PromptOptimizationIdentity] = field(default_factory=list)
+    experiment_guidance: List[str] = field(default_factory=list)
+    experiment_memory_hints: Dict[str, Any] = field(default_factory=dict)
 
     def to_session_metadata(self) -> Dict[str, Any]:
         """Serialize applied live prompt optimizations for session artifacts."""
@@ -95,7 +97,13 @@ class PromptOptimizationBundle:
             ).strip()
             if section_name:
                 by_section[section_name] = dict(entry)
-        return {"entries": entries, "by_section": by_section}
+        metadata = {"entries": entries, "by_section": by_section}
+        if self.experiment_guidance or self.experiment_memory_hints:
+            experiment_memory = dict(self.experiment_memory_hints)
+            if self.experiment_guidance:
+                experiment_memory["prompt_guidance"] = list(self.experiment_guidance)
+            metadata["experiment_memory"] = experiment_memory
+        return metadata
 
 
 @dataclass(frozen=True)
@@ -1454,6 +1462,16 @@ class RuntimeIntelligenceService:
         )
         if not records and query:
             records = store.search(
+                "",
+                benchmark=scope_filters["benchmark"],
+                provider=scope_filters["provider"],
+                model=scope_filters["model"],
+                prompt_candidate_hash=scope_filters["prompt_candidate_hash"],
+                section_name=scope_filters["section_name"],
+                limit=limit,
+            )
+        if not records and query:
+            records = store.search(
                 query,
                 provider=scope_filters["provider"],
                 model=scope_filters["model"],
@@ -1809,74 +1827,115 @@ class RuntimeIntelligenceService:
         turn_context: Any,
     ) -> PromptOptimizationBundle:
         """Collect prompt optimizations for the current turn."""
-        if self._optimization_injector is None:
-            return PromptOptimizationBundle()
-
         provider_name = getattr(turn_context, "provider_name", "")
         model_name = getattr(turn_context, "model", "")
         task_type = getattr(turn_context, "task_type", "default")
         evolved_sections: List[str] = []
         identities: List[PromptOptimizationIdentity] = []
-
-        payloads: Optional[Any] = None
-        if hasattr(self._optimization_injector, "get_evolved_section_payloads"):
-            payloads = self._optimization_injector.get_evolved_section_payloads(
-                provider=provider_name,
-                model=model_name,
-                task_type=task_type,
-            )
-        used_payload_sections = False
-        if isinstance(payloads, (list, tuple)):
-            for payload in payloads:
-                if not isinstance(payload, dict):
-                    continue
-                used_payload_sections = True
-                text = str(payload.get("text", "")).strip()
-                if text:
-                    evolved_sections.append(text)
-                identity = self._build_prompt_identity(payload)
-                if identity is not None:
-                    identities.append(identity)
-        if not used_payload_sections:
-            evolved_sections = self._optimization_injector.get_evolved_sections(
-                provider=provider_name,
-                model=model_name,
-                task_type=task_type,
-            )
-
         few_shots = None
-        few_shot_payload: Optional[Any] = None
-        if hasattr(self._optimization_injector, "get_few_shot_payload"):
-            few_shot_payload = self._optimization_injector.get_few_shot_payload(
-                user_message,
-                provider=provider_name,
-                model=model_name,
-                task_type=task_type,
-            )
-        used_payload_few_shot = False
-        if isinstance(few_shot_payload, dict):
-            if few_shot_payload:
-                used_payload_few_shot = True
-                few_shots = str(few_shot_payload.get("text", "")).strip() or None
-                identity = self._build_prompt_identity(few_shot_payload)
-                if identity is not None:
-                    identities.append(identity)
-        if not used_payload_few_shot:
-            few_shots = self._optimization_injector.get_few_shots(user_message)
-
         failure_hint = None
-        if getattr(turn_context, "last_turn_failed", False):
-            failure_hint = self._optimization_injector.get_failure_hint(
-                getattr(turn_context, "last_failure_category", None),
-                getattr(turn_context, "last_failure_error", None),
-            )
+        if self._optimization_injector is not None:
+            payloads: Optional[Any] = None
+            if hasattr(self._optimization_injector, "get_evolved_section_payloads"):
+                payloads = self._optimization_injector.get_evolved_section_payloads(
+                    provider=provider_name,
+                    model=model_name,
+                    task_type=task_type,
+                )
+            used_payload_sections = False
+            if isinstance(payloads, (list, tuple)):
+                for payload in payloads:
+                    if not isinstance(payload, dict):
+                        continue
+                    used_payload_sections = True
+                    text = str(payload.get("text", "")).strip()
+                    if text:
+                        evolved_sections.append(text)
+                    identity = self._build_prompt_identity(payload)
+                    if identity is not None:
+                        identities.append(identity)
+            if not used_payload_sections:
+                evolved_sections = self._optimization_injector.get_evolved_sections(
+                    provider=provider_name,
+                    model=model_name,
+                    task_type=task_type,
+                )
+
+            few_shot_payload: Optional[Any] = None
+            if hasattr(self._optimization_injector, "get_few_shot_payload"):
+                few_shot_payload = self._optimization_injector.get_few_shot_payload(
+                    user_message,
+                    provider=provider_name,
+                    model=model_name,
+                    task_type=task_type,
+                )
+            used_payload_few_shot = False
+            if isinstance(few_shot_payload, dict):
+                if few_shot_payload:
+                    used_payload_few_shot = True
+                    few_shots = str(few_shot_payload.get("text", "")).strip() or None
+                    identity = self._build_prompt_identity(few_shot_payload)
+                    if identity is not None:
+                        identities.append(identity)
+            if not used_payload_few_shot:
+                few_shots = self._optimization_injector.get_few_shots(user_message)
+
+            if getattr(turn_context, "last_turn_failed", False):
+                failure_hint = self._optimization_injector.get_failure_hint(
+                    getattr(turn_context, "last_failure_category", None),
+                    getattr(turn_context, "last_failure_error", None),
+                )
+
+        experiment_memory_hints = self.get_experiment_routing_context(
+            query=user_message,
+            scope_context={
+                "provider": provider_name,
+                "model": model_name,
+                "task_type": task_type,
+                "prompt_candidate_hash": getattr(turn_context, "prompt_candidate_hash", None),
+                "section_name": getattr(turn_context, "prompt_section_name", None)
+                or getattr(turn_context, "section_name", None),
+            },
+        )
+        experiment_guidance = self._build_experiment_prompt_guidance(experiment_memory_hints)
 
         return PromptOptimizationBundle(
             evolved_sections=list(evolved_sections or []),
             few_shots=few_shots,
             failure_hint=failure_hint,
             identities=identities,
+            experiment_guidance=experiment_guidance,
+            experiment_memory_hints=experiment_memory_hints,
         )
+
+    @staticmethod
+    def _build_experiment_prompt_guidance(hints: Optional[Dict[str, Any]]) -> List[str]:
+        """Convert experiment-memory routing hints into prompt-ready planning guidance."""
+        if not isinstance(hints, dict) or not hints:
+            return []
+
+        guidance: List[str] = []
+        constraint_tags = [
+            str(tag).strip()
+            for tag in list(hints.get("experiment_memory_constraint_tags") or [])
+            if str(tag).strip()
+        ]
+        if constraint_tags:
+            constraint_label = "constraint" if len(constraint_tags) == 1 else "constraints"
+            guidance.append(
+                "Experiment "
+                f"{constraint_label} from similar runs: satisfy "
+                f"{', '.join(constraint_tags[:2])} before broadening the plan."
+            )
+
+        next_candidate_hints = [
+            str(item).strip()
+            for item in list(hints.get("experiment_memory_next_candidate_hints") or [])
+            if str(item).strip()
+        ]
+        for hint in next_candidate_hints[:2]:
+            guidance.append(f"Experiment-guided next candidate: {hint}")
+        return guidance
 
     @staticmethod
     def _build_prompt_identity(payload: Any) -> Optional[PromptOptimizationIdentity]:

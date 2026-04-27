@@ -219,6 +219,149 @@ def test_get_prompt_optimization_bundle_falls_back_when_payload_hooks_are_empty(
     )
 
 
+def test_get_prompt_optimization_bundle_includes_experiment_memory_guidance_without_optimizer(
+    tmp_path,
+):
+    store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+    store.record(
+        ExperimentMemoryRecord(
+            record_id="exp-1",
+            created_at=10.0,
+            scope=ExperimentScope(
+                benchmark="guide",
+                provider="openai",
+                model="gpt-5",
+            ),
+            summary_metrics={},
+            insights=[
+                ExperimentInsight(
+                    kind="environment_constraint",
+                    summary="Similar runs failed because tests_pass was skipped.",
+                    confidence=0.8,
+                    evidence={"gate_failure": "tests_pass"},
+                ),
+                ExperimentInsight(
+                    kind="next_candidate",
+                    summary="Use read_file on the failing module, then execute_bash for pytest.",
+                    confidence=0.9,
+                ),
+            ],
+            keywords=["pytest", "read_file", "execute_bash"],
+        )
+    )
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        experiment_memory_path=tmp_path / "experiment_memory.json",
+    )
+    turn_context = SimpleNamespace(
+        provider_name="openai",
+        model="gpt-5",
+        task_type="edit",
+        last_turn_failed=False,
+    )
+
+    bundle = service.get_prompt_optimization_bundle(
+        "Fix the failing pytest in the module",
+        turn_context,
+    )
+
+    assert bundle.evolved_sections == []
+    assert bundle.few_shots is None
+    assert bundle.failure_hint is None
+    assert bundle.identities == []
+    assert bundle.experiment_guidance == [
+        "Experiment constraint from similar runs: satisfy tests_pass before broadening the plan.",
+        "Experiment-guided next candidate: Use read_file on the failing module, then execute_bash for pytest.",
+    ]
+    assert bundle.experiment_memory_hints == {
+        "experiment_memory_match_count": 1,
+        "experiment_memory_support": 0.3333,
+        "experiment_memory_selection_policy_bias": 0.0,
+        "experiment_memory_preferred_selection_policy": None,
+        "experiment_memory_constraint_tags": ["tests_pass"],
+        "experiment_memory_next_candidate_hints": [
+            "Use read_file on the failing module, then execute_bash for pytest."
+        ],
+        "experiment_memory_record_ids": ["exp-1"],
+    }
+    assert bundle.to_session_metadata() == {
+        "entries": [],
+        "by_section": {},
+        "experiment_memory": {
+            "experiment_memory_match_count": 1,
+            "experiment_memory_support": 0.3333,
+            "experiment_memory_selection_policy_bias": 0.0,
+            "experiment_memory_preferred_selection_policy": None,
+            "experiment_memory_constraint_tags": ["tests_pass"],
+            "experiment_memory_next_candidate_hints": [
+                "Use read_file on the failing module, then execute_bash for pytest."
+            ],
+            "experiment_memory_record_ids": ["exp-1"],
+            "prompt_guidance": [
+                "Experiment constraint from similar runs: satisfy tests_pass before broadening the plan.",
+                "Experiment-guided next candidate: Use read_file on the failing module, then execute_bash for pytest.",
+            ],
+        },
+    }
+
+
+def test_get_prompt_optimization_bundle_merges_optimizer_and_experiment_memory_guidance(
+    tmp_path,
+):
+    optimizer = MagicMock()
+    optimizer.get_evolved_sections.return_value = ["Prefer read over cat."]
+    optimizer.get_few_shots.return_value = "Example few shot"
+    optimizer.get_failure_hint.return_value = None
+    store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+    store.record(
+        ExperimentMemoryRecord(
+            record_id="exp-2",
+            created_at=12.0,
+            scope=ExperimentScope(
+                benchmark="guide",
+                provider="openai",
+                model="gpt-5",
+            ),
+            summary_metrics={},
+            insights=[
+                ExperimentInsight(
+                    kind="next_candidate",
+                    summary="Verify tests_pass before widening topology.",
+                    confidence=0.7,
+                )
+            ],
+            keywords=["tests_pass", "topology"],
+        )
+    )
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=optimizer,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        experiment_memory_path=tmp_path / "experiment_memory.json",
+    )
+    turn_context = SimpleNamespace(
+        provider_name="openai",
+        model="gpt-5",
+        task_type="edit",
+        last_turn_failed=False,
+    )
+
+    bundle = service.get_prompt_optimization_bundle("Fix the bug", turn_context)
+
+    assert bundle.evolved_sections == ["Prefer read over cat."]
+    assert bundle.few_shots == "Example few shot"
+    assert bundle.experiment_guidance == [
+        "Experiment-guided next candidate: Verify tests_pass before widening topology."
+    ]
+    assert bundle.experiment_memory_hints["experiment_memory_record_ids"] == ["exp-2"]
+
+
 def test_reset_decision_budget_delegates_to_service():
     decision_service = MagicMock()
     service = RuntimeIntelligenceService(
