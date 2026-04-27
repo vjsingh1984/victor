@@ -643,6 +643,18 @@ def test_load_runtime_feedback_aggregates_selection_policy_reward_metrics(tmp_pa
         "learned_close_override": 0.8,
     }
     assert loaded.metadata["topology_learned_override_reward_delta"] == pytest.approx(0.25)
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["task_type"]["edit"][
+        "learned_override_reward_delta"
+    ] == pytest.approx(0.25)
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["provider"]["openai"][
+        "avg_reward_by_policy"
+    ] == {
+        "heuristic": 0.55,
+        "learned_close_override": 0.8,
+    }
+    assert loaded.metadata["topology_selection_policy_scope_metrics"]["model_family"]["gpt"][
+        "policy_counts"
+    ] == {"heuristic": 2.0, "learned_close_override": 3.0}
 
 
 def test_build_swe_bench_validated_session_feedback_payload_uses_real_validator_outputs():

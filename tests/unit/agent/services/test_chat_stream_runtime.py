@@ -240,6 +240,11 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
     topology_context = runtime._paradigm_router.build_topology_input.call_args.kwargs["context"]
     assert topology_context["learned_topology_action"] == "team_plan"
     assert topology_context["learned_provider_hint"] == "anthropic"
+    learned_scope_context = (
+        orch._runtime_intelligence.get_topology_routing_context.call_args.kwargs["scope_context"]
+    )
+    assert learned_scope_context["task_type"] == "design"
+    assert learned_scope_context["provider_hint"] == "smart-router"
     emit_mock.assert_awaited_once()
 
 

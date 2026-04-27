@@ -1075,14 +1075,6 @@ class AgenticLoop:
         )
         routing_context.setdefault("tool_budget", tool_budget)
         routing_context.setdefault("available_team_formations", self._default_team_formations())
-        if hasattr(self.runtime_intelligence, "get_topology_routing_context"):
-            try:
-                learned_topology_context = self.runtime_intelligence.get_topology_routing_context()
-            except Exception as exc:
-                logger.debug("Runtime intelligence topology routing hints unavailable: %s", exc)
-            else:
-                if learned_topology_context:
-                    routing_context.update(learned_topology_context)
 
         provider_hints = await self._get_topology_provider_hints(
             task_type=task_type,
@@ -1099,6 +1091,18 @@ class AgenticLoop:
                     provider_candidates.append(fallback)
             if provider_candidates:
                 routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
+        if hasattr(self.runtime_intelligence, "get_topology_routing_context"):
+            learned_scope_context = dict(routing_context)
+            learned_scope_context.setdefault("task_type", task_type)
+            try:
+                learned_topology_context = self.runtime_intelligence.get_topology_routing_context(
+                    scope_context=learned_scope_context
+                )
+            except Exception as exc:
+                logger.debug("Runtime intelligence topology routing hints unavailable: %s", exc)
+            else:
+                if learned_topology_context:
+                    routing_context.update(learned_topology_context)
 
         topology_input = self.paradigm_router.build_topology_input(
             task_type=task_type,

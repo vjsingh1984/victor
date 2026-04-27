@@ -460,6 +460,131 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
                     "heuristic": 1.1,
                     "learned_close_override": 2.4,
                 },
+                "topology_selection_policy_scope_metrics": {
+                    "task_type": {
+                        "edit": {
+                            "policy_counts": {"heuristic": 2, "learned_close_override": 2},
+                            "policy_reward_totals": {
+                                "heuristic": 0.9,
+                                "learned_close_override": 1.4,
+                            },
+                            "avg_reward_by_policy": {
+                                "heuristic": 0.45,
+                                "learned_close_override": 0.7,
+                            },
+                            "learned_override_reward_delta": 0.25,
+                        }
+                    },
+                    "provider": {
+                        "openai": {
+                            "policy_counts": {"heuristic": 3, "learned_close_override": 3},
+                            "policy_reward_totals": {
+                                "heuristic": 1.2,
+                                "learned_close_override": 2.4,
+                            },
+                            "avg_reward_by_policy": {
+                                "heuristic": 0.4,
+                                "learned_close_override": 0.8,
+                            },
+                            "learned_override_reward_delta": 0.4,
+                        }
+                    },
+                    "model_family": {
+                        "gpt": {
+                            "policy_counts": {"heuristic": 4, "learned_close_override": 5},
+                            "policy_reward_totals": {
+                                "heuristic": 1.6,
+                                "learned_close_override": 4.25,
+                            },
+                            "avg_reward_by_policy": {
+                                "heuristic": 0.4,
+                                "learned_close_override": 0.85,
+                            },
+                            "learned_override_reward_delta": 0.45,
+                        }
+                    },
+                },
+            },
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+        evaluation_feedback_scope=RuntimeEvaluationFeedbackScope(
+            provider="openai",
+            model="gpt-5",
+            task_type="edit",
+        ),
+    )
+
+    feedback = service.get_topology_routing_feedback()
+    hints = service.get_topology_routing_context(
+        scope_context={
+            "task_type": "edit",
+            "provider_hint": "openai",
+            "model": "gpt-5",
+        }
+    )
+
+    assert feedback is not None
+    assert feedback.preferred_action == "team_plan"
+    assert feedback.preferred_topology == "team"
+    assert feedback.preferred_provider == "anthropic"
+    assert feedback.preferred_formation == "hierarchical"
+    assert feedback.support > 0.0
+    assert hints["learned_topology_action"] == "team_plan"
+    assert hints["learned_topology_kind"] == "team"
+    assert hints["learned_provider_hint"] == "anthropic"
+    assert hints["learned_formation_hint"] == "hierarchical"
+    assert hints["learned_override_policy_scope_dimension"] == "model_family"
+    assert hints["learned_override_policy_scope_label"] == "gpt"
+    assert hints["learned_override_policy_count"] == 5
+    assert hints["heuristic_policy_count"] == 4
+    assert hints["learned_override_policy_reward"] == pytest.approx(0.85)
+    assert hints["heuristic_policy_reward"] == pytest.approx(0.4)
+    assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.45)
+
+
+def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.74,
+            enhanced_progress_threshold=0.58,
+            minimum_supported_evidence_score=0.86,
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "topology_feedback_coverage": 0.64,
+                "avg_topology_reward": 0.71,
+                "avg_topology_confidence": 0.79,
+                "topology_final_actions": {"team_plan": 5, "single_agent": 2},
+                "topology_final_kinds": {"team": 5, "single_agent": 2},
+                "topology_execution_modes": {"team_execution": 5},
+                "topology_selection_policies": {"heuristic": 2, "learned_close_override": 3},
+                "topology_selection_policy_reward_totals": {
+                    "heuristic": 1.1,
+                    "learned_close_override": 2.4,
+                },
+                "topology_selection_policy_scope_metrics": {
+                    "task_type": {
+                        "analysis": {
+                            "policy_counts": {"heuristic": 2, "learned_close_override": 2},
+                            "policy_reward_totals": {
+                                "heuristic": 0.8,
+                                "learned_close_override": 1.6,
+                            },
+                            "avg_reward_by_policy": {
+                                "heuristic": 0.4,
+                                "learned_close_override": 0.8,
+                            },
+                            "learned_override_reward_delta": 0.4,
+                        }
+                    }
+                },
             },
         ),
         path=tmp_path / "runtime_evaluation_feedback.json",
@@ -473,24 +598,11 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
         evaluation_feedback_path=feedback_path,
     )
 
-    feedback = service.get_topology_routing_feedback()
-    hints = service.get_topology_routing_context()
+    hints = service.get_topology_routing_context(scope_context={"task_type": "analysis"})
 
-    assert feedback is not None
-    assert feedback.preferred_action == "team_plan"
-    assert feedback.preferred_topology == "team"
-    assert feedback.preferred_provider == "anthropic"
-    assert feedback.preferred_formation == "hierarchical"
-    assert feedback.support > 0.0
-    assert hints["learned_topology_action"] == "team_plan"
-    assert hints["learned_topology_kind"] == "team"
-    assert hints["learned_provider_hint"] == "anthropic"
-    assert hints["learned_formation_hint"] == "hierarchical"
-    assert hints["learned_override_policy_count"] == 3
-    assert hints["heuristic_policy_count"] == 2
-    assert hints["learned_override_policy_reward"] == pytest.approx(0.8)
-    assert hints["heuristic_policy_reward"] == pytest.approx(0.55)
-    assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.25)
+    assert hints["learned_override_policy_scope_dimension"] == "task_type"
+    assert hints["learned_override_policy_scope_label"] == "analysis"
+    assert hints["learned_override_policy_reward_delta"] == pytest.approx(0.4)
 
 
 def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp_path):

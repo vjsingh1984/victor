@@ -132,6 +132,9 @@ class TopologyRoutingFeedback:
     formation_distribution: Dict[str, float] = field(default_factory=dict)
     selection_policy_distribution: Dict[str, float] = field(default_factory=dict)
     selection_policy_reward_totals: Dict[str, float] = field(default_factory=dict)
+    selection_policy_scope_metrics: Dict[str, Dict[str, Dict[str, Any]]] = field(
+        default_factory=dict
+    )
 
     @property
     def support(self) -> float:
@@ -245,6 +248,7 @@ class TopologyRoutingFeedback:
             "selection_policy_reward_totals": dict(self.selection_policy_reward_totals),
             "avg_reward_by_selection_policy": dict(self.avg_reward_by_selection_policy),
             "learned_override_reward_delta": self.learned_override_reward_delta,
+            "selection_policy_scope_metrics": dict(self.selection_policy_scope_metrics),
         }
 
     def to_routing_context(
@@ -254,6 +258,7 @@ class TopologyRoutingFeedback:
         min_reward: float = 0.45,
         min_observations: int = 2,
         min_agreement: float = 0.6,
+        scope_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Convert learned feedback into soft topology-routing hints."""
         if (
@@ -276,20 +281,31 @@ class TopologyRoutingFeedback:
             "avg_topology_reward": round(self.avg_reward, 4),
             "avg_topology_confidence": round(self.avg_confidence, 4),
         }
-        learned_override_reward = self.avg_reward_by_selection_policy.get("learned_close_override")
-        heuristic_reward = self.avg_reward_by_selection_policy.get("heuristic")
+        selection_policy_metrics = self.resolve_selection_policy_metrics(scope_context=scope_context)
+        learned_override_reward = selection_policy_metrics.get("learned_override_policy_reward")
+        heuristic_reward = selection_policy_metrics.get("heuristic_policy_reward")
         if learned_override_reward is not None:
             routing_context["learned_override_policy_reward"] = learned_override_reward
-            routing_context["learned_override_policy_count"] = self._effective_policy_count(
-                "learned_close_override"
+            routing_context["learned_override_policy_count"] = int(
+                selection_policy_metrics.get("learned_override_policy_count", 0)
             )
         if heuristic_reward is not None:
             routing_context["heuristic_policy_reward"] = heuristic_reward
-            routing_context["heuristic_policy_count"] = self._effective_policy_count("heuristic")
-        if self.learned_override_reward_delta is not None:
-            routing_context["learned_override_policy_reward_delta"] = (
-                self.learned_override_reward_delta
+            routing_context["heuristic_policy_count"] = int(
+                selection_policy_metrics.get("heuristic_policy_count", 0)
             )
+        if selection_policy_metrics.get("learned_override_policy_reward_delta") is not None:
+            routing_context["learned_override_policy_reward_delta"] = (
+                selection_policy_metrics["learned_override_policy_reward_delta"]
+            )
+        if selection_policy_metrics.get("scope_dimension") is not None:
+            routing_context["learned_override_policy_scope_dimension"] = selection_policy_metrics[
+                "scope_dimension"
+            ]
+        if selection_policy_metrics.get("scope_label") is not None:
+            routing_context["learned_override_policy_scope_label"] = selection_policy_metrics[
+                "scope_label"
+            ]
         if self.preferred_action and self.action_agreement >= min_agreement:
             routing_context["learned_topology_action"] = self.preferred_action
         if self.preferred_topology and self.topology_agreement >= min_agreement:
@@ -307,13 +323,120 @@ class TopologyRoutingFeedback:
 
     def _effective_policy_count(self, policy: str) -> int:
         """Return a conservative integer evidence count for one selection policy."""
+        return self._effective_policy_count_from_distribution(
+            self.selection_policy_distribution,
+            policy,
+        )
+
+    @staticmethod
+    def _effective_policy_count_from_distribution(
+        distribution: Dict[str, float],
+        policy: str,
+    ) -> int:
+        """Return a conservative integer evidence count from a policy-count distribution."""
         try:
-            count = float(self.selection_policy_distribution.get(policy, 0.0))
+            count = float(distribution.get(policy, 0.0))
         except (TypeError, ValueError):
             return 0
         if count <= 0.0:
             return 0
         return max(1, int(math.ceil(count)))
+
+    @staticmethod
+    def _normalize_scope_token(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        return text or None
+
+    @classmethod
+    def _model_family_token(cls, value: Any) -> Optional[str]:
+        text = cls._normalize_scope_token(value)
+        if text is None:
+            return None
+        return text.split("-", 1)[0].split("_", 1)[0].split("/", 1)[0]
+
+    @classmethod
+    def _scope_context_label(
+        cls,
+        scope_context: Optional[Dict[str, Any]],
+        *,
+        dimension: str,
+    ) -> Optional[str]:
+        context = scope_context or {}
+        if dimension == "task_type":
+            return cls._normalize_scope_token(context.get("task_type"))
+        if dimension == "provider":
+            provider_value = (
+                context.get("provider_hint")
+                or context.get("provider")
+                or context.get("provider_name")
+            )
+            if provider_value is None:
+                candidates = context.get("provider_candidates")
+                if isinstance(candidates, list) and candidates:
+                    provider_value = candidates[0]
+            return cls._normalize_scope_token(provider_value)
+        if dimension == "model_family":
+            return cls._model_family_token(
+                context.get("model") or context.get("model_name")
+            )
+        return None
+
+    def resolve_selection_policy_metrics(
+        self,
+        *,
+        scope_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Resolve the most relevant learned-override policy metrics for the current scope."""
+        for dimension in ("model_family", "provider", "task_type"):
+            label = self._scope_context_label(scope_context, dimension=dimension)
+            if label is None:
+                continue
+            dimension_metrics = self.selection_policy_scope_metrics.get(dimension) or {}
+            bucket = dimension_metrics.get(label)
+            if not isinstance(bucket, dict):
+                continue
+            policy_counts = dict(bucket.get("policy_counts") or {})
+            avg_reward_by_policy = dict(bucket.get("avg_reward_by_policy") or {})
+            learned_override_reward = avg_reward_by_policy.get("learned_close_override")
+            heuristic_reward = avg_reward_by_policy.get("heuristic")
+            learned_override_reward_delta = bucket.get("learned_override_reward_delta")
+            if (
+                learned_override_reward is None
+                and heuristic_reward is None
+                and learned_override_reward_delta is None
+            ):
+                continue
+            return {
+                "scope_dimension": dimension,
+                "scope_label": label,
+                "learned_override_policy_reward": learned_override_reward,
+                "heuristic_policy_reward": heuristic_reward,
+                "learned_override_policy_count": self._effective_policy_count_from_distribution(
+                    policy_counts,
+                    "learned_close_override",
+                ),
+                "heuristic_policy_count": self._effective_policy_count_from_distribution(
+                    policy_counts,
+                    "heuristic",
+                ),
+                "learned_override_policy_reward_delta": learned_override_reward_delta,
+            }
+
+        return {
+            "scope_dimension": "global",
+            "scope_label": "global",
+            "learned_override_policy_reward": self.avg_reward_by_selection_policy.get(
+                "learned_close_override"
+            ),
+            "heuristic_policy_reward": self.avg_reward_by_selection_policy.get("heuristic"),
+            "learned_override_policy_count": self._effective_policy_count(
+                "learned_close_override"
+            ),
+            "heuristic_policy_count": self._effective_policy_count("heuristic"),
+            "learned_override_policy_reward_delta": self.learned_override_reward_delta,
+        }
 
 
 class RuntimeIntelligenceService:
@@ -675,6 +798,9 @@ class RuntimeIntelligenceService:
         selection_policy_reward_totals = cls._normalize_distribution(
             metadata.get("topology_selection_policy_reward_totals") or {}
         )
+        selection_policy_scope_metrics = dict(
+            metadata.get("topology_selection_policy_scope_metrics") or {}
+        )
         action_agreement = cls._coerce_feedback_float(
             metadata.get("topology_action_agreement")
         ) or cls._distribution_agreement(action_distribution)
@@ -731,6 +857,7 @@ class RuntimeIntelligenceService:
             formation_distribution=formation_distribution,
             selection_policy_distribution=selection_policy_distribution,
             selection_policy_reward_totals=selection_policy_reward_totals,
+            selection_policy_scope_metrics=selection_policy_scope_metrics,
         )
 
     @staticmethod
@@ -807,6 +934,48 @@ class RuntimeIntelligenceService:
             persisted.selection_policy_reward_totals,
             session.selection_policy_reward_totals,
         )
+        selection_policy_scope_metrics = dict(persisted.selection_policy_scope_metrics)
+        for dimension, entries in session.selection_policy_scope_metrics.items():
+            if not isinstance(entries, dict):
+                continue
+            dimension_bucket = selection_policy_scope_metrics.setdefault(dimension, {})
+            for label, bucket in entries.items():
+                if not isinstance(bucket, dict):
+                    continue
+                existing_bucket = dimension_bucket.get(label) or {}
+                merged_policy_counts = cls._merge_distributions(
+                    dict(existing_bucket.get("policy_counts") or {}),
+                    dict(bucket.get("policy_counts") or {}),
+                )
+                merged_policy_reward_totals = cls._merge_distributions(
+                    dict(existing_bucket.get("policy_reward_totals") or {}),
+                    dict(bucket.get("policy_reward_totals") or {}),
+                )
+                avg_reward_by_policy: Dict[str, float] = {}
+                for policy, count_value in merged_policy_counts.items():
+                    try:
+                        count = float(count_value)
+                        reward_total = float(merged_policy_reward_totals.get(policy, 0.0))
+                    except (TypeError, ValueError):
+                        continue
+                    if count <= 0.0:
+                        continue
+                    avg_reward_by_policy[policy] = round(reward_total / count, 4)
+                learned_override_reward_delta = None
+                try:
+                    learned_override_reward_delta = round(
+                        float(avg_reward_by_policy["learned_close_override"])
+                        - float(avg_reward_by_policy["heuristic"]),
+                        4,
+                    )
+                except (KeyError, TypeError, ValueError):
+                    learned_override_reward_delta = None
+                dimension_bucket[label] = {
+                    "policy_counts": merged_policy_counts,
+                    "policy_reward_totals": merged_policy_reward_totals,
+                    "avg_reward_by_policy": avg_reward_by_policy,
+                    "learned_override_reward_delta": learned_override_reward_delta,
+                }
 
         def weighted_average(first: float, second: float) -> float:
             return round(((first * persisted_weight) + (second * session_weight)) / total_weight, 4)
@@ -843,6 +1012,7 @@ class RuntimeIntelligenceService:
             formation_distribution=formation_distribution,
             selection_policy_distribution=selection_policy_distribution,
             selection_policy_reward_totals=selection_policy_reward_totals,
+            selection_policy_scope_metrics=selection_policy_scope_metrics,
         )
 
     def _synchronize_perception_policy(self, perception_integration: Any) -> None:
@@ -887,16 +1057,33 @@ class RuntimeIntelligenceService:
         min_coverage: float = 0.2,
         min_reward: float = 0.45,
         min_observations: int = 2,
+        scope_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Return soft topology-routing hints extracted from validated feedback."""
         feedback = self.get_topology_routing_feedback()
         if feedback is None:
             return {}
+        resolved_scope_context = self._resolve_routing_scope_context(scope_context)
         return feedback.to_routing_context(
             min_coverage=min_coverage,
             min_reward=min_reward,
             min_observations=min_observations,
+            scope_context=resolved_scope_context,
         )
+
+    def _resolve_routing_scope_context(
+        self,
+        scope_context: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Merge runtime routing scope hints with the persisted feedback scope defaults."""
+        resolved_context = dict(scope_context or {})
+        if self._evaluation_feedback_scope.task_type and "task_type" not in resolved_context:
+            resolved_context["task_type"] = self._evaluation_feedback_scope.task_type
+        if self._evaluation_feedback_scope.provider and "provider" not in resolved_context:
+            resolved_context["provider"] = self._evaluation_feedback_scope.provider
+        if self._evaluation_feedback_scope.model and "model" not in resolved_context:
+            resolved_context["model"] = self._evaluation_feedback_scope.model
+        return resolved_context
 
     def _build_persistable_session_topology_feedback(self) -> Optional[RuntimeEvaluationFeedback]:
         """Build the scoped live-topology feedback payload for persistence."""
@@ -924,6 +1111,9 @@ class RuntimeIntelligenceService:
                     feedback.avg_reward_by_selection_policy
                 ),
                 "topology_learned_override_reward_delta": feedback.learned_override_reward_delta,
+                "topology_selection_policy_scope_metrics": dict(
+                    feedback.selection_policy_scope_metrics
+                ),
                 "topology_observation_count": feedback.observation_count,
                 "topology_action_agreement": round(feedback.action_agreement, 4),
                 "topology_kind_agreement": round(feedback.topology_agreement, 4),

@@ -308,18 +308,6 @@ class ChatStreamHelperMixin:
             "tool_budget": int(tool_budget),
             "available_team_formations": self._default_team_formations(),
         }
-        runtime_intelligence = getattr(orch, "_runtime_intelligence", None)
-        if (
-            runtime_intelligence is not None
-            and hasattr(runtime_intelligence, "get_topology_routing_context")
-        ):
-            try:
-                learned_topology_context = runtime_intelligence.get_topology_routing_context()
-            except Exception as exc:
-                logger.debug("Streaming topology feedback hints unavailable: %s", exc)
-            else:
-                if learned_topology_context:
-                    routing_context.update(learned_topology_context)
 
         provider_hints = await self._get_stream_topology_provider_hints(
             task_type=task_type,
@@ -336,6 +324,22 @@ class ChatStreamHelperMixin:
                     provider_candidates.append(fallback)
             if provider_candidates:
                 routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
+        runtime_intelligence = getattr(orch, "_runtime_intelligence", None)
+        if (
+            runtime_intelligence is not None
+            and hasattr(runtime_intelligence, "get_topology_routing_context")
+        ):
+            learned_scope_context = dict(routing_context)
+            learned_scope_context.setdefault("task_type", task_type)
+            try:
+                learned_topology_context = runtime_intelligence.get_topology_routing_context(
+                    scope_context=learned_scope_context
+                )
+            except Exception as exc:
+                logger.debug("Streaming topology feedback hints unavailable: %s", exc)
+            else:
+                if learned_topology_context:
+                    routing_context.update(learned_topology_context)
 
         paradigm_router = getattr(self, "_paradigm_router", None)
         if paradigm_router is None:

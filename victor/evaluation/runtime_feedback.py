@@ -65,6 +65,7 @@ TOPOLOGY_RUNTIME_METADATA_KEYS = (
     "topology_selection_policy_reward_totals",
     "avg_topology_reward_by_selection_policy",
     "topology_learned_override_reward_delta",
+    "topology_selection_policy_scope_metrics",
     "topology_action_agreement",
     "topology_kind_agreement",
     "topology_provider_agreement",
@@ -1163,6 +1164,148 @@ def _selection_policy_reward_delta(averages: Mapping[str, Any]) -> Optional[floa
     return round(learned - heuristic, 4)
 
 
+def _model_family_token(value: Any) -> Optional[str]:
+    text = _coerce_optional_text(value)
+    if text is None:
+        return None
+    normalized = text.strip().lower()
+    parts = [part for part in re.split(r"[-_/:\s]+", normalized) if part]
+    if not parts:
+        return None
+    return parts[0]
+
+
+def _selection_policy_scope_label(
+    metadata: Mapping[str, Any],
+    *,
+    dimension: str,
+) -> Optional[str]:
+    scope = RuntimeEvaluationFeedbackScope.from_value(metadata.get("scope"))
+    if dimension == "task_type":
+        return _normalized_scope_token(scope.task_type or metadata.get("task_type"))
+    if dimension == "provider":
+        return _normalized_scope_token(scope.provider or metadata.get("provider"))
+    if dimension == "model_family":
+        return _model_family_token(scope.model or metadata.get("model"))
+    return None
+
+
+def _merge_selection_policy_scope_bucket(
+    scope_metrics: dict[str, dict[str, dict[str, Any]]],
+    *,
+    dimension: str,
+    label: str,
+    policy_counts: Mapping[str, Any],
+    policy_reward_totals: Mapping[str, Any],
+) -> None:
+    """Merge one scoped policy-metrics bucket into the aggregate structure."""
+    bucket = scope_metrics[dimension].setdefault(
+        label,
+        {
+            "policy_counts": {},
+            "policy_reward_totals": {},
+        },
+    )
+    for policy, count_value in policy_counts.items():
+        policy_name = str(policy).strip()
+        if not policy_name:
+            continue
+        try:
+            count = float(count_value)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0.0:
+            continue
+        bucket["policy_counts"][policy_name] = round(
+            bucket["policy_counts"].get(policy_name, 0.0) + count,
+            4,
+        )
+    for policy, reward_value in policy_reward_totals.items():
+        policy_name = str(policy).strip()
+        if not policy_name:
+            continue
+        try:
+            reward_total = float(reward_value)
+        except (TypeError, ValueError):
+            continue
+        if reward_total <= 0.0:
+            continue
+        bucket["policy_reward_totals"][policy_name] = round(
+            bucket["policy_reward_totals"].get(policy_name, 0.0) + reward_total,
+            4,
+        )
+
+
+def _build_selection_policy_scope_metrics(
+    metadata_list: list[dict[str, Any]],
+    _weights: list[float],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    scope_metrics: dict[str, dict[str, dict[str, Any]]] = {
+        "task_type": {},
+        "provider": {},
+        "model_family": {},
+    }
+
+    for metadata in metadata_list:
+        explicit_bucket_keys: set[tuple[str, str]] = set()
+        explicit_scope_metrics = metadata.get("topology_selection_policy_scope_metrics") or {}
+        if isinstance(explicit_scope_metrics, Mapping):
+            for dimension, entries in explicit_scope_metrics.items():
+                if dimension not in scope_metrics or not isinstance(entries, Mapping):
+                    continue
+                for label, bucket in entries.items():
+                    normalized_label = _normalized_scope_token(label)
+                    if normalized_label is None or not isinstance(bucket, Mapping):
+                        continue
+                    explicit_bucket_keys.add((dimension, normalized_label))
+                    _merge_selection_policy_scope_bucket(
+                        scope_metrics,
+                        dimension=dimension,
+                        label=normalized_label,
+                        policy_counts=dict(bucket.get("policy_counts") or {}),
+                        policy_reward_totals=dict(bucket.get("policy_reward_totals") or {}),
+                    )
+
+        selection_policy_counts = metadata.get("topology_selection_policies") or {}
+        selection_policy_reward_totals = metadata.get("topology_selection_policy_reward_totals") or {}
+        if not isinstance(selection_policy_counts, Mapping):
+            selection_policy_counts = {}
+        if not isinstance(selection_policy_reward_totals, Mapping):
+            selection_policy_reward_totals = {}
+        if not selection_policy_counts and not selection_policy_reward_totals:
+            continue
+
+        for dimension in scope_metrics:
+            label = _selection_policy_scope_label(metadata, dimension=dimension)
+            if label is None:
+                continue
+            if (dimension, label) in explicit_bucket_keys:
+                continue
+            _merge_selection_policy_scope_bucket(
+                scope_metrics,
+                dimension=dimension,
+                label=label,
+                policy_counts=selection_policy_counts,
+                policy_reward_totals=selection_policy_reward_totals,
+            )
+
+    for dimension, entries in scope_metrics.items():
+        for label, bucket in entries.items():
+            policy_counts = dict(bucket.get("policy_counts") or {})
+            policy_reward_totals = dict(bucket.get("policy_reward_totals") or {})
+            avg_reward_by_policy = _average_mapping_from_totals(
+                policy_counts,
+                policy_reward_totals,
+            )
+            bucket["policy_counts"] = policy_counts
+            bucket["policy_reward_totals"] = policy_reward_totals
+            bucket["avg_reward_by_policy"] = avg_reward_by_policy
+            bucket["learned_override_reward_delta"] = _selection_policy_reward_delta(
+                avg_reward_by_policy
+            )
+    return scope_metrics
+
+
 def _distribution_agreement(distribution: Any) -> Optional[float]:
     if not isinstance(distribution, Mapping):
         return None
@@ -1281,6 +1424,10 @@ def _aggregate_feedback_payloads(
         selection_policy_counts,
         selection_policy_reward_totals,
     )
+    selection_policy_scope_metrics = _build_selection_policy_scope_metrics(
+        metadata_list,
+        weights,
+    )
     scope_scores = [
         _scope_similarity_weight(metadata.get("scope"), selected_scope)
         for metadata in metadata_list
@@ -1347,6 +1494,7 @@ def _aggregate_feedback_payloads(
             "topology_learned_override_reward_delta": _selection_policy_reward_delta(
                 avg_reward_by_selection_policy
             ),
+            "topology_selection_policy_scope_metrics": selection_policy_scope_metrics,
             "task_count": sum(task_counts),
             "scope_selection_strategy": (
                 "scoped_relevance_recency_reliability_weighted"
@@ -1457,6 +1605,10 @@ def _aggregate_topology_feedback_metadata(
         selection_policy_distribution,
         selection_policy_reward_totals,
     )
+    selection_policy_scope_metrics = _build_selection_policy_scope_metrics(
+        metadata_list,
+        weights,
+    )
     action_agreement = _distribution_agreement(final_action_distribution or action_distribution)
     topology_agreement = _distribution_agreement(
         final_topology_distribution or topology_distribution
@@ -1516,6 +1668,7 @@ def _aggregate_topology_feedback_metadata(
         "topology_learned_override_reward_delta": _selection_policy_reward_delta(
             avg_reward_by_selection_policy
         ),
+        "topology_selection_policy_scope_metrics": selection_policy_scope_metrics,
         "topology_action_agreement": action_agreement,
         "topology_kind_agreement": topology_agreement,
         "topology_provider_agreement": provider_agreement,
