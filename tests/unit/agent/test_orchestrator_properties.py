@@ -44,6 +44,7 @@ class TestOrchestratorPropertyInstallation:
             "chunk_generator",
             "tool_planner",
             "task_coordinator",
+            "skill_matcher",
             "code_correction_middleware",
             "checkpoint_manager",
             "vertical_context",
@@ -90,6 +91,16 @@ class TestOrchestratorPropertyInstallation:
 
         assert isinstance(_PROPERTY_REGISTRY, dict)
         assert len(_PROPERTY_REGISTRY) >= 20  # At least 20 properties
+
+    def test_skill_matcher_property_returns_shared_matcher(self):
+        """skill_matcher should expose the shared framework matcher surface."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        matcher = MagicMock(name="skill_matcher")
+        orchestrator._skill_matcher = matcher
+
+        assert orchestrator.skill_matcher is matcher
 
     def test_tool_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
         """The legacy _tool_coordinator alias should warn and proxy the shim."""

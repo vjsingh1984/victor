@@ -316,6 +316,47 @@ class TurnExecutor:
             self._restore_agentic_loop_state(agentic_loop_state)
             raise
 
+    async def prepare_runtime_topology(
+        self,
+        topology_plan: Any,
+        *,
+        user_message: str,
+        task_classification: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Apply topology-selected runtime preparation steps.
+
+        AgenticLoop owns topology selection. TurnExecutor owns the concrete
+        runtime machinery needed to realize those choices.
+        """
+        from victor.framework.topology_runtime import (
+            derive_topology_task_context,
+            prepare_topology_runtime_contract,
+        )
+
+        orchestrator = getattr(self, "_orchestrator", None) or getattr(
+            self._chat_context, "_orchestrator", None
+        )
+        task_type, complexity = derive_topology_task_context(task_classification)
+        prepared_runtime = prepare_topology_runtime_contract(
+            topology_plan,
+            orchestrator=orchestrator,
+            task_type=task_type,
+            complexity=complexity,
+        )
+
+        if prepared_runtime.parallel_exploration is not None:
+            applied = await self._run_parallel_exploration(
+                user_message,
+                task_classification,
+                force=bool(prepared_runtime.parallel_exploration.get("force", True)),
+                max_results_override=prepared_runtime.parallel_exploration.get(
+                    "max_results_override"
+                ),
+            )
+            return prepared_runtime.to_result(prepared=bool(applied))
+
+        return prepared_runtime.to_result(prepared=prepared_runtime.team_plan is not None)
+
     async def execute_single_turn(
         self,
         messages: List[Any],
@@ -547,9 +588,6 @@ class TurnExecutor:
         task_classification = self._provider_context.task_classifier.classify(user_message)
         is_qa = self._is_question_only(user_message)
 
-        # Run parallel exploration for complex tasks (before loop)
-        await self._run_parallel_exploration(user_message, task_classification)
-
         # Calculate iteration budget same as legacy path
         max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
         task_budget = max(task_classification.tool_budget * 2, 1)
@@ -715,25 +753,28 @@ class TurnExecutor:
         self,
         user_message: str,
         task_classification: Any,
-    ) -> None:
+        *,
+        force: bool = False,
+        max_results_override: Optional[int] = None,
+    ) -> bool:
         """Run parallel exploration subagents for complex tasks.
 
         Spawns concurrent RESEARCHER subagents to explore the codebase
         before the main agentic loop starts. Findings are injected into
         the conversation context as a user message.
 
-        Only fires for COMPLEX/ACTION tasks when parallel_exploration is enabled.
-        Falls back gracefully on any error.
+        Only fires for COMPLEX/ACTION tasks when parallel_exploration is enabled,
+        unless a topology-selected runtime explicitly forces it.
         """
         # Only explore once per conversation, not on continuations
         if self._exploration_done:
-            return
+            return False
         if user_message.startswith("You have not edited") or user_message == "Continue.":
-            return
+            return False
 
         global _EXPLORATION_IN_PROGRESS
         if _EXPLORATION_IN_PROGRESS:
-            return  # Prevent recursive subagent exploration
+            return False  # Prevent recursive subagent exploration
 
         # Check if exploration is enabled and task warrants it
         try:
@@ -742,18 +783,19 @@ class TurnExecutor:
             settings = load_settings()
             pipeline = getattr(settings, "pipeline", None)
             if pipeline and not getattr(pipeline, "parallel_exploration", True):
-                return
+                return False
 
             from victor.framework.task.protocols import TaskComplexity
 
-            if task_classification.complexity not in {
+            complexity = getattr(task_classification, "complexity", None)
+            if not force and complexity not in {
                 TaskComplexity.COMPLEX,
                 TaskComplexity.ACTION,
                 TaskComplexity.ANALYSIS,
             }:
-                return
+                return False
         except Exception:
-            return
+            return False
 
         try:
             from pathlib import Path
@@ -790,7 +832,13 @@ class TurnExecutor:
 
             if budget.max_parallel_agents == 0:
                 self._exploration_done = True
-                return
+                return False
+
+            max_results = max_results_override or budget.tool_budget_per_agent
+            if isinstance(max_results, int):
+                max_results = max(1, max_results)
+            else:
+                max_results = budget.tool_budget_per_agent
 
             _EXPLORATION_IN_PROGRESS = True
             try:
@@ -798,7 +846,7 @@ class TurnExecutor:
                     explorer.explore_parallel(
                         task_description=user_message,
                         project_root=project_root,
-                        max_results=budget.tool_budget_per_agent,
+                        max_results=max_results,
                     ),
                     timeout=budget.exploration_timeout,
                 )
@@ -818,10 +866,14 @@ class TurnExecutor:
                     findings.duration_seconds,
                 )
 
+            return True
+
         except asyncio.TimeoutError:
             logger.debug("Parallel exploration timed out (90s), skipping")
+            return False
         except Exception as e:
             logger.debug("Parallel exploration skipped: %s", e)
+            return False
 
     # =====================================================================
     # Private Methods

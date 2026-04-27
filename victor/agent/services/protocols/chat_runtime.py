@@ -262,6 +262,11 @@ class PlanningContextProtocol(Protocol):
         """Current temporary system prompt override, if any."""
         ...
 
+    @property
+    def skill_matcher(self) -> Any:
+        """Shared framework skill matcher when available."""
+        ...
+
     async def chat(self, user_message: str, use_planning: bool = False) -> Any:
         """Execute a non-streaming chat turn."""
         ...

@@ -1,6 +1,6 @@
 import importlib
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -15,7 +15,9 @@ from victor.agent.topology_contract import (
 )
 from victor.agent.topology_grounder import GroundedTopologyPlan
 from victor.framework.task import TaskComplexity
+from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.providers.base import StreamChunk
+from victor.teams.types import TeamFormation
 
 
 def _make_orchestrator_stub():
@@ -267,11 +269,27 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
     emit_mock = AsyncMock(return_value=True)
     monkeypatch.setattr(helpers_module, "emit_topology_telemetry_event", emit_mock)
 
-    ctx = await runtime._create_stream_context("hello")
+    with patch(
+        "victor.framework.topology_runtime.resolve_configured_team",
+        return_value=ResolvedTeamExecutionPlan(
+            team_name="feature_team",
+            display_name="Feature Team",
+            formation=TeamFormation.PARALLEL,
+            member_count=2,
+            total_tool_budget=4,
+            max_iterations=20,
+            max_workers=3,
+        ),
+    ):
+        ctx = await runtime._create_stream_context("hello")
 
     assert ctx.topology_plan["execution_mode"] == "team_execution"
+    assert ctx.topology_plan["team_name"] == "feature_team"
+    assert ctx.topology_preparation["action"] == "team_plan"
+    assert ctx.topology_preparation["prepared"] is True
     assert ctx.provider_kwargs["provider_hint"] == "smart-router"
     assert ctx.runtime_context_overrides["formation_hint"] == "parallel"
+    assert ctx.runtime_context_overrides["team_name"] == "feature_team"
     assert ctx.tool_budget == 4
     assert ctx.max_total_iterations == 2
     assert orch.tool_budget == 4

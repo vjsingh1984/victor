@@ -7,7 +7,11 @@ import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.services.turn_execution_runtime import TurnExecutor
+from victor.agent.topology_contract import TopologyAction, TopologyKind
+from victor.agent.topology_grounder import GroundedTopologyPlan
 from victor.framework.task.protocols import TaskComplexity
+from victor.framework.team_runtime import ResolvedTeamExecutionPlan
+from victor.teams.types import TeamFormation
 from victor.providers.base import CompletionResponse, Message
 
 
@@ -198,7 +202,6 @@ async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
         execution_provider=MagicMock(),
     )
     executor._is_question_only = MagicMock(return_value=False)
-    executor._run_parallel_exploration = AsyncMock()
 
     response = CompletionResponse(content="done", role="assistant")
     loop_instance = MagicMock()
@@ -224,10 +227,97 @@ async def test_execute_via_agentic_loop_passes_conversation_history_to_loop():
         result = await executor._execute_via_agentic_loop("hello", max_iterations=5)
 
     assert result is response
-    executor._run_parallel_exploration.assert_awaited_once_with(
-        "hello",
-        provider_context.task_classifier.classify.return_value,
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_topology_delegates_parallel_exploration():
+    executor = _make_executor()
+    executor._run_parallel_exploration = AsyncMock(return_value=True)
+    topology_plan = GroundedTopologyPlan(
+        action=TopologyAction.PARALLEL_EXPLORATION,
+        topology=TopologyKind.PARALLEL_EXPLORATION,
+        execution_mode="parallel_exploration",
+        tool_budget=4,
+        iteration_budget=2,
     )
+    task_classification = SimpleNamespace(complexity=TaskComplexity.COMPLEX)
+
+    result = await executor.prepare_runtime_topology(
+        topology_plan,
+        user_message="inspect the runtime path",
+        task_classification=task_classification,
+    )
+
+    executor._run_parallel_exploration.assert_awaited_once_with(
+        "inspect the runtime path",
+        task_classification,
+        force=True,
+        max_results_override=4,
+    )
+    assert result["action"] == "parallel_exploration"
+    assert result["prepared"] is True
+    assert result["execution_mode"] == "parallel_exploration"
+    assert result["parallel_exploration"] == {"force": True, "max_results_override": 4}
+    assert result["runtime_context_overrides"]["topology_action"] == "parallel_exploration"
+    assert result["runtime_context_overrides"]["tool_budget"] == 4
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_topology_resolves_framework_team_plan():
+    executor = _make_executor()
+    orchestrator = SimpleNamespace()
+    executor._chat_context._orchestrator = orchestrator
+    topology_plan = GroundedTopologyPlan(
+        action=TopologyAction.TEAM_PLAN,
+        topology=TopologyKind.TEAM,
+        execution_mode="team_execution",
+        formation="parallel",
+        max_workers=2,
+        tool_budget=6,
+        iteration_budget=2,
+    )
+    task_classification = SimpleNamespace(task_type="feature", complexity=TaskComplexity.COMPLEX)
+
+    with patch(
+        "victor.framework.topology_runtime.resolve_configured_team",
+        return_value=ResolvedTeamExecutionPlan(
+            team_name="feature_team",
+            display_name="Feature Team",
+            formation=TeamFormation.PARALLEL,
+            member_count=2,
+            total_tool_budget=6,
+            max_iterations=25,
+            max_workers=2,
+        ),
+    ) as resolve_team:
+        result = await executor.prepare_runtime_topology(
+            topology_plan,
+            user_message="implement the feature with a team",
+            task_classification=task_classification,
+        )
+
+    resolve_team.assert_called_once_with(
+        orchestrator,
+        task_type="feature",
+        complexity="complex",
+        preferred_team=None,
+        preferred_formation="parallel",
+        max_workers=2,
+        tool_budget=6,
+    )
+    assert result["action"] == "team_plan"
+    assert result["prepared"] is True
+    assert result["execution_mode"] == "team_execution"
+    assert result["team_name"] == "feature_team"
+    assert result["display_name"] == "Feature Team"
+    assert result["formation"] == "parallel"
+    assert result["member_count"] == 2
+    assert result["runtime_context_overrides"]["team_name"] == "feature_team"
+    assert result["runtime_context_overrides"]["team_display_name"] == "Feature Team"
+    assert result["runtime_context_overrides"]["formation_hint"] == "parallel"
+    assert result["runtime_context_overrides"]["max_workers"] == 2
+    assert result["runtime_context_overrides"]["execution_mode"] == "team_execution"
+    assert result["runtime_context_overrides"]["topology_action"] == "team_plan"
 
 
 @pytest.mark.asyncio
@@ -273,7 +363,6 @@ async def test_execute_agentic_loop_restores_state_before_reraising_failure():
         execution_provider=MagicMock(),
     )
     executor._is_question_only = MagicMock(return_value=True)
-    executor._run_parallel_exploration = AsyncMock()
     executor._check_context_compaction = AsyncMock()
 
     loop_instance = MagicMock()

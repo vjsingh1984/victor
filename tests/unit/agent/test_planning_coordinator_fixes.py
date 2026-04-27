@@ -27,6 +27,8 @@ import json
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock, patch
+
+from victor_sdk.skills import SkillDefinition
 from victor.agent.services.planning_runtime import (
     PlanningCoordinator,
     PlanningConfig,
@@ -223,6 +225,59 @@ class TestPlanPersistence:
                 assert len(saved_plan["steps"]) == 2
                 assert saved_plan["steps"][0]["type"] == "research"
                 assert saved_plan["steps"][1]["type"] == "analysis"
+
+
+def _make_skill(name: str, phase: str = "action") -> SkillDefinition:
+    return SkillDefinition(
+        name=name,
+        description=f"Skill: {name}",
+        category="coding",
+        prompt_fragment=f"Prompt for {name}.",
+        required_tools=["read_file"],
+        phase=phase,
+    )
+
+
+class TestPlanningCoordinatorSkillIntegration:
+    """Planning should reuse the framework skill decomposition helpers."""
+
+    @pytest.mark.asyncio
+    async def test_generate_plan_uses_shared_skill_catalog_and_sequence(self):
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.provider = MagicMock()
+        mock_orchestrator.model = "test-model"
+        mock_orchestrator.profile = None
+        matcher = MagicMock()
+        matcher.initialized = True
+        matcher.skills = {
+            "debug": _make_skill("debug", phase="diagnostic"),
+            "refactor": _make_skill("refactor", phase="action"),
+        }
+        matcher.match_multiple_sync.return_value = [
+            (matcher.skills["debug"], 0.82),
+            (matcher.skills["refactor"], 0.64),
+        ]
+        mock_orchestrator._skill_matcher = matcher
+
+        coordinator = PlanningCoordinator(mock_orchestrator)
+        generated_plan = ReadableTaskPlan(
+            name="Skill-aware plan",
+            desc="generated",
+            complexity=TaskComplexity.MODERATE,
+            steps=[[1, "debug", "Inspect the failure", "read"]],
+        )
+
+        with patch(
+            "victor.agent.services.planning_runtime.generate_task_plan",
+            AsyncMock(return_value=generated_plan),
+        ) as generate_task_plan:
+            result = await coordinator._generate_plan("fix the auth regression")
+
+        assert result is generated_plan
+        prompt = generate_task_plan.await_args.kwargs["user_request"]
+        assert "Available skills" in prompt
+        assert "Suggested ordered skill sequence" in prompt
+        assert "debug -> refactor" in prompt
 
     def test_plan_saved_with_metadata(self):
         """Plan should include metadata like timestamp and step count."""

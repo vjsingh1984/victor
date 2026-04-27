@@ -382,20 +382,42 @@ class PlanningCoordinator:
                     )
                     planning_model = planning_model_override
 
-        # Build skill-aware prompt if skills are available
+        # Build skill-aware prompt from the shared framework skill matcher/capability.
         enriched_request = user_message
         try:
-            matcher = getattr(self.orchestrator, "skill_matcher", None)
+            matcher = getattr(self.orchestrator, "_skill_matcher", None) or getattr(
+                self.orchestrator, "skill_matcher", None
+            )
             if (
                 matcher
-                and getattr(matcher, "initialized", False)
-                and getattr(matcher, "skills", None)
+                and getattr(matcher, "initialized", getattr(matcher, "_initialized", False))
             ):
-                from victor.framework.skill_planner import build_skill_aware_plan_prompt
+                from victor.framework.skill_planner import (
+                    build_skill_aware_plan_prompt,
+                    build_skill_decomposition,
+                    coerce_skill_catalog,
+                )
 
-                skills = getattr(matcher, "skills", [])
-                enriched_request = build_skill_aware_plan_prompt(user_message, skills)
-                logger.debug("Plan generation enriched with %d skills", len(skills))
+                skills = coerce_skill_catalog(getattr(matcher, "skills", None))
+                if skills:
+                    decomposition = build_skill_decomposition(user_message, matcher)
+                    enriched_request = build_skill_aware_plan_prompt(
+                        user_message,
+                        skills,
+                        selected_skills=decomposition.skills if decomposition else None,
+                        decomposition_confidence=(
+                            decomposition.confidence if decomposition else None
+                        ),
+                    )
+                    logger.debug(
+                        "Plan generation enriched with %d skills%s",
+                        len(skills),
+                        (
+                            f" and decomposition {' -> '.join(decomposition.skills)}"
+                            if decomposition and decomposition.skills
+                            else ""
+                        ),
+                    )
         except Exception:
             logger.debug("Skill-aware planning enrichment skipped", exc_info=True)
 

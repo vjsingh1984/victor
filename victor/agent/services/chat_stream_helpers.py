@@ -28,6 +28,7 @@ from victor.core.errors import (
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
+from victor.framework.topology_runtime import prepare_topology_runtime_contract
 from victor.framework.task import TaskComplexity
 from victor.providers.base import Message, StreamChunk
 
@@ -382,11 +383,31 @@ class ChatStreamHelperMixin:
         )
         topology_decision = topology_selector.select(topology_input)
         topology_plan = topology_grounder.ground(topology_decision)
-        topology_overrides = topology_plan.to_context_overrides()
+        prepared_runtime = prepare_topology_runtime_contract(
+            topology_plan,
+            orchestrator=orch,
+            task_type=task_type,
+            complexity=str(
+                getattr(
+                    getattr(task_classification, "complexity", None),
+                    "value",
+                    getattr(task_classification, "complexity", None),
+                )
+                or "medium"
+            ),
+        )
+        topology_overrides = dict(prepared_runtime.runtime_context_overrides)
 
         stream_ctx.topology_input = topology_input.to_dict()
         stream_ctx.topology_decision = topology_decision.to_dict()
         stream_ctx.topology_plan = topology_plan.to_dict()
+        stream_ctx.topology_preparation = prepared_runtime.to_result(
+            prepared=prepared_runtime.team_plan is not None
+        )
+        if prepared_runtime.team_plan is not None:
+            stream_ctx.topology_plan["team_name"] = prepared_runtime.team_plan.team_name
+            stream_ctx.topology_plan["team_display_name"] = prepared_runtime.team_plan.display_name
+            stream_ctx.topology_plan["member_count"] = prepared_runtime.team_plan.member_count
         stream_ctx.runtime_context_overrides = dict(topology_overrides)
         stream_ctx.provider_kwargs = self._stream_provider_call_overrides(topology_overrides)
 

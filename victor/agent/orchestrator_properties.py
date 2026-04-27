@@ -134,6 +134,11 @@ def _task_coordinator(self: "AgentOrchestrator") -> "TaskCoordinator":
     return self._task_coordinator
 
 
+def _skill_matcher(self: "AgentOrchestrator") -> Any:
+    """Get the shared framework skill matcher when initialized."""
+    return getattr(self, "_skill_matcher", None)
+
+
 def _session_ledger_get(self: "AgentOrchestrator") -> Any:
     """Get the canonical session ledger for structured state tracking."""
     return self._session_ledger
@@ -668,6 +673,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "chunk_generator": (_chunk_generator, None),
     "tool_planner": (_tool_planner, None),
     "task_coordinator": (_task_coordinator, None),
+    "skill_matcher": (_skill_matcher, None),
     "session_ledger": (_session_ledger_get, _session_ledger_set),
     "code_correction_middleware": (_code_correction_middleware, None),
     "checkpoint_manager": (_checkpoint_manager, None),
