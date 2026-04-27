@@ -37,7 +37,11 @@ from typing import (
     runtime_checkable,
 )
 
-from victor.core.completion_markers import SUMMARY_MARKER, detect_active_completion_marker
+from victor.core.completion_markers import (
+    SUMMARY_MARKER,
+    detect_active_completion_marker,
+    strip_active_completion_markers,
+)
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -575,7 +579,9 @@ class TaskCompletionDetector:
             if active_marker == SUMMARY_MARKER:
                 marker_pos = response_text.find(SUMMARY_MARKER)
                 if marker_pos != -1:
-                    summary_text = response_text[marker_pos + len(SUMMARY_MARKER) :].strip()
+                    summary_text = strip_active_completion_markers(
+                        response_text[marker_pos + len(SUMMARY_MARKER) :]
+                    ).strip()
                     if summary_text:
                         self._state.last_summary = summary_text
                         logger.info(

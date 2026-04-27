@@ -616,3 +616,7 @@ async def test_pipeline_forced_completion_bypasses_recovery_and_stale_blocked_st
     recovery_mock.assert_not_awaited()
     assert coordinator._intent_classification_handler.calls == []
     assert coordinator._continuation_handler.calls == []
+    coordinator._orchestrator._conversation_controller.persist_compaction_summary.assert_called_once_with(
+        "Final findings mention graph and metrics but are complete.", []
+    )
+    coordinator._orchestrator._conversation_controller.inject_compaction_context.assert_called_once_with()

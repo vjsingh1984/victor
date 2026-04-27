@@ -653,10 +653,11 @@ class StreamingChatPipeline:
                         last_summary = getattr(
                             orch._task_completion_detector._state, "last_summary", ""
                         )
-                        if last_summary and hasattr(orch, "_conversation_controller"):
+                        sanitized_summary = strip_active_completion_markers(last_summary).strip()
+                        if sanitized_summary and hasattr(orch, "_conversation_controller"):
                             try:
                                 orch._conversation_controller.persist_compaction_summary(
-                                    last_summary, []
+                                    sanitized_summary, []
                                 )
                                 orch._conversation_controller.inject_compaction_context()
                                 logger.info("VICTOR_SUMMARY persisted for next-turn context injection")

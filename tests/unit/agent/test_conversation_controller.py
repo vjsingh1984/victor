@@ -25,6 +25,7 @@ from victor.agent.conversation.controller import (
 )
 from victor.agent.conversation.types import ConversationMessage, MessagePriority
 from victor.agent.conversation.state_machine import ConversationStage
+from victor.core.completion_markers import SUMMARY_MARKER
 from victor.providers.base import Message
 
 
@@ -509,3 +510,19 @@ class TestSmartCompaction:
             execution_limit=1,
             min_similarity=controller.config.semantic_relevance_threshold,
         )
+
+    def test_retrieve_relevant_history_sanitizes_summary_markers(self):
+        controller = ConversationController()
+        store = MagicMock()
+        store.get_dual_trace_relevant_messages.return_value = {"semantic": [], "execution": []}
+        store.get_relevant_summaries.return_value = [
+            (f"{SUMMARY_MARKER} Preserve pending architecture findings.", 0.88)
+        ]
+
+        controller.set_conversation_store(store, "session_123")
+
+        result = controller.retrieve_relevant_history("architecture findings", limit=2)
+
+        assert result == [
+            "[Prior context summary (relevance: 0.88)]: Preserve pending architecture findings."
+        ]

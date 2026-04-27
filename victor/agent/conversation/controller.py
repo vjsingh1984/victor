@@ -30,6 +30,7 @@ from victor.config.orchestrator_constants import (
     SEMANTIC_THRESHOLDS,
     TASK_COMPACTION_CONFIGS,
 )
+from victor.core.completion_markers import strip_active_completion_markers
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
@@ -90,6 +91,13 @@ def _is_pinned_content(content: str) -> bool:
         if pattern.search(content):
             return True
     return False
+
+
+def _sanitize_compaction_summary(summary: str) -> str:
+    """Remove runtime completion markers from stored and injected summaries."""
+    if not summary:
+        return ""
+    return strip_active_completion_markers(summary).strip()
 
 
 @dataclass
@@ -591,7 +599,9 @@ class ConversationController:
         removed_indices = {sm.index for sm in scored_messages[target:]}
         removed_messages = [m for i, m in enumerate(self.messages) if i in removed_indices]
         if removed_messages:
-            summary = self._generate_compaction_summary(removed_messages)
+            summary = _sanitize_compaction_summary(
+                self._generate_compaction_summary(removed_messages)
+            )
             if summary:
                 self._compaction_summaries.append(summary)
                 # Feed into hierarchical manager if available
@@ -957,7 +967,7 @@ class ConversationController:
         Two injection modes:
         - With ContextReminderManager: Sets compaction_summary on manager state.
           Actual injection happens during the next get_consolidated_reminder() call.
-        - Without (fallback): Inserts assistant message directly at position 1.
+        - Without (fallback): Inserts a system reminder message directly at position 1.
 
         Returns:
             True if compaction context was updated or injected.
@@ -970,6 +980,7 @@ class ConversationController:
             combined = self._hierarchical_manager.get_active_context()
         else:
             combined = " | ".join(self._compaction_summaries[-3:])
+        combined = _sanitize_compaction_summary(combined)
 
         if not combined:
             return False
@@ -981,7 +992,7 @@ class ConversationController:
 
         # Fallback: direct insertion (backward compat)
         if len(self.messages) > 1:
-            reminder_msg = Message(role="assistant", content=f"[Context reminder: {combined}]")
+            reminder_msg = Message(role="system", content=f"[Context reminder: {combined}]")
             self._history._messages.insert(1, reminder_msg)
             logger.debug(f"Injected compaction context: {combined[:100]}...")
             return True
@@ -1090,7 +1101,12 @@ class ConversationController:
             )
 
             for summary, score in relevant_summaries:
-                context = f"[Prior context summary (relevance: {score:.2f})]: {summary}"
+                sanitized_summary = _sanitize_compaction_summary(summary)
+                if not sanitized_summary:
+                    continue
+                context = (
+                    f"[Prior context summary (relevance: {score:.2f})]: {sanitized_summary}"
+                )
                 relevant_context.append(context)
 
         except (OSError, IOError) as e:
@@ -1107,6 +1123,9 @@ class ConversationController:
             summary: Summary of compacted content
             message_ids: IDs of messages that were summarized
         """
+        summary = _sanitize_compaction_summary(summary)
+        if not summary:
+            return
         if not self._conversation_store or not self._session_id:
             return
 
