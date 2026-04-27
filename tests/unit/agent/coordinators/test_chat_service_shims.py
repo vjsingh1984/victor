@@ -391,18 +391,16 @@ async def test_chat_coordinator_streaming_prefers_bound_chat_service():
 
 
 @pytest.mark.asyncio
-async def test_chat_coordinator_streaming_prefers_service_runtime_getter():
-    chunk = StreamChunk(content="service-runtime", is_final=True)
+async def test_chat_coordinator_streaming_prefers_orchestrator_public_runtime():
+    chunk = StreamChunk(content="orchestrator-runtime", is_final=True)
     orchestrator = MagicMock()
-    runtime = MagicMock()
 
     async def _runtime_stream_chat(user_message: str, **kwargs):
         assert user_message == "hello"
         assert kwargs == {"mode": "test"}
         yield chunk
 
-    runtime.stream_chat = _runtime_stream_chat
-    orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
+    orchestrator.stream_chat = _runtime_stream_chat
 
     coordinator = _make_deprecated_chat_coordinator(orchestrator)
 
@@ -413,14 +411,12 @@ async def test_chat_coordinator_streaming_prefers_service_runtime_getter():
         chunks = [item async for item in coordinator.stream_chat("hello", mode="test")]
 
     assert chunks == [chunk]
-    orchestrator._get_service_streaming_runtime.assert_called_once_with()
 
 
 @pytest.mark.asyncio
-async def test_chat_coordinator_streaming_service_runtime_beats_legacy_compatibility_hook():
-    chunk = StreamChunk(content="service-runtime", is_final=True)
+async def test_chat_coordinator_streaming_public_runtime_beats_internal_hooks():
+    chunk = StreamChunk(content="orchestrator-runtime", is_final=True)
     orchestrator = MagicMock()
-    runtime = MagicMock()
 
     async def _runtime_stream_chat(user_message: str, **kwargs):
         assert user_message == "hello"
@@ -430,8 +426,10 @@ async def test_chat_coordinator_streaming_service_runtime_beats_legacy_compatibi
     async def _legacy_stream_chat(user_message: str, **kwargs):
         raise AssertionError("legacy compatibility hook should not run")
 
-    runtime.stream_chat = _runtime_stream_chat
-    orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
+    orchestrator.stream_chat = _runtime_stream_chat
+    orchestrator._get_service_streaming_runtime = MagicMock(
+        side_effect=AssertionError("internal streaming runtime getter should not run")
+    )
     orchestrator._stream_chat_runtime = _legacy_stream_chat
 
     coordinator = _make_deprecated_chat_coordinator(orchestrator)
@@ -443,7 +441,7 @@ async def test_chat_coordinator_streaming_service_runtime_beats_legacy_compatibi
         chunks = [item async for item in coordinator.stream_chat("hello", mode="test")]
 
     assert chunks == [chunk]
-    orchestrator._get_service_streaming_runtime.assert_called_once_with()
+    orchestrator._get_service_streaming_runtime.assert_not_called()
 
 
 @pytest.mark.asyncio

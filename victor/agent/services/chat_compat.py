@@ -358,12 +358,10 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         Compatibility resolution order:
         1. Bound ``ChatService.stream_chat()``
-        2. Orchestrator ``_get_service_streaming_runtime()``
-        3. Legacy ``_stream_chat_runtime`` hook
+        2. Orchestrator ``stream_chat()``
 
         The shim does not own streaming execution anymore; it only forwards to
-        the canonical service/runtime path and preserves the older hook as a
-        last-resort compatibility fallback.
+        the canonical service/runtime path.
 
         Args:
             user_message: User's input message
@@ -388,14 +386,6 @@ class ChatCoordinator(ChatStreamHelperMixin):
                 yield chunk
             return
 
-        runtime_getter = self._get_orchestrator_callable("_get_service_streaming_runtime")
-        if callable(runtime_getter):
-            runtime = runtime_getter()
-            if runtime is not None and hasattr(runtime, "stream_chat"):
-                async for chunk in runtime.stream_chat(user_message, **kwargs):
-                    yield chunk
-                return
-
         runtime_helper = self._get_orchestrator_runtime_helper("stream_chat")
         if callable(runtime_helper):
             async for chunk in runtime_helper(user_message, **kwargs):
@@ -404,7 +394,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         raise RuntimeError(
             "ChatCoordinator has no bound ChatService or streaming runtime. "
-            "Ensure ServiceStreamingRuntime is registered on the orchestrator."
+            "Bind ChatService or use AgentOrchestrator.stream_chat()."
         )
 
     # =====================================================================
