@@ -521,6 +521,60 @@ class TestEvaluationResult:
         assert 0.0 <= metrics["avg_topology_reward"] <= 1.0
         assert metrics["topology_fallback_rate"] > 0.0
 
+    def test_get_metrics_includes_planning_feedback_summary(self):
+        """Aggregate metrics should expose planning policy coverage and deltas."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.FAILED,
+                    completion_score=0.2,
+                    metadata={
+                        "planning_events": [
+                            {
+                                "selection_policy": "heuristic_fast_path",
+                                "used_llm_planning": False,
+                                "task_type": "action",
+                            }
+                        ]
+                    },
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.PASSED,
+                    completion_score=0.9,
+                    metadata={
+                        "planning_events": [
+                            {
+                                "selection_policy": "experiment_forced_slow_path",
+                                "used_llm_planning": True,
+                                "task_type": "action",
+                                "force_reason": "experiment_constraints: tests_pass",
+                                "constraint_tags": ["tests_pass"],
+                                "experiment_support": 0.4,
+                            }
+                        ]
+                    },
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["tasks_with_planning_feedback"] == 2
+        assert metrics["planning_feedback_coverage"] == pytest.approx(1.0)
+        assert metrics["planning_policy_counts"] == {
+            "heuristic_fast_path": 1,
+            "experiment_forced_slow_path": 1,
+        }
+        assert metrics["planning_force_reasons"] == {"experiment_constraints: tests_pass": 1}
+        assert metrics["planning_used_llm_rate"] == pytest.approx(0.5)
+        assert metrics["planning_forced_slow_path_completion_delta"] == pytest.approx(0.7)
+
 
 class TestPassAtKResult:
     """Tests for PassAtKResult."""

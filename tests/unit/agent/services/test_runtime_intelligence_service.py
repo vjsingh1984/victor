@@ -282,6 +282,8 @@ def test_get_prompt_optimization_bundle_includes_experiment_memory_guidance_with
         "experiment_memory_support": 0.3333,
         "experiment_memory_selection_policy_bias": 0.0,
         "experiment_memory_preferred_selection_policy": None,
+        "experiment_memory_planning_policy_bias": 0.0,
+        "experiment_memory_preferred_planning_policy": None,
         "experiment_memory_constraint_tags": ["tests_pass"],
         "experiment_memory_next_candidate_hints": [
             "Use read_file on the failing module, then execute_bash for pytest."
@@ -296,6 +298,8 @@ def test_get_prompt_optimization_bundle_includes_experiment_memory_guidance_with
             "experiment_memory_support": 0.3333,
             "experiment_memory_selection_policy_bias": 0.0,
             "experiment_memory_preferred_selection_policy": None,
+            "experiment_memory_planning_policy_bias": 0.0,
+            "experiment_memory_preferred_planning_policy": None,
             "experiment_memory_constraint_tags": ["tests_pass"],
             "experiment_memory_next_candidate_hints": [
                 "Use read_file on the failing module, then execute_bash for pytest."
@@ -995,6 +999,59 @@ def test_runtime_intelligence_exposes_planning_force_hints_from_experiment_const
     assert hints["planning_experiment_support"] > 0.0
     assert hints["planning_match_count"] == 1
     assert "Verify tests_pass before widening topology." in hints["planning_next_candidate_hints"][0]
+
+
+def test_runtime_intelligence_exposes_planning_policy_bias_from_experiment_memory(tmp_path):
+    store = ExperimentMemoryStore(persist_path=tmp_path / "experiment_memory.json")
+    store.record(
+        ExperimentMemoryRecord(
+            record_id="guide-memory-3",
+            created_at=30.0,
+            scope=ExperimentScope(
+                benchmark="guide",
+                provider="openai",
+                model="gpt-5",
+            ),
+            summary_metrics={},
+            task_summaries=[],
+            insights=[
+                ExperimentInsight(
+                    kind="successful_transformation",
+                    summary="Forced LLM planning outperformed heuristic fast-path for this scope.",
+                    confidence=0.86,
+                    evidence={"completion_delta": 0.42},
+                )
+            ],
+            keywords=["planning", "fast_path", "llm_planning"],
+        )
+    )
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        experiment_memory_path=tmp_path / "experiment_memory.json",
+    )
+
+    experiment_hints = service.get_experiment_routing_context(
+        query="design the fix",
+        scope_context={"provider": "openai", "model": "gpt-5"},
+    )
+    planning_hints = service.get_planning_routing_context(
+        query="design the fix",
+        scope_context={"provider": "openai", "model": "gpt-5", "task_type": "analysis"},
+    )
+
+    assert experiment_hints["experiment_memory_planning_policy_bias"] > 0.0
+    assert experiment_hints["experiment_memory_preferred_planning_policy"] == (
+        "experiment_forced_slow_path"
+    )
+    assert planning_hints["planning_preferred_policy"] == "experiment_forced_slow_path"
+    assert planning_hints["planning_force_llm"] is True
+    assert planning_hints["planning_force_reason"] == (
+        "experiment_policy_bias: experiment_forced_slow_path"
+    )
 
 
 def test_runtime_intelligence_records_live_topology_outcomes_before_steering(tmp_path):

@@ -45,6 +45,13 @@ def _build_result() -> EvaluationResult:
                     },
                 },
                 metadata={
+                    "planning_events": [
+                        {
+                            "selection_policy": "heuristic_fast_path",
+                            "used_llm_planning": False,
+                            "task_type": "action",
+                        }
+                    ],
                     "topology_events": [
                         {
                             "action": "team_plan",
@@ -72,6 +79,16 @@ def _build_result() -> EvaluationResult:
                     }
                 },
                 metadata={
+                    "planning_events": [
+                        {
+                            "selection_policy": "experiment_forced_slow_path",
+                            "used_llm_planning": True,
+                            "task_type": "action",
+                            "force_reason": "experiment_constraints: tests_pass",
+                            "constraint_tags": ["tests_pass"],
+                            "experiment_support": 0.4,
+                        }
+                    ],
                     "topology_events": [
                         {
                             "action": "direct_answer",
@@ -102,6 +119,7 @@ def test_analyze_evaluation_result_distills_structured_experiment_memory(tmp_pat
     assert record.scope.prompt_candidate_hash == "cand-123"
     assert record.scope.section_name == "GROUNDING_RULES"
     assert record.summary_metrics["topology_learned_override_optimization_reward_delta"] < 0
+    assert record.summary_metrics["planning_forced_slow_path_completion_delta"] > 0
     assert len(record.task_summaries) == 2
     assert record.task_summaries[0].optimization["feasible"] is False
     assert record.task_summaries[0].topology["final_selection_policy"] == "learned_close_override"
@@ -110,7 +128,13 @@ def test_analyze_evaluation_result_distills_structured_experiment_memory(tmp_pat
     assert "failed_hypothesis" in insight_kinds
     assert "environment_constraint" in insight_kinds
     assert "next_candidate" in insight_kinds
+    assert any(
+        "Forced LLM planning outperformed heuristic fast-path"
+        in insight.summary
+        for insight in record.insights
+    )
     assert "learned_close_override" in record.keywords
+    assert "planning" in record.keywords
     assert "tests_pass" in record.keywords
 
 

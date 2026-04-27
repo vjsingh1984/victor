@@ -378,6 +378,10 @@ class TestAgenticLoop:
         assert result.success is True
         assert loop._plan.await_count >= 1
         assert result.final_state["plan"]["steps"] == ["verify tests", "execute"]
+        assert result.metadata["planning_events"][0]["selection_policy"] == (
+            "experiment_forced_slow_path"
+        )
+        assert result.metadata["planning_events"][0]["used_llm_planning"] is True
         assert result.final_state["planning_routing_hints"]["planning_force_llm"] is True
         assert result.metadata["planning_routing_hints"]["planning_force_reason"] == (
             "experiment_constraints: tests_pass"

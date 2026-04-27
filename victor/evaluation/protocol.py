@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from victor.evaluation.topology_feedback import aggregate_topology_feedback
+from victor.evaluation.planning_feedback import aggregate_planning_feedback
 
 
 @dataclass
@@ -715,6 +716,7 @@ class EvaluationResult:
             "overconfidence_rate": overconfident_failures / max(1, self.total_tasks),
             "underconfidence_rate": underconfident_passes / max(1, self.total_tasks),
         }
+        metrics.update(aggregate_planning_feedback(self.task_results, total_tasks=self.total_tasks))
         metrics.update(aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks))
         return metrics
 

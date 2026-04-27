@@ -1482,6 +1482,8 @@ class RuntimeIntelligenceService:
 
         bias_total = 0.0
         bias_weight = 0.0
+        planning_bias_total = 0.0
+        planning_bias_weight = 0.0
         constraint_tags: set[str] = set()
         next_candidate_hints: list[str] = []
         record_ids: list[str] = []
@@ -1503,10 +1505,16 @@ class RuntimeIntelligenceService:
                     if "learned close override" in summary_text and "heuristic" in summary_text:
                         bias_total -= max(0.25, confidence)
                         bias_weight += max(0.25, confidence)
+                    if "forced llm planning" in summary_text and "heuristic fast-path" in summary_text:
+                        planning_bias_total -= max(0.25, confidence)
+                        planning_bias_weight += max(0.25, confidence)
                 elif insight.kind == "successful_transformation":
                     if "learned close override" in summary_text and "heuristic" in summary_text:
                         bias_total += max(0.25, confidence)
                         bias_weight += max(0.25, confidence)
+                    if "forced llm planning" in summary_text and "heuristic fast-path" in summary_text:
+                        planning_bias_total += max(0.25, confidence)
+                        planning_bias_weight += max(0.25, confidence)
                 elif insight.kind == "environment_constraint":
                     gate_failure = self._coerce_optional_text(
                         insight.evidence.get("gate_failure")
@@ -1522,18 +1530,32 @@ class RuntimeIntelligenceService:
             bias = 0.0
         else:
             bias = round(max(-1.0, min(1.0, bias_total / bias_weight)), 4)
+        if planning_bias_weight <= 0.0:
+            planning_bias = 0.0
+        else:
+            planning_bias = round(
+                max(-1.0, min(1.0, planning_bias_total / planning_bias_weight)),
+                4,
+            )
 
         preferred_selection_policy = None
         if bias <= -0.1:
             preferred_selection_policy = "heuristic"
         elif bias >= 0.1:
             preferred_selection_policy = "learned_close_override"
+        preferred_planning_policy = None
+        if planning_bias <= -0.1:
+            preferred_planning_policy = "heuristic_fast_path"
+        elif planning_bias >= 0.1:
+            preferred_planning_policy = "experiment_forced_slow_path"
 
         return {
             "experiment_memory_match_count": len(records),
             "experiment_memory_support": round(min(1.0, len(records) / max(1.0, float(limit))), 4),
             "experiment_memory_selection_policy_bias": bias,
             "experiment_memory_preferred_selection_policy": preferred_selection_policy,
+            "experiment_memory_planning_policy_bias": planning_bias,
+            "experiment_memory_preferred_planning_policy": preferred_planning_policy,
             "experiment_memory_constraint_tags": sorted(constraint_tags),
             "experiment_memory_next_candidate_hints": next_candidate_hints[:2],
             "experiment_memory_record_ids": record_ids[:3],
@@ -1572,11 +1594,25 @@ class RuntimeIntelligenceService:
             ),
             "planning_constraint_tags": constraint_tags,
             "planning_next_candidate_hints": next_candidate_hints[:2],
+            "planning_policy_bias": float(
+                experiment_hints.get("experiment_memory_planning_policy_bias") or 0.0
+            ),
+            "planning_preferred_policy": self._coerce_optional_text(
+                experiment_hints.get("experiment_memory_preferred_planning_policy")
+            ),
         }
         if constraint_tags:
             planning_hints["planning_force_llm"] = True
             planning_hints["planning_force_reason"] = (
                 f"experiment_constraints: {', '.join(constraint_tags[:2])}"
+            )
+        elif (
+            planning_hints["planning_preferred_policy"] == "experiment_forced_slow_path"
+            and planning_hints["planning_policy_bias"] >= 0.15
+        ):
+            planning_hints["planning_force_llm"] = True
+            planning_hints["planning_force_reason"] = (
+                "experiment_policy_bias: experiment_forced_slow_path"
             )
         return planning_hints
 

@@ -642,6 +642,35 @@ class AgenticLoop:
                         use_llm_planning = False  # Override planning gate
                         skip_reason = "paradigm_router"
 
+                    planning_selection_policy = "default_llm_planning"
+                    if planning_routing_hints.get("planning_force_llm"):
+                        planning_selection_policy = "experiment_forced_slow_path"
+                    elif not use_llm_planning and skip_reason == "paradigm_router":
+                        planning_selection_policy = "paradigm_router_fast_path"
+                    elif not use_llm_planning and skip_planning:
+                        planning_selection_policy = "task_hint_fast_path"
+                    elif not use_llm_planning:
+                        planning_selection_policy = "heuristic_fast_path"
+
+                    state.setdefault("planning_events", []).append(
+                        {
+                            "selection_policy": planning_selection_policy,
+                            "used_llm_planning": bool(use_llm_planning),
+                            "task_type": task_type,
+                            "skip_reason": skip_reason,
+                            "forced_by_runtime_feedback": bool(
+                                planning_routing_hints.get("planning_force_llm")
+                            ),
+                            "force_reason": planning_routing_hints.get("planning_force_reason"),
+                            "constraint_tags": list(
+                                planning_routing_hints.get("planning_constraint_tags") or []
+                            ),
+                            "experiment_support": planning_routing_hints.get(
+                                "planning_experiment_support"
+                            ),
+                        }
+                    )
+
                     logger.info(
                         f"[Iteration {i}/{effective_max}] ROUTING: "
                         f"paradigm={routing_decision.paradigm.value}, "
@@ -940,6 +969,7 @@ class AgenticLoop:
                     "max_iterations_reached": len(iterations) >= self.max_iterations,
                     "effective_max_iterations": effective_max,
                     "progress_scores": list(self._progress_scores),
+                    "planning_events": list(state.get("planning_events", [])),
                     "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
                     "topology_events": list(state.get("topology_events", [])),
                 },
@@ -957,6 +987,7 @@ class AgenticLoop:
                 metadata={
                     "error": str(e),
                     "progress_scores": list(self._progress_scores),
+                    "planning_events": list(state.get("planning_events", [])),
                     "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
                     "topology_events": list(state.get("topology_events", [])),
                 },

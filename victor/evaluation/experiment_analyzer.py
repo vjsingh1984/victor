@@ -187,6 +187,87 @@ def _append_policy_insights(
         )
 
 
+def _append_planning_insights(
+    insights: list[ExperimentInsight],
+    keywords: set[str],
+    summary_metrics: Mapping[str, Any],
+) -> None:
+    planning_constraints = dict(summary_metrics.get("planning_constraint_tags") or {})
+    gate_failures = set(dict(summary_metrics.get("optimization_gate_failures") or {}))
+    if planning_constraints:
+        for constraint_name, count in sorted(
+            planning_constraints.items(),
+            key=lambda item: (-int(item[1]), item[0]),
+        )[:2]:
+            keywords.update({"planning", "fast_path", str(constraint_name)})
+            if str(constraint_name) in gate_failures:
+                continue
+            insights.append(
+                ExperimentInsight(
+                    kind="environment_constraint",
+                    summary=(
+                        f"Constraint-sensitive planning scope: {constraint_name} required "
+                        "deliberate planning."
+                    ),
+                    confidence=min(0.92, 0.45 + (0.08 * int(count))),
+                    evidence={
+                        "gate_failure": constraint_name,
+                        "planning_sensitive": True,
+                        "count": int(count),
+                    },
+                )
+            )
+
+    policy_counts = dict(summary_metrics.get("planning_policy_counts") or {})
+    forced_count = int(policy_counts.get("experiment_forced_slow_path", 0) or 0)
+    heuristic_count = int(policy_counts.get("heuristic_fast_path", 0) or 0)
+    forced_delta = _coerce_float(summary_metrics.get("planning_forced_slow_path_completion_delta"))
+    if forced_delta is not None and forced_delta >= 0.1:
+        keywords.update({"planning", "fast_path", "llm_planning"})
+        insights.append(
+            ExperimentInsight(
+                kind="successful_transformation",
+                summary="Forced LLM planning outperformed heuristic fast-path for this scope.",
+                confidence=0.88 if forced_count and heuristic_count else 0.72,
+                evidence={
+                    "completion_delta": round(forced_delta, 4),
+                    "forced_count": forced_count,
+                    "heuristic_count": heuristic_count,
+                },
+            )
+        )
+        dominant_constraint = next(iter(planning_constraints), None)
+        if dominant_constraint:
+            insights.append(
+                ExperimentInsight(
+                    kind="next_candidate",
+                    summary=(
+                        f"Keep LLM planning enabled when {dominant_constraint} "
+                        "constraints are present."
+                    ),
+                    confidence=0.78,
+                    evidence={
+                        "constraint_tag": dominant_constraint,
+                        "completion_delta": round(forced_delta, 4),
+                    },
+                )
+            )
+    elif forced_delta is not None and forced_delta <= -0.1:
+        keywords.update({"planning", "fast_path", "llm_planning"})
+        insights.append(
+            ExperimentInsight(
+                kind="failed_hypothesis",
+                summary="Forced LLM planning underperformed heuristic fast-path for this scope.",
+                confidence=0.88 if forced_count and heuristic_count else 0.72,
+                evidence={
+                    "completion_delta": round(forced_delta, 4),
+                    "forced_count": forced_count,
+                    "heuristic_count": heuristic_count,
+                },
+            )
+        )
+
+
 def _append_next_candidate(
     insights: list[ExperimentInsight],
     keywords: set[str],
@@ -322,6 +403,7 @@ def analyze_evaluation_result(
     insights: list[ExperimentInsight] = []
     keyword_seed: set[str] = set()
     _append_policy_insights(insights, keyword_seed, summary_metrics)
+    _append_planning_insights(insights, keyword_seed, summary_metrics)
     _append_gate_failure_constraints(insights, keyword_seed, summary_metrics)
     _append_next_candidate(insights, keyword_seed, summary_metrics)
     keywords = sorted(set(_build_keywords(scope, task_summaries, insights)) | keyword_seed)
