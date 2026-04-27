@@ -705,7 +705,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         if only_enabled:
             return [
-                tool for name, tool in self._tools.items() if self._tool_enabled.get(name, False)
+                tool
+                for name, tool in self._tools.items()
+                if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
             ]
         return list(self._tools.values())
 
@@ -723,28 +725,48 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         with self._schema_cache_lock:
             current_version = self._schema_cache_version
+            use_cache = not (only_enabled and self._has_dynamic_availability_checks())
 
             # O(1) cache check via version counter
-            cache_entry = self._schema_cache.get(only_enabled)
-            if cache_entry is not None:
-                cached_version, cached_schemas = cache_entry
-                if cached_version == current_version:
-                    return cached_schemas
+            if use_cache:
+                cache_entry = self._schema_cache.get(only_enabled)
+                if cache_entry is not None:
+                    cached_version, cached_schemas = cache_entry
+                    if cached_version == current_version:
+                        return cached_schemas
 
             # Cache miss - generate schemas
             if only_enabled:
                 schemas = [
                     tool.to_json_schema()
                     for name, tool in self._tools.items()
-                    if self._tool_enabled.get(name, False)
+                    if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
                 ]
             else:
                 schemas = [tool.to_json_schema() for tool in self._tools.values()]
 
             # Update cache with current version
-            self._schema_cache[only_enabled] = (current_version, schemas)
+            if use_cache:
+                self._schema_cache[only_enabled] = (current_version, schemas)
 
             return schemas
+
+    def _tool_is_available(self, tool: Any) -> bool:
+        """Return whether a tool is currently available for selection."""
+        checker = getattr(tool, "is_available", None)
+        if not callable(checker):
+            return True
+        return bool(checker())
+
+    def _has_dynamic_availability_checks(self) -> bool:
+        """Detect tools whose availability changes outside registry mutations."""
+        for tool in self._tools.values():
+            requires_configuration = getattr(tool, "requires_configuration", False)
+            if callable(requires_configuration):
+                requires_configuration = requires_configuration()
+            if requires_configuration:
+                return True
+        return False
 
     def get_tool_cost(self, name: str) -> Optional[CostTier]:
         """Get the cost tier for a tool.

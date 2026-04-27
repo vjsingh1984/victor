@@ -767,6 +767,47 @@ def _resolve_root_path(path: str) -> Path:
     return root_path
 
 
+def _has_enhanced_codebase_index_provider() -> bool:
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+
+    registry = CapabilityRegistry.get_instance()
+    try:
+        registry.ensure_bootstrapped()
+    except Exception:
+        logger.debug("[graph] Capability bootstrap failed during availability check", exc_info=True)
+
+    factory = registry.get(CodebaseIndexFactoryProtocol)
+    return factory is not None and registry.is_enhanced(CodebaseIndexFactoryProtocol)
+
+
+def _project_graph_has_data(root_path: Path) -> bool:
+    from victor.core.database import get_project_database
+
+    project_db = get_project_database(root_path)
+    if not project_db.table_exists("graph_node") or not project_db.table_exists("graph_edge"):
+        return False
+
+    node_row = project_db.query_one("SELECT COUNT(*) FROM graph_node")
+    edge_row = project_db.query_one("SELECT COUNT(*) FROM graph_edge")
+    node_count = int(node_row[0]) if node_row is not None else 0
+    edge_count = int(edge_row[0]) if edge_row is not None else 0
+    return node_count > 0 or edge_count > 0
+
+
+def _graph_tool_is_available() -> bool:
+    try:
+        if _has_enhanced_codebase_index_provider():
+            return True
+    except Exception:
+        logger.debug("[graph] Provider availability check failed", exc_info=True)
+
+    try:
+        return _project_graph_has_data(_resolve_root_path("."))
+    except Exception:
+        return False
+
+
 def _resolve_requested_subject_path(path: str) -> Path:
     requested = Path(path)
     if requested.is_absolute():
@@ -874,7 +915,9 @@ async def _load_graph_from_project_store(root_path: Path) -> LoadedGraph:
     try:
         ensure_project_graph_enriched(root_path)
     except Exception as exc:  # pragma: no cover - defensive logging only
-        logger.warning("[graph] Failed to enrich persisted project graph for %s: %s", root_path, exc)
+        logger.warning(
+            "[graph] Failed to enrich persisted project graph for %s: %s", root_path, exc
+        )
 
     graph_store = SqliteGraphStore(root_path)
     fallback_index = SimpleNamespace(graph_store=graph_store, files={})
@@ -1578,6 +1621,7 @@ async def _handle_multi_mode(
         "neighbors",
     ],
     aliases=["graph_tool"],
+    availability_check=_graph_tool_is_available,
     timeout=60.0,
 )
 async def graph(

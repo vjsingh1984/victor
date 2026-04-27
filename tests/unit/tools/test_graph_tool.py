@@ -548,6 +548,72 @@ async def test_graph_tool_falls_back_to_project_graph_store(monkeypatch, tmp_pat
     assert stats["result"]["edges"] == 7
 
 
+def test_graph_tool_is_available_with_persisted_project_graph(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    class _MissingProviderRegistry:
+        def ensure_bootstrapped(self) -> None:
+            return None
+
+        def get(self, protocol: object) -> None:
+            del protocol
+            return None
+
+        def is_enhanced(self, protocol: object) -> bool:
+            del protocol
+            return False
+
+    store = SqliteGraphStore(tmp_path)
+
+    import asyncio
+    import victor.core.capability_registry as capability_registry_module
+
+    asyncio.run(_seed_graph(store))
+    monkeypatch.setattr(
+        capability_registry_module.CapabilityRegistry,
+        "get_instance",
+        staticmethod(lambda: _MissingProviderRegistry()),
+    )
+    monkeypatch.setattr(
+        graph_tool_module,
+        "get_project_paths",
+        lambda: SimpleNamespace(project_root=tmp_path),
+    )
+
+    assert graph_tool_module.graph.Tool.is_available() is True
+
+
+def test_graph_tool_is_unavailable_without_provider_or_graph_data(monkeypatch, tmp_path: Path):
+    from victor.tools import graph_tool as graph_tool_module
+
+    class _MissingProviderRegistry:
+        def ensure_bootstrapped(self) -> None:
+            return None
+
+        def get(self, protocol: object) -> None:
+            del protocol
+            return None
+
+        def is_enhanced(self, protocol: object) -> bool:
+            del protocol
+            return False
+
+    import victor.core.capability_registry as capability_registry_module
+
+    monkeypatch.setattr(
+        capability_registry_module.CapabilityRegistry,
+        "get_instance",
+        staticmethod(lambda: _MissingProviderRegistry()),
+    )
+    monkeypatch.setattr(
+        graph_tool_module,
+        "get_project_paths",
+        lambda: SimpleNamespace(project_root=tmp_path),
+    )
+
+    assert graph_tool_module.graph.Tool.is_available() is False
+
+
 @pytest.mark.asyncio
 async def test_graph_tool_semantic_mode_gracefully_skips_when_index_has_no_semantic_search(
     monkeypatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
