@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Optional
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 from victor.agent.unified_task_tracker import TrackerTaskType
+from victor.core.loop_thresholds import DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
 from victor.core.errors import (
     ProviderAuthError,
     ProviderRateLimitError,
@@ -219,6 +220,11 @@ class ChatStreamHelperMixin:
             max_iterations=max_total_iterations,
             max_exploration=max_exploration_iterations,
             tool_budget=complexity_tool_budget,
+            max_blocked_before_force=getattr(
+                orch.settings,
+                "recovery_blocked_consecutive_threshold",
+                DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+            ),
         )
 
         ctx.stream_metrics = stream_metrics

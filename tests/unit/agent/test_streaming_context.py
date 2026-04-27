@@ -214,6 +214,11 @@ class TestCreateStreamContext:
         ctx = create_stream_context("test", tool_budget=None)
         assert ctx.complexity_tool_budget is None
 
+    def test_blocked_threshold_override(self):
+        """Factory accepts blocked-attempt threshold override."""
+        ctx = create_stream_context("test", max_blocked_before_force=7)
+        assert ctx.max_blocked_before_force == 7
+
 
 class TestStreamingChatContextTaskTypes:
     """Tests for task type handling in context."""

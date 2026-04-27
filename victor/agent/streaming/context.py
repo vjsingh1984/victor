@@ -332,6 +332,7 @@ def create_stream_context(
     max_iterations: int = 30,
     max_exploration: int = 10,
     tool_budget: Optional[int] = None,
+    max_blocked_before_force: Optional[int] = None,
 ) -> StreamingChatContext:
     """Factory function to create a StreamingChatContext.
 
@@ -340,6 +341,7 @@ def create_stream_context(
         max_iterations: Maximum total iterations
         max_exploration: Maximum exploration iterations
         tool_budget: Optional tool budget override
+        max_blocked_before_force: Optional blocked-attempt threshold override
 
     Returns:
         Initialized StreamingChatContext
@@ -352,4 +354,6 @@ def create_stream_context(
     )
     if tool_budget is not None:
         ctx.complexity_tool_budget = tool_budget
+    if max_blocked_before_force is not None:
+        ctx.max_blocked_before_force = max_blocked_before_force
     return ctx
