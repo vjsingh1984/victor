@@ -14,6 +14,7 @@
 
 """Tests for decorators module."""
 
+from enum import Enum
 import pytest
 from typing import Dict, Any, Optional
 from unittest.mock import patch
@@ -27,6 +28,11 @@ from victor.tools.decorators import (
     _WARN_ON_LEGACY_NAMES,
 )
 from victor.tools.base import BaseTool, CostTier, ToolResult
+
+
+class _SchemaMode(str, Enum):
+    OVERVIEW = "overview"
+    STATS = "stats"
 
 
 class TestToolDecorator:
@@ -233,6 +239,56 @@ class TestCreateToolClass:
         assert params["properties"]["int_param"]["type"] == "integer"
         assert params["properties"]["float_param"]["type"] == "number"
         assert params["properties"]["bool_param"]["type"] == "boolean"
+
+    def test_create_tool_class_with_runtime_enum_parameter(self):
+        """Runtime Enum annotations should become JSON schema enums."""
+
+        def enum_function(mode: _SchemaMode):
+            """Function with enum parameter.
+
+            Args:
+                mode: Execution mode.
+            """
+            return mode
+
+        tool_obj = _create_tool_class(enum_function)
+
+        params = tool_obj.parameters
+        assert params["properties"]["mode"]["type"] == "string"
+        assert params["properties"]["mode"]["enum"] == ["overview", "stats"]
+
+    def test_create_tool_class_with_string_enum_annotation(self):
+        """Stringified enum annotations should resolve through function globals."""
+
+        def enum_function(mode: "_SchemaMode"):
+            """Function with string enum annotation.
+
+            Args:
+                mode: Execution mode.
+            """
+            return mode
+
+        tool_obj = _create_tool_class(enum_function)
+
+        params = tool_obj.parameters
+        assert params["properties"]["mode"]["type"] == "string"
+        assert params["properties"]["mode"]["enum"] == ["overview", "stats"]
+
+    def test_create_tool_class_sanitizes_enum_default_values(self):
+        """Enum defaults should be exposed as raw values, not Python reprs."""
+
+        def enum_function(mode: _SchemaMode = _SchemaMode.OVERVIEW):
+            """Function with enum default.
+
+            Args:
+                mode: Execution mode.
+            """
+            return mode
+
+        tool_obj = _create_tool_class(enum_function)
+
+        params = tool_obj.parameters
+        assert params["properties"]["mode"]["default"] == "overview"
 
     def test_create_tool_class_with_no_docstring(self):
         """Test creating tool class with no docstring."""

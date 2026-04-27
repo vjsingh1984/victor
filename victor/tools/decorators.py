@@ -14,8 +14,10 @@
 
 
 import asyncio
+from enum import Enum
 import inspect
 import logging
+import types
 import warnings
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Set, Union, get_origin, get_args
@@ -128,7 +130,57 @@ def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
         return name
 
 
-def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
+def _enum_values_to_schema(enum_cls: type[Enum]) -> Dict[str, Any]:
+    """Convert an Enum class into a JSON Schema enum definition."""
+    values = [member.value for member in enum_cls]
+    if not values:
+        return {"type": "string"}
+
+    if all(isinstance(value, bool) for value in values):
+        schema_type = "boolean"
+    elif all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        schema_type = "integer"
+    elif all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
+        schema_type = "number"
+    else:
+        schema_type = "string"
+
+    return {"type": schema_type, "enum": values}
+
+
+def _resolve_annotation_string(annotation: str, globalns: Optional[Dict[str, Any]] = None) -> Any:
+    """Resolve a string annotation against the function globals when possible."""
+    namespace: Dict[str, Any] = {"__builtins__": __builtins__}
+    if globalns:
+        namespace.update(globalns)
+    try:
+        return eval(annotation, namespace, {})
+    except Exception:
+        return None
+
+
+def _sanitize_default_for_llm(value: Any) -> Any:
+    """Convert Python-specific default values into JSON-safe forms."""
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {key: _sanitize_default_for_llm(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize_default_for_llm(item) for item in value]
+    pathlike = getattr(value, "__fspath__", None)
+    if callable(pathlike):
+        try:
+            return pathlike()
+        except Exception:
+            return str(value)
+    return value
+
+
+def _get_json_schema_type(
+    annotation: Any,
+    *,
+    globalns: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Convert Python type annotation to JSON Schema type.
 
     Handles both runtime types (e.g., bool) and string annotations
@@ -148,15 +200,19 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
     if isinstance(annotation, str):
         annotation_str = annotation.strip()
 
+        resolved_annotation = _resolve_annotation_string(annotation_str, globalns)
+        if resolved_annotation is not None:
+            return _get_json_schema_type(resolved_annotation, globalns=globalns)
+
         # Handle Optional[X] as string
         if annotation_str.startswith("Optional[") and annotation_str.endswith("]"):
             inner = annotation_str[9:-1]  # Extract inner type
-            return _get_json_schema_type(inner)
+            return _get_json_schema_type(inner, globalns=globalns)
 
         # Handle List[X] as string
         if annotation_str.startswith("List[") and annotation_str.endswith("]"):
             inner = annotation_str[5:-1]
-            return {"type": "array", "items": _get_json_schema_type(inner)}
+            return {"type": "array", "items": _get_json_schema_type(inner, globalns=globalns)}
 
         # Handle Dict as string
         if annotation_str.startswith("Dict[") or annotation_str == "dict":
@@ -187,12 +243,15 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
     origin = get_origin(annotation)
     args = get_args(annotation)
 
-    if origin is Union:
+    if inspect.isclass(annotation) and issubclass(annotation, Enum):
+        return _enum_values_to_schema(annotation)
+
+    if origin in (Union, types.UnionType):
         # Check if it's Optional (Union with None)
         non_none_args = [a for a in args if a is not type(None)]
         if len(non_none_args) == 1:
             # It's Optional[X]
-            inner_schema = _get_json_schema_type(non_none_args[0])
+            inner_schema = _get_json_schema_type(non_none_args[0], globalns=globalns)
             return inner_schema  # JSON Schema handles nullable differently
         else:
             # Complex Union - default to string
@@ -200,7 +259,7 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
 
     if origin is list or annotation is list:
         if args:
-            items_schema = _get_json_schema_type(args[0])
+            items_schema = _get_json_schema_type(args[0], globalns=globalns)
             return {"type": "array", "items": items_schema}
         return {"type": "array", "items": {"type": "string"}}
 
@@ -558,7 +617,7 @@ def _create_tool_class(
             continue
 
         # Use the enhanced type handler for proper JSON Schema generation
-        type_schema = _get_json_schema_type(param.annotation)
+        type_schema = _get_json_schema_type(param.annotation, globalns=func.__globals__)
 
         # Merge type schema with description, then sanitize for LLM
         raw_schema = {
@@ -571,7 +630,7 @@ def _create_tool_class(
 
         # Add default value if present (helps LLMs understand optional params)
         if param.default != inspect.Parameter.empty and param.default is not None:
-            properties[name]["default"] = param.default
+            properties[name]["default"] = _sanitize_default_for_llm(param.default)
 
         if param.default == inspect.Parameter.empty:
             required.append(name)

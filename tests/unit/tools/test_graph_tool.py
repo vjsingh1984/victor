@@ -191,6 +191,19 @@ async def test_graph_tool_accepts_enum_mode_values(monkeypatch, tmp_path: Path):
     assert result["result"]["nodes"] == 7
 
 
+def test_graph_tool_schema_exposes_mode_and_direction_enums():
+    from victor.tools import graph_tool as graph_tool_module
+
+    params = graph_tool_module.graph.Tool.parameters
+
+    assert params["properties"]["mode"]["enum"]
+    assert "overview" in params["properties"]["mode"]["enum"]
+    assert "neighbors" in params["properties"]["mode"]["enum"]
+    assert params["properties"]["mode"]["default"] == "neighbors"
+
+    assert params["properties"]["direction"]["enum"] == ["out", "in", "both"]
+
+
 @pytest.mark.asyncio
 async def test_graph_tool_unsupported_mode_returns_follow_up_suggestions(
     monkeypatch, tmp_path: Path
