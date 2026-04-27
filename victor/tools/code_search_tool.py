@@ -920,9 +920,11 @@ def _result_matches_symbol_filter(result: Any, symbol: str) -> bool:
         if not isinstance(candidate, str):
             continue
         normalized_candidate = candidate.strip()
-        if normalized_candidate == target_symbol or normalized_candidate.endswith(
-            f".{target_symbol}"
-        ) or normalized_candidate.endswith(f":{target_symbol}"):
+        if (
+            normalized_candidate == target_symbol
+            or normalized_candidate.endswith(f".{target_symbol}")
+            or normalized_candidate.endswith(f":{target_symbol}")
+        ):
             return True
         if ("." in target_symbol or ":" in target_symbol) and normalized_candidate.endswith(
             target_symbol
