@@ -41,6 +41,21 @@ _MISSING = object()
 class ChatStreamHelperMixin:
     """Shared streaming helper methods reused by service and compatibility shims."""
 
+    @staticmethod
+    def _get_runtime_state_host(runtime_host: Any) -> Any:
+        """Return the concrete object that owns raw runtime instance state."""
+        instance_dict = getattr(runtime_host, "__dict__", {})
+        if isinstance(instance_dict, dict) and "_orchestrator" in instance_dict:
+            return instance_dict["_orchestrator"]
+        return runtime_host
+
+    @classmethod
+    def _get_runtime_state_dict(cls, runtime_host: Any) -> Dict[str, Any]:
+        """Return the instance dictionary for raw runtime state lookups."""
+        state_host = cls._get_runtime_state_host(runtime_host)
+        instance_dict = getattr(state_host, "__dict__", {})
+        return instance_dict if isinstance(instance_dict, dict) else {}
+
     async def _handle_context_and_iteration_limits(
         self,
         user_message: str,
@@ -324,7 +339,7 @@ class ChatStreamHelperMixin:
                     provider_candidates.append(fallback)
             if provider_candidates:
                 routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
-        runtime_intelligence = getattr(orch, "_runtime_intelligence", None)
+        runtime_intelligence = self._get_runtime_state_dict(orch).get("_runtime_intelligence")
         if (
             runtime_intelligence is not None
             and hasattr(runtime_intelligence, "get_topology_routing_context")
@@ -507,9 +522,9 @@ class ChatStreamHelperMixin:
             return None
 
         orch = self._orchestrator
-        instance_dict = getattr(orch, "__dict__", {})
+        state_dict = self._get_runtime_state_dict(orch)
         snapshot: Dict[str, Any] = {
-            "orchestrator_runtime_context": instance_dict.get(
+            "orchestrator_runtime_context": state_dict.get(
                 "_runtime_tool_context_overrides",
                 _MISSING,
             ),
@@ -582,9 +597,10 @@ class ChatStreamHelperMixin:
             return
 
         orch = self._orchestrator
+        state_dict = self._get_runtime_state_dict(orch)
         previous_runtime_context = snapshot.get("orchestrator_runtime_context", _MISSING)
         if previous_runtime_context is _MISSING:
-            if hasattr(orch, "_runtime_tool_context_overrides"):
+            if "_runtime_tool_context_overrides" in state_dict:
                 delattr(orch, "_runtime_tool_context_overrides")
         else:
             orch._runtime_tool_context_overrides = previous_runtime_context

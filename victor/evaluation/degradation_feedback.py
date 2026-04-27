@@ -81,11 +81,52 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
     }
 
 
+def _normalize_recovery_event(event: Any) -> Optional[dict[str, Any]]:
+    if event is None:
+        return None
+    if hasattr(event, "to_dict"):
+        event = event.to_dict()
+    if not isinstance(event, Mapping):
+        return None
+
+    source = _coerce_optional_text(event.get("source")) or "streaming_recovery"
+    kind = _coerce_optional_text(event.get("kind")) or "recovery_action"
+    action = _coerce_optional_text(event.get("action"))
+    strategy_name = _coerce_optional_text(event.get("strategy_name"))
+    reason = _coerce_optional_text(event.get("reason"))
+    failure_type = _coerce_optional_text(event.get("failure_type")) or "STREAMING_RECOVERY"
+
+    reasons = []
+    for value in (action, strategy_name, reason):
+        if value and value not in reasons:
+            reasons.append(value)
+
+    return {
+        "source": source,
+        "kind": kind,
+        "failure_type": failure_type,
+        "provider": _coerce_optional_text(event.get("provider")),
+        "model": _coerce_optional_text(event.get("model")),
+        "task_type": _coerce_optional_text(event.get("task_type")),
+        "pre_degraded": bool(event.get("pre_degraded", True)),
+        "post_degraded": bool(event.get("post_degraded", event.get("degraded", False))),
+        "recovered": bool(event.get("recovered", False)),
+        "adaptation_cost": _coerce_float(event.get("adaptation_cost", 1.0)),
+        "time_to_recover_seconds": _coerce_float(event.get("time_to_recover_seconds")),
+        "iteration": _coerce_int(event.get("iteration")),
+        "reasons": reasons,
+    }
+
+
 def extract_degradation_events(value: Any) -> list[dict[str, Any]]:
     """Extract normalized degradation events from task, trace, or payload objects."""
     events: list[dict[str, Any]] = []
     for item in _extract_sequence(value, "degradation_events"):
         normalized = _normalize_event(item)
+        if normalized is not None:
+            events.append(normalized)
+    for item in _extract_sequence(value, "recovery_events"):
+        normalized = _normalize_recovery_event(item)
         if normalized is not None:
             events.append(normalized)
 
@@ -94,6 +135,10 @@ def extract_degradation_events(value: Any) -> list[dict[str, Any]]:
         if isinstance(container, Mapping):
             for item in _extract_sequence(container, "degradation_events"):
                 normalized = _normalize_event(item)
+                if normalized is not None:
+                    events.append(normalized)
+            for item in _extract_sequence(container, "recovery_events"):
+                normalized = _normalize_recovery_event(item)
                 if normalized is not None:
                     events.append(normalized)
 

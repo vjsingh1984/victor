@@ -122,6 +122,80 @@ class StreamingChatPipeline:
         self._prev_visible_content = normalized_key
         return display_content
 
+    @staticmethod
+    def _append_stream_event(stream_ctx: Any, field_name: str, event: dict[str, Any]) -> None:
+        """Append a structured event list onto the mutable stream context."""
+        events = getattr(stream_ctx, field_name, None)
+        if not isinstance(events, list):
+            events = []
+            setattr(stream_ctx, field_name, events)
+        events.append(event)
+
+    @staticmethod
+    def _normalize_optional_text(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(getattr(value, "value", value)).strip()
+        return text or None
+
+    def _record_confidence_early_stop(self, stream_ctx: Any) -> None:
+        """Persist an early-stop signal into the shared degradation event path."""
+        task_type = self._normalize_optional_text(
+            getattr(getattr(stream_ctx, "unified_task_type", None), "value", None)
+            or getattr(stream_ctx, "coarse_task_type", None)
+        )
+        event = {
+            "source": "streaming_confidence",
+            "kind": "confidence_early_stop",
+            "task_type": task_type,
+            "iteration": getattr(stream_ctx, "total_iterations", 0),
+            "pre_degraded": False,
+            "post_degraded": False,
+            "recovered": False,
+            "adaptation_cost": 0.0,
+            "degradation_reasons": ["confidence_threshold_reached"],
+            "total_tokens": getattr(stream_ctx, "total_tokens", 0.0),
+        }
+        self._append_stream_event(stream_ctx, "degradation_events", event)
+
+    def _record_recovery_action(self, stream_ctx: Any, recovery_action: Any) -> None:
+        """Persist structured recovery metadata for stream teardown normalization."""
+        action = self._normalize_optional_text(getattr(recovery_action, "action", None))
+        if action is None or action == "continue":
+            return
+
+        task_type = self._normalize_optional_text(
+            getattr(getattr(stream_ctx, "unified_task_type", None), "value", None)
+            or getattr(stream_ctx, "coarse_task_type", None)
+        )
+        confidence = getattr(recovery_action, "confidence", None)
+        try:
+            confidence_value = float(confidence) if confidence is not None else None
+        except (TypeError, ValueError):
+            confidence_value = None
+        event = {
+            "source": "streaming_recovery",
+            "kind": "recovery_action",
+            "action": action,
+            "failure_type": self._normalize_optional_text(
+                getattr(recovery_action, "failure_type", None)
+            ),
+            "task_type": task_type,
+            "iteration": getattr(stream_ctx, "total_iterations", 0),
+            "reason": self._normalize_optional_text(getattr(recovery_action, "reason", None)),
+            "strategy_name": self._normalize_optional_text(
+                getattr(recovery_action, "strategy_name", None)
+            ),
+            "confidence": confidence_value,
+            "fallback_provider": self._normalize_optional_text(
+                getattr(recovery_action, "fallback_provider", None)
+            ),
+            "fallback_model": self._normalize_optional_text(
+                getattr(recovery_action, "fallback_model", None)
+            ),
+        }
+        self._append_stream_event(stream_ctx, "recovery_events", event)
+
     def _reset_streaming_turn_state(self, orch: Any) -> None:
         """Reset per-turn state shared across streaming iterations."""
         self._last_tool_context = None
@@ -528,6 +602,7 @@ class StreamingChatPipeline:
                     if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
                         self._confidence_monitor.record(full_content or "", stream_ctx.total_tokens)
                         if self._confidence_monitor.should_stop():
+                            self._record_confidence_early_stop(stream_ctx)
                             logger.info(
                                 "[ConfidenceMonitor] Stopping iteration early — confidence threshold met"
                             )
@@ -714,6 +789,7 @@ class StreamingChatPipeline:
 
             # Apply recovery action if not just "continue"
             if recovery_action.action != "continue":
+                self._record_recovery_action(stream_ctx, recovery_action)
                 recovery_chunk = orch._apply_recovery_action(recovery_action, stream_ctx)
                 if recovery_chunk:
                     yield recovery_chunk

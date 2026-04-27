@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 from victor.agent.topology_contract import (
     TopologyAction,
@@ -57,6 +58,45 @@ def test_service_streaming_runtime_caches_pipeline(monkeypatch):
     assert kwargs["perception"] is None
     assert kwargs["fulfillment"] is None
     assert kwargs["runtime_intelligence"] is orch._runtime_intelligence
+
+
+@pytest.mark.asyncio
+async def test_service_streaming_runtime_supports_protocol_adapter_host(monkeypatch):
+    orch = _make_orchestrator_stub()
+    adapter = OrchestratorProtocolAdapter(orch)
+    runtime = ServiceStreamingRuntime(adapter)
+    chunk = StreamChunk(content="service", is_final=True)
+
+    class DummyPipeline:
+        async def run(self, user_message: str, **kwargs):
+            assert user_message == "hello"
+            assert kwargs == {"mode": "test"}
+            yield chunk
+
+    def fake_factory(owner, **kwargs):
+        assert owner is runtime
+        return DummyPipeline()
+
+    streaming_module = importlib.import_module("victor.agent.streaming")
+    monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
+
+    ctx = SimpleNamespace(
+        cumulative_usage={
+            "prompt_tokens": 2,
+            "completion_tokens": 3,
+            "total_tokens": 5,
+        },
+        runtime_override_snapshot=None,
+    )
+    orch._current_stream_context = ctx
+
+    chunks = [item async for item in runtime.stream_chat("hello", mode="test")]
+
+    assert chunks == [chunk]
+    assert orch._cumulative_token_usage["prompt_tokens"] == 2
+    assert orch._cumulative_token_usage["completion_tokens"] == 3
+    assert orch._cumulative_token_usage["total_tokens"] == 5
+    assert orch._current_stream_context is None
 
 
 @pytest.mark.asyncio
@@ -330,3 +370,67 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     assert ctx.topology_events[-1]["outcome"]["runtime"] == "streaming"
     assert ctx.runtime_override_snapshot is None
     assert orch._current_stream_context is None
+
+
+@pytest.mark.asyncio
+async def test_service_streaming_runtime_stream_chat_normalizes_recovery_events():
+    orch = _make_orchestrator_stub()
+    orch._runtime_intelligence = SimpleNamespace(record_topology_outcome=MagicMock())
+    orch.has_capability.side_effect = lambda name: name == "current_stream_context"
+
+    runtime = ServiceStreamingRuntime(orch)
+    ctx = SimpleNamespace(
+        cumulative_usage={
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
+        last_quality_score=0.78,
+        topology_events=[],
+        degradation_events=[
+            {
+                "source": "streaming_confidence",
+                "kind": "confidence_early_stop",
+                "post_degraded": False,
+                "recovered": False,
+            }
+        ],
+        recovery_events=[
+            {
+                "action": "retry",
+                "failure_type": "PROVIDER_ERROR",
+                "strategy_name": "retry_with_hint",
+                "reason": "empty response loop",
+                "confidence": 0.61,
+                "iteration": 2,
+            }
+        ],
+        total_iterations=2,
+        tool_calls_used=0,
+        force_completion=False,
+        has_substantial_content=lambda: True,
+        runtime_override_snapshot=None,
+    )
+    orch.get_capability_value.side_effect = lambda name: ctx if name == "current_stream_context" else None
+    orch._current_stream_context = ctx
+
+    class DummyPipeline:
+        async def run(self, user_message: str, **kwargs):
+            yield StreamChunk(content="service", is_final=True)
+
+    runtime._streaming_pipeline = DummyPipeline()
+
+    chunks = [item async for item in runtime.stream_chat("hello")]
+
+    assert chunks == [StreamChunk(content="service", is_final=True)]
+    assert len(ctx.degradation_events) == 2
+    recovery_event = ctx.degradation_events[-1]
+    assert recovery_event["source"] == "streaming_recovery"
+    assert recovery_event["failure_type"] == "PROVIDER_ERROR"
+    assert recovery_event["recovered"] is True
+    assert recovery_event["post_degraded"] is False
+    assert recovery_event["degradation_reasons"] == [
+        "retry",
+        "retry_with_hint",
+        "empty response loop",
+    ]

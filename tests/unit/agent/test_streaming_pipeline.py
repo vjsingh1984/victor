@@ -1,3 +1,4 @@
+import importlib
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -493,6 +494,65 @@ async def test_pipeline_prefers_canonical_recovery_context_factory():
         chunks.append(chunk.content)
 
     assert any("fallback" in chunk for chunk in chunks)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_records_confidence_early_stop_event(monkeypatch):
+    feature_flags_module = importlib.import_module("victor.core.feature_flags")
+    monkeypatch.setattr(feature_flags_module, "is_feature_enabled", lambda *_: True)
+
+    class _ConfidenceMonitor:
+        def __init__(self) -> None:
+            self.records = []
+
+        def record(self, content: str, tokens: float) -> None:
+            self.records.append((content, tokens))
+
+        def should_stop(self) -> bool:
+            return True
+
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._provider_response = ("High confidence answer", None, None, False)
+    monitor = _ConfidenceMonitor()
+    pipeline = StreamingChatPipeline(coordinator, confidence_monitor=monitor)
+
+    chunks = [chunk async for chunk in pipeline.run("answer directly")]
+
+    assert chunks == []
+    assert monitor.records == [("High confidence answer", 0)]
+    assert coordinator._stream_ctx.degradation_events[0]["source"] == "streaming_confidence"
+    assert coordinator._stream_ctx.degradation_events[0]["kind"] == "confidence_early_stop"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_records_recovery_action_event():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._provider_response = ("response needs recovery", None, None, False)
+    coordinator._orchestrator._handle_recovery_with_integration = AsyncMock(
+        return_value=SimpleNamespace(
+            action="abort",
+            failure_type="PROVIDER_ERROR",
+            strategy_name="fallback_summary",
+            reason="empty response loop",
+            confidence=0.42,
+            fallback_provider="anthropic",
+            fallback_model="claude-sonnet",
+        )
+    )
+    coordinator._orchestrator._apply_recovery_action = MagicMock(
+        return_value=StreamChunk(content="Recovered fallback", is_final=True)
+    )
+
+    pipeline = StreamingChatPipeline(coordinator)
+    chunks = [chunk async for chunk in pipeline.run("recover this")]
+
+    assert [chunk.content for chunk in chunks] == ["Recovered fallback"]
+    assert len(coordinator._stream_ctx.recovery_events) == 1
+    event = coordinator._stream_ctx.recovery_events[0]
+    assert event["action"] == "abort"
+    assert event["failure_type"] == "PROVIDER_ERROR"
+    assert event["strategy_name"] == "fallback_summary"
+    assert event["fallback_provider"] == "anthropic"
 
 
 def test_prepare_visible_content_strips_completion_markers():

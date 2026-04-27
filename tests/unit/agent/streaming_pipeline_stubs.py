@@ -30,6 +30,8 @@ class DummyStreamContext:
         self.provider_kwargs = {}
         self.runtime_context_overrides = {}
         self.topology_events = []
+        self.degradation_events = []
+        self.recovery_events = []
         self.runtime_override_snapshot = None
 
     def accumulate_content(self, content: str) -> None:

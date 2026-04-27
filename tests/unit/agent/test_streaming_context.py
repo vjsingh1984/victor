@@ -194,6 +194,8 @@ class TestStreamingChatContext:
         assert ctx.topology_decision is None
         assert ctx.topology_plan is None
         assert ctx.topology_events == []
+        assert ctx.degradation_events == []
+        assert ctx.recovery_events == []
         assert ctx.runtime_override_snapshot is None
 
 

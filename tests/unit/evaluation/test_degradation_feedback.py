@@ -71,6 +71,32 @@ def test_summarize_degradation_feedback_returns_task_level_summary():
     assert summary["sources"] == {"provider_performance": 1, "agentic_loop": 1}
 
 
+def test_extract_degradation_events_normalizes_recovery_events():
+    task_payload = {
+        "metadata": {
+            "recovery_events": [
+                {
+                    "action": "retry",
+                    "failure_type": "PROVIDER_ERROR",
+                    "strategy_name": "retry_with_hint",
+                    "reason": "empty response loop",
+                    "iteration": 2,
+                    "recovered": True,
+                }
+            ]
+        }
+    }
+
+    events = extract_degradation_events(task_payload)
+
+    assert len(events) == 1
+    assert events[0]["source"] == "streaming_recovery"
+    assert events[0]["kind"] == "recovery_action"
+    assert events[0]["pre_degraded"] is True
+    assert events[0]["recovered"] is True
+    assert events[0]["reasons"] == ["retry", "retry_with_hint", "empty response loop"]
+
+
 def test_aggregate_degradation_feedback_rolls_up_counts():
     metrics = aggregate_degradation_feedback(
         [
