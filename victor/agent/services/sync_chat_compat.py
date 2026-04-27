@@ -137,7 +137,11 @@ class SyncChatCoordinator:
             response = await orchestrator.chat(user_message, use_planning=use_planning)
             return self._attach_skill_metadata(
                 response,
-                orchestrator.get_last_skill_match_info() if hasattr(orchestrator, "get_last_skill_match_info") else None,
+                (
+                    orchestrator.get_last_skill_match_info()
+                    if hasattr(orchestrator, "get_last_skill_match_info")
+                    else None
+                ),
             )
 
         raise RuntimeError(

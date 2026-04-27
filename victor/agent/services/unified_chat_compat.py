@@ -46,27 +46,29 @@ class UnifiedChatCoordinator:
     both sync and streaming paths forward directly to that service.
 
     Args:
-        sync_coordinator: Deprecated sync coordinator shim
-        streaming_coordinator: Deprecated streaming coordinator shim
+        sync_coordinator: Deprecated legacy compatibility dependency. Unused by
+            the canonical service-bound shim path.
+        streaming_coordinator: Deprecated legacy compatibility dependency.
+            Unused by the canonical service-bound shim path.
         default_mode: Default execution mode (AUTO, SYNC, or STREAMING)
     """
 
     def __init__(
         self,
-        sync_coordinator: "SyncChatCoordinator",
-        streaming_coordinator: "StreamingChatCoordinator",
+        sync_coordinator: "SyncChatCoordinator | None" = None,
+        streaming_coordinator: "StreamingChatCoordinator | None" = None,
         default_mode: ExecutionMode = ExecutionMode.AUTO,
         chat_service: Any = None,
     ) -> None:
         """Initialize the UnifiedChatCoordinator.
 
         Args:
-            sync_coordinator: Sync chat coordinator
-            streaming_coordinator: Streaming chat coordinator
+            sync_coordinator: Deprecated compatibility dependency retained for
+                constructor stability. No longer required by the canonical shim path.
+            streaming_coordinator: Deprecated compatibility dependency retained
+                for constructor stability. No longer required by the canonical shim path.
             default_mode: Default execution mode
         """
-        self._sync = sync_coordinator
-        self._streaming = streaming_coordinator
         self._default_mode = default_mode
         self._chat_service = chat_service
 

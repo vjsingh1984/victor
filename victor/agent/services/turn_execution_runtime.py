@@ -423,7 +423,9 @@ class TurnExecutor:
                 # Sort tool calls by dependency order when multiple tools are requested
                 if len(response.tool_calls) > 1:
                     try:
-                        from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
+                        from victor.agent.protocols.tool_protocols import (
+                            ToolDependencyGraphProtocol,
+                        )
 
                         _container = getattr(_orch, "_container", None)
                         _dep_graph = (
@@ -449,9 +451,7 @@ class TurnExecutor:
 
                     _container = getattr(_orch, "_container", None)
                     _dep_graph = (
-                        _container.get_optional(ToolDependencyGraphProtocol)
-                        if _container
-                        else None
+                        _container.get_optional(ToolDependencyGraphProtocol) if _container else None
                     )
                     if _dep_graph and len(tool_results) > 1:
                         _task_type = (
@@ -488,7 +488,9 @@ class TurnExecutor:
                 # Record failures for optimization hints
                 for result in tool_results:
                     if not result.get("success"):
-                        _injector = getattr(_orch, "_optimization_injector", None) if _orch else None
+                        _injector = (
+                            getattr(_orch, "_optimization_injector", None) if _orch else None
+                        )
                         if _injector and result.get("error"):
                             _injector.record_failure(
                                 result.get("tool_name", "unknown"),
@@ -1006,7 +1008,9 @@ class TurnExecutor:
             except Exception:
                 pass
 
-        tool_service = getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+        tool_service = (
+            getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+        )
         if tool_service is None:
             tool_service = getattr(self._tool_context, "_tool_service", None)
         if tool_service is not None and hasattr(tool_service, "get_tool_budget"):
@@ -1017,7 +1021,9 @@ class TurnExecutor:
                 except Exception:
                     pass
 
-        tool_pipeline = getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+        tool_pipeline = (
+            getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+        )
         if tool_pipeline is None:
             tool_pipeline = getattr(self._tool_context, "_tool_pipeline", None)
         pipeline_config = getattr(tool_pipeline, "config", None)
@@ -1041,7 +1047,9 @@ class TurnExecutor:
             except Exception:
                 pass
 
-        tool_service = getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+        tool_service = (
+            getattr(orchestrator, "_tool_service", None) if orchestrator is not None else None
+        )
         if tool_service is None:
             tool_service = getattr(self._tool_context, "_tool_service", None)
         previous_service_budget = snapshot.get("tool_service_budget", _MISSING)
@@ -1055,7 +1063,9 @@ class TurnExecutor:
             except Exception:
                 pass
 
-        tool_pipeline = getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+        tool_pipeline = (
+            getattr(orchestrator, "_tool_pipeline", None) if orchestrator is not None else None
+        )
         if tool_pipeline is None:
             tool_pipeline = getattr(self._tool_context, "_tool_pipeline", None)
         pipeline_config = getattr(tool_pipeline, "config", None)
