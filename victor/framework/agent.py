@@ -20,6 +20,7 @@ Example:
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -993,10 +994,16 @@ class Agent:
     async def close(self) -> None:
         """Clean up resources."""
         # Clean up orchestrator
+        cleanup = None
         if hasattr(self._orchestrator, "close"):
-            await self._orchestrator.close()
+            cleanup = self._orchestrator.close
         elif hasattr(self._orchestrator, "shutdown"):
-            await self._orchestrator.shutdown()
+            cleanup = self._orchestrator.shutdown
+
+        if cleanup is not None:
+            result = cleanup()
+            if inspect.isawaitable(result):
+                await result
         self._orchestrator = None  # Prevent __del__ warning after proper close
 
     async def __aenter__(self) -> "Agent":
