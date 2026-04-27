@@ -309,14 +309,23 @@ class OrchestrationFacade:
     @property
     def chat_coordinator(self) -> Optional[Any]:
         """Deprecated chat coordinator compatibility shim."""
+        route = "direct_slot"
         if self._deprecated_chat_coordinator is None and self._get_chat_coordinator is not None:
             self._deprecated_chat_coordinator = self._get_chat_coordinator()
+            route = "lazy_getter"
         if self._deprecated_chat_coordinator is not None:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "chat_coordinator", route
+            )
             warnings.warn(
                 "OrchestrationFacade.chat_coordinator is deprecated. "
                 "Use OrchestrationFacade.chat_service instead.",
                 DeprecationWarning,
                 stacklevel=2,
+            )
+        else:
+            record_deprecated_chat_shim_access(
+                "orchestration_facade", "chat_coordinator", "missing_surface"
             )
         return self._deprecated_chat_coordinator
 

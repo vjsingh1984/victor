@@ -574,6 +574,9 @@ def _chat_coordinator_get(self: "AgentOrchestrator") -> Any:
         DeprecationWarning,
         stacklevel=2,
     )
+    record_deprecated_chat_shim_access(
+        "agent_orchestrator", "_chat_coordinator_get", "compat_property"
+    )
     return getattr(self, "_deprecated_chat_coordinator", None)
 
 
@@ -583,6 +586,9 @@ def _chat_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
         "Store the shim on _deprecated_chat_coordinator instead.",
         DeprecationWarning,
         stacklevel=2,
+    )
+    record_deprecated_chat_shim_access(
+        "agent_orchestrator", "_chat_coordinator_set", "compat_property"
     )
     self._deprecated_chat_coordinator = value
 

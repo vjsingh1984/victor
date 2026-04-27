@@ -39,6 +39,10 @@ import importlib
 import warnings
 from typing import Any
 
+from victor.agent.services.chat_compat_telemetry import (
+    record_deprecated_chat_shim_access,
+)
+
 _SUBMODULE_MAP: dict[str, str] = {}
 
 _MODULE_MEMBERS = {
@@ -200,6 +204,15 @@ def __getattr__(name: str) -> Any:
             module = importlib.import_module(f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}")
         value = getattr(module, name)
         if name in _DEPRECATED_EXPORTS:
+            if name in {
+                "ChatCoordinator",
+                "SyncChatCoordinator",
+                "StreamingChatCoordinator",
+                "UnifiedChatCoordinator",
+            }:
+                record_deprecated_chat_shim_access(
+                    "coordinators_package", name, "package_export"
+                )
             warnings.warn(
                 _DEPRECATED_EXPORTS[name],
                 DeprecationWarning,

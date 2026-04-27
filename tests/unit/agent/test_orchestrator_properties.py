@@ -137,6 +137,8 @@ class TestOrchestratorPropertyInstallation:
             result = orchestrator._chat_coordinator
 
         assert result is shim
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["agent_orchestrator._chat_coordinator_get.compat_property"] == 1
 
     def test_chat_coordinator_alias_setter_warns(self):
         """The legacy _chat_coordinator setter should warn and update the shim slot."""
@@ -152,6 +154,8 @@ class TestOrchestratorPropertyInstallation:
             orchestrator._chat_coordinator = shim
 
         assert orchestrator._deprecated_chat_coordinator is shim
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["agent_orchestrator._chat_coordinator_set.compat_property"] == 1
 
     def test_session_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
         """The legacy _session_coordinator alias should warn and proxy the shim."""

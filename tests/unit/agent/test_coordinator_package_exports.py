@@ -2,6 +2,18 @@
 
 import pytest
 
+from victor.agent.services.chat_compat_telemetry import (
+    get_deprecated_chat_shim_telemetry,
+    reset_deprecated_chat_shim_telemetry,
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_chat_compat_telemetry():
+    reset_deprecated_chat_shim_telemetry()
+    yield
+    reset_deprecated_chat_shim_telemetry()
+
 
 def test_session_package_exports_warn():
     """Package-root session coordinator exports should be compatibility-only."""
@@ -70,6 +82,24 @@ def test_specialized_chat_package_exports_warn():
     assert package_sync_chat_coordinator is SyncChatCoordinator
     assert package_streaming_chat_coordinator is StreamingChatCoordinator
     assert package_unified_chat_coordinator is UnifiedChatCoordinator
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["coordinators_package.SyncChatCoordinator.package_export"] >= 1
+    assert telemetry["coordinators_package.StreamingChatCoordinator.package_export"] >= 1
+    assert telemetry["coordinators_package.UnifiedChatCoordinator.package_export"] >= 1
+
+
+def test_chat_coordinator_package_export_warns_and_records_telemetry():
+    from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="victor.agent.coordinators.ChatCoordinator is deprecated compatibility surface",
+    ):
+        from victor.agent.coordinators import ChatCoordinator as package_chat_coordinator
+
+    assert package_chat_coordinator is ChatCoordinator
+    telemetry = get_deprecated_chat_shim_telemetry()
+    assert telemetry["coordinators_package.ChatCoordinator.package_export"] >= 1
 
 
 def test_chat_protocol_package_exports_warn():

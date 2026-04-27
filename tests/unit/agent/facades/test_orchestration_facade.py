@@ -199,6 +199,8 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.chat_coordinator
 
         assert coordinator._mock_name == "chat"
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.chat_coordinator.direct_slot"] == 1
 
     def test_chat_coordinator_property_resolves_lazy_compatibility_getter(self):
         """ChatCoordinator compatibility accessor resolves lazily when needed."""
@@ -212,6 +214,16 @@ class TestOrchestrationFacadeProperties:
             coordinator = facade.chat_coordinator
 
         assert coordinator is chat
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.chat_coordinator.lazy_getter"] == 1
+
+    def test_chat_coordinator_property_records_missing_surface_access(self):
+        facade = OrchestrationFacade()
+
+        assert facade.chat_coordinator is None
+
+        telemetry = get_deprecated_chat_shim_telemetry()
+        assert telemetry["orchestration_facade.chat_coordinator.missing_surface"] == 1
 
     def test_old_chat_coordinator_kwarg_warns(self):
         """Old chat_coordinator kwarg should warn and remain compatible."""
