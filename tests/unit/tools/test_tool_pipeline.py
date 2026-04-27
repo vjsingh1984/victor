@@ -254,6 +254,8 @@ class TestToolPipeline:
         assert "Do not repeat the same read(path, offset, limit)" in skipped.result
         assert "code_search" in skipped.result
         assert "project_overview" in skipped.result
+        assert pipeline.last_batch_all_skipped is True
+        assert pipeline.last_batch_effectively_blocked is False
 
     @pytest.mark.asyncio
     async def test_redundant_code_search_skip_includes_recovery_payload(self, mock_tool_registry):
@@ -373,6 +375,23 @@ class TestToolPipeline:
         assert suggestions
         assert suggestions[0]["tool"] in {"overview", "graph"}
         assert mock_executor.execute.call_count == 0
+        assert pipeline.last_batch_all_skipped is True
+        assert pipeline.last_batch_effectively_blocked is False
+
+    @pytest.mark.asyncio
+    async def test_unknown_tool_skip_still_counts_as_effectively_blocked(self, pipeline, mock_tool_registry):
+        """Non-informative skipped batches should continue to count as blocked."""
+        mock_tool_registry.is_tool_enabled.return_value = False
+
+        result = await pipeline.execute_tool_calls(
+            [{"name": "unknown_tool", "arguments": {"x": 1}}],
+            {},
+        )
+
+        assert result.skipped_calls == 1
+        assert result.results[0].result is None
+        assert pipeline.last_batch_all_skipped is True
+        assert pipeline.last_batch_effectively_blocked is True
 
     def test_reset(self, pipeline):
         """Test resetting pipeline state."""

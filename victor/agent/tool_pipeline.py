@@ -596,6 +596,27 @@ def _build_repeated_failure_recovery(tool_name: str, arguments: Dict[str, Any]) 
     }
 
 
+def _has_informative_skip_payload(call_result: "ToolCallResult") -> bool:
+    """Return True when a skipped call still gave the model actionable information."""
+    if not getattr(call_result, "skipped", False):
+        return False
+
+    output = getattr(call_result, "result", None)
+    if isinstance(output, str):
+        return bool(output.strip())
+    if isinstance(output, dict):
+        return bool(
+            output
+            and (
+                output.get("error")
+                or output.get("result") is not None
+                or output.get("metadata")
+                or output.get("success") is False
+            )
+        )
+    return output is not None
+
+
 @dataclass
 class PipelineExecutionResult:
     """Result of executing multiple tool calls."""
@@ -699,6 +720,7 @@ class ToolPipeline:
 
         # Spin detection: track whether last batch had all calls blocked
         self.last_batch_all_skipped: bool = False
+        self.last_batch_effectively_blocked: bool = False
 
         # Output aggregation and synthesis checkpoints
         self._output_aggregator: Optional[OutputAggregator] = None
@@ -1492,10 +1514,14 @@ class ToolPipeline:
                 result.results.append(dup_result)
                 result.skipped_calls += 1
 
-        # Track whether ALL tool calls in this batch were skipped/blocked
-        # Used by spin detection in the streaming pipeline
+        # Track whether ALL tool calls in this batch were skipped.
+        # Some skipped batches still return actionable recovery content and should
+        # not count as a hard blocked turn for spin detection.
         self.last_batch_all_skipped = len(result.results) > 0 and all(
             getattr(r, "skipped", False) for r in result.results
+        )
+        self.last_batch_effectively_blocked = self.last_batch_all_skipped and not any(
+            _has_informative_skip_payload(r) for r in result.results
         )
         if self.last_batch_all_skipped:
             logger.info(

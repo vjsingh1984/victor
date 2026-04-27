@@ -429,7 +429,12 @@ class TurnExecutor:
                     if _orch:
                         _pipeline = getattr(_orch, "_tool_pipeline", None)
                 _all_blocked = bool(
-                    _pipeline and getattr(_pipeline, "last_batch_all_skipped", False)
+                    _pipeline
+                    and getattr(
+                        _pipeline,
+                        "last_batch_effectively_blocked",
+                        getattr(_pipeline, "last_batch_all_skipped", False),
+                    )
                 )
 
                 spin.record_turn(
@@ -648,7 +653,14 @@ class TurnExecutor:
             if _pipeline is None:
                 if _orch:
                     _pipeline = getattr(_orch, "_tool_pipeline", None)
-            all_blocked = bool(_pipeline and getattr(_pipeline, "last_batch_all_skipped", False))
+            all_blocked = bool(
+                _pipeline
+                and getattr(
+                    _pipeline,
+                    "last_batch_effectively_blocked",
+                    getattr(_pipeline, "last_batch_all_skipped", False),
+                )
+            )
 
             # Record failures for optimization hints
             for result in tool_results:
