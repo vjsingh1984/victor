@@ -31,9 +31,11 @@ from victor.framework.agentic_loop import (
 from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
 from victor.framework.fulfillment import FulfillmentResult, FulfillmentStatus, TaskType
 from victor.framework.perception_integration import Perception
+from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.framework.task.protocols import TaskComplexity
 from victor.providers.base import CompletionResponse
 from victor.providers.performance_tracker import ProviderPerformanceTracker, RequestMetric
+from victor.teams.types import TeamFormation, TeamResult
 
 # ============================================================================
 # LoopStage enum tests
@@ -236,6 +238,7 @@ class TestAgenticLoop:
             orchestrator=MagicMock(spec=[]),
             turn_executor=turn_executor,
             max_iterations=1,
+            config={"disable_enhanced_completion": True},
         )
         agentic_loop_module = __import__(
             "victor.framework.agentic_loop",
@@ -431,11 +434,142 @@ class TestAgenticLoop:
             user_message="Fix the bug",
             task_classification=task_classification,
         )
-        assert result.final_state["topology_preparation"] == {
-            "action": "parallel_exploration",
-            "prepared": True,
-            "execution_mode": "parallel_exploration",
-        }
+        assert result.final_state["topology_preparation"]["action"] == "parallel_exploration"
+        assert result.final_state["topology_preparation"]["prepared"] is True
+        assert (
+            result.final_state["topology_preparation"]["execution_mode"]
+            == "parallel_exploration"
+        )
+
+    async def test_run_team_topology_executes_framework_team_runtime(self, monkeypatch):
+        perception = _make_perception()
+        perception.confidence = 0.9
+        turn_executor = MagicMock()
+        turn_executor.prepare_runtime_topology = AsyncMock(
+            return_value={
+                "action": "team_plan",
+                "prepared": True,
+                "execution_mode": "team_execution",
+                "team_name": "feature_team",
+                "display_name": "Feature Team",
+                "formation": "parallel",
+                "member_count": 2,
+                "runtime_context_overrides": {
+                    "team_name": "feature_team",
+                    "team_display_name": "Feature Team",
+                    "formation_hint": "parallel",
+                    "execution_mode": "team_execution",
+                    "max_workers": 2,
+                },
+            }
+        )
+        turn_executor.execute_turn = AsyncMock()
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            turn_executor=turn_executor,
+            max_iterations=1,
+        )
+        loop._analyze_turn = AsyncMock(return_value=perception)
+        loop._plan = AsyncMock(return_value={"steps": ["research", "implement"]})
+        loop._get_topology_provider_hints = AsyncMock(return_value={})
+        loop.paradigm_router = MagicMock()
+        loop.paradigm_router.route.return_value = MagicMock(
+            skip_planning=False,
+            paradigm=SimpleNamespace(value="deep"),
+            model_tier=SimpleNamespace(value="large"),
+            max_tokens=4096,
+            confidence=0.88,
+            to_dict=MagicMock(return_value={"paradigm": "deep", "model_tier": "large"}),
+        )
+        loop.paradigm_router.build_topology_input = MagicMock(
+            return_value=TopologyDecisionInput(
+                query="Build the feature",
+                task_type="feature",
+                task_complexity="high",
+                tool_budget=6,
+                iteration_budget=1,
+                available_team_formations=["parallel", "hierarchical"],
+            )
+        )
+        topology_decision = TopologyDecision(
+            action=TopologyAction.TEAM_PLAN,
+            topology=TopologyKind.TEAM,
+            confidence=0.84,
+            rationale="Complex feature work benefits from coordinated execution",
+            grounding_requirements=TopologyGroundingRequirements(
+                formation="parallel",
+                max_workers=2,
+                tool_budget=4,
+                iteration_budget=1,
+            ),
+            formation="parallel",
+        )
+        topology_plan = GroundedTopologyPlan(
+            action=TopologyAction.TEAM_PLAN,
+            topology=TopologyKind.TEAM,
+            execution_mode="team_execution",
+            formation="parallel",
+            max_workers=2,
+            tool_budget=4,
+            iteration_budget=1,
+        )
+        loop._topology_selector.select = MagicMock(return_value=topology_decision)
+        loop._topology_grounder.ground = MagicMock(return_value=topology_plan)
+
+        with patch(
+            "victor.framework.team_runtime.run_configured_team",
+            new=AsyncMock(
+                return_value=(
+                    ResolvedTeamExecutionPlan(
+                        team_name="feature_team",
+                        display_name="Feature Team",
+                        formation=TeamFormation.PARALLEL,
+                        member_count=2,
+                        total_tool_budget=4,
+                        max_iterations=20,
+                        max_workers=2,
+                    ),
+                    TeamResult(
+                        success=True,
+                        final_output=(
+                            "Team synthesis: the feature plan is complete, code paths were "
+                            "reviewed, and the final implementation guidance is ready."
+                        ),
+                        member_results={},
+                        formation=TeamFormation.PARALLEL,
+                        total_tool_calls=3,
+                    ),
+                )
+            ),
+        ) as run_team:
+            result = await loop.run("Build the feature")
+
+        run_team.assert_awaited_once()
+        turn_executor.execute_turn.assert_not_called()
+        assert result.success is True
+        assert result.final_state["topology_preparation"]["team_name"] == "feature_team"
+        assert result.final_state["topology_overrides"]["team_name"] == "feature_team"
+
+    async def test_evaluate_framework_team_execution_turn_completes(self):
+        loop = self._make_loop(max_iterations=1, config={"disable_enhanced_completion": True})
+        perception = _make_perception()
+        action_result = TurnResult(
+            response=CompletionResponse(
+                content="Team execution completed with a final synthesized answer.",
+                role="assistant",
+                metadata={"execution_mode": "team_execution", "team_success": True},
+            ),
+            tool_results=[],
+            has_tool_calls=False,
+            tool_calls_count=0,
+            all_tools_blocked=False,
+            is_qa_response=False,
+        )
+
+        result = await loop._evaluate(perception, action_result, {"query": "Build the feature"})
+
+        assert result.decision == EvaluationDecision.COMPLETE
+        assert result.score == pytest.approx(0.92)
 
     async def test_experiment_memory_planning_hints_can_override_fast_path(self):
         perception = _make_perception()

@@ -1331,7 +1331,13 @@ class AgenticLoop:
             return None
 
         if isinstance(result, dict):
-            return dict(result)
+            prepared = dict(result)
+            prepared_overrides = prepared.get("runtime_context_overrides")
+            if isinstance(prepared_overrides, dict):
+                merged_overrides = dict(state.get("topology_overrides") or {})
+                merged_overrides.update(prepared_overrides)
+                state["topology_overrides"] = merged_overrides
+            return prepared
         return None
 
     async def _get_topology_provider_hints(
@@ -1710,6 +1716,14 @@ class AgenticLoop:
             task_classification = state.get("_task_classification")
             is_qa = state.get("_is_qa_task", False)
             runtime_context_overrides = state.get("topology_overrides")
+            if self._should_execute_team_plan(runtime_context_overrides):
+                team_turn = await self._execute_team_plan(
+                    plan,
+                    state,
+                    runtime_context_overrides,
+                )
+                if team_turn is not None:
+                    return team_turn
             enable_thinking = bool(
                 state.get("enable_thinking")
                 or (
@@ -1757,6 +1771,110 @@ class AgenticLoop:
             return await self.orchestrator.run(query)
 
         return {"plan_executed": True, "plan": plan}
+
+    @staticmethod
+    def _should_execute_team_plan(
+        runtime_context_overrides: Optional[Dict[str, Any]],
+    ) -> bool:
+        """Check whether topology preparation resolved a concrete team execution."""
+        return bool(
+            isinstance(runtime_context_overrides, dict)
+            and runtime_context_overrides.get("execution_mode") == "team_execution"
+            and runtime_context_overrides.get("team_name")
+        )
+
+    async def _execute_team_plan(
+        self,
+        plan: Any,
+        state: Dict[str, Any],
+        runtime_context_overrides: Optional[Dict[str, Any]],
+    ) -> Optional["TurnResult"]:
+        """Execute a topology-selected team plan through framework team runtime."""
+        from victor.agent.services.turn_execution_runtime import TurnResult
+        from victor.framework.team_runtime import run_configured_team
+        from victor.providers.base import CompletionResponse
+
+        if not isinstance(runtime_context_overrides, dict):
+            return None
+
+        task_classification = state.get("_task_classification")
+        complexity_value = getattr(task_classification, "complexity", None)
+        if hasattr(complexity_value, "value"):
+            complexity_value = complexity_value.value
+        if complexity_value is None:
+            complexity_value = state.get("task_complexity") or state.get("perception", {}).get(
+                "complexity",
+                "medium",
+            )
+
+        team_execution = await run_configured_team(
+            self.orchestrator,
+            goal=state.get("query", ""),
+            task_type=str(state.get("task_type") or "unknown"),
+            complexity=str(complexity_value or "medium"),
+            preferred_team=runtime_context_overrides.get("team_name"),
+            preferred_formation=runtime_context_overrides.get("formation_hint"),
+            max_workers=runtime_context_overrides.get("max_workers"),
+            tool_budget=runtime_context_overrides.get("tool_budget"),
+            context=self._build_team_execution_context(plan, state, runtime_context_overrides),
+        )
+        if team_execution is None:
+            return None
+
+        resolved_team, team_result = team_execution
+        final_output = team_result.final_output.strip() or team_result.error or "Team execution completed."
+        response = CompletionResponse(
+            content=final_output,
+            role="assistant",
+            stop_reason="team_execution_completed",
+            metadata={
+                "execution_mode": "team_execution",
+                "team_name": resolved_team.team_name,
+                "team_display_name": resolved_team.display_name,
+                "formation": resolved_team.formation.value,
+                "team_success": bool(team_result.success),
+                "member_count": resolved_team.member_count,
+                "total_tool_calls": team_result.total_tool_calls,
+            },
+        )
+        return TurnResult(
+            response=response,
+            tool_results=[],
+            has_tool_calls=False,
+            tool_calls_count=0,
+            all_tools_blocked=not team_result.success,
+            is_qa_response=False,
+        )
+
+    @staticmethod
+    def _build_team_execution_context(
+        plan: Any,
+        state: Dict[str, Any],
+        runtime_context_overrides: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build shared context for framework team execution."""
+        context: Dict[str, Any] = {
+            "query": state.get("query", ""),
+            "plan": plan,
+            "task_type": state.get("task_type"),
+            "task_complexity": state.get("task_complexity"),
+            "perception": state.get("perception"),
+            "topology_plan": state.get("topology_plan"),
+        }
+        for key in (
+            "team_name",
+            "team_display_name",
+            "formation_hint",
+            "topology_action",
+            "topology_kind",
+            "topology_metadata",
+            "provider_hint",
+            "max_workers",
+        ):
+            value = runtime_context_overrides.get(key)
+            if value is not None:
+                context[key] = value
+        return context
 
     def _is_complete_response(self, response: str) -> bool:
         """Check if response appears to be a complete answer.
@@ -1877,6 +1995,26 @@ class AgenticLoop:
                     "clarification_prompt": clarification.prompt,
                 },
             )
+
+        try:
+            from victor.agent.services.turn_execution_runtime import TurnResult
+
+            if isinstance(action_result, TurnResult):
+                response_metadata = action_result.response.metadata or {}
+                if response_metadata.get("execution_mode") == "team_execution":
+                    if response_metadata.get("team_success", True) and action_result.has_content:
+                        return EvaluationResult(
+                            decision=EvaluationDecision.COMPLETE,
+                            score=0.92,
+                            reason="Framework team execution completed with synthesized output",
+                        )
+                    return EvaluationResult(
+                        decision=EvaluationDecision.FAIL,
+                        score=0.2,
+                        reason="Framework team execution did not produce a usable final output",
+                    )
+        except Exception:
+            pass
 
         # ENHANCED: Use EnhancedCompletionEvaluator if enabled
         if self.enhanced_completion_evaluator is not None and self._should_use_enhanced_evaluation(
