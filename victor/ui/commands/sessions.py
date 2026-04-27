@@ -27,6 +27,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+from victor.ui.json_utils import create_json_option, print_json_data
 
 sessions_app = typer.Typer(name="session", help="Manage conversation sessions.")
 console = Console()
@@ -95,7 +96,7 @@ def _render_preview_messages(preview_messages: list[dict[str, object]]) -> None:
 def sessions_list(
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of sessions to list"),
     all: bool = typer.Option(False, "--all", help="List all sessions (no limit)"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List saved conversation sessions.
 
@@ -117,7 +118,7 @@ def sessions_list(
 
         if json_output:
             # Output as JSON
-            console.print_json(json.dumps(sessions, indent=2))
+            print_json_data({"sessions": sessions, "count": len(sessions)})
         else:
             # Output as table
             table = Table(title=f"Saved Sessions (last {len(sessions)})")
@@ -165,7 +166,7 @@ def sessions_list(
 @sessions_app.command("show")
 def sessions_show(
     session_id: str = typer.Argument(..., help="Session ID to show"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show details of a specific session.
 
@@ -185,7 +186,7 @@ def sessions_show(
 
         if json_output:
             # Output as JSON
-            console.print_json(json.dumps(session_data, indent=2))
+            print_json_data(session_data)
         else:
             # Output formatted
             from rich.panel import Panel
@@ -235,7 +236,7 @@ def sessions_show(
 def sessions_search(
     query: str = typer.Argument(..., help="Search query string"),
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum results"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Search sessions by title or content.
 
@@ -253,7 +254,7 @@ def sessions_search(
             sys.exit(0)
 
         if json_output:
-            console.print_json(json.dumps(sessions, indent=2))
+            print_json_data({"sessions": sessions, "count": len(sessions), "query": query})
         else:
             table = Table(title=f"Sessions matching '{query}'")
             table.add_column("Session ID", style="cyan", no_wrap=True)

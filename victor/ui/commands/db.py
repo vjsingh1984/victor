@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.table import Table
 
 from victor.config.settings import get_project_paths
+from victor.ui.json_utils import create_json_option, print_json_data
 
 db_app = typer.Typer(name="db", help="Database maintenance and management.")
 console = Console()
@@ -49,7 +50,7 @@ def _parse_duration(duration_str: str) -> int:
 
 @db_app.command("stats")
 def db_stats(
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show database statistics (table sizes, row counts, file size)."""
     from victor.core.database import get_database
@@ -61,14 +62,12 @@ def db_stats(
     stats = db.get_table_stats()
 
     if json_output:
-        import json
-
         output = {
             "db_path": str(db_path),
             "file_size_mb": round(file_size_mb, 1),
             "tables": stats,
         }
-        console.print_json(json.dumps(output))
+        print_json_data(output)
         return
 
     console.print(f"\n[bold]Database:[/bold] {db_path}")

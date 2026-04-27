@@ -14,7 +14,6 @@
 
 """Vertical management commands."""
 
-import json
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +25,7 @@ from victor.core.verticals.registry_manager import (
     PackageSpec,
     VerticalRegistryManager,
 )
+from victor.ui.json_utils import create_json_option, print_json_data
 
 # Initialize components
 vertical_app = typer.Typer(
@@ -313,7 +313,7 @@ def audit_verticals(
         None,
         help="One or more extracted vertical repository paths",
     ),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
     workspace: bool = typer.Option(
         False,
         "--workspace",
@@ -344,7 +344,7 @@ def audit_verticals(
     reports = VerticalContractAuditor().audit_paths(resolved_paths)
 
     if json_output:
-        console.print_json(json.dumps([report.to_dict() for report in reports], indent=2))
+        print_json_data({"reports": [report.to_dict() for report in reports], "count": len(reports)})
     else:
         table = Table(title="Vertical Contract Audit")
         table.add_column("Repo", style="cyan")
