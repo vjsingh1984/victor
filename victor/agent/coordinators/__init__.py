@@ -275,7 +275,7 @@ def __getattr__(name: str) -> Any:
                 "StreamingChatCoordinator",
                 "UnifiedChatCoordinator",
             }:
-                record_deprecated_chat_shim_access("coordinators_package", name, "service_reexport")
+                record_deprecated_chat_shim_access("coordinators_package", name, "package_export")
             warnings.warn(_DEPRECATED_EXPORTS[name], DeprecationWarning, stacklevel=2)
         globals()[name] = value
         return value
