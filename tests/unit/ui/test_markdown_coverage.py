@@ -120,6 +120,7 @@ class TestMarkdownBlock:
         result = _markdown_block("[bold]text[/]")
         # Should not crash, and should be a valid Markdown object
         from rich.markdown import Markdown
+
         assert isinstance(result, Markdown)
 
     def test_markdown_block_with_empty_string(self):
@@ -241,7 +242,9 @@ print("code")
     def test_rendering_exception_returns_fallback(self):
         """Exception during rendering falls back to plain text."""
         # Mock _markdown_block to raise an exception
-        with patch('victor.ui.rendering.markdown._markdown_block', side_effect=ValueError("Test error")):
+        with patch(
+            "victor.ui.rendering.markdown._markdown_block", side_effect=ValueError("Test error")
+        ):
             result = render_markdown_with_hooks("test content")
 
         # Should fall back to plain text

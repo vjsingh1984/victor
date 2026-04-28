@@ -670,9 +670,7 @@ class TTLCache(BaseCache[K, V]):
             Number of entries removed
         """
         with self._lock:
-            expired_keys = [
-                key for key, entry in self._cache.items() if entry.is_expired()
-            ]
+            expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
             for key in expired_keys:
                 del self._cache[key]
             return len(expired_keys)
@@ -753,7 +751,9 @@ class NamespacedCache(BaseCache[K, V]):
         cache = self._get_namespace(ns)
         return cache.get(key, default)
 
-    def set(self, key: K, value: V, namespace: Optional[str] = None, ttl: Optional[float] = None) -> None:
+    def set(
+        self, key: K, value: V, namespace: Optional[str] = None, ttl: Optional[float] = None
+    ) -> None:
         """Set a value in the cache.
 
         Args:
@@ -833,9 +833,7 @@ class NamespacedCache(BaseCache[K, V]):
 
     def __contains__(self, key: K) -> bool:
         """Check if a key is in any namespace."""
-        return any(
-            key in cache for cache in self._namespaces.values()
-        )
+        return any(key in cache for cache in self._namespaces.values())
 
     def get_stats(self) -> CacheStats:
         """Get combined statistics from all namespaces."""

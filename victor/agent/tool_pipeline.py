@@ -1071,7 +1071,9 @@ class ToolPipeline:
         expanded_tool_name, expanded_args, variant_changed = self._apply_tool_variant_expansion(
             tool_name, arguments
         )
-        normalized_args, strategy = self._normalize_arguments(expanded_tool_name, expanded_args, context=context)
+        normalized_args, strategy = self._normalize_arguments(
+            expanded_tool_name, expanded_args, context=context
+        )
         normalized_tool_name, normalized_args, search_changed = self._apply_search_routing(
             expanded_tool_name, normalized_args
         )
@@ -1635,6 +1637,7 @@ class ToolPipeline:
             if skip_reasons:
                 # Count unique reasons
                 from collections import Counter
+
                 reason_counts = Counter(skip_reasons)
                 reason_summary = ", ".join(f"{r} ({c})" for r, c in reason_counts.items())
                 logger.info(

@@ -131,7 +131,7 @@ class TestOpenAICompatErrorHandling:
         """400 errors with invalid JSON fall back to raw text."""
         mock_response = Mock()
         mock_response.status_code = 400
-        mock_response.text = 'Bad request {invalid json'
+        mock_response.text = "Bad request {invalid json"
 
         mock_exc = httpx.HTTPStatusError(
             "400",
@@ -186,7 +186,9 @@ class TestOpenAICompatErrorHandling:
         mock_response = Mock()
         mock_response.status_code = 500
         # Simulate exception when accessing text
-        type(mock_response).text = property(lambda self: (_ for _ in ()).throw(Exception("Read error")))
+        type(mock_response).text = property(
+            lambda self: (_ for _ in ()).throw(Exception("Read error"))
+        )
 
         mock_exc = httpx.HTTPStatusError(
             "500",
@@ -210,11 +212,7 @@ class TestAccumulateToolCallDelta:
 
         delta = {
             "tool_calls": [
-                {
-                    "index": 0,
-                    "id": "call_123",
-                    "function": {"name": "test_tool", "arguments": "{}"}
-                }
+                {"index": 0, "id": "call_123", "function": {"name": "test_tool", "arguments": "{}"}}
             ]
         }
 
@@ -279,15 +277,9 @@ class TestAccumulateToolCallDelta:
 
     def test_accumulate_preserves_id_and_name(self):
         """Tool call ID and name are preserved when already set."""
-        accumulated = [
-            {"id": "call_1", "name": "old_name", "arguments": ""}
-        ]
+        accumulated = [{"id": "call_1", "name": "old_name", "arguments": ""}]
 
-        delta = {
-            "tool_calls": [
-                {"index": 0, "id": "call_1", "function": {"name": "new_name"}}
-            ]
-        }
+        delta = {"tool_calls": [{"index": 0, "id": "call_1", "function": {"name": "new_name"}}]}
 
         accumulate_tool_call_delta(delta, accumulated)
 
@@ -355,7 +347,13 @@ class TestFixOrphanedToolMessages:
             {
                 "role": "assistant",
                 "content": None,
-                "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "tool", "arguments": "{}"}}]
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "tool", "arguments": "{}"},
+                    }
+                ],
             },
             {"role": "tool", "tool_call_id": "call_1", "content": "Success"},
         ]
@@ -399,9 +397,17 @@ class TestFixOrphanedToolMessages:
                 "role": "assistant",
                 "content": None,
                 "tool_calls": [
-                    {"id": "call_A", "type": "function", "function": {"name": "tool1", "arguments": "{}"}},
-                    {"id": "call_B", "type": "function", "function": {"name": "tool2", "arguments": "{}"}},
-                ]
+                    {
+                        "id": "call_A",
+                        "type": "function",
+                        "function": {"name": "tool1", "arguments": "{}"},
+                    },
+                    {
+                        "id": "call_B",
+                        "type": "function",
+                        "function": {"name": "tool2", "arguments": "{}"},
+                    },
+                ],
             },
             {"role": "tool", "tool_call_id": "call_A", "content": "Success"},
             # Note: call_B's response was compacted away (not in message list)
@@ -447,6 +453,7 @@ class TestMarkdownRendering:
 
         # Should return a Markdown object
         from rich.markdown import Markdown
+
         assert isinstance(result, Markdown)
 
     def test_render_image_placeholder(self):
@@ -455,6 +462,7 @@ class TestMarkdownRendering:
 
         # Should return a Panel
         from rich.panel import Panel
+
         assert isinstance(result, Panel)
 
     def test_render_markdown_with_hooks_empty_content(self):
@@ -587,9 +595,7 @@ class TestToolConversion:
                 description="A test tool",
                 parameters={
                     "type": "object",
-                    "properties": {
-                        "arg1": {"type": "string", "description": "First arg"}
-                    }
+                    "properties": {"arg1": {"type": "string", "description": "First arg"}},
                 },
             )
         ]
@@ -607,10 +613,7 @@ class TestToolConversion:
             {
                 "id": "call_123",
                 "type": "function",
-                "function": {
-                    "name": "test_tool",
-                    "arguments": '{"arg1": "value1"}'
-                }
+                "function": {"name": "test_tool", "arguments": '{"arg1": "value1"}'},
             }
         ]
 

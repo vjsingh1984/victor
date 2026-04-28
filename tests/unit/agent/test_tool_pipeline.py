@@ -189,36 +189,32 @@ class TestExecuteToolCalls:
         assert call_result.retryable is True
         assert "already read with the same offset/limit" in call_result.user_message
 
-    async def test_log_message_shows_actual_skip_reasons(
-        self, pipeline, log_capture
-    ):
+    async def test_log_message_shows_actual_skip_reasons(self, pipeline, log_capture):
         """Test that log messages show actual skip reasons, not hardcoded text."""
         # Force budget exhaustion
         pipeline.config.tool_budget = 1
         pipeline._calls_used = 1
 
         # Execute a tool call that will be skipped due to budget
-        await pipeline.execute_tool_calls(
-            [{"name": "read", "arguments": {"path": "/tmp/f.py"}}]
-        )
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "/tmp/f.py"}}])
 
         # Check that the log message contains the actual skip reason
         log_text = " ".join(log_capture)
         assert "Tool budget exhausted" in log_text or "budget" in log_text.lower()
 
-    async def test_log_message_multiple_skip_reasons(
-        self, pipeline, log_capture
-    ):
+    async def test_log_message_multiple_skip_reasons(self, pipeline, log_capture):
         """Test that log messages show multiple different skip reasons."""
         # First call exhausts budget
         pipeline.config.tool_budget = 1
         pipeline._calls_used = 1
 
         # Execute multiple tool calls that will be skipped
-        await pipeline.execute_tool_calls([
-            {"name": "read", "arguments": {"path": "/tmp/f1.py"}},
-            {"name": "ls", "arguments": {"path": "/tmp"}},
-        ])
+        await pipeline.execute_tool_calls(
+            [
+                {"name": "read", "arguments": {"path": "/tmp/f1.py"}},
+                {"name": "ls", "arguments": {"path": "/tmp"}},
+            ]
+        )
 
         # Check that the log message contains skip reason information
         log_text = " ".join(log_capture)

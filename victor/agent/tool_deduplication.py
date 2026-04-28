@@ -56,5 +56,5 @@ warnings.warn(
     "Use victor.agent.tool_call_tracker instead. "
     "This module will be removed in version 0.10.0.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )

@@ -41,6 +41,7 @@ def _escape_rich_markup_from_text(text: str) -> str:
     Returns:
         Text with Rich markup tags escaped by replacing [ with \\[
     """
+
     # Escape Rich markup tags by replacing [ with \\[
     # This is a simple approach that works for most cases
     # We escape patterns that look like Rich tags: [word], [/word], [tag=value]
@@ -113,6 +114,7 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
         # If Rich rendering fails, fall back to plain text to prevent
         # rendering errors from breaking the agentic loop
         import logging
+
         logger = logging.getLogger(__name__)
         logger.warning(
             "Rich rendering failed, falling back to plain text: %s",
@@ -120,6 +122,7 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
         )
         # Return as plain text (Rich Text object, not Markdown)
         from rich.text import Text
+
         return Text(content, style="dim")
 
 

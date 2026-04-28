@@ -47,10 +47,12 @@ except ImportError:
 # Operations where Python is faster than Rust based on benchmarks.
 # These operations should use Python fallback even when native is available.
 # See victor/processing/native/accelerator.py for benchmark data.
-_PYTHON_PREFERRED_OPERATIONS = frozenset({
-    "batch_cosine_similarity",  # NumPy+BLAS is ~6x faster for batch operations
-    "similarity_matrix",  # NumPy matmul is ~4x faster
-})
+_PYTHON_PREFERRED_OPERATIONS = frozenset(
+    {
+        "batch_cosine_similarity",  # NumPy+BLAS is ~6x faster for batch operations
+        "similarity_matrix",  # NumPy matmul is ~4x faster
+    }
+)
 
 
 def is_native_available() -> bool:

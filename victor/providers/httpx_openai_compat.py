@@ -235,7 +235,9 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 payload[key] = value
 
         # Log detailed message structure for debugging tool pairing issues
-        tool_messages = [(i, m) for i, m in enumerate(formatted) if m.get("role") in ("tool", "assistant")]
+        tool_messages = [
+            (i, m) for i, m in enumerate(formatted) if m.get("role") in ("tool", "assistant")
+        ]
         if tool_messages:
             for i, msg in tool_messages:
                 role = msg.get("role")

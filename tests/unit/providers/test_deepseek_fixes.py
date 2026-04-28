@@ -42,9 +42,7 @@ class TestDeepSeekEmptyToolContentFix:
         ]
         # Create assistant message with tool_calls
         assistant_msg = Message(role="assistant", content="")
-        assistant_msg.tool_calls = [
-            {"id": "call_123", "name": "test_tool", "arguments": {}}
-        ]
+        assistant_msg.tool_calls = [{"id": "call_123", "name": "test_tool", "arguments": {}}]
         messages.append(assistant_msg)
 
         # Create tool message with empty content
@@ -72,9 +70,7 @@ class TestDeepSeekEmptyToolContentFix:
             Message(role="user", content="Use the tool"),
         ]
         assistant_msg = Message(role="assistant", content="")
-        assistant_msg.tool_calls = [
-            {"id": "call_456", "name": "read", "arguments": {}}
-        ]
+        assistant_msg.tool_calls = [{"id": "call_456", "name": "read", "arguments": {}}]
         messages.append(assistant_msg)
 
         # Create tool message with whitespace-only content
@@ -95,9 +91,7 @@ class TestDeepSeekEmptyToolContentFix:
             Message(role="user", content="Use the tool"),
         ]
         assistant_msg = Message(role="assistant", content="")
-        assistant_msg.tool_calls = [
-            {"id": "call_789", "name": "write", "arguments": {}}
-        ]
+        assistant_msg.tool_calls = [{"id": "call_789", "name": "write", "arguments": {}}]
         messages.append(assistant_msg)
 
         # Create tool message with actual content
@@ -123,7 +117,10 @@ class TestRichMarkupEscapingFix:
         test_cases = [
             ("[bold]text[/bold]", "\\[bold]text\\[/bold]"),  # Complete bold tag
             ("[red]error[/red]", "\\[red]error\\[/red]"),  # Color tag
-            ("[link=https://example.com]text[/link]", "\\[link=https://example.com]text\\[/link]"),  # Link tag
+            (
+                "[link=https://example.com]text[/link]",
+                "\\[link=https://example.com]text\\[/link]",
+            ),  # Link tag
         ]
 
         for markup, expected in test_cases:
@@ -200,14 +197,8 @@ class TestDeepSeekErrorHandling:
             result = handle_httpx_status_error(mock_exc, "deepseek")
 
         # Should log the error with status code and details
-        assert any(
-            "Provider HTTP error" in record.message
-            for record in caplog.records
-        )
-        assert any(
-            "status=400" in record.message
-            for record in caplog.records
-        )
+        assert any("Provider HTTP error" in record.message for record in caplog.records)
+        assert any("status=400" in record.message for record in caplog.records)
 
     def test_connection_error_classification(self):
         """Connection errors are properly classified."""

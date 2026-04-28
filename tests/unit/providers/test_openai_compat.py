@@ -320,9 +320,7 @@ class TestBuildOpenAIMessages:
         ]
         # Create assistant message with tool_calls
         assistant_msg = Message(role="assistant", content="")
-        assistant_msg.tool_calls = [
-            {"id": "call_123", "name": "test_tool", "arguments": {}}
-        ]
+        assistant_msg.tool_calls = [{"id": "call_123", "name": "test_tool", "arguments": {}}]
         messages.append(assistant_msg)
 
         # Create tool message with empty content
@@ -360,9 +358,17 @@ class TestFixOrphanedToolMessages:
         """Test that tool_calls without matching responses are stripped."""
         messages = [
             {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": None, "tool_calls": [
-                {"id": "call_123", "type": "function", "function": {"name": "test", "arguments": "{}"}}
-            ]},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {"name": "test", "arguments": "{}"},
+                    }
+                ],
+            },
         ]
 
         result = fix_orphaned_tool_messages(messages)
@@ -377,9 +383,17 @@ class TestFixOrphanedToolMessages:
         """Test that valid tool_call/response pairs are preserved."""
         messages = [
             {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": None, "tool_calls": [
-                {"id": "call_123", "type": "function", "function": {"name": "test", "arguments": "{}"}}
-            ]},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {"name": "test", "arguments": "{}"},
+                    }
+                ],
+            },
             {"role": "tool", "tool_call_id": "call_123", "content": "Result"},
         ]
 
