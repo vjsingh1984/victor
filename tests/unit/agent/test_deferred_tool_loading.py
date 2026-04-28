@@ -358,11 +358,13 @@ class TestIntegrationScenarios:
                     content=msg.content,
                     result_id=result_id,
                 )
-                compacted.append(Message(
-                    role=msg.role,
-                    content=placeholder.content,
-                    tool_call_id=msg.tool_call_id,
-                ))
+                compacted.append(
+                    Message(
+                        role=msg.role,
+                        content=placeholder.content,
+                        tool_call_id=msg.tool_call_id,
+                    )
+                )
             else:
                 compacted.append(msg)
 

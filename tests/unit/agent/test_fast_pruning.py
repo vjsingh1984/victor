@@ -198,9 +198,11 @@ class TestFastPruningIntegration:
 
         messages = [
             Message(role="user", content="Task"),
-            Message(role="assistant", content="Let me check", tool_calls=[
-                {"id": "tc1", "name": "read", "arguments": "{}"}
-            ]),
+            Message(
+                role="assistant",
+                content="Let me check",
+                tool_calls=[{"id": "tc1", "name": "read", "arguments": "{}"}],
+            ),
             Message(role="tool", content="x" * 1500, tool_call_id="tc1"),
             Message(role="assistant", content="Done"),
         ]

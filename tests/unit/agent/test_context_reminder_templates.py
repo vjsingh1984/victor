@@ -44,11 +44,10 @@ class TestTaskReminderTemplates:
 
     def test_get_reminder_with_context(self):
         """Reminder with context should include context in template."""
-        reminder = get_reminder_for_task(
-            "analysis",
-            context={"files": "file1.py, file2.py"}
-        )
-        assert "file1.py" in reminder or "{files}" not in reminder  # Either filled or has placeholder
+        reminder = get_reminder_for_task("analysis", context={"files": "file1.py, file2.py"})
+        assert (
+            "file1.py" in reminder or "{files}" not in reminder
+        )  # Either filled or has placeholder
 
     def test_reminder_templates_are_concise(self):
         """Reminders should be concise (< 200 chars)."""
@@ -73,18 +72,14 @@ class TestPostCompactionReminder:
     def test_post_compaction_includes_compaction_context(self):
         """Post-compaction reminder should mention compaction."""
         reminder = get_post_compaction_reminder(
-            task_type="analysis",
-            compaction_summary="Removed 64 messages",
-            messages_removed=64
+            task_type="analysis", compaction_summary="Removed 64 messages", messages_removed=64
         )
         assert "compacted" in reminder.lower() or "removed" in reminder.lower()
 
     def test_post_compaction_includes_task_guidance(self):
         """Post-compaction reminder should include task-specific guidance."""
         reminder = get_post_compaction_reminder(
-            task_type="analysis",
-            compaction_summary="Removed 10 messages",
-            messages_removed=10
+            task_type="analysis", compaction_summary="Removed 10 messages", messages_removed=10
         )
         assert "analyzing" in reminder.lower() or "analysis" in reminder.lower()
 
@@ -92,18 +87,14 @@ class TestPostCompactionReminder:
         """High message removal should get more detailed reminder."""
         # DeepSeek with 64+ messages removed
         reminder = get_post_compaction_reminder(
-            task_type="coding",
-            compaction_summary="Removed 64 messages",
-            messages_removed=64
+            task_type="coding", compaction_summary="Removed 64 messages", messages_removed=64
         )
         assert len(reminder) > 50  # Should provide substantial guidance
 
     def test_post_compaction_with_low_removal(self):
         """Low message removal should get simpler reminder."""
         reminder = get_post_compaction_reminder(
-            task_type="analysis",
-            compaction_summary="Removed 5 messages",
-            messages_removed=5
+            task_type="analysis", compaction_summary="Removed 5 messages", messages_removed=5
         )
         # Should be brief (< 200 chars for simple reminder)
         assert len(reminder) < 200

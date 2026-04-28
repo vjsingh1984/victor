@@ -979,7 +979,9 @@ class ContinuationStrategy:
                 messages_removed=compaction_messages_removed,
                 current_turn=continuation_prompts + 1,  # Approximate turn count
                 task_description=task_description,
-                compaction_summary=f"Removed {compaction_messages_removed} messages" if compaction_occurred else "",
+                compaction_summary=(
+                    f"Removed {compaction_messages_removed} messages" if compaction_occurred else ""
+                ),
             )
 
             # If adaptive strategy returned a message, use it

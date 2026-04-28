@@ -140,6 +140,7 @@ class DeferredLoadingManager:
             self._evict_lru()
 
         import hashlib
+
         result_id = hashlib.md5(
             f"{tool_name}:{str(tool_args)}:{content[:100]}".encode()
         ).hexdigest()[:12]
@@ -155,8 +156,7 @@ class DeferredLoadingManager:
         self._total_bytes_saved += len(content)
 
         logger.debug(
-            f"Stored deferred tool result: {result_id} "
-            f"({len(content)} chars from {tool_name})"
+            f"Stored deferred tool result: {result_id} " f"({len(content)} chars from {tool_name})"
         )
 
         return result_id

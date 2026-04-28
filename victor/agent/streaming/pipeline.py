@@ -1168,7 +1168,9 @@ class StreamingChatPipeline:
                         turns_since_compaction = (
                             stream_ctx.total_iterations - stream_ctx.last_compaction_turn
                         )
-                        if turns_since_compaction <= 2:  # Force continuation for 2 turns after compaction
+                        if (
+                            turns_since_compaction <= 2
+                        ):  # Force continuation for 2 turns after compaction
                             is_asking_input = action_result.get("is_asking_input", False)
                             is_completion = action_result.get("is_completion", False)
 
@@ -1181,7 +1183,9 @@ class StreamingChatPipeline:
                                 # Build context-aware continuation message
                                 summary_hint = ""
                                 if stream_ctx.compaction_summary:
-                                    summary_hint = f" Previous work: {stream_ctx.compaction_summary[:200]}"
+                                    summary_hint = (
+                                        f" Previous work: {stream_ctx.compaction_summary[:200]}"
+                                    )
 
                                 # Inject user-role reminder for higher salience (OpenDev finding)
                                 orch.add_message(
@@ -1189,7 +1193,7 @@ class StreamingChatPipeline:
                                     f"[CONTEXT COMPACTED: Context was compacted to continue the session. "
                                     f"You were in the middle of a task.{summary_hint} "
                                     f"Please continue with what you were doing - "
-                                    f"use tools to gather more information or complete your analysis.]"
+                                    f"use tools to gather more information or complete your analysis.]",
                                 )
                                 # Reset compaction flag after injecting reminder
                                 if turns_since_compaction == 2:

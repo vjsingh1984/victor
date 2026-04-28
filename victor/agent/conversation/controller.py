@@ -1003,7 +1003,7 @@ class ConversationController:
         if len(self.messages) > 1:
             reminder_msg = Message(
                 role="user",
-                content=f"[CONTEXT COMPACTED: Previous context was compacted. Summary: {combined}]"
+                content=f"[CONTEXT COMPACTED: Previous context was compacted. Summary: {combined}]",
             )
             self._history._messages.insert(1, reminder_msg)
             logger.debug(f"Injected compaction context (user role): {combined[:100]}...")

@@ -239,10 +239,7 @@ def should_trigger_emergency_compaction(
     Returns:
         True if emergency compaction should be triggered
     """
-    return (
-        utilization >= critical_threshold
-        and standard_compaction_failed
-    )
+    return utilization >= critical_threshold and standard_compaction_failed
 
 
 def emergency_compact(

@@ -79,7 +79,10 @@ class TestStrategySelector:
         )
 
         # High compaction for DeepSeek should get context reminder
-        assert strategy in (ContinuationStrategy.CONTEXT_REMINDER, ContinuationStrategy.TASK_SUMMARY)
+        assert strategy in (
+            ContinuationStrategy.CONTEXT_REMINDER,
+            ContinuationStrategy.TASK_SUMMARY,
+        )
 
     def test_claude_gets_direct_continue(self):
         """Claude should get DIRECT_CONTINUE strategy (works well)."""
@@ -182,8 +185,14 @@ class TestStrategySelectionLogic:
         )
 
         # Both should be task-oriented strategies
-        assert strategy_low in (ContinuationStrategy.TASK_SUMMARY, ContinuationStrategy.CONTEXT_REMINDER)
-        assert strategy_high in (ContinuationStrategy.TASK_SUMMARY, ContinuationStrategy.CONTEXT_REMINDER)
+        assert strategy_low in (
+            ContinuationStrategy.TASK_SUMMARY,
+            ContinuationStrategy.CONTEXT_REMINDER,
+        )
+        assert strategy_high in (
+            ContinuationStrategy.TASK_SUMMARY,
+            ContinuationStrategy.CONTEXT_REMINDER,
+        )
 
     def test_unknown_provider_gets_direct_continue(self):
         """Unknown providers should default to DIRECT_CONTINUE."""

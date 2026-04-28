@@ -37,6 +37,7 @@ class FastPruningConfig:
         tool_result_size_threshold: Minimum size for tool result to be pruned
         assistant_message_threshold: Minimum size for assistant message pruning
     """
+
     max_tool_result_age: int = 5  # Prune tool results older than N turns
     max_pruned_chars: int = 200  # Max chars to keep in pruned marker
     prune_system_messages: bool = False  # Never prune system messages by default
@@ -100,16 +101,13 @@ class FastPruner:
                 pruned_msg = self._create_pruned_marker(msg)
                 pruned_messages.append(pruned_msg)
                 self._pruned_count += 1
-                logger.debug(
-                    f"Fast-pruned {msg.role} message ({len(msg.content)} chars)"
-                )
+                logger.debug(f"Fast-pruned {msg.role} message ({len(msg.content)} chars)")
             else:
                 pruned_messages.append(msg)
 
         if self._pruned_count > 0:
             logger.info(
-                f"Fast pruning: {self._pruned_count} messages pruned "
-                f"(turn {current_turn})"
+                f"Fast pruning: {self._pruned_count} messages pruned " f"(turn {current_turn})"
             )
 
         return pruned_messages

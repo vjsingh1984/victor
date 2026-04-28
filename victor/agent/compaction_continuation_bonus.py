@@ -31,6 +31,7 @@ class CompactionBonusConfig:
             Longer keys are matched first (e.g., "deepseek-coder" before "deepseek")
         default_bonus: Default bonus for models not in the map.
     """
+
     model_bonuses: Dict[str, int]
     default_bonus: int = 1
 
@@ -123,9 +124,7 @@ class CompactionContinuationBonus:
 
         # Sort keys by length (descending) to match "deepseek-coder" before "deepseek"
         sorted_keys = sorted(
-            self.config.model_bonuses.items(),
-            key=lambda x: len(x[0]),
-            reverse=True
+            self.config.model_bonuses.items(), key=lambda x: len(x[0]), reverse=True
         )
 
         for model_key, bonus in sorted_keys:
