@@ -6,6 +6,9 @@ on:
       - 'feps/**'
   workflow_dispatch:  # Allow manual triggering
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
