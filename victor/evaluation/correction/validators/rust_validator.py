@@ -261,31 +261,7 @@ class RustCodeValidator(BaseCodeValidator):
 
     def _check_brackets(self, code: str) -> Optional[str]:
         """Check for balanced brackets, braces, and angle brackets."""
-        # Remove string contents and comments
-        cleaned = self._remove_strings_and_comments(code)
-
-        bracket_pairs = {"(": ")", "[": "]", "{": "}"}
-        stack: list[tuple[str, int]] = []
-
-        for i, char in enumerate(cleaned):
-            if char in bracket_pairs:
-                stack.append((char, i))
-            elif char in bracket_pairs.values():
-                if not stack:
-                    line = code[:i].count("\n") + 1
-                    return f"Unmatched closing '{char}' at line {line}"
-
-                open_bracket, _ = stack.pop()
-                if bracket_pairs[open_bracket] != char:
-                    line = code[:i].count("\n") + 1
-                    return f"Mismatched brackets: expected '{bracket_pairs[open_bracket]}' but found '{char}' at line {line}"
-
-        if stack:
-            open_bracket, pos = stack[-1]
-            line = code[:pos].count("\n") + 1
-            return f"Unclosed '{open_bracket}' starting at line {line}"
-
-        return None
+        return super()._check_brackets(code)
 
     def _check_main_function(self, code: str) -> Optional[str]:
         """Check for main function in standalone code."""

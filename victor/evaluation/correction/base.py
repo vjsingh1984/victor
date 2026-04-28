@@ -146,6 +146,145 @@ class BaseCodeValidator(ABC):
         """
         return self.clean_markdown(code)
 
+    # =========================================================================
+    # Common Validation Methods (Template Methods)
+    # =========================================================================
+    # These methods are shared across multiple validators to reduce duplication.
+    # Subclasses can override for language-specific behavior.
+
+    def _check_brackets(self, code: str) -> Optional[str]:
+        """Check for balanced brackets, braces, and parentheses.
+
+        This is a universal bracket matching algorithm used by Python, Rust,
+        JavaScript, Go, and Java validators. Language-specific validators can
+        override for additional bracket types (e.g., angle brackets in Rust/Java).
+
+        Args:
+            code: Source code to check
+
+        Returns:
+            Error message if brackets are unbalanced, None otherwise
+        """
+        cleaned = self._remove_strings_and_comments(code)
+
+        bracket_pairs = {"(": ")", "[": "]", "{": "}"}
+        stack: list[tuple[str, int]] = []
+
+        for i, char in enumerate(cleaned):
+            if char in bracket_pairs:
+                stack.append((char, i))
+            elif char in bracket_pairs.values():
+                if not stack:
+                    line = code[:i].count("\n") + 1
+                    return f"Unmatched closing '{char}' at line {line}"
+
+                open_bracket, _ = stack.pop()
+                if bracket_pairs[open_bracket] != char:
+                    line = code[:i].count("\n") + 1
+                    return f"Mismatched brackets: expected '{bracket_pairs[open_bracket]}' but found '{char}' at line {line}"
+
+        if stack:
+            open_bracket, pos = stack[-1]
+            line = code[:pos].count("\n") + 1
+            return f"Unclosed '{open_bracket}' starting at line {line}"
+
+        return None
+
+    def _remove_strings_and_comments(
+        self,
+        code: str,
+        *,
+        has_raw_strings: bool = False,
+        has_template_strings: bool = False,
+        has_char_literals: bool = True,
+    ) -> str:
+        """Remove string contents and comments for structural analysis.
+
+        This allows bracket matching and other structural checks to work without
+        false positives from string contents or comments.
+
+        Args:
+            code: Source code to clean
+            has_raw_strings: Language has raw string literals (r"...") - Rust, Go
+            has_template_strings: Language has template strings (`...`) - JS/TS
+            has_char_literals: Language has char literals ('...')
+
+        Returns:
+            Code with strings replaced by empty placeholders and comments removed
+        """
+        result = code
+
+        # Remove single-line comments
+        result = re.sub(r"//.*$", "", result, flags=re.MULTILINE)
+
+        # Remove multi-line comments
+        result = re.sub(r"/\*.*?\*/", "", result, flags=re.DOTALL)
+
+        # Remove string contents (keep quotes for structure)
+        result = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', '""', result)
+
+        # Remove single-quote strings
+        if has_char_literals:
+            result = re.sub(r"'[^'\\]*(?:\\.[^'\\]*)*'", "''", result)
+
+        # Remove raw strings (Rust r#"..."#, Go `...`)
+        if has_raw_strings:
+            result = re.sub(r'r#*".*?"#*', '""', result)
+            result = re.sub(r"`[^`]*`", "``", result)
+
+        # Remove template strings (JS/TS)
+        if has_template_strings:
+            result = re.sub(r"`[^`\\]*(?:\\.[^`\\]*)*`", "``", result)
+
+        return result
+
+    def _check_incomplete_code(
+        self,
+        code: str,
+        *,
+        extra_patterns: list[str] | None = None,
+        check_brackets: bool = True,
+    ) -> Optional[str]:
+        """Check for obviously incomplete/truncated code.
+
+        Looks for patterns that suggest code was cut off mid-statement.
+
+        Args:
+            code: Source code to check
+            extra_patterns: Additional regex patterns for language-specific truncation
+            check_brackets: If True, also verify brackets are balanced
+
+        Returns:
+            Error message if code appears incomplete, None otherwise
+        """
+        stripped = code.strip()
+
+        if not stripped:
+            return "Empty code"
+
+        # Common truncation patterns across languages
+        truncation_patterns = [
+            r"=\s*$",  # Ends with assignment
+            r"{\s*$",  # Ends with open brace
+            r"\(\s*$",  # Ends with open paren
+        ]
+
+        # Add language-specific patterns
+        if extra_patterns:
+            truncation_patterns.extend(extra_patterns)
+
+        for pattern in truncation_patterns:
+            if re.search(pattern, stripped):
+                # Only flag if also has unclosed brackets (when requested)
+                if check_brackets:
+                    bracket_error = self._check_brackets(stripped)
+                    if bracket_error:
+                        return "Code appears to be truncated"
+                else:
+                    return "Code appears to be truncated"
+
+        return None
+
 
 class ValidatorCapabilities:
     """Descriptor for validator capabilities.
