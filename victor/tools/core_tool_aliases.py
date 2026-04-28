@@ -19,6 +19,7 @@ CORE_TOOL_ALIASES = {
     "patch_file": "edit",
     "execute_bash": "shell",
     "bash": "shell",
+    "shell_readonly": "shell",  # Maps to shell with readonly=True applied by tool selection
 }
 
 

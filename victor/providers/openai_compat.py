@@ -20,10 +20,8 @@ OpenAI-compatible APIs (OpenAI, xAI, LMStudio, vLLM, Ollama).
 These utilities help reduce code duplication across provider implementations.
 """
 
-import hashlib
 import json
 import logging
-import time
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -336,23 +334,12 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
 
         elif msg.role == "tool":
             tool_call_id = getattr(msg, "tool_call_id", None)
-            tool_name = getattr(msg, "name", None) or "unknown"
-            if tool_call_id and tool_call_id in valid_tool_call_ids:
-                entry["tool_call_id"] = tool_call_id
-            else:
-                # Missing or orphaned ID — generate stable fallback to avoid 400 errors
-                fallback = hashlib.md5(f"{tool_name}_{time.time()}".encode()).hexdigest()[:16]
-                entry["tool_call_id"] = fallback
-                logger.debug(
-                    "build_openai_messages: generated fallback tool_call_id=%s "
-                    "(original=%s, tool=%s)",
-                    fallback,
-                    tool_call_id,
-                    tool_name,
-                )
-
-        elif msg.role == "tool":
-            # name field for function responses
+            # Skip tool messages without tool_call_id - they would cause 400 errors
+            # and fix_orphaned_tool_messages() can't properly clean them up.
+            if not tool_call_id:
+                continue
+            entry["tool_call_id"] = tool_call_id
+            # name field for function responses (required by some providers)
             if hasattr(msg, "name") and msg.name:
                 entry["name"] = msg.name
 

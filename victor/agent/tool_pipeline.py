@@ -1046,14 +1046,36 @@ class ToolPipeline:
 
         return routed_tool_name, routed_args, changed
 
+    def _apply_tool_variant_expansion(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> tuple[str, Dict[str, Any], bool]:
+        """Expand tool variants that modify default parameters.
+
+        Examples:
+            shell_readonly -> shell with readonly=True
+        """
+        if tool_name == "shell_readonly":
+            # Map shell_readonly to shell with readonly=True
+            expanded_args = dict(arguments)
+            expanded_args["readonly"] = True
+            logger.debug("Expanded shell_readonly to shell with readonly=True")
+            return "shell", expanded_args, True
+
+        return tool_name, arguments, False
+
     def _normalize_tool_call(
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[str, Dict[str, Any], NormalizationStrategy]:
         """Normalize a full tool call, including search-routing adjustments."""
-        normalized_args, strategy = self._normalize_arguments(tool_name, arguments, context=context)
-        normalized_tool_name, normalized_args, changed = self._apply_search_routing(
-            tool_name, normalized_args
+        # Apply tool variant expansion first (e.g., shell_readonly -> shell with readonly=True)
+        expanded_tool_name, expanded_args, variant_changed = self._apply_tool_variant_expansion(
+            tool_name, arguments
         )
+        normalized_args, strategy = self._normalize_arguments(expanded_tool_name, expanded_args, context=context)
+        normalized_tool_name, normalized_args, search_changed = self._apply_search_routing(
+            expanded_tool_name, normalized_args
+        )
+        changed = variant_changed or search_changed
         if changed and strategy == NormalizationStrategy.DIRECT:
             strategy = NormalizationStrategy.MANUAL_REPAIR
         return normalized_tool_name, normalized_args, strategy

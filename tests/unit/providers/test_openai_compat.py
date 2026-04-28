@@ -6,6 +6,8 @@ from victor.providers.openai_compat import (
     convert_messages_to_openai_format,
     parse_openai_tool_calls,
     parse_openai_stream_chunk,
+    build_openai_messages,
+    fix_orphaned_tool_messages,
 )
 from victor.providers.base import Message, ToolDefinition
 
@@ -216,3 +218,145 @@ class TestParseOpenAIStreamChunk:
         chunk = {}
         result = parse_openai_stream_chunk(chunk)
         assert result["content"] is None
+
+
+class TestBuildOpenAIMessages:
+    """Tests for build_openai_messages."""
+
+    def test_tool_message_with_name_and_tool_call_id(self):
+        """Test that tool messages preserve both tool_call_id and name fields when paired."""
+        messages = [
+            Message(role="user", content="Use the tool"),
+        ]
+        # Create assistant message with tool_calls
+        assistant_msg = Message(role="assistant", content="")
+        assistant_msg.tool_calls = [
+            {"id": "call_123", "name": "test_tool", "arguments": {"arg": "value"}}
+        ]
+        messages.append(assistant_msg)
+        # Create a tool message with both tool_call_id and name
+        tool_msg = Message(role="tool", content="Result")
+        tool_msg.tool_call_id = "call_123"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # Find the tool message in result
+        tool_result = [m for m in result if m["role"] == "tool"][0]
+        assert tool_result["tool_call_id"] == "call_123"
+        assert tool_result["name"] == "test_tool"
+
+    def test_orphaned_tool_message_is_removed(self):
+        """Test that orphaned tool messages (no matching tool_call) are removed."""
+        messages = [
+            Message(role="user", content="Hello"),
+            Message(role="assistant", content="Hi"),
+        ]
+        # Create an orphaned tool message (no assistant message with tool_calls)
+        tool_msg = Message(role="tool", content="Orphaned result")
+        tool_msg.tool_call_id = "orphaned_123"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # The orphaned tool message should be removed by fix_orphaned_tool_messages
+        assert not any(m["role"] == "tool" for m in result)
+
+    def test_paired_tool_call_and_response(self):
+        """Test that properly paired tool_calls and tool responses are preserved."""
+        messages = [
+            Message(role="user", content="Use the tool"),
+        ]
+        # Create assistant message with tool_calls
+        assistant_msg = Message(role="assistant", content="")
+        assistant_msg.tool_calls = [
+            {"id": "call_abc", "name": "test_tool", "arguments": {"arg": "value"}}
+        ]
+        messages.append(assistant_msg)
+
+        # Create tool response
+        tool_msg = Message(role="tool", content="Success")
+        tool_msg.tool_call_id = "call_abc"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # Both should be present
+        assert len(result) == 3
+        assistant_result = [m for m in result if m["role"] == "assistant"][0]
+        tool_result = [m for m in result if m["role"] == "tool"][0]
+
+        assert "tool_calls" in assistant_result
+        assert assistant_result["tool_calls"][0]["id"] == "call_abc"
+        assert tool_result["tool_call_id"] == "call_abc"
+        assert tool_result["name"] == "test_tool"
+
+    def test_no_fallback_tool_call_id_generated(self):
+        """Test that no fallback tool_call_id is generated for missing IDs."""
+        messages = [
+            Message(role="user", content="Hello"),
+        ]
+        # Create a tool message without tool_call_id
+        tool_msg = Message(role="tool", content="Result")
+        # tool_call_id is None
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # Tool message should be removed (orphaned) since no tool_call_id
+        assert not any(m["role"] == "tool" for m in result)
+
+
+class TestFixOrphanedToolMessages:
+    """Tests for fix_orphaned_tool_messages."""
+
+    def test_removes_orphaned_tool_response(self):
+        """Test that tool responses without matching tool_calls are removed."""
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "tool", "tool_call_id": "orphan_123", "content": "Result"},
+        ]
+
+        result = fix_orphaned_tool_messages(messages)
+
+        # Orphaned tool message should be removed
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+
+    def test_removes_tool_calls_without_responses(self):
+        """Test that tool_calls without matching responses are stripped."""
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "call_123", "type": "function", "function": {"name": "test", "arguments": "{}"}}
+            ]},
+        ]
+
+        result = fix_orphaned_tool_messages(messages)
+
+        # tool_calls should be stripped from assistant message
+        assert len(result) == 2
+        assert result[1]["role"] == "assistant"
+        assert "tool_calls" not in result[1]
+        assert result[1]["content"] == ""
+
+    def test_preserves_valid_tool_call_pairs(self):
+        """Test that valid tool_call/response pairs are preserved."""
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "call_123", "type": "function", "function": {"name": "test", "arguments": "{}"}}
+            ]},
+            {"role": "tool", "tool_call_id": "call_123", "content": "Result"},
+        ]
+
+        result = fix_orphaned_tool_messages(messages)
+
+        # Both should be preserved
+        assert len(result) == 3
+        assert "tool_calls" in result[1]
+        assert result[2]["role"] == "tool"
+        assert result[2]["tool_call_id"] == "call_123"
