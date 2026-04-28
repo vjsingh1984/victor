@@ -554,6 +554,7 @@ def _is_missing_semantic_provider_error(error_msg: str) -> bool:
         "requires a codebase indexing provider" in lowered
         or "requires victor-coding package for semantic search" in lowered
         or "codebaseindex factory not registered" in lowered
+        or "unknown embedding provider" in lowered
     )
 
 

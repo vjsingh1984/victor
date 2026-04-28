@@ -25,7 +25,7 @@ from typing import Any, Callable, ClassVar, Dict, Optional, Union, List
 logger = logging.getLogger(__name__)
 
 import yaml
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
@@ -1212,9 +1212,14 @@ class Settings(BaseSettings):
 
     # Models known to support structured tool calls per provider
     # Loaded from model_capabilities.yaml, can be extended in profiles.yaml
-    tool_calling_models: Dict[str, list[str]] = Field(
-        default_factory=_load_tool_capable_patterns_from_yaml
-    )
+    # Computed field that delegates to tools.tool_calling_models for consistency
+    @computed_field  # type: ignore[misc]
+    @property
+    def tool_calling_models(self) -> Dict[str, list[str]]:
+        """Return tool_calling_models from tools nested config."""
+        if self.tools is None:
+            return _load_tool_capable_patterns_from_yaml()
+        return self.tools.tool_calling_models
 
     # Tool Retry Settings
     # NOTE: These fields are now in tools nested group

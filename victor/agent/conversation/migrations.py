@@ -235,7 +235,7 @@ def _migrate_messages_table(cursor: sqlite3.Cursor) -> bool:
     # Check if we're already at the target schema
     has_all_columns = all(col in columns for col in required_columns.keys())
     if has_all_columns:
-        logger.info("Messages table schema is already up-to-date")
+        logger.debug("Messages table schema is already up-to-date")
         return False
 
     # Check if we need a full table recreation (schema is too different)
@@ -289,7 +289,7 @@ def _migrate_model_sizes_table(cursor: sqlite3.Cursor) -> bool:
 
     # Check if already using new schema
     if "family_id" in columns and "num_parameters" in columns:
-        logger.info("model_sizes table already using new schema")
+        logger.debug("model_sizes table already using new schema")
         return False
 
     # Check if using old schema
@@ -330,7 +330,7 @@ def _migrate_model_sizes_table(cursor: sqlite3.Cursor) -> bool:
         logger.info(f"Successfully migrated {len(existing_rows)} rows in model_sizes table")
         return True
 
-    logger.info("model_sizes table schema is already up-to-date")
+    logger.debug("model_sizes table schema is already up-to-date")
     return False
 
 
@@ -354,7 +354,7 @@ def _migrate_model_families_table(cursor: sqlite3.Cursor) -> bool:
 
     # Check if already using new schema
     if "provider_id" in columns:
-        logger.info("model_families table already using new schema")
+        logger.debug("model_families table already using new schema")
         return False
 
     # Check if using old schema
@@ -392,7 +392,7 @@ def _migrate_model_families_table(cursor: sqlite3.Cursor) -> bool:
         logger.info(f"Successfully migrated {len(existing_rows)} rows in model_families table")
         return True
 
-    logger.info("model_families table schema is already up-to-date")
+    logger.debug("model_families table schema is already up-to-date")
     return False
 
 
@@ -416,7 +416,7 @@ def _migrate_context_sizes_table(cursor: sqlite3.Cursor) -> bool:
 
     # Check if already using correct schema
     if "name" in columns and "min_tokens" in columns and "max_tokens" in columns:
-        logger.info("context_sizes table already using correct schema")
+        logger.debug("context_sizes table already using correct schema")
         return False
 
     # Wrong schema detected - need to recreate
