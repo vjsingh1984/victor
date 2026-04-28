@@ -35,6 +35,7 @@ __all__ = [
     "ToolRegistrarProtocol",
     "ToolSequenceTrackerProtocol",
     "ToolOutputFormatterProtocol",
+    "ToolCallTrackerProtocol",
     "ToolDeduplicationTrackerProtocol",
     "ToolDependencyGraphProtocol",
     "ToolPluginRegistryProtocol",
@@ -357,10 +358,14 @@ class ToolOutputFormatterProtocol(Protocol):
 
 
 @runtime_checkable
-class ToolDeduplicationTrackerProtocol(Protocol):
-    """Protocol for tool call deduplication tracking.
+class ToolCallTrackerProtocol(Protocol):
+    """Protocol for tool call tracking.
 
     Tracks recent tool calls to detect and prevent redundant operations.
+
+    This is DISTINCT from victor.tools.deduplication/, which handles tool
+    DEFINITION deduplication (resolving naming conflicts between native,
+    LangChain, and MCP tools). This protocol tracks RUNTIME tool CALLS.
     """
 
     def add_call(self, tool_name: str, args: Dict[str, Any]) -> None:
@@ -399,6 +404,10 @@ class ToolDeduplicationTrackerProtocol(Protocol):
             List of recent tool calls (most recent first)
         """
         ...
+
+
+# Backward compatibility alias
+ToolDeduplicationTrackerProtocol = ToolCallTrackerProtocol
 
 
 @runtime_checkable

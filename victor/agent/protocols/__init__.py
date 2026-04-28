@@ -40,6 +40,7 @@ _MODULE_MEMBERS = {
         "ToolRegistrarProtocol",
         "ToolSequenceTrackerProtocol",
         "ToolOutputFormatterProtocol",
+        "ToolCallTrackerProtocol",
         "ToolDeduplicationTrackerProtocol",
         "ToolDependencyGraphProtocol",
         "ToolPluginRegistryProtocol",

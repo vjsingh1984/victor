@@ -1598,10 +1598,32 @@ class ToolPipeline:
             _has_informative_skip_payload(r) for r in result.results
         )
         if self.last_batch_all_skipped:
-            logger.info(
-                f"[pipeline] All {len(result.results)} tool calls in batch were "
-                f"skipped/blocked (dedup or session filter)"
-            )
+            # Collect actual skip reasons for accurate logging
+            skip_reasons = []
+            block_sources = []
+            for r in result.results:
+                reason = getattr(r, "skip_reason", None)
+                source = getattr(r, "block_source", None)
+                if reason:
+                    skip_reasons.append(reason)
+                if source:
+                    block_sources.append(source)
+
+            # Build informative log message
+            if skip_reasons:
+                # Count unique reasons
+                from collections import Counter
+                reason_counts = Counter(skip_reasons)
+                reason_summary = ", ".join(f"{r} ({c})" for r, c in reason_counts.items())
+                logger.info(
+                    f"[pipeline] All {len(result.results)} tool calls in batch were "
+                    f"skipped: {reason_summary}"
+                )
+            else:
+                logger.info(
+                    f"[pipeline] All {len(result.results)} tool calls in batch were "
+                    f"skipped/blocked"
+                )
 
         # Check synthesis checkpoint
         if self._synthesis_checkpoint and tool_history:

@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.tool_output_formatter import ToolOutputFormatter
-    from victor.agent.tool_deduplication import ToolDeduplicationTracker
+    from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.tool_access_controller import ToolAccessController
     from victor.agent.argument_normalizer import ArgumentNormalizer
@@ -493,7 +493,7 @@ class ToolBuildersMixin:
             return None
 
         try:
-            from victor.agent.tool_deduplication import ToolDeduplicationTracker
+            from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
 
             window_size = getattr(self.settings, "tool_deduplication_window_size", 10)
             tracker = ToolDeduplicationTracker(window_size=window_size)

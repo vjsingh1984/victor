@@ -109,7 +109,7 @@ if TYPE_CHECKING:
     from victor.agent.streaming.pipeline import StreamingChatPipeline
     from victor.agent.provider import ProviderSwitchCoordinator
     from victor.agent.lifecycle_manager import LifecycleManager
-    from victor.agent.tool_deduplication import ToolDeduplicationTracker
+    from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
     from victor.agent.provider_manager import ProviderManager
     from victor.agent.presentation.protocols import PresentationProtocol
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator

@@ -472,7 +472,7 @@ class ToolMetadataRegistry:
 
     _instance: Optional["ToolMetadataRegistry"] = None
 
-    def __init__(self, delegate: Any | None = None) -> None:
+    def __init__(self, delegate: Optional[Any] = None) -> None:
         _warn_legacy_registry_usage(stacklevel=3)
         self._delegate = delegate or _canonical_registry_cls().get_instance()
 

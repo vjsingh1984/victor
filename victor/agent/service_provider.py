@@ -87,6 +87,7 @@ if TYPE_CHECKING:
         TaskTrackerProtocol,
         TaskTypeHinterProtocol,
         ToolCacheProtocol,
+        ToolCallTrackerProtocol,
         ToolDeduplicationTrackerProtocol,
         ToolDependencyGraphProtocol,
         ToolExecutorProtocol,
@@ -700,13 +701,18 @@ class OrchestratorServiceProvider:
         return AgentModeController(initial_mode=initial_mode)
 
     def _create_tool_deduplication_tracker(self) -> "ToolDeduplicationTrackerProtocol":
-        """Create ToolDeduplicationTracker instance."""
-        from victor.agent.tool_deduplication import ToolDeduplicationTracker
+        """Create ToolDeduplicationTracker instance.
+
+        .. deprecated::
+            Use ToolCallTracker instead. This method now imports from
+            tool_call_tracker module for backward compatibility.
+        """
+        from victor.agent.tool_call_tracker import ToolCallTracker
 
         window_size = getattr(self._settings, "dedup_window_size", 10)
         similarity_threshold = getattr(self._settings, "dedup_similarity_threshold", 0.7)
 
-        return ToolDeduplicationTracker(
+        return ToolCallTracker(
             window_size=window_size,
             similarity_threshold=similarity_threshold,
         )
