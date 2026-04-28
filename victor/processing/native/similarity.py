@@ -18,7 +18,11 @@ from typing import List, Tuple
 
 import numpy as np
 
-from victor.processing.native._base import _NATIVE_AVAILABLE, _native
+from victor.processing.native._base import (
+    _NATIVE_AVAILABLE,
+    _native,
+    should_use_native_for_operation,
+)
 
 
 def cosine_similarity(a: List[float], b: List[float]) -> float:
@@ -55,6 +59,9 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
 def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> List[float]:
     """Compute cosine similarity between a query vector and multiple corpus vectors.
 
+    Uses NumPy+BLAS for batch operations (benchmark shows ~6x faster than Rust
+    for this operation due to hardware-optimized matrix multiplication).
+
     Args:
         query: Query embedding vector
         corpus: List of corpus embedding vectors
@@ -65,10 +72,11 @@ def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> Li
     Raises:
         ValueError: If query dimension doesn't match corpus dimensions
     """
-    if _NATIVE_AVAILABLE:
+    # Benchmark-aware dispatch: prefer Python (NumPy+BLAS) for batch operations
+    if should_use_native_for_operation("batch_cosine_similarity"):
         return _native.batch_cosine_similarity(query, corpus)
 
-    # Pure Python fallback using NumPy
+    # NumPy+BLAS fallback (actually faster for this operation)
     if not corpus:
         return []
 

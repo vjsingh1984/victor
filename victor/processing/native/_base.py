@@ -44,9 +44,39 @@ except ImportError:
     logger.debug("Native extensions not available, using pure Python fallback")
 
 
+# Operations where Python is faster than Rust based on benchmarks.
+# These operations should use Python fallback even when native is available.
+# See victor/processing/native/accelerator.py for benchmark data.
+_PYTHON_PREFERRED_OPERATIONS = frozenset({
+    "batch_cosine_similarity",  # NumPy+BLAS is ~6x faster for batch operations
+    "similarity_matrix",  # NumPy matmul is ~4x faster
+})
+
+
 def is_native_available() -> bool:
     """Check if native Rust extensions are available."""
     return _NATIVE_AVAILABLE
+
+
+def should_use_native_for_operation(operation_name: str) -> bool:
+    """Check if native Rust should be used for a given operation.
+
+    Returns False if:
+    - Native extensions are not available, OR
+    - The operation is in PYTHON_PREFERRED_OPERATIONS (Python is faster)
+
+    This allows module-level dispatch to respect benchmark data without
+    the overhead of importing the full accelerator module.
+
+    Args:
+        operation_name: Name of the operation (e.g., "batch_cosine_similarity")
+
+    Returns:
+        True if native Rust should be used, False otherwise
+    """
+    if not _NATIVE_AVAILABLE:
+        return False
+    return operation_name not in _PYTHON_PREFERRED_OPERATIONS
 
 
 def get_native_version() -> Optional[str]:
