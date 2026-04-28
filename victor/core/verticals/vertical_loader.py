@@ -610,7 +610,6 @@ class VerticalLoader:
             existing = VerticalRegistry.get(vertical_cls.name)
             if existing is not None and existing is not vertical_cls:
                 existing_module = getattr(existing, "__module__", "")
-                new_module = getattr(vertical_cls, "__module__", "")
                 existing_is_contrib = (
                     get_vertical_runtime_provenance(existing)
                     is VerticalRuntimeProvenance.CONTRIB
@@ -691,7 +690,6 @@ class VerticalLoader:
                     existing = VerticalRegistry.get(vertical_cls.name)
                     if existing is not None and existing is not vertical_cls:
                         existing_module = getattr(existing, "__module__", "")
-                        new_module = getattr(vertical_cls, "__module__", "")
                         existing_is_contrib = (
                             get_vertical_runtime_provenance(existing)
                             is VerticalRuntimeProvenance.CONTRIB
