@@ -61,11 +61,39 @@ from victor.core.circuit_breaker import (
     CircuitBreakerError as CanonicalCircuitBreakerError,
 )
 
+# Import the canonical CircuitBreaker for composition
+from victor.providers.circuit_breaker import CircuitBreaker as CanonicalCircuitBreaker
+
+
+# CircuitOpenError is a compatibility adapter for the canonical CircuitBreakerError
+# It provides the CircuitOpenError API that existing code expects
+class CircuitOpenError(CanonicalCircuitBreakerError):
+    """Raised when circuit breaker is open.
+
+    Compatibility adapter for CircuitBreakerError that provides the
+    CircuitOpenError API (circuit_name, retry_after attributes).
+    """
+
+    def __init__(self, circuit_name: str, retry_after: Optional[float] = None):
+        # Convert CircuitOpenError signature to CircuitBreakerError signature
+        self.circuit_name = circuit_name
+        self.retry_after = retry_after
+        message = f"Circuit breaker '{circuit_name}' is open"
+        if retry_after is not None:
+            message += f". Retry after {retry_after:.1f}s"
+        # Call parent with state=OPEN and retry_after
+        from victor.core.circuit_breaker import CircuitState
+        super().__init__(message, state=CircuitState.OPEN, retry_after=retry_after or 0)
+
 
 @dataclass
 class CircuitBreakerState:
-    """Runtime state of circuit breaker."""
+    """
+    Runtime state of circuit breaker.
 
+    DEPRECATED: This is kept for backward compatibility only.
+    New code should use the canonical CircuitBreaker from victor.providers.circuit_breaker.
+    """
     state: CircuitState = CircuitState.CLOSED
     failure_count: int = 0
     success_count: int = 0
@@ -75,27 +103,19 @@ class CircuitBreakerState:
     consecutive_successes: int = 0
 
 
-class CircuitOpenError(Exception):
-    """Raised when circuit breaker is open."""
-
-    def __init__(self, circuit_name: str, retry_after: Optional[float] = None):
-        self.circuit_name = circuit_name
-        self.retry_after = retry_after
-        message = f"Circuit breaker '{circuit_name}' is open"
-        if retry_after:
-            message += f". Retry after {retry_after:.1f}s"
-        super().__init__(message)
-
-
 class ProviderCircuitBreaker:
     """
-    Circuit breaker optimized for provider resilience workflow.
+    Circuit breaker adapter for provider resilience workflow.
 
-    Renamed from CircuitBreaker to be semantically distinct:
-    - CircuitBreaker (victor.providers.circuit_breaker): Standalone with decorator/context manager
-    - MultiCircuitBreaker (victor.agent.resilience): Manages multiple named circuits
-    - ObservableCircuitBreaker (victor.observability.resilience): Metrics/callback focused
-    - ProviderCircuitBreaker (here): ResilientProvider workflow with execute(), is_available
+    This is now a thin wrapper around the canonical CircuitBreaker from
+    victor.providers.circuit_breaker. It provides the ProviderCircuitBreaker
+    API (is_available, time_until_retry, execute) for backward compatibility
+    while delegating all state management to the canonical implementation.
+
+    Design: Composition over reimplementation
+    - Wraps CanonicalCircuitBreaker instead of duplicating logic
+    - Provides is_available/time_until_retry properties that ResilientProvider expects
+    - Maintains backward compatibility with existing code
 
     States:
     - CLOSED: Normal operation, tracking failures
@@ -128,8 +148,12 @@ class ProviderCircuitBreaker:
         """
         self.name = name
         self.config = config or CircuitBreakerConfig()
-        self._state = CircuitBreakerState()
-        self._lock = asyncio.Lock()
+
+        # Create the canonical circuit breaker with our config
+        self._breaker = CanonicalCircuitBreaker(
+            name=name,
+            config=self.config,
+        )
 
         logger.debug(
             f"CircuitBreaker '{name}' initialized. "
@@ -140,39 +164,30 @@ class ProviderCircuitBreaker:
     @property
     def state(self) -> CircuitState:
         """Current circuit state."""
-        return self._state.state
+        return self._breaker.state
 
     @property
     def failure_count(self) -> int:
         """Current failure count."""
-        return self._state.failure_count
+        # Access the internal state from the canonical breaker
+        return self._breaker._failure_count
 
     @property
     def is_available(self) -> bool:
         """Check if circuit allows requests."""
-        if self._state.state == CircuitState.CLOSED:
-            return True
-
-        if self._state.state == CircuitState.OPEN:
-            # Check if timeout has passed
-            if self._state.last_failure_time:
-                elapsed = (datetime.now() - self._state.last_failure_time).total_seconds()
-                if elapsed >= self.config.timeout_seconds:
-                    return True  # Will transition to half-open
-            return False
-
-        # Half-open: allow limited calls
-        return self._state.half_open_calls < self.config.half_open_max_calls
+        # Delegate to canonical breaker's can_execute method
+        return self._breaker.can_execute()
 
     @property
     def time_until_retry(self) -> Optional[float]:
         """Seconds until circuit might allow requests."""
-        if self._state.state != CircuitState.OPEN:
+        if self.state != CircuitState.OPEN:
             return None
 
-        if self._state.last_failure_time:
-            elapsed = (datetime.now() - self._state.last_failure_time).total_seconds()
-            remaining = self.config.timeout_seconds - elapsed
+        if self._breaker._last_failure_time:
+            import time
+            elapsed = time.time() - self._breaker._last_failure_time
+            remaining = self._breaker.recovery_timeout - elapsed
             return max(0, remaining)
 
         return None
@@ -196,93 +211,41 @@ class ProviderCircuitBreaker:
         Raises:
             CircuitOpenError: If circuit is open
         """
-        async with self._lock:
-            if not self.is_available:
-                raise CircuitOpenError(self.name, self.time_until_retry)
-
-            # Transition to half-open if timeout passed
-            if self._state.state == CircuitState.OPEN:
-                self._transition_to(CircuitState.HALF_OPEN)
-
-            if self._state.state == CircuitState.HALF_OPEN:
-                self._state.half_open_calls += 1
+        if not self.is_available:
+            raise CircuitOpenError(self.name, self.time_until_retry)
 
         try:
             result = await func(*args, **kwargs)
-            await self._record_success()
+            self._breaker.record_success()
             return result
         except Exception as e:
-            await self._record_failure(e)
+            self._breaker.record_failure(e)
             raise
-
-    async def _record_success(self):
-        """Record successful call."""
-        async with self._lock:
-            self._state.consecutive_successes += 1
-
-            if self._state.state == CircuitState.HALF_OPEN:
-                self._state.success_count += 1
-                if self._state.success_count >= self.config.success_threshold:
-                    self._transition_to(CircuitState.CLOSED)
-            else:
-                # Reset failure count on success in closed state
-                self._state.failure_count = max(0, self._state.failure_count - 1)
-
-    async def _record_failure(self, error: Exception):
-        """Record failed call."""
-        async with self._lock:
-            self._state.failure_count += 1
-            self._state.last_failure_time = datetime.now()
-            self._state.consecutive_successes = 0
-
-            if self._state.state == CircuitState.HALF_OPEN:
-                # Any failure in half-open goes back to open
-                self._transition_to(CircuitState.OPEN)
-            elif self._state.failure_count >= self.config.failure_threshold:
-                self._transition_to(CircuitState.OPEN)
-
-            logger.warning(
-                f"CircuitBreaker '{self.name}' recorded failure: {error}. "
-                f"State: {self._state.state.value}, "
-                f"Failures: {self._state.failure_count}/{self.config.failure_threshold}"
-            )
-
-    def _transition_to(self, new_state: CircuitState):
-        """Transition to new state."""
-        old_state = self._state.state
-        self._state.state = new_state
-        self._state.last_state_change = datetime.now()
-
-        if new_state == CircuitState.HALF_OPEN:
-            self._state.half_open_calls = 0
-            self._state.success_count = 0
-        elif new_state == CircuitState.CLOSED:
-            self._state.failure_count = 0
-            self._state.success_count = 0
-
-        logger.info(
-            f"CircuitBreaker '{self.name}' transitioned: " f"{old_state.value} -> {new_state.value}"
-        )
 
     def reset(self):
         """Reset circuit breaker to initial state."""
-        self._state = CircuitBreakerState()
+        # Reset the canonical breaker's state
+        self._breaker._state = CircuitState.CLOSED
+        self._breaker._failure_count = 0
+        self._breaker._success_count = 0
+        self._breaker._last_failure_time = None
+        self._breaker._last_exception = None
+        self._breaker._half_open_calls = 0
         logger.info(f"CircuitBreaker '{self.name}' reset")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get circuit breaker statistics."""
         return {
             "name": self.name,
-            "state": self._state.state.value,
-            "failure_count": self._state.failure_count,
-            "success_count": self._state.success_count,
-            "consecutive_successes": self._state.consecutive_successes,
+            "state": self.state.value,
+            "failure_count": self.failure_count,
+            "success_count": self._breaker._success_count,
             "is_available": self.is_available,
             "time_until_retry": self.time_until_retry,
             "last_failure_time": (
-                self._state.last_failure_time.isoformat() if self._state.last_failure_time else None
+                datetime.fromtimestamp(self._breaker._last_failure_time).isoformat()
+                if self._breaker._last_failure_time else None
             ),
-            "last_state_change": self._state.last_state_change.isoformat(),
         }
 
 
