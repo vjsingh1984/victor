@@ -42,8 +42,8 @@ if TYPE_CHECKING:
     from victor.agent.tool_output_formatter import ToolOutputFormatter
     from victor.agent.metrics_collector import MetricsCollector
     from victor.agent.conversation.store import ConversationStore
-    from victor.analytics.logger import UsageLogger
-    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.observability.analytics.logger import UsageLogger
+    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
     from victor.agent.response_completer import ResponseCompleter
     from victor.agent.message_history import MessageHistory
     from victor.agent.conversation.state_machine import ConversationStateMachine
@@ -168,7 +168,7 @@ class RuntimeBuildersMixin:
         self,
     ) -> Optional["StreamingMetricsCollector"]:
         """Create streaming metrics collector if enabled."""
-        from victor.analytics.streaming_metrics import StreamingMetricsCollector
+        from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 
         if not getattr(self.settings, "streaming_metrics_enabled", True):
             return None

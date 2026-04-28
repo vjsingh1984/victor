@@ -79,8 +79,8 @@ if TYPE_CHECKING:
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.conversation.store import ConversationStore
-    from victor.analytics.logger import UsageLogger  # noqa: F811
-    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.observability.analytics.logger import UsageLogger  # noqa: F811
+    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.parallel_executor import ParallelToolExecutor
     from victor.agent.response_completer import ResponseCompleter

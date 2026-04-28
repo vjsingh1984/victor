@@ -916,7 +916,7 @@ def _create_usage_logger(log_file: Path, settings: Settings) -> Any:
     sampling_filter = _create_sampling_filter(settings)
 
     try:
-        from victor.analytics.enhanced_logger import EnhancedUsageLogger
+        from victor.observability.analytics.enhanced_logger import EnhancedUsageLogger
 
         return EnhancedUsageLogger(
             log_file=log_file,
@@ -931,7 +931,7 @@ def _create_usage_logger(log_file: Path, settings: Settings) -> Any:
     except Exception as e:
         logger.warning(f"Failed to create enhanced logger: {e}")
         # Fall back to basic logger
-        from victor.analytics.logger import UsageLogger
+        from victor.observability.analytics.logger import UsageLogger
 
         return UsageLogger(log_file, enabled=True, sampling_filter=sampling_filter)
 

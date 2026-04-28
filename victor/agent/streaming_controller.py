@@ -39,7 +39,7 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 from victor.agent.stream_handler import StreamMetrics, StreamResult
 
 if TYPE_CHECKING:
-    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +316,7 @@ class StreamingController:
     def _record_to_analytics_collector(self, session: StreamingSession) -> None:
         """Record session to analytics collector."""
         try:
-            from victor.analytics.streaming_metrics import (
+            from victor.observability.analytics.streaming_metrics import (
                 StreamMetrics as AnalyticsMetrics,
             )
 

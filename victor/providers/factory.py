@@ -63,7 +63,7 @@ from victor.providers.concurrency import (
     RequestPriority,
     get_provider_config,
 )
-from victor.analytics.streaming_metrics import (
+from victor.observability.analytics.streaming_metrics import (
     StreamingMetricsCollector,
     MetricsStreamWrapper,
 )

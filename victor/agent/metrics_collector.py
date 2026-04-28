@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult
     from victor.agent.streaming_controller import StreamingSession
     from victor.agent.debug_logger import DebugLogger
-    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +274,7 @@ class MetricsCollector:
         # Record to streaming metrics collector if available
         if self.streaming_metrics_collector:
             try:
-                from victor.analytics.streaming_metrics import (
+                from victor.observability.analytics.streaming_metrics import (
                     StreamMetrics as AnalyticsMetrics,
                 )
 

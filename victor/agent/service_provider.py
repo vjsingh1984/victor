@@ -873,7 +873,7 @@ class OrchestratorServiceProvider:
             MetricsCollector,
             MetricsCollectorConfig,
         )
-        from victor.analytics.logger import UsageLogger
+        from victor.observability.analytics.logger import UsageLogger
         from pathlib import Path
 
         # Create config with provider/model info
@@ -924,7 +924,7 @@ class OrchestratorServiceProvider:
 
     def _create_usage_logger(self) -> "UsageLoggerProtocol":
         """Create UsageLogger instance."""
-        from victor.analytics.logger import UsageLogger
+        from victor.observability.analytics.logger import UsageLogger
         from pathlib import Path
 
         log_file = Path(getattr(self._settings, "usage_log_path", ".victor/logs/usage.log"))
@@ -936,7 +936,7 @@ class OrchestratorServiceProvider:
         self,
     ) -> "StreamingMetricsCollectorProtocol":
         """Create StreamingMetricsCollector instance."""
-        from victor.analytics.streaming_metrics import StreamingMetricsCollector
+        from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
         from pathlib import Path
 
         enabled = getattr(self._settings, "streaming_metrics_enabled", True)
