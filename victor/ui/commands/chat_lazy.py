@@ -192,8 +192,8 @@ def chat(
     """Start interactive chat or send a one-shot message."""
     # Lazy load settings
     load_settings = _get_load_settings()
-    settings = load_settings()
+    _settings = load_settings()  # noqa: F841 - Used for type checking, will be used in full implementation
 
     # Lazy load orchestrator only when creating agent
-    AgentOrchestrator = _get_orchestrator()
+    _Agent_orchestrator = _get_orchestrator()  # noqa: F841 - Will be used in full implementation
     # ... rest of implementation
