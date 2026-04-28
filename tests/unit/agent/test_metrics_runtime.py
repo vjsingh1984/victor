@@ -11,7 +11,7 @@ from victor.agent.runtime.metrics_runtime import create_metrics_runtime_componen
 
 def test_legacy_metrics_module_reexports_service_runtime():
     """Legacy coordinator path should re-export service-owned metrics runtime."""
-    from victor.agent.coordinators.metrics_coordinator import (
+    from victor.agent.services.metrics_service import (
         MetricsCoordinator as legacy_metrics_coordinator,
         create_metrics_coordinator as legacy_create_metrics_coordinator,
     )

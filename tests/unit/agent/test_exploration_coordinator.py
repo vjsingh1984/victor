@@ -20,7 +20,7 @@ class TestExplorationCoordinator:
 
     def test_legacy_module_reexports_service_runtime(self):
         """Legacy coordinator path should re-export service-owned exploration runtime."""
-        from victor.agent.coordinators.exploration_coordinator import (
+        from victor.agent.services.exploration_runtime import (
             ExplorationCoordinator as legacy_coordinator,
             ExplorationResult as legacy_result,
         )

@@ -1,10 +1,10 @@
 """Interop tests for SDK-owned coordinator contracts."""
 
-from victor.agent.coordinators.conversation_coordinator import (
+from victor_sdk.conversation import (
     ConversationCoordinator as CoreConversationCoordinator,
     TurnType as CoreTurnType,
 )
-from victor.agent.coordinators.safety_coordinator import (
+from victor_sdk.safety import (
     SafetyCoordinator as CoreSafetyCoordinator,
     SafetyRule as CoreSafetyRule,
 )

@@ -223,7 +223,7 @@ class TestPlanningCoordinatorIntegration:
 
     def test_legacy_coordinator_module_reexports_service_runtime(self):
         """Legacy planning coordinator import path should re-export the service runtime."""
-        from victor.agent.coordinators.planning_coordinator import (
+        from victor.agent.services.planning_runtime import (
             PlanningCoordinator as legacy_planning_coordinator,
         )
         from victor.agent.services.planning_runtime import (

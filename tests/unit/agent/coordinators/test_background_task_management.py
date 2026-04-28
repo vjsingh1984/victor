@@ -6,14 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.agent.coordinators.session_coordinator import (
-    SessionCoordinator as LegacySessionCoordinator,
-)
 from victor.agent.services.session_compat import SessionCoordinator
-
-
-def test_session_coordinator_module_reexports_service_shim():
-    assert LegacySessionCoordinator is SessionCoordinator
 
 
 class TestCreateBackgroundTask:

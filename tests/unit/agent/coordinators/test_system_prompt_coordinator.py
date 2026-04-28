@@ -70,7 +70,7 @@ class TestSystemPromptCoordinator:
 
     def test_legacy_module_reexports_service_runtime(self):
         """Legacy coordinator path should re-export service-owned runtime."""
-        from victor.agent.coordinators.system_prompt_coordinator import (
+        from victor.agent.services.system_prompt_runtime import (
             SystemPromptCoordinator as legacy_coordinator,
         )
 

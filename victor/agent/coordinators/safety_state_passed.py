@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor.agent.coordinators.safety_coordinator import (
+from victor_sdk.safety import (
     SafetyAction,
     SafetyCheckResult,
     SafetyCoordinator,

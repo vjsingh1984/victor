@@ -14,7 +14,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.coordinators.session_coordinator import (
+from victor.agent.services.session_compat import (
     SessionCoordinator as LegacySessionCoordinator,
 )
 from victor.agent.runtime.memory_runtime import (

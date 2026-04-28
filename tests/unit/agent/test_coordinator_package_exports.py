@@ -17,7 +17,7 @@ def _reset_chat_compat_telemetry():
 
 def test_session_package_exports_warn():
     """Package-root session coordinator exports should be compatibility-only."""
-    from victor.agent.coordinators.session_coordinator import (
+    from victor.agent.services.session_compat import (
         SessionCoordinator,
         create_session_coordinator,
     )
@@ -177,7 +177,7 @@ def test_state_passed_package_exports_are_first_class():
 
 def test_exploration_runtime_package_exports_are_first_class():
     """Canonical exploration runtime exports should be available from the package root."""
-    from victor.agent.coordinators.exploration_coordinator import (
+    from victor.agent.services.exploration_runtime import (
         ExplorationCoordinator,
         ExplorationResult,
     )

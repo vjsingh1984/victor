@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.agent.coordinators.safety_coordinator import (
+from victor_sdk.safety import (
     SafetyAction,
     SafetyCategory,
     SafetyCheckResult,
