@@ -606,6 +606,15 @@ class BaseProvider(ABC):
                 )
 
         if self._is_connection_error_like(error):
+            # Log detailed connection error information for debugging
+            error_type = type(error).__name__
+            error_msg = str(error)
+            logger.error(
+                "Provider connection error: provider=%s error_type=%s error_msg=%s",
+                self.name,
+                error_type,
+                error_msg,
+            )
             return ProviderConnectionError(
                 message=f"Connection failed: {error}",
                 provider=self.name,

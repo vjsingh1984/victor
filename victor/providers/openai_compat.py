@@ -369,6 +369,10 @@ def handle_httpx_status_error(
     Returns:
         The mapped exception (caller should raise it).
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     from victor.providers.base import ProviderAuthError, ProviderError, ProviderRateLimitError
 
     status = exc.response.status_code
@@ -377,6 +381,14 @@ def handle_httpx_status_error(
         raw = exc.response.text[:500]
     except Exception:
         pass
+
+    # Log HTTP errors for debugging (especially 400/401/429)
+    logger.error(
+        "Provider HTTP error: provider=%s status=%d error=%s",
+        provider_name,
+        status,
+        raw[:200],
+    )
 
     if status == 401:
         return ProviderAuthError(
