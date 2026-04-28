@@ -23,8 +23,10 @@ from victor.processing.native._base import (
     _native,
     should_use_native_for_operation,
 )
+from victor.processing.native.observability import dispatch_with_observability
 
 
+@dispatch_with_observability("cosine_similarity")
 def cosine_similarity(a: List[float], b: List[float]) -> float:
     """Compute cosine similarity between two vectors.
 
@@ -56,6 +58,7 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
     return float(np.dot(a_arr, b_arr) / (norm_a * norm_b))
 
 
+@dispatch_with_observability("batch_cosine_similarity")
 def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> List[float]:
     """Compute cosine similarity between a query vector and multiple corpus vectors.
 
@@ -98,6 +101,7 @@ def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> Li
     return similarities.tolist()
 
 
+@dispatch_with_observability("top_k_similar")
 def top_k_similar(
     query: List[float], corpus: List[List[float]], k: int = 10
 ) -> List[Tuple[int, float]]:
