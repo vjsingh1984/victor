@@ -12,7 +12,7 @@ Design Patterns:
 
 import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from .types import Language, CodeValidationResult
