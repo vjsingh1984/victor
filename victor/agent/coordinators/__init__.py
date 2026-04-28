@@ -77,18 +77,10 @@ _MODULE_MEMBERS = {
     # NOTE: tool_coordinator, tool_observability, tool_retry removed
     # These now import directly from victor.agent.services for backward compatibility
     # See __getattr__ below for service-level re-exports
-    "chat_coordinator": [
-        "ChatCoordinator",
-    ],
-    "sync_chat_coordinator": [
-        "SyncChatCoordinator",
-    ],
-    "streaming_chat_coordinator": [
-        "StreamingChatCoordinator",
-    ],
-    "unified_chat_coordinator": [
-        "UnifiedChatCoordinator",
-    ],
+    # NOTE: chat_coordinator, sync_chat_coordinator, streaming_chat_coordinator,
+    # unified_chat_coordinator removed as deprecated shims.
+    # These now import directly from victor.agent.services.chat_compat for backward compatibility.
+    # See __getattr__ below for service-level re-exports.
     "chat_protocols": [
         "ChatContextProtocol",
         "ChatOrchestratorProtocol",
@@ -200,6 +192,9 @@ def __getattr__(name: str) -> Any:
         "SessionCoordinator", "SessionInfo", "create_session_coordinator",
         "ConversationCoordinator", "TurnType", "ConversationTurn",
         "ConversationStats", "ConversationContext",
+        # Deleted chat coordinator shims
+        "ChatCoordinator", "SyncChatCoordinator", "StreamingChatCoordinator",
+        "UnifiedChatCoordinator",
     }:
         # Import from appropriate service module
         if name in {"ToolCoordinator", "ToolCoordinatorConfig", "TaskContext",
@@ -226,10 +221,27 @@ def __getattr__(name: str) -> Any:
         elif name in {"ConversationCoordinator", "TurnType", "ConversationTurn",
                       "ConversationStats", "ConversationContext"}:
             module = importlib.import_module("victor_sdk.conversation")
+        elif name == "ChatCoordinator":
+            module = importlib.import_module("victor.agent.services.chat_compat")
+        elif name == "SyncChatCoordinator":
+            module = importlib.import_module("victor.agent.services.sync_chat_compat")
+        elif name == "StreamingChatCoordinator":
+            module = importlib.import_module("victor.agent.services.streaming_chat_compat")
+        elif name == "UnifiedChatCoordinator":
+            module = importlib.import_module("victor.agent.services.unified_chat_compat")
 
         value = getattr(module, name)
         # Apply deprecation warning
         if name in _DEPRECATED_EXPORTS:
+            if name in {
+                "ChatCoordinator",
+                "SyncChatCoordinator",
+                "StreamingChatCoordinator",
+                "UnifiedChatCoordinator",
+            }:
+                record_deprecated_chat_shim_access(
+                    "coordinators_package", name, "service_reexport"
+                )
             warnings.warn(_DEPRECATED_EXPORTS[name], DeprecationWarning, stacklevel=2)
         globals()[name] = value
         return value
@@ -242,22 +254,11 @@ def __getattr__(name: str) -> Any:
             module = importlib.import_module(f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}")
         value = getattr(module, name)
         if name in _DEPRECATED_EXPORTS:
-            if name in {
-                "ChatCoordinator",
-                "SyncChatCoordinator",
-                "StreamingChatCoordinator",
-                "UnifiedChatCoordinator",
-            }:
-                record_deprecated_chat_shim_access(
-                    "coordinators_package", name, "package_export"
-                )
             warnings.warn(
                 _DEPRECATED_EXPORTS[name],
                 DeprecationWarning,
                 stacklevel=2,
             )
-            return value
-
         globals()[name] = value
         return value
     raise AttributeError(f"module 'victor.agent.coordinators' has no attribute {name!r}")
