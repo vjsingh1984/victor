@@ -55,18 +55,16 @@ if TYPE_CHECKING:
     from victor.storage.embeddings.task_classifier import TaskTypeClassifier
     from victor.agent.task_analyzer import TaskAnalyzer
 
+# Import native availability from shared location
+from victor.processing.native._base import _NATIVE_AVAILABLE, _native
+
 logger = logging.getLogger(__name__)
 
-# Try to import native extensions for fast keyword detection
-_NATIVE_AVAILABLE = False
-_native = None
-
-try:
-    import victor_native as _native
-
-    _NATIVE_AVAILABLE = True
-    logger.debug(f"Native classifier loaded (v{_native.__version__})")
-except ImportError:
+# Log native availability for classifier
+if _NATIVE_AVAILABLE:
+    version = getattr(_native, "__version__", "unknown")
+    logger.debug(f"Native classifier loaded (v{version})")
+else:
     logger.debug("Native extensions not available, using Python classifier")
 
 # Cache configuration
