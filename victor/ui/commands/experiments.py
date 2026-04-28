@@ -309,7 +309,7 @@ def delete_experiment(
     if tracker.delete_experiment(experiment_id):
         console.print(f"[green]Deleted experiment:[/] {experiment_id}")
     else:
-        console.print(f"[bold red]Error:[/] Failed to delete experiment")
+        console.print("[bold red]Error:[/] Failed to delete experiment")
         raise typer.Exit(1)
 
 

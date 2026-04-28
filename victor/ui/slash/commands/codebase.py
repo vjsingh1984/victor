@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Awaitable, Callable, cast
 
 from rich.markdown import Markdown
@@ -285,10 +286,8 @@ class InitCommand(BaseSlashCommand):
             return existing + "\n\n" + "\n".join(new_lines)
         return existing
 
-    def _create_symlinks(self, target: "Path", ctx: CommandContext) -> None:
+    def _create_symlinks(self, target: Path, ctx: CommandContext) -> None:
         """Create symlinks for other tools (CLAUDE.md, etc.)."""
-        from pathlib import Path
-
         aliases = ["CLAUDE.md", "CURSOR.md"]
         for alias in aliases:
             alias_path = target.parent.parent / alias

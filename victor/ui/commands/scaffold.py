@@ -299,15 +299,15 @@ def scaffold_plugin(
         console.print()
         console.print("[bold]Next steps:[/]")
         console.print(f"  1. Review and customize the files in victor/{name}/")
-        console.print(f"  2. Update tool and capability requirements in assistant.py")
+        console.print("  2. Update tool and capability requirements in assistant.py")
         console.print(
             f"  3. Verify {to_class_name(name)}Assistant.get_definition() works without runtime imports"
         )
         console.print(
-            f"  4. Use prompts.py, safety.py, and mode_config.py only for optional follow-on metadata"
+            "  4. Use prompts.py, safety.py, and mode_config.py only for optional follow-on metadata"
         )
         if service_provider:
-            console.print(f"  5. Wire any runtime-only integrations through service_provider.py")
+            console.print("  5. Wire any runtime-only integrations through service_provider.py")
         console.print()
         console.print(f"[dim]To use your new {label}:[/]")
         console.print(f"    from victor.{name} import {to_class_name(name)}Assistant")

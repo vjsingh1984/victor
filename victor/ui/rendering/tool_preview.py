@@ -127,9 +127,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                     clean_lines.append(clean_line)
 
                 # Count additions and removals from clean lines
-                added = sum(1 for l in clean_lines if l.startswith("+") and not l.startswith("+++"))
+                added = sum(1 for line in clean_lines if line.startswith("+") and not line.startswith("+++"))
                 removed = sum(
-                    1 for l in clean_lines if l.startswith("-") and not l.startswith("---")
+                    1 for line in clean_lines if line.startswith("-") and not line.startswith("---")
                 )
 
                 # Extract file paths from the formatted diff
@@ -160,9 +160,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                 diff_lines = raw_diff.splitlines()
 
                 # Count additions and removals
-                added = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+                added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
                 removed = sum(
-                    1 for l in diff_lines if l.startswith("-") and not l.startswith("---")
+                    1 for line in diff_lines if line.startswith("-") and not line.startswith("---")
                 )
 
                 # Extract file paths
@@ -178,7 +178,7 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
 
                 # Return content lines (excluding file headers)
                 content_lines = [
-                    l for l in diff_lines if not l.startswith("---") and not l.startswith("+++")
+                    line for line in diff_lines if not line.startswith("---") and not line.startswith("+++")
                 ]
                 visible = content_lines[:max_lines]
                 return RenderedPreview(
@@ -206,14 +206,14 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                     )
                 )
                 content_lines = [
-                    l for l in diff_lines if not l.startswith("---") and not l.startswith("+++")
+                    line for line in diff_lines if not line.startswith("---") and not line.startswith("+++")
                 ]
                 all_content_lines.extend(content_lines)
                 if path:
                     file_labels.append(path)
 
-            added = sum(1 for l in all_content_lines if l.startswith("+"))
-            removed = sum(1 for l in all_content_lines if l.startswith("-"))
+            added = sum(1 for line in all_content_lines if line.startswith("+"))
+            removed = sum(1 for line in all_content_lines if line.startswith("-"))
             file_part = f" {', '.join(file_labels)}" if file_labels else ""
             header = f"+{added} -{removed}{file_part}"
             visible = all_content_lines[:max_lines]
@@ -359,7 +359,7 @@ class _SearchPreviewStrategy(_ToolPreviewStrategy):
                 return RenderedPreview(lines=visible_items, header=header, total_line_count=count)
 
         # Plain text result (grep-style: file:line:content)
-        lines = [l for l in raw_result.splitlines() if l.strip()]
+        lines = [line for line in raw_result.splitlines() if line.strip()]
         count = len(lines)
         header = f"{count} match{'es' if count != 1 else ''}"
         return RenderedPreview(

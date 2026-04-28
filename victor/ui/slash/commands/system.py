@@ -391,7 +391,7 @@ class CleanupHistoryCommand(BaseSlashCommand):
         new_lines = sum(1 for _ in open(history_file))
         removed = original_lines - new_lines
 
-        ctx.console.print(f"[green]✓[/] Cleaned up history file:")
+        ctx.console.print("[green]✓[/] Cleaned up history file:")
         ctx.console.print(f"  Entries: {original_lines:,} → {new_lines:,} (removed {removed:,})")
         ctx.console.print(f"  File size: {history_file.stat().st_size / 1024:.1f} KB")
         ctx.console.print()

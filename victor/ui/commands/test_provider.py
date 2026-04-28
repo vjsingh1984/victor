@@ -118,7 +118,7 @@ async def _test_ollama(provider_settings: dict) -> None:
         models = await ollama.list_models()
         if models:
             console.print(f"[green]✓[/] Ollama is running with {len(models)} models")
-            console.print(f"\n[green]✓[/] Provider ollama is ready to use!")
+            console.print("\n[green]✓[/] Provider ollama is ready to use!")
         else:
             console.print("[yellow]⚠[/] Ollama is running but no models installed")
             console.print("\nPull a model: [bold]ollama pull qwen2.5-coder:7b[/]")
@@ -143,9 +143,9 @@ async def _test_anthropic(provider_settings: dict) -> None:
 
         # Try to get models (static list, but validates provider init)
         models = await anthropic.list_models()
-        console.print(f"[green]✓[/] Anthropic API key is valid")
+        console.print("[green]✓[/] Anthropic API key is valid")
         console.print(f"[green]✓[/] {len(models)} Claude models available")
-        console.print(f"\n[green]✓[/] Provider anthropic is ready to use!")
+        console.print("\n[green]✓[/] Provider anthropic is ready to use!")
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -155,7 +155,7 @@ async def _test_anthropic(provider_settings: dict) -> None:
         elif "rate_limit" in error_msg or "429" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] API key is valid (rate limited)")
-            console.print(f"\n[green]✓[/] Provider anthropic is ready to use!")
+            console.print("\n[green]✓[/] Provider anthropic is ready to use!")
         else:
             console.print(f"[red]✗[/] Connection error: {e}")
     finally:
@@ -179,7 +179,7 @@ async def _test_openai(provider_settings: dict, auth_mode: str = "api_key") -> N
         auth_label = "OAuth token" if auth_mode == "oauth" else "API key"
         console.print(f"[green]✓[/] OpenAI {auth_label} is valid")
         console.print(f"[green]✓[/] {len(models)} chat-capable models available")
-        console.print(f"\n[green]✓[/] Provider openai is ready to use!")
+        console.print("\n[green]✓[/] Provider openai is ready to use!")
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -196,7 +196,7 @@ async def _test_openai(provider_settings: dict, auth_mode: str = "api_key") -> N
         elif "rate_limit" in error_msg or "429" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] Credentials are valid (rate limited)")
-            console.print(f"\n[green]✓[/] Provider openai is ready to use!")
+            console.print("\n[green]✓[/] Provider openai is ready to use!")
         else:
             console.print(f"[red]✗[/] Connection error: {e}")
     finally:
@@ -224,9 +224,9 @@ async def _test_google(provider_settings: dict) -> None:
 
         # List models to verify API key
         models = await google.list_models()
-        console.print(f"[green]✓[/] Google API key is valid")
+        console.print("[green]✓[/] Google API key is valid")
         console.print(f"[green]✓[/] {len(models)} generative models available")
-        console.print(f"\n[green]✓[/] Provider google is ready to use!")
+        console.print("\n[green]✓[/] Provider google is ready to use!")
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -236,7 +236,7 @@ async def _test_google(provider_settings: dict) -> None:
         elif "rate_limit" in error_msg or "429" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] API key is valid (rate limited)")
-            console.print(f"\n[green]✓[/] Provider google is ready to use!")
+            console.print("\n[green]✓[/] Provider google is ready to use!")
         else:
             console.print(f"[red]✗[/] Connection error: {e}")
     finally:
@@ -264,13 +264,13 @@ async def _test_zai(
         console.print("[dim]Testing API connectivity...[/]")
 
         models = await zai.list_models()
-        console.print(f"[green]✓[/] Z.AI API key is valid")
+        console.print("[green]✓[/] Z.AI API key is valid")
         console.print(f"[green]✓[/] {len(models)} models available")
 
         if coding_plan or (endpoint and endpoint == "coding"):
             console.print("[green]✓[/] Coding Plan endpoint active")
 
-        console.print(f"\n[green]✓[/] Provider zai is ready to use!")
+        console.print("\n[green]✓[/] Provider zai is ready to use!")
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -312,7 +312,7 @@ async def _test_qwen(provider_settings: dict, auth_mode: str = "api_key") -> Non
         auth_label = "OAuth token" if auth_mode == "oauth" else "API key"
         console.print(f"[green]✓[/] Qwen {auth_label} is valid")
         console.print(f"[green]✓[/] Response: {response.content[:50]}")
-        console.print(f"\n[green]✓[/] Provider qwen is ready to use!")
+        console.print("\n[green]✓[/] Provider qwen is ready to use!")
 
     except Exception as e:
         error_msg = str(e).lower()

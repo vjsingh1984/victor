@@ -178,7 +178,7 @@ class LMStudioCommand(BaseSlashCommand):
             models = lmstudio.list_loaded_models()
             endpoint = lmstudio.get_active_endpoint()
 
-            content = f"[green]LMStudio Connected[/]\n\n"
+            content = "[green]LMStudio Connected[/]\n\n"
             content += f"[bold]Endpoint:[/] {endpoint}\n"
             content += f"[bold]Loaded Models:[/] {len(models)}\n\n"
 
