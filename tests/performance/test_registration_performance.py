@@ -251,7 +251,11 @@ class TestFeatureFlagCachePerformance:
 
 
 class TestQueryCachePerformance:
-    """Performance tests for query result caching."""
+    """Performance tests for query result caching.
+
+    Note: The victor.tools.query_cache module was deleted as part of
+    consolidation. The uncached query test remains as a baseline.
+    """
 
     @pytest.mark.benchmark(group="query-cache")
     def test_uncached_queries(self, benchmark) -> None:
@@ -268,26 +272,6 @@ class TestQueryCachePerformance:
                 registry.get(f"tool_{i}")
 
         benchmark(perform_queries)
-
-    @pytest.mark.benchmark(group="query-cache")
-    def test_cached_queries(self, benchmark) -> None:
-        """Test cached query operations (should be faster)."""
-        from victor.tools.query_cache import QueryCache
-
-        registry = ToolRegistry()
-        tools = [create_mock_tool(i) for i in range(100)]
-
-        with registry.batch_update():
-            for tool in tools:
-                registry.register(tool)
-
-        cache = QueryCache()
-
-        def perform_cached_queries():
-            for i in range(100):
-                cache.get(f"tool_{i}", lambda idx=i: registry.get(f"tool_{idx}"))
-
-        benchmark(perform_cached_queries)
 
 
 # Performance regression assertions
