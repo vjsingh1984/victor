@@ -288,7 +288,7 @@ class TestCreateStreamingMetricsCollector:
 
     def test_create_streaming_metrics_collector_when_enabled(self, factory, mock_settings):
         """create_streaming_metrics_collector returns collector when enabled."""
-        from victor.analytics.streaming_metrics import StreamingMetricsCollector
+        from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 
         mock_settings.streaming_metrics_enabled = True
 
