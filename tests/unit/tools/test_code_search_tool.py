@@ -2516,6 +2516,7 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
             project_root=repo_root,
             project_victor_dir=repo_root / ".victor",
             embeddings_dir=persist_dir,
+            global_victor_dir=Path.home() / ".victor",
         ),
     )
     monkeypatch.setattr(
