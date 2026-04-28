@@ -436,8 +436,17 @@ class ToolLoopDetector:
             "get_symbol",
             "analyze_symbol",
             "plan_files",
-            "graph_symbol",
+            # Graph tool operations (all read-only analysis)
+            "graph",
+            "graph_search",
+            "graph_neighbors",
+            "graph_analytics",
+            "graph_query",
             "graph_dependencies",
+            "graph_patterns",
+            "graph_path",
+            "graph_semantic",
+            "graph_symbol",
         }
         return tool_name.lower() in read_tools
 

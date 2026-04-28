@@ -47,6 +47,7 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "ls",
     "ll",
     "la",
+    "cd",  # Directory navigation (read-only, doesn't modify files)
     "tree",
     "find",
     "locate",

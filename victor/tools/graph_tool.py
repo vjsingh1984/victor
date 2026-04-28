@@ -1277,9 +1277,22 @@ async def _run_graph_sql_query_for_root(
             "success": True,
         }
     except Exception as e:
+        error_str = str(e)
         logger.warning(f"[graph] SQL query failed: {e}")
+
+        # Add helpful context for common column errors
+        available_columns = "node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, embedding_ref, metadata"
+        if "no such column" in error_str.lower() or "does not exist" in error_str.lower():
+            return {
+                "error": f"SQL execution failed: {error_str}\n\nAvailable columns in graph_node: {available_columns}\nAvailable columns in graph_edge: src, dst, type, file, line",
+                "success": False,
+                "available_columns": {
+                    "graph_node": available_columns,
+                    "graph_edge": "src, dst, type, file, line",
+                },
+            }
         return {
-            "error": f"SQL execution failed: {str(e)}",
+            "error": f"SQL execution failed: {error_str}",
             "success": False,
         }
 
