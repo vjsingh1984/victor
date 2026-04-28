@@ -309,6 +309,36 @@ class TestBuildOpenAIMessages:
         # Tool message should be removed (orphaned) since no tool_call_id
         assert not any(m["role"] == "tool" for m in result)
 
+    def test_empty_tool_content_gets_placeholder(self):
+        """Test that tool messages with empty content get a placeholder value.
+
+        DeepSeek and some other providers reject tool messages with empty content.
+        This test verifies that empty content is replaced with a placeholder.
+        """
+        messages = [
+            Message(role="user", content="Use the tool"),
+        ]
+        # Create assistant message with tool_calls
+        assistant_msg = Message(role="assistant", content="")
+        assistant_msg.tool_calls = [
+            {"id": "call_123", "name": "test_tool", "arguments": {}}
+        ]
+        messages.append(assistant_msg)
+
+        # Create tool message with empty content
+        tool_msg = Message(role="tool", content="")
+        tool_msg.tool_call_id = "call_123"
+        tool_msg.name = "test_tool"
+        messages.append(tool_msg)
+
+        result = build_openai_messages(messages)
+
+        # Find the tool message in result
+        tool_result = [m for m in result if m["role"] == "tool"][0]
+        # Empty content should be replaced with placeholder
+        assert tool_result["content"] == "(no output)"
+        assert tool_result["tool_call_id"] == "call_123"
+
 
 class TestFixOrphanedToolMessages:
     """Tests for fix_orphaned_tool_messages."""

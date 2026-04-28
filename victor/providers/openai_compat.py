@@ -342,6 +342,10 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
             # name field for function responses (required by some providers)
             if hasattr(msg, "name") and msg.name:
                 entry["name"] = msg.name
+            # DeepSeek and some other providers reject empty content in tool messages.
+            # Use a placeholder to avoid 400 errors while maintaining API compatibility.
+            if not entry.get("content"):
+                entry["content"] = "(no output)"
 
         formatted.append(entry)
 
