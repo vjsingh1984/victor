@@ -33,7 +33,7 @@ import pytest
 # Import components
 from victor.agent.conversation.store import ConversationStore
 from victor.agent.conversation.types import MessagePriority, MessageRole
-from victor.analytics.streaming_metrics import (
+from victor.observability.analytics.streaming_metrics import (
     StreamingMetricsCollector,
     StreamMetrics,
 )

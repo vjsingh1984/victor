@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from victor.analytics.logger import UsageLogger
+from victor.observability.analytics.logger import UsageLogger
 
 
 @pytest.fixture
