@@ -17,4 +17,4 @@ warnings.warn(
 
 from victor.observability.analytics.logger import *  # noqa: F401, F403
 
-__all__ = ["UsageLogger"]
+__all__ = ["UsageLogger"]  # noqa: F405
