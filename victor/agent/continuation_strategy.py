@@ -363,6 +363,9 @@ class ContinuationStrategy:
         # Dynamic budget parameters
         query_classification: Any = None,  # Optional[QueryClassification]
         plan_step_count: Optional[int] = None,
+        # P1 FIX: Compaction continuation bonus parameters
+        compaction_occurred: bool = False,
+        compaction_messages_removed: int = 0,
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -707,6 +710,30 @@ class ContinuationStrategy:
             else (max_cont_action if is_action_task else max_cont_default)
         )
 
+        # P1 FIX: Apply model-specific compaction continuation bonus
+        # After compaction, models (especially DeepSeek) need more continuation help
+        if compaction_occurred:
+            try:
+                from victor.agent.compaction_continuation_bonus import get_compaction_bonus
+
+                bonus_calculator = get_compaction_bonus()
+                compaction_bonus = bonus_calculator.get_bonus(
+                    provider=provider_name,
+                    model=model,
+                    compaction_occurred=compaction_occurred,
+                    messages_removed=compaction_messages_removed,
+                )
+                if compaction_bonus > 0:
+                    original_budget = max_continuation_prompts
+                    max_continuation_prompts += compaction_bonus
+                    logger.info(
+                        f"[compaction-bonus] Added {compaction_bonus} continuation prompts for "
+                        f"{provider_name}:{model} (after {compaction_messages_removed} messages removed): "
+                        f"{original_budget} → {max_continuation_prompts}"
+                    )
+            except Exception as e:
+                logger.debug(f"Failed to apply compaction continuation bonus: {e}")
+
         # Budget/iteration thresholds (reserved for future use)
         _budget_threshold = (
             tool_budget // 4 if requires_continuation_support else tool_budget // 2
@@ -931,19 +958,47 @@ class ContinuationStrategy:
             )
             updates["continuation_prompts"] = continuation_prompts + 1
 
-            # Determine message based on task type
+            # P2 FIX: Use adaptive continuation strategy for model-specific prompts
+            # This addresses DeepSeek Chat issue where simple "continue" causes stop
+            from victor.agent.adaptive_continuation_strategy import (
+                get_continuation_prompt as get_adaptive_continuation_prompt,
+            )
+
+            # Build task description for adaptive strategy
+            task_description = ""
             if is_analysis_task:
-                message = (
-                    "Continue your analysis. Use tools like read, ls, "
-                    "code_search to gather more information."
-                )
+                task_description = "analysis"
             elif is_action_task:
-                message = (
-                    "Continue with the implementation. Use tools like write "
-                    "and edit to make the necessary changes."
-                )
+                task_description = "implementation"
+
+            # Get adaptive continuation prompt
+            adaptive_message = get_adaptive_continuation_prompt(
+                provider=provider_name,
+                model=model,
+                compaction_occurred=compaction_occurred,
+                messages_removed=compaction_messages_removed,
+                current_turn=continuation_prompts + 1,  # Approximate turn count
+                task_description=task_description,
+                compaction_summary=f"Removed {compaction_messages_removed} messages" if compaction_occurred else "",
+            )
+
+            # If adaptive strategy returned a message, use it
+            if adaptive_message and adaptive_message != "Continue.":
+                message = adaptive_message
             else:
-                message = "Continue. Use appropriate tools if needed."
+                # Fall back to task-type-based messages
+                if is_analysis_task:
+                    message = (
+                        "Continue your analysis. Use tools like read, ls, "
+                        "code_search to gather more information."
+                    )
+                elif is_action_task:
+                    message = (
+                        "Continue with the implementation. Use tools like write "
+                        "and edit to make the necessary changes."
+                    )
+                else:
+                    message = "Continue. Use appropriate tools if needed."
 
             return {
                 "action": "prompt_tool_call",

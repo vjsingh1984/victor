@@ -1156,6 +1156,45 @@ class StreamingChatPipeline:
                         f"iteration={stream_ctx.total_iterations} spin_state={_spin.state.value}"
                     )
 
+                    # === P0 FIX: POST-COMPACTION CONTINUATION ===
+                    # After compaction, force continuation to prevent DeepSeek from stopping
+                    # Check if compaction occurred and we need to force continuation
+                    if (
+                        stream_ctx.compaction_occurred
+                        and not stream_ctx.force_completion
+                        and not forced_task_completion
+                    ):
+                        # Check if this is the first turn after compaction
+                        turns_since_compaction = (
+                            stream_ctx.total_iterations - stream_ctx.last_compaction_turn
+                        )
+                        if turns_since_compaction <= 2:  # Force continuation for 2 turns after compaction
+                            is_asking_input = action_result.get("is_asking_input", False)
+                            is_completion = action_result.get("is_completion", False)
+
+                            if not is_asking_input and not is_completion:
+                                logger.info(
+                                    f"[post-compaction-continuation] Forcing continuation after compaction "
+                                    f"(turn {stream_ctx.total_iterations}, "
+                                    f"{stream_ctx.compaction_message_removed_count} messages removed)"
+                                )
+                                # Build context-aware continuation message
+                                summary_hint = ""
+                                if stream_ctx.compaction_summary:
+                                    summary_hint = f" Previous work: {stream_ctx.compaction_summary[:200]}"
+
+                                # Inject user-role reminder for higher salience (OpenDev finding)
+                                orch.add_message(
+                                    "user",
+                                    f"[CONTEXT COMPACTED: Context was compacted to continue the session. "
+                                    f"You were in the middle of a task.{summary_hint} "
+                                    f"Please continue with what you were doing - "
+                                    f"use tools to gather more information or complete your analysis.]"
+                                )
+                                # Reset compaction flag after injecting reminder
+                                if turns_since_compaction == 2:
+                                    stream_ctx.compaction_occurred = False
+
                     # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
                     if not runtime_owner._continuation_handler:
                         from victor.agent.streaming import create_continuation_handler

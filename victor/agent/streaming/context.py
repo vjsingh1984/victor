@@ -130,6 +130,12 @@ class StreamingChatContext:
     tool_calls_used: int = 0
     unique_resources: Set[str] = field(default_factory=set)
 
+    # Compaction tracking (P0 fix for post-compaction continuation)
+    compaction_occurred: bool = False
+    compaction_summary: str = ""
+    last_compaction_turn: int = -1
+    compaction_message_removed_count: int = 0
+
     # Topology/runtime override tracking
     runtime_context_overrides: Dict[str, Any] = field(default_factory=dict)
     provider_kwargs: Dict[str, Any] = field(default_factory=dict)

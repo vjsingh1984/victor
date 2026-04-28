@@ -188,6 +188,7 @@ class CompactorConfig:
         enable_proactive: Enable proactive (pre-overflow) compaction
         enable_tool_truncation: Enable automatic tool result truncation
         enable_phase_aware: Enable phase-aware compaction thresholds
+        enable_fast_pruning: Enable fast pruning before LLM compaction (P1: OpenDev finding)
         phase_thresholds: Phase-specific compaction thresholds (overrides proactive_threshold)
     """
 
@@ -204,6 +205,7 @@ class CompactorConfig:
     enable_proactive: bool = True
     enable_tool_truncation: bool = True
     enable_phase_aware: bool = True
+    enable_fast_pruning: bool = COMPACTION_CONFIG.enable_fast_pruning
     # Phase-specific thresholds: EXPLORATION (keep diverse), PLANNING (focus),
     # EXECUTION (balance), REVIEW (comprehensive)
     phase_thresholds: Dict[TaskPhase, float] = field(
@@ -859,6 +861,40 @@ class ContextCompactor:
             f"Compaction triggered: {trigger.value} (utilization: {utilization:.1%}, "
             f"threshold: {effective_threshold:.0%})"
         )
+
+        # P1 FIX: Fast pruning before LLM compaction (OpenDev finding)
+        # Replace large tool results with [pruned] markers before expensive LLM compaction
+        # This reduces LLM compaction cost by 30-40%
+        if self.config.enable_fast_pruning:
+            try:
+                from victor.agent.fast_pruning import get_fast_pruner
+
+                fast_pruner = get_fast_pruner()
+                messages_before = self.controller.get_messages()
+
+                # Estimate if fast pruning would help
+                original_size, estimated_size = fast_pruner.estimate_size_reduction(
+                    messages_before, current_turn=len(messages_before)
+                )
+
+                # Only perform fast pruning if we'd save at least 20%
+                if original_size > 0 and (original_size - estimated_size) / original_size > 0.2:
+                    pruned_messages = fast_pruner.prune_old_tool_results(
+                        messages_before, current_turn=len(messages_before)
+                    )
+
+                    if fast_pruner.get_pruned_count() > 0:
+                        # Update controller messages with pruned version
+                        # This is done by replacing the message list
+                        from victor.agent.message_history import _TrackedList
+
+                        self.controller._history._messages = _TrackedList(pruned_messages)
+                        logger.info(
+                            f"[fast-pruning] Pruned {fast_pruner.get_pruned_count()} messages "
+                            f"before LLM compaction (saved {original_size - estimated_size} chars)"
+                        )
+            except Exception as e:
+                logger.debug(f"Fast pruning failed (continuing with LLM compaction): {e}")
 
         # Perform compaction
         chars_before = metrics.char_count

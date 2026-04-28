@@ -157,6 +157,8 @@ class CompactionConfig:
         output_reserve_pct: % of context to reserve for output generation (0.0-1.0)
         parallel_read_target_files: Target number of parallel file reads to optimize for
         chars_per_token: Approximate characters per token for calculations
+        enable_fast_pruning: Enable fast pruning before LLM compaction (P1: OpenDev finding)
+        enable_proactive: Enable proactive compaction at threshold (not just overflow)
 
     **Design Notes:**
     - min_messages_after_compact (6) preserves enough context for coherent conversation
@@ -165,6 +167,7 @@ class CompactionConfig:
     - tool_result_max_chars (5120) allows ~12-15 parallel reads within 32K usable tokens
     - output_reserve_pct (0.5) reserves half the context for model output
     - parallel_read_target_files (12) optimizes for common read patterns
+    - enable_fast_pruning (True) reduces LLM compaction cost by 30-40%
     """
 
     min_messages_after_compact: int = 6  # Reduced from 8
@@ -175,6 +178,9 @@ class CompactionConfig:
     output_reserve_pct: float = 0.5
     parallel_read_target_files: int = 12  # Increased from 10
     chars_per_token: float = 3.0
+    # P1 FIX: Fast pruning before LLM compaction (OpenDev finding)
+    enable_fast_pruning: bool = True
+    enable_proactive: bool = False
 
 
 # Task-specific compaction configurations

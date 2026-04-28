@@ -411,6 +411,9 @@ class IntentClassificationHandler:
             tool_budget=self._tool_budget,
             unified_tracker_config=self._unified_tracker.config,
             task_completion_signals=task_completion_signals,
+            # P1 FIX: Compaction continuation bonus parameters
+            compaction_occurred=getattr(stream_ctx, "compaction_occurred", False),
+            compaction_messages_removed=getattr(stream_ctx, "compaction_message_removed_count", 0),
         )
 
     def _apply_state_updates(

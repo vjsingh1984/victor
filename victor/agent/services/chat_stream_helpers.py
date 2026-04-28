@@ -728,6 +728,18 @@ class ChatStreamHelperMixin:
                     f"Compacted context: {compaction_action.messages_removed} messages removed, "
                     f"{compaction_action.tokens_freed} tokens freed"
                 )
+                # P0 FIX: Set compaction state on stream context for post-compaction continuation
+                stream_ctx.compaction_occurred = True
+                stream_ctx.last_compaction_turn = stream_ctx.total_iterations
+                stream_ctx.compaction_message_removed_count = compaction_action.messages_removed
+                # Get summary from controller if available
+                if hasattr(orch, "conversation_controller") and orch.conversation_controller:
+                    summaries = orch.conversation_controller.get_compaction_summaries()
+                    if summaries:
+                        stream_ctx.compaction_summary = summaries[-1]
+                logger.info(
+                    f"Post-compaction continuation enabled at turn {stream_ctx.total_iterations}"
+                )
 
         time_limit = getattr(orch.settings, "stream_idle_timeout_seconds", 300)
         if stream_ctx.is_over_time_limit(time_limit):

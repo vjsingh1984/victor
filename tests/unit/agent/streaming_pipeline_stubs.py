@@ -34,6 +34,11 @@ class DummyStreamContext:
         self.degradation_events = []
         self.recovery_events = []
         self.runtime_override_snapshot = None
+        # P0 FIX: Compaction tracking fields
+        self.compaction_occurred = False
+        self.compaction_summary = ""
+        self.last_compaction_turn = -1
+        self.compaction_message_removed_count = 0
 
     def accumulate_content(self, content: str) -> None:
         self.total_accumulated_chars = len(content)

@@ -720,6 +720,12 @@ class ConversationController:
             elif _is_pinned_content(msg.content):
                 scored.append(MessageImportance(msg, i, 999.0, "pinned_requirement"))
                 logger.debug(f"Message {i} marked as pinned (output requirement)")
+            # P0 FIX: Always preserve the FIRST (original) user message - highest priority
+            # This ensures the agent never loses track of the original task intent
+            elif msg.role == "user" and not any(sm.message.role == "user" for sm in scored):
+                # This is the first user message we've encountered - preserve it with highest priority
+                logger.debug(f"Original user message at index {i} preserved with highest priority")
+                scored.append(MessageImportance(msg, i, 2000.0, "original_user_intent"))
             else:
                 scorable_msgs.append(msg)
                 scorable_indices.append(i)
@@ -967,7 +973,9 @@ class ConversationController:
         Two injection modes:
         - With ContextReminderManager: Sets compaction_summary on manager state.
           Actual injection happens during the next get_consolidated_reminder() call.
-        - Without (fallback): Inserts a system reminder message directly at position 1.
+        - Without (fallback): Inserts a user reminder message directly at position 1.
+
+        P0 FIX: Uses user-role reminders for higher salience (OpenDev finding).
 
         Returns:
             True if compaction context was updated or injected.
@@ -991,10 +999,14 @@ class ConversationController:
             return True
 
         # Fallback: direct insertion (backward compat)
+        # P0 FIX: Use user role for higher salience instead of system role (OpenDev finding)
         if len(self.messages) > 1:
-            reminder_msg = Message(role="system", content=f"[Context reminder: {combined}]")
+            reminder_msg = Message(
+                role="user",
+                content=f"[CONTEXT COMPACTED: Previous context was compacted. Summary: {combined}]"
+            )
             self._history._messages.insert(1, reminder_msg)
-            logger.debug(f"Injected compaction context: {combined[:100]}...")
+            logger.debug(f"Injected compaction context (user role): {combined[:100]}...")
             return True
 
         return False
