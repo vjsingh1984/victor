@@ -243,33 +243,10 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     Returns:
         Cleaned message list with consistent tool_calls/response pairing.
     """
-    # Collect all tool_call IDs declared by assistant messages
-    declared_tool_call_ids: set = set()
-    for msg in messages:
-        if msg.get("role") == "assistant" and "tool_calls" in msg:
-            for tc in msg["tool_calls"]:
-                if "id" in tc:
-                    declared_tool_call_ids.add(tc["id"])
-
     # Collect all tool_call IDs present in tool responses
     present_response_ids = {
         m.get("tool_call_id") for m in messages if m.get("role") == "tool" and m.get("tool_call_id")
     }
-
-    logger.debug(
-        "[fix_orphaned_tool_messages] declared_tool_call_ids=%s present_response_ids=%s",
-        declared_tool_call_ids,
-        present_response_ids,
-    )
-
-    # Find orphaned tool responses (responses without matching tool_calls)
-    orphaned_responses = present_response_ids - declared_tool_call_ids
-    if orphaned_responses:
-        logger.warning(
-            "[fix_orphaned_tool_messages] Found %d orphaned tool responses (will be removed): %s",
-            len(orphaned_responses),
-            orphaned_responses,
-        )
 
     # Strip assistant tool_calls whose responses were compacted away
     stripped_calls_count = 0
@@ -291,6 +268,30 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
         logger.info(
             "[fix_orphaned_tool_messages] Stripped tool_calls from %d assistant messages",
             stripped_calls_count,
+        )
+
+    # Re-collect declared tool_call IDs AFTER stripping assistant messages
+    # This is critical - we need the IDs that are STILL in the messages after stripping
+    declared_tool_call_ids: set = set()
+    for msg in messages:
+        if msg.get("role") == "assistant" and "tool_calls" in msg:
+            for tc in msg["tool_calls"]:
+                if "id" in tc:
+                    declared_tool_call_ids.add(tc["id"])
+
+    logger.debug(
+        "[fix_orphaned_tool_messages] declared_tool_call_ids=%s present_response_ids=%s",
+        declared_tool_call_ids,
+        present_response_ids,
+    )
+
+    # Find orphaned tool responses (responses without matching tool_calls)
+    orphaned_responses = present_response_ids - declared_tool_call_ids
+    if orphaned_responses:
+        logger.warning(
+            "[fix_orphaned_tool_messages] Found %d orphaned tool responses (will be removed): %s",
+            len(orphaned_responses),
+            orphaned_responses,
         )
 
     # Remove orphaned tool responses whose assistant tool_calls were

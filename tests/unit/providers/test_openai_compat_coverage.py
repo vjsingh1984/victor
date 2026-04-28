@@ -379,6 +379,44 @@ class TestFixOrphanedToolMessages:
         assert result[0]["content"] == "Some text"
         assert "tool_calls" not in result[0]
 
+    def test_removes_tool_responses_when_tool_calls_are_stripped(self):
+        """Tool responses are removed when their tool_calls are stripped from assistant.
+
+        This is the critical bug fix: when context compaction removes some tool response
+        messages but leaves others, the assistant message may have tool_calls with missing
+        responses. When those tool_calls are stripped, the REMAINING tool responses become
+        orphaned and must also be removed to maintain strict pairing.
+
+        Scenario:
+        - Assistant message declares tool_calls A and B
+        - Tool response for A exists, tool response for B was compacted away
+        - Since not all responses exist, tool_calls A and B are both stripped from assistant
+        - Now tool response A is orphaned (no tool_calls in assistant) and must be removed
+        """
+        messages = [
+            {"role": "user", "content": "Use tools"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {"id": "call_A", "type": "function", "function": {"name": "tool1", "arguments": "{}"}},
+                    {"id": "call_B", "type": "function", "function": {"name": "tool2", "arguments": "{}"}},
+                ]
+            },
+            {"role": "tool", "tool_call_id": "call_A", "content": "Success"},
+            # Note: call_B's response was compacted away (not in message list)
+        ]
+
+        result = fix_orphaned_tool_messages(messages)
+
+        # The assistant message should have tool_calls stripped (missing one response)
+        # The tool response for call_A should also be removed (now orphaned)
+        assert len(result) == 2  # user + assistant only
+        assert result[1]["role"] == "assistant"
+        assert "tool_calls" not in result[1]  # stripped because not all responses present
+        # No tool messages should remain
+        assert not any(m.get("role") == "tool" for m in result)
+
 
 class TestMarkdownRendering:
     """Tests for markdown rendering functions."""
