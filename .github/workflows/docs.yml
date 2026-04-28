@@ -19,9 +19,6 @@ on:
       - '.github/workflows/docs.yml'
   workflow_dispatch:  # Allow manual trigger
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 # Set permissions for GitHub Pages deployment
 permissions:
   contents: read
@@ -36,6 +33,7 @@ concurrency:
 # Environment variables
 env:
   PYTHON_VERSION: "3.12"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # Build job
