@@ -127,7 +127,7 @@ from victor.tools.base import (
 )
 from victor.tools.keyword_matcher import KeywordMatcher
 from victor.tools.tool_category_resolver import ToolCategoryResolver
-from victor.tools.tool_schema_cache import ToolSchemaCache
+from victor.tools.cache_manager import CacheNamespace, ToolCacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -491,7 +491,7 @@ class ToolMetadataRegistry:
         self,
         category_resolver: Optional[ToolCategoryResolver] = None,
         keyword_matcher: Optional[KeywordMatcher] = None,
-        schema_cache: Optional[ToolSchemaCache] = None,
+        schema_cache: Optional[CacheNamespace] = None,
     ) -> None:
         """Initialize the registry.
 
@@ -519,7 +519,9 @@ class ToolMetadataRegistry:
         # Composed extracted classes (injectable for testing)
         self._category_resolver = category_resolver or ToolCategoryResolver()
         self._keyword_matcher = keyword_matcher or KeywordMatcher()
-        self._schema_cache = schema_cache or ToolSchemaCache()
+        self._schema_cache = schema_cache or CacheNamespace(
+            name="tool_schemas", max_entries=200, default_ttl=None
+        )
         self._tools_hash: Optional[str] = None
         self._last_refresh_count: int = 0
 
@@ -691,7 +693,7 @@ class ToolMetadataRegistry:
             )
         schema = getattr(tool, "parameters", None)
         if schema:
-            self._schema_cache.register(entry.name, schema)
+            self._schema_cache.set(entry.name, schema)
 
     def unregister_tool(self, tool_name: str) -> None:
         """Remove a tool and its indexes from the registry."""
@@ -744,10 +746,12 @@ class ToolMetadataRegistry:
             self._keyword_matcher.remove_tool(tool_name)
         if hasattr(self._schema_cache, "invalidate"):
             self._schema_cache.invalidate(tool_name)
+        elif hasattr(self._schema_cache, "delete"):
+            self._schema_cache.delete(tool_name)
 
     def get_tool_schema(self, tool_name: str) -> Optional[dict]:
         """Get cached schema for a tool by name."""
-        return self._schema_cache.get_schema(tool_name)
+        return self._schema_cache.get(tool_name)
 
     def get_metadata(self, name: str) -> Optional[ToolMetadataEntry]:
         """Compatibility alias for get()."""
