@@ -1980,7 +1980,8 @@ async def run_interactive(
     except Exception as e:
         # Use contextual error formatting for better UX
         error_message = format_exception_for_user(e)
-        console.print(f"[bold red]Error:[/]\n{error_message}")
+        # format_exception_for_user already includes markup, so print directly
+        console.print(error_message)
 
         # Show traceback in debug mode only
         import os

@@ -41,6 +41,24 @@ from typing import Any
 
 from victor.core.errors import VictorError, ErrorCategory
 
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def _escape_rich_markup(text: str) -> str:
+    """Escape rich console markup to prevent injection.
+
+    Args:
+        text: Text that may contain brackets or other markup
+
+    Returns:
+        Text with brackets escaped for safe display in rich console
+    """
+    return text.replace("[", "\\[").replace("]", "\\]")
+
+
 # =============================================================================
 # Contextual Error Classes
 # =============================================================================
@@ -506,7 +524,7 @@ def format_exception_for_user(
 
         if isinstance(error, ProviderAuthError):
             return (
-                f"{error}\n\n"
+                f"{_escape_rich_markup(str(error))}\n\n"
                 f"💡 Suggestions:\n"
                 f"  • Verify API key for {provider if provider != 'provider' else 'provider'}: victor doctor --credentials\n"
                 f"  • Check API key has required permissions\n"
@@ -525,7 +543,7 @@ def format_exception_for_user(
 
         if isinstance(error, ProviderNotFoundError):
             return (
-                f"{error}\n\n"
+                f"{_escape_rich_markup(str(error))}\n\n"
                 f"💡 Suggestions:\n"
                 f"  • Check available providers: victor doctor --providers\n"
                 f"  • Verify provider name in profiles.yaml\n"
@@ -534,7 +552,7 @@ def format_exception_for_user(
 
         if isinstance(error, ToolExecutionError):
             return (
-                f"{error}\n\n"
+                f"{_escape_rich_markup(str(error))}\n\n"
                 f"💡 Suggestions:\n"
                 f"  • Check tool permissions and requirements\n"
                 f"  • Verify file/directory paths are correct\n"
@@ -543,7 +561,7 @@ def format_exception_for_user(
 
         if isinstance(error, ValidationError):
             return (
-                f"{error}\n\n"
+                f"{_escape_rich_markup(str(error))}\n\n"
                 f"💡 Suggestions:\n"
                 f"  • Check input format and data types\n"
                 f"  • Validate configuration files: victor config validate\n"
@@ -556,7 +574,7 @@ def format_exception_for_user(
     # API key / authentication errors
     if "api key" in error_str or "unauthorized" in error_str or "authentication" in error_str:
         return (
-            f"{error}\n\n"
+            f"{_escape_rich_markup(str(error))}\n\n"
             f"💡 Suggestions:\n"
             f"  • Verify API key: victor doctor --credentials\n"
             f"  • Check API key has required permissions\n"
@@ -565,7 +583,7 @@ def format_exception_for_user(
     # Network/connection errors
     if "connection" in error_str or "network" in error_str:
         return (
-            f"{error}\n\n"
+            f"{_escape_rich_markup(str(error))}\n\n"
             f"💡 Suggestions:\n"
             f"  • Check internet connection\n"
             f"  • For local providers, ensure service is running\n"
@@ -574,7 +592,7 @@ def format_exception_for_user(
     # Permission errors
     if "permission" in error_str:
         return (
-            f"{error}\n\n"
+            f"{_escape_rich_markup(str(error))}\n\n"
             f"💡 Suggestions:\n"
             f"  • Check file/directory permissions\n"
             f"  • Try: ls -la <path>\n"
@@ -583,7 +601,7 @@ def format_exception_for_user(
     # File not found errors
     if "not found" in error_str or "no such file" in error_str:
         return (
-            f"{error}\n\n"
+            f"{_escape_rich_markup(str(error))}\n\n"
             f"💡 Suggestions:\n"
             f"  • Verify the file/path exists\n"
             f"  • Try: ls <path>\n"
@@ -612,7 +630,10 @@ def _format_error_with_suggestions(
     Returns:
         Formatted error message
     """
-    message = f"[bold red]Error during {operation}:[/]\n{error}\n"
+    # Escape rich markup in error message to prevent injection
+    error_str = _escape_rich_markup(str(error))
+
+    message = f"[bold red]Error during {operation}:[/]\n{error_str}\n"
     message += "\n[yellow]💡 Suggestions:[/]\n"
     for suggestion in suggestions:
         message += f"  • {suggestion}\n"

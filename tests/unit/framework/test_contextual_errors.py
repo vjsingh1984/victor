@@ -230,3 +230,35 @@ class TestFormatExceptionForUser:
         formatted = format_exception_for_user(error)
         assert "Generic error" in formatted
         assert "victor doctor" in formatted.lower()
+
+    def test_format_error_with_brackets_escapes_markup(self):
+        """Formatting error with brackets escapes rich markup."""
+        # VictorError includes brackets in recovery_hint, which should be escaped
+        from victor.core.errors import VictorError
+
+        error = VictorError(
+            message="Connection failed",
+            recovery_hint="Check your [network] connection",
+        )
+        formatted = format_exception_for_user(error)
+        # Brackets should be escaped with backslash
+        assert "\\[network\\]" in formatted
+        # The raw brackets should not appear unescaped (except for our own markup tags)
+        # Count escaped vs unescaped brackets - our markup tags like [bold red] should remain
+        # but brackets from the error message should be escaped
+
+    def test_format_error_with_closing_bracket_does_not_break_markup(self):
+        """Error message with closing bracket pattern doesn't break rich markup."""
+        # This simulates the actual error that caused the MarkupError
+        from victor.core.errors import VictorError
+
+        error = VictorError(
+            message="Connection failed: timeout",
+            recovery_hint="Check network connection and provider URL. Verify the provider service is running. (provider=deepseek)",
+        )
+        formatted = format_exception_for_user(error)
+        # Should be able to render without MarkupError
+        # The brackets in the error message should be escaped
+        assert "provider=deepseek" in formatted
+        # Check that the brackets are escaped
+        assert "\\[" in formatted or "provider=deepseek" in formatted

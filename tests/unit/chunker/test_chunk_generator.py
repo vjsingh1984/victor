@@ -21,7 +21,7 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from typing import Dict, Any, List
 
-from victor.agent.chunk_generator import ChunkGenerator as LegacyChunkGenerator
+from victor.agent.services.chunk_runtime import ChunkGenerator as LegacyChunkGenerator
 from victor.agent.services.chunk_runtime import ChunkGenerator
 from victor.providers.base import StreamChunk
 from victor.config.settings import Settings

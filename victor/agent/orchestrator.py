@@ -4657,7 +4657,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return
 
         try:
-            self._session_service.update_session_metadata({"prompt_optimization": normalized})
+            # Only update if there's an active session (avoid warning when sessionless)
+            if hasattr(self._session_service, "_current_session") and self._session_service._current_session is not None:
+                self._session_service.update_session_metadata({"prompt_optimization": normalized})
         except Exception as exc:
             logger.debug("Failed to update session prompt-optimization metadata: %s", exc)
 
