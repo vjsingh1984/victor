@@ -36,6 +36,8 @@ from victor.providers.resolution import (
 )
 
 # Default DeepSeek API endpoint
+# DeepSeek supports OpenAI-compatible format with /v1 suffix:
+# https://api.deepseek.com/v1/chat/completions
 DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
 
 # Available DeepSeek models
@@ -91,7 +93,7 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
 
         Args:
             api_key: DeepSeek API key (or set DEEPSEEK_API_KEY env var)
-            base_url: API endpoint (default: https://api.deepseek.com/v1)
+            base_url: API endpoint (default: https://api.deepseek.com)
             timeout: Request timeout (capped at 120 s internally)
             non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
