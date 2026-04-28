@@ -35,6 +35,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, List, Optional, Tuple
 
+# Import native dispatch functions for ~3x speedup when available
+from victor.processing.native.tool_extraction import (
+    sanitize_response_fast,
+    is_garbage_content_fast,
+    strip_markup_fast,
+)
+
 logger = logging.getLogger(__name__)
 
 # Try to import native extensions for performance
@@ -622,6 +629,8 @@ class ResponseSanitizer:
     def strip_markup(self, text: str) -> str:
         """Remove simple XML/HTML-like tags to salvage plain text.
 
+        Uses native Rust implementation when available for ~3x speedup.
+
         Args:
             text: Text potentially containing markup
 
@@ -630,8 +639,7 @@ class ResponseSanitizer:
         """
         if not text:
             return text
-        cleaned = re.sub(r"<[^>]+>", " ", text)
-        return " ".join(cleaned.split())
+        return strip_markup_fast(text)
 
     def _looks_like_path_fragment(self, token: str) -> bool:
         normalized = token.strip().strip("`'\"")
@@ -694,6 +702,9 @@ class ResponseSanitizer:
     def sanitize(self, text: str) -> str:
         """Sanitize model response by removing malformed patterns.
 
+        Uses native Rust implementation for common patterns (~3x speedup),
+        then applies additional ResponseSanitizer-specific filtering.
+
         Handles common issues from local models:
         - Repeated </function> or </parameter> tags
         - XML-like formatting artifacts
@@ -711,39 +722,17 @@ class ResponseSanitizer:
 
         original_len = len(text)
 
-        # Remove repeated closing tags (</function>, </parameter>, etc.)
-        # These indicate the model is confused about tool calling format
-        text = re.sub(r"(</\w+>\s*){3,}", "", text)
+        # Fast path: use native dispatch for common sanitization patterns
+        # This handles: repeated closing tags, orphaned XML-like tags,
+        # thinking tokens, training data leakage, JSON tool calls, etc.
+        text = sanitize_response_fast(text)
 
-        # Remove orphaned XML-like tags
-        text = re.sub(r"</?function[^>]*>", "", text)
-        text = re.sub(r"</?parameter[^>]*>", "", text)
-        text = re.sub(r"</?tool[^>]*>", "", text)
-        text = re.sub(r"</?IMPORTANT[^>]*>", "", text)
-
-        # Remove thinking tokens from reasoning models (DeepSeek, Qwen3)
-        # Uses native implementation when available for 2-3x speedup
-        text = strip_thinking_tokens_fast(text)
-
-        # Remove training data leakage patterns
-        for pattern in self.LEAKAGE_PATTERNS:
-            text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
-
-        # Remove JSON-like tool call attempts embedded in text
-        # Pattern: {"name": "tool_name", ...}
-        text = re.sub(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}', "", text)
-
-        # Remove lines that are just tool call syntax
+        # Additional line-by-line filtering for plaintext tool command lines
+        # (beyond what the native dispatch handles)
         lines = text.split("\n")
         cleaned_lines = []
         for line in lines:
             stripped = line.strip()
-            # Skip lines that look like raw tool call attempts
-            if stripped.startswith('{"name":') or stripped.startswith("</"):
-                continue
-            # Skip lines that are just parameter= syntax
-            if re.match(r"^(parameter=|<parameter)", stripped):
-                continue
             # Skip standalone shell-like command lines; these are malformed
             # plain-text tool intents, not useful user-facing content.
             if self._is_plaintext_tool_command_line(stripped):
@@ -768,6 +757,9 @@ class ResponseSanitizer:
     def is_garbage_content(self, content: str) -> bool:
         """Detect if content is garbage/malformed output from local models.
 
+        Uses native Rust implementation for common patterns (~3x speedup),
+        then checks additional ResponseSanitizer-specific patterns.
+
         Args:
             content: Content chunk to check
 
@@ -777,7 +769,26 @@ class ResponseSanitizer:
         if not content:
             return False
 
-        for pattern in self.GARBAGE_PATTERNS:
+        # Fast path: use native dispatch for common garbage patterns
+        if is_garbage_content_fast(content):
+            return True
+
+        # Additional patterns specific to ResponseSanitizer beyond native dispatch
+        additional_patterns = [
+            r"^\s*<important>",  # Instruction leakage (lowercase)
+            r"</important>",  # Instruction leakage closing tag
+            r"^\s*ALWAYS include",  # Instruction leakage
+            r"^\s*- Do NOT",  # List-style instruction leakage
+            r"^\s*- Use lowercase",  # Formatting instruction leakage
+            r"^\s*- The parameters",  # Parameter instruction leakage
+            r"the XML tag",  # Format instruction leakage
+            r"backticks.*markdown",  # Format instruction leakage
+            r"JSON parsing",  # Technical instruction leakage
+            r"file system structure",  # Security instruction leakage
+            r"\[END_TOOL_REQUEST\]",  # LMStudio default format leakage
+        ]
+
+        for pattern in additional_patterns:
             if re.search(pattern, content, re.IGNORECASE | re.MULTILINE):
                 return True
 
