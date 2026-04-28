@@ -234,6 +234,28 @@ class HttpxOpenAICompatProvider(BaseProvider):
             if key not in {"api_key"} and value is not None and key not in payload:
                 payload[key] = value
 
+        # Log detailed message structure for debugging tool pairing issues
+        tool_messages = [(i, m) for i, m in enumerate(formatted) if m.get("role") in ("tool", "assistant")]
+        if tool_messages:
+            for i, msg in tool_messages:
+                role = msg.get("role")
+                if role == "assistant" and "tool_calls" in msg:
+                    tc_ids = [tc.get("id", "") for tc in msg["tool_calls"]]
+                    self._provider_logger.logger.debug(
+                        "%s payload: message[%d] role=assistant tool_calls=%s",
+                        self.name,
+                        i,
+                        tc_ids,
+                    )
+                elif role == "tool":
+                    self._provider_logger.logger.debug(
+                        "%s payload: message[%d] role=tool tool_call_id=%s name=%s",
+                        self.name,
+                        i,
+                        msg.get("tool_call_id"),
+                        msg.get("name", ""),
+                    )
+
         self._provider_logger.logger.debug(
             "%s payload: model=%s messages=%d tools=%s stream=%s",
             self.name,

@@ -256,17 +256,46 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
         m.get("tool_call_id") for m in messages if m.get("role") == "tool" and m.get("tool_call_id")
     }
 
+    logger.debug(
+        "[fix_orphaned_tool_messages] declared_tool_call_ids=%s present_response_ids=%s",
+        declared_tool_call_ids,
+        present_response_ids,
+    )
+
+    # Find orphaned tool responses (responses without matching tool_calls)
+    orphaned_responses = present_response_ids - declared_tool_call_ids
+    if orphaned_responses:
+        logger.warning(
+            "[fix_orphaned_tool_messages] Found %d orphaned tool responses (will be removed): %s",
+            len(orphaned_responses),
+            orphaned_responses,
+        )
+
     # Strip assistant tool_calls whose responses were compacted away
+    stripped_calls_count = 0
     for msg in messages:
         if msg.get("role") == "assistant" and "tool_calls" in msg:
             tc_ids = {tc["id"] for tc in msg["tool_calls"] if "id" in tc}
+            missing_responses = tc_ids - present_response_ids
             if not tc_ids.issubset(present_response_ids):
+                logger.warning(
+                    "[fix_orphaned_tool_messages] Stripping tool_calls from assistant message: missing responses for IDs: %s",
+                    missing_responses,
+                )
                 del msg["tool_calls"]
                 if msg.get("content") is None:
                     msg["content"] = ""
+                stripped_calls_count += 1
+
+    if stripped_calls_count:
+        logger.info(
+            "[fix_orphaned_tool_messages] Stripped tool_calls from %d assistant messages",
+            stripped_calls_count,
+        )
 
     # Remove orphaned tool responses whose assistant tool_calls were
     # compacted away
+    original_count = len(messages)
     messages = [
         m
         for m in messages
@@ -276,6 +305,19 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
             and m["tool_call_id"] not in declared_tool_call_ids
         )
     ]
+
+    removed_count = original_count - len(messages)
+    if removed_count:
+        logger.info(
+            "[fix_orphaned_tool_messages] Removed %d orphaned tool response messages",
+            removed_count,
+        )
+
+    logger.debug(
+        "[fix_orphaned_tool_messages] Result: %d messages (was %d)",
+        len(messages),
+        original_count,
+    )
 
     return messages
 
@@ -299,6 +341,10 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
     Returns:
         Cleaned OpenAI-format message list ready to send to any /v1/chat/completions API
     """
+    logger.debug(
+        "[build_openai_messages] Input: %d messages",
+        len(messages),
+    )
     formatted: List[Dict[str, Any]] = []
     valid_tool_call_ids: set = set()
 
@@ -331,12 +377,20 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
                     entry["tool_calls"] = openai_tcs
                     if not entry["content"]:
                         entry["content"] = None
+                logger.debug(
+                    "[build_openai_messages] Assistant message with %d tool_calls: %s",
+                    len(openai_tcs),
+                    [tc.get("id", "") for tc in openai_tcs],
+                )
 
         elif msg.role == "tool":
             tool_call_id = getattr(msg, "tool_call_id", None)
             # Skip tool messages without tool_call_id - they would cause 400 errors
             # and fix_orphaned_tool_messages() can't properly clean them up.
             if not tool_call_id:
+                logger.warning(
+                    "[build_openai_messages] Tool message without tool_call_id - SKIPPING"
+                )
                 continue
             entry["tool_call_id"] = tool_call_id
             # name field for function responses (required by some providers)
@@ -346,10 +400,25 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
             # Use a placeholder to avoid 400 errors while maintaining API compatibility.
             if not entry.get("content"):
                 entry["content"] = "(no output)"
+            logger.debug(
+                "[build_openai_messages] Tool message with tool_call_id=%s name=%s",
+                tool_call_id,
+                entry.get("name", ""),
+            )
 
         formatted.append(entry)
 
-    return fix_orphaned_tool_messages(formatted)
+    logger.debug(
+        "[build_openai_messages] Before orphan cleanup: %d messages, valid_tool_call_ids=%s",
+        len(formatted),
+        valid_tool_call_ids,
+    )
+    result = fix_orphaned_tool_messages(formatted)
+    logger.debug(
+        "[build_openai_messages] After orphan cleanup: %d messages",
+        len(result),
+    )
+    return result
 
 
 def handle_httpx_status_error(
