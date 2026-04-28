@@ -488,7 +488,26 @@ def get_all_benchmarks() -> Dict[str, Dict[str, Any]]:
 
 
 # =============================================================================
-# PROTOCOL-BASED DISPATCH (SOLID Design)
+# PROTOCOL-BASED DISPATCH (DEPRECATED - Unused)
+# =============================================================================
+#
+# NOTE: The following protocol-based dispatch functions are currently unused
+# throughout the codebase. All callers use the flat function dispatch from
+# victor.processing.native modules (similarity.py, chunking.py, etc.) instead.
+#
+# These functions are kept for potential future use (dependency injection,
+# testing) but add maintenance burden. Consider removing in v0.9.0 if still
+# unused, or alternatively migrate all callers to use this layer consistently.
+#
+# Current state (2025-04):
+# - get_symbol_extractor: Unused (no callers)
+# - get_argument_normalizer: Unused (no callers)
+# - get_similarity_computer: Unused (no callers)
+# - get_text_chunker: Unused (no callers)
+# - get_token_counter: Unused (no callers)
+# - get_context_fitter: Unused (no callers)
+#
+# Flat dispatch (Layer A) is the recommended approach for all new code.
 # =============================================================================
 
 
