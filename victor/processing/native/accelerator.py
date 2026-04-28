@@ -505,7 +505,12 @@ def get_symbol_extractor(backend: Optional[str] = None) -> "SymbolExtractorProto
     from victor.native.protocols import SymbolExtractorProtocol
 
     if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
-        pass
+        try:
+            from victor.native.rust.symbol_extractor import RustSymbolExtractor
+
+            return RustSymbolExtractor()
+        except ImportError:
+            pass
 
     from victor.native.python.symbol_extractor import PythonSymbolExtractor
 
@@ -527,7 +532,12 @@ def get_argument_normalizer(
     from victor.native.protocols import ArgumentNormalizerProtocol
 
     if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
-        pass
+        try:
+            from victor.native.rust.arg_normalizer import RustArgumentNormalizer
+
+            return RustArgumentNormalizer()
+        except ImportError:
+            pass
 
     from victor.native.python.arg_normalizer import PythonArgumentNormalizer
 
