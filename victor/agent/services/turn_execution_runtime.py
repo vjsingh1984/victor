@@ -913,9 +913,9 @@ class TurnExecutor:
                 normalized["tool"] = tool_name
                 normalized["command"] = command.strip()
                 normalized["description"] = description
-                normalized["reason"] = str(
-                    suggestion.get("reason") or description
-                ).strip() or description
+                normalized["reason"] = (
+                    str(suggestion.get("reason") or description).strip() or description
+                )
                 suggestions.append(normalized)
                 if len(suggestions) >= 4:
                     return suggestions
@@ -1172,9 +1172,11 @@ class TurnExecutor:
             snapshot["tool_service_budget"] = getattr(
                 tool_service,
                 "budget",
-                tool_service.get_budget_info().get("max")
-                if hasattr(tool_service, "get_budget_info")
-                else tool_service.get_tool_budget(),
+                (
+                    tool_service.get_budget_info().get("max")
+                    if hasattr(tool_service, "get_budget_info")
+                    else tool_service.get_tool_budget()
+                ),
             )
             if hasattr(tool_service, "set_tool_budget"):
                 try:

@@ -647,4 +647,3 @@ def list_workflows(
     console.print()
     console.print(f"[dim]Total: {len(workflows)} workflows[/dim]")
     console.print()
-

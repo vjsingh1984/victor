@@ -117,10 +117,11 @@ class MergeAnalyzer:
         *,
         worktree_plan: Optional[WorktreeExecutionPlan] = None,
     ) -> MergeAnalysis:
-        assignments = {
-            assignment.member_id: assignment
-            for assignment in worktree_plan.assignments
-        } if worktree_plan is not None else {}
+        assignments = (
+            {assignment.member_id: assignment for assignment in worktree_plan.assignments}
+            if worktree_plan is not None
+            else {}
+        )
 
         member_changed_files: Dict[str, tuple[str, ...]] = {}
         out_of_scope_writes: Dict[str, tuple[str, ...]] = {}
@@ -141,12 +142,16 @@ class MergeAnalyzer:
             if assignment is not None and changed_files:
                 if assignment.claimed_paths:
                     outside_scope = tuple(
-                        path for path in changed_files if not _path_matches_any(path, assignment.claimed_paths)
+                        path
+                        for path in changed_files
+                        if not _path_matches_any(path, assignment.claimed_paths)
                     )
                     if outside_scope:
                         out_of_scope_writes[str(member_id)] = outside_scope
                 readonly_hits = tuple(
-                    path for path in changed_files if _path_matches_any(path, assignment.readonly_paths)
+                    path
+                    for path in changed_files
+                    if _path_matches_any(path, assignment.readonly_paths)
                 )
                 if readonly_hits:
                     readonly_violations[str(member_id)] = readonly_hits
@@ -197,7 +202,9 @@ class MergeAnalyzer:
             potential_scope_overlaps=tuple(potential_scope_overlaps),
             member_changed_files=member_changed_files,
             recommended_merge_order=(
-                worktree_plan.merge_order if worktree_plan is not None else tuple(member_results.keys())
+                worktree_plan.merge_order
+                if worktree_plan is not None
+                else tuple(member_results.keys())
             ),
             notes=tuple(notes),
         )

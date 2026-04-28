@@ -180,25 +180,51 @@ def __getattr__(name: str) -> Any:
     """
     # Service-level re-exports for deleted coordinator shims
     if name in {
-        "ToolCoordinator", "ToolCoordinatorConfig", "TaskContext", "IToolCoordinator",
-        "create_tool_coordinator", "ToolObservabilityHandler", "ToolRetryExecutor",
+        "ToolCoordinator",
+        "ToolCoordinatorConfig",
+        "TaskContext",
+        "IToolCoordinator",
+        "create_tool_coordinator",
+        "ToolObservabilityHandler",
+        "ToolRetryExecutor",
         # Deleted coordinator shims
-        "ExplorationCoordinator", "ExplorationResult",
-        "MetricsCoordinator", "create_metrics_coordinator",
-        "SafetyCoordinator", "SafetyRule", "SafetyCheckResult", "SafetyStats",
-        "SafetyAction", "SafetyCategory",
+        "ExplorationCoordinator",
+        "ExplorationResult",
+        "MetricsCoordinator",
+        "create_metrics_coordinator",
+        "SafetyCoordinator",
+        "SafetyRule",
+        "SafetyCheckResult",
+        "SafetyStats",
+        "SafetyAction",
+        "SafetyCategory",
         "SystemPromptCoordinator",
-        "PlanningCoordinator", "PlanningConfig", "PlanningMode", "PlanningResult",
-        "SessionCoordinator", "SessionInfo", "create_session_coordinator",
-        "ConversationCoordinator", "TurnType", "ConversationTurn",
-        "ConversationStats", "ConversationContext",
+        "PlanningCoordinator",
+        "PlanningConfig",
+        "PlanningMode",
+        "PlanningResult",
+        "SessionCoordinator",
+        "SessionInfo",
+        "create_session_coordinator",
+        "ConversationCoordinator",
+        "TurnType",
+        "ConversationTurn",
+        "ConversationStats",
+        "ConversationContext",
         # Deleted chat coordinator shims
-        "ChatCoordinator", "SyncChatCoordinator", "StreamingChatCoordinator",
+        "ChatCoordinator",
+        "SyncChatCoordinator",
+        "StreamingChatCoordinator",
         "UnifiedChatCoordinator",
     }:
         # Import from appropriate service module
-        if name in {"ToolCoordinator", "ToolCoordinatorConfig", "TaskContext",
-                    "IToolCoordinator", "create_tool_coordinator"}:
+        if name in {
+            "ToolCoordinator",
+            "ToolCoordinatorConfig",
+            "TaskContext",
+            "IToolCoordinator",
+            "create_tool_coordinator",
+        }:
             module = importlib.import_module("victor.agent.services.tool_compat")
         elif name == "ToolObservabilityHandler":
             module = importlib.import_module("victor.agent.services.tool_observability")
@@ -208,18 +234,28 @@ def __getattr__(name: str) -> Any:
             module = importlib.import_module("victor.agent.services.exploration_runtime")
         elif name in {"MetricsCoordinator", "create_metrics_coordinator"}:
             module = importlib.import_module("victor.agent.services.metrics_service")
-        elif name in {"SafetyCoordinator", "SafetyRule", "SafetyCheckResult",
-                      "SafetyStats", "SafetyAction", "SafetyCategory"}:
+        elif name in {
+            "SafetyCoordinator",
+            "SafetyRule",
+            "SafetyCheckResult",
+            "SafetyStats",
+            "SafetyAction",
+            "SafetyCategory",
+        }:
             module = importlib.import_module("victor_sdk.safety")
         elif name == "SystemPromptCoordinator":
             module = importlib.import_module("victor.agent.services.system_prompt_runtime")
-        elif name in {"PlanningCoordinator", "PlanningConfig", "PlanningMode",
-                      "PlanningResult"}:
+        elif name in {"PlanningCoordinator", "PlanningConfig", "PlanningMode", "PlanningResult"}:
             module = importlib.import_module("victor.agent.services.planning_runtime")
         elif name in {"SessionCoordinator", "SessionInfo", "create_session_coordinator"}:
             module = importlib.import_module("victor.agent.services.session_compat")
-        elif name in {"ConversationCoordinator", "TurnType", "ConversationTurn",
-                      "ConversationStats", "ConversationContext"}:
+        elif name in {
+            "ConversationCoordinator",
+            "TurnType",
+            "ConversationTurn",
+            "ConversationStats",
+            "ConversationContext",
+        }:
             module = importlib.import_module("victor_sdk.conversation")
         elif name == "ChatCoordinator":
             module = importlib.import_module("victor.agent.services.chat_compat")
@@ -239,9 +275,7 @@ def __getattr__(name: str) -> Any:
                 "StreamingChatCoordinator",
                 "UnifiedChatCoordinator",
             }:
-                record_deprecated_chat_shim_access(
-                    "coordinators_package", name, "service_reexport"
-                )
+                record_deprecated_chat_shim_access("coordinators_package", name, "service_reexport")
             warnings.warn(_DEPRECATED_EXPORTS[name], DeprecationWarning, stacklevel=2)
         globals()[name] = value
         return value

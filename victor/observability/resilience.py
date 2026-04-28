@@ -394,6 +394,7 @@ class ObservableCircuitBreaker(CanonicalCircuitBreaker):
         # Parent expects (old_state, new_state, name), we provide (old_state, new_state)
         wrapped_callback: Optional[Callable] = None
         if on_state_change is not None:
+
             def wrapped_callback(old: CircuitState, new: CircuitState, cb_name: str) -> None:
                 on_state_change(old, new)  # type: ignore
 

@@ -892,9 +892,7 @@ class TestBenchmarkToolUsageMetrics:
         loaded = harness.load_results(saved_path)
 
         assert loaded["summary"]["planning_feedback_coverage"] == 1.0
-        assert loaded["summary"]["planning_policy_counts"] == {
-            "experiment_forced_slow_path": 1
-        }
+        assert loaded["summary"]["planning_policy_counts"] == {"experiment_forced_slow_path": 1}
 
     def test_save_results_persists_degradation_feedback_metrics(self, tmp_path):
         harness = EvaluationHarness(checkpoint_dir=tmp_path)
@@ -971,7 +969,10 @@ class TestBenchmarkToolUsageMetrics:
                                 "tester": ["tests/auth/test_service.py"],
                             },
                         },
-                        "worktree_cleanup": {"removed": ["/tmp/feature-team-planner"], "errors": []},
+                        "worktree_cleanup": {
+                            "removed": ["/tmp/feature-team-planner"],
+                            "errors": [],
+                        },
                     },
                 )
             ],

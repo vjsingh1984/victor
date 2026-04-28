@@ -945,7 +945,9 @@ def test_runtime_intelligence_exposes_experiment_memory_routing_hints(tmp_path):
     assert hints["experiment_memory_preferred_selection_policy"] == "heuristic"
     assert hints["experiment_memory_selection_policy_bias"] < 0.0
     assert hints["experiment_memory_constraint_tags"] == ["tests_pass"]
-    assert "Tighten learned override thresholds" in hints["experiment_memory_next_candidate_hints"][0]
+    assert (
+        "Tighten learned override thresholds" in hints["experiment_memory_next_candidate_hints"][0]
+    )
 
 
 def test_runtime_intelligence_exposes_planning_force_hints_from_experiment_constraints(
@@ -998,7 +1000,9 @@ def test_runtime_intelligence_exposes_planning_force_hints_from_experiment_const
     assert hints["planning_constraint_tags"] == ["tests_pass"]
     assert hints["planning_experiment_support"] > 0.0
     assert hints["planning_match_count"] == 1
-    assert "Verify tests_pass before widening topology." in hints["planning_next_candidate_hints"][0]
+    assert (
+        "Verify tests_pass before widening topology." in hints["planning_next_candidate_hints"][0]
+    )
 
 
 def test_runtime_intelligence_exposes_planning_policy_bias_from_experiment_memory(tmp_path):
@@ -1342,10 +1346,12 @@ async def test_analyze_turn_includes_experiment_memory_hints(tmp_path):
     )
 
     assert snapshot.metadata["experiment_memory_hints"]["experiment_memory_match_count"] == 1
-    assert snapshot.metadata["experiment_memory_hints"]["experiment_memory_preferred_selection_policy"] == (
-        "heuristic"
+    assert snapshot.metadata["experiment_memory_hints"][
+        "experiment_memory_preferred_selection_policy"
+    ] == ("heuristic")
+    assert (
+        snapshot.metadata["topology_routing_hints"]["experiment_memory_selection_policy_bias"] < 0.0
     )
-    assert snapshot.metadata["topology_routing_hints"]["experiment_memory_selection_policy_bias"] < 0.0
 
 
 def test_from_container_merges_persisted_feedback_before_decision_service_feedback(tmp_path):

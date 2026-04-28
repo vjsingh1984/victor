@@ -26,9 +26,7 @@ VALIDATED_RUNTIME_FEEDBACK_SOURCES = {
 }
 AGGREGATED_RUNTIME_FEEDBACK_SOURCE = "validated_evaluation_truth_aggregate"
 SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = "session_topology_runtime_feedback"
-AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = (
-    "session_topology_runtime_feedback_aggregate"
-)
+AGGREGATED_SESSION_TOPOLOGY_RUNTIME_FEEDBACK_SOURCE = "session_topology_runtime_feedback_aggregate"
 FRESHNESS_HALF_LIFE_DAYS = 14.0
 SESSION_TOPOLOGY_FRESHNESS_HALF_LIFE_DAYS = 5.0
 VALIDATED_RUNTIME_FEEDBACK_SOURCE_TRUST = {
@@ -356,7 +354,10 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
     topology_selection_policy_feasibility_rates = dict(
         summary.get("topology_selection_policy_feasibility_rates") or {}
     )
-    if not topology_selection_policy_feasibility_rates and topology_selection_policy_optimization_counts:
+    if (
+        not topology_selection_policy_feasibility_rates
+        and topology_selection_policy_optimization_counts
+    ):
         topology_selection_policy_feasibility_rates = {
             str(policy): round(
                 float(topology_selection_policy_feasible_counts.get(policy, 0.0))
@@ -393,9 +394,7 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             "topology_feedback_coverage": round(
                 float(summary.get("topology_feedback_coverage", 0.0) or 0.0), 4
             ),
-            "avg_topology_reward": round(
-                float(summary.get("avg_topology_reward", 0.0) or 0.0), 4
-            ),
+            "avg_topology_reward": round(float(summary.get("avg_topology_reward", 0.0) or 0.0), 4),
             "avg_topology_confidence": round(
                 float(summary.get("avg_topology_confidence", 0.0) or 0.0), 4
             ),
@@ -425,9 +424,7 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             ),
             "degradation_sources": dict(summary.get("degradation_sources") or {}),
             "degradation_kinds": dict(summary.get("degradation_kinds") or {}),
-            "degradation_failure_types": dict(
-                summary.get("degradation_failure_types") or {}
-            ),
+            "degradation_failure_types": dict(summary.get("degradation_failure_types") or {}),
             "degradation_providers": dict(summary.get("degradation_providers") or {}),
             "degradation_reasons": dict(summary.get("degradation_reasons") or {}),
             "topology_actions": dict(summary.get("topology_actions") or {}),
@@ -463,7 +460,9 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
                 4,
             ),
             "avg_optimization_reward": round(
-                float(summary.get("avg_optimization_reward", summary.get("avg_reward", 0.0)) or 0.0),
+                float(
+                    summary.get("avg_optimization_reward", summary.get("avg_reward", 0.0)) or 0.0
+                ),
                 4,
             ),
             "avg_feasible_optimization_reward": round(
@@ -1496,7 +1495,9 @@ def _build_selection_policy_scope_metrics(
                     )
 
         selection_policy_counts = metadata.get("topology_selection_policies") or {}
-        selection_policy_reward_totals = metadata.get("topology_selection_policy_reward_totals") or {}
+        selection_policy_reward_totals = (
+            metadata.get("topology_selection_policy_reward_totals") or {}
+        )
         selection_policy_optimization_counts = (
             metadata.get("topology_selection_policy_optimization_counts") or {}
         )
@@ -1834,9 +1835,7 @@ def _aggregate_feedback_payloads(
             "topology_learned_override_reward_delta": _selection_policy_reward_delta(
                 avg_reward_by_selection_policy
             ),
-            "topology_selection_policy_optimization_counts": (
-                selection_policy_optimization_counts
-            ),
+            "topology_selection_policy_optimization_counts": (selection_policy_optimization_counts),
             "topology_selection_policy_optimization_reward_totals": (
                 selection_policy_optimization_reward_totals
             ),
@@ -1881,7 +1880,10 @@ def _load_session_topology_feedback_payloads_from_directory(base_dir: Path) -> l
 
 def _has_topology_runtime_metadata(metadata: Mapping[str, Any]) -> bool:
     """Return whether metadata carries any topology-routing statistics."""
-    return any(metadata.get(field_name) not in (None, {}, []) for field_name in TOPOLOGY_RUNTIME_METADATA_KEYS)
+    return any(
+        metadata.get(field_name) not in (None, {}, [])
+        for field_name in TOPOLOGY_RUNTIME_METADATA_KEYS
+    )
 
 
 def _aggregate_topology_feedback_metadata(
@@ -2030,9 +2032,7 @@ def _aggregate_topology_feedback_metadata(
         "topology_feedback_coverage": weighted_metadata_average("topology_feedback_coverage"),
         "avg_topology_reward": weighted_metadata_average("avg_topology_reward"),
         "avg_topology_confidence": weighted_metadata_average("avg_topology_confidence"),
-        "degradation_feedback_coverage": weighted_metadata_average(
-            "degradation_feedback_coverage"
-        ),
+        "degradation_feedback_coverage": weighted_metadata_average("degradation_feedback_coverage"),
         "degradation_event_count": weighted_metadata_average("degradation_event_count"),
         "degraded_task_count": weighted_metadata_average("degraded_task_count"),
         "recovered_task_count": weighted_metadata_average("recovered_task_count"),
@@ -2055,12 +2055,8 @@ def _aggregate_topology_feedback_metadata(
         "degradation_providers": weighted_distribution("degradation_providers"),
         "degradation_reasons": weighted_distribution("degradation_reasons"),
         "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
-        "optimization_infeasible_tasks": weighted_metadata_average(
-            "optimization_infeasible_tasks"
-        ),
-        "optimization_feasibility_rate": weighted_metadata_average(
-            "optimization_feasibility_rate"
-        ),
+        "optimization_infeasible_tasks": weighted_metadata_average("optimization_infeasible_tasks"),
+        "optimization_feasibility_rate": weighted_metadata_average("optimization_feasibility_rate"),
         "avg_optimization_reward": weighted_metadata_average("avg_optimization_reward"),
         "avg_feasible_optimization_reward": weighted_metadata_average(
             "avg_feasible_optimization_reward"

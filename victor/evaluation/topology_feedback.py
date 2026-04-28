@@ -94,14 +94,12 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
         "provider": _coerce_optional_text(event.get("provider")),
         "formation": _coerce_optional_text(event.get("formation")),
         "selection_policy": _coerce_optional_text(event.get("selection_policy"))
-        or _coerce_optional_text(
-            _extract_mapping(event, "telemetry_tags").get("selection_policy")
-        ),
+        or _coerce_optional_text(_extract_mapping(event, "telemetry_tags").get("selection_policy")),
         "fallback_action": _coerce_optional_text(event.get("fallback_action")),
         "confidence": _coerce_float(event.get("confidence")) or 0.0,
-        "outcome": dict(event.get("outcome") or {})
-        if isinstance(event.get("outcome"), Mapping)
-        else {},
+        "outcome": (
+            dict(event.get("outcome") or {}) if isinstance(event.get("outcome"), Mapping) else {}
+        ),
     }
 
 
@@ -207,8 +205,10 @@ def summarize_topology_feedback(value: Any) -> Optional[dict[str, Any]]:
 
     trace = _extract_value(value, "trace")
     if trace is not None:
-        tool_calls = tool_calls if tool_calls is not None else _coerce_int(
-            _extract_value(trace, "total_tool_calls")
+        tool_calls = (
+            tool_calls
+            if tool_calls is not None
+            else _coerce_int(_extract_value(trace, "total_tool_calls"))
         )
         turns = turns if turns is not None else _coerce_int(_extract_value(trace, "turns"))
 
@@ -510,9 +510,7 @@ def aggregate_topology_feedback(
         "topology_selection_policy_reward_totals": dict(selection_policy_reward_totals),
         "avg_topology_reward_by_selection_policy": dict(avg_reward_by_selection_policy),
         "topology_learned_override_reward_delta": learned_override_reward_delta,
-        "topology_selection_policy_optimization_counts": dict(
-            selection_policy_optimization_counts
-        ),
+        "topology_selection_policy_optimization_counts": dict(selection_policy_optimization_counts),
         "topology_selection_policy_optimization_reward_totals": dict(
             selection_policy_optimization_reward_totals
         ),
@@ -520,9 +518,7 @@ def aggregate_topology_feedback(
             avg_optimization_reward_by_selection_policy
         ),
         "topology_selection_policy_feasible_counts": dict(selection_policy_feasible_counts),
-        "topology_selection_policy_feasibility_rates": dict(
-            selection_policy_feasibility_rates
-        ),
+        "topology_selection_policy_feasibility_rates": dict(selection_policy_feasibility_rates),
         "topology_learned_override_optimization_reward_delta": (
             learned_override_optimization_reward_delta
         ),

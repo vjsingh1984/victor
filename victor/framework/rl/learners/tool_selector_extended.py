@@ -120,7 +120,9 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
         for tool_name in tool_names:
             # Get insights from UsageAnalytics
             insights = self.analytics.get_tool_insights(tool_name)
-            execution_count = int(insights.get("execution_count", insights.get("total_executions", 0)))
+            execution_count = int(
+                insights.get("execution_count", insights.get("total_executions", 0))
+            )
 
             # Create recommendation based on success rate
             if insights["success_rate"] > 0.7:

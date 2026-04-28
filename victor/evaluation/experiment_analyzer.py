@@ -135,7 +135,9 @@ def _append_policy_insights(
     selection_policy_counts = dict(
         summary_metrics.get("topology_selection_policy_optimization_counts") or {}
     )
-    delta = _coerce_float(summary_metrics.get("topology_learned_override_optimization_reward_delta"))
+    delta = _coerce_float(
+        summary_metrics.get("topology_learned_override_optimization_reward_delta")
+    )
     feasibility_delta = _coerce_float(
         summary_metrics.get("topology_learned_override_feasibility_delta")
     )
@@ -313,7 +315,7 @@ def _append_degradation_insights(
                 confidence=0.74,
                 evidence={"reason": dominant_reason[0], "count": int(dominant_reason[1])},
             )
-            )
+        )
 
 
 def _append_team_insights(
@@ -411,7 +413,9 @@ def _append_next_candidate(
     feasibility_rate = _coerce_float(summary_metrics.get("optimization_feasibility_rate"))
     pass_rate = _coerce_float(summary_metrics.get("pass_rate"))
     gate_failures = dict(summary_metrics.get("optimization_gate_failures") or {})
-    code_intelligence_coverage = _coerce_float(summary_metrics.get("code_intelligence_task_coverage"))
+    code_intelligence_coverage = _coerce_float(
+        summary_metrics.get("code_intelligence_task_coverage")
+    )
 
     if (
         reward_delta is not None
@@ -437,7 +441,9 @@ def _append_next_candidate(
         return
 
     if gate_failures and feasibility_rate is not None and feasibility_rate < 0.75:
-        dominant_failure = sorted(gate_failures.items(), key=lambda item: (-int(item[1]), item[0]))[0]
+        dominant_failure = sorted(gate_failures.items(), key=lambda item: (-int(item[1]), item[0]))[
+            0
+        ]
         keywords.add(str(dominant_failure[0]))
         insights.append(
             ExperimentInsight(

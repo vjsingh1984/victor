@@ -577,7 +577,9 @@ class TopologySelector:
         if heuristic_gap > thresholds.score_gap:
             return heuristic_best_action, score_breakdown, metadata
 
-        score_breakdown[preferred_action] = heuristic_best_score + self.config.learned_override_margin
+        score_breakdown[preferred_action] = (
+            heuristic_best_score + self.config.learned_override_margin
+        )
         metadata.update(
             {
                 "selection_policy": "learned_close_override",
@@ -654,10 +656,8 @@ class TopologySelector:
                 disabled=True,
             )
         has_live_policy_signal = not (
-            (
-                effective_reward_delta is None
-                and feasibility_delta is None
-            ) or reward_evidence < self.config.learned_override_min_policy_count
+            (effective_reward_delta is None and feasibility_delta is None)
+            or reward_evidence < self.config.learned_override_min_policy_count
         )
         if not has_live_policy_signal and (
             experiment_memory_match_count <= 0 or experiment_memory_bias is None
@@ -727,17 +727,17 @@ class TopologySelector:
             profile = (
                 "experiment_memory_positive"
                 if bounded_delta > 0.0
-                else "experiment_memory_negative"
-                if bounded_delta < 0.0
-                else "experiment_memory_neutral"
+                else (
+                    "experiment_memory_negative"
+                    if bounded_delta < 0.0
+                    else "experiment_memory_neutral"
+                )
             )
         else:
             profile = (
                 "adaptive_positive"
                 if bounded_delta > 0.0
-                else "adaptive_negative"
-                if bounded_delta < 0.0
-                else "adaptive_neutral"
+                else "adaptive_negative" if bounded_delta < 0.0 else "adaptive_neutral"
             )
         return LearnedOverrideThresholds(
             score_gap=self._clamp_float(

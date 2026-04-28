@@ -32,17 +32,11 @@ def coerce_skill_catalog(skills: Any) -> Dict[str, SkillDefinition]:
 
     if isinstance(skills, Mapping):
         return {
-            str(name): skill
-            for name, skill in skills.items()
-            if isinstance(skill, SkillDefinition)
+            str(name): skill for name, skill in skills.items() if isinstance(skill, SkillDefinition)
         }
 
     if isinstance(skills, list):
-        return {
-            skill.name: skill
-            for skill in skills
-            if isinstance(skill, SkillDefinition)
-        }
+        return {skill.name: skill for skill in skills if isinstance(skill, SkillDefinition)}
 
     return {}
 
@@ -58,7 +52,9 @@ def build_skill_decomposition(
     The matcher already owns the ranking and phase ordering logic. This helper
     turns those matches into a reusable planning/decomposition artifact.
     """
-    if matcher is None or not getattr(matcher, "initialized", getattr(matcher, "_initialized", False)):
+    if matcher is None or not getattr(
+        matcher, "initialized", getattr(matcher, "_initialized", False)
+    ):
         return None
 
     match_multiple = getattr(matcher, "match_multiple_sync", None)

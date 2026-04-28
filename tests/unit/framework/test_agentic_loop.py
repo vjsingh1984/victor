@@ -326,9 +326,9 @@ class TestAgenticLoop:
         topology_context = loop.paradigm_router.build_topology_input.call_args.kwargs["context"]
         assert topology_context["learned_topology_action"] == "team_plan"
         assert topology_context["learned_provider_hint"] == "anthropic"
-        learned_scope_context = loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs[
-            "scope_context"
-        ]
+        learned_scope_context = (
+            loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs["scope_context"]
+        )
         assert loop.runtime_intelligence.get_topology_routing_context.call_args.kwargs["query"] == (
             "Fix the bug"
         )
@@ -426,7 +426,9 @@ class TestAgenticLoop:
         loop._topology_selector.select = MagicMock(return_value=topology_decision)
         loop._topology_grounder.ground = MagicMock(return_value=topology_plan)
 
-        result = await loop.run("Fix the bug", context={"_task_classification": task_classification})
+        result = await loop.run(
+            "Fix the bug", context={"_task_classification": task_classification}
+        )
 
         assert result.success is True
         turn_executor.prepare_runtime_topology.assert_awaited_once_with(
@@ -437,8 +439,7 @@ class TestAgenticLoop:
         assert result.final_state["topology_preparation"]["action"] == "parallel_exploration"
         assert result.final_state["topology_preparation"]["prepared"] is True
         assert (
-            result.final_state["topology_preparation"]["execution_mode"]
-            == "parallel_exploration"
+            result.final_state["topology_preparation"]["execution_mode"] == "parallel_exploration"
         )
 
     async def test_run_team_topology_executes_framework_team_runtime(self, monkeypatch):

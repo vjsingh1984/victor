@@ -560,9 +560,7 @@ class TestChatServiceBootstrapLaziness:
         )
         assert callable(kwargs["context_limit_handler"])
         assert kwargs["context_limit_handler"].__self__ is obj._protocol_adapter
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(
-            obj._protocol_adapter
-        )
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -681,9 +679,7 @@ class TestChatServiceBootstrapLaziness:
         obj.conversation.ensure_system_prompt.assert_called_once()
         obj.add_message.assert_any_call("user", "plan this")
         obj.add_message.assert_any_call("assistant", "planned")
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(
-            obj._protocol_adapter
-        )
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -956,9 +952,7 @@ class TestChatServiceBootstrapLaziness:
             chunks = [c async for c in stream_chat_handler("hello", _preserve_iteration=True)]
 
         assert chunks == [stream_chunk]
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(
-            obj._protocol_adapter
-        )
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 

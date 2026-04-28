@@ -379,9 +379,7 @@ class OrchestrationFacade:
             self._deprecated_chat_coordinator = self._get_chat_coordinator()
             route = "lazy_getter"
         if self._deprecated_chat_coordinator is not None:
-            record_deprecated_chat_shim_access(
-                "orchestration_facade", "chat_coordinator", route
-            )
+            record_deprecated_chat_shim_access("orchestration_facade", "chat_coordinator", route)
             warnings.warn(
                 "OrchestrationFacade.chat_coordinator is deprecated. "
                 "Use OrchestrationFacade.chat_service instead.",

@@ -127,7 +127,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                     clean_lines.append(clean_line)
 
                 # Count additions and removals from clean lines
-                added = sum(1 for line in clean_lines if line.startswith("+") and not line.startswith("+++"))
+                added = sum(
+                    1 for line in clean_lines if line.startswith("+") and not line.startswith("+++")
+                )
                 removed = sum(
                     1 for line in clean_lines if line.startswith("-") and not line.startswith("---")
                 )
@@ -160,7 +162,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                 diff_lines = raw_diff.splitlines()
 
                 # Count additions and removals
-                added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+                added = sum(
+                    1 for line in diff_lines if line.startswith("+") and not line.startswith("+++")
+                )
                 removed = sum(
                     1 for line in diff_lines if line.startswith("-") and not line.startswith("---")
                 )
@@ -178,7 +182,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
 
                 # Return content lines (excluding file headers)
                 content_lines = [
-                    line for line in diff_lines if not line.startswith("---") and not line.startswith("+++")
+                    line
+                    for line in diff_lines
+                    if not line.startswith("---") and not line.startswith("+++")
                 ]
                 visible = content_lines[:max_lines]
                 return RenderedPreview(
@@ -206,7 +212,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                     )
                 )
                 content_lines = [
-                    line for line in diff_lines if not line.startswith("---") and not line.startswith("+++")
+                    line
+                    for line in diff_lines
+                    if not line.startswith("---") and not line.startswith("+++")
                 ]
                 all_content_lines.extend(content_lines)
                 if path:

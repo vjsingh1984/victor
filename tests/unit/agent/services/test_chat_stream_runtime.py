@@ -364,7 +364,9 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     ctx.runtime_override_snapshot = runtime._apply_stream_runtime_overrides(
         {"tool_budget": 4, "provider_hint": "smart-router"}
     )
-    orch.get_capability_value.side_effect = lambda name: ctx if name == "current_stream_context" else None
+    orch.get_capability_value.side_effect = lambda name: (
+        ctx if name == "current_stream_context" else None
+    )
     orch._current_stream_context = ctx
 
     class DummyPipeline:
@@ -429,7 +431,9 @@ async def test_service_streaming_runtime_stream_chat_normalizes_recovery_events(
         has_substantial_content=lambda: True,
         runtime_override_snapshot=None,
     )
-    orch.get_capability_value.side_effect = lambda name: ctx if name == "current_stream_context" else None
+    orch.get_capability_value.side_effect = lambda name: (
+        ctx if name == "current_stream_context" else None
+    )
     orch._current_stream_context = ctx
 
     class DummyPipeline:

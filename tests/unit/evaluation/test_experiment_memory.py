@@ -63,7 +63,7 @@ def _build_result() -> EvaluationResult:
                             "fallback_action": "direct_answer",
                             "confidence": 0.81,
                         }
-                    ]
+                    ],
                 },
             ),
             TaskResult(
@@ -98,7 +98,7 @@ def _build_result() -> EvaluationResult:
                             "selection_policy": "heuristic",
                             "confidence": 0.74,
                         }
-                    ]
+                    ],
                 },
             ),
         ],
@@ -129,8 +129,7 @@ def test_analyze_evaluation_result_distills_structured_experiment_memory(tmp_pat
     assert "environment_constraint" in insight_kinds
     assert "next_candidate" in insight_kinds
     assert any(
-        "Forced LLM planning outperformed heuristic fast-path"
-        in insight.summary
+        "Forced LLM planning outperformed heuristic fast-path" in insight.summary
         for insight in record.insights
     )
     assert "learned_close_override" in record.keywords

@@ -516,9 +516,12 @@ class TestTopologySelector:
         assert decision.action == TopologyAction.ESCALATE_MODEL
         assert decision.telemetry_tags["selection_policy"] == "learned_close_override"
         assert decision.telemetry_tags["learned_override_threshold_profile"] == "adaptive_positive"
-        assert decision.grounding_requirements.metadata[
-            "learned_override_policy_optimization_reward_delta"
-        ] == 0.25
+        assert (
+            decision.grounding_requirements.metadata[
+                "learned_override_policy_optimization_reward_delta"
+            ]
+            == 0.25
+        )
 
     def test_negative_feasibility_delta_hard_disables_learned_close_override(self):
         """Feasibility regressions should disable learned overrides even with positive reward."""
@@ -597,6 +600,6 @@ class TestTopologySelector:
             "experiment_memory_disabled_negative"
         )
         assert decision.grounding_requirements.metadata["learned_override_disabled"] is True
-        assert decision.grounding_requirements.metadata["experiment_memory_selection_policy_bias"] == (
-            -0.8
-        )
+        assert decision.grounding_requirements.metadata[
+            "experiment_memory_selection_policy_bias"
+        ] == (-0.8)

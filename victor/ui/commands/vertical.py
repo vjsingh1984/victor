@@ -344,7 +344,9 @@ def audit_verticals(
     reports = VerticalContractAuditor().audit_paths(resolved_paths)
 
     if json_output:
-        print_json_data({"reports": [report.to_dict() for report in reports], "count": len(reports)})
+        print_json_data(
+            {"reports": [report.to_dict() for report in reports], "count": len(reports)}
+        )
     else:
         table = Table(title="Vertical Contract Audit")
         table.add_column("Repo", style="cyan")

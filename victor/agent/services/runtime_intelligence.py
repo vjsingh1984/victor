@@ -192,8 +192,7 @@ class TopologyRoutingFeedback:
         """Return whether the feedback is strong enough to steer routing."""
         return (
             self.observation_count >= min_observations
-            and
-            self.coverage >= min_coverage
+            and self.coverage >= min_coverage
             and self.avg_reward >= min_reward
             and self.support > 0.0
             and any(
@@ -315,9 +314,7 @@ class TopologyRoutingFeedback:
             "selection_policy_reward_totals": dict(self.selection_policy_reward_totals),
             "avg_reward_by_selection_policy": dict(self.avg_reward_by_selection_policy),
             "learned_override_reward_delta": self.learned_override_reward_delta,
-            "selection_policy_optimization_counts": dict(
-                self.selection_policy_optimization_counts
-            ),
+            "selection_policy_optimization_counts": dict(self.selection_policy_optimization_counts),
             "selection_policy_optimization_reward_totals": dict(
                 self.selection_policy_optimization_reward_totals
             ),
@@ -325,9 +322,7 @@ class TopologyRoutingFeedback:
                 self.avg_optimization_reward_by_selection_policy
             ),
             "selection_policy_feasible_counts": dict(self.selection_policy_feasible_counts),
-            "feasibility_rate_by_selection_policy": dict(
-                self.feasibility_rate_by_selection_policy
-            ),
+            "feasibility_rate_by_selection_policy": dict(self.feasibility_rate_by_selection_policy),
             "learned_override_optimization_reward_delta": (
                 self.learned_override_optimization_reward_delta
             ),
@@ -365,7 +360,9 @@ class TopologyRoutingFeedback:
             "avg_topology_reward": round(self.avg_reward, 4),
             "avg_topology_confidence": round(self.avg_confidence, 4),
         }
-        selection_policy_metrics = self.resolve_selection_policy_metrics(scope_context=scope_context)
+        selection_policy_metrics = self.resolve_selection_policy_metrics(
+            scope_context=scope_context
+        )
         learned_override_reward = selection_policy_metrics.get("learned_override_policy_reward")
         heuristic_reward = selection_policy_metrics.get("heuristic_policy_reward")
         if learned_override_reward is not None:
@@ -379,33 +376,36 @@ class TopologyRoutingFeedback:
                 selection_policy_metrics.get("heuristic_policy_count", 0)
             )
         if selection_policy_metrics.get("learned_override_policy_reward_delta") is not None:
-            routing_context["learned_override_policy_reward_delta"] = (
-                selection_policy_metrics["learned_override_policy_reward_delta"]
-            )
+            routing_context["learned_override_policy_reward_delta"] = selection_policy_metrics[
+                "learned_override_policy_reward_delta"
+            ]
         if selection_policy_metrics.get("learned_override_policy_optimization_reward") is not None:
             routing_context["learned_override_policy_optimization_reward"] = (
                 selection_policy_metrics["learned_override_policy_optimization_reward"]
             )
         if selection_policy_metrics.get("heuristic_policy_optimization_reward") is not None:
-            routing_context["heuristic_policy_optimization_reward"] = (
-                selection_policy_metrics["heuristic_policy_optimization_reward"]
-            )
-        if selection_policy_metrics.get("learned_override_policy_optimization_reward_delta") is not None:
+            routing_context["heuristic_policy_optimization_reward"] = selection_policy_metrics[
+                "heuristic_policy_optimization_reward"
+            ]
+        if (
+            selection_policy_metrics.get("learned_override_policy_optimization_reward_delta")
+            is not None
+        ):
             routing_context["learned_override_policy_optimization_reward_delta"] = (
                 selection_policy_metrics["learned_override_policy_optimization_reward_delta"]
             )
         if selection_policy_metrics.get("learned_override_policy_feasibility_rate") is not None:
-            routing_context["learned_override_policy_feasibility_rate"] = (
-                selection_policy_metrics["learned_override_policy_feasibility_rate"]
-            )
+            routing_context["learned_override_policy_feasibility_rate"] = selection_policy_metrics[
+                "learned_override_policy_feasibility_rate"
+            ]
         if selection_policy_metrics.get("heuristic_policy_feasibility_rate") is not None:
-            routing_context["heuristic_policy_feasibility_rate"] = (
-                selection_policy_metrics["heuristic_policy_feasibility_rate"]
-            )
+            routing_context["heuristic_policy_feasibility_rate"] = selection_policy_metrics[
+                "heuristic_policy_feasibility_rate"
+            ]
         if selection_policy_metrics.get("learned_override_policy_feasibility_delta") is not None:
-            routing_context["learned_override_policy_feasibility_delta"] = (
-                selection_policy_metrics["learned_override_policy_feasibility_delta"]
-            )
+            routing_context["learned_override_policy_feasibility_delta"] = selection_policy_metrics[
+                "learned_override_policy_feasibility_delta"
+            ]
         if selection_policy_metrics.get("scope_dimension") is not None:
             routing_context["learned_override_policy_scope_dimension"] = selection_policy_metrics[
                 "scope_dimension"
@@ -486,9 +486,7 @@ class TopologyRoutingFeedback:
                     provider_value = candidates[0]
             return cls._normalize_scope_token(provider_value)
         if dimension == "model_family":
-            return cls._model_family_token(
-                context.get("model") or context.get("model_name")
-            )
+            return cls._model_family_token(context.get("model") or context.get("model_name"))
         return None
 
     def resolve_selection_policy_metrics(
@@ -525,9 +523,7 @@ class TopologyRoutingFeedback:
                 "learned_close_override"
             )
             heuristic_feasibility_rate = feasibility_rate_by_policy.get("heuristic")
-            learned_override_feasibility_delta = bucket.get(
-                "learned_override_feasibility_delta"
-            )
+            learned_override_feasibility_delta = bucket.get("learned_override_feasibility_delta")
             if (
                 learned_override_reward is None
                 and heuristic_reward is None
@@ -561,13 +557,9 @@ class TopologyRoutingFeedback:
                 "learned_override_policy_optimization_reward_delta": (
                     learned_override_optimization_reward_delta
                 ),
-                "learned_override_policy_feasibility_rate": (
-                    learned_override_feasibility_rate
-                ),
+                "learned_override_policy_feasibility_rate": (learned_override_feasibility_rate),
                 "heuristic_policy_feasibility_rate": heuristic_feasibility_rate,
-                "learned_override_policy_feasibility_delta": (
-                    learned_override_feasibility_delta
-                ),
+                "learned_override_policy_feasibility_delta": (learned_override_feasibility_delta),
             }
 
         return {
@@ -577,9 +569,7 @@ class TopologyRoutingFeedback:
                 "learned_close_override"
             ),
             "heuristic_policy_reward": self.avg_reward_by_selection_policy.get("heuristic"),
-            "learned_override_policy_count": self._effective_policy_count(
-                "learned_close_override"
-            ),
+            "learned_override_policy_count": self._effective_policy_count("learned_close_override"),
             "heuristic_policy_count": self._effective_policy_count("heuristic"),
             "learned_override_policy_reward_delta": self.learned_override_reward_delta,
             "learned_override_policy_optimization_reward": (
@@ -597,9 +587,7 @@ class TopologyRoutingFeedback:
             "heuristic_policy_feasibility_rate": (
                 self.feasibility_rate_by_selection_policy.get("heuristic")
             ),
-            "learned_override_policy_feasibility_delta": (
-                self.learned_override_feasibility_delta
-            ),
+            "learned_override_policy_feasibility_delta": (self.learned_override_feasibility_delta),
         }
 
 
@@ -996,7 +984,9 @@ class RuntimeIntelligenceService:
         execution_mode_distribution = cls._normalize_distribution(
             metadata.get("topology_execution_modes") or {}
         )
-        provider_distribution = cls._normalize_distribution(metadata.get("topology_providers") or {})
+        provider_distribution = cls._normalize_distribution(
+            metadata.get("topology_providers") or {}
+        )
         formation_distribution = cls._normalize_distribution(
             metadata.get("topology_formations") or {}
         )
@@ -1258,9 +1248,7 @@ class RuntimeIntelligenceService:
                     "policy_counts": merged_policy_counts,
                     "policy_reward_totals": merged_policy_reward_totals,
                     "policy_optimization_counts": merged_policy_optimization_counts,
-                    "policy_optimization_reward_totals": (
-                        merged_policy_optimization_reward_totals
-                    ),
+                    "policy_optimization_reward_totals": (merged_policy_optimization_reward_totals),
                     "policy_feasible_counts": merged_policy_feasible_counts,
                     "avg_reward_by_policy": avg_reward_by_policy,
                     "learned_override_reward_delta": learned_override_reward_delta,
@@ -1505,14 +1493,20 @@ class RuntimeIntelligenceService:
                     if "learned close override" in summary_text and "heuristic" in summary_text:
                         bias_total -= max(0.25, confidence)
                         bias_weight += max(0.25, confidence)
-                    if "forced llm planning" in summary_text and "heuristic fast-path" in summary_text:
+                    if (
+                        "forced llm planning" in summary_text
+                        and "heuristic fast-path" in summary_text
+                    ):
                         planning_bias_total -= max(0.25, confidence)
                         planning_bias_weight += max(0.25, confidence)
                 elif insight.kind == "successful_transformation":
                     if "learned close override" in summary_text and "heuristic" in summary_text:
                         bias_total += max(0.25, confidence)
                         bias_weight += max(0.25, confidence)
-                    if "forced llm planning" in summary_text and "heuristic fast-path" in summary_text:
+                    if (
+                        "forced llm planning" in summary_text
+                        and "heuristic fast-path" in summary_text
+                    ):
                         planning_bias_total += max(0.25, confidence)
                         planning_bias_weight += max(0.25, confidence)
                 elif insight.kind == "environment_constraint":
@@ -1620,12 +1614,8 @@ class RuntimeIntelligenceService:
         ):
             absolute_bias = min(1.0, abs(float(planning_hints["planning_policy_bias"])))
             planning_hints["planning_prefer_fast_path"] = True
-            planning_hints["planning_prefer_reason"] = (
-                "experiment_policy_bias: heuristic_fast_path"
-            )
-            planning_hints["planning_fast_path_tool_budget_limit"] = 4 + int(
-                absolute_bias >= 0.6
-            )
+            planning_hints["planning_prefer_reason"] = "experiment_policy_bias: heuristic_fast_path"
+            planning_hints["planning_fast_path_tool_budget_limit"] = 4 + int(absolute_bias >= 0.6)
             planning_hints["planning_fast_path_query_length_limit"] = int(
                 round(60 + (20 * absolute_bias))
             )

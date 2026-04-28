@@ -209,18 +209,22 @@ def summarize_degradation_feedback(value: Any) -> Optional[dict[str, Any]]:
         "provider_degradation_detected": any(
             event.get("source") == "provider_performance" for event in events
         ),
-        "avg_adaptation_cost": round(
-            sum(adaptation_costs) / max(1, len(adaptation_costs)),
-            4,
-        )
-        if adaptation_costs
-        else 0.0,
-        "avg_time_to_recover_seconds": round(
-            sum(recovery_times) / max(1, len(recovery_times)),
-            4,
-        )
-        if recovery_times
-        else 0.0,
+        "avg_adaptation_cost": (
+            round(
+                sum(adaptation_costs) / max(1, len(adaptation_costs)),
+                4,
+            )
+            if adaptation_costs
+            else 0.0
+        ),
+        "avg_time_to_recover_seconds": (
+            round(
+                sum(recovery_times) / max(1, len(recovery_times)),
+                4,
+            )
+            if recovery_times
+            else 0.0
+        ),
         "sources": dict(source_counts),
         "kinds": dict(kind_counts),
         "failure_types": dict(failure_types),
@@ -284,7 +288,9 @@ def aggregate_degradation_feedback(
     return {
         "tasks_with_degradation_feedback": len(summaries),
         "degradation_feedback_coverage": round(len(summaries) / max(1, task_count), 4),
-        "degradation_event_count": sum(int(summary.get("event_count", 0) or 0) for summary in summaries),
+        "degradation_event_count": sum(
+            int(summary.get("event_count", 0) or 0) for summary in summaries
+        ),
         "degraded_task_count": degraded_task_count,
         "recovered_task_count": recovered_task_count,
         "degradation_recovery_rate": round(recovered_task_count / max(1, degraded_task_count), 4),

@@ -62,9 +62,7 @@ def _normalize_path_map(value: Any) -> dict[str, tuple[str, ...]]:
         if not isinstance(paths, (list, tuple)):
             continue
         normalized[key] = tuple(
-            text
-            for text in (_coerce_optional_text(path) for path in paths)
-            if text is not None
+            text for text in (_coerce_optional_text(path) for path in paths) if text is not None
         )
     return normalized
 
@@ -148,12 +146,12 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
     session_assignments = _extract_sequence(session, "assignments")
     assignments = plan_assignments or session_assignments
     assignment_count = len(assignments)
-    scoped_member_count = sum(1 for assignment in assignments if _extract_sequence(assignment, "claimed_paths"))
+    scoped_member_count = sum(
+        1 for assignment in assignments if _extract_sequence(assignment, "claimed_paths")
+    )
     readonly_shared_path_count = len(_extract_sequence(plan, "shared_readonly_paths"))
     materialized_assignment_count = sum(
-        1
-        for assignment in session_assignments
-        if bool(_extract_value(assignment, "materialized"))
+        1 for assignment in session_assignments if bool(_extract_value(assignment, "materialized"))
     )
     merge_risk_level = _coerce_optional_text(
         _extract_value(value, "merge_risk_level") or merge_analysis.get("risk_level")
@@ -200,9 +198,15 @@ def summarize_team_feedback(value: Any) -> Optional[dict[str, Any]]:
         "cleanup_skipped_count": len(cleanup_skipped),
         "merge_order_length": len(merge_order),
         "merge_order": list(merge_order),
-        "member_changed_files": {member_id: list(paths) for member_id, paths in member_changed_files.items()},
-        "out_of_scope_writes": {member_id: list(paths) for member_id, paths in out_of_scope_writes.items()},
-        "readonly_violations": {member_id: list(paths) for member_id, paths in readonly_violations.items()},
+        "member_changed_files": {
+            member_id: list(paths) for member_id, paths in member_changed_files.items()
+        },
+        "out_of_scope_writes": {
+            member_id: list(paths) for member_id, paths in out_of_scope_writes.items()
+        },
+        "readonly_violations": {
+            member_id: list(paths) for member_id, paths in readonly_violations.items()
+        },
     }
 
 
@@ -298,7 +302,8 @@ def aggregate_team_feedback(
             int(summary.get("cleanup_error_count", 0) or 0) for summary in summaries
         ),
         "avg_team_assignments": round(
-            sum(int(summary.get("assignment_count", 0) or 0) for summary in summaries) / summary_count,
+            sum(int(summary.get("assignment_count", 0) or 0) for summary in summaries)
+            / summary_count,
             4,
         ),
         "avg_team_scoped_members": round(

@@ -299,7 +299,9 @@ class AgenticTaskResult:
         topology_summary = summarize_topology_feedback(self)
         topology_reward = self.overall_score
         if topology_summary is not None:
-            topology_reward = float(topology_summary.get("topology_reward", self.overall_score) or 0.0)
+            topology_reward = float(
+                topology_summary.get("topology_reward", self.overall_score) or 0.0
+            )
         reward_components = {
             "overall_score": round(self.overall_score, 4),
             "completion_precision": round(self.completion_precision, 4),
@@ -502,7 +504,9 @@ class AgenticMetrics:
 
     def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
-        topology_metrics = aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks)
+        topology_metrics = aggregate_topology_feedback(
+            self.task_results, total_tasks=self.total_tasks
+        )
         optimization_assessments = self.optimization_assessments
         feasible_tasks = sum(1 for assessment in optimization_assessments if assessment.feasible)
         infeasible_tasks = max(0, len(optimization_assessments) - feasible_tasks)
@@ -560,11 +564,7 @@ class AgenticMetrics:
                 "avg_overall_score": round(self.avg_overall_score, 4),
                 "avg_optimization_reward": round(avg_optimization_reward, 4),
                 "avg_feasible_optimization_reward": round(
-                    (
-                        sum(feasible_rewards) / len(feasible_rewards)
-                        if feasible_rewards
-                        else 0.0
-                    ),
+                    (sum(feasible_rewards) / len(feasible_rewards) if feasible_rewards else 0.0),
                     4,
                 ),
                 "avg_infeasible_optimization_reward": round(
@@ -592,11 +592,7 @@ class AgenticMetrics:
                 "feasibility_rate": round(feasible_tasks / max(1, self.total_tasks), 4),
                 "avg_reward": round(avg_optimization_reward, 4),
                 "avg_feasible_reward": round(
-                    (
-                        sum(feasible_rewards) / len(feasible_rewards)
-                        if feasible_rewards
-                        else 0.0
-                    ),
+                    (sum(feasible_rewards) / len(feasible_rewards) if feasible_rewards else 0.0),
                     4,
                 ),
                 "avg_infeasible_reward": round(

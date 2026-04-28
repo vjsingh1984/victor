@@ -410,8 +410,7 @@ class TestOrchestrationFacadeProperties:
 
         telemetry = get_deprecated_chat_shim_telemetry()
         assert (
-            telemetry["orchestration_facade.get_streaming_chat_coordinator.deprecated_input"]
-            == 1
+            telemetry["orchestration_facade.get_streaming_chat_coordinator.deprecated_input"] == 1
         )
 
         with pytest.warns(

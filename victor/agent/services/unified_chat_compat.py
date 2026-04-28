@@ -143,9 +143,7 @@ class UnifiedChatCoordinator:
                 use_planning=use_planning,
             )
 
-        record_deprecated_chat_shim_access(
-            "unified_chat_coordinator", "chat", "missing_runtime"
-        )
+        record_deprecated_chat_shim_access("unified_chat_coordinator", "chat", "missing_runtime")
         raise RuntimeError(
             "UnifiedChatCoordinator requires a bound ChatService. "
             "Bind ChatService before using deprecated compatibility shims."

@@ -341,16 +341,14 @@ class ChatStreamHelperMixin:
             if provider_candidates:
                 routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
         runtime_intelligence = self._get_runtime_state_dict(orch).get("_runtime_intelligence")
-        if (
-            runtime_intelligence is not None
-            and hasattr(runtime_intelligence, "get_topology_routing_context")
+        if runtime_intelligence is not None and hasattr(
+            runtime_intelligence, "get_topology_routing_context"
         ):
             learned_scope_context = dict(routing_context)
             learned_scope_context.setdefault("task_type", task_type)
             try:
                 learned_topology_context = runtime_intelligence.get_topology_routing_context(
-                    query=user_message,
-                    scope_context=learned_scope_context
+                    query=user_message, scope_context=learned_scope_context
                 )
             except Exception as exc:
                 logger.debug("Streaming topology feedback hints unavailable: %s", exc)
@@ -584,9 +582,11 @@ class ChatStreamHelperMixin:
                 snapshot["tool_service_budget"] = getattr(
                     tool_service,
                     "budget",
-                    tool_service.get_budget_info().get("max")
-                    if hasattr(tool_service, "get_budget_info")
-                    else tool_service.get_tool_budget(),
+                    (
+                        tool_service.get_budget_info().get("max")
+                        if hasattr(tool_service, "get_budget_info")
+                        else tool_service.get_tool_budget()
+                    ),
                 )
                 if hasattr(tool_service, "set_tool_budget"):
                     try:

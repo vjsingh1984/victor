@@ -504,7 +504,9 @@ async def test_execute_turn_applies_runtime_overrides_and_restores_state():
 @pytest.mark.asyncio
 async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches():
     executor = _make_executor()
-    executor._provider_context.provider = SimpleNamespace(supports_tools=MagicMock(return_value=True))
+    executor._provider_context.provider = SimpleNamespace(
+        supports_tools=MagicMock(return_value=True)
+    )
     executor._provider_context.thinking = False
     executor._tool_context.tool_calls_used = 0
     executor._tool_context.tool_budget = 8
@@ -564,7 +566,9 @@ async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches()
 @pytest.mark.asyncio
 async def test_execute_turn_deduplicates_repeated_recovery_guidance():
     executor = _make_executor()
-    executor._provider_context.provider = SimpleNamespace(supports_tools=MagicMock(return_value=True))
+    executor._provider_context.provider = SimpleNamespace(
+        supports_tools=MagicMock(return_value=True)
+    )
     executor._provider_context.thinking = False
     executor._tool_context.tool_calls_used = 0
     executor._tool_context.tool_budget = 8

@@ -247,7 +247,10 @@ class ExperimentMemoryStore:
                 continue
             if model and record.scope.model != model:
                 continue
-            if prompt_candidate_hash and record.scope.prompt_candidate_hash != prompt_candidate_hash:
+            if (
+                prompt_candidate_hash
+                and record.scope.prompt_candidate_hash != prompt_candidate_hash
+            ):
                 continue
             if section_name and record.scope.section_name != section_name:
                 continue

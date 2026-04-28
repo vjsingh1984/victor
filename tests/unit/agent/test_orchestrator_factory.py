@@ -565,9 +565,7 @@ class TestCreateToolCache:
 
         assert cache is None
 
-    def test_create_tool_cache_returns_none_when_initialization_fails(
-        self, factory, mock_settings
-    ):
+    def test_create_tool_cache_returns_none_when_initialization_fails(self, factory, mock_settings):
         """create_tool_cache degrades gracefully when disk cache init fails."""
         mock_settings.tool_cache_enabled = True
         mock_settings.tool_cache_ttl = 600

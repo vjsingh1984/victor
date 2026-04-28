@@ -35,11 +35,13 @@ class TestToolOutputAccuracy:
         large_output = "\n".join([f"Line {i}" for i in range(100)])
 
         # Format and prune
-        preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
-            tool_name="test_tool",
-            arguments={"query": "test"},
-            output=large_output,
-            task_type="unknown",
+        preview_output, llm_output, full_output, was_pruned, pruning_info = (
+            format_and_prune_tool_output(
+                tool_name="test_tool",
+                arguments={"query": "test"},
+                output=large_output,
+                task_type="unknown",
+            )
         )
 
         # CRITICAL: llm_output must contain FULL output (may be wrapped in tags)
@@ -62,11 +64,13 @@ class TestToolOutputAccuracy:
         # Create large output that will be pruned for preview
         large_output = "\n".join([f"Content line {i}" for i in range(500)])
 
-        preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
-            tool_name="read",
-            arguments={"path": "large_file.txt"},
-            output=large_output,
-            task_type="unknown",
+        preview_output, llm_output, full_output, was_pruned, pruning_info = (
+            format_and_prune_tool_output(
+                tool_name="read",
+                arguments={"path": "large_file.txt"},
+                output=large_output,
+                task_type="unknown",
+            )
         )
 
         # CRITICAL ASSERTIONS
@@ -82,7 +86,7 @@ class TestToolOutputAccuracy:
             assert pruning_info is not None
             assert preview_output != ""
         assert isinstance(full_output, str)
-            # pruning_info.lines_returned < 500  # Preview truncated
+        # pruning_info.lines_returned < 500  # Preview truncated
 
         # 4. Most important: LLM output contains ALL original content
         # (This is the fix - LLM gets full output regardless of preview)
@@ -243,10 +247,12 @@ class TestBackwardCompatibility:
         """Verify format_and_prune_tool_output return type hasn't changed."""
         from victor.agent.services.tool_service import format_and_prune_tool_output
 
-        preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
-            tool_name="test",
-            arguments={},
-            output="test output",
+        preview_output, llm_output, full_output, was_pruned, pruning_info = (
+            format_and_prune_tool_output(
+                tool_name="test",
+                arguments={},
+                output="test output",
+            )
         )
 
         # Return type should be: (preview, llm_output, full_output, was_pruned, pruning_info)

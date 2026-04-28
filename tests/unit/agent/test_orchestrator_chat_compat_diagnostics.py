@@ -25,9 +25,7 @@ def test_get_deprecated_chat_compat_report_returns_structured_telemetry():
     orchestrator = object.__new__(AgentOrchestrator)
 
     record_deprecated_chat_shim_access("chat_coordinator", "chat", "chat_service")
-    record_deprecated_chat_shim_access(
-        "orchestration_facade", "chat_coordinator", "lazy_getter"
-    )
+    record_deprecated_chat_shim_access("orchestration_facade", "chat_coordinator", "lazy_getter")
 
     report = orchestrator.get_deprecated_chat_compat_report()
 

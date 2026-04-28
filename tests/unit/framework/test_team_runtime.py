@@ -121,7 +121,9 @@ async def test_execute_resolved_team_limits_members_and_passes_budget():
         )
     )
 
-    with patch("victor.framework.team_runtime.AgentTeam.create", new=AsyncMock(return_value=mock_team)) as create_team:
+    with patch(
+        "victor.framework.team_runtime.AgentTeam.create", new=AsyncMock(return_value=mock_team)
+    ) as create_team:
         result = await execute_resolved_team(
             orchestrator,
             goal="Implement the feature",

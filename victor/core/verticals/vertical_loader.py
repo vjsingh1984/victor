@@ -196,8 +196,7 @@ class VerticalLoader:
                 reg_module = getattr(vertical, "__module__", "")
                 ep_module = getattr(ep_vertical, "__module__", "")
                 reg_is_contrib = (
-                    get_vertical_runtime_provenance(vertical)
-                    is VerticalRuntimeProvenance.CONTRIB
+                    get_vertical_runtime_provenance(vertical) is VerticalRuntimeProvenance.CONTRIB
                 )
                 ep_is_contrib = (
                     get_vertical_runtime_provenance(ep_vertical)
@@ -611,8 +610,7 @@ class VerticalLoader:
             if existing is not None and existing is not vertical_cls:
                 existing_module = getattr(existing, "__module__", "")
                 existing_is_contrib = (
-                    get_vertical_runtime_provenance(existing)
-                    is VerticalRuntimeProvenance.CONTRIB
+                    get_vertical_runtime_provenance(existing) is VerticalRuntimeProvenance.CONTRIB
                 )
                 new_is_contrib = (
                     get_vertical_runtime_provenance(vertical_cls)

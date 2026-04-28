@@ -197,9 +197,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         chat_service = self._resolve_chat_service()
         if chat_service is not None and hasattr(chat_service, "turn_executor"):
-            record_deprecated_chat_shim_access(
-                "chat_coordinator", "turn_executor", "chat_service"
-            )
+            record_deprecated_chat_shim_access("chat_coordinator", "turn_executor", "chat_service")
             return chat_service.turn_executor
 
         record_deprecated_chat_shim_access("chat_coordinator", "turn_executor", "missing_runtime")
@@ -247,9 +245,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         runtime_chat = self._get_orchestrator_runtime_helper("chat")
         if callable(runtime_chat):
-            record_deprecated_chat_shim_access(
-                "chat_coordinator", "chat", "orchestrator_public"
-            )
+            record_deprecated_chat_shim_access("chat_coordinator", "chat", "orchestrator_public")
             return await runtime_chat(user_message, use_planning=use_planning)
 
         record_deprecated_chat_shim_access("chat_coordinator", "chat", "missing_runtime")
@@ -385,9 +381,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         chat_service = self._resolve_chat_service()
         if chat_service is not None and hasattr(chat_service, "stream_chat"):
-            record_deprecated_chat_shim_access(
-                "chat_coordinator", "stream_chat", "chat_service"
-            )
+            record_deprecated_chat_shim_access("chat_coordinator", "stream_chat", "chat_service")
             async for chunk in chat_service.stream_chat(user_message, **kwargs):
                 yield chunk
             return

@@ -42,6 +42,7 @@ def _build_registry():
     Delegates to SkillRegistry.from_all_sources() for a single source of truth.
     """
     from victor.framework.skills import SkillRegistry
+
     return SkillRegistry.from_all_sources()
 
 

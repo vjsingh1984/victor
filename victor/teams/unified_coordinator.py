@@ -134,7 +134,10 @@ class _TeamMemberAdapter:
                 duration_override,
             ) = self._normalize_execution_result(raw_output)
             metadata.setdefault("task", task.content)
-            if "worktree_assignment" in self._member_context and "worktree_assignment" not in metadata:
+            if (
+                "worktree_assignment" in self._member_context
+                and "worktree_assignment" not in metadata
+            ):
                 metadata["worktree_assignment"] = self._member_context["worktree_assignment"]
             if "claimed_paths" in self._member_context and "claimed_paths" not in metadata:
                 metadata["claimed_paths"] = list(self._member_context["claimed_paths"])
@@ -179,7 +182,13 @@ class _TeamMemberAdapter:
         )
         error = str(raw_output.get("error")) if raw_output.get("error") is not None else None
         metadata = dict(raw_output.get("metadata", {}) or {})
-        for key in ("changed_files", "files_touched", "modified_files", "claimed_paths", "readonly_paths"):
+        for key in (
+            "changed_files",
+            "files_touched",
+            "modified_files",
+            "claimed_paths",
+            "readonly_paths",
+        ):
             if raw_output.get(key) is not None and key not in metadata:
                 metadata[key] = raw_output.get(key)
 
@@ -196,7 +205,15 @@ class _TeamMemberAdapter:
         except (TypeError, ValueError):
             duration_override = None
 
-        return success, str(output_value), error, metadata, tool_calls_used, discoveries, duration_override
+        return (
+            success,
+            str(output_value),
+            error,
+            metadata,
+            tool_calls_used,
+            discoveries,
+            duration_override,
+        )
 
 
 class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
@@ -551,8 +568,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             formation=active_formation,
         )
         worktree_session = self._materialize_worktree_plan(worktree_plan, context=context)
-        worktree_overrides_source = worktree_session.assignments if worktree_session else (
-            worktree_plan.assignments if worktree_plan is not None else ()
+        worktree_overrides_source = (
+            worktree_session.assignments
+            if worktree_session
+            else (worktree_plan.assignments if worktree_plan is not None else ())
         )
         member_context_overrides = (
             {
@@ -736,7 +755,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             return
         for member_id, result in list(member_results.items()):
             metadata = dict(result.metadata or {})
-            if any(metadata.get(key) for key in ("changed_files", "files_touched", "modified_files")):
+            if any(
+                metadata.get(key) for key in ("changed_files", "files_touched", "modified_files")
+            ):
                 continue
             try:
                 changed_files = list(collector(worktree_session, member_id))

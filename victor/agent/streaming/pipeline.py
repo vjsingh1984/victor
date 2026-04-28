@@ -365,7 +365,9 @@ class StreamingChatPipeline:
 
         from victor.framework.team_runtime import run_configured_team
 
-        complexity_value = getattr(getattr(stream_ctx, "task_classification", None), "complexity", None)
+        complexity_value = getattr(
+            getattr(stream_ctx, "task_classification", None), "complexity", None
+        )
         if hasattr(complexity_value, "value"):
             complexity_value = complexity_value.value
         if complexity_value is None:
@@ -386,7 +388,9 @@ class StreamingChatPipeline:
             return None
 
         resolved_team, team_result = team_execution
-        final_output = team_result.final_output.strip() or team_result.error or "Team execution completed."
+        final_output = (
+            team_result.final_output.strip() or team_result.error or "Team execution completed."
+        )
         if final_output:
             orch.add_message("assistant", final_output)
             if hasattr(stream_ctx, "accumulate_content"):

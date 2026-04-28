@@ -240,8 +240,7 @@ def _list_keys():
 
     # Get primary providers only (exclude local providers from listing)
     primary_providers = {
-        k: v for k, v in PROVIDER_ENV_VARS.items()
-        if k not in {"ollama", "lmstudio", "vllm"}
+        k: v for k, v in PROVIDER_ENV_VARS.items() if k not in {"ollama", "lmstudio", "vllm"}
     }
 
     configured_count = 0

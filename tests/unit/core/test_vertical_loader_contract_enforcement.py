@@ -589,7 +589,9 @@ def test_loader_resolve_prefers_explicit_external_provenance(monkeypatch) -> Non
     set_vertical_runtime_provenance(entry_point_vertical, VerticalRuntimeProvenance.EXTERNAL)
 
     monkeypatch.setattr(loader, "_get_vertical_entry_points", lambda force_refresh=False: {})
-    monkeypatch.setattr(loader, "_import_from_entrypoint", lambda *_args, **_kwargs: entry_point_vertical)
+    monkeypatch.setattr(
+        loader, "_import_from_entrypoint", lambda *_args, **_kwargs: entry_point_vertical
+    )
 
     resolved = loader.resolve(vertical_name)
 

@@ -631,7 +631,9 @@ class _ProviderRegistryAdapter:
         self._delegate = delegate
 
     def get_provider(self, name: str) -> Any:
-        getter = getattr(self._delegate, "get_provider", None) or getattr(self._delegate, "get", None)
+        getter = getattr(self._delegate, "get_provider", None) or getattr(
+            self._delegate, "get", None
+        )
         if getter is None:
             raise AttributeError("Provider registry does not expose get_provider() or get()")
         return getter(name)

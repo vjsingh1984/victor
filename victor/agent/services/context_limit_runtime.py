@@ -73,7 +73,9 @@ class ContextLimitRuntime:
         completion_prompt = runtime._get_thinking_disabled_prompt(
             "Context limit reached. Summarize in 2-3 sentences."
         )
-        recent_messages = runtime.messages[-8:] if len(runtime.messages) > 8 else runtime.messages[:]
+        recent_messages = (
+            runtime.messages[-8:] if len(runtime.messages) > 8 else runtime.messages[:]
+        )
         completion_messages = recent_messages + [Message(role="user", content=completion_prompt)]
 
         try:
@@ -122,7 +124,9 @@ class ContextLimitRuntime:
             "Max iterations reached. Summarize key findings in 3-4 sentences. "
             "Do NOT attempt any more tool calls."
         )
-        recent_messages = runtime.messages[-10:] if len(runtime.messages) > 10 else runtime.messages[:]
+        recent_messages = (
+            runtime.messages[-10:] if len(runtime.messages) > 10 else runtime.messages[:]
+        )
         completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
 
         chunk = StreamChunk(

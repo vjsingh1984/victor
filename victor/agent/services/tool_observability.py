@@ -235,11 +235,7 @@ class ToolObservabilityHandler:
             "budget_used": budget_used,
             "budget_total": budget_total,
             "budget_remaining": budget_remaining,
-            "budget_utilization": (
-                budget_used / budget_total
-                if budget_total > 0
-                else 0
-            ),
+            "budget_utilization": (budget_used / budget_total if budget_total > 0 else 0),
             "executed_tools": list(self._coordinator._executed_tools),
             "failed_signatures_count": len(self._coordinator._failed_tool_signatures),
         }

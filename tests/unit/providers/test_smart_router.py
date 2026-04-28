@@ -364,10 +364,11 @@ class TestRoutingDecisionEngine:
                 )
             )
 
-        with patch.object(engine, "_score_health", new=AsyncMock(return_value=1.0)), patch.object(
-            engine, "_score_resources", new=AsyncMock(return_value=1.0)
-        ), patch.object(engine, "_score_cost", new=AsyncMock(return_value=1.0)), patch.object(
-            engine, "_score_latency", new=AsyncMock(return_value=1.0)
+        with (
+            patch.object(engine, "_score_health", new=AsyncMock(return_value=1.0)),
+            patch.object(engine, "_score_resources", new=AsyncMock(return_value=1.0)),
+            patch.object(engine, "_score_cost", new=AsyncMock(return_value=1.0)),
+            patch.object(engine, "_score_latency", new=AsyncMock(return_value=1.0)),
         ):
             decision = await engine.decide(task_type="default")
 

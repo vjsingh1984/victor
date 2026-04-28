@@ -653,13 +653,15 @@ class AgenticLoop:
                                 state["temperature_override"] = temp_override
 
                     if hasattr(self.runtime_intelligence, "get_planning_routing_context"):
-                        planning_routing_hints = self.runtime_intelligence.get_planning_routing_context(
-                            query=query,
-                            scope_context={
-                                **(context or {}),
-                                "task_type": task_type,
-                                "tool_budget": tool_budget,
-                            },
+                        planning_routing_hints = (
+                            self.runtime_intelligence.get_planning_routing_context(
+                                query=query,
+                                scope_context={
+                                    **(context or {}),
+                                    "task_type": task_type,
+                                    "tool_budget": tool_budget,
+                                },
+                            )
                         )
                         if planning_routing_hints:
                             state["planning_routing_hints"] = dict(planning_routing_hints)
@@ -696,9 +698,8 @@ class AgenticLoop:
                     planning_selection_policy = "default_llm_planning"
                     if planning_routing_hints.get("planning_force_llm"):
                         planning_selection_policy = "experiment_forced_slow_path"
-                    elif (
-                        not use_llm_planning
-                        and planning_routing_hints.get("planning_prefer_fast_path")
+                    elif not use_llm_planning and planning_routing_hints.get(
+                        "planning_prefer_fast_path"
                     ):
                         planning_selection_policy = "heuristic_fast_path"
                     elif not use_llm_planning and skip_reason == "paradigm_router":
@@ -973,21 +974,16 @@ class AgenticLoop:
                         try:
                             tool_call_count = getattr(action_result, "tool_calls_count", None)
                             if tool_call_count is None:
-                                tool_call_count = (
-                                    getattr(action_result, "successful_tool_count", 0)
-                                    + getattr(action_result, "failed_tool_count", 0)
-                                )
+                                tool_call_count = getattr(
+                                    action_result, "successful_tool_count", 0
+                                ) + getattr(action_result, "failed_tool_count", 0)
                             self.runtime_intelligence.record_topology_outcome(
                                 {
-                                    "status": self._topology_feedback_status(
-                                        evaluation.decision
-                                    ),
+                                    "status": self._topology_feedback_status(evaluation.decision),
                                     "completion_score": evaluation.score,
                                     "tool_calls": tool_call_count,
                                     "turns": i,
-                                    "topology_events": list(
-                                        state.get("topology_events", [])
-                                    ),
+                                    "topology_events": list(state.get("topology_events", [])),
                                 }
                             )
                         except Exception as exc:
@@ -1257,8 +1253,7 @@ class AgenticLoop:
             learned_scope_context.setdefault("task_type", task_type)
             try:
                 learned_topology_context = self.runtime_intelligence.get_topology_routing_context(
-                    query=query,
-                    scope_context=learned_scope_context
+                    query=query, scope_context=learned_scope_context
                 )
             except Exception as exc:
                 logger.debug("Runtime intelligence topology routing hints unavailable: %s", exc)
@@ -1450,7 +1445,9 @@ class AgenticLoop:
 
         error_types = dict(after.get("recent_error_types") or {})
         failure_type = "PROVIDER_ERROR"
-        if any("rate" in str(name).lower() and "limit" in str(name).lower() for name in error_types):
+        if any(
+            "rate" in str(name).lower() and "limit" in str(name).lower() for name in error_types
+        ):
             failure_type = "RATE_LIMITED"
 
         event = {
@@ -1476,9 +1473,7 @@ class AgenticLoop:
             ),
             "time_to_recover_seconds": after.get("time_to_recover_seconds"),
             "degradation_reasons": list(
-                after.get("degradation_reasons")
-                or before.get("degradation_reasons")
-                or []
+                after.get("degradation_reasons") or before.get("degradation_reasons") or []
             ),
             "recent_error_types": error_types,
             "score_before": before.get("score"),
@@ -1520,7 +1515,11 @@ class AgenticLoop:
             provider_name = hinted_provider
         elif provider is not None:
             candidate_name = getattr(provider, "name", None)
-            if isinstance(candidate_name, str) and candidate_name and candidate_name != "smart-router":
+            if (
+                isinstance(candidate_name, str)
+                and candidate_name
+                and candidate_name != "smart-router"
+            ):
                 provider_name = candidate_name
 
         return tracker, provider_name, model_name
@@ -1822,7 +1821,9 @@ class AgenticLoop:
             return None
 
         resolved_team, team_result = team_execution
-        final_output = team_result.final_output.strip() or team_result.error or "Team execution completed."
+        final_output = (
+            team_result.final_output.strip() or team_result.error or "Team execution completed."
+        )
         response = CompletionResponse(
             content=final_output,
             role="assistant",

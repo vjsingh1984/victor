@@ -20,6 +20,7 @@ def _discover_tools_lightweight() -> List[Tuple[str, str, str]]:
         List of tuples: (name, description, cost_tier)
     """
     from victor.tools.registry import ToolRegistry
+
     return ToolRegistry.discover_lightweight()
 
 

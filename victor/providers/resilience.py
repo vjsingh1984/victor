@@ -83,6 +83,7 @@ class CircuitOpenError(CanonicalCircuitBreakerError):
             message += f". Retry after {retry_after:.1f}s"
         # Call parent with state=OPEN and retry_after
         from victor.core.circuit_breaker import CircuitState
+
         super().__init__(message, state=CircuitState.OPEN, retry_after=retry_after or 0)
 
 
@@ -94,6 +95,7 @@ class CircuitBreakerState:
     DEPRECATED: This is kept for backward compatibility only.
     New code should use the canonical CircuitBreaker from victor.providers.circuit_breaker.
     """
+
     state: CircuitState = CircuitState.CLOSED
     failure_count: int = 0
     success_count: int = 0
@@ -186,6 +188,7 @@ class ProviderCircuitBreaker:
 
         if self._breaker._last_failure_time:
             import time
+
             elapsed = time.time() - self._breaker._last_failure_time
             remaining = self._breaker.recovery_timeout - elapsed
             return max(0, remaining)
@@ -244,7 +247,8 @@ class ProviderCircuitBreaker:
             "time_until_retry": self.time_until_retry,
             "last_failure_time": (
                 datetime.fromtimestamp(self._breaker._last_failure_time).isoformat()
-                if self._breaker._last_failure_time else None
+                if self._breaker._last_failure_time
+                else None
             ),
         }
 

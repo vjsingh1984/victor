@@ -54,9 +54,7 @@ def _normalize_event(event: Any) -> Optional[dict[str, Any]]:
         return None
 
     constraint_tags = [
-        str(tag).strip()
-        for tag in list(event.get("constraint_tags") or [])
-        if str(tag).strip()
+        str(tag).strip() for tag in list(event.get("constraint_tags") or []) if str(tag).strip()
     ]
     return {
         "selection_policy": selection_policy,

@@ -207,9 +207,9 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
         "heuristic": 0.46,
         "learned_close_override": 0.82,
     }
-    assert feedback.metadata["topology_learned_override_optimization_reward_delta"] == pytest.approx(
-        0.36
-    )
+    assert feedback.metadata[
+        "topology_learned_override_optimization_reward_delta"
+    ] == pytest.approx(0.36)
     assert feedback.metadata["topology_learned_override_feasibility_delta"] == pytest.approx(1.0)
 
 

@@ -131,9 +131,7 @@ class SyncChatCoordinator:
         )
 
         if self._chat_service is not None:
-            record_deprecated_chat_shim_access(
-                "sync_chat_coordinator", "chat", "chat_service"
-            )
+            record_deprecated_chat_shim_access("sync_chat_coordinator", "chat", "chat_service")
             return await self._chat_service.chat(
                 user_message,
                 use_planning=use_planning,
@@ -154,9 +152,7 @@ class SyncChatCoordinator:
                 ),
             )
 
-        record_deprecated_chat_shim_access(
-            "sync_chat_coordinator", "chat", "missing_runtime"
-        )
+        record_deprecated_chat_shim_access("sync_chat_coordinator", "chat", "missing_runtime")
         raise RuntimeError(
             "SyncChatCoordinator has no bound ChatService or orchestrator chat runtime. "
             "Bind ChatService before using deprecated compatibility shims."

@@ -241,7 +241,9 @@ class WorktreeIsolationPlanner:
         parent_dir = _normalize_text(context.get("worktree_parent"))
         if parent_dir is None:
             parent_dir = str(Path(repo_root) / ".victor" / "team_worktrees")
-        branch_prefix = _normalize_text(context.get("branch_prefix")) or f"victor/{_slug(team_name)}"
+        branch_prefix = (
+            _normalize_text(context.get("branch_prefix")) or f"victor/{_slug(team_name)}"
+        )
         base_ref = _normalize_text(context.get("base_ref")) or "HEAD"
         shared_readonly_paths = _normalize_paths(
             context.get("shared_readonly_paths") or context.get("readonly_paths")
@@ -284,7 +286,9 @@ class WorktreeIsolationPlanner:
 
         merge_order = tuple(
             assignment.member_id
-            for assignment in sorted(assignments, key=lambda item: (item.merge_priority, item.member_id))
+            for assignment in sorted(
+                assignments, key=lambda item: (item.merge_priority, item.member_id)
+            )
         )
         return WorktreeExecutionPlan(
             team_name=team_name,
@@ -450,14 +454,14 @@ class GitWorktreeRuntime:
             "worktree_paths": {item.member_id: item.worktree_path for item in session.assignments},
             "merge_base": session.plan.base_ref,
             "merge_risk_level": (
-                merge_analysis.get("risk_level")
-                if isinstance(merge_analysis, dict)
-                else None
+                merge_analysis.get("risk_level") if isinstance(merge_analysis, dict) else None
             ),
             "conflict_paths": [
                 item.get("path")
                 for item in (
-                    merge_analysis.get("overlapping_files") if isinstance(merge_analysis, dict) else []
+                    merge_analysis.get("overlapping_files")
+                    if isinstance(merge_analysis, dict)
+                    else []
                 )
                 or []
                 if item.get("path")
@@ -505,7 +509,9 @@ class GitWorktreeRuntime:
             check=False,
         )
         if result.returncode != 0:
-            raise WorktreeRuntimeError(result.stderr.strip() or result.stdout.strip() or "git failed")
+            raise WorktreeRuntimeError(
+                result.stderr.strip() or result.stdout.strip() or "git failed"
+            )
 
     @staticmethod
     def _run_git_stdout(repo_root: str, *args: str) -> str:
@@ -518,7 +524,9 @@ class GitWorktreeRuntime:
             check=False,
         )
         if result.returncode != 0:
-            raise WorktreeRuntimeError(result.stderr.strip() or result.stdout.strip() or "git failed")
+            raise WorktreeRuntimeError(
+                result.stderr.strip() or result.stdout.strip() or "git failed"
+            )
         return result.stdout
 
 

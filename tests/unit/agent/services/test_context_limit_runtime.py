@@ -58,7 +58,9 @@ async def test_context_limit_runtime_compacts_history_before_forcing_summary():
 @pytest.mark.asyncio
 async def test_context_limit_runtime_forces_summary_on_iteration_limit():
     runtime_host = _make_runtime_host()
-    runtime_host.provider.chat.return_value = CompletionResponse(content="summary", role="assistant")
+    runtime_host.provider.chat.return_value = CompletionResponse(
+        content="summary", role="assistant"
+    )
     runtime = ContextLimitRuntime(runtime_host)
 
     handled, chunk = await runtime.handle_limits("hello", 5, 1000, 6, 0.8)

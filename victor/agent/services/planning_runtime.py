@@ -388,10 +388,7 @@ class PlanningCoordinator:
             matcher = getattr(self.orchestrator, "_skill_matcher", None) or getattr(
                 self.orchestrator, "skill_matcher", None
             )
-            if (
-                matcher
-                and getattr(matcher, "initialized", getattr(matcher, "_initialized", False))
-            ):
+            if matcher and getattr(matcher, "initialized", getattr(matcher, "_initialized", False)):
                 from victor.framework.skill_planner import (
                     build_skill_aware_plan_prompt,
                     build_skill_decomposition,

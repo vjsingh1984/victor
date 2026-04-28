@@ -263,7 +263,9 @@ class RoutingDecisionEngine:
             if isinstance(value, (int, float)) and not isinstance(value, bool)
         }
         max_factor = (
-            max(numeric_factors.items(), key=lambda x: x[1]) if numeric_factors else ("score", score)
+            max(numeric_factors.items(), key=lambda x: x[1])
+            if numeric_factors
+            else ("score", score)
         )
 
         rationale = f"Selected {selected_provider} (confidence={score:.2f})"
@@ -372,12 +374,8 @@ class RoutingDecisionEngine:
             factors["degradation_reasons"] = list(
                 getattr(degradation_snapshot, "degradation_reasons", ()) or ()
             )
-            factors["failure_streak"] = int(
-                getattr(degradation_snapshot, "failure_streak", 0) or 0
-            )
-            factors["success_streak"] = int(
-                getattr(degradation_snapshot, "success_streak", 0) or 0
-            )
+            factors["failure_streak"] = int(getattr(degradation_snapshot, "failure_streak", 0) or 0)
+            factors["success_streak"] = int(getattr(degradation_snapshot, "success_streak", 0) or 0)
             factors["recovered_from_recent_incident"] = bool(
                 getattr(degradation_snapshot, "recovered_from_recent_incident", False)
             )

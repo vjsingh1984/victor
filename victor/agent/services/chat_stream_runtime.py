@@ -328,14 +328,11 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                 if topology_feedback_payload is not None:
                     ctx.topology_events = list(topology_feedback_payload["topology_events"])
                     runtime_intelligence = state_dict.get("_runtime_intelligence")
-                    if (
-                        runtime_intelligence is not None
-                        and hasattr(runtime_intelligence, "record_topology_outcome")
+                    if runtime_intelligence is not None and hasattr(
+                        runtime_intelligence, "record_topology_outcome"
                     ):
                         try:
-                            runtime_intelligence.record_topology_outcome(
-                                topology_feedback_payload
-                            )
+                            runtime_intelligence.record_topology_outcome(topology_feedback_payload)
                         except Exception as exc:
                             logger.debug(
                                 "Failed to record streaming topology runtime outcome: %s",
