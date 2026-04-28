@@ -30,9 +30,9 @@ if TYPE_CHECKING:
 
 def create_legacy_workflow_executor(*args: Any, **kwargs: Any) -> "IWorkflowExecutor":
     """Create the compatibility workflow executor through a single seam."""
-    from victor.workflows.executor import WorkflowExecutor
+    from victor.workflows.unified_executor import CompiledWorkflowExecutor
 
-    return WorkflowExecutor(*args, **kwargs)
+    return CompiledWorkflowExecutor(*args, **kwargs)
 
 
 def create_legacy_streaming_workflow_executor(*args: Any, **kwargs: Any) -> "IStreamingExecutor":

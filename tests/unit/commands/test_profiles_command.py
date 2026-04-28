@@ -26,20 +26,19 @@ import typer
 
 from victor.ui.commands.profiles import (
     profiles_app,
-    _load_profiles_yaml,
-    _save_profiles_yaml,
 )
-from victor.config.profiles import ProfileLevel
+from victor.config.profiles import ProfileLevel, ProfileManager
 
 runner = CliRunner()
 
 
 class TestLoadProfilesYaml:
-    """Tests for _load_profiles_yaml helper function."""
+    """Tests for ProfileManager.load_profiles method."""
 
     def test_load_nonexistent_file(self, tmp_path):
         """Test loading from a nonexistent file returns empty dict."""
-        result = _load_profiles_yaml(tmp_path / "nonexistent.yaml")
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         assert result == {"profiles": {}}
 
     def test_load_valid_yaml(self, tmp_path):
@@ -58,7 +57,8 @@ class TestLoadProfilesYaml:
         with open(profiles_file, "w") as f:
             yaml.safe_dump(test_data, f)
 
-        result = _load_profiles_yaml(profiles_file)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         assert result == test_data
 
     def test_load_empty_yaml(self, tmp_path):
@@ -66,7 +66,8 @@ class TestLoadProfilesYaml:
         profiles_file = tmp_path / "profiles.yaml"
         profiles_file.touch()
 
-        result = _load_profiles_yaml(profiles_file)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         # Function always returns profiles dict for consistency
         assert result == {"profiles": {}}
 
@@ -76,21 +77,23 @@ class TestLoadProfilesYaml:
         with open(profiles_file, "w") as f:
             f.write("invalid: yaml: content: [")
 
-        result = _load_profiles_yaml(profiles_file)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        result = mgr.load_profiles()
         assert result == {"profiles": {}}
 
 
 class TestSaveProfilesYaml:
-    """Tests for _save_profiles_yaml helper function."""
+    """Tests for ProfileManager.save_profiles method."""
 
     def test_save_profiles_creates_directory(self, tmp_path):
         """Test saving creates parent directories if needed."""
         nested_dir = tmp_path / "nested" / "dir"
-        profiles_file = nested_dir / "profiles.yaml"
         test_data = {"profiles": {"test": {"provider": "test"}}}
 
-        _save_profiles_yaml(profiles_file, test_data)
+        mgr = ProfileManager.for_config_dir(nested_dir)
+        mgr.save_profiles(test_data)
 
+        profiles_file = nested_dir / "profiles.yaml"
         assert profiles_file.exists()
         with open(profiles_file) as f:
             loaded = yaml.safe_load(f)
@@ -107,7 +110,8 @@ class TestSaveProfilesYaml:
 
         # Save new data
         new_data = {"profiles": {"new": {"provider": "new"}}}
-        _save_profiles_yaml(profiles_file, new_data)
+        mgr = ProfileManager.for_config_dir(tmp_path)
+        mgr.save_profiles(new_data)
 
         with open(profiles_file) as f:
             loaded = yaml.safe_load(f)
@@ -131,8 +135,9 @@ class TestSaveProfilesYaml:
         if sys.platform != "win32":
             readonly_dir.chmod(0o444)
             try:
-                with pytest.raises(Exit):
-                    _save_profiles_yaml(profiles_file, {"test": "data"})
+                mgr = ProfileManager.for_config_dir(readonly_dir)
+                with pytest.raises(IOError):
+                    mgr.save_profiles({"test": "data"})
             finally:
                 readonly_dir.chmod(0o755)
 

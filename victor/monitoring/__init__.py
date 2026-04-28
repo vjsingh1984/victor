@@ -1,5 +1,9 @@
 """Performance monitoring for Victor AI framework.
 
+.. deprecated::
+    The victor.monitoring package is deprecated. For new code, use victor.observability.metrics
+    and related modules. This module remains for backward compatibility.
+
 This package provides metrics collection, alerting, and performance
 monitoring for tool registry operations.
 
@@ -21,7 +25,16 @@ Usage:
     >>> alert_manager.check_performance("register_tool", duration_ms=5.0)
 """
 
+from __future__ import annotations
+
+import warnings
 from typing import Optional
+
+warnings.warn(
+    "victor.monitoring is deprecated. Use victor.observability.metrics for new code.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from victor.monitoring.registry_metrics import (
     RegistryMetricsCollector,

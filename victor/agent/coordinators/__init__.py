@@ -53,19 +53,9 @@ _MODULE_MEMBERS = {
     "exploration_state_passed": [
         "ExplorationStatePassedCoordinator",
     ],
-    "tool_coordinator": [
-        "ToolCoordinator",
-        "ToolCoordinatorConfig",
-        "TaskContext",
-        "IToolCoordinator",
-        "create_tool_coordinator",
-    ],
-    "tool_observability": [
-        "ToolObservabilityHandler",
-    ],
-    "tool_retry": [
-        "ToolRetryExecutor",
-    ],
+    # NOTE: tool_coordinator, tool_observability, tool_retry removed
+    # These now import directly from victor.agent.services for backward compatibility
+    # See __getattr__ below for service-level re-exports
     "chat_coordinator": [
         "ChatCoordinator",
     ],
@@ -196,7 +186,32 @@ _DEPRECATED_EXPORTS = {
 
 
 def __getattr__(name: str) -> Any:
-    """Resolve coordinator exports lazily and warn on deprecated shims."""
+    """Resolve coordinator exports lazily and warn on deprecated shims.
+
+    For tool_coordinator, tool_observability, tool_retry: re-exports from services.
+    For chat_protocols: imports from services.protocols.chat_runtime.
+    For other coordinators: imports from coordinators.{module_name}.
+    """
+    # Service-level re-exports for deleted coordinator shims
+    if name in {
+        "ToolCoordinator", "ToolCoordinatorConfig", "TaskContext", "IToolCoordinator",
+        "create_tool_coordinator", "ToolObservabilityHandler", "ToolRetryExecutor"
+    }:
+        if name in {"ToolCoordinator", "ToolCoordinatorConfig", "TaskContext",
+                    "IToolCoordinator", "create_tool_coordinator"}:
+            module = importlib.import_module("victor.agent.services.tool_compat")
+        elif name == "ToolObservabilityHandler":
+            module = importlib.import_module("victor.agent.services.tool_observability")
+        elif name == "ToolRetryExecutor":
+            module = importlib.import_module("victor.agent.services.tool_retry")
+        value = getattr(module, name)
+        # Apply deprecation warning
+        if name in _DEPRECATED_EXPORTS:
+            warnings.warn(_DEPRECATED_EXPORTS[name], DeprecationWarning, stacklevel=2)
+        globals()[name] = value
+        return value
+
+    # Original coordinator imports
     if name in _SUBMODULE_MAP:
         if _SUBMODULE_MAP[name] == "chat_protocols":
             module = importlib.import_module("victor.agent.services.protocols.chat_runtime")

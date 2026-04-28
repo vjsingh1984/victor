@@ -23,20 +23,11 @@ import pytest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from typing import Any, Dict, List, Optional
 
-from victor.agent.recovery_coordinator import (
-    StreamingRecoveryCoordinator as LegacyStreamingRecoveryCoordinator,
-    StreamingRecoveryContext as LegacyStreamingRecoveryContext,
-)
 from victor.agent.services.recovery_compat import (
     StreamingRecoveryCoordinator,
     StreamingRecoveryContext,
 )
 from victor.providers.base import StreamChunk
-
-
-def test_legacy_recovery_coordinator_module_reexports_service_runtime():
-    assert LegacyStreamingRecoveryCoordinator is StreamingRecoveryCoordinator
-    assert LegacyStreamingRecoveryContext is StreamingRecoveryContext
 
 
 @pytest.fixture

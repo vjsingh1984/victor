@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.agent.coordinators.streaming_chat_coordinator import (
+from victor.agent.services.streaming_chat_compat import (
     StreamingChatCoordinator,
 )
 from victor.providers.base import StreamChunk

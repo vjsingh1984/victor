@@ -30,7 +30,7 @@ import os
 import threading
 import time
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     import numpy as np
@@ -95,6 +95,8 @@ class EmbeddingService:
         # Sync version (for non-async contexts)
         embedding = service.embed_text_sync("Hello world")
     """
+
+    semantic: bool = True  # ML model-based, produces real semantic vectors
 
     _instance: Optional["EmbeddingService"] = None
     _lock = threading.Lock()

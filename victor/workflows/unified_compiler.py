@@ -22,6 +22,11 @@ implementation modules — not alternatives. This module consolidates:
 2. YAMLToStateGraphCompiler (YAML -> StateGraph -> CompiledGraph)
 3. WorkflowDefinitionCompiler (WorkflowDefinition -> CompiledGraph)
 
+.. note::
+    The DI-based ``WorkflowCompiler`` in ``victor.workflows.compiler.unified_compiler``
+    is deprecated. All code should use this ``UnifiedWorkflowCompiler`` directly.
+    The DI facade remains only for backward compatibility and will be removed in 0.10.0.
+
 Key Features:
 - Single entry point for all workflow types
 - Integrated caching (definition + execution)

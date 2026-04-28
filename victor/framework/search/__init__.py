@@ -66,6 +66,7 @@ from victor.framework.search.query_expansion import (
     QueryExpanderProtocol,
     create_query_expander,
 )
+from victor.framework.search.skeleton import extract_skeleton
 
 __all__ = [
     # Hybrid search
@@ -92,4 +93,6 @@ __all__ = [
     "ExpandedQuery",
     "QueryExpanderProtocol",
     "create_query_expander",
+    # Skeleton extraction
+    "extract_skeleton",
 ]

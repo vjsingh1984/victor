@@ -21,14 +21,9 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from typing import Any
 
-from victor.agent.task_coordinator import TaskCoordinator as LegacyTaskCoordinator
 from victor.agent.services.task_runtime import TaskCoordinator
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.config.settings import Settings
-
-
-def test_legacy_task_coordinator_module_reexports_service_runtime():
-    assert LegacyTaskCoordinator is TaskCoordinator
 
 
 @pytest.fixture

@@ -76,7 +76,7 @@ from victor.workflows.registry import (
     WorkflowRegistry,
     get_global_registry,
 )
-from victor.workflows.executor import WorkflowExecutor
+from victor.workflows.unified_executor import WorkflowExecutor
 from victor.workflows.protocols import (
     RetryPolicy,
     IWorkflowNode,

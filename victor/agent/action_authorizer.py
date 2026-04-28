@@ -209,6 +209,30 @@ WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         0.8,
         "implement_into_file",
     ),
+    # "Address/handle/tackle the rest/findings/issues" - action-oriented continuation
+    (
+        r"\b(address|handle|tackle)\s+(the\s+)?(rest\s+of\s+)?(findings|issues|concerns|problems|tasks)\b",
+        0.95,
+        "address_findings",
+    ),
+    # Generic "address/handle/fix X" patterns
+    (
+        r"\b(address|handle|tackle|resolve)\s+\w+",
+        0.85,
+        "address_generic",
+    ),
+    # "gitignore X" as a verb (add to .gitignore)
+    (
+        r"\bgitignore\s+[\w\./]+",
+        0.9,
+        "gitignore_files",
+    ),
+    # "consolidate/merge/eliminate/deduplicate" - refactoring actions
+    (
+        r"\b(consolidate|merge|eliminate|deduplicate|remove|reduce)\s+\w+",
+        0.85,
+        "consolidate_action",
+    ),
 ]
 
 # Signals that indicate read-only intent (no generation)
@@ -230,6 +254,64 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         r"\b(analyze|review|check|find)\b.*\b(and|then)\s+(fix|update|modify|correct|improve)\b",
         1.0,
         "analyze_then_fix",
+    ),
+    # "Identify/find areas for consolidation/improvement" - refactoring context
+    (
+        r"\b(identify|find|locate|detect)\b.*\b(for)\s+(consolidation|refactoring|improvement|optimization|reduction)\b",
+        0.95,
+        "identify_for_improvement",
+    ),
+    # "Identify/find areas that need/require/should (be) X" - implies action should be taken
+    # Matches verb forms: consolidate, consolidated, consolidating; remove, removed, removal; etc.
+    (
+        r"\b(identify|find|locate|detect)\b.*?\s+(that\s+)?(needs?|requires?|should(\s+be)?)\s+(?:consolidat|refactor|improv|fix|remov|eliminat|reduc)(?:e|ed|ing|ement|ement|al|ation|ion|tion)?\b",
+        0.9,
+        "identify_needing_action",
+    ),
+    # "Review... and consolidate/eliminate/remove/reduce"
+    (
+        r"\b(review|analyze|examine)\b.*\b(and\s+)?(consolidate|eliminate|remove|reduce|deduplicate|merge)\b",
+        0.9,
+        "review_and_consolidate",
+    ),
+    # =============================================================================
+    # Review + output/documentation patterns - when review results need to be written
+    # =============================================================================
+    # "Review... and document/save/report/output the findings"
+    (
+        r"\b(review|analyze|examine|audit|inspect)\b.*\b(and|then)\s+(document|save|report|output|write)\b",
+        0.95,
+        "review_and_document",
+    ),
+    # "Generate/create a review/analysis report/document"
+    (
+        r"\b(generate|create|write|produce)\s+(a\s+)?(review|analysis|audit|summary)\s+(report|document|documentation)\b",
+        0.95,
+        "generate_review_report",
+    ),
+    # "Document the findings/issues/results"
+    (
+        r"\b(document|write|record|log)\s+(the\s+)?(findings|issues|results|analysis|review)\b",
+        0.9,
+        "document_findings",
+    ),
+    # "Save/output findings to file"
+    (
+        r"\b(save|output|export)\s+(the\s+)?(findings|results|analysis|review)\s+(to|as)\b",
+        0.9,
+        "save_findings_to_file",
+    ),
+    # "Write up the review/analysis/findings"
+    (
+        r"\bwrite\s+(up\s+)?(the\s+)?(review|analysis|findings|results)\b",
+        0.85,
+        "write_up_findings",
+    ),
+    # "Create summary/document of review"
+    (
+        r"\b(create|make)\s+(a\s+)?(summary|document|report)\s+(of|for|from)\s+(the\s+)?(review|analysis|audit)\b",
+        0.85,
+        "create_summary_document",
     ),
     (
         r"\b(review|analyze|find|gather)\b.*\b(apply|implement)\s+(the\s+)?fix(?:es)?\b",

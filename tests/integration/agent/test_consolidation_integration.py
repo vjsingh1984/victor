@@ -194,40 +194,40 @@ class TestCoordinatorIntegration:
         assert PromptCoordinatorProtocol is not None
 
     def test_tool_coordinator_importable(self):
-        """Test ToolCoordinator can be imported."""
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+        """Test ToolCoordinator can be imported from services."""
+        from victor.agent.services.tool_compat import ToolCoordinator
 
         assert ToolCoordinator is not None
 
     def test_state_coordinator_importable(self):
-        """Test StateCoordinator can be imported."""
-        from victor.agent.state_coordinator import StateCoordinator
+        """Test StateCoordinator can be imported from services."""
+        from victor.agent.services.state_compat import StateCoordinator
 
         assert StateCoordinator is not None
 
     def test_prompt_coordinator_importable(self):
-        """Test PromptCoordinator can be imported."""
-        from victor.agent.prompt_coordinator import PromptCoordinator
+        """Test PromptCoordinator can be imported from services."""
+        from victor.agent.services.prompt_compat import PromptCoordinator
 
         assert PromptCoordinator is not None
 
     def test_tool_coordinator_config_importable(self):
-        """Test ToolCoordinatorConfig can be imported."""
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinatorConfig
+        """Test ToolCoordinatorConfig can be imported from services."""
+        from victor.agent.services.tool_compat import ToolCoordinatorConfig
 
         config = ToolCoordinatorConfig()
         assert config.default_budget > 0
 
     def test_state_coordinator_config_importable(self):
-        """Test StateCoordinatorConfig can be imported."""
-        from victor.agent.state_coordinator import StateCoordinatorConfig
+        """Test StateCoordinatorConfig can be imported from services."""
+        from victor.agent.services.state_compat import StateCoordinatorConfig
 
         config = StateCoordinatorConfig()
         assert config.enable_auto_transitions is True
 
     def test_prompt_coordinator_config_importable(self):
-        """Test PromptCoordinatorConfig can be imported."""
-        from victor.agent.prompt_coordinator import PromptCoordinatorConfig
+        """Test PromptCoordinatorConfig can be imported from services."""
+        from victor.agent.services.prompt_compat import PromptCoordinatorConfig
 
         config = PromptCoordinatorConfig()
         assert config.enable_task_hints is True
@@ -506,15 +506,15 @@ class TestEndToEndIntegration:
 
     def test_coordinators_can_be_instantiated(self):
         """Test that coordinators can be instantiated with minimal config."""
-        from victor.agent.prompt_coordinator import (
+        from victor.agent.services.prompt_compat import (
             PromptCoordinator,
             PromptCoordinatorConfig,
         )
-        from victor.agent.state_coordinator import (
+        from victor.agent.services.state_compat import (
             StateCoordinator,
             StateCoordinatorConfig,
         )
-        from victor.agent.coordinators.tool_coordinator import (
+        from victor.agent.services.tool_compat import (
             ToolCoordinator,
             ToolCoordinatorConfig,
         )

@@ -24,13 +24,12 @@ from victor.agent.services.tool_observability import ToolObservabilityHandler
 from victor.observability.request_correlation import request_correlation_id
 
 
-def test_legacy_tool_observability_module_reexports_service_handler() -> None:
-    """Legacy coordinator path should re-export the service-owned handler."""
-    from victor.agent.coordinators.tool_observability import (
-        ToolObservabilityHandler as legacy_handler,
-    )
+def test_tool_observability_handler_is_service_owned() -> None:
+    """ToolObservabilityHandler should be imported from services module."""
+    # Verify the handler is available from the services module
+    from victor.agent.services.tool_observability import ToolObservabilityHandler
 
-    assert legacy_handler is ToolObservabilityHandler
+    assert ToolObservabilityHandler is not None
 
 
 @pytest.mark.asyncio

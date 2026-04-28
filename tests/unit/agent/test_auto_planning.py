@@ -28,7 +28,7 @@ def _make_classification(
 
 
 def _make_coordinator(query_classifier=None, orchestrator=None):
-    from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
+    from victor.agent.services.sync_chat_compat import SyncChatCoordinator
 
     mock_chat_ctx = MagicMock()
     mock_chat_ctx.settings = MagicMock()

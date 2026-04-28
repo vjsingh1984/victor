@@ -291,7 +291,7 @@ class TestChatCoordinatorWithMock:
     """Verify ChatCoordinator remains available as a deprecated shim."""
 
     def test_instantiation_with_magicmock(self):
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+        from victor.agent.services.chat_compat import ChatCoordinator
 
         mock_orch = MagicMock()
         with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):
@@ -299,7 +299,7 @@ class TestChatCoordinatorWithMock:
         assert coordinator._orchestrator is mock_orch
 
     def test_lazy_handlers_are_none_initially(self):
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+        from victor.agent.services.chat_compat import ChatCoordinator
 
         mock_orch = MagicMock()
         with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):

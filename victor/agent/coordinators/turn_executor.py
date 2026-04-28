@@ -12,13 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Deprecated coordinator-path shim for the turn execution runtime.
+"""DEPRECATED: TurnExecutor has moved to services.
 
-The canonical host for turn execution now lives in
-`victor.agent.services.turn_execution_runtime`. This module remains only as a
-backward-compatible import path while callers migrate away from
-coordinator-named runtime modules.
+.. deprecated::
+    Import from victor.agent.services.turn_execution_runtime instead.
+    This module remains as a backward compatibility redirect.
 """
+
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "victor.agent.coordinators.turn_executor is deprecated. "
+    "Import from victor.agent.services.turn_execution_runtime instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from victor.agent.services.turn_execution_runtime import TurnExecutor, TurnResult
 

@@ -43,7 +43,7 @@ COORDINATOR_FILES = [
     COORDINATOR_DIR / "chat_coordinator.py",
     COORDINATOR_DIR / "sync_chat_coordinator.py",
     COORDINATOR_DIR / "protocol_adapters.py",
-    COORDINATOR_DIR / "tool_coordinator.py",
+    # NOTE: tool_coordinator.py removed - now in victor.agent.services.tool_compat
 ]
 
 # Pattern: hasattr(something, "_private") or getattr(something, "_private"...)
@@ -148,16 +148,6 @@ class TestRequiredCapabilitiesRegistered:
 # =============================================================================
 
 
-class TestToolCoordinatorUsesPublicAPI:
-    """tool_coordinator should use get_enabled_tools() not _enabled_tools."""
-
-    def test_no_direct_enabled_tools_access(self):
-        """tool_coordinator should use orchestrator.get_enabled_tools()."""
-        filepath = COORDINATOR_DIR / "tool_coordinator.py"
-        source = filepath.read_text(encoding="utf-8")
-
-        # Should NOT have getattr(..., "_enabled_tools", ...)
-        assert '_enabled_tools"' not in source or "get_enabled_tools" in source, (
-            "tool_coordinator.py should use orchestrator.get_enabled_tools() "
-            "instead of getattr(orchestrator, '_enabled_tools', None)"
-        )
+# NOTE: TestToolCoordinatorUsesPublicAPI class removed
+# tool_coordinator.py has been deleted - functionality moved to victor.agent.services.tool_compat
+# The service-level implementation is tested separately in tests/unit/agent/services/

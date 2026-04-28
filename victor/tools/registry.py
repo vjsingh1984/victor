@@ -39,6 +39,13 @@ if TYPE_CHECKING:
     from victor.tools.registration.registry import ToolRegistrationStrategyRegistry
 
 
+# Type alias: Any at runtime, BaseTool for type-checkers
+# This avoids circular import while preserving type safety
+_ToolType = Any  # Runtime: avoid circular import
+if TYPE_CHECKING:
+    _ToolType = "BaseTool"
+
+
 class HookError(Exception):
     """Raised when a critical hook fails."""
 
@@ -83,7 +90,7 @@ class Hook:
         return self.callback(*args, **kwargs)
 
 
-class ToolRegistry(BaseRegistry[str, Any]):
+class ToolRegistry(BaseRegistry[str, _ToolType]):
     """Registry for managing available tools.
 
     Extends BaseRegistry to provide tool-specific functionality including:
@@ -205,7 +212,6 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
         # Check if tool with same normalized name already exists
         # Import here to avoid circular dependency
-        from victor.tools.deduplication import ToolSource
 
         # Detect source of new tool
         new_tool_source = self._detect_tool_source(tool)

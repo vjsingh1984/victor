@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+from victor.agent.services.chat_compat import ChatCoordinator
 from victor.agent.services.chat_service import ChatService
 
 

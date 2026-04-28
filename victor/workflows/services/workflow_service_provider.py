@@ -385,19 +385,31 @@ class WorkflowServiceProvider:
         This is a pure compiler - NO execution logic (SRP compliance).
 
         Returns:
-            WorkflowCompiler instance
+            WorkflowCompilerImpl instance (using canonical backend)
         """
-        from victor.workflows.compiler.unified_compiler import WorkflowCompiler
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
+        from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
+        from victor.workflows.validator import WorkflowValidator
+        from victor.workflows.yaml_loader import YAMLWorkflowLoader
 
-        # Get dependencies from DI container
-        yaml_loader = self.container.get("YAMLWorkflowLoader")
-        validator = self.container.get("WorkflowValidator")
-        factory = self.container.get("NodeExecutorFactoryProtocol")
+        # Get dependencies from DI container (use actual types, not strings)
+        factory = self.container.get(NodeExecutorFactoryProtocol)
+        validator = self.container.get(WorkflowValidator)
 
-        compiler = WorkflowCompiler(
+        # Create YAML loader directly (not registered in container)
+        cache_enabled = getattr(self._settings, "enable_workflow_cache", True)
+        cache_ttl = getattr(self._settings, "workflow_cache_ttl", 3600)
+        yaml_loader = YAMLWorkflowLoader(
+            enable_cache=cache_enabled,
+            cache_ttl=cache_ttl,
+        )
+
+        compiler = WorkflowCompilerImpl(
             yaml_loader=yaml_loader,
             validator=validator,
-            node_executor_factory=factory,
+            node_factory=factory,
         )
 
         return compiler

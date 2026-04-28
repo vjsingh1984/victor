@@ -500,10 +500,20 @@ class OrchestratorProtocolAdapter:
         """Get cancel event."""
         return self._orchestrator._cancel_event
 
+    @_cancel_event.setter
+    def _cancel_event(self, value: Optional["asyncio.Event"]) -> None:
+        """Set cancel event."""
+        self._orchestrator._cancel_event = value
+
     @property
     def _is_streaming(self) -> bool:
         """Get streaming flag."""
         return self._orchestrator._is_streaming
+
+    @_is_streaming.setter
+    def _is_streaming(self, value: bool) -> None:
+        """Set streaming flag."""
+        self._orchestrator._is_streaming = value
 
     def _check_cancellation(self) -> bool:
         """Check if cancellation requested."""

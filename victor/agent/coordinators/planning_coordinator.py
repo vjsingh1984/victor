@@ -12,13 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Deprecated coordinator-path shim for the planning runtime implementation.
+"""DEPRECATED: PlanningCoordinator has moved to services.
 
-The canonical host for planning runtime helpers now lives in
-`victor.agent.services.planning_runtime`. This module remains only as a
-backward-compatible import path while callers migrate away from
-coordinator-named runtime modules.
+.. deprecated::
+    Import from victor.agent.services.planning_runtime instead.
+    This module remains as a backward compatibility redirect.
 """
+
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "victor.agent.coordinators.planning_coordinator is deprecated. "
+    "Import from victor.agent.services.planning_runtime instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from victor.agent.services.planning_runtime import (
     PlanningConfig,

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.tool_coordinator import (
+from victor.agent.services.tool_compat import (
     ToolCoordinator,
     ToolResultContext,
 )

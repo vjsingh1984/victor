@@ -12,7 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Compatibility re-exports for SDK-owned safety coordination."""
+"""DEPRECATED: Safety coordination is now SDK-owned.
+
+.. deprecated::
+    Import from victor_sdk.safety instead.
+    This module remains as a backward compatibility redirect.
+"""
+
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "victor.agent.coordinators.safety_coordinator is deprecated. "
+    "Import from victor_sdk.safety instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from victor_sdk.safety import (
     SafetyAction,

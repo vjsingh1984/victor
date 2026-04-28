@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Builder pattern implementations for AgentOrchestrator initialization.
+"""DEPRECATED: Builder pattern implementations for AgentOrchestrator initialization.
+
+.. deprecated::
+    The victor.agent.builders package is deprecated. For new code, use
+    victor.agent.factory.OrchestratorFactory and the mixin-based builders in
+    victor.agent.factory. This module remains for backward compatibility.
 
 This module provides builder classes that extract component initialization
 logic from AgentOrchestrator.__init__() to improve testability and maintainability.
@@ -26,23 +31,45 @@ Available Builders:
     ToolBuilder: Builds tools and tool-related components
     ProviderBuilder: Builds provider and provider-related components
 
-Usage:
-    from victor.agent.builders import ServiceBuilder, ToolBuilder, ProviderBuilder
+Migration Guide:
+    OLD: from victor.agent.builders import ServiceBuilder, ToolBuilder, ProviderBuilder
+    NEW: from victor.agent.factory import OrchestratorFactory
 
-    # Build services
+    # Old way
     service_builder = ServiceBuilder(settings)
     services = service_builder.build()
 
-    # Build provider components
-    provider_builder = ProviderBuilder(settings)
-    provider_components = provider_builder.build(provider=my_provider)
+    # New way
+    factory = OrchestratorFactory(settings)
+    orchestrator = factory.create_orchestrator()
 
-    # Build tool components
-    tool_builder = ToolBuilder(settings)
-    tool_components = tool_builder.build(
-        service_provider=services['service_provider']
-    )
+Usage:
+    >>> from victor.agent.builders import ServiceBuilder, ToolBuilder, ProviderBuilder
+    >>>
+    >>> # Build services
+    >>> service_builder = ServiceBuilder(settings)
+    >>> services = service_builder.build()
+    >>>
+    >>> # Build provider components
+    >>> provider_builder = ProviderBuilder(settings)
+    >>> provider_components = provider_builder.build(provider=my_provider)
+    >>>
+    >>> # Build tool components
+    >>> tool_builder = ToolBuilder(settings)
+    >>> tool_components = tool_builder.build(
+    ...     service_provider=services['service_provider']
+    ... )
 """
+
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "victor.agent.builders is deprecated. Use victor.agent.factory.OrchestratorFactory for new code.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from victor.agent.builders.base import ComponentBuilder, FactoryAwareBuilder
 from victor.agent.builders.service_builder import ServiceBuilder

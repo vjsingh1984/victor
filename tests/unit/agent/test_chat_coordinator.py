@@ -21,7 +21,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from typing import Any
 
-from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+from victor.agent.services.chat_compat import ChatCoordinator
 from victor.core.errors import ProviderRateLimitError
 
 

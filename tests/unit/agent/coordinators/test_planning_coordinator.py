@@ -236,7 +236,7 @@ class TestPlanningCoordinatorIntegration:
         """Planning should be canonical on ChatService and shimmed on ChatCoordinator."""
         from victor.agent.services.chat_service import ChatService
         from victor.agent.services.protocols import ChatServiceProtocol
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+        from victor.agent.services.chat_compat import ChatCoordinator
 
         assert hasattr(ChatServiceProtocol, "chat_with_planning")
         assert hasattr(ChatService, "chat_with_planning")

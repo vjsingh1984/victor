@@ -12,7 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Compatibility re-exports for SDK-owned conversation coordination."""
+"""DEPRECATED: Conversation coordination is now SDK-owned.
+
+.. deprecated::
+    Import from victor_sdk.conversation instead.
+    This module remains as a backward compatibility redirect.
+"""
+
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "victor.agent.coordinators.conversation_coordinator is deprecated. "
+    "Import from victor_sdk.conversation instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from victor_sdk.conversation import (
     ConversationContext,

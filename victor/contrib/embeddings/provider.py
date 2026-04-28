@@ -42,7 +42,6 @@ from typing import Any, Dict, List
 
 from victor.framework.vertical_protocols import (
     EmbeddingsProtocol,
-    EmbeddingResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,6 +78,11 @@ class BasicEmbeddingsProvider(EmbeddingsProtocol):
         self._dimension = dimension
         self._model = model
 
+    @property
+    def semantic(self) -> bool:
+        """Whether this provider produces semantically meaningful vectors."""
+        return False
+
     async def embed_text(
         self,
         text: str,
@@ -96,9 +100,10 @@ class BasicEmbeddingsProvider(EmbeddingsProtocol):
         Returns:
             List of floats representing the embedding vector
         """
-        logger.debug(
-            "Using hash-based embeddings (not semantic). "
-            "Install victor-rag for proper embeddings."
+        logger.warning(
+            "Using hash-based embeddings (NOT semantic). "
+            "Semantic search, tool selection, and intent classification "
+            "will produce incorrect results. Install victor-rag for proper embeddings."
         )
 
         # Generate deterministic hash-based vector
@@ -140,15 +145,14 @@ class BasicEmbeddingsProvider(EmbeddingsProtocol):
 
     def get_model_info(self) -> Dict[str, Any]:
         """Get model metadata."""
-        note = "Not semantic - install victor-rag for proper embeddings"
         return {
             "name": self._model,
             "dimension": self._dimension,
             "type": "hash-based",
+            "semantic": False,
             "info": {
-                "note": note,
+                "note": "Not semantic — install victor-rag for proper embeddings",
             },
-            "note": note,
         }
 
 

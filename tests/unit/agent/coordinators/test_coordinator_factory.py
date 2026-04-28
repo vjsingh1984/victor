@@ -13,7 +13,7 @@ from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoord
 from victor.agent.coordinators.system_prompt_state_passed import (
     SystemPromptStatePassedCoordinator,
 )
-from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+from victor.agent.services.tool_compat import ToolCoordinator
 from victor.agent.protocols import (
     IBudgetManager,
     IToolAccessController,

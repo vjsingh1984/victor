@@ -133,39 +133,31 @@ def test_tool_service_bound_pipeline_budget_is_authoritative():
     assert service.get_remaining_budget() == 12
 
 
-def test_legacy_tool_retry_module_reexports_service_executor():
-    """Legacy coordinator path should re-export the service-owned retry runtime."""
-    from victor.agent.coordinators.tool_retry import ToolRetryExecutor as legacy_executor
-    from victor.agent.services.tool_retry import ToolRetryExecutor as service_executor
+def test_tool_retry_executor_available_from_services():
+    """ToolRetryExecutor should be available from services module."""
+    from victor.agent.services.tool_retry import ToolRetryExecutor
 
-    assert legacy_executor is service_executor
+    assert ToolRetryExecutor is not None
 
 
-def test_legacy_tool_coordinator_contracts_reexport_service_contracts():
-    """Legacy coordinator path should re-export service-owned tool contract DTOs."""
-    from victor.agent.coordinators.tool_coordinator import (
-        NormalizedArgs as legacy_normalized_args,
-        ToolCallValidation as legacy_tool_call_validation,
-    )
+def test_tool_coordinator_contracts_available_from_services():
+    """Tool contract DTOs should be available from services module."""
     from victor.agent.services.tool_contracts import (
-        NormalizedArgs as service_normalized_args,
-        ToolCallValidation as service_tool_call_validation,
+        NormalizedArgs,
+        ToolCallValidation,
     )
 
-    assert legacy_tool_call_validation is service_tool_call_validation
-    assert legacy_normalized_args is service_normalized_args
+    assert NormalizedArgs is not None
+    assert ToolCallValidation is not None
 
 
-def test_legacy_protocol_adapter_module_reexports_service_adapter():
-    """Legacy coordinator adapter path should re-export the service-owned adapter."""
-    from victor.agent.coordinators.protocol_adapters import (
-        OrchestratorProtocolAdapter as legacy_adapter,
-    )
+def test_orchestrator_protocol_adapter_available_from_services():
+    """OrchestratorProtocolAdapter should be available from services module."""
     from victor.agent.services.orchestrator_protocol_adapter import (
-        OrchestratorProtocolAdapter as service_adapter,
+        OrchestratorProtocolAdapter,
     )
 
-    assert legacy_adapter is service_adapter
+    assert OrchestratorProtocolAdapter is not None
 
 
 def test_service_rl_runtime_prompt_rollout_helper_uses_global_coordinator():

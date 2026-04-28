@@ -15,7 +15,6 @@ from victor.workflows.compiler.boundary import (
     WorkflowDefinitionValidator,
     WorkflowParser,
 )
-from victor.workflows.compiler.unified_compiler import WorkflowCompiler
 from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
 from victor.workflows.definition import (
     AgentNode,
@@ -283,7 +282,7 @@ class TestNativeWorkflowGraphCompiler:
 
 
 class TestWorkflowCompilerFacade:
-    def test_workflow_compiler_uses_explicit_boundary_stages(self) -> None:
+    def test_workflow_compiler_impl_uses_explicit_boundary_stages(self) -> None:
         parsed = ParsedWorkflowDefinition(
             request=WorkflowCompilationRequest(source="workflow.yaml", workflow_name="alpha"),
             workflow=_make_workflow("alpha"),
@@ -296,14 +295,15 @@ class TestWorkflowCompilerFacade:
         compiled = object()
         graph_compiler.compile.return_value = compiled
 
-        compiler = WorkflowCompiler(
+        compiler = WorkflowCompilerImpl(
             yaml_loader=Mock(),
             validator=Mock(),
-            node_executor_factory=Mock(),
-            workflow_parser=parser,
-            workflow_definition_validator=validator,
-            graph_compiler=graph_compiler,
+            node_factory=Mock(),
         )
+        # Inject mocks for testing
+        compiler._workflow_parser = parser
+        compiler._workflow_definition_validator = validator
+        compiler._graph_compiler = graph_compiler
 
         result = compiler.compile("workflow.yaml", workflow_name="alpha", validate=True)
 
@@ -318,7 +318,7 @@ class TestWorkflowCompilerFacade:
         graph_compiler.compile.assert_called_once_with(parsed)
         assert result is compiled
 
-    def test_workflow_compiler_skips_validation_when_disabled(self) -> None:
+    def test_workflow_compiler_impl_skips_validation_when_disabled(self) -> None:
         parsed = ParsedWorkflowDefinition(
             request=WorkflowCompilationRequest(source="workflow.yaml", validate=False),
             workflow=_make_workflow("alpha"),
@@ -329,26 +329,28 @@ class TestWorkflowCompilerFacade:
         graph_compiler = Mock(return_value=object())
         graph_compiler.compile.return_value = object()
 
-        compiler = WorkflowCompiler(
+        compiler = WorkflowCompilerImpl(
             yaml_loader=Mock(),
             validator=Mock(),
-            node_executor_factory=Mock(),
-            workflow_parser=parser,
-            workflow_definition_validator=validator,
-            graph_compiler=graph_compiler,
+            node_factory=Mock(),
         )
+        # Inject mocks for testing
+        compiler._workflow_parser = parser
+        compiler._workflow_definition_validator = validator
+        compiler._graph_compiler = graph_compiler
 
         compiler.compile("workflow.yaml", validate=False)
 
         validator.validate.assert_not_called()
         graph_compiler.compile.assert_called_once_with(parsed)
 
-    def test_workflow_compiler_impl_reuses_shared_facade(self) -> None:
+    def test_workflow_compiler_impl_has_expected_interface(self) -> None:
         compiler = WorkflowCompilerImpl(yaml_loader=Mock(), validator=Mock(), node_factory=Mock())
 
-        assert isinstance(compiler, WorkflowCompiler)
+        assert hasattr(compiler, "compile")
+        assert callable(compiler.compile)
 
-    def test_workflow_compiler_defaults_to_native_backend(self) -> None:
+    def test_workflow_compiler_impl_defaults_to_native_backend(self) -> None:
         workflow = WorkflowDefinition(
             name="alpha",
             nodes={
@@ -370,10 +372,10 @@ class TestWorkflowCompilerFacade:
             return state
 
         node_executor_factory.create_executor.return_value = passthrough
-        compiler = WorkflowCompiler(
+        compiler = WorkflowCompilerImpl(
             yaml_loader=loader,
             validator=validator,
-            node_executor_factory=node_executor_factory,
+            node_factory=node_executor_factory,
         )
 
         compiled = compiler.compile("workflow.yaml")

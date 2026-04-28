@@ -24,25 +24,12 @@ import pytest
 from unittest.mock import MagicMock, PropertyMock
 
 from victor.agent.conversation.state_machine import ConversationStage
-from victor.agent.state_coordinator import (
-    StateCoordinator as LegacyStateCoordinator,
-    StateCoordinatorConfig as LegacyStateCoordinatorConfig,
-    StageTransition as LegacyStageTransition,
-    create_state_coordinator as legacy_create_state_coordinator,
-)
 from victor.agent.services.state_compat import (
     StageTransition,
     StateCoordinator,
     StateCoordinatorConfig,
     create_state_coordinator,
 )
-
-
-def test_legacy_state_coordinator_module_reexports_service_runtime():
-    assert LegacyStateCoordinator is StateCoordinator
-    assert LegacyStateCoordinatorConfig is StateCoordinatorConfig
-    assert LegacyStageTransition is StageTransition
-    assert legacy_create_state_coordinator is create_state_coordinator
 
 
 class TestStateCoordinatorConfig:

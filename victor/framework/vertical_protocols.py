@@ -604,6 +604,15 @@ class EmbeddingsProtocol(Protocol):
         vector = await embeddings.embed_text("Hello world")
     """
 
+    @property
+    def semantic(self) -> bool:
+        """Whether this provider produces semantically meaningful vectors.
+
+        Hash-based fallbacks return False. ML model-based providers return True.
+        Consumers should check this before relying on similarity scores.
+        """
+        ...
+
     async def embed_text(
         self,
         text: str,

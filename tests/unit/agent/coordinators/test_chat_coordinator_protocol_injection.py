@@ -13,7 +13,7 @@ from typing import Any, List
 from dataclasses import dataclass, field
 from unittest.mock import AsyncMock, MagicMock
 
-from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+from victor.agent.services.chat_compat import ChatCoordinator
 from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
 # =============================================================================
@@ -297,7 +297,7 @@ class TestChatCoordinatorProtocolInjection:
 
         # Import only the protocol and ChatCoordinator
         from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+        from victor.agent.services.chat_compat import ChatCoordinator
 
         # Verify protocol is runtime-checkable
         from typing import Protocol, runtime_checkable

@@ -10,12 +10,12 @@ from victor.agent.services.chat_compat_telemetry import (
     reset_deprecated_chat_shim_telemetry,
 )
 from victor.agent.services.protocols.chat_runtime import ExecutionMode
-from victor.agent.coordinators.streaming_chat_coordinator import (
+from victor.agent.services.streaming_chat_compat import (
     StreamingChatCoordinator,
 )
-from victor.agent.coordinators.chat_coordinator import ChatCoordinator
-from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
-from victor.agent.coordinators.unified_chat_coordinator import UnifiedChatCoordinator
+from victor.agent.services.chat_compat import ChatCoordinator
+from victor.agent.services.sync_chat_compat import SyncChatCoordinator
+from victor.agent.services.unified_chat_compat import UnifiedChatCoordinator
 from victor.providers.base import CompletionResponse, StreamChunk
 
 

@@ -45,9 +45,9 @@ def test_session_package_exports_warn():
 
 def test_specialized_chat_package_exports_warn():
     """Package-root specialized chat exports should be compatibility-only."""
-    from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
-    from victor.agent.coordinators.streaming_chat_coordinator import StreamingChatCoordinator
-    from victor.agent.coordinators.unified_chat_coordinator import UnifiedChatCoordinator
+    from victor.agent.services.sync_chat_compat import SyncChatCoordinator
+    from victor.agent.services.streaming_chat_compat import StreamingChatCoordinator
+    from victor.agent.services.unified_chat_compat import UnifiedChatCoordinator
 
     with pytest.warns(
         DeprecationWarning,
@@ -89,7 +89,7 @@ def test_specialized_chat_package_exports_warn():
 
 
 def test_chat_coordinator_package_export_warns_and_records_telemetry():
-    from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+    from victor.agent.services.chat_compat import ChatCoordinator
 
     with pytest.warns(
         DeprecationWarning,

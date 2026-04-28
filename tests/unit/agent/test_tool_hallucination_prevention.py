@@ -76,7 +76,7 @@ class TestToolPreFilter:
     """Tests for pre-filtering hallucinated tool names in ToolCoordinator."""
 
     def _make_coordinator(self, known_tools=None):
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+        from victor.agent.services.tool_compat import ToolCoordinator
 
         mock_pipeline = MagicMock()
         mock_registry = MagicMock()
