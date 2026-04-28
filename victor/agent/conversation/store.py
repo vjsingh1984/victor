@@ -224,6 +224,20 @@ class ConversationStore:
             f"DB: {self.db_path}, Max tokens: {max_context_tokens}"
         )
 
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get a SQLite connection with optimized settings for concurrent access.
+
+        Returns a connection with:
+        - 30-second timeout for handling concurrent access
+        - WAL mode for better read/write concurrency
+        - Optimized pragmas for performance
+        """
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        # Ensure WAL mode is set (in case it wasn't during init)
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+        return conn
+
     def _init_database(self) -> None:
         """Initialize SQLite database for persistence with normalized schema.
 
@@ -1970,7 +1984,8 @@ class ConversationStore:
         # Sanitize metadata for JSON serialization (handles Ellipsis, Path objects, etc.)
         meta = self._sanitize_metadata_for_json(meta)
 
-        with sqlite3.connect(self.db_path) as conn:
+        # Use helper method for connection with proper timeout and WAL mode
+        with self._get_connection() as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO messages
