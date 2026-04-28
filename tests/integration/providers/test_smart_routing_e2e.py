@@ -93,7 +93,14 @@ class TestSmartRoutingE2E:
         mock_providers[0].chat.assert_called_once()
 
         # Now simulate Ollama failure (circuit breaker opens)
-        smart_provider.resilient_providers["ollama"].circuit_breaker._state.state = "OPEN"
+        # Record enough failures to open the circuit (threshold is typically 5)
+        circuit_breaker = smart_provider.resilient_providers["ollama"].circuit_breaker
+        for _ in range(10):  # Ensure we exceed the failure threshold
+            try:
+                circuit_breaker.record_failure(Exception("Simulated failure"))
+            except Exception:
+                pass  # record_failure may raise in some states
+
         smart_provider.checker._provider_health["ollama"] = ProviderHealthResult(
             healthy=False,
             provider="ollama",
