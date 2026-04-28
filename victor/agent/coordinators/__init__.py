@@ -43,13 +43,34 @@ from victor.agent.services.chat_compat_telemetry import (
     record_deprecated_chat_shim_access,
 )
 
-_SUBMODULE_MAP: dict[str, str] = {}
+_SUBMODULE_MAP: dict[str, str] = {
+    # Deleted coordinator shims now import directly from services
+    "ExplorationCoordinator": "services.exploration_runtime",
+    "ExplorationResult": "services.exploration_runtime",
+    "MetricsCoordinator": "services.metrics_service",
+    "create_metrics_coordinator": "services.metrics_service",
+    "SafetyCoordinator": "victor_sdk.safety",
+    "SafetyRule": "victor_sdk.safety",
+    "SafetyCheckResult": "victor_sdk.safety",
+    "SafetyStats": "victor_sdk.safety",
+    "SafetyAction": "victor_sdk.safety",
+    "SafetyCategory": "victor_sdk.safety",
+    "SystemPromptCoordinator": "services.system_prompt_runtime",
+    "PlanningCoordinator": "services.planning_runtime",
+    "PlanningConfig": "services.planning_runtime",
+    "PlanningMode": "services.planning_runtime",
+    "PlanningResult": "services.planning_runtime",
+    "SessionCoordinator": "services.session_compat",
+    "SessionInfo": "services.session_compat",
+    "create_session_coordinator": "services.session_compat",
+    "ConversationCoordinator": "victor_sdk.conversation",
+    "TurnType": "victor_sdk.conversation",
+    "ConversationTurn": "victor_sdk.conversation",
+    "ConversationStats": "victor_sdk.conversation",
+    "ConversationContext": "victor_sdk.conversation",
+}
 
 _MODULE_MEMBERS = {
-    "exploration_coordinator": [
-        "ExplorationCoordinator",
-        "ExplorationResult",
-    ],
     "exploration_state_passed": [
         "ExplorationStatePassedCoordinator",
     ],
@@ -74,17 +95,6 @@ _MODULE_MEMBERS = {
         "ProviderContextProtocol",
         "ToolContextProtocol",
     ],
-    "session_coordinator": [
-        "SessionCoordinator",
-        "SessionInfo",
-        "create_session_coordinator",
-    ],
-    "planning_coordinator": [
-        "PlanningCoordinator",
-        "PlanningConfig",
-        "PlanningMode",
-        "PlanningResult",
-    ],
     "protocols": [
         "CacheProvider",
         "CacheEventType",
@@ -94,33 +104,17 @@ _MODULE_MEMBERS = {
         "NoOpEventEmitter",
         "DictConfigProvider",
     ],
-    "conversation_coordinator": [
-        "ConversationCoordinator",
-        "TurnType",
-        "ConversationTurn",
-        "ConversationStats",
-        "ConversationContext",
-    ],
-    "safety_coordinator": [
-        "SafetyCoordinator",
-        "SafetyRule",
-        "SafetyCheckResult",
-        "SafetyStats",
-        "SafetyAction",
-        "SafetyCategory",
-    ],
-    "metrics_coordinator": [
-        "MetricsCoordinator",
-    ],
-    "system_prompt_coordinator": [
-        "SystemPromptCoordinator",
-    ],
     "system_prompt_state_passed": [
         "SystemPromptStatePassedCoordinator",
     ],
     "safety_state_passed": [
         "SafetyStatePassedCoordinator",
     ],
+    # NOTE: exploration_coordinator, metrics_coordinator, safety_coordinator,
+    # system_prompt_coordinator, planning_coordinator, session_coordinator,
+    # turn_executor, conversation_coordinator removed as deprecated shims.
+    # These now import directly from services for backward compatibility.
+    # See __getattr__ below for service-level re-exports.
 }
 
 for _module_name, _exported_names in _MODULE_MEMBERS.items():
@@ -188,15 +182,26 @@ _DEPRECATED_EXPORTS = {
 def __getattr__(name: str) -> Any:
     """Resolve coordinator exports lazily and warn on deprecated shims.
 
-    For tool_coordinator, tool_observability, tool_retry: re-exports from services.
+    For deleted coordinator shims: re-exports from services or SDK.
     For chat_protocols: imports from services.protocols.chat_runtime.
     For other coordinators: imports from coordinators.{module_name}.
     """
     # Service-level re-exports for deleted coordinator shims
     if name in {
         "ToolCoordinator", "ToolCoordinatorConfig", "TaskContext", "IToolCoordinator",
-        "create_tool_coordinator", "ToolObservabilityHandler", "ToolRetryExecutor"
+        "create_tool_coordinator", "ToolObservabilityHandler", "ToolRetryExecutor",
+        # Deleted coordinator shims
+        "ExplorationCoordinator", "ExplorationResult",
+        "MetricsCoordinator", "create_metrics_coordinator",
+        "SafetyCoordinator", "SafetyRule", "SafetyCheckResult", "SafetyStats",
+        "SafetyAction", "SafetyCategory",
+        "SystemPromptCoordinator",
+        "PlanningCoordinator", "PlanningConfig", "PlanningMode", "PlanningResult",
+        "SessionCoordinator", "SessionInfo", "create_session_coordinator",
+        "ConversationCoordinator", "TurnType", "ConversationTurn",
+        "ConversationStats", "ConversationContext",
     }:
+        # Import from appropriate service module
         if name in {"ToolCoordinator", "ToolCoordinatorConfig", "TaskContext",
                     "IToolCoordinator", "create_tool_coordinator"}:
             module = importlib.import_module("victor.agent.services.tool_compat")
@@ -204,6 +209,24 @@ def __getattr__(name: str) -> Any:
             module = importlib.import_module("victor.agent.services.tool_observability")
         elif name == "ToolRetryExecutor":
             module = importlib.import_module("victor.agent.services.tool_retry")
+        elif name in {"ExplorationCoordinator", "ExplorationResult"}:
+            module = importlib.import_module("victor.agent.services.exploration_runtime")
+        elif name in {"MetricsCoordinator", "create_metrics_coordinator"}:
+            module = importlib.import_module("victor.agent.services.metrics_service")
+        elif name in {"SafetyCoordinator", "SafetyRule", "SafetyCheckResult",
+                      "SafetyStats", "SafetyAction", "SafetyCategory"}:
+            module = importlib.import_module("victor_sdk.safety")
+        elif name == "SystemPromptCoordinator":
+            module = importlib.import_module("victor.agent.services.system_prompt_runtime")
+        elif name in {"PlanningCoordinator", "PlanningConfig", "PlanningMode",
+                      "PlanningResult"}:
+            module = importlib.import_module("victor.agent.services.planning_runtime")
+        elif name in {"SessionCoordinator", "SessionInfo", "create_session_coordinator"}:
+            module = importlib.import_module("victor.agent.services.session_compat")
+        elif name in {"ConversationCoordinator", "TurnType", "ConversationTurn",
+                      "ConversationStats", "ConversationContext"}:
+            module = importlib.import_module("victor_sdk.conversation")
+
         value = getattr(module, name)
         # Apply deprecation warning
         if name in _DEPRECATED_EXPORTS:
