@@ -1274,6 +1274,11 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
     def _check_loop(self) -> Optional[str]:
         """Check for loop patterns."""
+        # Check for read-only loop (too many reads without any writes)
+        readonly_loop = self._check_readonly_loop()
+        if readonly_loop:
+            return readonly_loop
+
         # Check file read overlaps
         file_loop = self._check_file_read_loops()
         if file_loop:
@@ -1298,6 +1303,38 @@ class UnifiedTaskTracker(ModeAwareMixin):
             for sig, count in sig_counts.items():
                 if count >= threshold:
                     return f"Same signature repeated {count} times: {sig[:50]}"
+
+        return None
+
+    def _check_readonly_loop(self) -> Optional[str]:
+        """Check for read-only loop - too many reads without any writes.
+
+        This catches the case where the agent keeps reading different files
+        without making any progress on the actual task (no edits/creates/writes).
+        """
+        # Only check for analysis/research tasks after minimum iterations
+        if self._progress.task_type not in {
+            TrackerTaskType.ANALYZE,
+            TrackerTaskType.SEARCH,
+            TrackerTaskType.RESEARCH,
+        }:
+            return None
+
+        # Need at least some iterations before checking
+        if self._progress.iteration_count < 10:
+            return None
+
+        # Check if we've read many files without any write operations
+        files_read = len(self._progress.files_read)
+        files_modified = len(self._progress.files_modified)
+
+        # If we've read more than 20 files without modifying anything, flag it
+        if files_read > 20 and files_modified == 0:
+            return f"Read-only loop: {files_read} files read, 0 files modified"
+
+        # If we've read more than 50 files with fewer than 5 modifications, flag it
+        if files_read > 50 and files_modified < 5:
+            return f"Read-heavy loop: {files_read} files read, only {files_modified} files modified"
 
         return None
 
