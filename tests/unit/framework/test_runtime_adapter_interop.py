@@ -51,5 +51,6 @@ def test_sdk_runtime_adapters_resolve_host_types() -> None:
     assert AgentSpec.__name__ == "AgentSpec"
     assert callable(set_role_tool_provider)
     assert RuntimeToolSet.__name__ == "ToolSet"
-    assert WorkflowExecutor.__name__ == "WorkflowExecutor"
+    # WorkflowExecutor is now an alias for CompiledWorkflowExecutor
+    assert WorkflowExecutor.__name__ in ("WorkflowExecutor", "CompiledWorkflowExecutor")
     assert BaseHandler.__name__ == "BaseHandler"
