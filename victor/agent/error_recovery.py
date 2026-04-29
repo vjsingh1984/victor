@@ -28,6 +28,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
+import asyncio
 import logging
 import os
 import re
@@ -437,6 +438,26 @@ class RateLimitHandler(ErrorRecoveryHandler):
         )
 
 
+class TimeoutErrorHandler(ErrorRecoveryHandler):
+    """Handle tool timeout errors.
+
+    Timeouts are expected for slow tools (code_search, web_search, etc.)
+    and do not require handler intervention beyond clear messaging.
+    """
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        if isinstance(error, asyncio.TimeoutError):
+            return True
+        error_str = str(error).lower()
+        return "timed out" in error_str or "timeout" in error_str
+
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+        return RecoveryResult(
+            action=RecoveryAction.SKIP,
+            user_message=f"Tool '{tool_name}' timed out. Consider increasing --tool-budget or simplifying the operation.",
+        )
+
+
 class PermissionErrorHandler(ErrorRecoveryHandler):
     """Handle permission errors."""
 
@@ -511,6 +532,7 @@ def build_recovery_chain() -> ErrorRecoveryHandler:
         .set_next(ToolNotFoundHandler())
         .set_next(RateLimitHandler())
         .set_next(NetworkErrorHandler())
+        .set_next(TimeoutErrorHandler())
         .set_next(PermissionErrorHandler())
     )
     return chain

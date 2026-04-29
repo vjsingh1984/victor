@@ -2614,16 +2614,23 @@ class ToolPipeline:
         """Get effective timeout for a tool, preferring per-tool override.
 
         Resolution order:
-        1. Per-tool timeout from @tool(timeout=N) decorator
-        2. Pipeline default (config.per_tool_timeout_seconds)
+        1. Per-tool timeout from @tool(timeout=N) decorator (_tool_timeout attribute)
+        2. Per-tool timeout from ToolDefinition.timeout (wrapped by registry)
+        3. Pipeline default (config.per_tool_timeout_seconds)
         """
-        # Check if the tool has a per-tool timeout via the registry
         try:
             tool_func = self.executor.get_tool_function(tool_name)
-            if tool_func and hasattr(tool_func, "_tool_timeout"):
-                per_tool = tool_func._tool_timeout
-                if isinstance(per_tool, (int, float)) and per_tool > 0:
-                    return float(per_tool)
+            if tool_func:
+                # Check raw function attribute (set by @tool decorator)
+                if hasattr(tool_func, "_tool_timeout"):
+                    per_tool = tool_func._tool_timeout
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
+                # Check ToolDefinition object (wrapped by registry)
+                if hasattr(tool_func, "timeout"):
+                    per_tool = tool_func.timeout
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
         except Exception:
             pass
         return self.config.per_tool_timeout_seconds
