@@ -693,6 +693,23 @@ class TestChatServiceBootstrapLaziness:
         assert first is second
         assert first._runtime is adapter
 
+    def test_get_provider_management_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.provider_management_runtime import (
+            ProviderManagementRuntime,
+        )
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_provider_management_runtime()
+        second = obj._get_provider_management_runtime()
+
+        assert isinstance(first, ProviderManagementRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
     @pytest.mark.asyncio
     async def test_run_planning_chat_runtime_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -707,6 +724,90 @@ class TestChatServiceBootstrapLaziness:
 
         assert result is response
         helper.run.assert_awaited_once_with("plan this")
+
+    @pytest.mark.asyncio
+    async def test_switch_provider_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.switch_provider = AsyncMock(return_value=True)
+        obj._provider_management_runtime = helper
+        callback = MagicMock()
+
+        result = await AgentOrchestrator.switch_provider(obj, "openai", "gpt-4.1", callback)
+
+        assert result is True
+        helper.switch_provider.assert_awaited_once_with("openai", "gpt-4.1", callback)
+
+    @pytest.mark.asyncio
+    async def test_switch_model_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.switch_model = AsyncMock(return_value=True)
+        obj._provider_management_runtime = helper
+
+        result = await AgentOrchestrator.switch_model(obj, "gpt-4.1")
+
+        assert result is True
+        helper.switch_model.assert_awaited_once_with("gpt-4.1")
+
+    @pytest.mark.asyncio
+    async def test_start_health_monitoring_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.start_health_monitoring = AsyncMock(return_value=True)
+        obj._provider_management_runtime = helper
+
+        result = await AgentOrchestrator.start_health_monitoring(obj)
+
+        assert result is True
+        helper.start_health_monitoring.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_stop_health_monitoring_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.stop_health_monitoring = AsyncMock(return_value=True)
+        obj._provider_management_runtime = helper
+
+        result = await AgentOrchestrator.stop_health_monitoring(obj)
+
+        assert result is True
+        helper.stop_health_monitoring.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_get_provider_health_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_provider_health = AsyncMock(return_value={"healthy": True})
+        obj._provider_management_runtime = helper
+
+        result = await AgentOrchestrator.get_provider_health(obj)
+
+        assert result == {"healthy": True}
+        helper.get_provider_health.assert_awaited_once_with()
+
+    def test_get_current_provider_info_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_current_provider_info.return_value = {"provider_name": "openai"}
+        obj._provider_management_runtime = helper
+
+        result = AgentOrchestrator.get_current_provider_info(obj)
+
+        assert result == {"provider_name": "openai"}
+        helper.get_current_provider_info.assert_called_once_with()
 
     def test_get_task_guidance_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator

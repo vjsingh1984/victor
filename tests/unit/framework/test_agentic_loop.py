@@ -462,7 +462,8 @@ class TestAgenticLoop:
                     "execution_mode": "team_execution",
                     "max_workers": 2,
                     "worktree_isolation": True,
-                    "materialize_worktrees": True,
+                    "dry_run_worktrees": True,
+                    "cleanup_worktrees": False,
                 },
             }
         )
@@ -554,7 +555,8 @@ class TestAgenticLoop:
         assert result.final_state["topology_preparation"]["team_name"] == "feature_team"
         assert result.final_state["topology_overrides"]["team_name"] == "feature_team"
         assert team_context["worktree_isolation"] is True
-        assert team_context["materialize_worktrees"] is True
+        assert team_context["dry_run_worktrees"] is True
+        assert team_context["cleanup_worktrees"] is False
 
     async def test_evaluate_framework_team_execution_turn_completes(self):
         loop = self._make_loop(max_iterations=1, config={"disable_enhanced_completion": True})

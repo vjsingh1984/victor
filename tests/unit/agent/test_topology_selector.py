@@ -298,14 +298,16 @@ class TestTopologySelector:
                     "learned_team_support": 0.74,
                     "learned_formation_hint": "parallel",
                     "learned_worktree_isolation_hint": True,
-                    "learned_materialize_worktrees_hint": True,
+                    "learned_dry_run_worktrees_hint": True,
+                    "learned_cleanup_worktrees_hint": False,
                 },
             )
         )
 
         assert decision.action == TopologyAction.TEAM_PLAN
         assert decision.grounding_requirements.metadata["worktree_isolation"] is True
-        assert decision.grounding_requirements.metadata["materialize_worktrees"] is True
+        assert decision.grounding_requirements.metadata["dry_run_worktrees"] is True
+        assert decision.grounding_requirements.metadata["cleanup_worktrees"] is False
 
     def test_low_agreement_feedback_does_not_override_base_action(self):
         """Low-agreement learned hints should not override the base heuristic action."""

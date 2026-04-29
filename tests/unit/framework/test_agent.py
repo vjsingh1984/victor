@@ -1145,6 +1145,50 @@ class TestAgentTeams:
         teams = agent.get_available_teams()
         assert set(teams) == {"team1", "team2"}
 
+    def test_get_coordination_suggestion_uses_shared_framework_runtime(
+        self, mock_orchestrator, mock_vertical
+    ):
+        """get_coordination_suggestion should use the shared framework helper."""
+        from victor.framework.agent import Agent
+
+        mock_provider = MagicMock()
+        mock_provider.get_team_specs = MagicMock(
+            return_value={
+                "feature_team": MagicMock(
+                    description="Handles feature implementation",
+                    formation="parallel",
+                )
+            }
+        )
+        mock_workflow_provider = MagicMock()
+        mock_workflow_provider.get_workflows = MagicMock(
+            return_value={
+                "feature_implementation": MagicMock(
+                    description="Implement features end-to-end",
+                )
+            }
+        )
+        mock_vertical.get_team_spec_provider = MagicMock(return_value=mock_provider)
+        mock_vertical.get_workflow_provider = MagicMock(return_value=mock_workflow_provider)
+        mock_orchestrator.get_vertical_context = MagicMock(
+            return_value=MagicMock(
+                config=mock_vertical,
+                team_specs={},
+                workflows={},
+            )
+        )
+        mock_orchestrator.mode_controller = MagicMock(
+            current_mode=MagicMock(value="build"),
+        )
+
+        agent = Agent(mock_orchestrator, vertical=mock_vertical)
+        suggestion = agent.get_coordination_suggestion("feature", "high")
+
+        assert suggestion.primary_team is not None
+        assert suggestion.primary_team.team_name == "feature_team"
+        assert suggestion.primary_workflow is not None
+        assert suggestion.primary_workflow.workflow_name == "feature_implementation"
+
     @pytest.mark.asyncio
     async def test_run_team_success(self, mock_orchestrator, mock_vertical):
         """run_team should execute team and return result."""

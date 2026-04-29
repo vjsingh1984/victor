@@ -321,7 +321,8 @@ async def test_pipeline_executes_prepared_team_before_provider_stream():
         "tool_budget": 4,
         "max_workers": 2,
         "worktree_isolation": True,
-        "materialize_worktrees": True,
+        "dry_run_worktrees": True,
+        "cleanup_worktrees": False,
     }
     coordinator._stream_ctx.topology_plan = {"execution_mode": "team_execution"}
     coordinator._stream_provider_response = AsyncMock(
@@ -368,7 +369,8 @@ async def test_pipeline_executes_prepared_team_before_provider_stream():
     assert coordinator._stream_ctx.tool_calls_used == 3
     assert coordinator._stream_ctx.topology_plan["team_name"] == "feature_team"
     assert team_context["worktree_isolation"] is True
-    assert team_context["materialize_worktrees"] is True
+    assert team_context["dry_run_worktrees"] is True
+    assert team_context["cleanup_worktrees"] is False
 
 
 @pytest.mark.asyncio
