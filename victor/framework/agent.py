@@ -954,6 +954,32 @@ class Agent:
             return []
         return team_catalog.list_names()
 
+    def get_coordination_suggestion(
+        self,
+        task_type: str,
+        complexity: str,
+        *,
+        mode: Optional[str] = None,
+    ) -> Any:
+        """Get shared framework coordination recommendations for a task.
+
+        Args:
+            task_type: Classified task type
+            complexity: Complexity level string
+            mode: Optional mode override. Defaults to the runtime's current mode.
+
+        Returns:
+            CoordinationSuggestion with team and workflow recommendations.
+        """
+        from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
+
+        return build_runtime_coordination_suggestion(
+            runtime_subject=self._orchestrator,
+            task_type=task_type,
+            complexity=complexity,
+            mode=mode,
+        )
+
     # =========================================================================
     # Lifecycle
     # =========================================================================

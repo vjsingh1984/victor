@@ -348,6 +348,7 @@ class StreamingChatPipeline:
             "max_workers",
             "worktree_isolation",
             "materialize_worktrees",
+            "dry_run_worktrees",
             "cleanup_worktrees",
         ):
             value = runtime_context_overrides.get(key)

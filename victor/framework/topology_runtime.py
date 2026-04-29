@@ -131,7 +131,12 @@ def _promote_team_runtime_policy_hints(overrides: Dict[str, Any]) -> None:
     metadata = overrides.get("topology_metadata")
     if not isinstance(metadata, dict):
         return
-    for key in ("worktree_isolation", "materialize_worktrees", "cleanup_worktrees"):
+    for key in (
+        "worktree_isolation",
+        "materialize_worktrees",
+        "dry_run_worktrees",
+        "cleanup_worktrees",
+    ):
         if key in overrides:
             continue
         value = _coerce_optional_bool(metadata.get(key))

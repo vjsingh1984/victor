@@ -1291,17 +1291,12 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             CoordinationSuggestion with team and workflow recommendations
         """
-        from victor.agent.mode_controller import MODE_CONFIGS
+        from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
 
-        # Get current mode
-        current_mode = "build"  # Default
-        if self.mode_controller:
-            current_mode = self.mode_controller.current_mode.value
-
-        return self.coordination.suggest_for_task(
+        return build_runtime_coordination_suggestion(
+            runtime_subject=self,
             task_type=task_type,
             complexity=complexity,
-            mode=current_mode,
         )
 
     # =========================================================================
@@ -2594,20 +2589,25 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             tool_cache=getattr(self, "tool_cache", None),
         )
 
+    def _get_provider_management_runtime(self) -> Any:
+        """Get the canonical service-owned provider management runtime helper."""
+        runtime = getattr(self, "_provider_management_runtime", None)
+        if runtime is None:
+            from victor.agent.services.provider_management_runtime import (
+                ProviderManagementRuntime,
+            )
+
+            runtime = ProviderManagementRuntime(self.protocol_adapter)
+            self._provider_management_runtime = runtime
+        return runtime
+
     async def start_health_monitoring(self) -> bool:
         """[CANONICAL] Start background health monitoring via ProviderService.
 
         Returns:
             True if monitoring started, False if already running or unavailable
         """
-        try:
-            if self._provider_service is None:
-                return False
-            await self._provider_service.start_health_monitoring()
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to start health monitoring: {e}")
-            return False
+        return await self._get_provider_management_runtime().start_health_monitoring()
 
     async def stop_health_monitoring(self) -> bool:
         """[CANONICAL] Stop background health monitoring via ProviderService.
@@ -2615,14 +2615,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             True if monitoring stopped, False if not running or error
         """
-        try:
-            if self._provider_service is None:
-                return False
-            await self._provider_service.stop_health_monitoring()
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to stop health monitoring: {e}")
-            return False
+        return await self._get_provider_management_runtime().stop_health_monitoring()
 
     async def get_provider_health(self) -> Dict[str, Any]:
         """[CANONICAL] Get health status via ProviderService.
@@ -2630,19 +2623,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Delegates to ProviderService for diagnostics, maintaining backward
         compatibility by returning the expected health information dictionary.
         """
-        try:
-            is_healthy = await self._provider_service.check_provider_health()
-            info = self._provider_service.get_current_provider_info()
-
-            return {
-                "healthy": is_healthy,
-                "provider": info.provider_name,
-                "model": info.model_name,
-                "api_key_configured": info.api_key_configured,
-            }
-        except Exception as e:
-            logger.warning(f"Health check failed: {e}")
-            return {"healthy": False, "error": str(e)}
+        return await self._get_provider_management_runtime().get_provider_health()
 
     async def graceful_shutdown(self) -> Dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
@@ -2680,26 +2661,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             Dictionary with provider/model info and capabilities.
         """
-        # [CANONICAL] Get metadata from state-passed service
-        info = self._provider_service.get_current_provider_info()
-
-        # Format the service info object into the expected dictionary structure
-        result = {
-            "provider_name": info.provider_name,
-            "model_name": info.model_name,
-            "api_key_configured": info.api_key_configured,
-            "supports_streaming": info.supports_streaming,
-            "supports_tool_calling": info.supports_tool_calling,
-            "max_tokens": info.max_tokens,
-            "tool_budget": self.tool_budget,
-            "tool_calls_used": self.tool_calls_used,
-        }
-
-        stats = self._provider_service.get_rate_limit_stats()
-        if stats:
-            result.update(stats)
-
-        return result
+        return self._get_provider_management_runtime().get_current_provider_info()
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
@@ -4807,44 +4769,15 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             model: Optional specific model
             on_switch: Optional callback after switch
         """
-        try:
-            provider_service = getattr(self, "_provider_service", None)
-            if provider_service is None:
-                logger.error(
-                    "Provider switch failed: canonical provider service is not initialized"
-                )
-                return False
-
-            await provider_service.switch_provider(provider_name, model)
-            info = provider_service.get_current_provider_info()
-            self.provider = provider_service.get_current_provider()
-            self.provider_name = info.provider_name
-            self.model = info.model_name
-
-            if on_switch:
-                on_switch(self.provider_name, self.model)
-            return True
-        except Exception as e:
-            logger.error(f"Provider switch failed: {e}")
-            return False
+        return await self._get_provider_management_runtime().switch_provider(
+            provider_name,
+            model,
+            on_switch,
+        )
 
     async def switch_model(self, model: str) -> bool:
         """[CANONICAL] Switch model via ProviderService."""
-        try:
-            provider_service = getattr(self, "_provider_service", None)
-            if provider_service is None:
-                logger.error("Model switch failed: canonical provider service is not initialized")
-                return False
-
-            await provider_service.switch_model(model)
-            info = provider_service.get_current_provider_info()
-            self.provider = provider_service.get_current_provider()
-            self.provider_name = info.provider_name
-            self.model = info.model_name
-            return True
-        except Exception as e:
-            logger.error(f"Model switch failed: {e}")
-            return False
+        return await self._get_provider_management_runtime().switch_model(model)
 
     # --- ToolsProtocol ---
 

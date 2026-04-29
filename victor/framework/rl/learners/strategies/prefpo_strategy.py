@@ -32,7 +32,7 @@ ChallengerFactoryFn = Callable[[str, List[Any], str], str]
 class PrefPOStrategy:
     """Deterministic pairwise prompt optimizer for targeted sections."""
 
-    TARGET_SECTIONS = {"GROUNDING_RULES", "COMPLETION_GUIDANCE"}
+    TARGET_SECTIONS = {"GROUNDING_RULES", "COMPLETION_GUIDANCE", "CONCISE_MODE_GUIDANCE"}
     requires_benchmark_gate = True
 
     def __init__(

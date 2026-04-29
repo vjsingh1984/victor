@@ -642,26 +642,15 @@ def _get_coordination_suggestion(
     task_type: str,
     complexity: str,
 ) -> Optional[Any]:
-    """Ask the canonical coordination surface for a team recommendation."""
+    """Ask the shared framework coordination engine for a team recommendation."""
     try:
-        coordination = getattr(orchestrator, "coordination", None)
-    except Exception as exc:
-        logger.debug("Failed to access coordination surface: %s", exc)
-        coordination = None
+        from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
 
-    suggest_for_task = getattr(coordination, "suggest_for_task", None)
-    if not callable(suggest_for_task):
-        return None
-
-    mode_name = "build"
-    mode_controller = getattr(orchestrator, "mode_controller", None)
-    current_mode = getattr(mode_controller, "current_mode", None)
-    current_mode_value = getattr(current_mode, "value", None)
-    if isinstance(current_mode_value, str) and current_mode_value:
-        mode_name = current_mode_value
-
-    try:
-        return suggest_for_task(task_type=task_type, complexity=complexity, mode=mode_name)
+        return build_runtime_coordination_suggestion(
+            runtime_subject=orchestrator,
+            task_type=task_type,
+            complexity=complexity,
+        )
     except Exception as exc:
         logger.debug("Failed to get coordination team suggestion: %s", exc)
         return None

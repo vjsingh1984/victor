@@ -258,6 +258,11 @@ FAILURE_HINTS: Dict[str, str] = {
         "Read the test output carefully. Identify which assertion failed and why. "
         "Fix the root cause, not the symptom."
     ),
+    "verbosity": (
+        "Keep responses concise and direct. Avoid unnecessary preamble, summaries, "
+        "or explanations. Skip 'I'll' and 'Let me' phrases. For code: show the code "
+        "with minimal commentary. For questions: answer directly, then stop."
+    ),
     "other": (
         "Read the error message carefully. Diagnose the root cause before "
         "retrying. Avoid repeating the same failing operation."

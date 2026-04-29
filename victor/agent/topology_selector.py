@@ -508,6 +508,7 @@ class TopologySelector:
         for context_key, metadata_key in (
             ("learned_worktree_isolation_hint", "worktree_isolation"),
             ("learned_materialize_worktrees_hint", "materialize_worktrees"),
+            ("learned_dry_run_worktrees_hint", "dry_run_worktrees"),
             ("learned_cleanup_worktrees_hint", "cleanup_worktrees"),
         ):
             value = self._coerce_optional_bool(context.get(context_key))
