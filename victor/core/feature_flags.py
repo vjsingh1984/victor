@@ -153,6 +153,14 @@ class FeatureFlag(Enum):
     # - Performance guards and error handling
     USE_RICH_FORMATTING = "use_rich_formatting"
 
+    # Phase 14 - Graph-Based Enhancements (unified graph schema, CCG, Graph RAG)
+    # These flags enable the new graph-based code intelligence features
+    USE_GRAPH_RAG = "use_graph_rag"
+    USE_CCG = "use_ccg"
+    USE_GRAPH_QUERY_TOOL = "use_graph_query_tool"
+    USE_MULTI_HOP_RETRIEVAL = "use_multi_hop_retrieval"
+    USE_GRAPH_ENHANCED_CONTEXT = "use_graph_enhanced_context"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 

@@ -1,0 +1,568 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Graph operations commands for Victor CLI."""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from pathlib import Path
+from typing import Optional
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from victor.config.settings import load_settings
+from victor.core.async_utils import run_sync
+from victor.storage.graph import create_graph_store
+
+graph_app = typer.Typer(name="graph", help="Graph-based code intelligence operations.")
+console = Console()
+
+
+async def _index_async(
+    path: str,
+    enable_ccg: bool,
+    force: bool,
+) -> bool:
+    """Index codebase into graph store asynchronously.
+
+    Args:
+        path: Path to codebase root
+        enable_ccg: Whether to build CCG
+        force: Force rebuild
+
+    Returns:
+        True if successful
+    """
+    from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+
+    root_path = Path(path).resolve()
+
+    if not root_path.is_dir():
+        console.print(f"[red]Error:[/red] Path '{path}' is not a directory")
+        return False
+
+    console.print(f"[dim]Indexing codebase at: {root_path}[/dim]")
+
+    # Create graph store
+    graph_store = create_graph_store("sqlite", None, root_path)
+    await graph_store.initialize()
+
+    # Clear existing if forced
+    if force:
+        await graph_store.delete_by_repo()
+        console.print("[dim]Cleared existing graph data[/dim]")
+
+    # Configure indexing
+    config = GraphIndexConfig(
+        root_path=root_path,
+        enable_ccg=enable_ccg,
+        enable_embeddings=False,  # TODO: Add embedding support
+    )
+
+    # Build index
+    pipeline = GraphIndexingPipeline(graph_store, config)
+    stats = await pipeline.index_repository()
+
+    # Print results
+    console.print("\n[green]✓ Indexing complete[/green]")
+    console.print(f"  Files processed: {stats.files_processed}")
+    console.print(f"  Nodes created: {stats.nodes_created}")
+    console.print(f"  Edges created: {stats.edges_created}")
+    if stats.ccg_nodes_created > 0:
+        console.print(f"  CCG nodes: {stats.ccg_nodes_created}")
+        console.print(f"  CCG edges: {stats.ccg_edges_created}")
+    if stats.error_count > 0:
+        console.print(f"[yellow]  Warnings: {stats.error_count}[/yellow]")
+
+    return stats.error_count == 0
+
+
+async def _query_async(
+    query: str,
+    path: str,
+    mode: str,
+    max_hops: int,
+    max_results: int,
+) -> bool:
+    """Query code graph using natural language.
+
+    Args:
+        query: Natural language query
+        path: Path to search within
+        mode: Query mode
+        max_hops: Maximum hops
+        max_results: Maximum results
+
+    Returns:
+        True if successful
+    """
+    from victor.core.graph_rag import MultiHopRetriever, RetrievalConfig
+
+    root_path = Path(path).resolve()
+
+    # Create graph store
+    graph_store = create_graph_store("sqlite", None, root_path)
+    await graph_store.initialize()
+
+    # Check if graph exists
+    stats = await graph_store.stats()
+    if stats.get("nodes", 0) == 0:
+        console.print(f"[red]Error:[/red] No graph data found at {path}")
+        console.print("[dim]Run 'victor graph index' first[/dim]")
+        return False
+
+    # Create retriever
+    config = RetrievalConfig(
+        seed_count=max_results,
+        max_hops=max_hops,
+        top_k=max_results,
+    )
+    retriever = MultiHopRetriever(graph_store, config)
+
+    # Execute query
+    result = await retriever.retrieve(query, config)
+
+    # Print results
+    console.print(f"\n[green]Query results for:[/green] '{query}'")
+    console.print(f"[dim]Found {len(result.nodes)} symbols in {result.execution_time_ms:.1f}ms[/dim]\n")
+
+    if not result.nodes:
+        console.print("[dim]No matching symbols found[/dim]")
+        return True
+
+    # Create results table
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Symbol", style="cyan")
+    table.add_column("Type", style="green")
+    table.add_column("File", style="blue")
+    table.add_column("Line", style="yellow")
+    table.add_column("Score", style="magenta")
+
+    for node in result.nodes[:20]:
+        line_str = str(node.line) if node.line else "-"
+        score_str = f"{result.scores.get(node.node_id, 0):.2f}"
+        table.add_row(
+            node.name,
+            node.type,
+            node.file,
+            line_str,
+            score_str,
+        )
+
+    console.print(table)
+
+    if len(result.nodes) > 20:
+        console.print(f"[dim]... and {len(result.nodes) - 20} more[/dim]")
+
+    return True
+
+
+async def _impact_async(
+    target: str,
+    analysis_type: str,
+    max_depth: int,
+    path: str,
+) -> bool:
+    """Analyze impact of code changes.
+
+    Args:
+        target: Target symbol or file:line
+        analysis_type: forward or backward
+        max_depth: Maximum depth
+        path: Path to codebase
+
+    Returns:
+        True if successful
+    """
+    from victor.storage.graph.edge_types import EdgeType
+
+    root_path = Path(path).resolve()
+
+    # Create graph store
+    graph_store = create_graph_store("sqlite", None, root_path)
+    await graph_store.initialize()
+
+    # Resolve target
+    target_node_id = await _resolve_target(target, graph_store)
+    if target_node_id is None:
+        console.print(f"[red]Error:[/red] Could not resolve target: {target}")
+        return False
+
+    # Traverse for impact
+    direction = "out" if analysis_type == "forward" else "in"
+    edges = await graph_store.get_neighbors(
+        target_node_id,
+        direction=direction,
+        max_depth=max_depth,
+    )
+
+    # Collect impacted nodes
+    impacted_ids: set[str] = set()
+    for edge in edges:
+        if direction == "out":
+            impacted_ids.add(edge.dst)
+        else:
+            impacted_ids.add(edge.src)
+
+    # Get node details
+    impacted_nodes = []
+    for node_id in list(impacted_ids)[:50]:
+        node = await graph_store.get_node_by_id(node_id)
+        if node:
+            impacted_nodes.append(node)
+
+    # Print results
+    direction_str = "downstream" if analysis_type == "forward" else "upstream"
+    console.print(f"\n[green]Impact Analysis:[/green] {target}")
+    console.print(f"[dim]Analysis type: {direction_str} (max depth: {max_depth})[/dim]")
+    console.print(f"[dim]Found {len(impacted_nodes)} impacted symbols\n")
+
+    if not impacted_nodes:
+        console.print("[dim]No impacted symbols found[/dim]")
+        return True
+
+    # Create results table
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Symbol", style="cyan")
+    table.add_column("Type", style="green")
+    table.add_column("File", style="blue")
+    table.add_column("Line", style="yellow")
+
+    for node in impacted_nodes[:20]:
+        line_str = str(node.line) if node.line else "-"
+        table.add_row(node.name, node.type, node.file, line_str)
+
+    console.print(table)
+
+    if len(impacted_nodes) > 20:
+        console.print(f"[dim]... and {len(impacted_nodes) - 20} more[/dim]")
+
+    return True
+
+
+async def _resolve_target(target: str, graph_store) -> Optional[str]:
+    """Resolve a target string to a node ID."""
+    from victor.storage.graph.edge_types import EdgeType
+
+    # Check if file:line format
+    if ":" in target:
+        file_path, line_str = target.rsplit(":", 1)
+        try:
+            line = int(line_str)
+            nodes = await graph_store.get_nodes_by_file(file_path)
+            for node in nodes:
+                if node.line and node.line <= line <= (node.end_line or line):
+                    return node.node_id
+        except ValueError:
+            pass
+
+    # Search by name
+    nodes = await graph_store.find_nodes(name=target)
+    if nodes:
+        return nodes[0].node_id
+
+    return None
+
+
+async def _stats_async(path: str) -> bool:
+    """Show graph statistics.
+
+    Args:
+        path: Path to codebase
+
+    Returns:
+        True if successful
+    """
+    root_path = Path(path).resolve()
+
+    # Create graph store
+    graph_store = create_graph_store("sqlite", None, root_path)
+    await graph_store.initialize()
+
+    # Get stats
+    stats = await graph_store.stats()
+
+    # Print stats
+    console.print(f"\n[green]Graph Statistics:[/green] {path}\n")
+
+    table = Table(show_header=False)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Nodes", str(stats.get("nodes", 0)))
+    table.add_row("Edges", str(stats.get("edges", 0)))
+    table.add_row("Indexed files", str(stats.get("indexed_files", 0)))
+
+    console.print(table)
+
+    return True
+
+
+async def _export_async(
+    path: str,
+    output: str,
+    format: str,
+) -> bool:
+    """Export graph to file.
+
+    Args:
+        path: Path to codebase
+        output: Output file path
+        format: Export format (dot, json)
+
+    Returns:
+        True if successful
+    """
+    root_path = Path(path).resolve()
+    output_path = Path(output)
+
+    # Create graph store
+    graph_store = create_graph_store("sqlite", None, root_path)
+    await graph_store.initialize()
+
+    # Get all nodes and edges
+    nodes = await graph_store.get_all_nodes()
+    edges = await graph_store.get_all_edges()
+
+    if format == "json":
+        # Export as JSON
+        data = {
+            "nodes": [
+                {
+                    "id": n.node_id,
+                    "type": n.type,
+                    "name": n.name,
+                    "file": n.file,
+                    "line": n.line,
+                    "end_line": n.end_line,
+                    "lang": n.lang,
+                    "signature": n.signature,
+                    "docstring": n.docstring,
+                }
+                for n in nodes
+            ],
+            "edges": [
+                {
+                    "source": e.src,
+                    "target": e.dst,
+                    "type": e.type,
+                    "weight": e.weight,
+                }
+                for e in edges
+            ],
+        }
+
+        with output_path.open("w") as f:
+            json.dump(data, f, indent=2)
+
+        console.print(f"[green]✓ Exported {len(nodes)} nodes and {len(edges)} edges to {output}[/green]")
+
+    elif format == "dot":
+        # Export as DOT (GraphViz)
+        with output_path.open("w") as f:
+            f.write("digraph code_graph {\n")
+            f.write("  rankdir=LR;\n\n")
+
+            # Nodes
+            for node in nodes:
+                label = f"{node.name}\\n{node.type}"
+                f.write(f'  "{node.node_id}" [label="{label}"];\n')
+
+            f.write("\n")
+
+            # Edges
+            for edge in edges:
+                f.write(f'  "{edge.src}" -> "{edge.dst}" [label="{edge.type}"];\n')
+
+            f.write("}\n")
+
+        console.print(f"[green]✓ Exported {len(nodes)} nodes and {len(edges)} edges to {output}[/green]")
+        console.print("[dim]Render with: dot -Tpng graph.dot -o graph.png[/dim]")
+
+    else:
+        console.print(f"[red]Error:[/red] Unsupported format: {format}")
+        return False
+
+    return True
+
+
+# ============================================================================
+# CLI Commands
+# ============================================================================
+
+@graph_app.command("index")
+def graph_index(
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
+    enable_ccg: bool = typer.Option(True, "--ccg/--no-ccg", help="Build Code Context Graph"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force rebuild"),
+):
+    """Index codebase into graph store."""
+    cwd = os.path.abspath(path)
+
+    start_time = time.time()
+    success = run_sync(_index_async(cwd, enable_ccg, force))
+    elapsed = time.time() - start_time
+
+    if success:
+        console.print(f"[green]✓ Complete in {elapsed:.1f}s[/green]")
+    else:
+        raise typer.Exit(1)
+
+
+@graph_app.command("query")
+def graph_query(
+    query: str = typer.Argument(..., help="Natural language query"),
+    path: str = typer.Option(".", "--path", "-p", help="Path to search within"),
+    mode: str = typer.Option("semantic", "--mode", "-m", help="Query mode"),
+    max_hops: int = typer.Option(2, "--hops", "-H", help="Maximum hops", min=1, max=3),
+    max_results: int = typer.Option(10, "--results", "-r", help="Maximum results", min=1, max=50),
+):
+    """Query code graph using natural language."""
+    cwd = os.path.abspath(path)
+
+    success = run_sync(_query_async(query, cwd, mode, max_hops, max_results))
+
+    if not success:
+        raise typer.Exit(1)
+
+
+@graph_app.command("impact")
+def graph_impact(
+    target: str = typer.Argument(..., help="Target symbol or file:line"),
+    analysis_type: str = typer.Option("forward", "--type", "-t", help="Analysis type"),
+    max_depth: int = typer.Option(3, "--depth", "-d", help="Maximum depth", min=1, max=5),
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase"),
+):
+    """Analyze impact of code changes using CCG."""
+    cwd = os.path.abspath(path)
+
+    success = run_sync(_impact_async(target, analysis_type, max_depth, cwd))
+
+    if not success:
+        raise typer.Exit(1)
+
+
+@graph_app.command("stats")
+def graph_stats(
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase"),
+):
+    """Show graph statistics."""
+    cwd = os.path.abspath(path)
+
+    success = run_sync(_stats_async(cwd))
+
+    if not success:
+        raise typer.Exit(1)
+
+
+@graph_app.command("export")
+def graph_export(
+    output: str = typer.Option("graph.json", "--output", "-o", help="Output file"),
+    format: str = typer.Option("json", "--format", "-f", help="Export format"),
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase"),
+):
+    """Export graph to file (DOT or JSON)."""
+    cwd = os.path.abspath(path)
+
+    success = run_sync(_export_async(cwd, output, format))
+
+    if not success:
+        raise typer.Exit(1)
+
+
+async def _init_context_async(
+    path: str,
+    task: Optional[str],
+    max_symbols: int,
+    force: bool,
+) -> bool:
+    """Generate graph-enhanced init.md.
+
+    Args:
+        path: Path to codebase root
+        task: Optional task description for context relevance
+        max_symbols: Maximum symbols to include
+        force: Force overwrite existing file
+
+    Returns:
+        True if successful
+    """
+    from victor.context.project_context import init_victor_md_with_graph
+
+    root_path = Path(path).resolve()
+
+    if not root_path.is_dir():
+        console.print(f"[red]Error:[/red] Path '{path}' is not a directory")
+        return False
+
+    console.print(f"[dim]Generating graph-enhanced init.md for: {root_path}[/dim]")
+
+    # Check if graph exists
+    from victor.storage.graph import create_graph_store
+
+    graph_store = create_graph_store("sqlite", None, root_path)
+    await graph_store.initialize()
+
+    stats = await graph_store.stats()
+    node_count = stats.get("node_count", stats.get("nodes", 0))
+
+    if node_count == 0:
+        console.print(f"[yellow]Warning:[/yellow] No graph data found")
+        console.print("[dim]Run 'victor graph index' first to build the graph[/dim]")
+        console.print("[dim]Proceeding with standard init.md generation...[/dim]")
+
+    await graph_store.close()
+
+    # Generate init.md with graph context
+    result_path = await init_victor_md_with_graph(
+        root_path=root_path,
+        force=force,
+        task=task,
+        max_symbols=max_symbols,
+    )
+
+    if result_path:
+        console.print(f"[green]✓ Created {result_path}[/green]")
+        if node_count > 0:
+            console.print(f"[dim]  Included graph context from {node_count} nodes[/dim]")
+        return True
+    else:
+        console.print("[yellow]init.md already exists[/yellow]")
+        console.print("[dim]Use --force to overwrite[/dim]")
+        return False
+
+
+@graph_app.command("init-context")
+def graph_init_context(
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
+    task: Optional[str] = typer.Option(None, "--task", "-t", help="Task description for relevance"),
+    max_symbols: int = typer.Option(50, "--symbols", "-s", help="Max symbols to include", min=10, max=200),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing file"),
+):
+    """Generate graph-enhanced init.md with symbol context."""
+    cwd = os.path.abspath(path)
+
+    start_time = time.time()
+    success = run_sync(_init_context_async(cwd, task, max_symbols, force))
+    elapsed = time.time() - start_time
+
+    if success:
+        console.print(f"[green]✓ Complete in {elapsed:.1f}s[/green]")
+    else:
+        raise typer.Exit(1)

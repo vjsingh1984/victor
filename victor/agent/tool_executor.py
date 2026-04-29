@@ -508,7 +508,9 @@ class ToolExecutor:
             - should_proceed: True if execution should continue
             - validation_result: ToolValidationResult or None if validation was skipped
         """
-        if self.validation_mode == ValidationMode.OFF:
+        effective_mode = self._get_effective_validation_mode(tool)
+
+        if effective_mode == ValidationMode.OFF:
             return True, None
 
         # First check for unknown/hallucinated arguments (provides clearer errors)
@@ -522,7 +524,7 @@ class ToolExecutor:
                 f"Valid parameters for '{tool.name}': {', '.join(sorted(valid_params)) or 'none'}"
             )
             self._validation_failures += 1
-            if self.validation_mode == ValidationMode.STRICT:
+            if effective_mode == ValidationMode.STRICT:
                 logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
                 return False, ToolValidationResult.failure([error_msg])
             else:
@@ -544,7 +546,7 @@ class ToolExecutor:
                 if len(validation.errors) > 3:
                     error_summary += f" (+{len(validation.errors) - 3} more)"
 
-                if self.validation_mode == ValidationMode.STRICT:
+                if effective_mode == ValidationMode.STRICT:
                     logger.error(
                         "STRICT validation failed for '%s': %s",
                         tool.name,
@@ -565,9 +567,18 @@ class ToolExecutor:
             # Catch any exception during validation (RuntimeError, ValueError, etc)
             logger.warning("Validation error for '%s': %s", tool.name, str(e))
             # On validation system error, proceed in lenient mode, block in strict
-            if self.validation_mode == ValidationMode.STRICT:
+            if effective_mode == ValidationMode.STRICT:
                 return False, ToolValidationResult.failure([f"Validation system error: {e}"])
             return True, None
+
+    def _get_effective_validation_mode(self, tool: BaseTool) -> ValidationMode:
+        """Elevate validation for stateful tools even when global mode is lenient."""
+        if self.validation_mode != ValidationMode.LENIENT:
+            return self.validation_mode
+        access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
+        if access_mode in {AccessMode.WRITE, AccessMode.EXECUTE, AccessMode.MIXED}:
+            return ValidationMode.STRICT
+        return self.validation_mode
 
     def _complete_tool_call(
         self,
@@ -778,7 +789,7 @@ class ToolExecutor:
 
         # In LENIENT mode, coerce argument types to match schema to prevent
         # runtime TypeErrors (e.g., string "5" when int expected)
-        if self.validation_mode == ValidationMode.LENIENT:
+        if self._get_effective_validation_mode(tool) == ValidationMode.LENIENT:
             self._coerce_arg_types(tool, normalized_args)
 
         # Safety check for dangerous operations

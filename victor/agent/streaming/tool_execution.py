@@ -85,6 +85,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+TERMINAL_SKIP_OUTCOME_KINDS = frozenset(
+    {
+        "budget_exhausted",
+        "repeated_failure",
+        "permission_denied",
+    }
+)
+
 
 # =============================================================================
 # Result Types
@@ -381,6 +389,18 @@ class ToolExecutionHandler:
             for chunk in self._chunk_generator.generate_tool_result_chunks(tool_result):
                 result.add_chunk(chunk)
 
+        if self._should_force_completion_after_terminal_skips(tool_results):
+            stream_ctx.force_completion = True
+            self._message_adder.add_message(
+                "user",
+                (
+                    "[SYSTEM: Tool execution is no longer making progress. "
+                    "Do not request more blocked tools; summarize the current findings or explain "
+                    "the blocker directly.]"
+                ),
+                metadata=build_internal_history_metadata("force_completion"),
+            )
+
         # NOTE: We no longer add a "Thinking..." status chunk here because:
         # 1. The main pipeline iteration logic already handles status updates.
         # 2. Providers like z.ai/Anthropic yield their own reasoning/thinking content.
@@ -401,6 +421,20 @@ class ToolExecutionHandler:
                 f"[SYSTEM-REMINDER: {reminder}]",
                 metadata=build_internal_history_metadata("system_reminder"),
             )
+
+    @staticmethod
+    def _should_force_completion_after_terminal_skips(tool_results: List[Dict[str, Any]]) -> bool:
+        """Force completion when every tool call ended in a terminal skip state."""
+        if not tool_results:
+            return False
+        terminal_skips = [
+            result
+            for result in tool_results
+            if result.get("skipped")
+            and not result.get("success")
+            and result.get("outcome_kind") in TERMINAL_SKIP_OUTCOME_KINDS
+        ]
+        return len(terminal_skips) == len(tool_results)
 
 
 # =============================================================================

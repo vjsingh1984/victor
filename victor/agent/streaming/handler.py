@@ -432,6 +432,14 @@ class StreamingChatHandler:
             StreamChunk with block notification
         """
         ctx.record_tool_blocked()
+
+        # Log detailed information about the blocked tool
+        args_summary = ", ".join(f"{k}={repr(v)[:30]}" for k, v in tool_args.items() if k not in {"offset", "limit"})
+        logger.info(
+            f"[dedup-block-exec] BLOCKED tool execution: {tool_name}({args_summary}) | "
+            f"reason: {block_reason}"
+        )
+
         logger.debug(f"BLOCKED tool call: {tool_name}({tool_args}) - {block_reason}")
 
         # Add tool result feedback

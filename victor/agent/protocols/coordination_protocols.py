@@ -66,13 +66,17 @@ class ToolPlannerProtocol(Protocol):
         ...
 
     def filter_tools_by_intent(
-        self, tools: List[Any], current_intent: Optional[Any] = None
+        self,
+        tools: List[Any],
+        current_intent: Optional[Any] = None,
+        user_message: Optional[str] = None,
     ) -> List[Any]:
         """Filter tools based on detected user intent.
 
         Args:
             tools: List of tool definitions
             current_intent: The detected user intent (if None, no filtering)
+            user_message: Current user message for explicit tool-request disambiguation
 
         Returns:
             Filtered list of tools

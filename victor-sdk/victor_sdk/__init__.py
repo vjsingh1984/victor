@@ -169,6 +169,7 @@ from victor_sdk.verticals import (
     load_tool_dependency_yaml,
     register_vertical,
 )
+from victor_sdk.verticals.protocols.storage import CCGBuilderProtocol
 from victor_sdk.verticals.mode_config import ModeDefinition
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols.capabilities import (
@@ -354,6 +355,7 @@ __all__ = [
     # Base class
     "VerticalBase",
     "register_vertical",
+    "CCGBuilderProtocol",
     "ExtensionDependency",
     # Capability protocols
     "CapabilityProvider",

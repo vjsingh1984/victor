@@ -52,7 +52,7 @@ from victor.core.loop_thresholds import (
     derive_blocked_total_threshold,
 )
 from victor.tools.tool_names import ToolNames, get_canonical_name
-from victor.tools.metadata_registry import get_progress_params
+from victor.tools.metadata_registry import get_signature_params
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
@@ -1097,6 +1097,18 @@ class UnifiedTaskTracker(ModeAwareMixin):
                     # Add to permanent block list IMMEDIATELY when warning is given
                     # This ensures it stays blocked even if model tries other operations
                     self._progress.permanently_blocked.add(sig)
+
+                    # Parse signature for logging
+                    sig_parts = sig.split("|")
+                    tool_name = sig_parts[0] if sig_parts else sig
+
+                    logger.info(
+                        f"[dedup-warning] Tool call approaching loop threshold: {tool_name} | "
+                        f"signature={sig[:80]}... | "
+                        f"count={count}/{threshold} | "
+                        f"Adding to permanent block list"
+                    )
+
                     return f"Approaching loop ({count}/{threshold}): {sig[:80]}"
 
         return None
@@ -1116,6 +1128,13 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Check if this signature is permanently blocked
         if proposed_sig in self._progress.permanently_blocked:
+            # Log detailed information about the blocked tool call
+            args_summary = ", ".join(f"{k}={repr(v)[:30]}" for k, v in arguments.items() if k not in {"offset", "limit"})
+            logger.info(
+                f"[dedup-block] Tool call BLOCKED: {tool_name}({args_summary}) | "
+                f"signature={proposed_sig[:60]}... | "
+                f"permanently_blocked after loop warning"
+            )
             return f"Blocked: same operation after warning ({proposed_sig[:50]})"
 
         return None
@@ -1444,15 +1463,20 @@ class UnifiedTaskTracker(ModeAwareMixin):
     ) -> str:
         """Generate context-aware signature for loop detection.
 
-        For progressive tools (with progress_params defined via @tool decorator),
-        only the specified parameters are used in the signature - this allows
-        different queries/paths to be treated as exploration, not loops.
+        Tools declare signature_params via @tool decorator to explicitly control
+        which parameters are included in loop detection signatures. Only params in
+        signature_params affect the signature - pagination parameters (offset, limit, k)
+        are excluded to allow reading results in chunks.
+
+        Examples:
+            read(path="file.py", offset=0)   → signature="read|file.py|stage:initial"
+            read(path="file.py", offset=500) → signature="read|file.py|stage:initial" (SAME!)
+            This enables pagination - different chunks of same file = exploration, not loop.
 
         Context-Awareness:
         - Includes conversation stage to prevent false loop detection when the same
           operation is performed in different stages (e.g., reading a file in
-          EXPLORING stage vs IMPLEMENTING stage)
-        - Excludes volatile parameters like offset/limit for progressive reads
+          READING stage vs EXECUTING stage)
 
         Args:
             tool_name: Name of the tool being called
@@ -1462,30 +1486,12 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Context-aware signature string for loop detection
         """
-        # Volatile fields that shouldn't count towards loop detection
-        # Reading the same file with different offsets is NOT a loop
-        volatile_fields = {
-            "offset",
-            "limit",
-            "line_start",
-            "line_end",
-            "start_line",
-            "end_line",
-            "page",
-            "page_size",
-            "count",
-            "max_results",
-            "timeout",
-        }
-
         canonical_tool_name = get_canonical_name(tool_name)
-        params = list(get_progress_params(canonical_tool_name))
+        params = list(get_signature_params(canonical_tool_name))
         if params:
+            # Use only declared signature_params - explicit positive allowlist
             sig_parts = [canonical_tool_name]
             for param in params:
-                # Skip volatile fields for progressive tools
-                if param in volatile_fields:
-                    continue
                 value = arguments.get(param, "")
                 if isinstance(value, str) and len(value) > 100:
                     value = value[:100]
@@ -1497,9 +1503,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
             return "|".join(sig_parts)
         else:
-            # Filter out volatile fields for non-progressive tools too
-            stable_args = {k: v for k, v in arguments.items() if k not in volatile_fields}
-            args_str = str(sorted(stable_args.items()))
+            # For tools without signature_params, use all arguments
+            args_str = str(sorted(arguments.items()))
             base_sig = f"{canonical_tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
 
             # Add stage for context-awareness

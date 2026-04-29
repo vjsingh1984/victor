@@ -47,8 +47,14 @@ from victor.agent.protocols import (
     ToolAccessContext,
     ToolAccessDecision,
 )
+from victor.agent.action_authorizer import (
+    get_write_tools_for_policy,
+    is_tool_blocked_for_intent,
+    should_allow_shell_for_read_only_intent,
+)
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.tool_names import ToolNames
 
 if TYPE_CHECKING:
     from victor.agent.conversation.state_machine import ConversationStage
@@ -59,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 def _core_tool_name(tool_name: str) -> str:
     """Canonicalize only the compact file/shell tool aliases."""
-    return canonicalize_core_tool_name(tool_name)
+    return canonicalize_core_tool_name(tool_name, preserve_variants=True)
 
 
 def _tool_matches(tool_name: str, names: Set[str]) -> bool:
@@ -401,7 +407,6 @@ class StageLayer(AccessLayer, ModeAwareMixin):
             "ls",
             "search",
             "code_search",
-            "shell",
         }
     )
 
@@ -444,8 +449,14 @@ class StageLayer(AccessLayer, ModeAwareMixin):
         if _tool_matches(tool_name, self.CORE_TOOLS | self._preserved_tools):
             return True, f"Tool '{tool_name}' is core/preserved"
 
+        if _core_tool_name(tool_name) == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
+            getattr(context, "intent", None),
+            getattr(context, "user_message", None),
+        ):
+            return True, "Explicit readonly shell request allowed during exploration"
+
         # Filter write tools during exploration
-        if _tool_matches(tool_name, self.WRITE_TOOLS):
+        if _tool_matches(tool_name, self.WRITE_TOOLS | get_write_tools_for_policy()):
             return False, f"Write tool '{tool_name}' filtered during {stage_name} stage"
 
         return True, f"Tool allowed during {stage_name} stage"
@@ -496,7 +507,11 @@ class IntentLayer(AccessLayer):
 
         # Check if read-only intent
         if intent_name in self.READ_ONLY_INTENTS:
-            if _tool_matches(tool_name, self.WRITE_TOOLS):
+            if is_tool_blocked_for_intent(
+                tool_name,
+                context.intent,
+                getattr(context, "user_message", None),
+            ):
                 return (
                     False,
                     f"Write tool '{tool_name}' blocked for {intent_name} intent",

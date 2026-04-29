@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, List, Optional, Set, Tuple
 
+from victor.agent.safety import get_write_tool_names
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 from victor.tools.tool_names import ToolNames
 
@@ -54,7 +55,12 @@ SHELL_TOOL_ALIASES = frozenset({ToolNames.SHELL, "execute_bash", "bash"})
 
 def _canonicalize_tool_set(tools: Set[str]) -> Set[str]:
     """Canonicalize only the compact file/shell tool aliases."""
-    return {canonicalize_core_tool_name(tool) for tool in tools}
+    return {canonicalize_core_tool_name(tool, preserve_variants=True) for tool in tools}
+
+
+def _canonicalize_tool_name(tool_name: str) -> str:
+    """Canonicalize tool names while preserving safe runtime variants."""
+    return canonicalize_core_tool_name(tool_name, preserve_variants=True)
 
 
 class ActionIntent(Enum):
@@ -86,6 +92,7 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         # Direct file modifications
         ToolNames.WRITE,
         ToolNames.EDIT,
+        "notebook_edit",
         # Patch/diff application
         "apply_patch",  # patch_tool.py
         # Bash execution (can modify files)
@@ -133,6 +140,19 @@ GENERATION_TOOLS: frozenset[str] = frozenset(
     }
 )
 
+# Signals that indicate the user explicitly wants readonly shell/SQLite inspection.
+READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
+    (r"\b(sqlite|sqlite3)\b", "sqlite"),
+    (
+        r"\b(use|run|query|inspect|review|check|look\s+at)\b.*\b(shell|bash|terminal|sqlite3?)\b",
+        "explicit_shell_request",
+    ),
+    (
+        r"\b(shell|bash|terminal)\b.*\b(read|review|inspect|query|check|look\s+at)\b",
+        "explicit_shell_request_reverse",
+    ),
+]
+
 # Mapping of intent to blocked tool sets
 INTENT_BLOCKED_TOOLS: dict[ActionIntent, frozenset[str]] = {
     ActionIntent.DISPLAY_ONLY: WRITE_TOOLS,
@@ -159,6 +179,87 @@ class IntentClassification:
     matched_signals: List[str]
     safe_actions: Set[str]
     prompt_guard: str
+
+
+READ_ONLY_INTENTS: frozenset[ActionIntent] = frozenset(
+    {ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY}
+)
+
+
+def _coerce_action_intent(intent: Optional[object]) -> Optional[ActionIntent]:
+    """Normalize enums, strings, or mock-like objects into ActionIntent."""
+    if isinstance(intent, ActionIntent):
+        return intent
+    if isinstance(intent, str):
+        try:
+            return ActionIntent(intent.lower())
+        except ValueError:
+            try:
+                return ActionIntent[intent.upper()]
+            except KeyError:
+                return None
+    intent_name = getattr(intent, "name", None)
+    if isinstance(intent_name, str):
+        try:
+            return ActionIntent[intent_name.upper()]
+        except KeyError:
+            return None
+    return None
+
+
+def get_write_tools_for_policy() -> frozenset[str]:
+    """Return the canonical write/execute tool set used by intent policy."""
+    dynamic_tools = _canonicalize_tool_set(set(get_write_tool_names()))
+    static_tools = _canonicalize_tool_set(set(WRITE_TOOLS))
+    return frozenset(dynamic_tools | static_tools)
+
+
+def get_intent_blocked_tools(intent: ActionIntent) -> frozenset[str]:
+    """Return blocked tools for an intent using shared, registry-aware policy."""
+    intent = _coerce_action_intent(intent)
+    if intent is None:
+        return frozenset()
+    if intent == ActionIntent.DISPLAY_ONLY:
+        return get_write_tools_for_policy()
+    if intent == ActionIntent.READ_ONLY:
+        return frozenset(set(get_write_tools_for_policy()) | set(GENERATION_TOOLS))
+    return frozenset()
+
+
+def has_explicit_readonly_shell_request(message: Optional[str]) -> bool:
+    """Return True when the user explicitly requests readonly shell/SQLite access."""
+    if not message:
+        return False
+    lowered = message.lower()
+    return any(re.search(pattern, lowered, re.IGNORECASE) for pattern, _ in READONLY_SHELL_SIGNALS)
+
+
+def should_allow_shell_for_read_only_intent(
+    intent: Optional[ActionIntent],
+    message: Optional[str],
+) -> bool:
+    """Allow the single shell tool on read-only turns when the user explicitly asks for it."""
+    intent = _coerce_action_intent(intent)
+    if intent not in READ_ONLY_INTENTS:
+        return False
+    return has_explicit_readonly_shell_request(message)
+
+
+def is_tool_blocked_for_intent(
+    tool_name: str,
+    intent: Optional[ActionIntent],
+    user_message: Optional[str] = None,
+) -> bool:
+    """Check whether a tool is blocked for a given intent under shared policy."""
+    intent = _coerce_action_intent(intent)
+    if intent is None:
+        return False
+    canonical_tool_name = _canonicalize_tool_name(tool_name)
+    if canonical_tool_name == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
+        intent, user_message
+    ):
+        return False
+    return canonical_tool_name in get_intent_blocked_tools(intent)
 
 
 # Signals that indicate "display only" intent

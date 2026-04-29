@@ -66,7 +66,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                 return
 
             if show_status:
-                self._show_status(ctx, learner)
+                self._show_status(ctx, learner, coordinator.db_path)
                 return
 
             # Determine which sections to evolve
@@ -106,15 +106,17 @@ class PromptOptimizeCommand(BaseSlashCommand):
             # Run evolution
             results = Table(title="GEPA Prompt Evolution Results")
             results.add_column("Section", style="cyan")
-            results.add_column("Gen", style="green")
+            results.add_column("Provider", style="magenta")
+            results.add_column("Ordinal", style="green")
             results.add_column("Status", style="bold")
             results.add_column("Change", style="dim")
+            results.add_column("Lineage", style="dim")
 
             for section in sections:
                 current = section_text.get(section)
                 if current is None:
                     # Section not registered in section_text at all
-                    results.add_row(section, "-", "[yellow]Not available[/]", "-")
+                    results.add_row(section, "-", "-", "[yellow]Not available[/]", "-", "-")
                     continue
 
                 candidate = learner.evolve(section, current)
@@ -124,20 +126,32 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     change = f"+{added} chars" if added > 0 else f"{added} chars"
                     results.add_row(
                         section,
+                        candidate.provider,
                         str(candidate.generation),
                         "[green]Evolved[/]",
                         change,
+                        f"{candidate.parent_hash[:8]} -> {candidate.text_hash[:8]}",
                     )
                 else:
-                    results.add_row(section, "-", "[dim]No change[/]", "-")
+                    results.add_row(section, "-", "-", "[dim]No change[/]", "-", "-")
 
             ctx.console.print(results)
+            ctx.console.print(
+                Panel(
+                    f"Persisted in: [bold]{coordinator.db_path}[/]\n"
+                    "Ordinal is candidate creation order per (section, provider). Shared parent "
+                    "hashes indicate sibling candidates from the same baseline, not a strict "
+                    "linear prompt chain.",
+                    title="Prompt Evolution Notes",
+                    border_style="blue",
+                )
+            )
 
         except Exception as e:
             ctx.console.print(f"[red]Prompt optimization failed:[/] {e}")
             logger.exception("Prompt optimization error")
 
-    def _show_status(self, ctx: CommandContext, learner) -> None:
+    def _show_status(self, ctx: CommandContext, learner, db_path) -> None:
         """Display current prompt candidates and their scores."""
         metrics = learner.export_metrics()
 
@@ -146,7 +160,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
                 Panel(
                     "No evolved prompt candidates yet.\n\n"
                     "Run [bold]/prompt-optimize[/] to start evolution cycle.\n"
-                    "Requires execution trace data in ~/.victor/logs/usage.jsonl",
+                    "Requires execution trace data in ~/.victor/logs/usage.jsonl\n"
+                    f"Stored in: {db_path}",
                     title="Prompt Optimizer Status",
                     border_style="blue",
                 )
@@ -155,22 +170,33 @@ class PromptOptimizeCommand(BaseSlashCommand):
 
         table = Table(title="Prompt Candidates")
         table.add_column("Section", style="cyan")
-        table.add_column("Gen", style="green")
+        table.add_column("Provider", style="magenta")
+        table.add_column("Ordinal", style="green")
+        table.add_column("Parent", style="dim")
+        table.add_column("Hash", style="dim")
+        table.add_column("Live", style="bold")
+        table.add_column("Bench", style="bold")
         table.add_column("α/β", style="dim")
         table.add_column("Mean", style="bold")
         table.add_column("Samples", style="dim")
+        table.add_column("Strategy", style="dim")
         table.add_column("Preview", style="dim", max_width=50)
 
-        for section, candidates in learner._candidates.items():
-            for c in sorted(candidates, key=lambda x: -x.generation):
-                table.add_row(
-                    section,
-                    str(c.generation),
-                    f"{c.alpha:.1f}/{c.beta_val:.1f}",
-                    f"{c.mean:.2f}",
-                    str(c.sample_count),
-                    c.text[:50] + "..." if len(c.text) > 50 else c.text,
-                )
+        for row in learner.export_candidate_rows():
+            table.add_row(
+                row["section"],
+                row["provider"],
+                str(row["ordinal"]),
+                row["parent_hash"][:8],
+                row["text_hash"][:8],
+                "yes" if row["active"] else "no",
+                "yes" if row["benchmark_passed"] else "no",
+                f"{row['alpha']:.1f}/{row['beta']:.1f}",
+                f"{row['mean']:.2f}",
+                str(row["sample_count"]),
+                row["strategy"],
+                row["preview"],
+            )
 
         ctx.console.print(table)
 
@@ -197,6 +223,15 @@ class PromptOptimizeCommand(BaseSlashCommand):
 
         ctx.console.print(
             f"\n[dim]Total: {metrics['total_candidates']} candidates "
-            f"across {len(metrics['sections'])} sections"
+            f"across {len(metrics['sections'])} section/provider keys"
             f"{' (Pareto v2)' if metrics.get('use_pareto') else ''}[/]"
+        )
+        ctx.console.print(f"[dim]Database: {db_path}[/]")
+        ctx.console.print(
+            Panel(
+                "Ordinals are creation order, not guaranteed linear ancestry. "
+                "Compare parent/hash pairs to see sibling candidates evolved from the same baseline.",
+                title="Lineage Semantics",
+                border_style="blue",
+            )
         )

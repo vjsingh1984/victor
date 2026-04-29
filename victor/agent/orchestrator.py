@@ -138,7 +138,7 @@ from victor.agent.protocols import (
 
 # Mixins (used at class definition time)
 from victor.protocols.mode_aware import ModeAwareMixin
-from victor.agent.capability_registry import CapabilityRegistryMixin
+from victor.agent.capability_registry import OrchestratorCapabilityMixin
 
 # Config and enums (used at runtime)
 from victor.config.config_loaders import get_provider_limits
@@ -437,13 +437,13 @@ def _detect_mentioned_tools(text: str) -> List[str]:
     return mentioned
 
 
-class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
+class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     """Orchestrates agent interactions, tool execution, and provider communication.
 
     Uses ModeAwareMixin for consistent mode controller access (via self.is_build_mode,
     self.mode_controller, self.exploration_multiplier, etc.).
 
-    Uses CapabilityRegistryMixin for explicit capability discovery, replacing hasattr
+    Uses OrchestratorCapabilityMixin for explicit capability discovery, replacing hasattr
     duck-typing with type-safe protocol conformance. See capability_registry.py.
     """
 
@@ -595,12 +595,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     def _initialize_interaction_runtime(self) -> None:
         """Initialize interaction runtime boundaries with canonical services first."""
-        from victor.agent.runtime.interaction_runtime import (
-            create_chat_coordinator_shim,
-            create_session_coordinator_shim,
-            create_tool_coordinator_shim,
-            create_interaction_runtime_components,
-        )
+        from victor.agent.runtime.interaction_runtime import create_interaction_runtime_components
 
         self._interaction_runtime = create_interaction_runtime_components(
             enabled_tools=getattr(self, "_enabled_tools", None),
@@ -634,27 +629,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._session_service = self._interaction_runtime.session_service
         self._context_service = self._interaction_runtime.context_service
         self._recovery_service = self._interaction_runtime.recovery_service
-        self._deprecated_session_coordinator = create_session_coordinator_shim(
-            session_state_manager=self._session_state,
-            lifecycle_manager=self._lifecycle_manager,
-            memory_manager=self.memory_manager,
-            checkpoint_manager=self._checkpoint_manager,
-            cost_tracker=self._session_cost_tracker,
-            session_service=self._session_service,
-        )
-        self._deprecated_chat_coordinator = create_chat_coordinator_shim(
-            runtime=self.protocol_adapter,
-            get_chat_service=lambda: getattr(self, "_chat_service", None),
-        )
-        self._deprecated_tool_coordinator = create_tool_coordinator_shim(
-            enabled_tools=getattr(self, "_enabled_tools", None),
-            tool_pipeline=self._tool_pipeline,
-            tool_registry=self.tools,
-            tool_selector=(self.tool_selector if hasattr(self, "tool_selector") else None),
-            tool_access_controller=getattr(self, "_tool_access_controller", None),
-            mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
-            tool_service=getattr(self, "_tool_service", None),
-        )
 
     def _initialize_credit_runtime(self) -> None:
         """Initialize credit assignment runtime (FEP-0001 Phase 3).
@@ -3580,6 +3554,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Sync current_intent back to orchestrator
         self._current_intent = self.task_coordinator.current_intent
+        self._current_user_message = user_message
 
     def _apply_task_guidance(
         self,
@@ -3657,7 +3632,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
         current_intent = getattr(self, "_current_intent", None)
-        tools = self._tool_planner.filter_tools_by_intent(tools, current_intent)
+        tools = self._tool_planner.filter_tools_by_intent(
+            tools,
+            current_intent,
+            user_message=context_msg,
+        )
         tools = self._apply_kv_tool_strategy(tools)
         return self._sort_tools_for_kv_stability(tools)
 
@@ -4525,6 +4504,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "tool_registry": self.tools,
                 "workflow_registry": self.workflow_registry,
                 "settings": self.settings,
+                "current_intent": getattr(self, "_current_intent", None),
+                "user_message": getattr(self, "_current_user_message", None),
             }
         runtime_overrides = getattr(self, "_runtime_tool_context_overrides", None)
         if not isinstance(runtime_overrides, dict) or not runtime_overrides:

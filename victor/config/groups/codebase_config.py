@@ -51,7 +51,7 @@ class CodebaseSettings(BaseModel):
     codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
     codebase_dimension: int = 384  # Embedding dimension
     codebase_batch_size: int = 32  # Batch size for embedding generation
-    codebase_structural_indexing_enabled: bool = True
+    codebase_structural_indexing_enabled: bool = False
     codebase_chunking_strategy: str = "tree_sitter_structural"
     codebase_chunk_size: int = 500
     codebase_chunk_overlap: int = 50

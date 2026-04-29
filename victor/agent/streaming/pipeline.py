@@ -801,8 +801,11 @@ class StreamingChatPipeline:
                                     is_final=True,
                                 )
                                 return
+                        elif overlap > 0.4:  # 40-60% overlap — moderate, decrement counter slowly
+                            # Don't reset immediately; allow for gradual divergence
+                            self._repetition_count = max(0, self._repetition_count - 1)
                         else:
-                            # Content has diverged — reset counter
+                            # Content has truly diverged (<40% overlap) — reset counter
                             self._repetition_count = 0
                 else:
                     self._repetition_count = 0

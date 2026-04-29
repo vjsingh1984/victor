@@ -45,6 +45,7 @@ from victor.ui.commands.embeddings import embeddings_app
 from victor.ui.commands.examples import examples_app
 from victor.ui.commands.experiments import experiment_app
 from victor.ui.commands.fep import fep_app
+from victor.ui.commands.graph import graph_app
 from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
 
@@ -356,6 +357,7 @@ app.add_typer(tools_app, rich_help_panel="Development")
 app.add_typer(skills_app, rich_help_panel="Development")
 app.add_typer(workflow_app, rich_help_panel="Development")
 app.add_typer(index_app, rich_help_panel="Development")
+app.add_typer(graph_app, rich_help_panel="Development")
 app.add_typer(plugin_app, rich_help_panel="Development")
 app.add_typer(serve_app, rich_help_panel="Development")
 app.add_typer(mcp_app, rich_help_panel="Development")

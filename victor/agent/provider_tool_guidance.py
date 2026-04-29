@@ -219,8 +219,9 @@ For git operations (status, diff, log, branch):
 - Use git(operation="status") or git(operation="log") for git-specific operations
 
 For executing shell commands:
-- Use shell(cmd=..., readonly=True) for safe, readonly commands (ls, cat, grep, git status, etc.)
-- Use shell(cmd=..., dangerous=True) only when you need to modify files or run write operations
+- shell() defaults to readonly=True for safe inspection commands (ls, cat, grep, git status, etc.)
+- Set shell(cmd=..., readonly=False) only when you need to run a command that mutates state
+- Use dangerous=True only for genuinely destructive commands such as rm or kill
 """
 
         if task_type == "simple":

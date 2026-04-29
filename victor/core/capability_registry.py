@@ -52,17 +52,22 @@ class CapabilityStatus(Enum):
     ENHANCED = "enhanced"
 
 
-class CapabilityRegistry:
-    """Singleton registry for optional capabilities.
+class OptionalFeatureRegistry:
+    """Singleton registry for optional feature capabilities.
+
+    Manages optional capabilities (tree-sitter parsing, codebase indexing, LSP, etc.)
+    with stub/enhanced provider semantics.
 
     Capabilities are registered with a protocol type as key and a provider
     instance as value. Each registration has a status (STUB or ENHANCED).
 
     Enhanced registrations will not be downgraded to STUB. This ensures
     that once a vertical installs an enhanced provider, it stays active.
+
+    Note: Previously named CapabilityRegistry - renamed for clarity.
     """
 
-    _instance: Optional[CapabilityRegistry] = None
+    _instance: Optional["OptionalFeatureRegistry"] = None
     _providers: Dict[Type, tuple[Any, CapabilityStatus]]
 
     def __init__(self) -> None:
@@ -70,7 +75,7 @@ class CapabilityRegistry:
         self._bootstrapped = False
 
     @classmethod
-    def get_instance(cls) -> CapabilityRegistry:
+    def get_instance(cls) -> "OptionalFeatureRegistry":
         """Get the singleton registry instance."""
         if cls._instance is None:
             cls._instance = cls()
@@ -169,7 +174,7 @@ class CapabilityRegistry:
 
 
 # Module-level shortcut for convenient access
-capabilities = CapabilityRegistry.get_instance()
+capabilities = OptionalFeatureRegistry.get_instance()
 
 
 # ---------------------------------------------------------------------------
@@ -220,3 +225,11 @@ def get_method_for_capability(capability_name: str) -> str:
         Method name to call for this capability
     """
     return CAPABILITY_METHOD_MAPPINGS.get(capability_name, f"set_{capability_name}")
+
+
+# =============================================================================
+# Backward compatibility aliases
+# =============================================================================
+
+# Alias for backward compatibility - was renamed for clarity
+CapabilityRegistry = OptionalFeatureRegistry

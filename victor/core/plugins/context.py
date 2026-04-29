@@ -586,6 +586,41 @@ class HostPluginContext(PluginContext):
         self._pending_mcp_servers.append(spec)
         logger.debug("Plugin buffered MCP server spec: %s", getattr(spec, "name", spec))
 
+    def register_ccg_builder(
+        self,
+        language: str,
+        builder: Any,
+    ) -> None:
+        """Register a language-specific CCG builder with the capability registry.
+
+        This allows external packages (victor-coding) to provide enhanced
+        CCG construction for specific languages.
+
+        Args:
+            language: Language identifier (e.g., "python", "javascript")
+            builder: CCG builder instance implementing CCGBuilderProtocol
+
+        Example:
+            context.register_ccg_builder("python", PythonCCGBuilder(graph_store))
+        """
+        from victor.core.capability_registry import CapabilityRegistry, CapabilityStatus
+        from victor.framework.vertical_protocols import CCGBuilderProtocol
+
+        try:
+            registry = CapabilityRegistry.get_instance()
+            registry.register(
+                CCGBuilderProtocol,
+                builder,
+                CapabilityStatus.ENHANCED,
+                metadata={"language": language}
+            )
+            logger.debug(
+                "Plugin registered CCG builder for language: %s",
+                language,
+            )
+        except Exception as exc:
+            logger.error("Plugin failed to register CCG builder for %s: %s", language, exc)
+
 
 class _LazyCapabilityProxy:
     """Proxy that defers provider instantiation until first attribute access.

@@ -19,12 +19,12 @@ duck-typing with type-safe protocol conformance.
 
 Design Pattern: Mixin + Registry
 ================================
-- CapabilityRegistryMixin provides capability discovery methods
+- OrchestratorCapabilityMixin provides capability discovery methods
 - Capabilities are registered at initialization, not discovered at runtime
 - Invocation goes through the registry, not getattr
 
 Usage:
-    class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
+    class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         def __init__(self, ...):
             ...
             self._register_capabilities()  # At end of __init__
@@ -67,8 +67,8 @@ from victor.core.capability_registry import (  # noqa: F401
 )
 
 
-class CapabilityRegistryMixin:
-    """Mixin providing capability registry functionality.
+class OrchestratorCapabilityMixin:
+    """Mixin providing orchestrator capability registry functionality.
 
     Add this mixin to AgentOrchestrator to enable explicit capability
     discovery and invocation.
@@ -78,6 +78,8 @@ class CapabilityRegistryMixin:
     - Invoked via setter methods
     - Read via getter methods or attribute access
     - Dynamically loaded from plugins (Phase 4.4)
+
+    Note: Previously named CapabilityRegistryMixin - renamed for clarity.
     """
 
     def __init_capability_registry__(self) -> None:
@@ -823,4 +825,15 @@ class CapabilityRegistryMixin:
         return loader.apply_to(self, capability_names)
 
 
-__all__ = ["CapabilityRegistryMixin"]
+# =============================================================================
+# Backward compatibility aliases
+# =============================================================================
+
+# Alias for backward compatibility - was renamed for clarity
+CapabilityRegistryMixin = OrchestratorCapabilityMixin
+
+
+__all__ = [
+    "OrchestratorCapabilityMixin",
+    "CapabilityRegistryMixin",  # Backward compat alias
+]

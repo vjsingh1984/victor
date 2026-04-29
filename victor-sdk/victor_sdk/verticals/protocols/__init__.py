@@ -112,6 +112,7 @@ from victor_sdk.verticals.protocols.storage import (
     GraphStoreProtocol,
     VectorStoreProtocol,
     EmbeddingServiceProtocol,
+    CCGBuilderProtocol,
 )
 from victor_sdk.verticals.protocols.memory import MemoryCoordinatorProtocol
 
@@ -226,6 +227,7 @@ __all__ = [
     "GraphStoreProtocol",
     "VectorStoreProtocol",
     "EmbeddingServiceProtocol",
+    "CCGBuilderProtocol",
     "MemoryCoordinatorProtocol",
     # Promoted tool protocols
     "ToolResultData",

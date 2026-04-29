@@ -249,6 +249,21 @@ class PluginContext(Protocol):
         """
         ...
 
+    def register_ccg_builder(self, language: str, builder: Any) -> None:
+        """Register a language-specific CCG builder with the capability registry.
+
+        This allows external packages (victor-coding) to provide enhanced
+        CCG construction for specific languages.
+
+        Args:
+            language: Language identifier (e.g., "python", "javascript").
+            builder: CCG builder instance implementing CCGBuilderProtocol.
+
+        Example:
+            context.register_ccg_builder("python", PythonCCGBuilder(graph_store))
+        """
+        ...
+
 
 @runtime_checkable
 class VictorPlugin(Protocol):

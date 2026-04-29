@@ -138,6 +138,41 @@ class EmbeddingServiceProtocol(Protocol):
     async def embed_batch(self, texts: List[str]) -> List[List[float]]: ...
 
 
+@runtime_checkable
+class CCGBuilderProtocol(Protocol):
+    """Protocol for language-specific CCG (Code Context Graph) builders.
+
+    External packages (victor-coding) can implement this to provide
+    enhanced CCG construction for specific languages. The core provides
+    a basic implementation; external packages can override with enhanced
+    versions that have deeper language-specific analysis.
+
+    Example implementation in victor-coding:
+
+        class PythonCCGBuilder:
+            def __init__(self, graph_store):
+                self.graph_store = graph_store
+
+            async def build_ccg_for_file(self, file_path, language=None):
+                # Enhanced Python-specific CCG construction
+                # - Better control flow analysis
+                # - Type-aware DDG
+                # - Decorator handling
+                ...
+
+            def supports_language(self, language):
+                return language == "python"
+    """
+
+    async def build_ccg_for_file(
+        self,
+        file_path: str,
+        language: Optional[str] = None,
+    ) -> tuple[List[Any], List[Any]]: ...
+
+    def supports_language(self, language: str) -> bool: ...
+
+
 __all__ = [
     # Data types
     "GraphNodeData",
@@ -148,4 +183,5 @@ __all__ = [
     "GraphStoreProtocol",
     "VectorStoreProtocol",
     "EmbeddingServiceProtocol",
+    "CCGBuilderProtocol",
 ]

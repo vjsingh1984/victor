@@ -168,7 +168,7 @@ class InfrastructureBuildersMixin:
             UsageLogger instance
         """
         from victor.core.bootstrap import UsageLoggerProtocol
-        from victor.observability.analytics.logger import UsageLogger
+        from victor.analytics.logger import UsageLogger
         from victor.config.settings import get_project_paths
 
         usage_logger = self.container.get_optional(UsageLoggerProtocol)

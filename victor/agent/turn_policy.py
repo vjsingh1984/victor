@@ -173,6 +173,7 @@ class NudgeType(Enum):
     DIFFERENT_TOOLS = "different_tools"  # All tools blocked by dedup
     CODE_SEARCH = "code_search"  # Too many read-only turns
     BUDGET_WARNING = "budget_warning"  # Past halfway on iteration budget
+    REPETITION_BREAK = "repetition_break"  # Break repetition loop immediately
 
 
 @dataclass
@@ -243,17 +244,32 @@ class NudgePolicy:
 
         # Agent not using tools
         if state == SpinState.WARNING:
-            nudge = NudgeDecision(
-                nudge_type=NudgeType.USE_TOOLS,
-                message=(
-                    f"You have not called any tools in the last "
-                    f"{detector.consecutive_no_tool_turns} turns. You MUST "
-                    f"use a tool now (read, edit, write, shell) to make "
-                    f"progress on the task. Do not respond with text only."
-                ),
-                role="user",
-            )
-            return nudge
+            # After 2+ turns without tools, use stronger language
+            if detector.consecutive_no_tool_turns >= 2:
+                nudge = NudgeDecision(
+                    nudge_type=NudgeType.REPETITION_BREAK,
+                    message=(
+                        f"STOP. You have not called any tools in {detector.consecutive_no_tool_turns} turns. "
+                        f"This is a repetition loop. You MUST:\n"
+                        f"1. Use a tool NOW (read, edit, write, shell, code_search)\n"
+                        f"2. OR provide your final answer if the task is complete\n"
+                        f"Do NOT respond with more text analysis. Take action or conclude."
+                    ),
+                    role="user",
+                )
+                return nudge
+            else:
+                nudge = NudgeDecision(
+                    nudge_type=NudgeType.USE_TOOLS,
+                    message=(
+                        f"You have not called any tools in the last "
+                        f"{detector.consecutive_no_tool_turns} turns. You MUST "
+                        f"use a tool now (read, edit, write, shell) to make "
+                        f"progress on the task. Do not respond with text only."
+                    ),
+                    role="user",
+                )
+                return nudge
 
         # Too many read-only turns: tailor based on intent
         if detector.consecutive_read_only_turns >= READ_ONLY_ESCALATION_THRESHOLD:

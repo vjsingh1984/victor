@@ -169,6 +169,11 @@ class Tables:
     GRAPH_MODULE_METRIC = "graph_module_metric"  # Module coupling/cohesion/hotspot metrics
     GRAPH_MODULE_METRIC_HISTORY = "graph_module_metric_history"  # Historical metric snapshots
 
+    # CCG and Graph RAG (Phase 14: Graph-Based Enhancements)
+    GRAPH_REQUIREMENT = "graph_requirement"  # Requirement nodes (GraphCodeAgent pattern)
+    GRAPH_SUBGRAPH = "graph_subgraph"  # Cached subgraphs for multi-hop retrieval
+    GRAPH_SUBGRAPH_NODE = "graph_subgraph_node"  # Junction table: subgraph -> nodes
+
     # ===========================================
     # UI DOMAIN (ui_)
     # ===========================================
@@ -716,6 +721,63 @@ class Schema:
             ON {Tables.GRAPH_MODULE_METRIC}(tdd_priority DESC);
     """
 
+    # Requirement nodes (GraphCodeAgent pattern)
+    GRAPH_REQUIREMENT = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_REQUIREMENT} (
+            requirement_id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            source TEXT,
+            title TEXT NOT NULL,
+            description TEXT,
+            priority REAL DEFAULT 0.5,
+            status TEXT DEFAULT 'open',
+            metadata TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (requirement_id) REFERENCES {Tables.GRAPH_NODE}(node_id)
+        )
+    """
+
+    # Cached subgraphs for multi-hop retrieval
+    GRAPH_SUBGRAPH = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_SUBGRAPH} (
+            subgraph_id TEXT PRIMARY KEY,
+            anchor_node_id TEXT NOT NULL,
+            radius INTEGER NOT NULL,
+            edge_types TEXT,
+            node_count INTEGER,
+            computed_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (anchor_node_id) REFERENCES {Tables.GRAPH_NODE}(node_id)
+        )
+    """
+
+    # Junction table: subgraph -> nodes (many-to-many)
+    GRAPH_SUBGRAPH_NODE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_SUBGRAPH_NODE} (
+            subgraph_id TEXT NOT NULL,
+            node_id TEXT NOT NULL,
+            hop_distance INTEGER,
+            PRIMARY KEY (subgraph_id, node_id),
+            FOREIGN KEY (subgraph_id) REFERENCES {Tables.GRAPH_SUBGRAPH}(subgraph_id) ON DELETE CASCADE,
+            FOREIGN KEY (node_id) REFERENCES {Tables.GRAPH_NODE}(node_id) ON DELETE CASCADE
+        )
+    """
+
+    # Indexes for new CCG tables
+    GRAPH_RAG_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_graph_requirement_type
+            ON {Tables.GRAPH_REQUIREMENT}(type);
+        CREATE INDEX IF NOT EXISTS idx_graph_requirement_status
+            ON {Tables.GRAPH_REQUIREMENT}(status);
+        CREATE INDEX IF NOT EXISTS idx_graph_requirement_priority
+            ON {Tables.GRAPH_REQUIREMENT}(priority DESC);
+        CREATE INDEX IF NOT EXISTS idx_graph_subgraph_anchor
+            ON {Tables.GRAPH_SUBGRAPH}(anchor_node_id);
+        CREATE INDEX IF NOT EXISTS idx_graph_subgraph_node
+            ON {Tables.GRAPH_SUBGRAPH_NODE}(node_id);
+        CREATE INDEX IF NOT EXISTS idx_graph_subgraph_node_distance
+            ON {Tables.GRAPH_SUBGRAPH_NODE}(hop_distance);
+    """
+
     # ===========================================
     # CONVERSATION TABLES (project-level)
     # ===========================================
@@ -1058,7 +1120,7 @@ class Schema:
 
 
 # Schema version for migrations
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1113,6 +1175,28 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             # Add indexes for performance
             f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
             f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_repo ON {Tables.RL_OUTCOME}(repo_id, created_at)",
+        ],
+        # Version 4 -> 5: Phase 14 - Graph-Based Enhancements (CCG + Graph RAG)
+        5: [
+            # Add CCG columns to graph_node
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN ast_kind TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN scope_id TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN statement_type TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN requirement_id TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN visibility TEXT",
+            # Create indexes for new query patterns
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_statement_type ON {Tables.GRAPH_NODE}(statement_type)",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_requirement ON {Tables.GRAPH_NODE}(requirement_id)",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_visibility ON {Tables.GRAPH_NODE}(visibility)",
+            # Partial indexes for CCG edges (performance)
+            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_cfg ON {Tables.GRAPH_EDGE}(src, type) WHERE type LIKE 'CFG_%'",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_cdg ON {Tables.GRAPH_EDGE}(src, type) WHERE type LIKE 'CDG_%'",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_ddg ON {Tables.GRAPH_EDGE}(src, type) WHERE type LIKE 'DDG_%'",
+            # Create new tables for requirement tracking and subgraph caching
+            Schema.GRAPH_REQUIREMENT,
+            Schema.GRAPH_SUBGRAPH,
+            Schema.GRAPH_SUBGRAPH_NODE,
+            Schema.GRAPH_RAG_INDEXES,
         ],
     }
 

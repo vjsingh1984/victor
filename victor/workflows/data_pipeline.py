@@ -335,24 +335,3 @@ class DataPipeline:
             failed,
             NOTIF_QUEUE_FILE.stat().st_size,
         )
-
-
-# Example usage
-if __name__ == "__main__":
-    # Dummy schema
-    SCHEMA = {
-        "type": "object",
-        "properties": {
-            "id": {"type": "string"},
-            "value": {"type": "number"},
-        },
-        "required": ["id", "value"],
-    }
-
-    def transform_func(rec):
-        # Example: add a computed field
-        rec["value_squared"] = rec["value"] ** 2
-        return rec
-
-    pipeline = DataPipeline("https://jsonplaceholder.typicode.com/posts", SCHEMA, transform_func)
-    pipeline.run()

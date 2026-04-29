@@ -241,11 +241,36 @@ def has_persisted_codebase_index_data(persist_directory: Path) -> bool:
 def enable_structural_codebase_embeddings(
     embedding_config: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Rewrite a codebase embedding config to use the structural bridge when available."""
+    """Rewrite a codebase embedding config to use the structural bridge when explicitly requested.
+
+    The bridge is only activated if:
+    1. structural_indexing_enabled is True in extra_config, AND
+    2. victor-coding is installed, AND
+    3. The user has NOT explicitly opted out via VICTOR_DISABLE_STRUCTURAL_BRIDGE env var
+
+    By default, victor-coding uses its own providers (lancedb, chromadb, proximadb) directly
+    without needing this bridge. The bridge is only useful for advanced use cases where
+    victor's structural chunking capabilities are needed.
+    """
+
+    import os
 
     config = dict(embedding_config)
     extra_config = _normalized_extra_config(config)
-    if not bool(extra_config.get("structural_indexing_enabled", True)):
+
+    # Check if structural indexing is explicitly disabled
+    if not bool(extra_config.get("structural_indexing_enabled", False)):
+        config["extra_config"] = extra_config
+        return config
+
+    # Check if the bridge is explicitly disabled via environment variable
+    # This allows users to opt out of the bridge even if structural_indexing_enabled is True
+    if os.environ.get("VICTOR_DISABLE_STRUCTURAL_BRIDGE", "").lower() in ("1", "true", "yes"):
+        logger.debug(
+            "[structural_bridge] Bridge disabled via VICTOR_DISABLE_STRUCTURAL_BRIDGE env var, "
+            "using direct vector store: %s",
+            config.get("vector_store", "lancedb"),
+        )
         config["extra_config"] = extra_config
         return config
 
@@ -255,12 +280,20 @@ def enable_structural_codebase_embeddings(
         return config
 
     if not register_structural_codebase_embedding_provider():
+        logger.debug(
+            "[structural_bridge] Bridge registration failed, using direct vector store: %s",
+            vector_store,
+        )
         config["extra_config"] = extra_config
         return config
 
     extra_config.setdefault("upstream_vector_store", vector_store)
     config["vector_store"] = STRUCTURAL_CODEBASE_VECTOR_STORE
     config["extra_config"] = extra_config
+    logger.info(
+        "[structural_bridge] Using structural bridge with upstream vector store: %s",
+        vector_store,
+    )
     return config
 
 
@@ -772,3 +805,34 @@ __all__ = [
     "register_structural_codebase_embedding_provider",
     "write_codebase_index_manifest",
 ]
+
+
+# Auto-register the structural bridge provider on module import
+# This ensures victor-coding's registry knows about the bridge without requiring
+# explicit registration calls by users of the framework.
+_try_auto_registration: bool = True
+
+
+def _auto_register_bridge_on_import() -> None:
+    """Attempt to register the structural bridge on module import.
+
+    This is called at module import time to ensure the bridge is available
+    for victor-coding's embedding registry. Failures are silently ignored
+    since the bridge is an optional enhancement.
+    """
+    global _try_auto_registration
+    if not _try_auto_registration:
+        return
+
+    try:
+        if register_structural_codebase_embedding_provider():
+            logger.debug(
+                "[structural_bridge] Auto-registered %s provider",
+                STRUCTURAL_CODEBASE_VECTOR_STORE,
+            )
+    except Exception:
+        # Silently ignore registration failures - the bridge is optional
+        _try_auto_registration = False
+
+
+_auto_register_bridge_on_import()

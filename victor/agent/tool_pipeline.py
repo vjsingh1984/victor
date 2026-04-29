@@ -1052,7 +1052,7 @@ class ToolPipeline:
         """Expand tool variants that modify default parameters.
 
         Examples:
-            shell_readonly -> shell with readonly=True
+            shell_readonly -> shell with readonly=True (legacy alias)
         """
         if tool_name == "shell_readonly":
             # Map shell_readonly to shell with readonly=True
@@ -1062,6 +1062,66 @@ class ToolPipeline:
             return "shell", expanded_args, True
 
         return tool_name, arguments, False
+
+    @staticmethod
+    def _coerce_bool_like(value: Any) -> Any:
+        """Coerce common boolean-like strings for tool parameters."""
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "off"}:
+                return False
+        return value
+
+    def _apply_shell_readonly_policy(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> tuple[Dict[str, Any], bool]:
+        """Apply the single-shell readonly policy.
+
+        The runtime now exposes a single ``shell`` tool and defaults it to
+        ``readonly=True`` unless the caller explicitly opts out. On read-only
+        or display-only turns, ``readonly`` is pinned back to True.
+        """
+        if tool_name != "shell":
+            return arguments, False
+
+        from victor.agent.action_authorizer import ActionIntent
+
+        adjusted = dict(arguments)
+        changed = False
+
+        readonly = adjusted.get("readonly")
+        if readonly is None:
+            adjusted["readonly"] = True
+            changed = True
+        else:
+            coerced = self._coerce_bool_like(readonly)
+            if coerced is not readonly:
+                adjusted["readonly"] = coerced
+                changed = True
+
+        raw_intent = (context or {}).get("current_intent")
+        intent: Optional[ActionIntent] = None
+        if isinstance(raw_intent, ActionIntent):
+            intent = raw_intent
+        elif isinstance(raw_intent, str):
+            try:
+                intent = ActionIntent(raw_intent)
+            except ValueError:
+                intent = None
+
+        if intent in {ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY} and adjusted.get(
+            "readonly"
+        ) is not True:
+            adjusted["readonly"] = True
+            changed = True
+            logger.info("Pinned shell readonly=True due to %s intent", intent.value)
+
+        return adjusted, changed
 
     def _normalize_tool_call(
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
@@ -1074,10 +1134,15 @@ class ToolPipeline:
         normalized_args, strategy = self._normalize_arguments(
             expanded_tool_name, expanded_args, context=context
         )
+        normalized_args, readonly_changed = self._apply_shell_readonly_policy(
+            expanded_tool_name,
+            normalized_args,
+            context=context,
+        )
         normalized_tool_name, normalized_args, search_changed = self._apply_search_routing(
             expanded_tool_name, normalized_args
         )
-        changed = variant_changed or search_changed
+        changed = variant_changed or readonly_changed or search_changed
         if changed and strategy == NormalizationStrategy.DIRECT:
             strategy = NormalizationStrategy.MANUAL_REPAIR
         return normalized_tool_name, normalized_args, strategy

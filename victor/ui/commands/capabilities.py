@@ -129,6 +129,13 @@ class CapabilityDiscovery:
         result: Dict[str, Any] = {"vertical": vertical}
 
         try:
+            from victor.framework.team_runtime import resolve_registered_coordination_catalogs
+
+            coordination_catalog = resolve_registered_coordination_catalogs().get(vertical)
+        except Exception:
+            coordination_catalog = None
+
+        try:
             from victor.framework.persona_registry import get_persona_registry
 
             registry = get_persona_registry()
@@ -145,21 +152,14 @@ class CapabilityDiscovery:
             result["chains"] = []
 
         try:
-            from victor.framework.providers.protocol import get_provider_registry
-
-            provider_registry = get_provider_registry()
-            all_workflows = provider_registry.get_all_workflows()
-            vertical_workflows = all_workflows.get(vertical, {})
-            result["workflows"] = list(vertical_workflows.keys())
+            result["workflows"] = (
+                coordination_catalog.list_workflow_names() if coordination_catalog else []
+            )
         except Exception:
             result["workflows"] = []
 
         try:
-            from victor.framework.team_registry import get_team_registry
-
-            registry = get_team_registry()
-            teams_data = registry.find_by_vertical(vertical)
-            result["teams"] = list(teams_data.keys()) if teams_data else []
+            result["teams"] = coordination_catalog.list_team_names() if coordination_catalog else []
         except Exception:
             result["teams"] = []
 
@@ -231,10 +231,9 @@ class CapabilityDiscovery:
     def _discover_teams(self) -> List[str]:
         """Discover all registered team specs."""
         try:
-            from victor.framework.team_registry import get_team_registry
+            from victor.framework.team_runtime import list_registered_team_names
 
-            registry = get_team_registry()
-            return registry.list_teams()
+            return list_registered_team_names()
         except Exception:
             return []
 
@@ -249,18 +248,11 @@ class CapabilityDiscovery:
             return []
 
     def _discover_workflows(self) -> List[str]:
-        """Discover all workflow specs from provider registry."""
+        """Discover all workflow specs from the shared framework catalog surface."""
         try:
-            from victor.framework.providers.protocol import get_provider_registry
+            from victor.framework.team_runtime import list_registered_workflow_names
 
-            provider_registry = get_provider_registry()
-            all_workflows = provider_registry.get_all_workflows()
-            # Flatten the dict of vertical_name -> workflows into a list
-            workflow_names = []
-            for vertical, workflows in all_workflows.items():
-                for name in workflows.keys():
-                    workflow_names.append(f"{vertical}:{name}")
-            return workflow_names
+            return list_registered_workflow_names()
         except Exception:
             return []
 

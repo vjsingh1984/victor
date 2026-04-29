@@ -26,11 +26,13 @@ Primary location: {project_root}/.victor/init.md
 Legacy locations: .victor.md, VICTOR.md (for backwards compatibility)
 """
 
+from __future__ import annotations
+
 import logging
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from victor.config.settings import (
     VICTOR_DIR_NAME,
@@ -540,3 +542,190 @@ def init_victor_md(root_path: Optional[str] = None, force: bool = False) -> Opti
     except Exception as e:
         logger.error(f"Failed to create {VICTOR_CONTEXT_FILE}: {e}")
         return None
+
+
+async def generate_victor_md_with_graph(
+    root_path: Optional[str] = None,
+    task: Optional[str] = None,
+    max_symbols: Optional[int] = None,
+) -> str:
+    """Generate project context file with graph-based enhancements.
+
+    This async version includes graph-aware context when available:
+    - Relevant symbols from graph traversal
+    - Symbol dependencies
+    - Data flow information
+    - Similar code patterns
+
+    Args:
+        root_path: Root directory to analyze. Defaults to current directory.
+        task: Optional task description for context relevance. If None,
+              uses a generic "understand this codebase" task.
+        max_symbols: Maximum number of symbols to include in graph context.
+                     If None, uses settings.graph.init_max_symbols.
+
+    Returns:
+        Generated markdown content for init.md with graph enhancements
+    """
+    from victor.config.settings import get_settings
+
+    root = Path(root_path) if root_path else Path.cwd()
+    settings = get_settings()
+
+    # Start with standard content
+    content = generate_victor_md(root_path)
+    sections = [content]
+
+    # Check if graph-enhanced context is enabled
+    graph_enabled = getattr(settings, "graph", None)
+    if graph_enabled is None:
+        logger.debug("Graph settings not available, skipping graph context")
+        return content
+
+    if not getattr(graph_enabled, "enable_graph_rag", False):
+        logger.debug("Graph RAG not enabled, skipping graph context")
+        return content
+
+    if not getattr(graph_enabled, "enable_graph_context_in_init", True):
+        logger.debug("Graph context in init.md disabled via settings")
+        return content
+
+    # Use setting for max_symbols if not provided
+    if max_symbols is None:
+        max_symbols = getattr(graph_enabled, "init_max_symbols", 50)
+
+    # Check feature flag
+    try:
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_GRAPH_ENHANCED_CONTEXT):
+            logger.debug("USE_GRAPH_ENHANCED_CONTEXT feature flag disabled")
+            return content
+    except Exception:
+        logger.debug("Feature flag check failed, proceeding with graph context")
+
+    # Try to add graph context
+    try:
+        from victor.storage.graph import create_graph_store
+
+        # Get graph store path from settings
+        graph_path = getattr(graph_enabled, "codebase_graph_path", None) or str(
+            root / ".victor" / "graph.db"
+        )
+
+        graph_store = create_graph_store("sqlite", graph_path, root)
+        await graph_store.initialize()
+
+        # Check if graph has data
+        stats = await graph_store.stats()
+        if stats.get("node_count", 0) == 0:
+            logger.info("Graph store is empty, skipping graph context")
+            await graph_store.close()
+            return content
+
+        # Build graph context
+        from victor.context.graph_context_builder import GraphEnhancedContextBuilder
+
+        builder = GraphEnhancedContextBuilder(graph_store)
+
+        # Use provided task or generic understanding task
+        query_task = task or f"Understand the {root.name} codebase structure and key components"
+
+        result = await builder.build_context(query_task, max_symbols)
+
+        # Add graph context section
+        if result.context and result.symbols_included:
+            sections.append("\n## Code Graph Context\n")
+            sections.append(
+                f"*Graph analysis: {len(result.symbols_included)} relevant symbols, "
+                f"{result.build_time_ms:.0f}ms build time*\n"
+            )
+
+            # Add symbols section
+            if result.symbols_included:
+                sections.append("### Key Symbols\n")
+                for symbol in result.symbols_included[:20]:  # Limit display
+                    sections.append(f"- `{symbol}`")
+                sections.append("")
+
+            # Add dependencies section
+            if result.dependencies_found:
+                sections.append("### Dependencies\n")
+                count = 0
+                for symbol_name, deps in result.dependencies_found.items():
+                    if deps and count < 10:  # Limit display
+                        sections.append(f"- `{symbol_name}` → " + ", ".join(f"`{d}`" for d in deps[:3]))
+                        count += 1
+                sections.append("")
+
+            # Add data flow section if available
+            if result.metadata.get("dependency_count", 0) > 0:
+                sections.append(
+                    f"*Total dependencies tracked: {result.metadata['dependency_count']}*\n"
+                )
+
+        await graph_store.close()
+
+        logger.info(
+            f"Generated graph-enhanced init.md with {len(result.symbols_included)} symbols"
+        )
+
+    except ImportError as e:
+        logger.debug(f"Graph dependencies not available: {e}")
+    except Exception as e:
+        logger.warning(f"Failed to generate graph context: {e}")
+
+    return "\n".join(sections)
+
+
+async def init_victor_md_with_graph(
+    root_path: Optional[str] = None,
+    force: bool = False,
+    task: Optional[str] = None,
+    max_symbols: int = 50,
+) -> Optional[Path]:
+    """Initialize project context file with graph-based enhancements (async).
+
+    Creates the file at the configured location (default: .victor/init.md)
+    with graph-aware context included.
+
+    Args:
+        root_path: Root directory to create file in. Defaults to current directory.
+        force: If True, overwrite existing file.
+        task: Optional task description for context relevance.
+        max_symbols: Maximum number of symbols to include in graph context.
+
+    Returns:
+        Path to created file, or None if file exists and force=False.
+    """
+    root = Path(root_path) if root_path else Path.cwd()
+
+    # Use settings-driven path
+    paths = get_project_paths(root)
+    target_file = paths.project_context_file
+
+    # Ensure .victor directory exists
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if target_file.exists() and not force:
+        logger.warning(f"{VICTOR_CONTEXT_FILE} already exists at {target_file}")
+        return None
+
+    content = await generate_victor_md_with_graph(root_path, task, max_symbols)
+
+    try:
+        target_file.write_text(content, encoding="utf-8")
+        logger.info(f"Created graph-enhanced {VICTOR_CONTEXT_FILE} at {target_file}")
+        return target_file
+    except Exception as e:
+        logger.error(f"Failed to create {VICTOR_CONTEXT_FILE}: {e}")
+        return None
+
+
+__all__ = [
+    "ProjectContext",
+    "generate_victor_md",
+    "init_victor_md",
+    "generate_victor_md_with_graph",
+    "init_victor_md_with_graph",
+]

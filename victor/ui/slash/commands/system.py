@@ -385,10 +385,12 @@ class CleanupHistoryCommand(BaseSlashCommand):
         # Import the prune function from chat.py
         from victor.ui.commands.chat import _prune_history_file
 
-        original_lines = sum(1 for _ in open(history_file))
+        with open(history_file) as f:
+            original_lines = sum(1 for _ in f)
         _prune_history_file(history_file, max_entries=250)
 
-        new_lines = sum(1 for _ in open(history_file))
+        with open(history_file) as f:
+            new_lines = sum(1 for _ in f)
         removed = original_lines - new_lines
 
         ctx.console.print("[green]✓[/] Cleaned up history file:")

@@ -99,7 +99,7 @@ class ToolMetadata:
     stages: List[str] = field(default_factory=list)
     mandatory_keywords: List[str] = field(default_factory=list)
     task_types: List[str] = field(default_factory=list)
-    progress_params: List[str] = field(default_factory=list)
+    signature_params: List[str] = field(default_factory=list)
     cost_tier: Optional[str] = None
 
     @classmethod
@@ -125,7 +125,7 @@ class ToolMetadata:
             stages=getattr(tool, "stages", []),
             mandatory_keywords=getattr(tool, "mandatory_keywords", []),
             task_types=getattr(tool, "task_types", []),
-            progress_params=getattr(tool, "progress_params", []),
+            signature_params=getattr(tool, "signature_params", []),
             cost_tier=getattr(tool, "cost_tier", None),
         )
 

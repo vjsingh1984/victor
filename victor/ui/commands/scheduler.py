@@ -228,8 +228,9 @@ def _start_daemon(
     pid_file.write_text(str(os.getpid()))
 
     # Redirect stdout/stderr to log file
+    # Note: File handle intentionally kept open for daemon process lifetime
     log_file = pid_file.parent / "scheduler.log"
-    sys.stdout = open(log_file, "a")
+    sys.stdout = open(log_file, "a", buffering=1)  # Line buffering
     sys.stderr = sys.stdout
 
     # Run scheduler
