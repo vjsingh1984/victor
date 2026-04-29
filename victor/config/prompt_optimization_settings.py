@@ -26,10 +26,15 @@ from pydantic import BaseModel, Field
 from victor.config.gepa_settings import GEPASettings
 
 # Preserve current behavior while making strategy resolution config-driven.
+# PrefPO is enabled for GROUNDING_RULES and COMPLETION_GUIDANCE to leverage
+# failure-pattern-based optimization. It analyzes tool_failures from traces
+# and adds targeted guidance items for dominant failure categories.
 BUILTIN_SECTION_STRATEGIES: Dict[str, List[str]] = {
     "FEW_SHOT_EXAMPLES": ["miprov2"],
     "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ["gepa", "cot_distillation"],
     "INIT_SYNTHESIS_RULES": ["gepa"],
+    "GROUNDING_RULES": ["gepa", "prefpo"],
+    "COMPLETION_GUIDANCE": ["gepa", "prefpo"],
 }
 
 
