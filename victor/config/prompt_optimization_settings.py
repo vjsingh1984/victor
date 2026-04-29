@@ -29,12 +29,14 @@ from victor.config.gepa_settings import GEPASettings
 # PrefPO is enabled for GROUNDING_RULES and COMPLETION_GUIDANCE to leverage
 # failure-pattern-based optimization. It analyzes tool_failures from traces
 # and adds targeted guidance items for dominant failure categories.
+# CONCISE_MODE_GUIDANCE uses PrefPO with automated verbosity detection.
 BUILTIN_SECTION_STRATEGIES: Dict[str, List[str]] = {
     "FEW_SHOT_EXAMPLES": ["miprov2"],
     "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ["gepa", "cot_distillation"],
     "INIT_SYNTHESIS_RULES": ["gepa"],
     "GROUNDING_RULES": ["gepa", "prefpo"],
     "COMPLETION_GUIDANCE": ["gepa", "prefpo"],
+    "CONCISE_MODE_GUIDANCE": ["prefpo"],  # Auto-detected verbosity feedback
 }
 
 
@@ -71,6 +73,22 @@ class PrefPOSettings(BaseModel):
     max_prompt_growth_chars: int = 240
 
 
+class VerbositySettings(BaseModel):
+    """Automated verbosity detection for CONCISE_MODE_GUIDANCE evolution.
+
+    Tracks agent response verbosity to generate implicit feedback signals
+    for PrefPO optimization. Responses exceeding thresholds are flagged
+    as 'verbosity' failures, driving CONCISE_MODE_GUIDANCE refinements.
+    """
+
+    enabled: bool = True
+    max_response_chars: int = 2000
+    max_response_lines: int = 50
+    auto_feedback_weight: float = 0.5
+    # Minimum verbosity ratio to trigger feedback (actual / max)
+    min_verbosity_ratio: float = 1.2
+
+
 class PromptOptimizationSettings(BaseModel):
     """Top-level prompt optimization configuration."""
 
@@ -91,6 +109,7 @@ class PromptOptimizationSettings(BaseModel):
     miprov2: MIPROv2Settings = Field(default_factory=MIPROv2Settings)
     cot_distillation: CoTDistillationSettings = Field(default_factory=CoTDistillationSettings)
     prefpo: PrefPOSettings = Field(default_factory=PrefPOSettings)
+    verbosity: VerbositySettings = Field(default_factory=VerbositySettings)
 
     def get_strategies_for_section(self, section_name: str) -> List[str]:
         """Resolve which strategies apply to a given section.
