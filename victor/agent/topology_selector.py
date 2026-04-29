@@ -22,7 +22,7 @@ inspectable rationale and telemetry before moving to learned policies.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from victor.agent.topology_contract import (
     TopologyAction,
@@ -442,13 +442,15 @@ class TopologySelector:
             )
 
         if action == TopologyAction.TEAM_PLAN:
+            metadata = {"topology": "team_plan"}
+            metadata.update(self._team_execution_metadata(decision_input))
             return TopologyGroundingRequirements(
                 provider=provider,
                 formation=formation,
                 max_workers=self._team_worker_count(decision_input),
                 tool_budget=decision_input.tool_budget,
                 iteration_budget=decision_input.iteration_budget,
-                metadata={"topology": "team_plan"},
+                metadata=metadata,
             )
 
         if action == TopologyAction.ESCALATE_MODEL:
@@ -492,6 +494,26 @@ class TopologySelector:
         except (TypeError, ValueError):
             return None
         return max(self.config.min_parallel_workers, min(self.config.max_parallel_workers, worker_hint))
+
+    def _team_execution_metadata(
+        self,
+        decision_input: TopologyDecisionInput,
+    ) -> Dict[str, Any]:
+        context = decision_input.context or {}
+        support = self._coerce_unit_float(context.get("learned_team_support"))
+        if support <= 0.0:
+            return {}
+
+        metadata: Dict[str, Any] = {}
+        for context_key, metadata_key in (
+            ("learned_worktree_isolation_hint", "worktree_isolation"),
+            ("learned_materialize_worktrees_hint", "materialize_worktrees"),
+            ("learned_cleanup_worktrees_hint", "cleanup_worktrees"),
+        ):
+            value = self._coerce_optional_bool(context.get(context_key))
+            if value is not None:
+                metadata[metadata_key] = value
+        return metadata
 
     def _topology_kind_for_action(self, action: TopologyAction) -> TopologyKind:
         return {
@@ -1075,6 +1097,19 @@ class TopologySelector:
             return float(value)
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _coerce_optional_bool(value: object) -> Optional[bool]:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return True
+        if text in {"0", "false", "no", "off"}:
+            return False
+        return None
 
     @staticmethod
     def _coerce_non_negative_int(value: object) -> int:

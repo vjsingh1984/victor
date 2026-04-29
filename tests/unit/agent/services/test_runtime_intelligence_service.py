@@ -833,9 +833,13 @@ def test_runtime_intelligence_exposes_team_routing_hints_from_feedback(tmp_path)
     assert feedback is not None
     assert feedback.preferred_formation == "parallel"
     assert feedback.recommended_max_workers == 3
+    assert feedback.recommends_worktree_isolation is True
+    assert feedback.recommends_materialized_worktrees is True
     assert hints["learned_team_support"] > 0.0
     assert hints["learned_formation_hint"] == "parallel"
     assert hints["learned_team_max_workers_hint"] == 3
+    assert hints["learned_worktree_isolation_hint"] is True
+    assert hints["learned_materialize_worktrees_hint"] is True
 
 
 def test_runtime_intelligence_team_feedback_prefers_safer_parallelism_when_risk_is_high(tmp_path):
@@ -875,9 +879,13 @@ def test_runtime_intelligence_team_feedback_prefers_safer_parallelism_when_risk_
     assert feedback is not None
     assert feedback.preferred_formation == "hierarchical"
     assert feedback.recommended_max_workers == 2
+    assert feedback.recommends_worktree_isolation is True
+    assert feedback.recommends_materialized_worktrees is True
     assert hints["learned_formation_hint"] == "hierarchical"
     assert hints["learned_team_max_workers_hint"] == 2
     assert hints["learned_team_risk_score"] >= 0.5
+    assert hints["learned_worktree_isolation_hint"] is True
+    assert hints["learned_materialize_worktrees_hint"] is True
 
 
 def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_path):

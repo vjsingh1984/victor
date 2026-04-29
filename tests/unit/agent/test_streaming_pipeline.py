@@ -320,6 +320,8 @@ async def test_pipeline_executes_prepared_team_before_provider_stream():
         "formation_hint": "parallel",
         "tool_budget": 4,
         "max_workers": 2,
+        "worktree_isolation": True,
+        "materialize_worktrees": True,
     }
     coordinator._stream_ctx.topology_plan = {"execution_mode": "team_execution"}
     coordinator._stream_provider_response = AsyncMock(
@@ -358,12 +360,15 @@ async def test_pipeline_executes_prepared_team_before_provider_stream():
     ]
     assert chunks[0].is_final is True
     run_team.assert_awaited_once()
+    team_context = run_team.await_args.kwargs["context"]
     coordinator._stream_provider_response.assert_not_awaited()
     assert coordinator._stream_ctx.full_content == (
         "Team streaming result with final synthesized guidance."
     )
     assert coordinator._stream_ctx.tool_calls_used == 3
     assert coordinator._stream_ctx.topology_plan["team_name"] == "feature_team"
+    assert team_context["worktree_isolation"] is True
+    assert team_context["materialize_worktrees"] is True
 
 
 @pytest.mark.asyncio

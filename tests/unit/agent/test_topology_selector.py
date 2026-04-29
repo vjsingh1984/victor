@@ -276,6 +276,37 @@ class TestTopologySelector:
         assert decision.action == TopologyAction.TEAM_PLAN
         assert decision.grounding_requirements.max_workers == 2
 
+    def test_team_feedback_hints_can_enable_worktree_isolation(self):
+        """Learned team feedback should ground worktree isolation policy into team plans."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="implement the refactor across multiple modules",
+                task_type="feature",
+                task_complexity="high",
+                confidence_hint=0.58,
+                tool_budget=10,
+                iteration_budget=3,
+                expected_depth="high",
+                expected_breadth="medium",
+                observability_level="medium",
+                latency_sensitivity="low",
+                available_team_formations=["parallel", "hierarchical", "adaptive"],
+                provider_candidates=["openai", "anthropic"],
+                context={
+                    "learned_team_support": 0.74,
+                    "learned_formation_hint": "parallel",
+                    "learned_worktree_isolation_hint": True,
+                    "learned_materialize_worktrees_hint": True,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.TEAM_PLAN
+        assert decision.grounding_requirements.metadata["worktree_isolation"] is True
+        assert decision.grounding_requirements.metadata["materialize_worktrees"] is True
+
     def test_low_agreement_feedback_does_not_override_base_action(self):
         """Low-agreement learned hints should not override the base heuristic action."""
         selector = TopologySelector()

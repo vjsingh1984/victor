@@ -49,6 +49,7 @@ def test_prepare_topology_runtime_contract_resolves_team_plan():
         max_workers=2,
         tool_budget=6,
         iteration_budget=2,
+        metadata={"worktree_isolation": True, "materialize_worktrees": True},
     )
     orchestrator = SimpleNamespace()
 
@@ -84,3 +85,5 @@ def test_prepare_topology_runtime_contract_resolves_team_plan():
     assert prepared.runtime_context_overrides["team_name"] == "feature_team"
     assert prepared.runtime_context_overrides["formation_hint"] == "parallel"
     assert prepared.runtime_context_overrides["execution_mode"] == "team_execution"
+    assert prepared.runtime_context_overrides["worktree_isolation"] is True
+    assert prepared.runtime_context_overrides["materialize_worktrees"] is True

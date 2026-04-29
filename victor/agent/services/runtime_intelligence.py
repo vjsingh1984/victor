@@ -697,6 +697,22 @@ class TeamRoutingFeedback:
             workers = min(workers, 2)
         return max(2, min(4, workers))
 
+    @property
+    def recommends_worktree_isolation(self) -> bool:
+        """Whether team execution should use isolated worktrees by default."""
+        if self.support <= 0.0 or self.worktree_plan_count <= 0:
+            return False
+        if self.avg_team_scoped_members >= 2.0 or self.avg_team_changed_file_count >= 2.0:
+            return True
+        return self.worktree_materialized_count > 0
+
+    @property
+    def recommends_materialized_worktrees(self) -> bool:
+        """Whether isolated worktrees should be materialized, not just planned."""
+        if not self.recommends_worktree_isolation or self.worktree_materialized_count <= 0:
+            return False
+        return self.materialization_rate >= 0.4 and self.cleanup_error_rate < 0.5
+
     def to_metadata(self) -> Dict[str, Any]:
         """Serialize the learned team/worktree preference for logs and snapshots."""
         return {
@@ -720,6 +736,8 @@ class TeamRoutingFeedback:
             "cleanup_error_rate": self.cleanup_error_rate,
             "materialization_rate": self.materialization_rate,
             "risk_score": self.risk_score,
+            "recommends_worktree_isolation": self.recommends_worktree_isolation,
+            "recommends_materialized_worktrees": self.recommends_materialized_worktrees,
             "avg_team_assignments": round(self.avg_team_assignments, 4),
             "avg_team_scoped_members": round(self.avg_team_scoped_members, 4),
             "avg_team_members_with_changes": round(self.avg_team_members_with_changes, 4),
@@ -756,6 +774,10 @@ class TeamRoutingFeedback:
         recommended_max_workers = self.recommended_max_workers
         if recommended_max_workers is not None:
             routing_context["learned_team_max_workers_hint"] = recommended_max_workers
+        if self.recommends_worktree_isolation:
+            routing_context["learned_worktree_isolation_hint"] = True
+        if self.recommends_materialized_worktrees:
+            routing_context["learned_materialize_worktrees_hint"] = True
         return routing_context
 
 

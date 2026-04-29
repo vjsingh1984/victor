@@ -120,8 +120,36 @@ def _coerce_topology_overrides(topology_plan: Any) -> Dict[str, Any]:
     if callable(to_context_overrides):
         overrides = to_context_overrides()
         if isinstance(overrides, dict):
-            return dict(overrides)
+            resolved = dict(overrides)
+            _promote_team_runtime_policy_hints(resolved)
+            return resolved
     return {}
+
+
+def _promote_team_runtime_policy_hints(overrides: Dict[str, Any]) -> None:
+    """Promote team runtime policy hints from topology metadata into flat overrides."""
+    metadata = overrides.get("topology_metadata")
+    if not isinstance(metadata, dict):
+        return
+    for key in ("worktree_isolation", "materialize_worktrees", "cleanup_worktrees"):
+        if key in overrides:
+            continue
+        value = _coerce_optional_bool(metadata.get(key))
+        if value is not None:
+            overrides[key] = value
+
+
+def _coerce_optional_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return None
 
 
 __all__ = [

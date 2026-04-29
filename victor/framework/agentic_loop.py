@@ -1886,6 +1886,9 @@ class AgenticLoop:
             "topology_metadata",
             "provider_hint",
             "max_workers",
+            "worktree_isolation",
+            "materialize_worktrees",
+            "cleanup_worktrees",
         ):
             value = runtime_context_overrides.get(key)
             if value is not None:

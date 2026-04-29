@@ -461,6 +461,8 @@ class TestAgenticLoop:
                     "formation_hint": "parallel",
                     "execution_mode": "team_execution",
                     "max_workers": 2,
+                    "worktree_isolation": True,
+                    "materialize_worktrees": True,
                 },
             }
         )
@@ -546,10 +548,13 @@ class TestAgenticLoop:
             result = await loop.run("Build the feature")
 
         run_team.assert_awaited_once()
+        team_context = run_team.await_args.kwargs["context"]
         turn_executor.execute_turn.assert_not_called()
         assert result.success is True
         assert result.final_state["topology_preparation"]["team_name"] == "feature_team"
         assert result.final_state["topology_overrides"]["team_name"] == "feature_team"
+        assert team_context["worktree_isolation"] is True
+        assert team_context["materialize_worktrees"] is True
 
     async def test_evaluate_framework_team_execution_turn_completes(self):
         loop = self._make_loop(max_iterations=1, config={"disable_enhanced_completion": True})
