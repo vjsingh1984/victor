@@ -3497,6 +3497,16 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         async for chunk in runtime.stream_chat(user_message, **kwargs):
             yield chunk
 
+    def _get_task_guidance_runtime(self) -> Any:
+        """Get the canonical service-owned task guidance runtime helper."""
+        runtime = getattr(self, "_task_guidance_runtime", None)
+        if runtime is None:
+            from victor.agent.services.task_guidance_runtime import TaskGuidanceRuntime
+
+            runtime = TaskGuidanceRuntime(self.protocol_adapter)
+            self._task_guidance_runtime = runtime
+        return runtime
+
     def _prepare_task(
         self, user_message: str, unified_task_type: TrackerTaskType
     ) -> tuple[Any, int]:
@@ -3506,14 +3516,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         Extracted from CRITICAL-001 Phase 2D.
         """
-        # Wire reminder_manager dependency if not already set
-        if self.task_coordinator._reminder_manager is None:
-            self.task_coordinator.set_reminder_manager(self.reminder_manager)
-
-        # Delegate to TaskCoordinator
-        return self.task_coordinator.prepare_task(
-            user_message, unified_task_type, self.conversation_controller
-        )
+        return self._get_task_guidance_runtime().prepare_task(user_message, unified_task_type)
 
     def _apply_intent_guard(self, user_message: str) -> None:
         """Detect intent and inject prompt guards for read-only tasks.
@@ -3522,12 +3525,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         Extracted from CRITICAL-001 Phase 2D.
         """
-        # Delegate to TaskCoordinator
-        self.task_coordinator.apply_intent_guard(user_message, self.conversation_controller)
-
-        # Sync current_intent back to orchestrator
-        self._current_intent = self.task_coordinator.current_intent
-        self._current_user_message = user_message
+        self._get_task_guidance_runtime().apply_intent_guard(user_message)
 
     def _apply_task_guidance(
         self,
@@ -3544,24 +3542,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         Extracted from CRITICAL-001 Phase 2D.
         """
-        # Set initial temperature and tool_budget in TaskCoordinator
-        self.task_coordinator.temperature = self.temperature
-        self.task_coordinator.tool_budget = self.tool_budget
-
-        # Delegate to TaskCoordinator
-        self.task_coordinator.apply_task_guidance(
+        self._get_task_guidance_runtime().apply_task_guidance(
             user_message=user_message,
             unified_task_type=unified_task_type,
             is_analysis_task=is_analysis_task,
             is_action_task=is_action_task,
             needs_execution=needs_execution,
             max_exploration_iterations=max_exploration_iterations,
-            conversation_controller=self.conversation_controller,
         )
-
-        # Sync temperature and tool_budget back to orchestrator
-        self.temperature = self.task_coordinator.temperature
-        self.tool_budget = self.task_coordinator.tool_budget
 
     async def _select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
         """Select and prioritize tools for the current turn.

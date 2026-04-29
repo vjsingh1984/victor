@@ -234,6 +234,18 @@ class TestAdapterProtocolConformance:
         context_service.add_message("user", "hello")
         assert [message.role for message in controller.messages] == ["system", "user"]
 
+    def test_protocol_adapter_runtime_state_setters_proxy_to_host_orchestrator(self):
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+
+        orchestrator = SimpleNamespace(temperature=0.2, tool_budget=5)
+        adapter = OrchestratorProtocolAdapter(orchestrator)
+
+        adapter.temperature = 0.6
+        adapter.tool_budget = 12
+
+        assert orchestrator.temperature == 0.6
+        assert orchestrator.tool_budget == 12
+
     @pytest.mark.asyncio
     async def test_orchestrator_protocol_adapter_prefers_execute_tool_calls(self):
         from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
@@ -695,6 +707,71 @@ class TestChatServiceBootstrapLaziness:
 
         assert result is response
         helper.run.assert_awaited_once_with("plan this")
+
+    def test_get_task_guidance_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.task_guidance_runtime import TaskGuidanceRuntime
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_task_guidance_runtime()
+        second = obj._get_task_guidance_runtime()
+
+        assert isinstance(first, TaskGuidanceRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
+    def test_prepare_task_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.prepare_task.return_value = ("classification", 7)
+        obj._task_guidance_runtime = helper
+
+        result = AgentOrchestrator._prepare_task(obj, "plan this", "analysis")
+
+        assert result == ("classification", 7)
+        helper.prepare_task.assert_called_once_with("plan this", "analysis")
+
+    def test_apply_intent_guard_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._task_guidance_runtime = helper
+
+        AgentOrchestrator._apply_intent_guard(obj, "read this file")
+
+        helper.apply_intent_guard.assert_called_once_with("read this file")
+
+    def test_apply_task_guidance_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._task_guidance_runtime = helper
+
+        AgentOrchestrator._apply_task_guidance(
+            obj,
+            user_message="analyze architecture",
+            unified_task_type="analysis",
+            is_analysis_task=True,
+            is_action_task=False,
+            needs_execution=False,
+            max_exploration_iterations=8,
+        )
+
+        helper.apply_task_guidance.assert_called_once_with(
+            user_message="analyze architecture",
+            unified_task_type="analysis",
+            is_analysis_task=True,
+            is_action_task=False,
+            needs_execution=False,
+            max_exploration_iterations=8,
+        )
 
     def test_get_context_limit_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator

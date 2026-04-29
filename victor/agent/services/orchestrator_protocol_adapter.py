@@ -388,6 +388,11 @@ class OrchestratorProtocolAdapter:
         """Get tool budget."""
         return self._orchestrator.tool_budget
 
+    @tool_budget.setter
+    def tool_budget(self, value: int) -> None:
+        """Set tool budget."""
+        self._orchestrator.tool_budget = value
+
     @property
     def tool_calls_used(self) -> int:
         """Get tool calls used."""
@@ -445,6 +450,11 @@ class OrchestratorProtocolAdapter:
     def temperature(self) -> float:
         """Get temperature."""
         return self._orchestrator.temperature
+
+    @temperature.setter
+    def temperature(self, value: float) -> None:
+        """Set temperature."""
+        self._orchestrator.temperature = value
 
     @property
     def max_tokens(self) -> int:
