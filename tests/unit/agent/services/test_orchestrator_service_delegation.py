@@ -688,13 +688,14 @@ class TestChatServiceBootstrapLaziness:
         self,
     ):
         from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
         obj = object.__new__(AgentOrchestrator)
-        protocol_adapter = MagicMock(name="protocol_adapter")
         planning_response = CompletionResponse(content="planned", role="assistant")
         planning_instance = MagicMock(name="planning_coordinator")
         planning_instance.chat_with_planning = AsyncMock(return_value=planning_response)
 
+        protocol_adapter = OrchestratorProtocolAdapter(obj)
         obj._protocol_adapter = protocol_adapter
         obj._service_planning_coordinator = None
         obj._task_analyzer = MagicMock()
@@ -713,6 +714,36 @@ class TestChatServiceBootstrapLaziness:
             "plan this",
             task_analysis="task-analysis",
         )
+
+    def test_get_planning_chat_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.planning_chat_runtime import PlanningChatRuntime
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_planning_chat_runtime()
+        second = obj._get_planning_chat_runtime()
+
+        assert isinstance(first, PlanningChatRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
+    @pytest.mark.asyncio
+    async def test_run_planning_chat_runtime_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        response = CompletionResponse(content="planned", role="assistant")
+        helper.run = AsyncMock(return_value=response)
+        obj._planning_chat_runtime = helper
+
+        result = await AgentOrchestrator._run_planning_chat_runtime(obj, "plan this")
+
+        assert result is response
+        helper.run.assert_awaited_once_with("plan this")
 
     def test_get_context_limit_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator

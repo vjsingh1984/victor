@@ -3467,34 +3467,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return await self._chat_service.chat_with_planning(user_message, use_planning)
 
+    def _get_planning_chat_runtime(self) -> Any:
+        """Get the canonical service-owned planning chat runtime helper."""
+        runtime = getattr(self, "_planning_chat_runtime", None)
+        if runtime is None:
+            from victor.agent.services.planning_chat_runtime import PlanningChatRuntime
+
+            runtime = PlanningChatRuntime(self.protocol_adapter)
+            self._planning_chat_runtime = runtime
+        return runtime
+
     async def _run_planning_chat_runtime(self, user_message: str) -> CompletionResponse:
         """Execute structured planning from the canonical service runtime path."""
-        from victor.agent.services.planning_runtime import PlanningCoordinator
-
-        planning_coordinator = getattr(self, "_service_planning_coordinator", None)
-        if planning_coordinator is None:
-            planning_coordinator = PlanningCoordinator(self.protocol_adapter)
-            self._service_planning_coordinator = planning_coordinator
-
-        task_analysis = self.task_analyzer.analyze(user_message)
-        initial_message_count = self._get_conversation_message_count()
-        response = await planning_coordinator.chat_with_planning(
-            user_message,
-            task_analysis=task_analysis,
-        )
-
-        if self._get_conversation_message_count() > initial_message_count:
-            return response
-
-        if not self._system_added:
-            self.conversation.ensure_system_prompt()
-            self._system_added = True
-
-        self.add_message("user", user_message)
-        if response.content:
-            self.add_message("assistant", response.content)
-
-        return response
+        return await self._get_planning_chat_runtime().run(user_message)
 
     def _get_context_limit_runtime(self) -> Any:
         """Get the canonical service-owned context/iteration limit runtime helper."""
