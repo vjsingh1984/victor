@@ -45,7 +45,10 @@ RAW DATA:
 Return ONLY the final init.md markdown. No preamble, no explanation."""
 
 # The evolvable rules section — this is what GEPA v2 optimizes.
+# Evolved Gen 2 version from GEPA v2 (1500 chars cap, g_e_p_a_service strategy)
+# Key enhancement: "analyze the specific project files" emphasis before writing
 SYNTHESIS_RULES = """RULES:
+- Before writing each section, analyze the specific project files and metadata carefully; tailor content precisely. Do NOT use generic templates or phrases.
 - Write project-specific content only. No generic advice.
 - Sections in order: Project Overview, System Flow, Package Layout, Key Entry Points,
   Architecture Patterns, Development Commands, Dependencies, Configuration, Codebase Scale.

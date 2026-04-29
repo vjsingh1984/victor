@@ -104,7 +104,7 @@ class GraphRAGBenchmark:
             project_path: Path to test project (creates temp if None)
         """
         self.project_path = project_path or Path(tempfile.mkdtemp())
-        self.graph_store = create_graph_store("sqlite", None, self.project_path)
+        self.graph_store = create_graph_store("sqlite", self.project_path)
 
     async def setup(self) -> None:
         """Set up the test environment."""

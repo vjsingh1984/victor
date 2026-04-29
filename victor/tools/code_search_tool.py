@@ -1567,7 +1567,7 @@ async def _graph_search(
 
     # Create graph store
     try:
-        graph_store = create_graph_store("sqlite", None, root_path)
+        graph_store = create_graph_store("sqlite", root_path)
         await graph_store.initialize()
 
         # Check if graph has data
