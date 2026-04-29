@@ -63,10 +63,10 @@ CLOUD_PROVIDERS: Set[str] = {
 LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
 
 # Critical grounding rules to prevent hallucination
-# Concise version for cloud providers - they handle context well
+# Evolved Gen 3 version from GEPA v2 (1093 chars) - strongest anti-hallucination language
+# Drift from baseline: Added schema validation emphasis, removed git/npm checks, strengthened "only" constraint
 GROUNDING_RULES = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
+GROUNDING: Base ALL responses strictly on tool output only. Never assume, invent, or fabricate file paths, content, or any information not explicitly present in tool responses. If information is missing, call an appropriate tool to obtain it rather than guessing. Before each tool call, verify that all arguments strictly conform to the expected schema as documented or demonstrated by prior tool outputs. Always verify file existence with a dedicated ls() or code_search() call before attempting to read or operate on files to prevent file_not_found errors. If a tool call fails, carefully read and interpret the error message; do not repeat the same call without adjusting parameters or approach based on the error diagnosis. Keep tool calls focused and targeted—avoid broad directory scans, large data reads, or complex shell commands. Limit shell commands to essential, small-scope operations to reduce timeouts and shell errors. Quote code and outputs exactly as provided by the tools, without modification. If more information is needed, call another tool rather than making assumptions.
 """.strip()
 
 # Parallel read optimization guidance
@@ -155,28 +155,21 @@ DO NOT assume content is missing - use offset/search to access additional sectio
 """.strip()
 
 # ASI-derived guidance: Lessons learned from execution trace analysis (GEPA-inspired).
-# These rules were extracted from 64K+ tool execution events across 11 days:
-# - 165 read(dir) errors → directory vs file guidance
-# - 60% literal code_search with 0 results → search mode guidance
-# - 70:9 read:code_search ratio → search-first discovery guidance
-# - 33% edit failure rate → edit precision guidance
+# Evolved Gen 3 version from GEPA v2 (1500 chars, g_e_p_a_service+cot_distillation strategy)
+# Drift from baseline: Added schema validation emphasis, structured as step-by-step approach
 ASI_TOOL_EFFECTIVENESS_GUIDANCE = """
 TOOL EFFECTIVENESS (from execution data):
-- Use code_search(query='...') FIRST to discover relevant files before reading them.
-  Do NOT browse with read→read→read — search finds the right file in one call.
-- code_search works best with mode='semantic' for concepts and patterns.
-  Use mode='literal' only for exact identifiers you know exist.
-- For edits: include 3+ surrounding lines of context in old_str to ensure a unique match.
-  Ambiguous matches (old_str appears 2+ times) will fail — add more context.
-- Use ls() for directories, read() for files. read('directory_name') will auto-convert
-  but wastes a tool call.
-- Only access files within the current project. Never guess paths from other projects.
-  If read('victor') or read('../') fails, you are in the WRONG directory.
-  Use ls('.') to orient yourself in the workspace.
-- Do NOT use shell('rg ...') or shell('grep ...') to search code.
-  Use code_search(query='...') instead — it uses the semantic index.
-- After a failed edit (old_str not found), RE-READ the file at the exact location
-  and copy the text character-by-character. Do NOT guess from memory.
+
+- Use code_search(query='...', mode='semantic') FIRST to locate relevant files efficiently. Avoid browsing files sequentially with multiple read() calls.
+- Use mode='literal' in code_search only for exact known identifiers.
+- Before calling any tool, verify argument names and types exactly match the tool schema. If an error occurs, consult the error message and adjust arguments before retrying.
+- Always confirm file or directory existence with ls() before using read() or other file access tools. Avoid guessing or hardcoding paths.
+- Use ls() for directories and read() for files. Avoid read('directory_name') as it wastes a tool call.
+- Only access files within the current project directory. Use ls('.') to verify your location. If read('victor') or read('../') fails, you are in the wrong directory.
+- Do NOT use shell('rg ...') or shell('grep ...') commands for searching code. Always use code_search(query='...') for reliable, semantic search.
+- For edits, include 3+ surrounding lines of context in old_str to ensure unique matches. If old_str appears multiple times, add more context.
+- After a failed edit (old_str not found), re-read the file at the exact location, copying text character-by-character. Do NOT guess from memory.
+- After any tool failure, carefully read the error message and analyze the root cause before retrying. Do not repeat the same tool call with unchanged arguments immediately.
 """.strip()
 
 # Task-type hints are now in vertical prompt contributors (E5 M3).
