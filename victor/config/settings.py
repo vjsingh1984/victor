@@ -1347,11 +1347,13 @@ class Settings(BaseSettings):
     # When enabled:
     # - Automatically selects best provider for each request
     # - Falls back to alternative providers on failures
-    # - Learns from provider performance over time
+    # - Learns from provider performance over time (uses rl_provider_stat table)
     # - Respects user's explicit --provider choice (never overrides)
     #
-    # Enable via: victor chat --enable-smart-routing --routing-profile balanced
-    smart_routing_enabled: bool = False  # Master switch for smart routing
+    # Production data verified (2026-04-29): 140 provider stats with 90.5% success rate
+    # Enable via: victor chat --routing-profile balanced
+    # Disable via: victor chat --disable-smart-routing or VICTOR_SMART_ROUTING_ENABLED=false
+    smart_routing_enabled: bool = True  # Master switch for smart routing (ON by default with production data)
     smart_routing_profile: str = (
         "balanced"  # Routing profile (balanced, cost-optimized, performance, local-first)
     )

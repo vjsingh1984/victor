@@ -276,20 +276,31 @@ class ProviderPerformanceTracker:
             logger.debug("rl_provider_stat write failed (non-fatal): %s", exc)
 
     def _hydrate(self, provider: str) -> None:
-        """Populate the in-memory deque for a provider from the DB (once per session)."""
+        """Populate the in-memory deque for a provider from the DB (once per session).
+
+        Data quality filters applied:
+        - Only loads data from last 30 days (stale data is unreliable)
+        - Validates latency_ms is positive and reasonable (1ms to 60s)
+        - Skips records with obviously corrupted timestamps
+        """
         if self._db is None or provider in self._hydrated:
             return
         self._hydrated.add(provider)
         try:
+            # Only load recent data (last 30 days) to avoid stale performance patterns
+            from datetime import timedelta
+
+            cutoff_date = (datetime.now() - timedelta(days=30)).isoformat()
+
             rows = self._db.query(
                 """
                 SELECT provider, model, task_type, success, latency_ms, error_type, created_at
                 FROM rl_provider_stat
-                WHERE provider = ?
+                WHERE provider = ? AND created_at > ?
                 ORDER BY id DESC
                 LIMIT ?
                 """,
-                (provider, self.window_size),
+                (provider, cutoff_date, self.window_size),
             )
             if not rows:
                 return
@@ -298,26 +309,33 @@ class ProviderPerformanceTracker:
             deq = self.metrics[provider]
             # Rows come back newest-first; insert oldest-first so the deque is in
             # chronological order for trend analysis.
+            loaded_count = 0
             for row in reversed(rows):
                 try:
                     ts = datetime.fromisoformat(row["created_at"])
                 except (ValueError, TypeError):
-                    ts = datetime.now()
+                    continue  # Skip records with invalid timestamps
+                # Validate latency is reasonable (1ms to 60 seconds)
+                latency = float(row["latency_ms"])
+                if latency < 1.0 or latency > 60000.0:
+                    continue  # Skip obviously bad latency values
                 deq.append(
                     RequestMetric(
                         provider=row["provider"],
                         model=row["model"],
                         task_type=row["task_type"] or "default",
                         success=bool(row["success"]),
-                        latency_ms=float(row["latency_ms"]),
+                        latency_ms=latency,
                         error_type=row["error_type"],
                         timestamp=ts,
                     )
                 )
+                loaded_count += 1
             logger.debug(
-                "Hydrated %d historical metrics for provider '%s' from DB",
-                len(rows),
+                "Hydrated %d historical metrics for provider '%s' from DB (filtered from %d total rows)",
+                loaded_count,
                 provider,
+                len(rows),
             )
         except Exception as exc:
             logger.debug("rl_provider_stat hydration failed (non-fatal): %s", exc)
