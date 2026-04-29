@@ -82,6 +82,32 @@ class EmbeddingRegistry:
         """
         if name not in cls._providers:
             available = ", ".join(cls._providers.keys())
+
+            # Special case for victor-coding bridge provider
+            if name == "victor_structural_bridge":
+                # Check if victor-coding is actually installed
+                import importlib.util
+
+                victor_coding_installed = importlib.util.find_spec("victor_coding") is not None
+
+                if victor_coding_installed:
+                    # victor-coding IS installed but the bridge isn't registered in victor's registry
+                    # This is expected - the bridge lives in victor-coding's namespace
+                    # Provide a helpful error message that explains this
+                    raise KeyError(
+                        f"The '{name}' vector store is only available through victor-coding's "
+                        f"embedding registry, not victor's core registry. "
+                        f"Use the upstream vector store directly (e.g., 'lancedb', 'chromadb') "
+                        f"or access through victor-coding's CodebaseIndex factory.\n"
+                        f"Available providers in victor's registry: {available if available else 'none'}"
+                    )
+                else:
+                    raise KeyError(
+                        f"The '{name}' vector store requires victor-coding to be installed. "
+                        f"Install it with: pip install victor-coding\n"
+                        f"Available providers in this registry: {available if available else 'none'}"
+                    )
+
             raise KeyError(
                 f"Unknown embedding provider: {name}. "
                 f"Available: {available if available else 'none'}"

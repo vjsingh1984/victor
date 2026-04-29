@@ -189,6 +189,30 @@ class TestIntentFiltering:
         assert "write" not in tool_names
         assert "edit" not in tool_names
 
+    def test_filter_tools_read_only_intent_keeps_shell_for_explicit_sqlite_request(
+        self, tool_planner
+    ):
+        """Explicit readonly shell/SQLite requests should preserve shell availability."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        read_tool = Mock()
+        read_tool.name = "read"
+        shell_tool = Mock()
+        shell_tool.name = "shell"
+        write_tool = Mock()
+        write_tool.name = "write"
+
+        result = tool_planner.filter_tools_by_intent(
+            [read_tool, shell_tool, write_tool],
+            ActionIntent.READ_ONLY,
+            user_message="use shell tool with sqlite commands to review generations",
+        )
+
+        tool_names = [t.name for t in result]
+        assert "read" in tool_names
+        assert "shell" in tool_names
+        assert "write" not in tool_names
+
     def test_filter_tools_write_allowed_intent(self, tool_planner):
         """Test filtering with WRITE_ALLOWED intent."""
         from victor.agent.action_authorizer import ActionIntent

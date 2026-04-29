@@ -861,6 +861,65 @@ class SymbolStoreFactoryProtocol(Protocol):
 
 
 # =============================================================================
+# Graph Building Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class CCGBuilderProtocol(Protocol):
+    """Protocol for language-specific CCG (Code Context Graph) builders.
+
+    External packages (victor-coding) can implement this to provide
+    enhanced CCG construction for specific languages. The core provides
+    a basic implementation; external packages can override with enhanced
+    versions that have deeper language-specific analysis.
+
+    Example implementation in victor-coding:
+
+        class PythonCCGBuilder:
+            def __init__(self, graph_store):
+                self.graph_store = graph_store
+
+            async def build_ccg_for_file(self, file_path, language=None):
+                # Enhanced Python-specific CCG construction
+                # - Better control flow analysis
+                # - Type-aware DDG
+                # - Decorator handling
+                ...
+
+            def supports_language(self, language):
+                return language == "python"
+    """
+
+    async def build_ccg_for_file(
+        self,
+        file_path: Path,
+        language: str | None = None,
+    ) -> Tuple[List[Any], List[Any]]:
+        """Build CCG for a file.
+
+        Args:
+            file_path: Path to source file
+            language: Optional language override (auto-detected if None)
+
+        Returns:
+            Tuple of (nodes, edges) representing the CCG
+        """
+        ...
+
+    def supports_language(self, language: str) -> bool:
+        """Check if this builder supports the given language.
+
+        Args:
+            language: Language identifier (e.g., "python", "javascript")
+
+        Returns:
+            True if this builder can handle the language
+        """
+        ...
+
+
+# =============================================================================
 # Language Registry Protocols
 # =============================================================================
 
@@ -1063,6 +1122,8 @@ __all__ = [
     # Codebase indexing protocols
     "CodebaseIndexFactoryProtocol",
     "SymbolStoreFactoryProtocol",
+    # Graph building protocols
+    "CCGBuilderProtocol",
     # Language registry protocols
     "LanguageRegistryProtocol",
     "DocCommentPatternProtocol",

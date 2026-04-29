@@ -39,6 +39,17 @@ from victor.storage.graph.protocol import (
     GraphEdge,
     GraphStoreProtocol,
     GraphTraversalDirection,
+    RequirementNode,
+    Subgraph,
+    GraphQueryResult,
+)
+from victor.storage.graph.edge_types import (
+    EdgeType,
+    CFG_EDGE_TYPES,
+    CDG_EDGE_TYPES,
+    DDG_EDGE_TYPES,
+    CCG_EDGE_TYPES,
+    LEGACY_EDGE_TYPES,
 )
 from victor.storage.graph.registry import create_graph_store
 from victor.storage.graph.sqlite_store import SqliteGraphStore
@@ -50,6 +61,16 @@ __all__ = [
     "GraphEdge",
     "GraphStoreProtocol",
     "GraphTraversalDirection",
+    "RequirementNode",
+    "Subgraph",
+    "GraphQueryResult",
+    # Edge types
+    "EdgeType",
+    "CFG_EDGE_TYPES",
+    "CDG_EDGE_TYPES",
+    "DDG_EDGE_TYPES",
+    "CCG_EDGE_TYPES",
+    "LEGACY_EDGE_TYPES",
     # Factory
     "create_graph_store",
     # Stores

@@ -52,7 +52,7 @@ class MockTool:
         # NEW: Semantic selection attributes
         mandatory_keywords: list = None,
         task_types: list = None,
-        progress_params: list = None,
+        signature_params: list = None,
         execution_category: ExecutionCategory = None,
     ):
         self.name = name
@@ -68,7 +68,7 @@ class MockTool:
         # NEW: Semantic selection attributes
         self.mandatory_keywords = mandatory_keywords or []
         self.task_types = task_types or []
-        self.progress_params = progress_params or []
+        self.signature_params = signature_params or []
         self.execution_category = execution_category or ExecutionCategory.READ_ONLY
 
 
@@ -991,57 +991,57 @@ class TestSemanticSelectionRegistry:
         # And not with self
         assert "write1" not in conflicts
 
-    def test_progress_params_lookup(self):
+    def test_signature_params_lookup(self):
         """Test getting progress params for a tool."""
         registry = ToolMetadataRegistry()
         registry.register(
             MockTool(
                 name="reader",
-                progress_params=["path", "offset", "limit"],
+                signature_params=["path", "offset", "limit"],
             )
         )
         registry.register(
             MockTool(
                 name="simple",
-                progress_params=[],
+                signature_params=[],
             )
         )
 
         # Get progress params
-        params = registry.get_progress_params("reader")
+        params = registry.get_signature_params("reader")
         assert "path" in params
         assert "offset" in params
         assert "limit" in params
 
         # Empty for tools without progress params
-        assert len(registry.get_progress_params("simple")) == 0
+        assert len(registry.get_signature_params("simple")) == 0
 
         # Empty for non-existent tools
-        assert len(registry.get_progress_params("nonexistent")) == 0
+        assert len(registry.get_signature_params("nonexistent")) == 0
 
-    def test_tools_with_progress_params(self):
+    def test_tools_with_signature_params(self):
         """Test getting all tools with progress params."""
         registry = ToolMetadataRegistry()
         registry.register(
             MockTool(
                 name="reader",
-                progress_params=["path", "offset"],
+                signature_params=["path", "offset"],
             )
         )
         registry.register(
             MockTool(
                 name="searcher",
-                progress_params=["query", "page"],
+                signature_params=["query", "page"],
             )
         )
         registry.register(
             MockTool(
                 name="simple",
-                progress_params=[],
+                signature_params=[],
             )
         )
 
-        tools_with_params = registry.get_tools_with_progress_params()
+        tools_with_params = registry.get_tools_with_signature_params()
 
         assert "reader" in tools_with_params
         assert "searcher" in tools_with_params
@@ -1081,7 +1081,7 @@ class TestSemanticSelectionRegistry:
                 task_types=["analysis"],
                 execution_category=ExecutionCategory.READ_ONLY,
                 mandatory_keywords=["analyze"],
-                progress_params=["path"],
+                signature_params=["path"],
             )
         )
         registry.register(
@@ -1105,8 +1105,8 @@ class TestSemanticSelectionRegistry:
         assert "mandatory_keywords_count" in summary
         assert summary["mandatory_keywords_count"] == 1
 
-        assert "tools_with_progress_params" in summary
-        assert summary["tools_with_progress_params"] == 1
+        assert "tools_with_signature_params" in summary
+        assert summary["tools_with_signature_params"] == 1
 
         assert "parallelizable_tools" in summary
 
@@ -1118,7 +1118,7 @@ class TestSemanticSelectionRegistry:
             get_task_type_tool_mapping,
             get_tools_by_execution_category,
             get_parallelizable_tools,
-            get_progress_params,
+            get_signature_params,
             get_execution_category_mapping,
         )
 
@@ -1128,7 +1128,7 @@ class TestSemanticSelectionRegistry:
         assert isinstance(get_task_type_tool_mapping(), dict)
         assert isinstance(get_tools_by_execution_category(ExecutionCategory.READ_ONLY), set)
         assert isinstance(get_parallelizable_tools(), set)
-        assert isinstance(get_progress_params("any_tool"), set)
+        assert isinstance(get_signature_params("any_tool"), set)
         assert isinstance(get_execution_category_mapping(), dict)
 
 

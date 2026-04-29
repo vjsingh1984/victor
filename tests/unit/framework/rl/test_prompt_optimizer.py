@@ -374,6 +374,37 @@ class TestPromptOptimizerLearner:
         assert "total_candidates" in metrics
         assert metrics["total_candidates"] == 0
 
+    def test_export_candidate_rows_includes_lineage_and_status(self, learner):
+        candidate = PromptCandidate(
+            section_name="GROUNDING_RULES",
+            text="candidate prompt",
+            text_hash="hash1234abcd",
+            generation=3,
+            parent_hash="parent1234ab",
+            provider="default",
+            alpha=2.0,
+            beta_val=4.0,
+            sample_count=7,
+            benchmark_passed=True,
+            is_active=True,
+            strategy_chain="gepa+merge",
+        )
+        learner._candidates[learner._candidate_key("GROUNDING_RULES", "default")] = [candidate]
+
+        rows = learner.export_candidate_rows()
+
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["section"] == "GROUNDING_RULES"
+        assert row["provider"] == "default"
+        assert row["ordinal"] == 3
+        assert row["parent_hash"] == "parent1234ab"
+        assert row["text_hash"] == "hash1234abcd"
+        assert row["active"] is True
+        assert row["benchmark_passed"] is True
+        assert row["alpha"] == 2.0
+        assert row["beta"] == 4.0
+
     def test_categorize_failure(self):
         assert (
             PromptOptimizerLearner._categorize_failure("File not found: foo.py") == "file_not_found"

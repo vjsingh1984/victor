@@ -60,7 +60,7 @@ async def test_shell_allow_dangerous():
         mock_process.communicate = AsyncMock(return_value=(b"", b""))
         mock_subprocess.return_value = mock_process
 
-        await shell(cmd="rm -rf test", dangerous=True)
+        await shell(cmd="rm -rf test", dangerous=True, readonly=False)
 
         # Should attempt to execute
         mock_subprocess.assert_called_once()
@@ -86,7 +86,7 @@ async def test_shell_timeout():
         mock_process.wait = AsyncMock(return_value=None)
         mock_subprocess.return_value = mock_process
 
-        result = await shell(cmd="sleep 100", timeout=1)
+        result = await shell(cmd="sleep 100", timeout=1, readonly=False)
 
         assert result["success"] is False
         assert "timed out" in result["error"] or "Failed to execute" in result["error"]
@@ -111,11 +111,20 @@ async def test_shell_general_exception():
     ):
         mock_subprocess.side_effect = RuntimeError("Unexpected error")
 
-        result = await shell(cmd="echo test")
+        result = await shell(cmd="echo test", readonly=False)
 
         assert result["success"] is False
         assert "Failed to execute command" in result["error"]
         assert result["return_code"] == -1
+
+
+@pytest.mark.asyncio
+async def test_shell_defaults_to_readonly_mode():
+    """Shell should default to readonly mode when the caller omits the flag."""
+    result = await shell(cmd="sleep 1")
+
+    assert result["success"] is False
+    assert "readonly mode" in result["error"]
 
 
 @pytest.mark.asyncio

@@ -2520,3 +2520,35 @@ class PromptOptimizerLearner(BaseLearner):
             "use_pareto": self._use_pareto,
             "pareto": pareto_info,
         }
+
+    def export_candidate_rows(self) -> List[Dict[str, Any]]:
+        """Export flat candidate rows for status/reporting UIs."""
+        rows: List[Dict[str, Any]] = []
+        for key, candidates in self._candidates.items():
+            for candidate in sorted(candidates, key=lambda c: (-c.generation, c.text_hash)):
+                rows.append(
+                    {
+                        "key": key,
+                        "section": candidate.section_name,
+                        "provider": candidate.provider,
+                        "ordinal": candidate.generation,
+                        "parent_hash": candidate.parent_hash,
+                        "text_hash": candidate.text_hash,
+                        "active": candidate.is_active,
+                        "benchmark_passed": candidate.benchmark_passed,
+                        "benchmark_runs": candidate.benchmark_runs,
+                        "sample_count": candidate.sample_count,
+                        "alpha": candidate.alpha,
+                        "beta": candidate.beta_val,
+                        "mean": candidate.mean,
+                        "strategy": candidate.strategy_chain or candidate.strategy_name,
+                        "chars": candidate.char_length or len(candidate.text),
+                        "preview": (
+                            candidate.text[:80] + "..."
+                            if len(candidate.text) > 80
+                            else candidate.text
+                        ),
+                    }
+                )
+        rows.sort(key=lambda row: (row["section"], row["provider"], -row["ordinal"]))
+        return rows

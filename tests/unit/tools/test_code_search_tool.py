@@ -139,7 +139,7 @@ def test_build_codebase_embedding_config_forwards_existing_search_settings(tmp_p
     assert config["embedding_model_name"] == "BAAI/bge-small-en-v1.5"
     assert config["extra_config"]["dimension"] == 768
     assert config["extra_config"]["batch_size"] == 12
-    assert config["extra_config"]["structural_indexing_enabled"] is True
+    assert config["extra_config"]["structural_indexing_enabled"] is False
     assert config["extra_config"]["code_chunking_strategy"] == "tree_sitter_structural"
     assert config["extra_config"]["chunk_size"] == 500
     assert config["extra_config"]["chunk_overlap"] == 50

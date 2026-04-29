@@ -1164,6 +1164,32 @@ class TestToolExecutorUnknownArguments:
         assert should_proceed is True
         assert executor._validation_failures == 1  # Still counted as failure
 
+    def test_validate_arguments_lenient_mode_is_strict_for_execute_tools(
+        self, mock_tool_with_schema
+    ):
+        """Stateful tools should not bypass validation just because global mode is lenient."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import AccessMode, ToolValidationResult
+
+        mock_tool_with_schema.access_mode = AccessMode.EXECUTE
+        mock_tool_with_schema.validate_parameters_detailed = MagicMock(
+            return_value=ToolValidationResult.success()
+        )
+
+        registry = ToolRegistry()
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.LENIENT,
+        )
+
+        should_proceed, result = executor._validate_arguments(
+            mock_tool_with_schema, {"path": "/test", "invented_arg": "value"}
+        )
+
+        assert should_proceed is False
+        assert result is not None
+        assert "Unknown argument(s): invented_arg" in result.errors[0]
+
     def test_check_unknown_arguments_empty_schema(self):
         """Test that tools with empty schema allow any arguments."""
         from victor.agent.tool_executor import ValidationMode

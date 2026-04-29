@@ -25,6 +25,8 @@ Key Features:
 - Batch operations for performance
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from pathlib import Path
@@ -42,6 +44,16 @@ from victor.storage.unified.protocol import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_graph_types() -> Tuple[type, type]:
+    """Lazy import of graph types.
+
+    Returns:
+        Tuple of (GraphNode, GraphEdge) classes
+    """
+    from victor.storage.graph.protocol import GraphEdge, GraphNode
+    return GraphNode, GraphEdge
 
 
 class SqliteLanceDBStore:
@@ -740,6 +752,192 @@ class SqliteLanceDBStore:
                 results[r.symbol.unified_id] = r
 
         return sorted(results.values(), key=lambda r: r.score, reverse=True)
+
+    # =========================================================================
+    # Graph Indexing Integration
+    # =========================================================================
+
+    async def ensure_graph_indexed(
+        self,
+        enable_ccg: bool = True,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """Ensure the codebase graph is indexed with optional CCG.
+
+        This method provides automatic graph indexing integration. It checks
+        if graph indexing is needed based on staleness, and runs the full
+        graph indexing pipeline with CCG if enabled.
+
+        Args:
+            enable_ccg: Whether to build Code Context Graph (CFG/CDG/DDG)
+            force: Force re-indexing even if graph is fresh
+
+        Returns:
+            Dictionary with indexing stats and metadata
+        """
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+        from victor.config.settings import get_settings
+
+        if not self._initialized:
+            await self.initialize()
+
+        # Check feature flags
+        flag_manager = get_feature_flag_manager()
+        if not flag_manager.is_enabled(FeatureFlag.USE_CCG):
+            enable_ccg = False
+
+        # Check if graph is fresh
+        if not force:
+            graph_stats = await self._graph_store.stats()
+            node_count = graph_stats.get("node_count", graph_stats.get("nodes", 0))
+            if node_count > 0:
+                # Graph exists, check if we should still update
+                # For now, consider any existing graph as "fresh enough"
+                # Future: add staleness detection based on file mtimes
+                return {
+                    "indexed": False,
+                    "reason": "graph_exists",
+                    "stats": graph_stats,
+                }
+
+        # Run graph indexing
+        from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+
+        # Get settings for CCG languages
+        settings = get_settings()
+        graph_settings = getattr(settings, "graph", None)
+        ccg_languages = ["python", "javascript", "typescript", "go", "rust"]
+        if graph_settings:
+            ccg_languages = getattr(graph_settings, "ccg_languages", ccg_languages)
+
+        config = GraphIndexConfig(
+            root_path=self.repo_root,
+            enable_ccg=enable_ccg,
+            enable_embeddings=False,  # Embeddings handled separately
+            ccg_languages=set(ccg_languages),
+        )
+
+        pipeline = GraphIndexingPipeline(self._graph_store, config)
+        stats = await pipeline.index_repository()
+
+        return {
+            "indexed": True,
+            "stats": stats.to_dict(),
+            "enable_ccg": enable_ccg,
+        }
+
+    async def upsert_symbols(
+        self,
+        symbols: List[UnifiedSymbol],
+        build_graph: bool = True,
+        build_ccg: bool = True,
+    ) -> Dict[str, int]:
+        """Insert or update symbols with optional graph building.
+
+        This is the main integration point for codebase indexers to
+        automatically trigger graph indexing when symbols are added.
+
+        Args:
+            symbols: List of unified symbols to upsert
+            build_graph: Whether to build graph edges between symbols
+            build_ccg: Whether to build Code Context Graph
+
+        Returns:
+            Dictionary with counts of nodes/edges created
+        """
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+        from victor.config.settings import get_settings
+
+        if not self._initialized:
+            await self.initialize()
+
+        # Check feature flags
+        flag_manager = get_feature_flag_manager()
+        if not flag_manager.is_enabled(FeatureFlag.USE_CCG):
+            build_ccg = False
+
+        # Get settings
+        settings = get_settings()
+        graph_settings = getattr(settings, "graph", None)
+        if graph_settings:
+            ccg_languages = getattr(graph_settings, "ccg_languages", [])
+        else:
+            ccg_languages = []
+
+        # Convert symbols to graph nodes
+        GraphNode, GraphEdge = _get_graph_types()
+        from victor.storage.graph.edge_types import EdgeType
+
+        nodes = []
+        edges = []
+
+        for symbol in symbols:
+            # Create node from symbol
+            node = GraphNode(
+                node_id=symbol.unified_id,
+                type=symbol.symbol_type,
+                name=symbol.symbol_name,
+                file=symbol.file_path,
+                line=symbol.line_number,
+                end_line=symbol.end_line,
+                lang=symbol.language,
+                signature=symbol.signature,
+                docstring=symbol.docstring,
+            )
+            nodes.append(node)
+
+            # Build CONTAINS edge for nested symbols
+            if symbol.parent_id and symbol.parent_id != symbol.unified_id:
+                edges.append(GraphEdge(
+                    src=symbol.parent_id,
+                    dst=symbol.unified_id,
+                    type=EdgeType.CONTAINS,
+                ))
+
+        # Store nodes and edges
+        await self._graph_store.upsert_nodes(nodes)
+        if edges:
+            await self._graph_store.upsert_edges(edges)
+
+        result = {
+            "nodes_created": len(nodes),
+            "edges_created": len(edges),
+        }
+
+        # Build CCG if enabled
+        if build_ccg and ccg_languages:
+            from victor.core.indexing.ccg_builder import CodeContextGraphBuilder
+
+            ccg_builder = CodeContextGraphBuilder(self._graph_store)
+
+            # Group files by language
+            files_by_lang: Dict[str, List[Path]] = {}
+            for symbol in symbols:
+                if symbol.language in ccg_languages:
+                    file_path = Path(symbol.file_path)
+                    if file_path not in files_by_lang[symbol.language]:
+                        files_by_lang[symbol.language].append(file_path)
+
+            # Build CCG for each file
+            ccg_nodes = 0
+            ccg_edges = 0
+            for language, files in files_by_lang.items():
+                for file_path in files:
+                    try:
+                        cn, ce = await ccg_builder.build_ccg_for_file(file_path, language)
+                        if cn:
+                            await self._graph_store.upsert_nodes(cn)
+                            ccg_nodes += len(cn)
+                        if ce:
+                            await self._graph_store.upsert_edges(ce)
+                            ccg_edges += len(ce)
+                    except Exception as e:
+                        logger.warning(f"CCG build failed for {file_path}: {e}")
+
+            result["ccg_nodes_created"] = ccg_nodes
+            result["ccg_edges_created"] = ccg_edges
+
+        return result
 
     # =========================================================================
     # Maintenance

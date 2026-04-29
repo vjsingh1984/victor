@@ -308,16 +308,17 @@ class StateValidator:
             hints = get_type_hints(self._schema)
             if hasattr(self._schema, "__required_keys__"):
                 required = self._schema.__required_keys__
-                # optional = set(hints.keys()) - required  # TODO: Use for optional validation
+                optional = set(hints.keys()) - required
             else:
                 required = set(hints.keys())
+                optional = set()
 
             # Check required fields
             for key in required:
                 if key not in state:
                     errors.append(f"Missing required field: '{key}'")
 
-            # Type checking for present fields
+            # Type checking for present fields (including optional)
             for key, value in state.items():
                 if key not in hints:
                     errors.append(f"Unexpected field: '{key}'")
@@ -328,6 +329,15 @@ class StateValidator:
                     errors.append(
                         f"Type mismatch for '{key}': expected {expected_type}, got {type(value).__name__}"
                     )
+
+            # Validate optional field types when present
+            for key in optional:
+                if key in state:
+                    expected_type = hints[key]
+                    if not self._check_type(state[key], expected_type):
+                        errors.append(
+                            f"Type mismatch for optional field '{key}': expected {expected_type}, got {type(state[key]).__name__}"
+                        )
 
             return errors
         except Exception as e:

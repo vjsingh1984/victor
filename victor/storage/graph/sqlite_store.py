@@ -6,7 +6,7 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, TYPE_CHECKING
 
 from victor.core.schema import Tables
 from victor.storage.graph.protocol import (
@@ -156,12 +156,21 @@ class SqliteGraphStore(GraphStoreProtocol):
         cursor = conn.execute(f"PRAGMA table_info({_NODE_TABLE})")
         columns = {row[1] for row in cursor.fetchall()}
 
+        # v4 columns (legacy)
         new_columns = [
             ("end_line", "INTEGER"),
             ("signature", "TEXT"),
             ("docstring", "TEXT"),
             ("parent_id", "TEXT"),
         ]
+        # v5 columns (CCG and Graph RAG)
+        new_columns.extend([
+            ("ast_kind", "TEXT"),
+            ("scope_id", "TEXT"),
+            ("statement_type", "TEXT"),
+            ("requirement_id", "TEXT"),
+            ("visibility", "TEXT"),
+        ])
         for col_name, col_type in new_columns:
             if col_name not in columns:
                 try:
@@ -184,6 +193,12 @@ class SqliteGraphStore(GraphStoreProtocol):
                 n.parent_id,
                 n.embedding_ref,
                 json.dumps(n.metadata),
+                # v5 CCG fields
+                n.ast_kind,
+                n.scope_id,
+                n.statement_type,
+                n.requirement_id,
+                n.visibility,
             )
             for n in nodes
         ]
@@ -194,8 +209,9 @@ class SqliteGraphStore(GraphStoreProtocol):
             conn.executemany(
                 f"""
                 INSERT INTO {_NODE_TABLE}(node_id, type, name, file, line, end_line, lang,
-                                 signature, docstring, parent_id, embedding_ref, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 signature, docstring, parent_id, embedding_ref, metadata,
+                                 ast_kind, scope_id, statement_type, requirement_id, visibility)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(node_id) DO UPDATE SET
                     type=excluded.type,
                     name=excluded.name,
@@ -207,7 +223,12 @@ class SqliteGraphStore(GraphStoreProtocol):
                     docstring=excluded.docstring,
                     parent_id=excluded.parent_id,
                     embedding_ref=excluded.embedding_ref,
-                    metadata=excluded.metadata
+                    metadata=excluded.metadata,
+                    ast_kind=excluded.ast_kind,
+                    scope_id=excluded.scope_id,
+                    statement_type=excluded.statement_type,
+                    requirement_id=excluded.requirement_id,
+                    visibility=excluded.visibility
                 """,
                 rows,
             )
@@ -341,7 +362,9 @@ class SqliteGraphStore(GraphStoreProtocol):
 
     def _row_to_node(self, row: tuple) -> GraphNode:
         """Convert a database row to a GraphNode."""
-        return GraphNode(
+        # Handle both v4 (12 columns) and v5 (17 columns) schemas
+        row_len = len(row)
+        node = GraphNode(
             node_id=row[0],
             type=row[1],
             name=row[2],
@@ -353,10 +376,22 @@ class SqliteGraphStore(GraphStoreProtocol):
             docstring=row[8],
             parent_id=row[9],
             embedding_ref=row[10],
-            metadata=json.loads(row[11]) if row[11] else {},
+            metadata=json.loads(row[11]) if row_len > 11 and row[11] else {},
         )
+        # v5 CCG fields (optional for backward compatibility)
+        if row_len > 12:
+            node.ast_kind = row[12]
+        if row_len > 13:
+            node.scope_id = row[13]
+        if row_len > 14:
+            node.statement_type = row[14]
+        if row_len > 15:
+            node.requirement_id = row[15]
+        if row_len > 16:
+            node.visibility = row[16]
+        return node
 
-    _NODE_COLS = "node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, embedding_ref, metadata"
+    _NODE_COLS = "node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, embedding_ref, metadata, ast_kind, scope_id, statement_type, requirement_id, visibility"
 
     async def find_nodes(
         self,
@@ -563,3 +598,316 @@ class SqliteGraphStore(GraphStoreProtocol):
                 )
                 for row in cur.fetchall()
             ]
+
+    # ===========================================
+    # v5: Lazy loading methods (PH4-006)
+    # ===========================================
+
+    async def iter_nodes(
+        self,
+        *,
+        batch_size: int = 100,
+        name: str | None = None,
+        type: str | None = None,
+        file: str | None = None,
+    ) -> AsyncIterator[List[GraphNode]]:
+        """Iterate over nodes in batches for memory-efficient processing."""
+        clauses = []
+        params: list[Any] = []
+        if name:
+            clauses.append("name = ?")
+            params.append(name)
+        if type:
+            clauses.append("type = ?")
+            params.append(type)
+        if file:
+            clauses.append("file = ?")
+            params.append(file)
+        where = " AND ".join(clauses) if clauses else "1=1"
+        query = f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE {where} ORDER BY file, line, name"
+
+        async with self._lock:
+            conn = self._connect()
+            cur = conn.execute(query, params)
+
+            while True:
+                rows = cur.fetchmany(batch_size)
+                if not rows:
+                    break
+                yield [self._row_to_node(row) for row in rows]
+
+    async def iter_edges(
+        self,
+        *,
+        batch_size: int = 100,
+        edge_types: Iterable[str] | None = None,
+    ) -> AsyncIterator[List[GraphEdge]]:
+        """Iterate over edges in batches for memory-efficient processing."""
+        query = f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE}"
+        params: list[Any] = []
+
+        if edge_types:
+            types = list(edge_types)
+            placeholders = ",".join("?" for _ in types)
+            query += f" WHERE type IN ({placeholders})"
+            params.extend(types)
+
+        query += " ORDER BY src, dst, type"
+
+        async with self._lock:
+            conn = self._connect()
+            cur = conn.execute(query, params)
+
+            while True:
+                rows = cur.fetchmany(batch_size)
+                if not rows:
+                    break
+                yield [
+                    GraphEdge(
+                        src=row[0],
+                        dst=row[1],
+                        type=row[2],
+                        weight=row[3],
+                        metadata=json.loads(row[4]) if row[4] else {},
+                    )
+                    for row in rows
+                ]
+
+    async def iter_neighbors(
+        self,
+        node_id: str,
+        *,
+        batch_size: int = 50,
+        edge_types: Iterable[str] | None = None,
+        direction: GraphTraversalDirection = "out",
+    ) -> AsyncIterator[List[GraphEdge]]:
+        """Iterate over neighbors in batches for memory-efficient traversal."""
+        if direction not in {"out", "in", "both"}:
+            raise ValueError(f"Unsupported graph traversal direction: {direction}")
+
+        # Build query for single-hop neighbors
+        if direction == "out":
+            node_column = "src"
+            neighbor_column = "dst"
+        elif direction == "in":
+            node_column = "dst"
+            neighbor_column = "src"
+        else:  # both
+            # For both directions, we'll use two queries
+            async for batch in self._iter_neighbors_direction(
+                node_id, batch_size, edge_types, "src", "dst"
+            ):
+                yield batch
+            async for batch in self._iter_neighbors_direction(
+                node_id, batch_size, edge_types, "dst", "src"
+            ):
+                yield batch
+            return
+
+        async for batch in self._iter_neighbors_direction(
+            node_id, batch_size, edge_types, node_column, neighbor_column
+        ):
+            yield batch
+
+    async def _iter_neighbors_direction(
+        self,
+        node_id: str,
+        batch_size: int,
+        edge_types: Iterable[str] | None,
+        node_column: str,
+        neighbor_column: str,
+    ) -> AsyncIterator[List[GraphEdge]]:
+        """Helper for iterating neighbors in a specific direction."""
+        query = f"""
+            SELECT src, dst, type, weight, metadata, {neighbor_column}
+            FROM {_EDGE_TABLE}
+            WHERE {node_column} = ?
+        """
+        params: list[Any] = [node_id]
+
+        if edge_types:
+            types = list(edge_types)
+            placeholders = ",".join("?" for _ in types)
+            query += f" AND type IN ({placeholders})"
+            params.extend(types)
+
+        query += f" ORDER BY {neighbor_column}, type"
+
+        async with self._lock:
+            conn = self._connect()
+            cur = conn.execute(query, params)
+
+            while True:
+                rows = cur.fetchmany(batch_size)
+                if not rows:
+                    break
+                yield [
+                    GraphEdge(
+                        src=row[0],
+                        dst=row[1],
+                        type=row[2],
+                        weight=row[3],
+                        metadata=json.loads(row[4]) if row[4] else {},
+                    )
+                    for row in rows
+                ]
+
+    # ===========================================
+    # v5: Parallel traversal methods (PH4-007)
+    # ===========================================
+
+    async def get_neighbors_batch(
+        self,
+        node_ids: List[str],
+        *,
+        edge_types: Iterable[str] | None = None,
+        direction: GraphTraversalDirection = "out",
+    ) -> Dict[str, List[GraphEdge]]:
+        """Get neighbors for multiple nodes in parallel.
+
+        Uses asyncio.gather() to fetch neighbors concurrently.
+
+        Args:
+            node_ids: List of node IDs to get neighbors for
+            edge_types: Optional filter by edge types
+            direction: Traversal direction
+
+        Returns:
+            Dict mapping node_id to list of neighboring edges
+        """
+        if not node_ids:
+            return {}
+
+        # Create tasks for each node
+        tasks = [
+            self.get_neighbors(
+                node_id,
+                edge_types=edge_types,
+                direction=direction,
+                max_depth=1,
+            )
+            for node_id in node_ids
+        ]
+
+        # Execute in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Build result dict
+        neighbor_map: Dict[str, List[GraphEdge]] = {}
+        for node_id, result in zip(node_ids, results):
+            if isinstance(result, Exception):
+                logger.warning(f"Error getting neighbors for {node_id}: {result}")
+                neighbor_map[node_id] = []
+            else:
+                neighbor_map[node_id] = result
+
+        return neighbor_map
+
+    async def multi_hop_traverse_parallel(
+        self,
+        start_node_ids: List[str],
+        max_hops: int = 2,
+        edge_types: Iterable[str] | None = None,
+        max_nodes: int = 100,
+        max_workers: int = 4,
+    ) -> GraphQueryResult:
+        """Parallel multi-hop traversal from multiple start nodes.
+
+        Performs BFS traversal but processes multiple frontier nodes
+        in parallel using asyncio.gather().
+
+        Args:
+            start_node_ids: Multiple starting node IDs
+            max_hops: Maximum hop distance
+            edge_types: Optional filter by edge types
+            max_nodes: Maximum total nodes to return
+            max_workers: Maximum parallel workers
+
+        Returns:
+            GraphQueryResult with traversed nodes and edges
+        """
+        import time
+        from victor.storage.graph.protocol import GraphQueryResult
+
+        start_time = time.time()
+
+        if not start_node_ids:
+            return GraphQueryResult(nodes=[], edges=[], query="parallel_traversal")
+
+        # Initialize BFS state
+        visited: Set[str] = set(start_node_ids)
+        frontier: List[str] = list(start_node_ids)
+        all_edges: Dict[tuple[str, str, str], GraphEdge] = {}
+        all_nodes: Dict[str, GraphNode] = {}
+
+        # Get initial nodes
+        for node_id in start_node_ids:
+            node = await self.get_node_by_id(node_id)
+            if node:
+                all_nodes[node_id] = node
+
+        # Parallel BFS
+        for hop in range(max_hops):
+            if not frontier or len(all_nodes) >= max_nodes:
+                break
+
+            # Process frontier in parallel batches
+            batch_size = max_workers
+            results: Dict[str, List[GraphEdge]] = {}
+
+            for i in range(0, len(frontier), batch_size):
+                batch = frontier[i:i + batch_size]
+
+                # Fetch neighbors for this batch in parallel
+                batch_results = await self.get_neighbors_batch(
+                    batch,
+                    edge_types=edge_types,
+                    direction="out",
+                )
+
+                results.update(batch_results)
+
+            # Process results
+            next_frontier: Set[str] = set()
+
+            for node_id, neighbors in results.items():
+                for edge in neighbors:
+                    # Store edge
+                    edge_key = (edge.src, edge.dst, edge.type)
+                    if edge_key not in all_edges:
+                        all_edges[edge_key] = edge
+
+                    # Track neighbor
+                    neighbor_id = edge.dst
+                    if neighbor_id not in visited:
+                        visited.add(neighbor_id)
+                        next_frontier.add(neighbor_id)
+
+                        # Get neighbor node details
+                        if len(all_nodes) < max_nodes:
+                            node = await self.get_node_by_id(neighbor_id)
+                            if node:
+                                all_nodes[neighbor_id] = node
+
+                        # Stop if we've reached max_nodes
+                        if len(all_nodes) >= max_nodes:
+                            break
+
+                if len(all_nodes) >= max_nodes:
+                    break
+
+            frontier = list(next_frontier)
+
+        # Build result
+        return GraphQueryResult(
+            nodes=list(all_nodes.values()),
+            edges=list(all_edges.values()),
+            query=f"parallel_traverse_{len(start_node_ids)}_seeds",
+            execution_time_ms=(time.time() - start_time) * 1000,
+            metadata={
+                "start_nodes": start_node_ids,
+                "max_hops": max_hops,
+                "hops_completed": hop + 1 if hop < max_hops else max_hops,
+                "max_workers": max_workers,
+            },
+        )
