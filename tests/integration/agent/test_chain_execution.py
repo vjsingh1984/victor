@@ -1057,3 +1057,229 @@ class TestChainBindingAndConfiguration:
 
         result = await runnable.invoke({"data": "test"}, config)
         assert result["processed"] is True
+
+
+# =============================================================================
+# Integration: Workflow Chain Handler Resolution
+# =============================================================================
+
+
+@pytest.mark.integration
+class TestWorkflowChainHandlerResolution:
+    """Integration tests for chain handler resolution in workflows."""
+
+    @pytest.mark.asyncio
+    async def test_chain_handler_resolution_with_vertical(self):
+        """Chain handlers with vertical namespace are resolved correctly."""
+
+        # Register a chain
+        @chain("workflow_test:analyze")
+        def analyze_chain():
+            return RunnableLambda(lambda x: {"analyzed": True, "input": x.get("data")})
+
+        # Simulate workflow executor resolution
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+
+        executor = ComputeNodeExecutor()
+
+        # Test resolution with vertical
+        handler = executor._resolve_chain_handler("chain:workflow_test:analyze")
+        assert handler is not None
+
+        # Create mock node and context
+        from victor.workflows.definition import ComputeNode
+        from victor.workflows.context import WorkflowContext
+
+        node = ComputeNode(
+            id="test_node",
+            name="Test Node",
+            handler="chain:workflow_test:analyze",
+            input_mapping={"data": "$ctx.input_data"},
+            output_key="result",
+        )
+
+        context = WorkflowContext({"input_data": "test data"})
+
+        # Execute the handler
+        result = await handler(node, context, None)
+
+        assert result.status.value == "completed"
+        assert result.output["analyzed"] is True
+        assert result.output["input"] == "test data"
+        assert context.get("result") == result.output
+
+    @pytest.mark.asyncio
+    async def test_chain_handler_resolution_without_vertical(self):
+        """Chain handlers without vertical namespace are resolved correctly."""
+
+        # Register a chain without vertical
+        @chain("simple_process")
+        def simple_chain():
+            return RunnableLambda(lambda x: {"processed": x.get("value") * 2})
+
+        # Simulate workflow executor resolution
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+
+        executor = ComputeNodeExecutor()
+
+        # Test resolution without vertical
+        handler = executor._resolve_chain_handler("chain:simple_process")
+        assert handler is not None
+
+        # Create mock node and context
+        from victor.workflows.definition import ComputeNode
+        from victor.workflows.context import WorkflowContext
+
+        node = ComputeNode(
+            id="test_node",
+            name="Test Node",
+            handler="chain:simple_process",
+        )
+
+        context = WorkflowContext({"value": 21})
+
+        # Execute the handler
+        result = await handler(node, context, None)
+
+        assert result.status.value == "completed"
+        assert result.output["processed"] == 42
+
+    @pytest.mark.asyncio
+    async def test_chain_handler_not_found(self):
+        """Non-existent chain handlers return None gracefully."""
+
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+
+        executor = ComputeNodeExecutor()
+
+        # Test with non-existent chain
+        handler = executor._resolve_chain_handler("chain:nonexistent:missing")
+        assert handler is None
+
+    @pytest.mark.asyncio
+    async def test_chain_handler_timeout(self):
+        """Chain handlers respect timeout configuration."""
+
+        import asyncio
+
+        @chain("timeout_test:slow")
+        def slow_chain():
+            async def slow_fn(x):
+                await asyncio.sleep(5)
+                return {"done": True}
+
+            return RunnableLambda(slow_fn)
+
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+        from victor.workflows.definition import ComputeNode
+        from victor.workflows.context import WorkflowContext
+
+        executor = ComputeNodeExecutor()
+        handler = executor._resolve_chain_handler("chain:timeout_test:slow")
+
+        from victor.workflows.definition import TaskConstraints
+
+        node = ComputeNode(
+            id="timeout_node",
+            name="Timeout Node",
+            handler="chain:timeout_test:slow",
+            constraints=TaskConstraints(_timeout=1.0),  # 1 second timeout
+        )
+
+        context = WorkflowContext({})
+
+        # Execute should timeout
+        result = await handler(node, context, None)
+
+        assert result.status.value == "failed"
+        assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_chain_handler_with_input_output_mapping(self):
+        """Chain handlers properly map input and output using input_mapping."""
+
+        @chain("mapping_test:transform")
+        def transform_chain():
+            return RunnableLambda(
+                lambda x: {
+                    "result": f"Processed: {x.get('content')}",
+                    "length": len(x.get("content", "")),
+                }
+            )
+
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+        from victor.workflows.definition import ComputeNode
+        from victor.workflows.context import WorkflowContext
+
+        executor = ComputeNodeExecutor()
+        handler = executor._resolve_chain_handler("chain:mapping_test:transform")
+
+        node = ComputeNode(
+            id="mapping_node",
+            name="Mapping Node",
+            handler="chain:mapping_test:transform",
+            input_mapping={"content": "$ctx.input_text"},
+            output_key="transformed",
+        )
+
+        context = WorkflowContext({"input_text": "Hello, World!"})
+
+        result = await handler(node, context, None)
+
+        assert result.status.value == "completed"
+        assert result.output["result"] == "Processed: Hello, World!"
+        assert result.output["length"] == 13
+        assert context.get("transformed") == result.output
+
+    @pytest.mark.asyncio
+    async def test_chain_handler_error_propagation(self):
+        """Chain handlers propagate exceptions as failed results."""
+
+        @chain("error_test:failing")
+        def failing_chain():
+            def fail_fn(x):
+                raise ValueError("Simulated chain failure")
+
+            return RunnableLambda(fail_fn)
+
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+        from victor.workflows.definition import ComputeNode
+        from victor.workflows.context import WorkflowContext
+
+        executor = ComputeNodeExecutor()
+        handler = executor._resolve_chain_handler("chain:error_test:failing")
+
+        node = ComputeNode(
+            id="error_node",
+            name="Error Node",
+            handler="chain:error_test:failing",
+        )
+
+        context = WorkflowContext({})
+
+        result = await handler(node, context, None)
+
+        assert result.status.value == "failed"
+        assert "execution failed" in result.error.lower()
+        assert "Simulated chain failure" in result.error
+
+    @pytest.mark.asyncio
+    async def test_get_compute_handler_with_chain_prefix(self):
+        """_get_compute_handler correctly routes chain: prefixed handlers."""
+
+        @chain("routing_test:target")
+        def target_chain():
+            return RunnableLambda(lambda x: {"routed": True})
+
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+
+        executor = ComputeNodeExecutor()
+
+        # Chain handler should be resolved
+        chain_handler = executor._get_compute_handler("chain:routing_test:target")
+        assert chain_handler is not None
+
+        # Regular handler should use compute_registry
+        regular_handler = executor._get_compute_handler("some_regular_handler")
+        # Will be None since handler not registered, but different code path
+        assert regular_handler is None
