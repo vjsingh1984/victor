@@ -56,9 +56,7 @@ from victor.evaluation.test_runners import (
 logger = logging.getLogger(__name__)
 
 
-def _clamp(value: float, lower: float, upper: float) -> float:
-    """Bound a numeric score into a closed interval."""
-    return max(lower, min(upper, value))
+from victor.core.utils import clamp as _clamp
 
 
 class AgenticValidationType(Enum):

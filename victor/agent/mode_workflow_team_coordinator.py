@@ -710,11 +710,10 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         """
         mode_config = self._mode_configs.get(mode)
         if mode_config and mode_config.default_workflows:
-            # Check if any default workflow exists in context
-            if self._vertical_context:
-                for name in mode_config.default_workflows:
-                    if self._vertical_context.get_workflow(name):
-                        return name
+            available_workflows = self._get_available_workflows()
+            for name in mode_config.default_workflows:
+                if name in available_workflows:
+                    return name
             return mode_config.default_workflows[0]
         return None
 
@@ -782,9 +781,11 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         Returns:
             Dict mapping team names to specs
         """
-        if self._vertical_context:
-            return self._vertical_context.team_specs or {}
-        return {}
+        if not self._vertical_context:
+            return {}
+
+        team_catalog = self._get_coordination_catalog().team_catalog
+        return dict(team_catalog.team_specs) if team_catalog.has_team_specs else {}
 
     def _get_available_workflows(self) -> Dict[str, Any]:
         """Get available workflows from context.
@@ -792,9 +793,17 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         Returns:
             Dict mapping workflow names to definitions
         """
-        if self._vertical_context:
-            return self._vertical_context.workflows or {}
-        return {}
+        if not self._vertical_context:
+            return {}
+
+        workflow_catalog = self._get_coordination_catalog().workflow_catalog
+        return dict(workflow_catalog.workflow_specs) if workflow_catalog.has_workflow_specs else {}
+
+    def _get_coordination_catalog(self) -> Any:
+        """Resolve the shared team/workflow catalog for the current vertical context."""
+        from victor.framework.team_runtime import resolve_vertical_coordination_catalog
+
+        return resolve_vertical_coordination_catalog(self._vertical_context)
 
     def _get_workflow_recommendations(
         self,

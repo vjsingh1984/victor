@@ -27,8 +27,7 @@ _SUCCESS_STATUSES = {"passed", "complete", "completed", "resolved", "success"}
 _FAILURE_STATUSES = {"failed", "error", "timeout", "cancelled"}
 
 
-def _clamp(value: float, lower: float, upper: float) -> float:
-    return max(lower, min(upper, value))
+from victor.core.utils import clamp as _clamp
 
 
 def _coerce_optional_text(value: Any) -> Optional[str]:

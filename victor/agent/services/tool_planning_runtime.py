@@ -22,6 +22,7 @@ implementation for compatibility.
 """
 
 import logging
+from copy import copy
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.core.events import ObservabilityBus
@@ -86,32 +87,59 @@ class ToolPlanner:
         return self.tool_registrar.infer_goals_from_message(user_message)
 
     def filter_tools_by_intent(
-        self, tools: List[Any], current_intent: Optional["ActionIntent"] = None
+        self,
+        tools: List[Any],
+        current_intent: Optional["ActionIntent"] = None,
+        user_message: Optional[str] = None,
     ) -> List[Any]:
         """Filter tools based on detected user intent."""
         if current_intent is None:
             return tools
 
-        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS
         from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+        from victor.agent.action_authorizer import get_intent_blocked_tools, is_tool_blocked_for_intent
 
-        blocked_tools = INTENT_BLOCKED_TOOLS.get(current_intent, frozenset())
+        blocked_tools = get_intent_blocked_tools(current_intent)
         if not blocked_tools:
             return tools
 
         def get_tool_name(tool: Any) -> str:
             if hasattr(tool, "name"):
-                return canonicalize_core_tool_name(tool.name)
+                return canonicalize_core_tool_name(tool.name, preserve_variants=True)
             if isinstance(tool, dict):
-                return canonicalize_core_tool_name(tool.get("name", ""))
+                return canonicalize_core_tool_name(tool.get("name", ""), preserve_variants=True)
             return ""
 
+        def clone_tool_with_name(tool: Any, new_name: str) -> Any:
+            if hasattr(tool, "model_copy"):
+                return tool.model_copy(update={"name": new_name})
+            if isinstance(tool, dict):
+                updated = dict(tool)
+                updated["name"] = new_name
+                return updated
+            cloned = copy(tool)
+            if hasattr(cloned, "name"):
+                cloned.name = new_name
+            return cloned
+
         original_count = len(tools)
-        filtered = [t for t in tools if get_tool_name(t) not in blocked_tools]
+        filtered = []
+        blocked_names = set()
+        for tool in tools:
+            tool_name = get_tool_name(tool)
+            if not tool_name:
+                continue
+            if is_tool_blocked_for_intent(tool_name, current_intent, user_message):
+                blocked_names.add(tool_name)
+                continue
+            filtered.append(
+                clone_tool_with_name(tool, "shell")
+                if tool_name == "shell_readonly"
+                else tool
+            )
         filtered_count = original_count - len(filtered)
 
         if filtered_count > 0:
-            blocked_names = blocked_tools & {get_tool_name(t) for t in tools}
             logger.info(
                 f"Intent {current_intent.value}: filtered {filtered_count} "
                 f"write/generation tools (blocked: {blocked_names})"

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+from inspect import getattr_static
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -122,6 +123,114 @@ class VerticalWorkflowCatalog:
     def list_names(self) -> List[str]:
         """List available workflow names."""
         return list(self.workflow_specs.keys())
+
+
+@dataclass(frozen=True)
+class VerticalCoordinationCatalog:
+    """Combined team/workflow catalog for a vertical-facing surface."""
+
+    team_catalog: VerticalTeamCatalog = field(
+        default_factory=lambda: VerticalTeamCatalog(supported=False, provider_available=False)
+    )
+    workflow_catalog: VerticalWorkflowCatalog = field(
+        default_factory=lambda: VerticalWorkflowCatalog(supported=False, provider_available=False)
+    )
+
+    @property
+    def has_team_specs(self) -> bool:
+        """Whether a team catalog is populated."""
+        return self.team_catalog.has_team_specs
+
+    @property
+    def has_workflow_specs(self) -> bool:
+        """Whether a workflow catalog is populated."""
+        return self.workflow_catalog.has_workflow_specs
+
+    def list_team_names(self) -> List[str]:
+        """List available team names."""
+        return self.team_catalog.list_names()
+
+    def list_workflow_names(self) -> List[str]:
+        """List available workflow names."""
+        return self.workflow_catalog.list_names()
+
+
+def resolve_registered_team_catalogs() -> Dict[str, VerticalTeamCatalog]:
+    """Resolve team catalogs exposed by all registered vertical providers.
+
+    This is the shared framework-facing discovery surface for inspection paths
+    such as CLI capability listings. It normalizes provider-registry payloads
+    into the same ``VerticalTeamCatalog`` shape used elsewhere in the framework.
+    """
+    return _resolve_registered_catalogs(
+        registry_method="get_all_team_specs",
+        catalog_builder=lambda payload: VerticalTeamCatalog(
+            supported=True,
+            provider_available=bool(payload),
+            team_specs=payload,
+        ),
+    )
+
+
+def resolve_registered_workflow_catalogs() -> Dict[str, VerticalWorkflowCatalog]:
+    """Resolve workflow catalogs exposed by all registered vertical providers."""
+    return _resolve_registered_catalogs(
+        registry_method="get_all_workflows",
+        catalog_builder=lambda payload: VerticalWorkflowCatalog(
+            supported=True,
+            provider_available=bool(payload),
+            workflow_specs=payload,
+        ),
+    )
+
+
+def list_registered_team_names(
+    *,
+    vertical: Optional[str] = None,
+    qualify_with_vertical: bool = True,
+) -> List[str]:
+    """List registered team names from the shared framework catalog surface."""
+    return _list_registered_catalog_names(
+        resolve_registered_team_catalogs(),
+        vertical=vertical,
+        qualify_with_vertical=qualify_with_vertical,
+    )
+
+
+def list_registered_workflow_names(
+    *,
+    vertical: Optional[str] = None,
+    qualify_with_vertical: bool = True,
+) -> List[str]:
+    """List registered workflow names from the shared framework catalog surface."""
+    return _list_registered_catalog_names(
+        resolve_registered_workflow_catalogs(),
+        vertical=vertical,
+        qualify_with_vertical=qualify_with_vertical,
+    )
+
+
+def resolve_vertical_coordination_catalog(subject: Any) -> VerticalCoordinationCatalog:
+    """Resolve both team and workflow catalogs for a single vertical surface."""
+    return VerticalCoordinationCatalog(
+        team_catalog=resolve_vertical_team_catalog(subject),
+        workflow_catalog=resolve_vertical_workflow_catalog(subject),
+    )
+
+
+def resolve_registered_coordination_catalogs() -> Dict[str, VerticalCoordinationCatalog]:
+    """Resolve combined team/workflow catalogs for all registered verticals."""
+    team_catalogs = resolve_registered_team_catalogs()
+    workflow_catalogs = resolve_registered_workflow_catalogs()
+    vertical_names = set(team_catalogs) | set(workflow_catalogs)
+
+    resolved: Dict[str, VerticalCoordinationCatalog] = {}
+    for vertical_name in vertical_names:
+        resolved[vertical_name] = VerticalCoordinationCatalog(
+            team_catalog=team_catalogs.get(vertical_name, _empty_team_catalog()),
+            workflow_catalog=workflow_catalogs.get(vertical_name, _empty_workflow_catalog()),
+        )
+    return resolved
 
 
 def resolve_configured_team(
@@ -268,38 +377,71 @@ async def run_configured_team(
 
 
 def resolve_vertical_team_catalog(vertical: Any) -> VerticalTeamCatalog:
-    """Resolve team specs from a framework vertical through the canonical provider API."""
-    if vertical is None or not hasattr(vertical, "get_team_spec_provider"):
+    """Resolve team specs from a vertical or cached vertical context.
+
+    Prefers the canonical team-spec provider API when a live vertical is
+    available. If the caller only has a VerticalContext-like snapshot, falls
+    back to its cached ``team_specs`` mapping so interface layers can reuse the
+    same framework discovery surface.
+    """
+    team_specs_snapshot = _get_catalog_snapshot(vertical, "team_specs")
+    supports_snapshot = _supports_catalog_snapshot(vertical, "team_specs")
+    vertical_source = _resolve_vertical_catalog_source(vertical, "get_team_spec_provider")
+    if vertical_source is None:
+        if supports_snapshot:
+            return VerticalTeamCatalog(
+                supported=True,
+                provider_available=bool(team_specs_snapshot),
+                team_specs=team_specs_snapshot,
+            )
         return VerticalTeamCatalog(supported=False, provider_available=False)
 
-    team_provider = vertical.get_team_spec_provider()
+    team_provider = vertical_source.get_team_spec_provider()
     if team_provider is None:
-        return VerticalTeamCatalog(supported=True, provider_available=False)
+        return VerticalTeamCatalog(
+            supported=True,
+            provider_available=bool(team_specs_snapshot),
+            team_specs=team_specs_snapshot,
+        )
 
     get_team_specs = getattr(team_provider, "get_team_specs", None)
     if not callable(get_team_specs):
-        return VerticalTeamCatalog(supported=True, provider_available=False)
+        return VerticalTeamCatalog(
+            supported=True,
+            provider_available=bool(team_specs_snapshot),
+            team_specs=team_specs_snapshot,
+        )
 
-    team_specs = get_team_specs()
-    if not isinstance(team_specs, dict):
-        return VerticalTeamCatalog(supported=True, provider_available=True)
+    try:
+        team_specs = get_team_specs()
+    except Exception as exc:
+        logger.debug("Failed to get team specs from provider: %s", exc)
+        team_specs = None
+
+    if isinstance(team_specs, dict):
+        return VerticalTeamCatalog(
+            supported=True,
+            provider_available=True,
+            team_specs=dict(team_specs),
+        )
     return VerticalTeamCatalog(
         supported=True,
         provider_available=True,
-        team_specs=dict(team_specs),
+        team_specs=team_specs_snapshot,
     )
 
 
 def resolve_vertical_workflow_catalog(vertical: Any) -> VerticalWorkflowCatalog:
-    """Resolve workflow specs from a framework vertical through the canonical provider API.
+    """Resolve workflow specs from a vertical or cached vertical context.
 
-    This function mirrors the behavior of resolve_vertical_team_catalog but for
-    workflows. It checks if the vertical has get_workflow_provider(), retrieves
-    the provider, and calls get_workflows() or get_workflow_names() to build
-    a normalized catalog.
+    Prefers the canonical workflow provider API when available. If the caller
+    only has a VerticalContext-like snapshot, falls back to its cached
+    ``workflows`` mapping so chat, CLI, and framework surfaces share one
+    catalog-resolution path.
 
     Args:
-        vertical: A vertical instance or class that may provide workflows
+        vertical: A vertical instance, a VerticalContext-like snapshot, or any
+            object that exposes the canonical workflow provider API.
 
     Returns:
         VerticalWorkflowCatalog with supported, provider_available, and workflow_specs
@@ -310,12 +452,25 @@ def resolve_vertical_workflow_catalog(vertical: Any) -> VerticalWorkflowCatalog:
             for name in catalog.list_names():
                 print(f"Workflow: {name}")
     """
-    if vertical is None or not hasattr(vertical, "get_workflow_provider"):
+    workflow_specs_snapshot = _get_catalog_snapshot(vertical, "workflows")
+    supports_snapshot = _supports_catalog_snapshot(vertical, "workflows")
+    vertical_source = _resolve_vertical_catalog_source(vertical, "get_workflow_provider")
+    if vertical_source is None:
+        if supports_snapshot:
+            return VerticalWorkflowCatalog(
+                supported=True,
+                provider_available=bool(workflow_specs_snapshot),
+                workflow_specs=workflow_specs_snapshot,
+            )
         return VerticalWorkflowCatalog(supported=False, provider_available=False)
 
-    workflow_provider = vertical.get_workflow_provider()
+    workflow_provider = vertical_source.get_workflow_provider()
     if workflow_provider is None:
-        return VerticalWorkflowCatalog(supported=True, provider_available=False)
+        return VerticalWorkflowCatalog(
+            supported=True,
+            provider_available=bool(workflow_specs_snapshot),
+            workflow_specs=workflow_specs_snapshot,
+        )
 
     # Try get_workflows() first (returns Dict[str, Any])
     get_workflows = getattr(workflow_provider, "get_workflows", None)
@@ -347,7 +502,11 @@ def resolve_vertical_workflow_catalog(vertical: Any) -> VerticalWorkflowCatalog:
             logger.debug("Failed to get workflow names from provider: %s", exc)
 
     # Provider exists but doesn't have callable methods
-    return VerticalWorkflowCatalog(supported=True, provider_available=False)
+    return VerticalWorkflowCatalog(
+        supported=True,
+        provider_available=bool(workflow_specs_snapshot),
+        workflow_specs=workflow_specs_snapshot,
+    )
 
 
 def _get_team_specs(orchestrator: Any) -> Dict[str, Any]:
@@ -373,6 +532,108 @@ def _get_team_specs(orchestrator: Any) -> Dict[str, Any]:
 
     specs = getattr(vertical_context, "team_specs", None)
     return dict(specs) if isinstance(specs, dict) else {}
+
+
+def _resolve_registered_catalogs(
+    *,
+    registry_method: str,
+    catalog_builder: Any,
+) -> Dict[str, Any]:
+    """Normalize provider-registry payloads into per-vertical catalogs."""
+    try:
+        from victor.framework.providers.protocol import get_provider_registry
+
+        provider_registry = get_provider_registry()
+        get_all = getattr(provider_registry, registry_method, None)
+        if not callable(get_all):
+            return {}
+        raw_catalogs = get_all()
+    except Exception as exc:
+        logger.debug("Failed to resolve registered catalogs via %s: %s", registry_method, exc)
+        return {}
+
+    if not isinstance(raw_catalogs, dict):
+        return {}
+
+    resolved: Dict[str, Any] = {}
+    default_payload: Dict[str, Any] = {}
+    for vertical_name, payload in raw_catalogs.items():
+        if isinstance(payload, dict):
+            resolved[str(vertical_name)] = catalog_builder(dict(payload))
+        else:
+            default_payload[str(vertical_name)] = payload
+
+    if default_payload:
+        resolved["default"] = catalog_builder(default_payload)
+
+    return resolved
+
+
+def _list_registered_catalog_names(
+    catalogs: Dict[str, Any],
+    *,
+    vertical: Optional[str],
+    qualify_with_vertical: bool,
+) -> List[str]:
+    """Flatten registered catalog names for inspection surfaces."""
+    if vertical is not None:
+        catalog = catalogs.get(vertical)
+        if catalog is None:
+            return []
+        return list(catalog.list_names())
+
+    names: List[str] = []
+    for vertical_name, catalog in catalogs.items():
+        for item_name in catalog.list_names():
+            if qualify_with_vertical:
+                names.append(f"{vertical_name}:{item_name}")
+            else:
+                names.append(item_name)
+    return names
+
+
+def _empty_team_catalog() -> VerticalTeamCatalog:
+    """Create an empty team catalog."""
+    return VerticalTeamCatalog(supported=False, provider_available=False)
+
+
+def _empty_workflow_catalog() -> VerticalWorkflowCatalog:
+    """Create an empty workflow catalog."""
+    return VerticalWorkflowCatalog(supported=False, provider_available=False)
+
+
+def _resolve_vertical_catalog_source(subject: Any, provider_method: str) -> Optional[Any]:
+    """Resolve the canonical vertical-like object for catalog discovery."""
+    if subject is None:
+        return None
+    if _has_declared_attribute(subject, provider_method):
+        return subject
+    config = getattr(subject, "config", None) if _has_declared_attribute(subject, "config") else None
+    if config is not None and _has_declared_attribute(config, provider_method):
+        return config
+    return None
+
+
+def _supports_catalog_snapshot(subject: Any, attr_name: str) -> bool:
+    """Whether the subject exposes a cached catalog snapshot."""
+    return _has_declared_attribute(subject, attr_name)
+
+
+def _get_catalog_snapshot(subject: Any, attr_name: str) -> Dict[str, Any]:
+    """Read a cached dict snapshot for a team/workflow catalog."""
+    mapping = getattr(subject, attr_name, None)
+    return dict(mapping) if isinstance(mapping, dict) else {}
+
+
+def _has_declared_attribute(subject: Any, attr_name: str) -> bool:
+    """Check for a real attribute without triggering MagicMock fallbacks."""
+    if subject is None:
+        return False
+    try:
+        getattr_static(subject, attr_name)
+    except AttributeError:
+        return False
+    return True
 
 
 def _get_coordination_suggestion(
@@ -456,10 +717,17 @@ def _coerce_positive_int(value: Any) -> Optional[int]:
 
 __all__ = [
     "ResolvedTeamExecutionPlan",
+    "VerticalCoordinationCatalog",
     "VerticalTeamCatalog",
     "VerticalWorkflowCatalog",
     "execute_resolved_team",
+    "list_registered_team_names",
+    "list_registered_workflow_names",
     "resolve_configured_team",
+    "resolve_registered_coordination_catalogs",
+    "resolve_registered_team_catalogs",
+    "resolve_registered_workflow_catalogs",
+    "resolve_vertical_coordination_catalog",
     "resolve_vertical_team_catalog",
     "resolve_vertical_workflow_catalog",
     "run_configured_team",

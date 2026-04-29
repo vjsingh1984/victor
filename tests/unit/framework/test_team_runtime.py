@@ -7,9 +7,16 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from victor.agent.vertical_context import create_vertical_context
 from victor.framework.team_runtime import (
     execute_resolved_team,
+    list_registered_team_names,
+    list_registered_workflow_names,
     resolve_configured_team,
+    resolve_registered_coordination_catalogs,
+    resolve_registered_team_catalogs,
+    resolve_registered_workflow_catalogs,
+    resolve_vertical_coordination_catalog,
     resolve_vertical_team_catalog,
     resolve_vertical_workflow_catalog,
     VerticalWorkflowCatalog,
@@ -157,6 +164,38 @@ def test_resolve_vertical_team_catalog_reads_provider_specs():
     assert catalog.list_names() == ["feature_team"]
 
 
+def test_resolve_vertical_team_catalog_reads_context_snapshot():
+    feature_team = _make_team_spec()
+    context = create_vertical_context("coding")
+    context.apply_team_specs({"feature_team": feature_team})
+
+    catalog = resolve_vertical_team_catalog(context)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is True
+    assert catalog.has_team_specs is True
+    assert catalog.get("feature_team") is feature_team
+
+
+def test_resolve_vertical_team_catalog_reads_context_config_provider():
+    feature_team = _make_team_spec()
+    context = create_vertical_context(
+        "coding",
+        SimpleNamespace(
+            get_team_spec_provider=lambda: SimpleNamespace(
+                get_team_specs=lambda: {"feature_team": feature_team}
+            )
+        ),
+    )
+
+    catalog = resolve_vertical_team_catalog(context)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is True
+    assert catalog.has_team_specs is True
+    assert catalog.get("feature_team") is feature_team
+
+
 def test_resolve_vertical_workflow_catalog_with_get_workflows():
     """Test workflow catalog resolution when provider has get_workflows()."""
     workflow_spec = SimpleNamespace(name="feature_workflow", description="Implement features")
@@ -173,6 +212,38 @@ def test_resolve_vertical_workflow_catalog_with_get_workflows():
     assert catalog.has_workflow_specs is True
     assert catalog.get("feature_workflow") is workflow_spec
     assert catalog.list_names() == ["feature_workflow"]
+
+
+def test_resolve_vertical_workflow_catalog_reads_context_snapshot():
+    workflow_spec = SimpleNamespace(name="feature_workflow", description="Implement features")
+    context = create_vertical_context("coding")
+    context.apply_workflows({"feature_workflow": workflow_spec})
+
+    catalog = resolve_vertical_workflow_catalog(context)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is True
+    assert catalog.has_workflow_specs is True
+    assert catalog.get("feature_workflow") is workflow_spec
+
+
+def test_resolve_vertical_workflow_catalog_reads_context_config_provider():
+    workflow_spec = SimpleNamespace(name="feature_workflow", description="Implement features")
+    context = create_vertical_context(
+        "coding",
+        SimpleNamespace(
+            get_workflow_provider=lambda: SimpleNamespace(
+                get_workflows=lambda: {"feature_workflow": workflow_spec}
+            )
+        ),
+    )
+
+    catalog = resolve_vertical_workflow_catalog(context)
+
+    assert catalog.supported is True
+    assert catalog.provider_available is True
+    assert catalog.has_workflow_specs is True
+    assert catalog.get("feature_workflow") is workflow_spec
 
 
 def test_resolve_vertical_workflow_catalog_with_get_workflow_names():
@@ -239,6 +310,107 @@ def test_resolve_vertical_workflow_catalog_not_supported():
     assert catalog.provider_available is False
     assert catalog.has_workflow_specs is False
     assert catalog.list_names() == []
+
+
+def test_resolve_registered_team_catalogs_wraps_provider_registry_payload():
+    feature_team = _make_team_spec()
+    provider_registry = SimpleNamespace(
+        get_all_team_specs=lambda: {"coding": {"feature_team": feature_team}}
+    )
+
+    with patch(
+        "victor.framework.providers.protocol.get_provider_registry",
+        return_value=provider_registry,
+    ):
+        catalogs = resolve_registered_team_catalogs()
+        listed_names = list_registered_team_names()
+        listed_vertical_names = list_registered_team_names(
+            vertical="coding",
+            qualify_with_vertical=False,
+        )
+
+    assert set(catalogs.keys()) == {"coding"}
+    assert catalogs["coding"].has_team_specs is True
+    assert catalogs["coding"].get("feature_team") is feature_team
+    assert listed_names == ["coding:feature_team"]
+    assert listed_vertical_names == ["feature_team"]
+
+
+def test_resolve_registered_workflow_catalogs_wraps_provider_registry_payload():
+    workflow_spec = SimpleNamespace(name="feature_workflow")
+    provider_registry = SimpleNamespace(
+        get_all_workflows=lambda: {"coding": {"feature_workflow": workflow_spec}}
+    )
+
+    with patch(
+        "victor.framework.providers.protocol.get_provider_registry",
+        return_value=provider_registry,
+    ):
+        catalogs = resolve_registered_workflow_catalogs()
+        listed_names = list_registered_workflow_names()
+        listed_vertical_names = list_registered_workflow_names(
+            vertical="coding",
+            qualify_with_vertical=False,
+        )
+
+    assert set(catalogs.keys()) == {"coding"}
+    assert catalogs["coding"].has_workflow_specs is True
+    assert catalogs["coding"].get("feature_workflow") is workflow_spec
+    assert listed_names == ["coding:feature_workflow"]
+    assert listed_vertical_names == ["feature_workflow"]
+
+
+def test_resolve_registered_catalogs_normalizes_unnamespaced_payload_to_default():
+    provider_registry = SimpleNamespace(
+        get_all_team_specs=lambda: {"feature_team": _make_team_spec()},
+        get_all_workflows=lambda: {"feature_workflow": SimpleNamespace(name="feature_workflow")},
+    )
+
+    with patch(
+        "victor.framework.providers.protocol.get_provider_registry",
+        return_value=provider_registry,
+    ):
+        team_catalogs = resolve_registered_team_catalogs()
+        workflow_catalogs = resolve_registered_workflow_catalogs()
+
+    assert set(team_catalogs.keys()) == {"default"}
+    assert team_catalogs["default"].list_names() == ["feature_team"]
+    assert set(workflow_catalogs.keys()) == {"default"}
+    assert workflow_catalogs["default"].list_names() == ["feature_workflow"]
+
+
+def test_resolve_vertical_coordination_catalog_combines_team_and_workflow_sources():
+    feature_team = _make_team_spec()
+    workflow_spec = SimpleNamespace(name="feature_workflow")
+    context = create_vertical_context("coding")
+    context.apply_team_specs({"feature_team": feature_team})
+    context.apply_workflows({"feature_workflow": workflow_spec})
+
+    catalog = resolve_vertical_coordination_catalog(context)
+
+    assert catalog.has_team_specs is True
+    assert catalog.has_workflow_specs is True
+    assert catalog.list_team_names() == ["feature_team"]
+    assert catalog.list_workflow_names() == ["feature_workflow"]
+
+
+def test_resolve_registered_coordination_catalogs_merges_team_and_workflow_catalogs():
+    feature_team = _make_team_spec()
+    workflow_spec = SimpleNamespace(name="feature_workflow")
+    provider_registry = SimpleNamespace(
+        get_all_team_specs=lambda: {"coding": {"feature_team": feature_team}},
+        get_all_workflows=lambda: {"coding": {"feature_workflow": workflow_spec}},
+    )
+
+    with patch(
+        "victor.framework.providers.protocol.get_provider_registry",
+        return_value=provider_registry,
+    ):
+        catalogs = resolve_registered_coordination_catalogs()
+
+    assert set(catalogs.keys()) == {"coding"}
+    assert catalogs["coding"].list_team_names() == ["feature_team"]
+    assert catalogs["coding"].list_workflow_names() == ["feature_workflow"]
 
 
 def test_vertical_workflow_catalog_frozen():

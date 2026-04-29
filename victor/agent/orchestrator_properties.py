@@ -30,10 +30,6 @@ import logging
 import warnings
 from typing import Any, Optional, TYPE_CHECKING
 
-from victor.agent.services.chat_compat_telemetry import (
-    record_deprecated_chat_shim_access,
-)
-
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
@@ -191,98 +187,6 @@ def _turn_executor(self: "AgentOrchestrator") -> Any:
             execution_provider=self.protocol_adapter,
         )
     return self._turn_executor
-
-
-def _ensure_sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Materialize the deprecated sync chat coordinator shim if needed."""
-    if getattr(self, "_deprecated_sync_chat_coordinator", None) is None:
-        from victor.agent.services.sync_chat_compat import SyncChatCoordinator
-
-        from victor.agent.query_classifier import QueryClassifier
-
-        self._deprecated_sync_chat_coordinator = SyncChatCoordinator(
-            chat_context=self.protocol_adapter,
-            tool_context=self.protocol_adapter,
-            provider_context=self.protocol_adapter,
-            orchestrator=self.protocol_adapter,
-            query_classifier=QueryClassifier(),
-            chat_service=getattr(self, "_chat_service", None),
-        )
-    return self._deprecated_sync_chat_coordinator
-
-
-def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated sync chat coordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator.sync_chat_coordinator is deprecated compatibility surface. "
-        "Use ChatService instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    record_deprecated_chat_shim_access(
-        "agent_orchestrator", "sync_chat_coordinator", "compat_property"
-    )
-    return _ensure_sync_chat_coordinator(self)
-
-
-def _ensure_streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Materialize the deprecated streaming chat coordinator shim if needed."""
-    if getattr(self, "_deprecated_streaming_chat_coordinator", None) is None:
-        from victor.agent.services.streaming_chat_compat import (
-            StreamingChatCoordinator,
-        )
-
-        self._deprecated_streaming_chat_coordinator = StreamingChatCoordinator(
-            chat_context=self.protocol_adapter,
-            tool_context=self.protocol_adapter,
-            provider_context=self.protocol_adapter,
-            event_emitter=self.observability,
-            chat_service=getattr(self, "_chat_service", None),
-        )
-    return self._deprecated_streaming_chat_coordinator
-
-
-def _streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated streaming chat coordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator.streaming_chat_coordinator is deprecated compatibility surface. "
-        "Use ChatService instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    record_deprecated_chat_shim_access(
-        "agent_orchestrator", "streaming_chat_coordinator", "compat_property"
-    )
-    return _ensure_streaming_chat_coordinator(self)
-
-
-def _ensure_unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Materialize the deprecated unified chat coordinator shim if needed."""
-    if getattr(self, "_deprecated_unified_chat_coordinator", None) is None:
-        from victor.agent.services.unified_chat_compat import (
-            UnifiedChatCoordinator,
-        )
-        from victor.agent.services.protocols.chat_runtime import ExecutionMode
-
-        self._deprecated_unified_chat_coordinator = UnifiedChatCoordinator(
-            default_mode=ExecutionMode.SYNC,
-            chat_service=getattr(self, "_chat_service", None),
-        )
-    return self._deprecated_unified_chat_coordinator
-
-
-def _unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated unified chat coordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator.unified_chat_coordinator is deprecated compatibility surface. "
-        "Use ChatService instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    record_deprecated_chat_shim_access(
-        "agent_orchestrator", "unified_chat_coordinator", "compat_property"
-    )
-    return _ensure_unified_chat_coordinator(self)
 
 
 def _intelligent_integration(
@@ -550,75 +454,6 @@ def _provider_switch_coordinator_set(self: "AgentOrchestrator", value: Any) -> N
     self._deprecated_provider_switch_coordinator = value
 
 
-def _tool_coordinator_get(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated ToolCoordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator._tool_coordinator is deprecated compatibility surface. "
-        "Use AgentOrchestrator._deprecated_tool_coordinator or ToolService instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return getattr(self, "_deprecated_tool_coordinator", None)
-
-
-def _tool_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
-    warnings.warn(
-        "AgentOrchestrator._tool_coordinator is deprecated compatibility surface. "
-        "Store the shim on _deprecated_tool_coordinator instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    self._deprecated_tool_coordinator = value
-
-
-def _chat_coordinator_get(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated ChatCoordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator._chat_coordinator is deprecated compatibility surface. "
-        "Use AgentOrchestrator._deprecated_chat_coordinator or ChatService instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    record_deprecated_chat_shim_access(
-        "agent_orchestrator", "_chat_coordinator_get", "compat_property"
-    )
-    return getattr(self, "_deprecated_chat_coordinator", None)
-
-
-def _chat_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
-    warnings.warn(
-        "AgentOrchestrator._chat_coordinator is deprecated compatibility surface. "
-        "Store the shim on _deprecated_chat_coordinator instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    record_deprecated_chat_shim_access(
-        "agent_orchestrator", "_chat_coordinator_set", "compat_property"
-    )
-    self._deprecated_chat_coordinator = value
-
-
-def _session_coordinator_get(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated SessionCoordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator._session_coordinator is deprecated compatibility surface. "
-        "Use AgentOrchestrator._deprecated_session_coordinator or SessionService instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return getattr(self, "_deprecated_session_coordinator", None)
-
-
-def _session_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
-    warnings.warn(
-        "AgentOrchestrator._session_coordinator is deprecated compatibility surface. "
-        "Store the shim on _deprecated_session_coordinator instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    self._deprecated_session_coordinator = value
-
-
 # =====================================================================
 # Property installation registry
 # =====================================================================
@@ -681,9 +516,6 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     # Group 2: Lazy coordinators (getter only)
     "protocol_adapter": (_protocol_adapter, None),
     "turn_executor": (_turn_executor, None),
-    "sync_chat_coordinator": (_sync_chat_coordinator, None),
-    "streaming_chat_coordinator": (_streaming_chat_coordinator, None),
-    "unified_chat_coordinator": (_unified_chat_coordinator, None),
     "intelligent_integration": (_intelligent_integration, None),
     "subagent_orchestrator": (_subagent_orchestrator, None),
     "coordination": (_coordination, None),
@@ -719,9 +551,6 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
         _provider_switch_coordinator_get,
         _provider_switch_coordinator_set,
     ),
-    "_chat_coordinator": (_chat_coordinator_get, _chat_coordinator_set),
-    "_session_coordinator": (_session_coordinator_get, _session_coordinator_set),
-    "_tool_coordinator": (_tool_coordinator_get, _tool_coordinator_set),
     # Group 6: ToolService convenience methods (delegates to canonical service)
     "is_tool_enabled": (_is_tool_enabled_get, None),
     "get_enabled_tools": (_get_enabled_tools_get, None),

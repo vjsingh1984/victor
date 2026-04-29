@@ -34,11 +34,9 @@ Deprecated compatibility exports retained here:
     PromptRuntimeSupport: Canonical internal fallback support for orchestrator
         prompt helper seams when UnifiedPromptPipeline is unavailable
     PromptCoordinator: Deprecated shim; canonical target is UnifiedPromptPipeline
-    SessionCoordinator: Deprecated shim; canonical target is SessionService
     StateCoordinator: Deprecated shim; live state belongs to ConversationController
         and ConversationStateMachine, while StateService persists vertical state
     StreamingRecoveryCoordinator: Deprecated shim; canonical target is RecoveryService
-    ToolCoordinator: Deprecated shim; canonical target is ToolService
     SystemPromptCoordinator: Deprecated wrapper over UnifiedPromptPipeline
 """
 
@@ -93,12 +91,6 @@ from victor.agent.services.recovery_compat import (
     StreamingRecoveryCoordinator,
 )
 from victor.agent.services.session_service import SessionService, SessionInfoImpl
-from victor.agent.services.session_compat import (
-    SessionCoordinator,
-    SessionCostSummary,
-    SessionInfo,
-    create_session_coordinator,
-)
 from victor.agent.services.state_compat import (
     IStateCoordinator,
     StageTransition,
@@ -121,13 +113,6 @@ from victor.agent.services.tool_service import (
     ToolServiceConfig,
 )
 from victor.agent.services.tool_contracts import NormalizedArgs, ToolCallValidation
-from victor.agent.services.tool_compat import (
-    IToolCoordinator,
-    TaskContext,
-    ToolCoordinator,
-    ToolCoordinatorConfig,
-    create_tool_coordinator,
-)
 from victor.agent.services.tool_observability import ToolObservabilityHandler
 from victor.agent.services.tool_planning_runtime import ToolPlanner
 from victor.agent.services.tool_retry import ToolRetryExecutor
@@ -168,9 +153,6 @@ __all__ = [
     "RuntimeIntelligenceSnapshot",
     "StreamingRecoveryContext",
     "StreamingRecoveryCoordinator",
-    "SessionCoordinator",
-    "SessionCostSummary",
-    "SessionInfo",
     "SessionService",
     "SessionInfoImpl",
     "StateCoordinator",
@@ -179,12 +161,8 @@ __all__ = [
     "IStateCoordinator",
     "SystemPromptCoordinator",
     "TaskCoordinator",
-    "IToolCoordinator",
-    "TaskContext",
     "ToolBudgetExceededError",
     "ToolCallValidation",
-    "ToolCoordinator",
-    "ToolCoordinatorConfig",
     "ToolPlanner",
     "ToolResultContext",
     "ToolService",
@@ -194,10 +172,8 @@ __all__ = [
     "ToolRetryExecutor",
     "TurnExecutor",
     "TurnResult",
-    "create_session_coordinator",
     "create_prompt_coordinator",
     "create_state_coordinator",
-    "create_tool_coordinator",
     "create_metrics_coordinator",
     "analyze_prompt_rollout_experiment",
     "analyze_prompt_rollout_experiment_async",

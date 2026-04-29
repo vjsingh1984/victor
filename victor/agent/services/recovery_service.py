@@ -859,7 +859,7 @@ class RecoveryService:
         """Truncate tool calls to the allowed budget."""
         if len(tool_calls) <= max_calls:
             return tool_calls, False
-        self._logger.warning(
+        self._logger.info(
             "Truncating %d tool calls to budget limit of %d",
             len(tool_calls),
             max_calls,

@@ -870,7 +870,7 @@ class StreamingRecoveryCoordinator:
         if len(tool_calls) <= max_calls:
             return tool_calls, False
 
-        logger.warning(f"Truncating {len(tool_calls)} tool calls to budget limit of {max_calls}")
+        logger.info("Truncating %d tool calls to budget limit of %d", len(tool_calls), max_calls)
         return tool_calls[:max_calls], True
 
     # =====================================================================

@@ -1005,25 +1005,26 @@ class TurnExecutor:
         # Issue 4: Filter write/generation tools when intent is read-only or display-only.
         if tools and intent:
             try:
-                from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+                from victor.agent.action_authorizer import ActionIntent, is_tool_blocked_for_intent
 
                 action_intent = ActionIntent(intent)
-                blocked = INTENT_BLOCKED_TOOLS.get(action_intent, frozenset())
-                if blocked:
-                    before = len(tools)
-                    tools = [
-                        t
-                        for t in tools
-                        if (t.get("name") if isinstance(t, dict) else getattr(t, "name", None))
-                        not in blocked
-                    ]
-                    removed = before - len(tools)
-                    if removed:
-                        logger.debug(
-                            "Intent filter (%s): removed %d blocked tools",
-                            intent,
-                            removed,
-                        )
+                before = len(tools)
+                tools = [
+                    t
+                    for t in tools
+                    if not is_tool_blocked_for_intent(
+                        (t.get("name") if isinstance(t, dict) else getattr(t, "name", None)) or "",
+                        action_intent,
+                        user_message,
+                    )
+                ]
+                removed = before - len(tools)
+                if removed > 0:
+                    logger.debug(
+                        "Intent filter (%s): removed %d blocked tools",
+                        intent,
+                        removed,
+                    )
             except (ValueError, ImportError, AttributeError):
                 pass
 

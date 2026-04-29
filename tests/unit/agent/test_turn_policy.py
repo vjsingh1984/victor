@@ -146,12 +146,19 @@ class TestNudgePolicy:
     def test_use_tools_nudge_on_warning(self):
         policy = NudgePolicy()
         detector = SpinDetector()
-        for _ in range(NUDGE_THRESHOLD):
-            detector.record_turn(has_tool_calls=False)
+        # First no-tool turn (below threshold) - no nudge
+        detector.record_turn(has_tool_calls=False)
         decision = policy.evaluate(detector)
-        assert decision.nudge_type == NudgeType.USE_TOOLS
+        assert decision.nudge_type == NudgeType.NONE
+        assert decision.should_inject is False
+
+        # Second no-tool turn (at threshold) - gets REPETITION_BREAK nudge
+        detector.record_turn(has_tool_calls=False)
+        decision = policy.evaluate(detector)
+        assert decision.nudge_type == NudgeType.REPETITION_BREAK
         assert decision.should_inject is True
-        assert "MUST use a tool" in decision.message
+        assert "MUST" in decision.message
+        assert "repetition loop" in decision.message
         assert decision.role == "user"
 
     def test_different_tools_nudge_on_blocked(self):
@@ -370,3 +377,110 @@ class TestBatchStreamingConsistency:
         assert n1.nudge_type == n2.nudge_type
         assert n1.message == n2.message
         assert n1.role == n2.role
+
+
+# ============================================================================
+# Pagination Support tests
+# ============================================================================
+
+
+class TestPaginationSupport:
+    """Verify pagination is allowed - same resource with different offsets is NOT a loop.
+
+    Key principle: progress_params positive allowlist enables tools to explicitly
+    declare which parameters indicate meaningful progress. Pagination parameters
+    (offset, limit, k, etc.) are EXCLUDED from progress_params, allowing the LLM
+    to read files in chunks without triggering false loop detection.
+    """
+
+    def test_read_pagination_same_signature(self, mocker):
+        """Reading same file with different offsets generates SAME signature (not a loop)."""
+        from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+        tracker = UnifiedTaskTracker()
+
+        # Mock get_signature_params to return ["path"] for read tool (offset/limit excluded)
+        def mock_get_signature_params(tool_name):
+            if tool_name == "read":
+                return {"path"}
+            return set()
+
+        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+
+        # Get signatures for pagination calls
+        sig1 = tracker._get_signature("read", {"path": "src/main.py", "offset": 0, "limit": 500})
+        sig2 = tracker._get_signature("read", {"path": "src/main.py", "offset": 500, "limit": 500})
+        sig3 = tracker._get_signature("read", {"path": "src/main.py", "offset": 1000, "limit": 100})
+
+        # All should have the SAME signature because offset/limit are NOT in signature_params
+        assert sig1 == sig2 == sig3, f"Pagination should generate same signature: {sig1}, {sig2}, {sig3}"
+        # Verify only path is in the signature
+        assert "src/main.py" in sig1
+        assert "offset" not in sig1.lower()
+        assert "limit" not in sig1.lower()
+
+    def test_read_different_path_different_signature(self, mocker):
+        """Reading different files generates DIFFERENT signatures (actual loop detection)."""
+        from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+        tracker = UnifiedTaskTracker()
+
+        # Mock get_signature_params to return ["path"] for read tool
+        def mock_get_signature_params(tool_name):
+            if tool_name == "read":
+                return {"path"}
+            return set()
+
+        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+
+        sig1 = tracker._get_signature("read", {"path": "src/main.py", "offset": 0})
+        sig2 = tracker._get_signature("read", {"path": "src/utils.py", "offset": 0})
+        sig3 = tracker._get_signature("read", {"path": "README.md", "offset": 0})
+
+        # All should have DIFFERENT signatures because paths differ
+        assert sig1 != sig2 != sig3, "Different paths should generate different signatures"
+        assert "main.py" in sig1
+        assert "utils.py" in sig2
+        assert "README.md" in sig3
+
+    def test_code_search_pagination_same_signature(self, mocker):
+        """Code search with different k (result count) generates SAME signature."""
+        from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+        tracker = UnifiedTaskTracker()
+
+        # Mock get_signature_params - note that "k" is NOT included (pagination param)
+        def mock_get_signature_params(tool_name):
+            if tool_name == "code_search":
+                return {"query", "path", "mode"}
+            return set()
+
+        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+
+        sig1 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 10})
+        sig2 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 20})
+        sig3 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 50})
+
+        # All should have the SAME signature because k is NOT in signature_params
+        assert sig1 == sig2 == sig3, f"Pagination with different k should generate same signature: {sig1}, {sig2}, {sig3}"
+
+    def test_ls_depth_is_progress(self, mocker):
+        """ls with different depth values generates DIFFERENT signatures (meaningful exploration)."""
+        from victor.agent.unified_task_tracker import UnifiedTaskTracker
+
+        tracker = UnifiedTaskTracker()
+
+        # Mock get_signature_params - depth IS included (exploration param, not pagination)
+        def mock_get_signature_params(tool_name):
+            if tool_name == "ls":
+                return {"path", "depth", "pattern"}
+            return set()
+
+        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+
+        sig1 = tracker._get_signature("ls", {"path": "src", "depth": 1})
+        sig2 = tracker._get_signature("ls", {"path": "src", "depth": 2})
+        sig3 = tracker._get_signature("ls", {"path": "src", "depth": 3})
+
+        # All should have DIFFERENT signatures because depth IS in signature_params
+        assert sig1 != sig2 != sig3, "Different depth values should generate different signatures"
