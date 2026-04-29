@@ -1,0 +1,577 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Framework-first coordination recommendation helpers."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from victor.framework.team_runtime import VerticalCoordinationCatalog
+from victor.protocols.coordination import (
+    CoordinationSuggestion,
+    ComplexityLevel,
+    TeamRecommendation,
+    TeamSelectionStrategyProtocol,
+    TeamSuggestionAction,
+    WorkflowRecommendation,
+    WorkflowSelectionStrategyProtocol,
+)
+
+if TYPE_CHECKING:
+    from victor.agent.teams.learner import TeamCompositionLearner
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ModeCoordinationConfig:
+    """Configuration for a specific mode."""
+
+    mode_name: str
+    default_workflows: List[str] = field(default_factory=list)
+    default_teams: List[str] = field(default_factory=list)
+    team_suggestion_enabled: bool = True
+    complexity_thresholds: Dict[str, TeamSuggestionAction] = field(
+        default_factory=lambda: {
+            "trivial": TeamSuggestionAction.NONE,
+            "low": TeamSuggestionAction.NONE,
+            "medium": TeamSuggestionAction.SUGGEST,
+            "high": TeamSuggestionAction.SUGGEST,
+            "extreme": TeamSuggestionAction.AUTO_SPAWN,
+        }
+    )
+    tool_priorities: Dict[str, float] = field(default_factory=dict)
+    system_prompt_addition: str = ""
+
+
+DEFAULT_MODE_CONFIGS: Dict[str, ModeCoordinationConfig] = {
+    "explore": ModeCoordinationConfig(
+        mode_name="explore",
+        default_workflows=[],
+        default_teams=["research_team"],
+        team_suggestion_enabled=False,
+        complexity_thresholds={
+            "trivial": TeamSuggestionAction.NONE,
+            "low": TeamSuggestionAction.NONE,
+            "medium": TeamSuggestionAction.NONE,
+            "high": TeamSuggestionAction.SUGGEST,
+            "extreme": TeamSuggestionAction.SUGGEST,
+        },
+    ),
+    "plan": ModeCoordinationConfig(
+        mode_name="plan",
+        default_workflows=["planning_workflow"],
+        default_teams=["research_team", "analysis_team"],
+        team_suggestion_enabled=True,
+        complexity_thresholds={
+            "trivial": TeamSuggestionAction.NONE,
+            "low": TeamSuggestionAction.NONE,
+            "medium": TeamSuggestionAction.SUGGEST,
+            "high": TeamSuggestionAction.SUGGEST,
+            "extreme": TeamSuggestionAction.SUGGEST,
+        },
+    ),
+    "build": ModeCoordinationConfig(
+        mode_name="build",
+        default_workflows=["feature_implementation", "bug_fix"],
+        default_teams=["feature_team", "bug_fix_team", "refactoring_team"],
+        team_suggestion_enabled=True,
+        complexity_thresholds={
+            "trivial": TeamSuggestionAction.NONE,
+            "low": TeamSuggestionAction.NONE,
+            "medium": TeamSuggestionAction.SUGGEST,
+            "high": TeamSuggestionAction.AUTO_SPAWN,
+            "extreme": TeamSuggestionAction.AUTO_SPAWN,
+        },
+    ),
+}
+
+
+class RuleBasedTeamSelector:
+    """Rule-based team selection using keyword matching."""
+
+    TASK_TEAM_PATTERNS: Dict[str, List[str]] = {
+        "feature": ["feature_team", "implementation_team"],
+        "bugfix": ["bug_fix_team", "debugging_team"],
+        "bug": ["bug_fix_team", "debugging_team"],
+        "refactor": ["refactoring_team", "code_review_team"],
+        "review": ["review_team", "code_review_team"],
+        "test": ["testing_team", "qa_team"],
+        "documentation": ["documentation_team", "docs_team"],
+        "research": ["research_team", "deep_research_team"],
+        "analysis": ["analysis_team", "eda_team"],
+        "deployment": ["deployment_team", "devops_team"],
+        "container": ["container_team", "docker_team"],
+        "monitoring": ["monitoring_team", "observability_team"],
+        "visualization": ["visualization_team", "charting_team"],
+        "ml": ["ml_team", "machine_learning_team"],
+        "data": ["data_team", "cleaning_team", "eda_team"],
+    }
+
+    def select(
+        self,
+        task_type: str,
+        complexity: str,
+        available_teams: Dict[str, Any],
+    ) -> Optional[str]:
+        """Select a team based on task type matching."""
+        task_lower = task_type.lower()
+        for pattern, team_names in self.TASK_TEAM_PATTERNS.items():
+            if pattern in task_lower:
+                for team_name in team_names:
+                    if team_name in available_teams:
+                        return team_name
+
+        for team_name in available_teams:
+            if task_lower in team_name.lower():
+                return team_name
+
+        return None
+
+    def recommend(
+        self,
+        task_type: str,
+        complexity: str,
+        available_teams: Dict[str, Any],
+        top_k: int = 3,
+    ) -> List[TeamRecommendation]:
+        """Recommend teams with confidence scores."""
+        recommendations = []
+        task_lower = task_type.lower()
+
+        for team_name, spec in available_teams.items():
+            confidence = 0.0
+            reason = ""
+            for pattern, team_names in self.TASK_TEAM_PATTERNS.items():
+                if pattern in task_lower and team_name in team_names:
+                    confidence = max(confidence, 0.8)
+                    reason = f"Task type '{task_type}' matches pattern '{pattern}'"
+                    break
+
+            if task_lower in team_name.lower():
+                confidence = max(confidence, 0.6)
+                reason = reason or "Team name contains task type"
+
+            if hasattr(spec, "description") and task_lower in spec.description.lower():
+                confidence = max(confidence, 0.5)
+                reason = reason or "Team description matches task"
+
+            if confidence > 0:
+                recommendations.append(
+                    TeamRecommendation(
+                        team_name=team_name,
+                        confidence=confidence,
+                        reason=reason,
+                        formation=getattr(spec, "formation", None),
+                        source="rule",
+                    )
+                )
+
+        recommendations.sort(reverse=True)
+        return recommendations[:top_k]
+
+
+class LearningBasedTeamSelector:
+    """Learning-based team selection using TeamCompositionLearner."""
+
+    def __init__(self, learner: Optional["TeamCompositionLearner"] = None):
+        self._learner = learner
+
+    def set_learner(self, learner: "TeamCompositionLearner") -> None:
+        """Set the learner instance."""
+        self._learner = learner
+
+    def select(
+        self,
+        task_type: str,
+        complexity: str,
+        available_teams: Dict[str, Any],
+    ) -> Optional[str]:
+        """Select team using learner recommendations."""
+        if self._learner is None:
+            return None
+
+        try:
+            recommendation = self._learner.get_recommendation(task_type)
+            if recommendation and not recommendation.is_baseline:
+                return self._find_team_for_recommendation(recommendation, available_teams)
+        except Exception as exc:
+            logger.debug("Learner selection failed: %s", exc)
+
+        return None
+
+    def recommend(
+        self,
+        task_type: str,
+        complexity: str,
+        available_teams: Dict[str, Any],
+        top_k: int = 3,
+    ) -> List[TeamRecommendation]:
+        """Recommend teams using learner feedback."""
+        if self._learner is None:
+            return []
+
+        try:
+            recommendation = self._learner.get_recommendation(task_type)
+            if recommendation:
+                return [
+                    TeamRecommendation(
+                        team_name=self._find_team_for_recommendation(
+                            recommendation, available_teams
+                        )
+                        or "feature_team",
+                        confidence=recommendation.confidence,
+                        reason=recommendation.reason,
+                        formation=(
+                            recommendation.formation.value if recommendation.formation else None
+                        ),
+                        suggested_budget=recommendation.suggested_budget,
+                        role_distribution=recommendation.role_distribution,
+                        source="learning",
+                    )
+                ]
+        except Exception as exc:
+            logger.debug("Learner recommendation failed: %s", exc)
+
+        return []
+
+    def _find_team_for_recommendation(
+        self,
+        recommendation: Any,
+        available_teams: Dict[str, Any],
+    ) -> Optional[str]:
+        """Find team matching learner recommendation."""
+        if hasattr(recommendation, "formation") and recommendation.formation:
+            formation_name = (
+                recommendation.formation.value
+                if hasattr(recommendation.formation, "value")
+                else str(recommendation.formation)
+            )
+            for team_name, spec in available_teams.items():
+                if hasattr(spec, "formation"):
+                    spec_formation = (
+                        spec.formation.value
+                        if hasattr(spec.formation, "value")
+                        else str(spec.formation)
+                    )
+                    if spec_formation == formation_name:
+                        return team_name
+
+        if available_teams:
+            return next(iter(available_teams))
+        return None
+
+
+class HybridTeamSelector:
+    """Hybrid team selection combining rules and learning."""
+
+    def __init__(
+        self,
+        rule_selector: RuleBasedTeamSelector,
+        learning_selector: LearningBasedTeamSelector,
+        rule_weight: float = 0.4,
+        learning_weight: float = 0.6,
+    ):
+        self._rule_selector = rule_selector
+        self._learning_selector = learning_selector
+        self._rule_weight = rule_weight
+        self._learning_weight = learning_weight
+
+    def select(
+        self,
+        task_type: str,
+        complexity: str,
+        available_teams: Dict[str, Any],
+    ) -> Optional[str]:
+        """Select team using hybrid approach."""
+        learning_pick = self._learning_selector.select(task_type, complexity, available_teams)
+        if learning_pick:
+            return learning_pick
+        return self._rule_selector.select(task_type, complexity, available_teams)
+
+    def recommend(
+        self,
+        task_type: str,
+        complexity: str,
+        available_teams: Dict[str, Any],
+        top_k: int = 3,
+    ) -> List[TeamRecommendation]:
+        """Recommend teams using hybrid approach."""
+        rule_recs = self._rule_selector.recommend(task_type, complexity, available_teams, top_k)
+        learning_recs = self._learning_selector.recommend(
+            task_type, complexity, available_teams, top_k
+        )
+
+        combined: Dict[str, TeamRecommendation] = {}
+        for rec in rule_recs:
+            combined[rec.team_name] = TeamRecommendation(
+                team_name=rec.team_name,
+                confidence=rec.confidence * self._rule_weight,
+                reason=rec.reason,
+                formation=rec.formation,
+                source="hybrid-rule",
+            )
+
+        for rec in learning_recs:
+            if rec.team_name in combined:
+                existing = combined[rec.team_name]
+                combined[rec.team_name] = TeamRecommendation(
+                    team_name=rec.team_name,
+                    confidence=(existing.confidence + rec.confidence * self._learning_weight),
+                    reason=f"{existing.reason}; {rec.reason}",
+                    formation=rec.formation or existing.formation,
+                    suggested_budget=rec.suggested_budget,
+                    role_distribution=rec.role_distribution,
+                    source="hybrid",
+                )
+            else:
+                combined[rec.team_name] = TeamRecommendation(
+                    team_name=rec.team_name,
+                    confidence=rec.confidence * self._learning_weight,
+                    reason=rec.reason,
+                    formation=rec.formation,
+                    suggested_budget=rec.suggested_budget,
+                    role_distribution=rec.role_distribution,
+                    source="hybrid-learning",
+                )
+
+        return sorted(combined.values(), reverse=True)[:top_k]
+
+
+class RuleBasedWorkflowSelector:
+    """Rule-based workflow selection."""
+
+    TASK_WORKFLOW_PATTERNS: Dict[str, List[str]] = {
+        "feature": ["feature_implementation", "quick_feature"],
+        "bugfix": ["bug_fix", "quick_fix"],
+        "bug": ["bug_fix", "quick_fix"],
+        "refactor": ["refactoring", "code_review"],
+        "review": ["code_review", "pr_review", "quick_review"],
+        "test": ["testing", "test_coverage"],
+    }
+
+    def select(
+        self,
+        task_type: str,
+        mode: str,
+        available_workflows: Dict[str, Any],
+    ) -> Optional[str]:
+        """Select workflow based on task type and mode."""
+        task_lower = task_type.lower()
+        for pattern, workflow_names in self.TASK_WORKFLOW_PATTERNS.items():
+            if pattern in task_lower:
+                for name in workflow_names:
+                    if name in available_workflows:
+                        return name
+        return None
+
+    def recommend(
+        self,
+        task_type: str,
+        mode: str,
+        available_workflows: Dict[str, Any],
+        top_k: int = 3,
+    ) -> List[WorkflowRecommendation]:
+        """Recommend workflows with confidence."""
+        recommendations = []
+        task_lower = task_type.lower()
+
+        for name, workflow in available_workflows.items():
+            confidence = 0.0
+            reason = ""
+            for pattern, workflow_names in self.TASK_WORKFLOW_PATTERNS.items():
+                if pattern in task_lower and name in workflow_names:
+                    confidence = max(confidence, 0.8)
+                    reason = f"Task type '{task_type}' matches workflow pattern"
+                    break
+
+            if task_lower in name.lower():
+                confidence = max(confidence, 0.6)
+                reason = reason or "Workflow name matches task"
+
+            if confidence > 0:
+                recommendations.append(
+                    WorkflowRecommendation(
+                        workflow_name=name,
+                        confidence=confidence,
+                        reason=reason,
+                    )
+                )
+
+        recommendations.sort(key=lambda rec: rec.confidence, reverse=True)
+        return recommendations[:top_k]
+
+
+def get_action_for_complexity(
+    complexity: str,
+    mode: str,
+    *,
+    mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
+) -> TeamSuggestionAction:
+    """Determine action based on complexity and mode."""
+    resolved_mode_configs = mode_configs or DEFAULT_MODE_CONFIGS
+    mode_config = resolved_mode_configs.get(mode, resolved_mode_configs["build"])
+    complexity_lower = complexity.lower()
+
+    if complexity_lower in mode_config.complexity_thresholds:
+        return mode_config.complexity_thresholds[complexity_lower]
+
+    complexity_level = ComplexityLevel.from_string(complexity)
+    default_actions = {
+        ComplexityLevel.TRIVIAL: TeamSuggestionAction.NONE,
+        ComplexityLevel.LOW: TeamSuggestionAction.NONE,
+        ComplexityLevel.MEDIUM: TeamSuggestionAction.SUGGEST,
+        ComplexityLevel.HIGH: TeamSuggestionAction.SUGGEST,
+        ComplexityLevel.EXTREME: TeamSuggestionAction.AUTO_SPAWN,
+    }
+    return default_actions.get(complexity_level, TeamSuggestionAction.NONE)
+
+
+def recommend_teams_for_catalog(
+    *,
+    task_type: str,
+    complexity: str,
+    coordination_catalog: VerticalCoordinationCatalog,
+    team_selector: TeamSelectionStrategyProtocol,
+    top_k: int = 3,
+) -> List[TeamRecommendation]:
+    """Recommend teams from a shared coordination catalog."""
+    available_teams = (
+        dict(coordination_catalog.team_catalog.team_specs)
+        if coordination_catalog.has_team_specs
+        else {}
+    )
+    if not available_teams:
+        return []
+
+    return team_selector.recommend(
+        task_type=task_type,
+        complexity=complexity,
+        available_teams=available_teams,
+        top_k=top_k,
+    )
+
+
+def recommend_workflows_for_catalog(
+    *,
+    task_type: str,
+    mode: str,
+    coordination_catalog: VerticalCoordinationCatalog,
+    workflow_selector: WorkflowSelectionStrategyProtocol,
+    top_k: int = 3,
+) -> List[WorkflowRecommendation]:
+    """Recommend workflows from a shared coordination catalog."""
+    available_workflows = (
+        dict(coordination_catalog.workflow_catalog.workflow_specs)
+        if coordination_catalog.has_workflow_specs
+        else {}
+    )
+    if not available_workflows:
+        return []
+
+    return workflow_selector.recommend(
+        task_type=task_type,
+        mode=mode,
+        available_workflows=available_workflows,
+        top_k=top_k,
+    )
+
+
+def resolve_default_workflow_for_mode(
+    mode: str,
+    *,
+    coordination_catalog: VerticalCoordinationCatalog,
+    mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
+) -> Optional[str]:
+    """Resolve the default workflow for a mode from a shared coordination catalog."""
+    resolved_mode_configs = mode_configs or DEFAULT_MODE_CONFIGS
+    mode_config = resolved_mode_configs.get(mode)
+    if mode_config is None or not mode_config.default_workflows:
+        return None
+
+    available_workflows = set(coordination_catalog.list_workflow_names())
+    for workflow_name in mode_config.default_workflows:
+        if workflow_name in available_workflows:
+            return workflow_name
+    return mode_config.default_workflows[0]
+
+
+def build_coordination_suggestion(
+    *,
+    task_type: str,
+    complexity: str,
+    mode: str,
+    coordination_catalog: VerticalCoordinationCatalog,
+    team_selector: TeamSelectionStrategyProtocol,
+    workflow_selector: WorkflowSelectionStrategyProtocol,
+    mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
+) -> CoordinationSuggestion:
+    """Build a shared coordination recommendation from a framework catalog."""
+    resolved_mode_configs = mode_configs or DEFAULT_MODE_CONFIGS
+    complexity_level = ComplexityLevel.from_string(complexity)
+    mode_config = resolved_mode_configs.get(mode, resolved_mode_configs["build"])
+    action = get_action_for_complexity(
+        complexity,
+        mode,
+        mode_configs=resolved_mode_configs,
+    )
+
+    team_recommendations: List[TeamRecommendation] = []
+    if mode_config.team_suggestion_enabled:
+        team_recommendations = recommend_teams_for_catalog(
+            task_type=task_type,
+            complexity=complexity,
+            coordination_catalog=coordination_catalog,
+            team_selector=team_selector,
+        )
+
+    workflow_recommendations = recommend_workflows_for_catalog(
+        task_type=task_type,
+        mode=mode,
+        coordination_catalog=coordination_catalog,
+        workflow_selector=workflow_selector,
+    )
+
+    return CoordinationSuggestion(
+        mode=mode,
+        task_type=task_type,
+        complexity=complexity_level,
+        action=action,
+        team_recommendations=team_recommendations,
+        workflow_recommendations=workflow_recommendations,
+        system_prompt_additions=mode_config.system_prompt_addition,
+        tool_priorities=mode_config.tool_priorities,
+        metadata={
+            "mode_config": mode_config.mode_name,
+            "team_suggestion_enabled": mode_config.team_suggestion_enabled,
+        },
+    )
+
+
+__all__ = [
+    "DEFAULT_MODE_CONFIGS",
+    "HybridTeamSelector",
+    "LearningBasedTeamSelector",
+    "ModeCoordinationConfig",
+    "RuleBasedTeamSelector",
+    "RuleBasedWorkflowSelector",
+    "build_coordination_suggestion",
+    "get_action_for_complexity",
+    "recommend_teams_for_catalog",
+    "recommend_workflows_for_catalog",
+    "resolve_default_workflow_for_mode",
+]
