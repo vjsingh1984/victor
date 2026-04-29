@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Code indexing modules for building and maintaining code graphs.
+"""Language-specific edge detection handlers.
 
-This package provides:
-- CCG Builder: Builds Control Flow, Control Dependence, and Data Dependence Graphs
-- Symbol extraction: Language-aware symbol extraction using Tree-sitter
-- Graph indexing: Incremental indexing with staleness detection
+MIGRATION COMPLETE:
+All edge detection has been migrated to victor_coding language plugins.
+This package is now empty - use victor_coding.plugins for language-specific
+edge detection implementations.
+
+The victor-ai core now discovers and uses victor_coding plugins via:
+- victor.core.graph_rag.language_handlers._get_victor_coding_handler()
+- victor_coding.languages.registry.get_plugin_by_language()
 """
 
-from victor.core.indexing.ccg_builder import CodeContextGraphBuilder
-
-__all__ = [
-    "CodeContextGraphBuilder",
-]
+__all__ = []

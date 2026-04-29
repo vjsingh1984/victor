@@ -11,6 +11,8 @@ This module consolidates processing-related functionality:
 - **merge**: Merge conflict resolution
 - **completion**: Code completion providers for IDE integration
 - **file_types**: File type detection and categorization
+- **graph_profiler**: Performance profiling for graph operations (PH4-008)
+- **graph_optimizations**: Optimization utilities for graph operations (PH4-008)
 
 Example usage:
     # Import from submodules
@@ -20,6 +22,8 @@ Example usage:
     from victor.processing.merge import MergeManager
     from victor.processing.completion import CompletionManager
     from victor.processing.file_types import detect_file_type
+    from victor.processing.graph_profiler import GraphProfiler, profile_graph_operation
+    from victor.processing.graph_optimizations import GraphOptimizer, optimize_batch_size
 
     # Or import submodules directly
     from victor.processing import serialization, native, editing
@@ -35,6 +39,14 @@ from victor.processing import (
     file_types,
 )
 
+# Import graph-related modules (PH4-008)
+try:
+    from victor.processing import graph_profiler, graph_optimizations
+
+    _graph_modules_available = True
+except ImportError:
+    _graph_modules_available = False
+
 __all__ = [
     "serialization",
     "native",
@@ -42,4 +54,6 @@ __all__ = [
     "merge",
     "completion",
     "file_types",
+    "graph_profiler",
+    "graph_optimizations",
 ]
