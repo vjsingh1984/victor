@@ -888,6 +888,163 @@ def test_runtime_intelligence_team_feedback_prefers_safer_parallelism_when_risk_
     assert hints["learned_materialize_worktrees_hint"] is True
 
 
+def test_runtime_intelligence_prefers_scoped_dry_run_worktree_policy(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "team_feedback_coverage": 0.8,
+                "tasks_with_team_feedback": 4,
+                "team_formations": {"parallel": 4},
+                "team_merge_risk_levels": {"low": 3, "medium": 1},
+                "team_worktree_plan_count": 4,
+                "team_worktree_materialized_count": 4,
+                "team_low_risk_task_count": 3,
+                "team_medium_risk_task_count": 1,
+                "team_high_risk_task_count": 0,
+                "team_merge_conflict_task_count": 0,
+                "team_cleanup_task_count": 4,
+                "team_cleanup_error_task_count": 0,
+                "avg_team_assignments": 3.0,
+                "avg_team_scoped_members": 3.0,
+                "team_worktree_scope_metrics": {
+                    "task_type": {
+                        "analysis": {
+                            "tasks_with_team_feedback": 4.0,
+                            "team_feedback_coverage": 0.8,
+                            "team_worktree_plan_count": 4.0,
+                            "team_worktree_materialized_count": 1.0,
+                            "team_worktree_dry_run_count": 3.0,
+                            "team_cleanup_task_count": 3.0,
+                            "team_cleanup_error_task_count": 2.0,
+                            "team_merge_conflict_task_count": 1.0,
+                            "team_low_risk_task_count": 1.0,
+                            "team_medium_risk_task_count": 1.0,
+                            "team_high_risk_task_count": 2.0,
+                            "avg_team_assignments": 3.0,
+                            "avg_team_scoped_members": 3.0,
+                            "avg_team_members_with_changes": 2.0,
+                            "avg_team_changed_file_count": 4.0,
+                            "team_formations": {"parallel": 3.0},
+                            "team_merge_risk_levels": {
+                                "high": 2.0,
+                                "medium": 1.0,
+                                "low": 1.0,
+                            },
+                        }
+                    }
+                },
+            }
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    feedback = service.resolve_team_routing_feedback(scope_context={"task_type": "analysis"})
+    hints = service.get_topology_routing_context(scope_context={"task_type": "analysis"})
+
+    assert feedback is not None
+    assert feedback.scope_dimension == "task_type"
+    assert feedback.scope_label == "analysis"
+    assert feedback.recommends_worktree_isolation is True
+    assert feedback.recommends_dry_run_worktrees is True
+    assert feedback.recommended_cleanup_worktrees is False
+    assert hints["learned_team_policy_scope_dimension"] == "task_type"
+    assert hints["learned_team_policy_scope_label"] == "analysis"
+    assert hints["learned_worktree_isolation_hint"] is True
+    assert hints["learned_dry_run_worktrees_hint"] is True
+    assert hints["learned_materialize_worktrees_hint"] is False
+    assert hints["learned_cleanup_worktrees_hint"] is False
+
+
+def test_runtime_intelligence_exposes_degradation_routing_hints_from_feedback(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "degradation_feedback_coverage": 0.85,
+                "degradation_event_count": 6,
+                "degraded_task_count": 4,
+                "recovered_task_count": 2,
+                "degradation_recovery_rate": 0.5,
+                "avg_degradation_adaptation_cost": 2.2,
+                "avg_degradation_time_to_recover_seconds": 4.5,
+                "avg_degradation_cost_variance": 1.1,
+                "avg_degradation_recovery_time_variance": 0.9,
+                "avg_degradation_intervention_count": 1.8,
+                "avg_degradation_confidence": 0.35,
+                "avg_degradation_drift_score": 0.72,
+                "content_degradation_task_count": 1,
+                "confidence_degradation_task_count": 2,
+                "provider_degradation_task_count": 3,
+                "persistent_degradation_task_count": 1,
+                "drift_task_count": 4,
+                "degradation_drift_rate": 0.8,
+                "degradation_intervention_task_count": 3,
+                "degradation_intervention_rate": 0.6,
+                "high_adaptation_cost_task_count": 2,
+                "degradation_high_cost_rate": 0.4,
+                "degradation_confidence_rate": 0.5,
+                "degradation_stability_score": 0.28,
+                "degradation_sources": {
+                    "provider_performance": 4,
+                    "streaming_confidence": 2,
+                },
+                "degradation_kinds": {
+                    "persistent_provider_degradation": 2,
+                    "confidence_early_stop": 2,
+                    "recovery_action": 2,
+                },
+                "degradation_failure_types": {
+                    "PROVIDER_ERROR": 4,
+                    "CONFIDENCE_LOW": 2,
+                },
+                "degradation_providers": {"ollama": 4},
+                "degradation_reasons": {
+                    "failure_streak": 3,
+                    "confidence_threshold_reached": 2,
+                },
+            }
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    feedback = service.get_degradation_routing_feedback()
+    hints = service.get_topology_routing_context(scope_context={"task_type": "analysis"})
+
+    assert feedback is not None
+    assert feedback.dominant_source == "provider_performance"
+    assert feedback.dominant_kind == "persistent_provider_degradation"
+    assert feedback.dominant_provider == "ollama"
+    assert feedback.recommends_conservative_routing is True
+    assert feedback.recommends_recovery_budget_buffer is True
+    assert hints["learned_degradation_support"] > 0.0
+    assert hints["learned_degradation_severity_score"] > 0.4
+    assert hints["learned_degradation_drift_rate"] == pytest.approx(0.8)
+    assert hints["learned_degradation_intervention_rate"] == pytest.approx(0.6)
+    assert hints["learned_degradation_high_cost_rate"] == pytest.approx(0.4)
+    assert hints["learned_degradation_dominant_source"] == "provider_performance"
+    assert hints["learned_degradation_dominant_kind"] == "persistent_provider_degradation"
+    assert hints["learned_degradation_dominant_provider"] == "ollama"
+    assert hints["learned_degradation_conservative_routing_hint"] is True
+    assert hints["learned_degradation_recovery_buffer_hint"] is True
+
+
 def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_path):
     feedback_path = save_runtime_evaluation_feedback(
         RuntimeEvaluationFeedback(
@@ -1388,6 +1545,63 @@ async def test_analyze_turn_includes_topology_feedback_metadata(tmp_path):
     assert snapshot.metadata["topology_routing_hints"]["learned_topology_action"] == (
         "single_agent"
     )
+
+
+@pytest.mark.asyncio
+async def test_analyze_turn_includes_degradation_feedback_metadata(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.74,
+            enhanced_progress_threshold=0.58,
+            minimum_supported_evidence_score=0.86,
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "degradation_feedback_coverage": 0.9,
+                "degradation_event_count": 4,
+                "degraded_task_count": 3,
+                "recovered_task_count": 1,
+                "degradation_recovery_rate": 0.3333,
+                "avg_degradation_adaptation_cost": 2.1,
+                "avg_degradation_time_to_recover_seconds": 4.2,
+                "avg_degradation_cost_variance": 1.0,
+                "avg_degradation_intervention_count": 1.3,
+                "avg_degradation_drift_score": 0.69,
+                "degradation_drift_rate": 0.75,
+                "degradation_intervention_rate": 0.5,
+                "degradation_high_cost_rate": 0.33,
+                "degradation_stability_score": 0.31,
+                "persistent_degradation_task_count": 1,
+                "degradation_sources": {"provider_performance": 3, "agentic_loop": 1},
+                "degradation_kinds": {
+                    "persistent_provider_degradation": 2,
+                    "content_repetition": 1,
+                    "recovery_action": 1,
+                },
+                "degradation_providers": {"ollama": 3},
+            },
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+    perception = SimpleNamespace(task_analysis=MagicMock(task_type="edit"), confidence=0.81)
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=SimpleNamespace(
+            perceive=AsyncMock(return_value=perception),
+            evaluation_policy=RuntimeEvaluationPolicy(),
+            config={},
+        ),
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    snapshot = await service.analyze_turn("Fix the flaky provider path")
+
+    assert snapshot.metadata["degradation_feedback"]["dominant_source"] == "provider_performance"
+    assert snapshot.metadata["degradation_feedback"]["severity_score"] > 0.4
+    assert snapshot.metadata["topology_routing_hints"][
+        "learned_degradation_conservative_routing_hint"
+    ] is True
 
 
 @pytest.mark.asyncio

@@ -599,10 +599,12 @@ class TeamRoutingFeedback:
     task_count: int = 0
     worktree_plan_count: int = 0
     worktree_materialized_count: int = 0
+    worktree_dry_run_count: int = 0
     low_risk_task_count: int = 0
     medium_risk_task_count: int = 0
     high_risk_task_count: int = 0
     merge_conflict_task_count: int = 0
+    cleanup_task_count: int = 0
     cleanup_error_task_count: int = 0
     avg_team_assignments: float = 0.0
     avg_team_scoped_members: float = 0.0
@@ -610,6 +612,8 @@ class TeamRoutingFeedback:
     avg_team_changed_file_count: float = 0.0
     formation_distribution: Dict[str, float] = field(default_factory=dict)
     merge_risk_distribution: Dict[str, float] = field(default_factory=dict)
+    scope_dimension: Optional[str] = None
+    scope_label: Optional[str] = None
 
     @property
     def formation_agreement(self) -> float:
@@ -648,6 +652,16 @@ class TeamRoutingFeedback:
     @property
     def materialization_rate(self) -> float:
         return round(self.worktree_materialized_count / max(1, self.task_count), 4)
+
+    @property
+    def dry_run_rate(self) -> float:
+        return round(self.worktree_dry_run_count / max(1, self.task_count), 4)
+
+    @property
+    def cleanup_failure_rate(self) -> float:
+        if self.cleanup_task_count <= 0:
+            return self.cleanup_error_rate
+        return round(self.cleanup_error_task_count / max(1, self.cleanup_task_count), 4)
 
     @property
     def risk_score(self) -> float:
@@ -709,22 +723,46 @@ class TeamRoutingFeedback:
     @property
     def recommends_materialized_worktrees(self) -> bool:
         """Whether isolated worktrees should be materialized, not just planned."""
-        if not self.recommends_worktree_isolation or self.worktree_materialized_count <= 0:
+        if (
+            not self.recommends_worktree_isolation
+            or self.worktree_materialized_count <= 0
+            or self.recommends_dry_run_worktrees
+        ):
             return False
-        return self.materialization_rate >= 0.4 and self.cleanup_error_rate < 0.5
+        return self.materialization_rate >= 0.4 and self.cleanup_failure_rate < 0.5
+
+    @property
+    def recommends_dry_run_worktrees(self) -> bool:
+        """Whether the current scope should prefer planned/dry-run worktrees."""
+        if not self.recommends_worktree_isolation or self.worktree_dry_run_count <= 0:
+            return False
+        if self.worktree_materialized_count <= 0:
+            return True
+        if self.dry_run_rate >= self.materialization_rate:
+            return True
+        return self.risk_score >= 0.45 or self.cleanup_failure_rate >= 0.35
+
+    @property
+    def recommended_cleanup_worktrees(self) -> Optional[bool]:
+        """Whether materialized worktrees should be auto-cleaned after execution."""
+        if not self.recommends_worktree_isolation or self.cleanup_task_count <= 0:
+            return None
+        return self.cleanup_failure_rate < 0.35
 
     def to_metadata(self) -> Dict[str, Any]:
         """Serialize the learned team/worktree preference for logs and snapshots."""
-        return {
+        metadata = {
             "coverage": round(self.coverage, 4),
             "support": round(self.support, 4),
             "task_count": self.task_count,
             "worktree_plan_count": self.worktree_plan_count,
             "worktree_materialized_count": self.worktree_materialized_count,
+            "worktree_dry_run_count": self.worktree_dry_run_count,
             "low_risk_task_count": self.low_risk_task_count,
             "medium_risk_task_count": self.medium_risk_task_count,
             "high_risk_task_count": self.high_risk_task_count,
             "merge_conflict_task_count": self.merge_conflict_task_count,
+            "cleanup_task_count": self.cleanup_task_count,
             "cleanup_error_task_count": self.cleanup_error_task_count,
             "formation_agreement": round(self.formation_agreement, 4),
             "preferred_formation": self.preferred_formation,
@@ -734,10 +772,14 @@ class TeamRoutingFeedback:
             "high_risk_rate": self.high_risk_rate,
             "merge_conflict_rate": self.merge_conflict_rate,
             "cleanup_error_rate": self.cleanup_error_rate,
+            "cleanup_failure_rate": self.cleanup_failure_rate,
             "materialization_rate": self.materialization_rate,
+            "dry_run_rate": self.dry_run_rate,
             "risk_score": self.risk_score,
             "recommends_worktree_isolation": self.recommends_worktree_isolation,
             "recommends_materialized_worktrees": self.recommends_materialized_worktrees,
+            "recommends_dry_run_worktrees": self.recommends_dry_run_worktrees,
+            "recommended_cleanup_worktrees": self.recommended_cleanup_worktrees,
             "avg_team_assignments": round(self.avg_team_assignments, 4),
             "avg_team_scoped_members": round(self.avg_team_scoped_members, 4),
             "avg_team_members_with_changes": round(self.avg_team_members_with_changes, 4),
@@ -745,6 +787,11 @@ class TeamRoutingFeedback:
             "formation_distribution": dict(self.formation_distribution),
             "merge_risk_distribution": dict(self.merge_risk_distribution),
         }
+        if self.scope_dimension:
+            metadata["scope_dimension"] = self.scope_dimension
+        if self.scope_label:
+            metadata["scope_label"] = self.scope_label
+        return metadata
 
     def to_routing_context(
         self,
@@ -763,10 +810,15 @@ class TeamRoutingFeedback:
             "learned_team_risk_score": round(self.risk_score, 4),
             "learned_team_formation_agreement": round(self.formation_agreement, 4),
             "team_worktree_materialized_count": self.worktree_materialized_count,
+            "team_worktree_dry_run_count": self.worktree_dry_run_count,
             "team_high_risk_task_count": self.high_risk_task_count,
             "team_merge_conflict_task_count": self.merge_conflict_task_count,
             "team_cleanup_error_task_count": self.cleanup_error_task_count,
         }
+        if self.scope_dimension:
+            routing_context["learned_team_policy_scope_dimension"] = self.scope_dimension
+        if self.scope_label:
+            routing_context["learned_team_policy_scope_label"] = self.scope_label
         preferred_formation = self.preferred_formation
         if preferred_formation and self.formation_agreement >= min_agreement:
             routing_context["learned_formation_hint"] = preferred_formation
@@ -776,8 +828,210 @@ class TeamRoutingFeedback:
             routing_context["learned_team_max_workers_hint"] = recommended_max_workers
         if self.recommends_worktree_isolation:
             routing_context["learned_worktree_isolation_hint"] = True
-        if self.recommends_materialized_worktrees:
+        if self.recommends_dry_run_worktrees:
+            routing_context["learned_dry_run_worktrees_hint"] = True
+            routing_context["learned_materialize_worktrees_hint"] = False
+        elif self.recommends_materialized_worktrees:
             routing_context["learned_materialize_worktrees_hint"] = True
+            routing_context["learned_dry_run_worktrees_hint"] = False
+        cleanup_hint = self.recommended_cleanup_worktrees
+        if cleanup_hint is not None:
+            routing_context["learned_cleanup_worktrees_hint"] = cleanup_hint
+        return routing_context
+
+
+@dataclass(frozen=True)
+class DegradationRoutingFeedback:
+    """Learned degradation and recovery preference derived from runtime feedback."""
+
+    coverage: float = 0.0
+    event_count: int = 0
+    degraded_task_count: int = 0
+    recovered_task_count: int = 0
+    recovery_rate: float = 0.0
+    avg_adaptation_cost: float = 0.0
+    avg_time_to_recover_seconds: float = 0.0
+    avg_cost_variance: float = 0.0
+    avg_recovery_time_variance: float = 0.0
+    avg_intervention_count: float = 0.0
+    avg_confidence: float = 0.0
+    avg_drift_score: float = 0.0
+    content_degradation_task_count: int = 0
+    confidence_degradation_task_count: int = 0
+    provider_degradation_task_count: int = 0
+    persistent_degradation_task_count: int = 0
+    drift_task_count: int = 0
+    intervention_task_count: int = 0
+    high_adaptation_cost_task_count: int = 0
+    drift_rate: float = 0.0
+    intervention_rate: float = 0.0
+    high_cost_rate: float = 0.0
+    confidence_rate: float = 0.0
+    stability_score: float = 1.0
+    source_distribution: Dict[str, float] = field(default_factory=dict)
+    kind_distribution: Dict[str, float] = field(default_factory=dict)
+    failure_type_distribution: Dict[str, float] = field(default_factory=dict)
+    provider_distribution: Dict[str, float] = field(default_factory=dict)
+    reason_distribution: Dict[str, float] = field(default_factory=dict)
+
+    @property
+    def support(self) -> float:
+        """Normalized trust in the long-horizon degradation signal."""
+        return round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (self.coverage * 0.45)
+                    + (min(1.0, self.event_count / 8.0) * 0.2)
+                    + (min(1.0, self.degraded_task_count / 4.0) * 0.2)
+                    + ((1.0 - self.stability_score) * 0.15),
+                ),
+            ),
+            4,
+        )
+
+    @property
+    def severity_score(self) -> float:
+        """Compress drift, intervention, and recovery cost into one bounded penalty."""
+        return round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (self.avg_drift_score * 0.35)
+                    + (self.drift_rate * 0.2)
+                    + (self.intervention_rate * 0.15)
+                    + (self.high_cost_rate * 0.1)
+                    + (min(1.0, self.avg_adaptation_cost / 4.0) * 0.1)
+                    + (min(1.0, self.avg_cost_variance / 4.0) * 0.05)
+                    + ((1.0 - self.stability_score) * 0.05),
+                ),
+            ),
+            4,
+        )
+
+    @property
+    def dominant_source(self) -> Optional[str]:
+        return RuntimeIntelligenceService._preferred_label(self.source_distribution)
+
+    @property
+    def dominant_kind(self) -> Optional[str]:
+        return RuntimeIntelligenceService._preferred_label(self.kind_distribution)
+
+    @property
+    def dominant_failure_type(self) -> Optional[str]:
+        return RuntimeIntelligenceService._preferred_label(self.failure_type_distribution)
+
+    @property
+    def dominant_provider(self) -> Optional[str]:
+        return RuntimeIntelligenceService._preferred_label(self.provider_distribution)
+
+    @property
+    def recommends_conservative_routing(self) -> bool:
+        """Whether the runtime should treat this scope as degradation-prone."""
+        return (
+            self.severity_score >= 0.45
+            or self.persistent_degradation_task_count > 0
+            or self.drift_rate >= 0.5
+            or self.high_cost_rate >= 0.35
+        )
+
+    @property
+    def recommends_recovery_budget_buffer(self) -> bool:
+        """Whether the runtime should expect retries or extra recovery work."""
+        return (
+            self.intervention_rate >= 0.25
+            or self.avg_adaptation_cost >= 1.5
+            or self.avg_time_to_recover_seconds >= 3.0
+        )
+
+    def to_metadata(self) -> Dict[str, Any]:
+        """Serialize the learned degradation preference for logs and snapshots."""
+        return {
+            "coverage": round(self.coverage, 4),
+            "support": round(self.support, 4),
+            "event_count": self.event_count,
+            "degraded_task_count": self.degraded_task_count,
+            "recovered_task_count": self.recovered_task_count,
+            "recovery_rate": round(self.recovery_rate, 4),
+            "avg_adaptation_cost": round(self.avg_adaptation_cost, 4),
+            "avg_time_to_recover_seconds": round(self.avg_time_to_recover_seconds, 4),
+            "avg_cost_variance": round(self.avg_cost_variance, 4),
+            "avg_recovery_time_variance": round(self.avg_recovery_time_variance, 4),
+            "avg_intervention_count": round(self.avg_intervention_count, 4),
+            "avg_confidence": round(self.avg_confidence, 4),
+            "avg_drift_score": round(self.avg_drift_score, 4),
+            "content_degradation_task_count": self.content_degradation_task_count,
+            "confidence_degradation_task_count": self.confidence_degradation_task_count,
+            "provider_degradation_task_count": self.provider_degradation_task_count,
+            "persistent_degradation_task_count": self.persistent_degradation_task_count,
+            "drift_task_count": self.drift_task_count,
+            "intervention_task_count": self.intervention_task_count,
+            "high_adaptation_cost_task_count": self.high_adaptation_cost_task_count,
+            "drift_rate": round(self.drift_rate, 4),
+            "intervention_rate": round(self.intervention_rate, 4),
+            "high_cost_rate": round(self.high_cost_rate, 4),
+            "confidence_rate": round(self.confidence_rate, 4),
+            "stability_score": round(self.stability_score, 4),
+            "severity_score": round(self.severity_score, 4),
+            "dominant_source": self.dominant_source,
+            "dominant_kind": self.dominant_kind,
+            "dominant_failure_type": self.dominant_failure_type,
+            "dominant_provider": self.dominant_provider,
+            "recommends_conservative_routing": self.recommends_conservative_routing,
+            "recommends_recovery_budget_buffer": self.recommends_recovery_budget_buffer,
+            "source_distribution": dict(self.source_distribution),
+            "kind_distribution": dict(self.kind_distribution),
+            "failure_type_distribution": dict(self.failure_type_distribution),
+            "provider_distribution": dict(self.provider_distribution),
+            "reason_distribution": dict(self.reason_distribution),
+        }
+
+    def to_routing_context(
+        self,
+        *,
+        min_coverage: float = 0.2,
+        min_support: float = 0.2,
+    ) -> Dict[str, Any]:
+        """Convert long-horizon degradation feedback into soft routing hints."""
+        if self.coverage < min_coverage or self.support < min_support or self.event_count <= 0:
+            return {}
+
+        routing_context: Dict[str, Any] = {
+            "learned_degradation_support": round(self.support, 4),
+            "degradation_feedback_coverage": round(self.coverage, 4),
+            "learned_degradation_severity_score": round(self.severity_score, 4),
+            "learned_degradation_stability_score": round(self.stability_score, 4),
+            "learned_degradation_event_count": self.event_count,
+            "learned_degradation_recovery_rate": round(self.recovery_rate, 4),
+            "learned_degradation_drift_rate": round(self.drift_rate, 4),
+            "learned_degradation_intervention_rate": round(self.intervention_rate, 4),
+            "learned_degradation_high_cost_rate": round(self.high_cost_rate, 4),
+            "learned_degradation_confidence_rate": round(self.confidence_rate, 4),
+            "learned_degradation_avg_adaptation_cost": round(self.avg_adaptation_cost, 4),
+            "learned_degradation_avg_time_to_recover_seconds": round(
+                self.avg_time_to_recover_seconds,
+                4,
+            ),
+            "learned_degradation_avg_drift_score": round(self.avg_drift_score, 4),
+            "learned_degradation_persistent_task_count": self.persistent_degradation_task_count,
+            "learned_degradation_intervention_task_count": self.intervention_task_count,
+        }
+        if self.dominant_source:
+            routing_context["learned_degradation_dominant_source"] = self.dominant_source
+        if self.dominant_kind:
+            routing_context["learned_degradation_dominant_kind"] = self.dominant_kind
+        if self.dominant_failure_type:
+            routing_context["learned_degradation_dominant_failure_type"] = (
+                self.dominant_failure_type
+            )
+        if self.dominant_provider:
+            routing_context["learned_degradation_dominant_provider"] = self.dominant_provider
+        if self.recommends_conservative_routing:
+            routing_context["learned_degradation_conservative_routing_hint"] = True
+        if self.recommends_recovery_budget_buffer:
+            routing_context["learned_degradation_recovery_buffer_hint"] = True
         return routing_context
 
 
@@ -842,6 +1096,9 @@ class RuntimeIntelligenceService:
             self._runtime_feedback_metadata
         )
         self._persisted_team_routing_feedback = self._extract_team_routing_feedback(
+            self._runtime_feedback_metadata
+        )
+        self._persisted_degradation_routing_feedback = self._extract_degradation_routing_feedback(
             self._runtime_feedback_metadata
         )
         self._session_topology_feedback_records: List[Dict[str, Any]] = []
@@ -1278,6 +1535,17 @@ class RuntimeIntelligenceService:
         metadata: Dict[str, Any],
     ) -> Optional[TeamRoutingFeedback]:
         """Build learned team/worktree routing feedback from persisted runtime metadata."""
+        return cls._extract_team_routing_feedback_from_mapping(metadata)
+
+    @classmethod
+    def _extract_team_routing_feedback_from_mapping(
+        cls,
+        metadata: Dict[str, Any],
+        *,
+        scope_dimension: Optional[str] = None,
+        scope_label: Optional[str] = None,
+    ) -> Optional[TeamRoutingFeedback]:
+        """Build learned team/worktree routing feedback from one metadata mapping."""
         if not isinstance(metadata, dict):
             return None
 
@@ -1287,6 +1555,7 @@ class RuntimeIntelligenceService:
         worktree_materialized_count = cls._coerce_feedback_int(
             metadata.get("team_worktree_materialized_count")
         )
+        worktree_dry_run_count = cls._coerce_feedback_int(metadata.get("team_worktree_dry_run_count"))
         low_risk_task_count = cls._coerce_feedback_int(metadata.get("team_low_risk_task_count"))
         medium_risk_task_count = cls._coerce_feedback_int(
             metadata.get("team_medium_risk_task_count")
@@ -1295,6 +1564,7 @@ class RuntimeIntelligenceService:
         merge_conflict_task_count = cls._coerce_feedback_int(
             metadata.get("team_merge_conflict_task_count")
         )
+        cleanup_task_count = cls._coerce_feedback_int(metadata.get("team_cleanup_task_count"))
         cleanup_error_task_count = cls._coerce_feedback_int(
             metadata.get("team_cleanup_error_task_count")
         )
@@ -1331,10 +1601,12 @@ class RuntimeIntelligenceService:
             task_count=task_count,
             worktree_plan_count=worktree_plan_count,
             worktree_materialized_count=worktree_materialized_count,
+            worktree_dry_run_count=worktree_dry_run_count,
             low_risk_task_count=low_risk_task_count,
             medium_risk_task_count=medium_risk_task_count,
             high_risk_task_count=high_risk_task_count,
             merge_conflict_task_count=merge_conflict_task_count,
+            cleanup_task_count=cleanup_task_count,
             cleanup_error_task_count=cleanup_error_task_count,
             avg_team_assignments=avg_team_assignments,
             avg_team_scoped_members=avg_team_scoped_members,
@@ -1342,6 +1614,137 @@ class RuntimeIntelligenceService:
             avg_team_changed_file_count=avg_team_changed_file_count,
             formation_distribution=formation_distribution,
             merge_risk_distribution=merge_risk_distribution,
+            scope_dimension=scope_dimension,
+            scope_label=scope_label,
+        )
+
+    @classmethod
+    def _extract_degradation_routing_feedback(
+        cls,
+        metadata: Dict[str, Any],
+    ) -> Optional[DegradationRoutingFeedback]:
+        """Build long-horizon degradation routing feedback from runtime metadata."""
+        if not isinstance(metadata, dict):
+            return None
+
+        coverage = cls._coerce_feedback_float(metadata.get("degradation_feedback_coverage"))
+        event_count = cls._coerce_feedback_int(metadata.get("degradation_event_count"))
+        degraded_task_count = cls._coerce_feedback_int(metadata.get("degraded_task_count"))
+        recovered_task_count = cls._coerce_feedback_int(metadata.get("recovered_task_count"))
+        recovery_rate = cls._coerce_feedback_float(metadata.get("degradation_recovery_rate"))
+        avg_adaptation_cost = cls._coerce_non_negative_float(
+            metadata.get("avg_degradation_adaptation_cost")
+        )
+        avg_time_to_recover_seconds = cls._coerce_non_negative_float(
+            metadata.get("avg_degradation_time_to_recover_seconds")
+        )
+        avg_cost_variance = cls._coerce_non_negative_float(
+            metadata.get("avg_degradation_cost_variance")
+        )
+        avg_recovery_time_variance = cls._coerce_non_negative_float(
+            metadata.get("avg_degradation_recovery_time_variance")
+        )
+        avg_intervention_count = cls._coerce_non_negative_float(
+            metadata.get("avg_degradation_intervention_count")
+        )
+        avg_confidence = cls._coerce_feedback_float(metadata.get("avg_degradation_confidence"))
+        avg_drift_score = cls._coerce_feedback_float(metadata.get("avg_degradation_drift_score"))
+        content_degradation_task_count = cls._coerce_feedback_int(
+            metadata.get("content_degradation_task_count")
+        )
+        confidence_degradation_task_count = cls._coerce_feedback_int(
+            metadata.get("confidence_degradation_task_count")
+        )
+        provider_degradation_task_count = cls._coerce_feedback_int(
+            metadata.get("provider_degradation_task_count")
+        )
+        persistent_degradation_task_count = cls._coerce_feedback_int(
+            metadata.get("persistent_degradation_task_count")
+        )
+        drift_task_count = cls._coerce_feedback_int(metadata.get("drift_task_count"))
+        intervention_task_count = cls._coerce_feedback_int(
+            metadata.get("degradation_intervention_task_count")
+        )
+        high_adaptation_cost_task_count = cls._coerce_feedback_int(
+            metadata.get("high_adaptation_cost_task_count")
+        )
+        drift_rate = cls._coerce_feedback_float(metadata.get("degradation_drift_rate"))
+        intervention_rate = cls._coerce_feedback_float(
+            metadata.get("degradation_intervention_rate")
+        )
+        high_cost_rate = cls._coerce_feedback_float(metadata.get("degradation_high_cost_rate"))
+        confidence_rate = cls._coerce_feedback_float(metadata.get("degradation_confidence_rate"))
+        stability_score_raw = metadata.get("degradation_stability_score")
+        if stability_score_raw is None:
+            stability_score = max(
+                0.0,
+                min(
+                    1.0,
+                    1.0
+                    - (drift_rate * 0.35)
+                    - (intervention_rate * 0.15)
+                    - (high_cost_rate * 0.15)
+                    - (min(1.0, avg_adaptation_cost / 4.0) * 0.15)
+                    - (min(1.0, avg_cost_variance / 4.0) * 0.1)
+                    - (confidence_rate * 0.05)
+                    + (recovery_rate * 0.1),
+                ),
+            )
+        else:
+            stability_score = cls._coerce_feedback_float(stability_score_raw)
+
+        source_distribution = cls._normalize_distribution(metadata.get("degradation_sources") or {})
+        kind_distribution = cls._normalize_distribution(metadata.get("degradation_kinds") or {})
+        failure_type_distribution = cls._normalize_distribution(
+            metadata.get("degradation_failure_types") or {}
+        )
+        provider_distribution = cls._normalize_distribution(
+            metadata.get("degradation_providers") or {}
+        )
+        reason_distribution = cls._normalize_distribution(metadata.get("degradation_reasons") or {})
+
+        if not any(
+            (
+                coverage > 0.0,
+                event_count > 0,
+                degraded_task_count > 0,
+                drift_task_count > 0,
+                source_distribution,
+                kind_distribution,
+            )
+        ):
+            return None
+
+        return DegradationRoutingFeedback(
+            coverage=coverage,
+            event_count=event_count,
+            degraded_task_count=degraded_task_count,
+            recovered_task_count=recovered_task_count,
+            recovery_rate=recovery_rate,
+            avg_adaptation_cost=avg_adaptation_cost,
+            avg_time_to_recover_seconds=avg_time_to_recover_seconds,
+            avg_cost_variance=avg_cost_variance,
+            avg_recovery_time_variance=avg_recovery_time_variance,
+            avg_intervention_count=avg_intervention_count,
+            avg_confidence=avg_confidence,
+            avg_drift_score=avg_drift_score,
+            content_degradation_task_count=content_degradation_task_count,
+            confidence_degradation_task_count=confidence_degradation_task_count,
+            provider_degradation_task_count=provider_degradation_task_count,
+            persistent_degradation_task_count=persistent_degradation_task_count,
+            drift_task_count=drift_task_count,
+            intervention_task_count=intervention_task_count,
+            high_adaptation_cost_task_count=high_adaptation_cost_task_count,
+            drift_rate=drift_rate,
+            intervention_rate=intervention_rate,
+            high_cost_rate=high_cost_rate,
+            confidence_rate=confidence_rate,
+            stability_score=round(stability_score, 4),
+            source_distribution=source_distribution,
+            kind_distribution=kind_distribution,
+            failure_type_distribution=failure_type_distribution,
+            provider_distribution=provider_distribution,
+            reason_distribution=reason_distribution,
         )
 
     @staticmethod
@@ -1615,6 +2018,50 @@ class RuntimeIntelligenceService:
         """Return learned team/worktree preferences derived from runtime feedback metadata."""
         return self._persisted_team_routing_feedback
 
+    def get_degradation_routing_feedback(self) -> Optional[DegradationRoutingFeedback]:
+        """Return long-horizon degradation preferences derived from runtime feedback metadata."""
+        return self._persisted_degradation_routing_feedback
+
+    def resolve_team_routing_feedback(
+        self,
+        *,
+        scope_context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[TeamRoutingFeedback]:
+        """Resolve the most relevant team/worktree routing feedback for a runtime scope."""
+        scoped_feedback = self._resolve_scoped_team_routing_feedback(scope_context=scope_context)
+        if scoped_feedback is not None:
+            return scoped_feedback
+        return self.get_team_routing_feedback()
+
+    def _resolve_scoped_team_routing_feedback(
+        self,
+        *,
+        scope_context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[TeamRoutingFeedback]:
+        """Resolve scoped team/worktree routing feedback for the requested runtime context."""
+        scope_metrics = self._runtime_feedback_metadata.get("team_worktree_scope_metrics") or {}
+        if not isinstance(scope_metrics, dict):
+            return None
+        for dimension in ("model_family", "provider", "task_type"):
+            label = TopologyRoutingFeedback._scope_context_label(
+                scope_context,
+                dimension=dimension,
+            )
+            if label is None:
+                continue
+            dimension_metrics = scope_metrics.get(dimension) or {}
+            bucket = dimension_metrics.get(label)
+            if not isinstance(bucket, dict):
+                continue
+            feedback = self._extract_team_routing_feedback_from_mapping(
+                dict(bucket),
+                scope_dimension=dimension,
+                scope_label=label,
+            )
+            if feedback is not None:
+                return feedback
+        return None
+
     def get_topology_routing_context(
         self,
         *,
@@ -1638,10 +2085,16 @@ class RuntimeIntelligenceService:
                     scope_context=resolved_scope_context,
                 )
             )
-        team_feedback = self.get_team_routing_feedback()
+        team_feedback = self.resolve_team_routing_feedback(scope_context=resolved_scope_context)
         if team_feedback is not None:
-            for key, value in team_feedback.to_routing_context().items():
+            routing_context.update(team_feedback.to_routing_context())
+        global_team_feedback = self.get_team_routing_feedback()
+        if global_team_feedback is not None and global_team_feedback is not team_feedback:
+            for key, value in global_team_feedback.to_routing_context().items():
                 routing_context.setdefault(key, value)
+        degradation_feedback = self.get_degradation_routing_feedback()
+        if degradation_feedback is not None:
+            routing_context.update(degradation_feedback.to_routing_context())
 
         experiment_hints = self.get_experiment_routing_context(
             query=query,
@@ -2069,6 +2522,9 @@ class RuntimeIntelligenceService:
         team_feedback = self.get_team_routing_feedback()
         if team_feedback is not None:
             metadata["team_feedback"] = team_feedback.to_metadata()
+        degradation_feedback = self.get_degradation_routing_feedback()
+        if degradation_feedback is not None:
+            metadata["degradation_feedback"] = degradation_feedback.to_metadata()
         routing_scope_context = dict(context or {})
         if task_analysis is not None and "task_type" not in routing_scope_context:
             routing_scope_context["task_type"] = getattr(task_analysis, "task_type", None)
