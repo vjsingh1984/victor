@@ -1,142 +1,45 @@
-# Copyright 2026 Vijaykumar Singh <singhvjd@gmail.com>
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-"""Telemetry helpers for deprecated chat compatibility surfaces.
+"""Telemetry for deprecated chat coordinator shims.
 
-These counters are intentionally process-local and dependency-light so
-deprecated compatibility shims can report usage without re-coupling
-themselves to evolving runtime services.
+This module provides telemetry functions for tracking access to deprecated
+chat coordinator shims during the migration to the new chat service architecture.
 """
 
-from __future__ import annotations
+import logging
 
-import threading
-from collections import defaultdict
-from typing import Any, DefaultDict, Dict, Tuple
-
-_LOCK = threading.Lock()
-_COUNTS: DefaultDict[Tuple[str, str, str], int] = defaultdict(int)
+logger = logging.getLogger(__name__)
 
 
-def record_deprecated_chat_shim_access(component: str, surface: str, route: str) -> None:
-    """Record one deprecated chat compatibility access event."""
-    key = (component, surface, route)
-    with _LOCK:
-        _COUNTS[key] += 1
+def record_deprecated_chat_shim_access(
+    location: str,
+    name: str,
+    access_type: str,
+) -> None:
+    """Record access to a deprecated chat coordinator shim.
 
-
-def get_deprecated_chat_shim_telemetry() -> Dict[str, int]:
-    """Return a stable flat snapshot of deprecated chat shim access counters."""
-    with _LOCK:
-        snapshot = dict(_COUNTS)
-
-    telemetry: Dict[str, int] = {}
-    total = 0
-    for (component, surface, route), count in snapshot.items():
-        telemetry[f"{component}.{surface}.{route}"] = count
-        total += count
-    telemetry["total"] = total
-    return telemetry
-
-
-def get_deprecated_chat_shim_report() -> Dict[str, Any]:
-    """Return a structured summary of deprecated chat compatibility usage."""
-    telemetry = get_deprecated_chat_shim_telemetry()
-    report: Dict[str, Any] = {
-        "total": telemetry.get("total", 0),
-        "deprecated_surface_count": 0,
-        "components": {},
-        "route_totals": {},
-        "active_components": [],
-        "active_routes": [],
-        "active_surfaces": [],
-        "removal_candidates": [],
-    }
-
-    surface_totals: Dict[str, int] = {}
-
-    for key, count in telemetry.items():
-        if key == "total":
-            continue
-
-        component, surface, route = key.split(".", 2)
-        component_entry = report["components"].setdefault(
-            component,
-            {"total": 0, "surfaces": {}},
-        )
-        surface_entry = component_entry["surfaces"].setdefault(
-            surface,
-            {"total": 0, "routes": {}},
-        )
-
-        component_entry["total"] += count
-        surface_entry["total"] += count
-        surface_entry["routes"][route] = count
-        report["route_totals"][route] = report["route_totals"].get(route, 0) + count
-
-        surface_key = f"{component}.{surface}"
-        surface_totals[surface_key] = surface_totals.get(surface_key, 0) + count
-
-    report["deprecated_surface_count"] = len(surface_totals)
-    report["active_components"] = [
-        {"component": component, "count": component_data["total"]}
-        for component, component_data in sorted(
-            report["components"].items(),
-            key=lambda item: (-item[1]["total"], item[0]),
-        )
-    ]
-    report["active_routes"] = [
-        {"route": route, "count": count}
-        for route, count in sorted(
-            report["route_totals"].items(),
-            key=lambda item: (-item[1], item[0]),
-        )
-    ]
-    report["active_surfaces"] = [
-        {"surface": surface, "count": count}
-        for surface, count in sorted(
-            surface_totals.items(),
-            key=lambda item: (-item[1], item[0]),
-        )
-    ]
-    removal_candidates = [
-        {
-            "surface": f"{component}.{surface}",
-            "count": surface_data["total"],
-            "routes": dict(
-                sorted(
-                    surface_data["routes"].items(),
-                    key=lambda item: (-item[1], item[0]),
-                )
-            ),
-        }
-        for component, component_data in report["components"].items()
-        for surface, surface_data in component_data["surfaces"].items()
-    ]
-    report["removal_candidates"] = sorted(
-        removal_candidates,
-        key=lambda item: (item["count"], item["surface"]),
+    Args:
+        location: Where the access occurred (e.g., "coordinators_package")
+        name: Name of the deprecated shim
+        access_type: Type of access (e.g., "package_export", "attribute")
+    """
+    logger.debug(
+        f"Deprecated chat shim access: {location} accessed {name} via {access_type}"
     )
-    return report
+    # In production, this would emit a telemetry event
+    # For now, just log at debug level to avoid spam
 
 
-def has_deprecated_chat_shim_usage() -> bool:
-    """Return whether any deprecated chat compatibility surface was used."""
-    return get_deprecated_chat_shim_telemetry().get("total", 0) > 0
-
-
-def reset_deprecated_chat_shim_telemetry() -> None:
-    """Reset deprecated chat shim telemetry counters."""
-    with _LOCK:
-        _COUNTS.clear()
-
-
-__all__ = [
-    "get_deprecated_chat_shim_report",
-    "get_deprecated_chat_shim_telemetry",
-    "has_deprecated_chat_shim_usage",
-    "record_deprecated_chat_shim_access",
-    "reset_deprecated_chat_shim_telemetry",
-]
+__all__ = ["record_deprecated_chat_shim_access"]

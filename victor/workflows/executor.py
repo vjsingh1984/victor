@@ -56,6 +56,10 @@ warnings.warn(
     stacklevel=2,
 )
 
+# Chain handler prefix for YAML workflow references
+# Used to identify chain handlers in workflow definitions: "chain:vertical:name"
+CHAIN_HANDLER_PREFIX = "chain:"
+
 
 # Dummy function for test patching (deprecated)
 def get_chain_registry():
@@ -181,6 +185,8 @@ __all__ = [
     "_compute_handlers",
     # Chain registry (deprecated stub)
     "get_chain_registry",
+    # Chain handler prefix
+    "CHAIN_HANDLER_PREFIX",
     # Deprecated classes
     "WorkflowExecutor",
 ]
