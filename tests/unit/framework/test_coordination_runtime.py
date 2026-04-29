@@ -8,6 +8,7 @@ from victor.framework.coordination_runtime import (
     RuleBasedTeamSelector,
     RuleBasedWorkflowSelector,
     build_coordination_suggestion,
+    build_runtime_coordination_suggestion,
     get_action_for_complexity,
     recommend_teams_for_catalog,
     recommend_workflows_for_catalog,
@@ -92,3 +93,45 @@ def test_resolve_default_workflow_for_mode_prefers_available_shared_workflow() -
 def test_get_action_for_complexity_uses_shared_mode_policy() -> None:
     assert get_action_for_complexity("high", "build") == TeamSuggestionAction.AUTO_SPAWN
     assert get_action_for_complexity("low", "build") == TeamSuggestionAction.NONE
+
+
+def test_build_runtime_coordination_suggestion_uses_runtime_mode_and_vertical_context() -> None:
+    context = create_vertical_context("coding")
+    context.apply_team_specs(
+        {
+            "feature_team": SimpleNamespace(
+                name="Feature Team",
+                formation="parallel",
+                members=[],
+                description="Handles feature implementation",
+            )
+        }
+    )
+    context.apply_workflows(
+        {
+            "feature_implementation": SimpleNamespace(
+                name="feature_implementation",
+                description="Implement features end-to-end",
+            )
+        }
+    )
+    runtime = SimpleNamespace(
+        get_vertical_context=lambda: context,
+        mode_controller=SimpleNamespace(current_mode=SimpleNamespace(value="build")),
+        coordination=SimpleNamespace(
+            _team_selector=RuleBasedTeamSelector(),
+            _workflow_selector=RuleBasedWorkflowSelector(),
+        ),
+    )
+
+    suggestion = build_runtime_coordination_suggestion(
+        runtime_subject=runtime,
+        task_type="feature",
+        complexity="high",
+    )
+
+    assert suggestion.action == TeamSuggestionAction.AUTO_SPAWN
+    assert suggestion.primary_team is not None
+    assert suggestion.primary_team.team_name == "feature_team"
+    assert suggestion.primary_workflow is not None
+    assert suggestion.primary_workflow.workflow_name == "feature_implementation"

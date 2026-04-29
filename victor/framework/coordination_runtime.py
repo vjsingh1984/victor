@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+from inspect import getattr_static
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -562,6 +563,143 @@ def build_coordination_suggestion(
     )
 
 
+def build_runtime_coordination_suggestion(
+    *,
+    runtime_subject: Any,
+    task_type: str,
+    complexity: str,
+    mode: Optional[str] = None,
+) -> CoordinationSuggestion:
+    """Build a coordination recommendation for an orchestrator-like runtime.
+
+    This helper keeps user-facing runtime surfaces on the shared framework
+    recommendation engine while still honoring configured selectors and mode
+    policies when the runtime already has them.
+    """
+    from victor.framework.team_runtime import resolve_vertical_coordination_catalog
+
+    coordination = _resolve_runtime_coordination(runtime_subject)
+    if _should_delegate_to_coordination_surface(coordination):
+        try:
+            return coordination.suggest_for_task(
+                task_type=task_type,
+                complexity=complexity,
+                mode=mode or _resolve_runtime_mode(runtime_subject),
+            )
+        except Exception as exc:
+            logger.debug("Fallback coordination surface failed: %s", exc)
+
+    resolved_mode = mode or _resolve_runtime_mode(runtime_subject)
+    return build_coordination_suggestion(
+        task_type=task_type,
+        complexity=complexity,
+        mode=resolved_mode,
+        coordination_catalog=resolve_vertical_coordination_catalog(
+            _resolve_runtime_vertical_subject(runtime_subject)
+        ),
+        team_selector=_resolve_runtime_team_selector(runtime_subject),
+        workflow_selector=_resolve_runtime_workflow_selector(runtime_subject),
+        mode_configs=_resolve_runtime_mode_configs(runtime_subject),
+    )
+
+
+def _resolve_runtime_mode(runtime_subject: Any) -> str:
+    """Resolve the current mode from a runtime-like object."""
+    mode_controller = getattr(runtime_subject, "mode_controller", None)
+    current_mode = getattr(mode_controller, "current_mode", None)
+    current_mode_value = getattr(current_mode, "value", None)
+    if isinstance(current_mode_value, str) and current_mode_value:
+        return current_mode_value
+    return "build"
+
+
+def _resolve_runtime_vertical_subject(runtime_subject: Any) -> Any:
+    """Resolve the vertical or vertical context for a runtime-like object."""
+    get_vertical_context = getattr(runtime_subject, "get_vertical_context", None)
+    if callable(get_vertical_context):
+        try:
+            vertical_context = get_vertical_context()
+        except Exception:
+            vertical_context = None
+        if vertical_context is not None:
+            return vertical_context
+
+    vertical_context = (
+        getattr(runtime_subject, "vertical_context", None)
+        if _has_declared_attribute(runtime_subject, "vertical_context")
+        else None
+    )
+    if vertical_context is not None:
+        return vertical_context
+    if _has_declared_attribute(runtime_subject, "_vertical_context"):
+        return getattr(runtime_subject, "_vertical_context", None)
+    return None
+
+
+def _resolve_runtime_coordination(runtime_subject: Any) -> Any:
+    """Resolve the declared coordination surface for a runtime-like object."""
+    if not _has_declared_attribute(runtime_subject, "coordination"):
+        return None
+    try:
+        return getattr(runtime_subject, "coordination", None)
+    except Exception:
+        return None
+
+
+def _resolve_runtime_team_selector(runtime_subject: Any) -> Any:
+    """Resolve the configured team selector for a runtime-like object."""
+    coordination = _resolve_runtime_coordination(runtime_subject)
+    team_selector = getattr(coordination, "_team_selector", None)
+    if team_selector is not None:
+        return team_selector
+    return HybridTeamSelector(
+        RuleBasedTeamSelector(),
+        LearningBasedTeamSelector(),
+    )
+
+
+def _resolve_runtime_workflow_selector(runtime_subject: Any) -> Any:
+    """Resolve the configured workflow selector for a runtime-like object."""
+    coordination = _resolve_runtime_coordination(runtime_subject)
+    workflow_selector = getattr(coordination, "_workflow_selector", None)
+    if workflow_selector is not None:
+        return workflow_selector
+    return RuleBasedWorkflowSelector()
+
+
+def _resolve_runtime_mode_configs(runtime_subject: Any) -> Dict[str, ModeCoordinationConfig]:
+    """Resolve the configured mode policies for a runtime-like object."""
+    coordination = _resolve_runtime_coordination(runtime_subject)
+    mode_configs = getattr(coordination, "_mode_configs", None)
+    if isinstance(mode_configs, dict) and mode_configs:
+        return mode_configs
+    return DEFAULT_MODE_CONFIGS
+
+
+def _should_delegate_to_coordination_surface(coordination: Any) -> bool:
+    """Whether to fall back to a runtime-provided coordination surface."""
+    if coordination is None:
+        return False
+    suggest_for_task = getattr(coordination, "suggest_for_task", None)
+    if not callable(suggest_for_task):
+        return False
+    return not any(
+        _has_declared_attribute(coordination, attr_name)
+        for attr_name in ("_team_selector", "_workflow_selector", "_mode_configs")
+    )
+
+
+def _has_declared_attribute(subject: Any, attr_name: str) -> bool:
+    """Check for a real attribute without triggering MagicMock fallback."""
+    if subject is None:
+        return False
+    try:
+        getattr_static(subject, attr_name)
+    except AttributeError:
+        return False
+    return True
+
+
 __all__ = [
     "DEFAULT_MODE_CONFIGS",
     "HybridTeamSelector",
@@ -570,6 +708,7 @@ __all__ = [
     "RuleBasedTeamSelector",
     "RuleBasedWorkflowSelector",
     "build_coordination_suggestion",
+    "build_runtime_coordination_suggestion",
     "get_action_for_complexity",
     "recommend_teams_for_catalog",
     "recommend_workflows_for_catalog",
