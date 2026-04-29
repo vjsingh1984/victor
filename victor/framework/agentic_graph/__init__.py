@@ -25,6 +25,15 @@ Architecture:
         ├── evaluate_node: Progress evaluation via FulfillmentDetector
         └── decide: Conditional edge routing back to PERCEIVE or END
 
+Components:
+    - state: AgenticLoopStateModel and helpers
+    - nodes: Core agentic loop nodes (perceive, plan, act, evaluate)
+    - builder: Graph construction utilities
+    - executor: AgenticLoopGraphExecutor for running the graph
+    - coordinator_nodes: State-passed coordinator adapters
+    - service_nodes: Service provider nodes (chat, tool, context, provider)
+    - team_selector: Formation selection logic
+
 Example:
     from victor.framework.agentic_graph import (
         create_agentic_loop_graph,
@@ -37,18 +46,90 @@ Example:
 
     # Execute
     result = await executor.run("Fix the authentication bug")
+
+Team Architecture Note:
+    Teams are formations, not separate graphs. Use UnifiedTeamCoordinator
+    directly as a StateGraph node:
+
+        from victor.teams import UnifiedTeamCoordinator, TeamFormation
+        coordinator = UnifiedTeamCoordinator(orchestrator)
+        coordinator.set_formation(TeamFormation.PARALLEL)
+        graph.add_node("team", coordinator)  # Direct usage!
 """
 
+# Core state and graph components
 from victor.framework.agentic_graph.state import (
     AgenticLoopState,
     AgenticLoopStateModel,
     create_initial_state,
     should_continue_loop,
 )
+from victor.framework.agentic_graph.nodes import (
+    perceive_node,
+    plan_node,
+    act_node,
+    evaluate_node,
+    decide_edge,
+)
+from victor.framework.agentic_graph.builder import create_agentic_loop_graph
+from victor.framework.agentic_graph.executor import (
+    AgenticLoopGraphExecutor,
+    LoopResult,
+)
+
+# Coordinator adapters
+from victor.framework.agentic_graph.coordinator_nodes import (
+    CoordinatorAdapter,
+    exploration_node,
+    safety_node,
+    system_prompt_node,
+)
+
+# Service provider nodes
+from victor.framework.agentic_graph.service_nodes import (
+    chat_service_node,
+    tool_service_node,
+    context_service_node,
+    provider_service_node,
+    inject_execution_context,
+)
+
+# Team selector (formation selection logic)
+from victor.framework.agentic_graph.team_selector import (
+    select_formation,
+    FormationCriteria,
+    DEFAULT_FORMATION,
+)
 
 __all__ = [
+    # State
     "AgenticLoopState",
     "AgenticLoopStateModel",
     "create_initial_state",
     "should_continue_loop",
+    # Core nodes
+    "perceive_node",
+    "plan_node",
+    "act_node",
+    "evaluate_node",
+    "decide_edge",
+    # Builder and executor
+    "create_agentic_loop_graph",
+    "AgenticLoopGraphExecutor",
+    "LoopResult",
+    # Coordinator adapters
+    "CoordinatorAdapter",
+    "exploration_node",
+    "safety_node",
+    "system_prompt_node",
+    # Service nodes
+    "chat_service_node",
+    "tool_service_node",
+    "context_service_node",
+    "provider_service_node",
+    "inject_execution_context",
+    # Team selector
+    "select_formation",
+    "FormationCriteria",
+    "DEFAULT_FORMATION",
 ]
