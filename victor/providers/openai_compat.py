@@ -255,7 +255,7 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
             tc_ids = {tc["id"] for tc in msg["tool_calls"] if "id" in tc}
             missing_responses = tc_ids - present_response_ids
             if not tc_ids.issubset(present_response_ids):
-                logger.warning(
+                logger.debug(
                     "[fix_orphaned_tool_messages] Stripping tool_calls from assistant message: missing responses for IDs: %s",
                     missing_responses,
                 )
@@ -288,7 +288,7 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     # Find orphaned tool responses (responses without matching tool_calls)
     orphaned_responses = present_response_ids - declared_tool_call_ids
     if orphaned_responses:
-        logger.warning(
+        logger.debug(
             "[fix_orphaned_tool_messages] Found %d orphaned tool responses (will be removed): %s",
             len(orphaned_responses),
             orphaned_responses,

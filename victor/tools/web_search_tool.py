@@ -578,7 +578,7 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     access_mode=AccessMode.NETWORK,  # Makes external HTTP requests
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["query"],  # Different queries indicate progress, not loops
+    signature_params=["query"],  # Different queries indicate progress, not loops
     stages=["planning", "initial"],  # Conversation stages where relevant
     task_types=[
         "research",
@@ -742,7 +742,7 @@ async def web_search(
     access_mode=AccessMode.NETWORK,  # Makes external HTTP requests
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["url"],  # Different URLs indicate progress, not loops
+    signature_params=["url"],  # Different URLs indicate progress, not loops
     stages=["planning", "initial"],  # Conversation stages where relevant
     task_types=[
         "research",

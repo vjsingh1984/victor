@@ -109,7 +109,7 @@ async def _run_git_async(
     ],
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.MIXED,  # Can both read and write
-    progress_params=[
+    signature_params=[
         "operation",
         "files",
         "branch",

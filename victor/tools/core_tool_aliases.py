@@ -19,10 +19,18 @@ CORE_TOOL_ALIASES = {
     "patch_file": "edit",
     "execute_bash": "shell",
     "bash": "shell",
-    "shell_readonly": "shell",  # Maps to shell with readonly=True applied by tool selection
+    "shell_readonly": "shell",  # Legacy alias retained for backward compatibility
 }
 
 
-def canonicalize_core_tool_name(name: str) -> str:
-    """Resolve known core-tool aliases to Victor's canonical internal names."""
+def canonicalize_core_tool_name(name: str, preserve_variants: bool = False) -> str:
+    """Resolve known core-tool aliases to Victor's canonical internal names.
+
+    Args:
+        name: Tool name to normalize.
+        preserve_variants: When True, keep intent/runtime variants like
+            ``shell_readonly`` distinct instead of collapsing them to ``shell``.
+    """
+    if preserve_variants and name == "shell_readonly":
+        return name
     return CORE_TOOL_ALIASES.get(name, name)

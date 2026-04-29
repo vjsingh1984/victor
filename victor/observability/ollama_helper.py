@@ -147,22 +147,3 @@ def is_ollama_available() -> bool:
     """
     models = get_ollama_models()
     return len(models) > 0
-
-
-if __name__ == "__main__":
-    """Test ollama detection."""
-    print("Testing Ollama model detection...")
-    print()
-
-    if is_ollama_available():
-        models = get_ollama_models()
-        print(f"Found {len(models)} available models:")
-        for model in models:
-            print(f"  - {model}")
-        print()
-
-        simplest = select_simplest_model(models)
-        print(f"Simplest model: {simplest}")
-    else:
-        print("Ollama not available on localhost:11434")
-        print("Using fallback model: llama3.2")

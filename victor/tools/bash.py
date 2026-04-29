@@ -291,6 +291,13 @@ def _is_readonly_command(cmd: str) -> bool:
 
     Returns True if the command is safe for read-only operations.
     """
+    # Check for compound commands (&&, ||, ;, \n) which are not allowed in readonly mode
+    # We allow pipes (|) for simple command chains like "grep foo file | head -20"
+    # but reject other compound operators that could execute non-readonly commands
+    for op in ["&&", "||", ";"]:
+        if op in cmd:
+            return False
+
     readonly_commands = _get_readonly_commands()
     base_cmd = _extract_base_command(cmd)
 
@@ -430,7 +437,7 @@ def _is_dangerous(command: str) -> bool:
     access_mode=AccessMode.EXECUTE,  # Executes external commands
     danger_level=DangerLevel.HIGH,  # Arbitrary command execution is risky
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["cmd"],  # Different commands indicate progress, not loops
+    signature_params=["cmd"],  # Different commands indicate progress, not loops
     stages=["execution", "verification"],  # Conversation stages where relevant
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.EXECUTE,  # Cannot run safely in parallel
@@ -459,7 +466,7 @@ async def shell(
     cwd: Optional[str] = None,
     timeout: Optional[int] = None,
     dangerous: bool = False,
-    readonly: bool = False,
+    readonly: bool = True,
     stdout_limit: Optional[int] = None,
     stderr_limit: Optional[int] = None,
 ) -> Dict[str, Any]:
@@ -476,7 +483,8 @@ async def shell(
         cwd: Working directory for the command
         timeout: Maximum seconds before timeout
         dangerous: Set true only for destructive commands (rm, kill, etc.)
-        readonly: If True, only allows safe readonly commands (ls, cat, git status, etc.)
+        readonly: Defaults to True. Set False only when the command must mutate state
+            or invoke non-readonly subcommands.
         stdout_limit: Max lines for stdout (None=unlimited, default: 10000)
         stderr_limit: Max lines for stderr (None=unlimited, default: 2000)
 
@@ -556,6 +564,21 @@ async def shell(
     # Check readonly mode restrictions
     if readonly and not _is_readonly_command(cmd):
         base_cmd = _extract_base_command(cmd)
+        # Check if this is a compound command error
+        is_compound = any(op in cmd for op in ["&&", "||", ";"])
+        if is_compound:
+            return {
+                "success": False,
+                "error": (
+                    f"Compound commands (with '&&', '||', ';') are not allowed in readonly mode. "
+                    f"Split into separate commands or use 'shell' tool without readonly=True. "
+                    f"Command: {cmd[:100]}{'...' if len(cmd) > 100 else ''}"
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+                "cwd": os.getcwd(),
+            }
         return {
             "success": False,
             "error": (

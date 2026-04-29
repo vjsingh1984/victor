@@ -165,7 +165,8 @@ def print_metrics_table() -> None:
     print()
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point for metrics export."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Export EventBridge metrics")
@@ -201,3 +202,7 @@ if __name__ == "__main__":
             print(f"Metrics exported to: {args.output}")
         else:
             print(output)
+
+
+if __name__ == "__main__":
+    main()

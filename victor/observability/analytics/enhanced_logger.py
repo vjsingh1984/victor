@@ -383,11 +383,15 @@ class EnhancedUsageLogger:
             Sanitized data safe for JSON serialization
         """
         import inspect
-        from types import CoroutineType
+        from types import CoroutineType, MappingProxyType
 
-        if isinstance(data, dict):
-            return {k: self._sanitize_log_data(v) for k, v in data.items()}
+        if isinstance(data, dict) or isinstance(data, MappingProxyType):
+            # Handle both dict and mappingproxy (read-only dict wrapper)
+            return {k: self._sanitize_log_data(v) for k, v in dict(data).items()}
         elif isinstance(data, (list, tuple)):
+            return [self._sanitize_log_data(item) for item in data]
+        elif isinstance(data, set):
+            # Sets can't be directly JSON serialized, convert to list
             return [self._sanitize_log_data(item) for item in data]
         elif isinstance(data, CoroutineType):
             # Coroutines can't be serialized, return a placeholder
@@ -395,6 +399,9 @@ class EnhancedUsageLogger:
         elif inspect.isgenerator(data):
             # Generators can't be serialized
             return "<generator>"
+        elif inspect.isasyncgen(data):
+            # Async generators can't be serialized
+            return "<async_generator>"
         elif hasattr(data, "__dict__"):
             # For objects, try to serialize their dict representation
             return self._sanitize_log_data(data.__dict__)

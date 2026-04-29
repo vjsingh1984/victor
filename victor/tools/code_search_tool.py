@@ -215,7 +215,7 @@ def _build_codebase_embedding_extra_config(
         "dimension": getattr(settings, "codebase_dimension", 384),
         "batch_size": getattr(settings, "codebase_batch_size", 32),
         "structural_indexing_enabled": getattr(
-            settings, "codebase_structural_indexing_enabled", True
+            settings, "codebase_structural_indexing_enabled", False
         ),
         "code_chunking_strategy": getattr(
             settings, "codebase_chunking_strategy", DEFAULT_CODEBASE_CHUNKING_STRATEGY
@@ -1531,6 +1531,121 @@ def _sanitize_search_metadata(value: Any) -> Any:
     return value
 
 
+async def _graph_search(
+    query: str,
+    root_path: Path,
+    k: int,
+    max_hops: int,
+    edge_types: Optional[List[str]],
+    filters: Optional[SearchFilters],
+    settings: Any,
+) -> Dict[str, Any]:
+    """Execute graph-based multi-hop search.
+
+    Args:
+        query: Search query
+        root_path: Root directory to search
+        k: Maximum results
+        max_hops: Maximum traversal depth
+        edge_types: Edge types to traverse
+        filters: Search filters
+        settings: Settings object
+
+    Returns:
+        Dictionary with results, metadata
+    """
+    import time
+    from victor.core.graph_rag import MultiHopRetriever, RetrievalConfig
+    from victor.storage.graph import create_graph_store
+
+    start_time = time.time()
+
+    # Default edge types for graph traversal
+    default_edge_types = ["CALLS", "REFERENCES", "IMPORTS", "INHERITS", "CONTAINS"]
+    if edge_types is None:
+        edge_types = default_edge_types
+
+    # Create graph store
+    try:
+        graph_store = create_graph_store("sqlite", None, root_path)
+        await graph_store.initialize()
+
+        # Check if graph has data
+        stats = await graph_store.stats()
+        node_count = stats.get("node_count", stats.get("nodes", 0))
+
+        if node_count == 0:
+            logger.info("Graph store is empty for graph search")
+            await graph_store.close()
+            return {"results": [], "error": "graph_empty"}
+
+    except Exception as e:
+        logger.warning(f"Failed to initialize graph store: {e}")
+        return {"results": [], "error": str(e)}
+
+    # Create retrieval configuration
+    config = RetrievalConfig(
+        seed_count=k,
+        max_hops=min(max_hops, 3),  # Cap at 3 hops
+        top_k=k,
+        edge_types=edge_types,
+    )
+
+    # Create retriever
+    retriever = MultiHopRetriever(graph_store, config)
+
+    # Execute retrieval
+    try:
+        result = await retriever.retrieve(query, config)
+
+        # Convert graph nodes to search results format
+        results = []
+        for node in result.nodes:
+            # Apply filters if provided
+            if filters:
+                if filters.language and node.lang != filters.language:
+                    continue
+                if filters.symbol and node.name != filters.symbol:
+                    continue
+
+            result_item = {
+                "file_path": node.file,
+                "path": node.file,
+                "line_number": node.line,
+                "end_line": node.end_line,
+                "symbol_name": node.name,
+                "symbol_type": node.type,
+                "content": node.docstring or f"# {node.type}: {node.name}",
+                "score": result.scores.get(node.node_id, 0.5),
+                "similarity": result.scores.get(node.node_id, 0.5),
+                "combined_score": result.scores.get(node.node_id, 0.5),
+                "metadata": {
+                    "node_id": node.node_id,
+                    "search_mode": "graph",
+                    "hop_distance": result.hop_distances.get(node.node_id, 0),
+                    "signature": node.signature,
+                    "language": node.lang,
+                },
+            }
+            results.append(result_item)
+
+        execution_time_ms = (time.time() - start_time) * 1000
+
+        await graph_store.close()
+
+        return {
+            "results": results,
+            "edge_types_used": edge_types,
+            "nodes_traversed": len(result.nodes),
+            "execution_time_ms": execution_time_ms,
+        }
+
+    except Exception as e:
+        logger.warning(f"Graph retrieval failed: {e}")
+        await graph_store.close()
+        return {"results": [], "error": str(e)}
+
+
 def _prepare_ranked_results(
     results: List[Any],
     search_mode: str,
@@ -2294,7 +2409,7 @@ async def _literal_search(
     access_mode=AccessMode.READONLY,  # Only reads files for search
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=[
+    signature_params=[
         "query",
         "path",
         "mode",
@@ -2326,6 +2441,12 @@ async def _literal_search(
         "literal",
         "code search",
         "filename",
+        "graph",
+        "graph search",
+        "multi-hop",
+        "dependencies",
+        "relationships",
+        "traverse",
     ],
     mandatory_keywords=[
         "search code",
@@ -2351,9 +2472,11 @@ async def code_search(
     mode: str = "semantic",
     reindex: bool = False,
     filters: Optional[SearchFilters] = None,
+    max_hops: int = 2,
+    graph_edge_types: Optional[List[str]] = None,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Find code by CONCEPT, TEXT, or FILENAME when you DON'T know exact location.
+    """Find code by CONCEPT, TEXT, FILENAME, or GRAPH when you DON'T know exact location.
 
     Use this tool for exploration when you need to discover where relevant code
     lives. Returns file snippets ranked by relevance.
@@ -2362,14 +2485,21 @@ async def code_search(
     - semantic: Vector search using embeddings (default)
     - text: Literal text search
     - filename: Search by filename pattern
+    - graph: Multi-hop graph traversal for code relationships (experimental)
+
+    Graph mode parameters:
+    - max_hops: Maximum traversal depth (default: 2, range: 1-3)
+    - graph_edge_types: Edge types to traverse (default: CALLS, REFERENCES, IMPORTS, INHERITS)
 
     Args:
         query: Search query (code concept, text, or filename pattern)
         path: Root directory to search (default: ".")
         k: Maximum number of results to return (default: 10)
-        mode: Search mode - 'semantic', 'text', or 'filename' (default: 'semantic')
+        mode: Search mode - 'semantic', 'text', 'filename', or 'graph' (default: 'semantic')
         reindex: Force rebuild of search index (default: False)
         filters: SearchFilters object with file_pattern, symbol, language, test_only, extensions
+        max_hops: Maximum hops for graph traversal (default: 2)
+        graph_edge_types: Specific edge types to traverse (default: CALLS, REFERENCES, IMPORTS, INHERITS)
 
     Returns:
         Dictionary with search results including matches, scores, file paths
@@ -2895,6 +3025,87 @@ async def code_search(
                     "fallback_mode": "semantic",
                     "fallback_reason": str(exc),
                 }
+        elif mode == "graph":
+            # Graph-based multi-hop search using Graph RAG pipeline
+            from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+            flag_manager = get_feature_flag_manager()
+            graph_enabled = (
+                flag_manager.is_enabled(FeatureFlag.USE_GRAPH_RAG) and
+                flag_manager.is_enabled(FeatureFlag.USE_MULTI_HOP_RETRIEVAL)
+            )
+
+            if not graph_enabled:
+                logger.info("Graph search features not enabled, falling back to semantic search")
+                filters_applied.append("mode_fallback=semantic")
+                fallback_metadata = {
+                    "requested_mode": "graph",
+                    "fallback_mode": "semantic",
+                    "fallback_reason": "graph_features_disabled",
+                }
+            else:
+                try:
+                    graph_results = await _graph_search(
+                        query=query,
+                        root_path=root_path,
+                        k=k,
+                        max_hops=max_hops,
+                        edge_types=graph_edge_types,
+                        filters=filters,
+                        settings=settings,
+                    )
+
+                    if graph_results.get("results"):
+                        ranked_results = _prepare_ranked_results(
+                            graph_results["results"],
+                            search_mode="graph",
+                        )
+                        ranked_results, enrichment_metadata = enrich_code_search_results(
+                            ranked_results,
+                            root_path=root_path,
+                        )
+
+                        extra_metadata = {
+                            **backend_metadata,
+                            "graph_search": {
+                                "max_hops": max_hops,
+                                "edge_types": graph_edge_types or graph_results.get("edge_types_used", []),
+                                "nodes_traversed": graph_results.get("nodes_traversed", 0),
+                                "execution_time_ms": graph_results.get("execution_time_ms", 0),
+                            },
+                        }
+                        extra_metadata.update(enrichment_metadata)
+
+                        follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
+                        return _build_search_response(
+                            results=ranked_results,
+                            mode="graph",
+                            rebuilt=rebuilt,
+                            root_path=root_path,
+                            exec_ctx=_exec_ctx,
+                            filters_applied=filters_applied,
+                            ranking_note=f"Results ranked by graph traversal (max {max_hops} hops). Includes related code through CALLS, REFERENCES, and other relationships.",
+                            extra_metadata=extra_metadata,
+                            follow_up_suggestions=follow_up_suggestions,
+                        )
+                    else:
+                        # No graph results, fall back to semantic
+                        logger.info("Graph search returned no results, falling back to semantic search")
+                        filters_applied.append("mode_fallback=semantic")
+                        fallback_metadata = {
+                            "requested_mode": "graph",
+                            "fallback_mode": "semantic",
+                            "fallback_reason": "graph_no_results",
+                        }
+
+                except Exception as exc:
+                    logger.warning("Graph search failed (%s), falling back to semantic search", exc)
+                    filters_applied.append("mode_fallback=semantic")
+                    fallback_metadata = {
+                        "requested_mode": "graph",
+                        "fallback_mode": "semantic",
+                        "fallback_reason": f"graph_error: {exc}",
+                    }
         else:
             fallback_metadata = {**dict(backend_metadata), **literal_escalation_metadata}
 

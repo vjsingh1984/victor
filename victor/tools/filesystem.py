@@ -1138,11 +1138,9 @@ TEXT_EXTENSIONS = {
     access_mode=AccessMode.READONLY,  # Only reads files
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=[
+    signature_params=[
         "path",
-        "offset",
-        "limit",
-    ],  # Params indicating exploration progress
+    ],  # Only path matters for loop detection. offset/limit excluded to enable pagination - reading different chunks of same file is exploration, not a loop
     stages=[
         "reading",
         "initial",
@@ -1756,7 +1754,7 @@ async def read(
     access_mode=AccessMode.WRITE,  # Creates/overwrites files
     danger_level=DangerLevel.LOW,  # Minor risk, easily undoable
     # Registry-driven metadata for tool selection and cache invalidation
-    progress_params=["path"],  # Same file = loop, regardless of content
+    signature_params=["path"],  # Same file = loop, regardless of content
     stages=["execution"],  # Conversation stages where relevant
     task_types=[
         "edit",
@@ -2083,7 +2081,7 @@ async def write(
     priority=Priority.HIGH,
     access_mode=AccessMode.WRITE,
     danger_level=DangerLevel.LOW,
-    progress_params=["path"],
+    signature_params=["path"],
     stages=["initial", "planning", "writing"],
     task_types=["edit", "refactor", "create"],
     execution_category=ExecutionCategory.WRITE,
@@ -2115,7 +2113,7 @@ async def write(
     access_mode=AccessMode.READONLY,  # Only reads directory contents
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=[
+    signature_params=[
         "path",
         "depth",
         "pattern",
@@ -2710,7 +2708,7 @@ async def _get_directory_summaries(root: Path, directory_paths: List[str]) -> Di
     access_mode=AccessMode.READONLY,
     danger_level=DangerLevel.SAFE,
     # Registry-driven metadata for tool selection
-    progress_params=[
+    signature_params=[
         "path",
         "max_depth",
     ],  # Params indicating exploration progress

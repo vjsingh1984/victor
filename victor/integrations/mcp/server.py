@@ -697,5 +697,10 @@ async def run_mcp_server_stdio() -> None:
     await server.start_stdio_server()
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point for MCP server."""
     run_sync(run_mcp_server_stdio())
+
+
+if __name__ == "__main__":
+    main()

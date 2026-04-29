@@ -301,8 +301,8 @@ def tool(
     mandatory_keywords: Optional[List[str]] = None,
     # NEW: Task types for classification-aware selection
     task_types: Optional[List[str]] = None,
-    # NEW: Progress parameters for loop detection
-    progress_params: Optional[List[str]] = None,
+    # NEW: Signature parameters for loop detection
+    signature_params: Optional[List[str]] = None,
     # NEW: Execution category for parallel execution
     execution_category: Optional[str] = None,
     # NEW: Availability check for optional tools requiring configuration
@@ -361,9 +361,11 @@ def tool(
         task_types: Task types this tool is relevant for. Valid types:
                    "analysis", "action", "generation", "search", "edit", "default".
                    Used for classification-aware tool selection.
-        progress_params: Parameters that indicate progress in loop detection.
-                        If these params change between calls, it's progress not a loop.
-                        E.g., ["path", "offset", "limit"] for read tool.
+        signature_params: Parameters to track in loop detection signatures.
+                         Only these parameters are included in the signature used for
+                         loop detection. Pagination parameters (offset, limit, k, etc.)
+                         should be excluded to allow reading results in chunks.
+                         E.g., ["path"] for read tool (excludes offset/limit for pagination).
         execution_category: Category for parallel execution. Valid values:
                            "read_only", "write", "compute", "network", "execute", "mixed".
                            Determines which tools can safely run concurrently.
@@ -414,7 +416,7 @@ def tool(
         "stages": stages,
         "mandatory_keywords": mandatory_keywords,
         "task_types": task_types,
-        "progress_params": progress_params,
+        "signature_params": signature_params,
         "execution_category": execution_category,
         "availability_check": availability_check,
         "timeout": timeout,
@@ -665,7 +667,7 @@ def _create_tool_class(
     # Extract new decorator-driven fields for semantic selection
     _mandatory_keywords = _metadata_params.get("mandatory_keywords") or []
     _task_types = _metadata_params.get("task_types") or []
-    _progress_params = _metadata_params.get("progress_params") or []
+    _signature_params = _metadata_params.get("signature_params") or []
     _availability_check = _metadata_params.get("availability_check")
 
     # Parse execution_category from string to enum
@@ -697,7 +699,7 @@ def _create_tool_class(
             stages=_stages,
             mandatory_keywords=_mandatory_keywords,
             task_types=_task_types,
-            progress_params=_progress_params,
+            signature_params=_signature_params,
             execution_category=_execution_category,
         )
 
@@ -721,7 +723,7 @@ def _create_tool_class(
             # New decorator-driven semantic selection fields
             self._mandatory_keywords = _mandatory_keywords
             self._task_types = _task_types
-            self._progress_params = _progress_params
+            self._signature_params = _signature_params
             self._execution_category = _execution_category or ExecutionCategory.READ_ONLY
             # Availability check for optional tools requiring configuration
             self._availability_check = _availability_check
@@ -808,14 +810,16 @@ def _create_tool_class(
             return self._task_types
 
         @property
-        def progress_params(self) -> List[str]:
-            """Return progress parameters for loop detection.
+        def signature_params(self) -> List[str]:
+            """Return signature parameters for loop detection.
 
-            These parameters indicate meaningful progress when changed between
-            tool calls. If these params differ, it's exploration not repetition.
-            E.g., ["path", "offset", "limit"] for read tool.
+            Only these parameters are included in the loop detection signature.
+            Pagination parameters (offset, limit, k, etc.) should be excluded
+            to allow reading results in chunks without triggering false loop detection.
+
+            E.g., ["path"] for read tool excludes offset/limit for pagination.
             """
-            return self._progress_params
+            return self._signature_params
 
         @property
         def execution_category(self) -> ExecutionCategory:

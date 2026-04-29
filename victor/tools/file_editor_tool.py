@@ -218,7 +218,7 @@ from victor.tools.filesystem import enforce_sandbox_path
     access_mode=AccessMode.WRITE,  # Creates/modifies/deletes files
     danger_level=DangerLevel.LOW,  # Changes are undoable via transaction system
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["ops"],  # Different operations indicate progress, not loops
+    signature_params=["ops"],  # Different operations indicate progress, not loops
     stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "action"],  # Task types for classification-aware selection
     execution_category="write",  # Cannot run in parallel with conflicting ops

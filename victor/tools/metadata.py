@@ -57,9 +57,10 @@ class ToolMetadata:
                            E.g., ["show diff", "compare"] for shell tool.
         task_types: Task types this tool is relevant for (analysis, action, generation,
                    search, edit, default). Used for classification-aware tool selection.
-        progress_params: Parameters that indicate progress in loop detection.
-                        If these params change between calls, it's progress not a loop.
-                        E.g., ["path", "offset", "limit"] for read tool.
+        signature_params: Parameters to track in loop detection signatures.
+                         Only these parameters are included in the signature. Pagination
+                         parameters (offset, limit, k, etc.) should be excluded.
+                         E.g., ["path"] for read tool (excludes offset/limit).
         execution_category: Category for parallel execution and dependency analysis.
                            Determines which tools can safely run concurrently.
     """
@@ -79,8 +80,8 @@ class ToolMetadata:
     mandatory_keywords: List[str] = field(default_factory=list)  # e.g., ["show diff", "compare"]
     # NEW: Task types for classification-aware selection
     task_types: List[str] = field(default_factory=list)  # e.g., ["analysis", "search", "default"]
-    # NEW: Progress parameters for loop detection
-    progress_params: List[str] = field(default_factory=list)  # e.g., ["path", "offset", "limit"]
+    # NEW: Signature parameters for loop detection
+    signature_params: List[str] = field(default_factory=list)  # e.g., ["path"] (excludes offset/limit)
     # NEW: Execution category for parallel execution
     execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
 
@@ -124,7 +125,7 @@ class ToolMetadata:
             "stages": self.stages,
             "mandatory_keywords": self.mandatory_keywords,
             "task_types": self.task_types,
-            "progress_params": self.progress_params,
+            "signature_params": self.signature_params,
             "execution_category": (
                 self.execution_category.value if self.execution_category else "read_only"
             ),
@@ -442,7 +443,7 @@ def _entry_to_tool_metadata(entry: Any) -> Optional[ToolMetadata]:
         stages=sorted(entry.stages),
         mandatory_keywords=sorted(entry.mandatory_keywords),
         task_types=sorted(entry.task_types),
-        progress_params=sorted(entry.progress_params),
+        signature_params=sorted(entry.signature_params),
         execution_category=entry.execution_category,
     )
 
