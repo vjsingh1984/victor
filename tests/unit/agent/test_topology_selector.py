@@ -247,6 +247,35 @@ class TestTopologySelector:
         assert decision.provider == "anthropic"
         assert decision.formation == "parallel"
 
+    def test_team_feedback_hint_can_constrain_team_worker_count(self):
+        """Merge-safe team feedback should tighten the grounded team worker count."""
+        selector = TopologySelector()
+
+        decision = selector.select(
+            TopologyDecisionInput(
+                query="redesign the orchestration architecture",
+                task_type="design",
+                task_complexity="high",
+                confidence_hint=0.6,
+                tool_budget=12,
+                iteration_budget=3,
+                expected_depth="high",
+                expected_breadth="medium",
+                observability_level="medium",
+                latency_sensitivity="low",
+                available_team_formations=["parallel", "hierarchical", "adaptive"],
+                provider_candidates=["openai", "anthropic"],
+                context={
+                    "learned_formation_hint": "parallel",
+                    "learned_team_support": 0.72,
+                    "learned_team_max_workers_hint": 2,
+                },
+            )
+        )
+
+        assert decision.action == TopologyAction.TEAM_PLAN
+        assert decision.grounding_requirements.max_workers == 2
+
     def test_low_agreement_feedback_does_not_override_base_action(self):
         """Low-agreement learned hints should not override the base heuristic action."""
         selector = TopologySelector()

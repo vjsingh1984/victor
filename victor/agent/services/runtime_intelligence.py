@@ -591,6 +591,174 @@ class TopologyRoutingFeedback:
         }
 
 
+@dataclass(frozen=True)
+class TeamRoutingFeedback:
+    """Learned team/worktree preference derived from validated runtime feedback."""
+
+    coverage: float = 0.0
+    task_count: int = 0
+    worktree_plan_count: int = 0
+    worktree_materialized_count: int = 0
+    low_risk_task_count: int = 0
+    medium_risk_task_count: int = 0
+    high_risk_task_count: int = 0
+    merge_conflict_task_count: int = 0
+    cleanup_error_task_count: int = 0
+    avg_team_assignments: float = 0.0
+    avg_team_scoped_members: float = 0.0
+    avg_team_members_with_changes: float = 0.0
+    avg_team_changed_file_count: float = 0.0
+    formation_distribution: Dict[str, float] = field(default_factory=dict)
+    merge_risk_distribution: Dict[str, float] = field(default_factory=dict)
+
+    @property
+    def formation_agreement(self) -> float:
+        """Estimate agreement from the dominant learned team formation."""
+        return RuntimeIntelligenceService._distribution_agreement(self.formation_distribution)
+
+    @property
+    def preferred_formation(self) -> Optional[str]:
+        """Return the safest supported formation hint for team execution."""
+        if self.support <= 0.0:
+            return None
+        if self.risk_score >= 0.5:
+            return "hierarchical"
+        return RuntimeIntelligenceService._preferred_label(self.formation_distribution)
+
+    @property
+    def low_risk_rate(self) -> float:
+        return round(self.low_risk_task_count / max(1, self.task_count), 4)
+
+    @property
+    def medium_risk_rate(self) -> float:
+        return round(self.medium_risk_task_count / max(1, self.task_count), 4)
+
+    @property
+    def high_risk_rate(self) -> float:
+        return round(self.high_risk_task_count / max(1, self.task_count), 4)
+
+    @property
+    def merge_conflict_rate(self) -> float:
+        return round(self.merge_conflict_task_count / max(1, self.task_count), 4)
+
+    @property
+    def cleanup_error_rate(self) -> float:
+        return round(self.cleanup_error_task_count / max(1, self.task_count), 4)
+
+    @property
+    def materialization_rate(self) -> float:
+        return round(self.worktree_materialized_count / max(1, self.task_count), 4)
+
+    @property
+    def risk_score(self) -> float:
+        """Compress merge-risk and cleanup instability into one bounded penalty."""
+        return round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (self.high_risk_rate * 0.55)
+                    + (self.merge_conflict_rate * 0.25)
+                    + (self.cleanup_error_rate * 0.20),
+                ),
+            ),
+            4,
+        )
+
+    @property
+    def support(self) -> float:
+        """Normalized trust in the learned team/worktree preference."""
+        return round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (self.coverage * 0.35)
+                    + (self.materialization_rate * 0.25)
+                    + ((1.0 - self.risk_score) * 0.25)
+                    + (self.low_risk_rate * 0.15),
+                ),
+            ),
+            4,
+        )
+
+    @property
+    def recommended_max_workers(self) -> Optional[int]:
+        """Return a conservative worker-count hint derived from merge-safe history."""
+        if self.support <= 0.0:
+            return None
+        baseline = max(self.avg_team_scoped_members, self.avg_team_assignments, 0.0)
+        if baseline <= 0.0:
+            return None
+        workers = int(round(baseline))
+        if self.high_risk_rate >= 0.25 or self.medium_risk_rate >= 0.5:
+            workers -= 1
+        if self.merge_conflict_task_count > 0 or self.cleanup_error_task_count > 0:
+            workers = min(workers, 2)
+        return max(2, min(4, workers))
+
+    def to_metadata(self) -> Dict[str, Any]:
+        """Serialize the learned team/worktree preference for logs and snapshots."""
+        return {
+            "coverage": round(self.coverage, 4),
+            "support": round(self.support, 4),
+            "task_count": self.task_count,
+            "worktree_plan_count": self.worktree_plan_count,
+            "worktree_materialized_count": self.worktree_materialized_count,
+            "low_risk_task_count": self.low_risk_task_count,
+            "medium_risk_task_count": self.medium_risk_task_count,
+            "high_risk_task_count": self.high_risk_task_count,
+            "merge_conflict_task_count": self.merge_conflict_task_count,
+            "cleanup_error_task_count": self.cleanup_error_task_count,
+            "formation_agreement": round(self.formation_agreement, 4),
+            "preferred_formation": self.preferred_formation,
+            "recommended_max_workers": self.recommended_max_workers,
+            "low_risk_rate": self.low_risk_rate,
+            "medium_risk_rate": self.medium_risk_rate,
+            "high_risk_rate": self.high_risk_rate,
+            "merge_conflict_rate": self.merge_conflict_rate,
+            "cleanup_error_rate": self.cleanup_error_rate,
+            "materialization_rate": self.materialization_rate,
+            "risk_score": self.risk_score,
+            "avg_team_assignments": round(self.avg_team_assignments, 4),
+            "avg_team_scoped_members": round(self.avg_team_scoped_members, 4),
+            "avg_team_members_with_changes": round(self.avg_team_members_with_changes, 4),
+            "avg_team_changed_file_count": round(self.avg_team_changed_file_count, 4),
+            "formation_distribution": dict(self.formation_distribution),
+            "merge_risk_distribution": dict(self.merge_risk_distribution),
+        }
+
+    def to_routing_context(
+        self,
+        *,
+        min_coverage: float = 0.2,
+        min_support: float = 0.2,
+        min_agreement: float = 0.55,
+    ) -> Dict[str, Any]:
+        """Convert learned team feedback into soft formation and parallelism hints."""
+        if self.coverage < min_coverage or self.support < min_support or self.task_count <= 0:
+            return {}
+
+        routing_context: Dict[str, Any] = {
+            "learned_team_support": round(self.support, 4),
+            "team_feedback_coverage": round(self.coverage, 4),
+            "learned_team_risk_score": round(self.risk_score, 4),
+            "learned_team_formation_agreement": round(self.formation_agreement, 4),
+            "team_worktree_materialized_count": self.worktree_materialized_count,
+            "team_high_risk_task_count": self.high_risk_task_count,
+            "team_merge_conflict_task_count": self.merge_conflict_task_count,
+            "team_cleanup_error_task_count": self.cleanup_error_task_count,
+        }
+        preferred_formation = self.preferred_formation
+        if preferred_formation and self.formation_agreement >= min_agreement:
+            routing_context["learned_formation_hint"] = preferred_formation
+            routing_context["learned_formation_agreement"] = round(self.formation_agreement, 4)
+        recommended_max_workers = self.recommended_max_workers
+        if recommended_max_workers is not None:
+            routing_context["learned_team_max_workers_hint"] = recommended_max_workers
+        return routing_context
+
+
 class RuntimeIntelligenceService:
     """Service-first boundary for runtime task intelligence."""
 
@@ -649,6 +817,9 @@ class RuntimeIntelligenceService:
             self._experiment_memory_path
         )
         self._persisted_topology_routing_feedback = self._extract_topology_routing_feedback(
+            self._runtime_feedback_metadata
+        )
+        self._persisted_team_routing_feedback = self._extract_team_routing_feedback(
             self._runtime_feedback_metadata
         )
         self._session_topology_feedback_records: List[Dict[str, Any]] = []
@@ -870,6 +1041,15 @@ class RuntimeIntelligenceService:
         return max(0.0, min(1.0, numeric))
 
     @staticmethod
+    def _coerce_non_negative_float(value: Any) -> float:
+        """Normalize optional feedback metrics into non-negative floats."""
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+        return max(0.0, numeric)
+
+    @staticmethod
     def _coerce_feedback_int(value: Any) -> int:
         """Normalize optional feedback counts into non-negative integers."""
         try:
@@ -1068,6 +1248,78 @@ class RuntimeIntelligenceService:
             selection_policy_optimization_reward_totals=selection_policy_optimization_reward_totals,
             selection_policy_feasible_counts=selection_policy_feasible_counts,
             selection_policy_scope_metrics=selection_policy_scope_metrics,
+        )
+
+    @classmethod
+    def _extract_team_routing_feedback(
+        cls,
+        metadata: Dict[str, Any],
+    ) -> Optional[TeamRoutingFeedback]:
+        """Build learned team/worktree routing feedback from persisted runtime metadata."""
+        if not isinstance(metadata, dict):
+            return None
+
+        coverage = cls._coerce_feedback_float(metadata.get("team_feedback_coverage"))
+        task_count = cls._coerce_feedback_int(metadata.get("tasks_with_team_feedback"))
+        worktree_plan_count = cls._coerce_feedback_int(metadata.get("team_worktree_plan_count"))
+        worktree_materialized_count = cls._coerce_feedback_int(
+            metadata.get("team_worktree_materialized_count")
+        )
+        low_risk_task_count = cls._coerce_feedback_int(metadata.get("team_low_risk_task_count"))
+        medium_risk_task_count = cls._coerce_feedback_int(
+            metadata.get("team_medium_risk_task_count")
+        )
+        high_risk_task_count = cls._coerce_feedback_int(metadata.get("team_high_risk_task_count"))
+        merge_conflict_task_count = cls._coerce_feedback_int(
+            metadata.get("team_merge_conflict_task_count")
+        )
+        cleanup_error_task_count = cls._coerce_feedback_int(
+            metadata.get("team_cleanup_error_task_count")
+        )
+        avg_team_assignments = cls._coerce_non_negative_float(
+            metadata.get("avg_team_assignments")
+        )
+        avg_team_scoped_members = cls._coerce_non_negative_float(
+            metadata.get("avg_team_scoped_members")
+        )
+        avg_team_members_with_changes = cls._coerce_non_negative_float(
+            metadata.get("avg_team_members_with_changes")
+        )
+        avg_team_changed_file_count = cls._coerce_non_negative_float(
+            metadata.get("avg_team_changed_file_count")
+        )
+        formation_distribution = cls._normalize_distribution(metadata.get("team_formations") or {})
+        merge_risk_distribution = cls._normalize_distribution(
+            metadata.get("team_merge_risk_levels") or {}
+        )
+
+        if not any(
+            (
+                coverage > 0.0,
+                task_count > 0,
+                worktree_plan_count > 0,
+                formation_distribution,
+                merge_risk_distribution,
+            )
+        ):
+            return None
+
+        return TeamRoutingFeedback(
+            coverage=coverage,
+            task_count=task_count,
+            worktree_plan_count=worktree_plan_count,
+            worktree_materialized_count=worktree_materialized_count,
+            low_risk_task_count=low_risk_task_count,
+            medium_risk_task_count=medium_risk_task_count,
+            high_risk_task_count=high_risk_task_count,
+            merge_conflict_task_count=merge_conflict_task_count,
+            cleanup_error_task_count=cleanup_error_task_count,
+            avg_team_assignments=avg_team_assignments,
+            avg_team_scoped_members=avg_team_scoped_members,
+            avg_team_members_with_changes=avg_team_members_with_changes,
+            avg_team_changed_file_count=avg_team_changed_file_count,
+            formation_distribution=formation_distribution,
+            merge_risk_distribution=merge_risk_distribution,
         )
 
     @staticmethod
@@ -1337,6 +1589,10 @@ class RuntimeIntelligenceService:
             self._session_topology_routing_feedback,
         )
 
+    def get_team_routing_feedback(self) -> Optional[TeamRoutingFeedback]:
+        """Return learned team/worktree preferences derived from runtime feedback metadata."""
+        return self._persisted_team_routing_feedback
+
     def get_topology_routing_context(
         self,
         *,
@@ -1360,6 +1616,10 @@ class RuntimeIntelligenceService:
                     scope_context=resolved_scope_context,
                 )
             )
+        team_feedback = self.get_team_routing_feedback()
+        if team_feedback is not None:
+            for key, value in team_feedback.to_routing_context().items():
+                routing_context.setdefault(key, value)
 
         experiment_hints = self.get_experiment_routing_context(
             query=query,
@@ -1784,6 +2044,9 @@ class RuntimeIntelligenceService:
         topology_feedback = self.get_topology_routing_feedback()
         if topology_feedback is not None:
             metadata["topology_feedback"] = topology_feedback.to_metadata()
+        team_feedback = self.get_team_routing_feedback()
+        if team_feedback is not None:
+            metadata["team_feedback"] = team_feedback.to_metadata()
         routing_scope_context = dict(context or {})
         if task_analysis is not None and "task_type" not in routing_scope_context:
             routing_scope_context["task_type"] = getattr(task_analysis, "task_type", None)

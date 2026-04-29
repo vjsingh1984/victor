@@ -123,6 +123,17 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
             "avg_degradation_time_to_recover_seconds": 4.0,
             "content_degradation_task_count": 1,
             "provider_degradation_task_count": 1,
+            "tasks_with_team_feedback": 2,
+            "team_feedback_coverage": 1.0,
+            "team_formations": {"parallel": 2},
+            "team_merge_risk_levels": {"low": 1, "high": 1},
+            "team_worktree_plan_count": 2,
+            "team_worktree_materialized_count": 1,
+            "team_high_risk_task_count": 1,
+            "team_merge_conflict_task_count": 1,
+            "team_cleanup_error_task_count": 1,
+            "avg_team_assignments": 2.5,
+            "avg_team_scoped_members": 2.0,
         },
         "quality": {
             "avg_topology_reward": 0.73,
@@ -193,6 +204,17 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
         "failure_streak": 1,
         "content_repetition": 1,
     }
+    assert feedback.metadata["tasks_with_team_feedback"] == 2
+    assert feedback.metadata["team_feedback_coverage"] == pytest.approx(1.0)
+    assert feedback.metadata["team_formations"] == {"parallel": 2}
+    assert feedback.metadata["team_merge_risk_levels"] == {"low": 1, "high": 1}
+    assert feedback.metadata["team_worktree_plan_count"] == 2
+    assert feedback.metadata["team_worktree_materialized_count"] == 1
+    assert feedback.metadata["team_high_risk_task_count"] == 1
+    assert feedback.metadata["team_merge_conflict_task_count"] == 1
+    assert feedback.metadata["team_cleanup_error_task_count"] == 1
+    assert feedback.metadata["avg_team_assignments"] == pytest.approx(2.5)
+    assert feedback.metadata["avg_team_scoped_members"] == pytest.approx(2.0)
     assert feedback.metadata["optimization_infeasible_tasks"] == 1
     assert feedback.metadata["optimization_feasibility_rate"] == pytest.approx(0.5)
     assert feedback.metadata["avg_optimization_reward"] == pytest.approx(0.64)
@@ -311,6 +333,10 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
                         "topology_feedback_coverage": 0.25,
                         "avg_topology_reward": 0.52,
                         "topology_actions": {"single_agent": 2},
+                        "tasks_with_team_feedback": 2,
+                        "team_feedback_coverage": 0.2,
+                        "team_formations": {"parallel": 1},
+                        "team_merge_risk_levels": {"low": 1},
                         "saved_at": "2026-04-01T00:00:00+00:00",
                     },
                 }
@@ -332,6 +358,11 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
                         "topology_feedback_coverage": 0.9,
                         "avg_topology_reward": 0.79,
                         "topology_actions": {"team_plan": 3},
+                        "tasks_with_team_feedback": 3,
+                        "team_feedback_coverage": 1.0,
+                        "team_formations": {"hierarchical": 2, "parallel": 1},
+                        "team_merge_risk_levels": {"high": 1, "low": 2},
+                        "team_worktree_materialized_count": 2,
                         "saved_at": "2026-04-25T00:00:00+00:00",
                     },
                 }
@@ -370,6 +401,9 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
     assert loaded.metadata["topology_feedback_coverage"] is not None
     assert loaded.metadata["avg_topology_reward"] is not None
     assert loaded.metadata["topology_actions"]
+    assert loaded.metadata["team_feedback_coverage"] is not None
+    assert loaded.metadata["team_formations"]
+    assert loaded.metadata["team_merge_risk_levels"]
 
 
 def test_load_runtime_feedback_prefers_directory_aggregate_over_stale_canonical_file(tmp_path):

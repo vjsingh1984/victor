@@ -787,6 +787,99 @@ def test_runtime_intelligence_exposes_topology_routing_context_from_feedback(tmp
     assert hints["learned_override_policy_feasibility_delta"] == pytest.approx(0.5)
 
 
+def test_runtime_intelligence_exposes_team_routing_hints_from_feedback(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "team_feedback_coverage": 0.8,
+                "tasks_with_team_feedback": 4,
+                "team_formations": {"parallel": 3, "hierarchical": 1},
+                "team_merge_risk_levels": {"low": 3, "medium": 1},
+                "team_worktree_plan_count": 4,
+                "team_worktree_materialized_count": 3,
+                "team_low_risk_task_count": 3,
+                "team_medium_risk_task_count": 1,
+                "team_high_risk_task_count": 0,
+                "team_merge_conflict_task_count": 0,
+                "team_cleanup_error_task_count": 0,
+                "avg_team_assignments": 3.0,
+                "avg_team_scoped_members": 3.0,
+                "avg_team_members_with_changes": 2.5,
+                "avg_team_changed_file_count": 4.5,
+            }
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    perception = SimpleNamespace(task_analysis=MagicMock(task_type="design"), confidence=0.81)
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=SimpleNamespace(
+            perceive=AsyncMock(return_value=perception),
+            evaluation_policy=RuntimeEvaluationPolicy(),
+            config={},
+        ),
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    feedback = service.get_team_routing_feedback()
+    hints = service.get_topology_routing_context(
+        scope_context={"task_type": "design", "provider": "openai", "model": "gpt-5"}
+    )
+
+    assert feedback is not None
+    assert feedback.preferred_formation == "parallel"
+    assert feedback.recommended_max_workers == 3
+    assert hints["learned_team_support"] > 0.0
+    assert hints["learned_formation_hint"] == "parallel"
+    assert hints["learned_team_max_workers_hint"] == 3
+
+
+def test_runtime_intelligence_team_feedback_prefers_safer_parallelism_when_risk_is_high(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "team_feedback_coverage": 0.75,
+                "tasks_with_team_feedback": 4,
+                "team_formations": {"parallel": 4},
+                "team_merge_risk_levels": {"high": 3, "medium": 1},
+                "team_worktree_plan_count": 4,
+                "team_worktree_materialized_count": 4,
+                "team_low_risk_task_count": 0,
+                "team_medium_risk_task_count": 1,
+                "team_high_risk_task_count": 3,
+                "team_merge_conflict_task_count": 2,
+                "team_cleanup_error_task_count": 1,
+                "avg_team_assignments": 4.0,
+                "avg_team_scoped_members": 4.0,
+            }
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    feedback = service.get_team_routing_feedback()
+    hints = service.get_topology_routing_context(scope_context={"task_type": "design"})
+
+    assert feedback is not None
+    assert feedback.preferred_formation == "hierarchical"
+    assert feedback.recommended_max_workers == 2
+    assert hints["learned_formation_hint"] == "hierarchical"
+    assert hints["learned_team_max_workers_hint"] == 2
+    assert hints["learned_team_risk_score"] >= 0.5
+
+
 def test_runtime_intelligence_falls_back_to_task_type_scoped_policy_metrics(tmp_path):
     feedback_path = save_runtime_evaluation_feedback(
         RuntimeEvaluationFeedback(

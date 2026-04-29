@@ -445,7 +445,7 @@ class TopologySelector:
             return TopologyGroundingRequirements(
                 provider=provider,
                 formation=formation,
-                max_workers=self._parallel_worker_count(decision_input),
+                max_workers=self._team_worker_count(decision_input),
                 tool_budget=decision_input.tool_budget,
                 iteration_budget=decision_input.iteration_budget,
                 metadata={"topology": "team_plan"},
@@ -472,6 +472,26 @@ class TopologySelector:
                 max(self.config.min_parallel_workers, decision_input.tool_budget // 2),
             )
         return self.config.min_parallel_workers
+
+    def _team_worker_count(self, decision_input: TopologyDecisionInput) -> int:
+        learned_hint = self._learned_team_worker_count(decision_input)
+        if learned_hint is not None:
+            return learned_hint
+        return self._parallel_worker_count(decision_input)
+
+    def _learned_team_worker_count(
+        self,
+        decision_input: TopologyDecisionInput,
+    ) -> Optional[int]:
+        context = decision_input.context or {}
+        support = self._coerce_unit_float(context.get("learned_team_support"))
+        if support <= 0.0:
+            return None
+        try:
+            worker_hint = int(context.get("learned_team_max_workers_hint"))
+        except (TypeError, ValueError):
+            return None
+        return max(self.config.min_parallel_workers, min(self.config.max_parallel_workers, worker_hint))
 
     def _topology_kind_for_action(self, action: TopologyAction) -> TopologyKind:
         return {

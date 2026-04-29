@@ -97,6 +97,31 @@ TOPOLOGY_RUNTIME_METADATA_KEYS = (
     "topology_provider_agreement",
     "topology_formation_agreement",
     "topology_conflict_score",
+    "tasks_with_team_feedback",
+    "team_feedback_coverage",
+    "team_formations",
+    "team_merge_risk_levels",
+    "team_worktree_plan_count",
+    "team_worktree_materialized_count",
+    "team_worktree_dry_run_count",
+    "team_low_risk_task_count",
+    "team_medium_risk_task_count",
+    "team_high_risk_task_count",
+    "team_merge_conflict_task_count",
+    "team_merge_conflict_count",
+    "team_merge_overlap_task_count",
+    "team_out_of_scope_write_task_count",
+    "team_out_of_scope_write_count",
+    "team_readonly_violation_task_count",
+    "team_readonly_violation_count",
+    "team_cleanup_task_count",
+    "team_cleanup_error_task_count",
+    "team_cleanup_error_count",
+    "avg_team_assignments",
+    "avg_team_scoped_members",
+    "avg_team_members_with_changes",
+    "avg_team_changed_file_count",
+    "team_materialized_assignment_total",
 )
 SCOPE_FIELD_WEIGHTS = {
     "project": 4.0,
@@ -208,8 +233,7 @@ def _normalized_scope_token(value: Any) -> Optional[str]:
     return text.lower() if text is not None else None
 
 
-def _clamp(value: float, lower: float, upper: float) -> float:
-    return max(lower, min(upper, value))
+from victor.core.utils import clamp as _clamp
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -512,6 +536,65 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             "topology_learned_override_feasibility_delta": (
                 _coerce_float(summary.get("topology_learned_override_feasibility_delta"))
                 or _selection_policy_reward_delta(topology_selection_policy_feasibility_rates)
+            ),
+            "tasks_with_team_feedback": int(summary.get("tasks_with_team_feedback", 0) or 0),
+            "team_feedback_coverage": round(
+                float(summary.get("team_feedback_coverage", 0.0) or 0.0),
+                4,
+            ),
+            "team_formations": dict(summary.get("team_formations") or {}),
+            "team_merge_risk_levels": dict(summary.get("team_merge_risk_levels") or {}),
+            "team_worktree_plan_count": int(summary.get("team_worktree_plan_count", 0) or 0),
+            "team_worktree_materialized_count": int(
+                summary.get("team_worktree_materialized_count", 0) or 0
+            ),
+            "team_worktree_dry_run_count": int(
+                summary.get("team_worktree_dry_run_count", 0) or 0
+            ),
+            "team_low_risk_task_count": int(summary.get("team_low_risk_task_count", 0) or 0),
+            "team_medium_risk_task_count": int(
+                summary.get("team_medium_risk_task_count", 0) or 0
+            ),
+            "team_high_risk_task_count": int(summary.get("team_high_risk_task_count", 0) or 0),
+            "team_merge_conflict_task_count": int(
+                summary.get("team_merge_conflict_task_count", 0) or 0
+            ),
+            "team_merge_conflict_count": int(summary.get("team_merge_conflict_count", 0) or 0),
+            "team_merge_overlap_task_count": int(
+                summary.get("team_merge_overlap_task_count", 0) or 0
+            ),
+            "team_out_of_scope_write_task_count": int(
+                summary.get("team_out_of_scope_write_task_count", 0) or 0
+            ),
+            "team_out_of_scope_write_count": int(
+                summary.get("team_out_of_scope_write_count", 0) or 0
+            ),
+            "team_readonly_violation_task_count": int(
+                summary.get("team_readonly_violation_task_count", 0) or 0
+            ),
+            "team_readonly_violation_count": int(
+                summary.get("team_readonly_violation_count", 0) or 0
+            ),
+            "team_cleanup_task_count": int(summary.get("team_cleanup_task_count", 0) or 0),
+            "team_cleanup_error_task_count": int(
+                summary.get("team_cleanup_error_task_count", 0) or 0
+            ),
+            "team_cleanup_error_count": int(summary.get("team_cleanup_error_count", 0) or 0),
+            "avg_team_assignments": round(float(summary.get("avg_team_assignments", 0.0) or 0.0), 4),
+            "avg_team_scoped_members": round(
+                float(summary.get("avg_team_scoped_members", 0.0) or 0.0),
+                4,
+            ),
+            "avg_team_members_with_changes": round(
+                float(summary.get("avg_team_members_with_changes", 0.0) or 0.0),
+                4,
+            ),
+            "avg_team_changed_file_count": round(
+                float(summary.get("avg_team_changed_file_count", 0.0) or 0.0),
+                4,
+            ),
+            "team_materialized_assignment_total": int(
+                summary.get("team_materialized_assignment_total", 0) or 0
             ),
         },
     )
@@ -2054,6 +2137,51 @@ def _aggregate_topology_feedback_metadata(
         "degradation_failure_types": weighted_distribution("degradation_failure_types"),
         "degradation_providers": weighted_distribution("degradation_providers"),
         "degradation_reasons": weighted_distribution("degradation_reasons"),
+        "tasks_with_team_feedback": weighted_metadata_average("tasks_with_team_feedback"),
+        "team_feedback_coverage": weighted_metadata_average("team_feedback_coverage"),
+        "team_formations": weighted_distribution("team_formations"),
+        "team_merge_risk_levels": weighted_distribution("team_merge_risk_levels"),
+        "team_worktree_plan_count": weighted_metadata_average("team_worktree_plan_count"),
+        "team_worktree_materialized_count": weighted_metadata_average(
+            "team_worktree_materialized_count"
+        ),
+        "team_worktree_dry_run_count": weighted_metadata_average("team_worktree_dry_run_count"),
+        "team_low_risk_task_count": weighted_metadata_average("team_low_risk_task_count"),
+        "team_medium_risk_task_count": weighted_metadata_average("team_medium_risk_task_count"),
+        "team_high_risk_task_count": weighted_metadata_average("team_high_risk_task_count"),
+        "team_merge_conflict_task_count": weighted_metadata_average(
+            "team_merge_conflict_task_count"
+        ),
+        "team_merge_conflict_count": weighted_metadata_average("team_merge_conflict_count"),
+        "team_merge_overlap_task_count": weighted_metadata_average(
+            "team_merge_overlap_task_count"
+        ),
+        "team_out_of_scope_write_task_count": weighted_metadata_average(
+            "team_out_of_scope_write_task_count"
+        ),
+        "team_out_of_scope_write_count": weighted_metadata_average(
+            "team_out_of_scope_write_count"
+        ),
+        "team_readonly_violation_task_count": weighted_metadata_average(
+            "team_readonly_violation_task_count"
+        ),
+        "team_readonly_violation_count": weighted_metadata_average(
+            "team_readonly_violation_count"
+        ),
+        "team_cleanup_task_count": weighted_metadata_average("team_cleanup_task_count"),
+        "team_cleanup_error_task_count": weighted_metadata_average(
+            "team_cleanup_error_task_count"
+        ),
+        "team_cleanup_error_count": weighted_metadata_average("team_cleanup_error_count"),
+        "avg_team_assignments": weighted_metadata_average("avg_team_assignments"),
+        "avg_team_scoped_members": weighted_metadata_average("avg_team_scoped_members"),
+        "avg_team_members_with_changes": weighted_metadata_average(
+            "avg_team_members_with_changes"
+        ),
+        "avg_team_changed_file_count": weighted_metadata_average("avg_team_changed_file_count"),
+        "team_materialized_assignment_total": weighted_metadata_average(
+            "team_materialized_assignment_total"
+        ),
         "optimization_feasible_tasks": weighted_metadata_average("optimization_feasible_tasks"),
         "optimization_infeasible_tasks": weighted_metadata_average("optimization_infeasible_tasks"),
         "optimization_feasibility_rate": weighted_metadata_average("optimization_feasibility_rate"),
