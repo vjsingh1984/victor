@@ -215,17 +215,180 @@ class ComputeNodeExecutor:
         return state
 
     def _get_compute_handler(self, handler_name: str) -> Any:
-        """Get compute handler by name.
+        """Get compute handler by name, including chain: prefix resolution.
 
         Args:
-            handler_name: Name of the registered handler
+            handler_name: Name of the registered handler (e.g., "my_handler" or "chain:vertical:name")
 
         Returns:
             Handler instance or None if not found
         """
         from victor.workflows.compute_registry import get_compute_handler
+        from victor.workflows.executor import CHAIN_HANDLER_PREFIX
+
+        # Check if this is a chain reference (e.g., "chain:coding:static_analysis")
+        if handler_name.startswith(CHAIN_HANDLER_PREFIX):
+            return self._resolve_chain_handler(handler_name)
 
         return get_compute_handler(handler_name)
+
+    def _resolve_chain_handler(self, handler_name: str) -> Any:
+        """Resolve a chain:vertical:name reference to a ComputeHandler.
+
+        Implements the Agent-as-Tool protocol from research:
+        - Parses "chain:vertical:name" or "chain:name"
+        - Creates chain from registry (lazy evaluation)
+        - Wraps Runnable as ComputeHandler with standardized protocol
+
+        Args:
+            handler_name: Full handler string with "chain:" prefix
+
+        Returns:
+            ComputeHandler wrapper or None if chain not found
+        """
+        from victor.workflows.executor import CHAIN_HANDLER_PREFIX
+        from victor.framework.chain_registry import create_chain
+
+        # Parse "chain:vertical:name" or "chain:name"
+        chain_ref = handler_name[len(CHAIN_HANDLER_PREFIX):]
+        if ":" in chain_ref:
+            vertical, name = chain_ref.split(":", 1)
+        else:
+            vertical, name = None, chain_ref
+
+        # Create chain from registry (lazy evaluation)
+        runnable = create_chain(name, vertical=vertical)
+        if runnable is None:
+            logger.warning(
+                f"Chain '{chain_ref}' not found in registry "
+                f"(vertical={vertical}, name={name})"
+            )
+            return None
+
+        logger.info(f"Resolved chain handler '{chain_ref}' to runnable")
+        return self._create_chain_wrapper(runnable, chain_ref)
+
+    def _create_chain_wrapper(self, runnable: Any, chain_ref: str) -> Any:
+        """Wrap a Runnable as a ComputeHandler following Agent-as-Tool protocol.
+
+        Implements the protocol: Tk(p) = (v, σ)
+        - p: structured parameter object (input_data)
+        - v: structured result (output)
+        - σ: execution status (NodeResult.status)
+
+        Args:
+            runnable: The Runnable chain to wrap
+            chain_ref: Original chain reference for logging
+
+        Returns:
+            Async ComputeHandler function
+        """
+        import asyncio
+        from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+
+        async def chain_handler(
+            node: "ComputeNode",
+            context: Any,
+            tool_registry: Any,
+        ) -> "NodeResult":
+            """Execute the chain as a compute handler."""
+            # Prepare input data from context and input_mapping
+            input_data = self._prepare_chain_input(node, context)
+
+            logger.debug(f"Executing chain '{chain_ref}' with input: {list(input_data.keys())}")
+
+            # Get timeout from node
+            timeout = getattr(node, "timeout", 300)
+
+            try:
+                # Execute chain with timeout
+                output = await asyncio.wait_for(
+                    runnable.invoke(input_data),
+                    timeout=timeout
+                )
+
+                # Update context with output
+                self._update_context(context, node, output)
+
+                logger.info(f"Chain '{chain_ref}' completed successfully")
+
+                return NodeResult(
+                    node_id=node.id,
+                    status=ExecutorNodeStatus.COMPLETED,
+                    output=output
+                )
+
+            except asyncio.TimeoutError:
+                error = f"Chain '{chain_ref}' timed out after {timeout}s"
+                logger.error(error)
+                return NodeResult(
+                    node_id=node.id,
+                    status=ExecutorNodeStatus.FAILED,
+                    error=error
+                )
+
+            except Exception as e:
+                error = f"Chain '{chain_ref}' execution failed: {e}"
+                logger.error(error, exc_info=True)
+                return NodeResult(
+                    node_id=node.id,
+                    status=ExecutorNodeStatus.FAILED,
+                    error=error
+                )
+
+        return chain_handler
+
+    def _prepare_chain_input(self, node: "ComputeNode", context: Any) -> dict:
+        """Prepare input data for chain invocation from context and input_mapping.
+
+        Args:
+            node: Compute node with optional input_mapping
+            context: Workflow context
+
+        Returns:
+            Dictionary of input data for the chain
+        """
+        input_data = {}
+
+        # Use input_mapping if provided
+        if hasattr(node, "input_mapping") and node.input_mapping:
+            for key, source in node.input_mapping.items():
+                # Handle $ctx. prefix
+                if isinstance(source, str) and source.startswith("$ctx."):
+                    context_key = source[5:]
+                    input_data[key] = context.get(context_key, context_key)
+                # Handle $state. prefix
+                elif isinstance(source, str) and source.startswith("$state."):
+                    context_key = source[7:]
+                    input_data[key] = context.get(context_key, context_key)
+                # Direct value
+                else:
+                    input_data[key] = source
+        else:
+            # Fall back to all context data
+            if hasattr(context, "data"):
+                input_data = dict(context.data)
+            elif isinstance(context, dict):
+                input_data = dict(context)
+
+        return input_data
+
+    def _update_context(self, context: Any, node: "ComputeNode", output: Any) -> None:
+        """Update workflow context with chain output.
+
+        Args:
+            context: Workflow context to update
+            node: Compute node with optional output_key
+            output: Chain execution output
+        """
+        # Use output_key if specified
+        if hasattr(node, "output_key") and node.output_key:
+            context.set(node.output_key, output)
+        # Otherwise, merge dict output
+        elif isinstance(output, dict):
+            for key, value in output.items():
+                if not key.startswith("_"):
+                    context.set(key, value)
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if this executor supports the given node type."""
