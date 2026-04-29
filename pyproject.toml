@@ -474,9 +474,17 @@ Repository = "https://github.com/vijayksingh/victor"
 Issues = "https://github.com/vijayksingh/victor/issues"
 
 [project.scripts]
+# Main CLI
 victor = "victor.ui.cli:app"
 vic = "victor.ui.cli:app"
 victor-examples = "examples.playground.cli:app"
+
+# Utility commands
+victor-graph-warmup = "victor.tools.graph_warmup:main"
+victor-reset-tool-stats = "victor.framework.rl.reset_tool_stats:main"
+victor-prune-prompts = "victor.framework.rl.learners.prompt_history_pruner:main"
+victor-metrics-export = "victor.integrations.api.metrics_exporter:main"
+victor-mcp-server = "victor.integrations.mcp.server:main"
 
 [project.entry-points."victor.plugins"]
 # Built-in verticals (canonical registration)
