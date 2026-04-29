@@ -888,3 +888,58 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     def manager(self) -> Optional["ITeamMember"]:
         """Get team manager (for hierarchical formation)."""
         return self._manager
+
+    # =========================================================================
+    # StateGraph Integration
+    # =========================================================================
+
+    async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute as a StateGraph node.
+
+        This makes the coordinator directly usable in StateGraph:
+            graph.add_node("team", coordinator)
+
+        The coordinator extracts the task/query from the state, executes
+        the team with the configured formation, and returns an updated
+        state with the results.
+
+        Args:
+            state: Current graph state. Expected keys:
+                - "task" or "query": The task to execute
+                - Other keys are passed as execution context
+
+        Returns:
+            Updated state with:
+                - "result": Final output string
+                - "team_output": Full team execution result dict
+                - "error": Error message if execution failed
+
+        Example:
+            from victor.framework import StateGraph
+            from victor.teams import UnifiedTeamCoordinator, TeamFormation
+
+            coordinator = UnifiedTeamCoordinator(orchestrator)
+            coordinator.set_formation(TeamFormation.PARALLEL)
+            coordinator.add_member(agent1).add_member(agent2)
+
+            graph = StateGraph(AgentState)
+            graph.add_node("research_team", coordinator)  # Direct usage!
+        """
+        # Extract task from state (try both "task" and "query" keys)
+        task = state.get("task", state.get("query", ""))
+
+        # Extract context (everything except task/query keys)
+        context = {k: v for k, v in state.items() if k not in ("task", "query")}
+
+        # Execute team task
+        result = await self.execute_task(task, context)
+
+        # Update state with results
+        if result.get("success"):
+            state["result"] = result.get("final_output", "")
+            state["team_output"] = result
+        else:
+            state["error"] = result.get("error", "Unknown error")
+            state["team_output"] = result
+
+        return state
