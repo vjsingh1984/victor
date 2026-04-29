@@ -373,6 +373,61 @@ class TestEvaluationHarness:
 
         assert harness1 is harness2
 
+    @pytest.mark.asyncio
+    async def test_run_evaluation_tolerates_unwritable_persistence_dirs(self, tmp_path: Path):
+        """Evaluation should complete when checkpoint/result persistence is not writable."""
+
+        class SingleTaskRunner(MockBenchmarkRunner):
+            def __init__(self, tasks: list[BenchmarkTask]):
+                self._tasks = tasks
+
+            async def load_tasks(self, config: EvaluationConfig) -> list[BenchmarkTask]:
+                return self._tasks
+
+            async def run_task(
+                self,
+                task: BenchmarkTask,
+                agent_output: str,
+                config: EvaluationConfig,
+            ) -> TaskResult:
+                return TaskResult(
+                    task_id=task.task_id,
+                    status=TaskStatus.PASSED,
+                    generated_code=agent_output,
+                )
+
+        task = BenchmarkTask(
+            task_id="task-1",
+            benchmark=BenchmarkType.CUSTOM,
+            description="Test task",
+        )
+        runner = SingleTaskRunner([task])
+        harness = EvaluationHarness(runners={BenchmarkType.CUSTOM: runner})
+        config = EvaluationConfig(benchmark=BenchmarkType.CUSTOM, model="test-model")
+
+        results_dir = tmp_path / "results"
+        checkpoint_dir = tmp_path / "checkpoints"
+        results_dir.mkdir()
+        checkpoint_dir.mkdir()
+        results_dir.chmod(0o555)
+        checkpoint_dir.chmod(0o555)
+        harness._results_dir = results_dir
+        harness._checkpoint_dir = checkpoint_dir
+
+        async def agent_callback(_task):
+            return "print('hi')"
+
+        try:
+            result = await harness.run_evaluation(config, agent_callback)
+        finally:
+            results_dir.chmod(0o755)
+            checkpoint_dir.chmod(0o755)
+
+        assert len(result.task_results) == 1
+        assert result.task_results[0].status == TaskStatus.PASSED
+        assert list(results_dir.iterdir()) == []
+        assert list(checkpoint_dir.iterdir()) == []
+
 
 class TestCheckpointPaths:
     """Tests for checkpoint path methods."""
