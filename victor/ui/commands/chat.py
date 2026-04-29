@@ -882,12 +882,10 @@ victor chat --sessionid abc123            # Resume session
 
         # Handle --sessions flag (list sessions and exit)
         if list_sessions:
-            from victor.agent.sqlite_session_persistence import (
-                get_sqlite_session_persistence,
-            )
+            from victor.agent.conversation.store import ConversationStore
 
-            persistence = get_sqlite_session_persistence()
-            sessions = persistence.list_sessions(limit=20)
+            store = ConversationStore()
+            sessions = store.list_sessions(limit=20)
 
             if not sessions:
                 console.print("[dim]No sessions found[/]")
@@ -902,25 +900,14 @@ victor chat --sessionid abc123            # Resume session
             table.add_column("Created", style="dim")
 
             for session in sessions:
-                try:
-                    from datetime import datetime
-
-                    dt = datetime.fromisoformat(session["created_at"])
-                    date_str = dt.strftime("%Y-%m-%d %H:%M")
-                except Exception:
-                    date_str = session["created_at"][:16]
-
-                title = (
-                    session["title"][:40] + "..."
-                    if len(session["title"]) > 40
-                    else session["title"]
-                )
+                date_str = session.created_at.strftime("%Y-%m-%d %H:%M")
+                title = "Untitled"  # ConversationSession doesn't have title
                 table.add_row(
-                    session["session_id"],
+                    session.session_id,
                     title,
-                    session["model"],
-                    session["provider"],
-                    str(session["message_count"]),
+                    session.model or "unknown",
+                    session.provider or "unknown",
+                    str(len(session.messages)),
                     date_str,
                 )
 

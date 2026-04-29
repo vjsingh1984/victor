@@ -344,25 +344,22 @@ class QueryService:
         sessions = []
 
         try:
-            # Try SQLite session persistence
-            from victor.agent.sqlite_session_persistence import (
-                get_sqlite_session_persistence,
-            )
+            # Use ConversationStore instead of deprecated SQLiteSessionPersistence
+            from victor.agent.conversation.store import ConversationStore
 
-            persistence = get_sqlite_session_persistence()
-            sessions_data = await asyncio.to_thread(persistence.list_sessions, limit)
+            store = ConversationStore()
+            sessions_data = await asyncio.to_thread(store.list_sessions, limit=limit)
 
-            for session_data in sessions_data[offset : offset + limit]:
-                metadata = session_data.get("metadata", {})
+            for conv_session in sessions_data[offset : offset + limit]:
                 session = SessionInfo(
-                    id=session_data.get("session_id", ""),
-                    created_at=datetime.fromisoformat(metadata.get("created_at", "")),
-                    updated_at=datetime.fromisoformat(metadata.get("updated_at", "")),
-                    message_count=metadata.get("message_count", 0),
-                    provider=metadata.get("provider", "unknown"),
-                    model=metadata.get("model", "unknown"),
-                    title=metadata.get("title"),
-                    tags=metadata.get("tags", []),
+                    id=conv_session.session_id,
+                    created_at=conv_session.created_at,
+                    updated_at=conv_session.last_activity,
+                    message_count=len(conv_session.messages),
+                    provider=conv_session.provider or "unknown",
+                    model=conv_session.model or "unknown",
+                    title=None,  # ConversationSession doesn't have title
+                    tags=[],  # ConversationSession doesn't have tags
                 )
                 sessions.append(session)
 
