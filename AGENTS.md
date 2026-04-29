@@ -112,6 +112,37 @@ Large framework-level changes usually need more than code:
 - Changes to `victor/framework/` public APIs, protocol definitions, workflow DSL structure, or major architecture patterns likely need a FEP and docs updates.
 - For version changes, update `VERSION` and use `python scripts/sync_version.py` so root and `victor-sdk/` stay aligned.
 
+## Team Architecture Reminder
+
+**IMPORTANT**: Teams are formations, not separate graphs.
+
+- **StateGraph** is the execution engine (always)
+- **Teams/Formations** are coordination patterns for multiple agents (logical layer)
+- **"Multi-agent"** means a StateGraph where some nodes are team formations
+- **DO NOT** create separate "multi-agent graph" abstractions
+- **DO** use UnifiedTeamCoordinator directly as a StateGraph node
+
+Correct usage:
+```python
+from victor.framework import StateGraph
+from victor.teams import UnifiedTeamCoordinator, TeamFormation
+
+coordinator = UnifiedTeamCoordinator(orchestrator)
+coordinator.set_formation(TeamFormation.PARALLEL)
+coordinator.add_member(agent1).add_member(agent2)
+
+graph = StateGraph(AgentState)
+graph.add_node("research_team", coordinator)  # Direct usage!
+```
+
+Wrong (don't do this):
+```python
+# Don't create wrapper nodes for each formation
+# Don't create separate "multi-agent graph" types
+```
+
+This architectural principle was established after Phase 4 consolidation revealed that wrapper layers (team_nodes.py, multi_agent_graph.py) added unnecessary indirection without value.
+
 ## Commit & Pull Request Guidelines
 Follow Conventional Commits such as `feat: add workflow retry guard` or `fix: handle empty tool result`. Keep commits scoped. Reference issues with `Fixes #123` when appropriate.
 
