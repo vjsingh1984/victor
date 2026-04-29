@@ -121,8 +121,23 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
             "degradation_recovery_rate": 0.5,
             "avg_degradation_adaptation_cost": 2.5,
             "avg_degradation_time_to_recover_seconds": 4.0,
+            "avg_degradation_cost_variance": 0.75,
+            "avg_degradation_recovery_time_variance": 1.25,
+            "avg_degradation_intervention_count": 1.5,
+            "avg_degradation_confidence": 0.42,
+            "avg_degradation_drift_score": 0.67,
             "content_degradation_task_count": 1,
+            "confidence_degradation_task_count": 1,
             "provider_degradation_task_count": 1,
+            "persistent_degradation_task_count": 1,
+            "drift_task_count": 2,
+            "degradation_drift_rate": 1.0,
+            "degradation_intervention_task_count": 2,
+            "degradation_intervention_rate": 1.0,
+            "high_adaptation_cost_task_count": 1,
+            "degradation_high_cost_rate": 0.5,
+            "degradation_confidence_rate": 0.5,
+            "degradation_stability_score": 0.38,
             "tasks_with_team_feedback": 2,
             "team_feedback_coverage": 1.0,
             "team_formations": {"parallel": 2},
@@ -200,6 +215,21 @@ def test_derive_runtime_feedback_reads_agentic_harness_sections_and_optimization
     assert feedback.metadata["degradation_feedback_coverage"] == pytest.approx(1.0)
     assert feedback.metadata["degradation_event_count"] == 2
     assert feedback.metadata["recovered_task_count"] == 1
+    assert feedback.metadata["avg_degradation_cost_variance"] == pytest.approx(0.75)
+    assert feedback.metadata["avg_degradation_recovery_time_variance"] == pytest.approx(1.25)
+    assert feedback.metadata["avg_degradation_intervention_count"] == pytest.approx(1.5)
+    assert feedback.metadata["avg_degradation_confidence"] == pytest.approx(0.42)
+    assert feedback.metadata["avg_degradation_drift_score"] == pytest.approx(0.67)
+    assert feedback.metadata["confidence_degradation_task_count"] == 1
+    assert feedback.metadata["persistent_degradation_task_count"] == 1
+    assert feedback.metadata["drift_task_count"] == 2
+    assert feedback.metadata["degradation_drift_rate"] == pytest.approx(1.0)
+    assert feedback.metadata["degradation_intervention_task_count"] == 2
+    assert feedback.metadata["degradation_intervention_rate"] == pytest.approx(1.0)
+    assert feedback.metadata["high_adaptation_cost_task_count"] == 1
+    assert feedback.metadata["degradation_high_cost_rate"] == pytest.approx(0.5)
+    assert feedback.metadata["degradation_confidence_rate"] == pytest.approx(0.5)
+    assert feedback.metadata["degradation_stability_score"] == pytest.approx(0.38)
     assert feedback.metadata["degradation_reasons"] == {
         "failure_streak": 1,
         "content_repetition": 1,
@@ -404,6 +434,150 @@ def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_p
     assert loaded.metadata["team_feedback_coverage"] is not None
     assert loaded.metadata["team_formations"]
     assert loaded.metadata["team_merge_risk_levels"]
+
+
+def test_load_runtime_feedback_builds_scoped_team_worktree_metrics(tmp_path):
+    save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "source": "validated_session_truth_feedback",
+                "validated_evaluation_truth": True,
+                "saved_at": "2026-04-25T00:00:00+00:00",
+                "scope": RuntimeEvaluationFeedbackScope(
+                    provider="openai",
+                    model="gpt-5",
+                    task_type="edit",
+                ).to_dict(),
+                "tasks_with_team_feedback": 2,
+                "team_feedback_coverage": 1.0,
+                "team_formations": {"parallel": 2},
+                "team_merge_risk_levels": {"low": 2},
+                "team_worktree_plan_count": 2,
+                "team_worktree_materialized_count": 2,
+                "team_cleanup_task_count": 2,
+                "team_cleanup_error_task_count": 0,
+                "avg_team_assignments": 2.0,
+                "avg_team_scoped_members": 2.0,
+            }
+        ),
+        path=tmp_path / "eval_edit_feedback.json",
+    )
+    save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "source": "validated_session_truth_feedback",
+                "validated_evaluation_truth": True,
+                "saved_at": "2026-04-26T00:00:00+00:00",
+                "scope": RuntimeEvaluationFeedbackScope(
+                    provider="anthropic",
+                    model="claude-4",
+                    task_type="analysis",
+                ).to_dict(),
+                "tasks_with_team_feedback": 3,
+                "team_feedback_coverage": 1.0,
+                "team_formations": {"parallel": 3},
+                "team_merge_risk_levels": {"high": 2, "medium": 1},
+                "team_worktree_plan_count": 3,
+                "team_worktree_materialized_count": 1,
+                "team_worktree_dry_run_count": 2,
+                "team_cleanup_task_count": 2,
+                "team_cleanup_error_task_count": 1,
+                "team_merge_conflict_task_count": 1,
+                "avg_team_assignments": 3.0,
+                "avg_team_scoped_members": 3.0,
+                "avg_team_changed_file_count": 4.0,
+            }
+        ),
+        path=tmp_path / "eval_analysis_feedback.json",
+    )
+
+    loaded = load_runtime_evaluation_feedback(tmp_path / "runtime_evaluation_feedback.json")
+
+    assert loaded is not None
+    scope_metrics = loaded.metadata["team_worktree_scope_metrics"]
+    assert scope_metrics["task_type"]["edit"]["team_worktree_materialized_count"] == pytest.approx(
+        2.0
+    )
+    assert scope_metrics["task_type"]["analysis"]["team_worktree_dry_run_count"] == pytest.approx(
+        2.0
+    )
+    assert scope_metrics["provider"]["anthropic"]["team_cleanup_error_task_count"] == pytest.approx(
+        1.0
+    )
+    assert scope_metrics["model_family"]["gpt"]["team_formations"]["parallel"] == pytest.approx(
+        2.0
+    )
+
+
+def test_load_runtime_feedback_aggregates_long_horizon_degradation_metrics(tmp_path):
+    save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            completion_threshold=0.78,
+            enhanced_progress_threshold=0.61,
+            minimum_supported_evidence_score=0.85,
+            metadata={
+                "source": "validated_session_truth_feedback",
+                "validated_evaluation_truth": True,
+                "saved_at": "2026-04-26T00:00:00+00:00",
+                "scope": RuntimeEvaluationFeedbackScope(
+                    provider="openai",
+                    model="gpt-5",
+                    task_type="analysis",
+                ).to_dict(),
+                "degradation_feedback_coverage": 1.0,
+                "degradation_event_count": 3,
+                "degraded_task_count": 2,
+                "recovered_task_count": 1,
+                "degradation_recovery_rate": 0.5,
+                "avg_degradation_adaptation_cost": 2.25,
+                "avg_degradation_time_to_recover_seconds": 4.5,
+                "avg_degradation_cost_variance": 1.1,
+                "avg_degradation_recovery_time_variance": 0.9,
+                "avg_degradation_intervention_count": 1.5,
+                "avg_degradation_confidence": 0.41,
+                "avg_degradation_drift_score": 0.72,
+                "content_degradation_task_count": 1,
+                "confidence_degradation_task_count": 1,
+                "provider_degradation_task_count": 1,
+                "persistent_degradation_task_count": 1,
+                "drift_task_count": 2,
+                "degradation_drift_rate": 1.0,
+                "degradation_intervention_task_count": 2,
+                "degradation_intervention_rate": 1.0,
+                "high_adaptation_cost_task_count": 1,
+                "degradation_high_cost_rate": 0.5,
+                "degradation_confidence_rate": 0.5,
+                "degradation_stability_score": 0.33,
+                "degradation_sources": {"provider_performance": 2, "streaming_confidence": 1},
+                "degradation_kinds": {
+                    "persistent_provider_degradation": 1,
+                    "confidence_early_stop": 1,
+                    "recovery_action": 1,
+                },
+            },
+        ),
+        path=tmp_path / "eval_degradation_feedback.json",
+    )
+
+    loaded = load_runtime_evaluation_feedback(tmp_path / "runtime_evaluation_feedback.json")
+
+    assert loaded is not None
+    assert loaded.metadata["avg_degradation_cost_variance"] == pytest.approx(1.1)
+    assert loaded.metadata["avg_degradation_recovery_time_variance"] == pytest.approx(0.9)
+    assert loaded.metadata["avg_degradation_intervention_count"] == pytest.approx(1.5)
+    assert loaded.metadata["avg_degradation_confidence"] == pytest.approx(0.41)
+    assert loaded.metadata["avg_degradation_drift_score"] == pytest.approx(0.72)
+    assert loaded.metadata["confidence_degradation_task_count"] == pytest.approx(1.0)
+    assert loaded.metadata["persistent_degradation_task_count"] == pytest.approx(1.0)
+    assert loaded.metadata["drift_task_count"] == pytest.approx(2.0)
+    assert loaded.metadata["degradation_drift_rate"] == pytest.approx(1.0)
+    assert loaded.metadata["degradation_intervention_task_count"] == pytest.approx(2.0)
+    assert loaded.metadata["degradation_intervention_rate"] == pytest.approx(1.0)
+    assert loaded.metadata["high_adaptation_cost_task_count"] == pytest.approx(1.0)
+    assert loaded.metadata["degradation_high_cost_rate"] == pytest.approx(0.5)
+    assert loaded.metadata["degradation_confidence_rate"] == pytest.approx(0.5)
+    assert loaded.metadata["degradation_stability_score"] == pytest.approx(0.33)
+    assert loaded.metadata["degradation_sources"]["provider_performance"] > 0.0
 
 
 def test_load_runtime_feedback_prefers_directory_aggregate_over_stale_canonical_file(tmp_path):

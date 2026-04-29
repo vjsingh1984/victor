@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from victor.evaluation.degradation_feedback import (
     aggregate_degradation_feedback,
     extract_degradation_events,
@@ -69,6 +71,60 @@ def test_summarize_degradation_feedback_returns_task_level_summary():
     assert summary["provider_degradation_detected"] is True
     assert summary["content_degradation_detected"] is True
     assert summary["sources"] == {"provider_performance": 1, "agentic_loop": 1}
+
+
+def test_summarize_degradation_feedback_tracks_drift_and_stability_metrics():
+    summary = summarize_degradation_feedback(
+        {
+            "metadata": {
+                "degradation_events": [
+                    {
+                        "source": "provider_performance",
+                        "kind": "persistent_provider_degradation",
+                        "failure_type": "PROVIDER_ERROR",
+                        "provider": "ollama",
+                        "post_degraded": True,
+                        "adaptation_cost": 4,
+                        "time_to_recover_seconds": 6.0,
+                        "confidence": 0.2,
+                        "degradation_reasons": ["failure_streak"],
+                    },
+                    {
+                        "source": "streaming_confidence",
+                        "kind": "confidence_early_stop",
+                        "failure_type": "CONFIDENCE_LOW",
+                        "post_degraded": True,
+                        "adaptation_cost": 1,
+                        "confidence": 0.3,
+                        "degradation_reasons": ["confidence_threshold_reached"],
+                    },
+                ],
+                "recovery_events": [
+                    {
+                        "action": "retry",
+                        "strategy_name": "fallback_provider",
+                        "reason": "provider degraded",
+                        "recovered": True,
+                        "adaptation_cost": 2,
+                        "time_to_recover_seconds": 5.0,
+                        "confidence": 0.4,
+                    }
+                ],
+            }
+        }
+    )
+
+    assert summary is not None
+    assert summary["drift_detected"] is True
+    assert summary["drift_event_count"] == 2
+    assert summary["intervention_event_count"] == 3
+    assert summary["confidence_degradation_detected"] is True
+    assert summary["persistent_provider_degradation_detected"] is True
+    assert summary["high_adaptation_cost_detected"] is True
+    assert summary["avg_confidence_at_degradation"] == pytest.approx(0.3)
+    assert summary["adaptation_cost_variance"] > 0.0
+    assert summary["recovery_time_variance"] > 0.0
+    assert summary["drift_score"] > 0.0
 
 
 def test_extract_degradation_events_normalizes_recovery_events():
@@ -145,4 +201,8 @@ def test_aggregate_degradation_feedback_rolls_up_counts():
     assert metrics["degradation_recovery_rate"] == 0.5
     assert metrics["content_degradation_task_count"] == 1
     assert metrics["provider_degradation_task_count"] == 1
+    assert metrics["drift_task_count"] == 2
+    assert metrics["degradation_drift_rate"] == pytest.approx(1.0)
+    assert metrics["avg_degradation_intervention_count"] == pytest.approx(1.0)
+    assert metrics["degradation_stability_score"] < 1.0
     assert metrics["degradation_sources"] == {"provider_performance": 1, "agentic_loop": 1}
