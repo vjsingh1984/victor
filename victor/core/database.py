@@ -86,6 +86,326 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# DATABASE CONSOLIDATION
+# =============================================================================
+
+
+class DatabaseConsolidator:
+    """Handle database consolidation migration to canonical two-database structure.
+
+    Target Architecture:
+        ~/.victor/victor.db - Global database (user-wide data)
+            - Settings, API keys, profiles
+            - RL learning (rl_outcomes, rl_q_values, etc.)
+            - Team composition stats
+            - Cross-vertical patterns
+            - TUI session persistence
+
+        ./.victor/project.db - Project database (project-specific data)
+            - Graph nodes/edges
+            - Conversations and messages
+            - Project sessions
+            - Entity memory
+            - Mode learning
+            - Change tracking
+
+    Migration Strategy:
+        1. Backup existing databases with .bak.<timestamp> suffix
+        2. Migrate data to canonical databases
+        3. Validate integrity
+        4. Update metadata
+    """
+
+    def __init__(self, victor_dir: Optional[Path] = None):
+        """Initialize consolidator.
+
+        Args:
+            victor_dir: Path to ~/.victor directory
+        """
+        if victor_dir is None:
+            victor_dir = Path.home() / ".victor"
+        self.victor_dir = victor_dir
+        self._consolidated_flag = victor_dir / ".consolidated_v6"
+
+    def needs_consolidation(self) -> bool:
+        """Check if database consolidation is needed.
+
+        Returns:
+            True if consolidation has not been completed
+        """
+        # Check if consolidation flag exists
+        if self._consolidated_flag.exists():
+            return False
+
+        # Check if there are any legacy databases to migrate
+        legacy_dbs = [
+            self.victor_dir / "conversation.db",
+            self.victor_dir / "profile_learning.db",
+            self.victor_dir / "project.db",  # Old mixed database
+        ]
+
+        for db_path in legacy_dbs:
+            if db_path.exists() and db_path.stat().st_size > 0:
+                return True
+
+        return False
+
+    def consolidate(self) -> None:
+        """Consolidate databases to canonical two-database structure.
+
+        Raises:
+            Exception: If consolidation fails
+        """
+        if not self.needs_consolidation():
+            logger.debug("Database consolidation already completed")
+            return
+
+        logger.info("Starting database consolidation...")
+
+        try:
+            # Step 1: Backup existing databases
+            self._backup_legacy_databases()
+
+            # Step 2: Migrate global data to ~/.victor/victor.db
+            self._migrate_global_database()
+
+            # Step 3: Migrate project data to ./.victor/project.db
+            self._migrate_project_databases()
+
+            # Step 4: Create consolidation flag
+            self._consolidated_flag.write_text(
+                f"consolidated_at={datetime.now().isoformat()}\n"
+                f"schema_version=6\n"
+            )
+
+            logger.info("Database consolidation complete")
+
+        except Exception as e:
+            logger.error(f"Database consolidation failed: {e}")
+            raise
+
+    def _backup_legacy_databases(self) -> None:
+        """Backup legacy databases with .bak.<timestamp> suffix."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        legacy_dbs = [
+            self.victor_dir / "conversation.db",
+            self.victor_dir / "profile_learning.db",
+            self.victor_dir / "project.db",
+            self.victor_dir / "graph" / "graph.db",
+        ]
+
+        for db_path in legacy_dbs:
+            if db_path.exists() and db_path.stat().st_size > 0:
+                backup_path = Path(f"{db_path}.bak.{timestamp}")
+                shutil.copy2(db_path, backup_path)
+                logger.info(f"Backed up {db_path.name} to {backup_path.name}")
+
+    def _migrate_global_database(self) -> None:
+        """Migrate global user data to ~/.victor/victor.db."""
+        target_path = self.victor_dir / "victor.db"
+
+        # Source databases with global data
+        sources = [
+            self.victor_dir / "conversation.db",
+            self.victor_dir / "profile_learning.db",
+            self.victor_dir / "project.db",  # Old mixed database
+        ]
+
+        for source_path in sources:
+            if source_path.exists() and source_path.stat().st_size > 0:
+                self._migrate_global_tables(source_path, target_path)
+
+    def _migrate_global_tables(
+        self,
+        source_path: Path,
+        target_path: Path,
+    ) -> None:
+        """Migrate global tables from source to target database.
+
+        Global tables (user-wide data):
+        - rl_* (reinforcement learning)
+        - agent_* (agent learning, teams)
+        - ui_* (UI sessions, preferences)
+        - interaction_history (profile learning)
+        - profile_metrics (profile learning)
+        """
+        # Global tables to migrate
+        global_tables = {
+            # RL tables
+            "rl_learner", "rl_outcome", "rl_metric", "rl_q_value",
+            "rl_transition", "rl_param", "rl_task_stat",
+            "rl_mode_q", "rl_mode_history", "rl_mode_task",
+            "rl_model_q", "rl_model_task", "rl_model_state",
+            "rl_tool_q", "rl_tool_task", "rl_tool_outcome",
+            "rl_cache_q", "rl_cache_tool", "rl_cache_history",
+            "rl_grounding_param", "rl_grounding_stat", "rl_grounding_history",
+            "rl_semantic_stat", "rl_patience_stat", "rl_prompt_stat",
+            "rl_quality_weight", "rl_quality_history",
+            "rl_provider_stat", "rl_context_pruning",
+            "rl_pattern", "rl_pattern_use",
+            # Agent tables
+            "agent_team_config", "agent_team_run",
+            "agent_workflow_run", "agent_workflow_q",
+            "agent_prompt_style", "agent_prompt_element",
+            "agent_prompt_history", "agent_prompt_candidate",
+            "agent_prompt_pareto_instance",
+            "agent_curriculum_stage", "agent_curriculum_metric",
+            "agent_curriculum_history", "agent_policy_snapshot",
+            # UI tables
+            "ui_session", "ui_failed_call",
+            # Profile learning
+            "interaction_history", "profile_metrics",
+        }
+
+        self._migrate_tables(source_path, target_path, global_tables)
+
+    def _migrate_project_databases(self) -> None:
+        """Migrate project data to ./.victor/project.db."""
+        # For each project directory with a legacy database
+        project_dir = Path.cwd() / ".victor"
+
+        # Check for standalone graph.db in project
+        graph_db = project_dir / "graph.db"
+        if graph_db.exists() and graph_db.stat().st_size > 0:
+            target_path = project_dir / "project.db"
+            self._migrate_project_tables(graph_db, target_path)
+
+    def _migrate_project_tables(
+        self,
+        source_path: Path,
+        target_path: Path,
+    ) -> None:
+        """Migrate project tables from source to target database.
+
+        Project tables (project-specific data):
+        - graph_* (graph nodes, edges, file mtime)
+        - messages, sessions (conversations)
+        - context_sizes, context_summaries
+        - entities (entity memory)
+        - change_groups, file_changes (change tracking)
+        """
+        # Project tables to migrate
+        project_tables = {
+            # Graph tables
+            "graph_node", "graph_edge", "graph_file_mtime",
+            "graph_module_metric", "graph_module_metric_history",
+            "graph_requirement", "graph_subgraph", "graph_subgraph_node",
+            # Conversation tables
+            "messages", "sessions",
+            "context_sizes", "context_summaries",
+            # Entity memory
+            "entities",
+            # Changes
+            "change_groups", "file_changes",
+        }
+
+        self._migrate_tables(source_path, target_path, project_tables)
+
+    def _migrate_tables(
+        self,
+        source_path: Path,
+        target_path: Path,
+        table_names: set,
+    ) -> None:
+        """Migrate tables from source to target database.
+
+        Args:
+            source_path: Path to source database
+            target_path: Path to target database
+            table_names: Set of table names to migrate
+        """
+        import sqlite3
+
+        # Connect to both databases
+        source_conn = sqlite3.connect(str(source_path))
+        target_conn = sqlite3.connect(str(target_path))
+
+        try:
+            # Attach source database
+            target_conn.execute(f"ATTACH DATABASE ? AS source_db", (str(source_path),))
+
+            # Get tables in source that we want to migrate
+            cursor = target_conn.execute("""
+                SELECT name FROM source_db.sqlite_master
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+            """)
+            source_tables = {row[0] for row in cursor.fetchall()}
+
+            # Migrate matching tables
+            migrated = 0
+            for table in table_names & source_tables:
+                try:
+                    # Check if table exists in target
+                    target_cursor = target_conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                        (table,)
+                    )
+                    if target_cursor.fetchone():
+                        # Table exists, copy data if target is empty
+                        source_count = target_conn.execute(
+                            f"SELECT COUNT(*) FROM source_db.{table}"
+                        ).fetchone()[0]
+                        target_count = target_conn.execute(
+                            f"SELECT COUNT(*) FROM {table}"
+                        ).fetchone()[0]
+
+                        if source_count > 0 and target_count == 0:
+                            target_conn.execute(f"""
+                                INSERT INTO {table}
+                                SELECT * FROM source_db.{table}
+                            """)
+                            logger.debug(f"Copied {source_count} rows from {table}")
+                            migrated += 1
+                    else:
+                        # Create table and copy data
+                        schema_row = target_conn.execute(
+                            f"""
+                            SELECT sql FROM source_db.sqlite_master
+                            WHERE type='table' AND name=?
+                        """,
+                            (table,),
+                        ).fetchone()
+
+                        if schema_row and schema_row[0]:
+                            target_conn.execute(schema_row[0])
+                            target_conn.execute(f"""
+                                INSERT INTO {table}
+                                SELECT * FROM source_db.{table}
+                            """)
+
+                            # Copy indexes
+                            idx_cursor = target_conn.execute(
+                                f"""
+                                SELECT sql FROM source_db.sqlite_master
+                                WHERE type='index' AND tbl_name=? AND sql IS NOT NULL
+                            """,
+                                (table,),
+                            )
+                            for idx_row in idx_cursor:
+                                try:
+                                    target_conn.execute(idx_row[0])
+                                except sqlite3.OperationalError:
+                                    pass  # Index may already exist
+
+                            migrated += 1
+                            logger.debug(f"Migrated table: {table}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to migrate {table}: {e}")
+
+            target_conn.commit()
+
+            if migrated > 0:
+                logger.info(f"Migrated {migrated} tables from {source_path.name}")
+
+        finally:
+            target_conn.execute("DETACH DATABASE source_db")
+            source_conn.close()
+            target_conn.close()
+
+
 def _normalize_project_database_paths(project_path: Optional[Path]) -> tuple[Path, Path, Path]:
     """Normalize project DB input to project root, state dir, and db file."""
     if project_path is None:
@@ -256,6 +576,12 @@ class DatabaseManager(_DatabaseManagerBase):
         """Ensure database exists and is up to date."""
         from victor.core.schema import Tables, Schema
 
+        # Run database consolidation if needed
+        consolidator = DatabaseConsolidator(self._victor_dir)
+        if consolidator.needs_consolidation():
+            logger.info("Running database consolidation...")
+            consolidator.consolidate()
+
         # Create database if needed
         conn = self._get_raw_connection()
 
@@ -268,7 +594,10 @@ class DatabaseManager(_DatabaseManagerBase):
         conn.execute(Schema.SYS_METADATA)
         conn.commit()
 
-        # Run migrations if needed
+        # Run schema version migrations if needed
+        self._run_schema_version_migrations(conn)
+
+        # Run legacy migrations if needed
         self._run_migrations(conn)
 
     def get_connection(self) -> sqlite3.Connection:
@@ -397,6 +726,59 @@ class DatabaseManager(_DatabaseManagerBase):
         """
         rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row[0] for row in rows]
+
+    def _run_schema_version_migrations(self, conn: sqlite3.Connection) -> None:
+        """Run schema version migrations.
+
+        Args:
+            conn: Database connection
+        """
+        from victor.core.schema import Tables, CURRENT_SCHEMA_VERSION, get_migration_sql
+
+        # Get current schema version
+        cursor = conn.execute(
+            f"SELECT value FROM {Tables.SYS_METADATA} WHERE key = 'schema_version'"
+        )
+        row = cursor.fetchone()
+
+        if row:
+            current_version = int(row[0])
+        else:
+            # First time initialization - set version to CURRENT
+            conn.execute(
+                f"""
+                INSERT INTO {Tables.SYS_METADATA} (key, value, updated_at)
+                VALUES ('schema_version', ?, datetime('now'))
+                """,
+                (str(CURRENT_SCHEMA_VERSION),),
+            )
+            conn.commit()
+            logger.info(f"Database initialized at schema version {CURRENT_SCHEMA_VERSION}")
+            return
+
+        # Run migrations if needed
+        if current_version < CURRENT_SCHEMA_VERSION:
+            logger.info(f"Migrating database from version {current_version} to {CURRENT_SCHEMA_VERSION}")
+
+            migration_sqls = get_migration_sql(current_version, CURRENT_SCHEMA_VERSION)
+
+            for sql in migration_sqls:
+                try:
+                    conn.execute(sql)
+                except Exception as e:
+                    logger.warning(f"Migration SQL failed (may be idempotent): {e}")
+
+            # Update schema version
+            conn.execute(
+                f"""
+                UPDATE {Tables.SYS_METADATA}
+                SET value = ?, updated_at = datetime('now')
+                WHERE key = 'schema_version'
+                """,
+                (str(CURRENT_SCHEMA_VERSION),),
+            )
+            conn.commit()
+            logger.info(f"Database migrated to schema version {CURRENT_SCHEMA_VERSION}")
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
         """Run database migrations from legacy databases."""

@@ -8,14 +8,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
 
 @dataclass(frozen=True)
 class CoordinationRuntimeComponents:
-    """Coordination runtime handles exposed to the orchestrator facade."""
+    """Coordination runtime handles exposed to the orchestrator facade.
+
+    Note: recovery_coordinator is now RecoveryService with native streaming runtime.
+    The name is retained for compatibility but will be renamed in a future update.
+    """
 
     recovery_coordinator: LazyRuntimeProxy[Any]
     chunk_generator: LazyRuntimeProxy[Any]
@@ -26,21 +30,15 @@ class CoordinationRuntimeComponents:
 def create_coordination_runtime_components(
     *,
     factory: Any,
-    get_recovery_service: Optional[Callable[[], Any]] = None,
 ) -> CoordinationRuntimeComponents:
-    """Create lazy coordination components for orchestrator wiring."""
+    """Create lazy coordination components for orchestrator wiring.
 
-    def _build_recovery_coordinator() -> Any:
-        coordinator = factory.create_recovery_coordinator()
-        if get_recovery_service is not None and hasattr(coordinator, "bind_recovery_service"):
-            service = get_recovery_service()
-            if service is not None:
-                coordinator.bind_recovery_service(service)
-        return coordinator
-
+    The recovery_coordinator is now RecoveryService with native streaming runtime
+    enabled. No additional binding is required.
+    """
     return CoordinationRuntimeComponents(
         recovery_coordinator=LazyRuntimeProxy(
-            factory=_build_recovery_coordinator,
+            factory=lambda: factory.create_recovery_coordinator(),
             name="recovery_coordinator",
         ),
         chunk_generator=LazyRuntimeProxy(

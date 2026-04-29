@@ -4,10 +4,10 @@ import os
 import pytest
 import time
 
-from victor.agent.tool_deduplication import (
+from victor.agent.tool_call_tracker import (
     TrackedToolCall,
-    ToolDeduplicationTracker,
-    get_deduplication_tracker,
+    ToolCallTracker,
+    get_tool_call_tracker,
     is_redundant_call,
     track_call,
 )
@@ -34,12 +34,12 @@ class TestTrackedToolCall:
         assert call2.timestamp > call1.timestamp
 
 
-class TestToolDeduplicationTracker:
-    """Test ToolDeduplicationTracker class."""
+class TestToolCallTracker:
+    """Test ToolCallTracker class."""
 
     def test_initialization_default(self):
         """Test initialization with default parameters."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         assert tracker.window_size == 10
         assert tracker.similarity_threshold == 0.7
@@ -47,14 +47,14 @@ class TestToolDeduplicationTracker:
 
     def test_initialization_custom(self):
         """Test initialization with custom parameters."""
-        tracker = ToolDeduplicationTracker(window_size=5, similarity_threshold=0.8)
+        tracker = ToolCallTracker(window_size=5, similarity_threshold=0.8)
 
         assert tracker.window_size == 5
         assert tracker.similarity_threshold == 0.8
 
     def test_add_call(self):
         """Test adding a tool call."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
         tracker.add_call("read_file", {"path": "foo.py"})
 
         assert len(tracker.recent_calls) == 1
@@ -63,7 +63,7 @@ class TestToolDeduplicationTracker:
 
     def test_window_size_enforcement(self):
         """Test that window size is enforced."""
-        tracker = ToolDeduplicationTracker(window_size=3)
+        tracker = ToolCallTracker(window_size=3)
 
         # Add 5 calls (exceeds window size)
         for i in range(5):
@@ -75,7 +75,7 @@ class TestToolDeduplicationTracker:
 
     def test_is_redundant_exact_duplicate(self):
         """Test detection of exact duplicate calls."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("read_file", {"path": "foo.py"})
         is_dup = tracker.is_redundant("read_file", {"path": "foo.py"})
@@ -84,7 +84,7 @@ class TestToolDeduplicationTracker:
 
     def test_is_redundant_different_call(self):
         """Test that different calls are not marked redundant."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("read_file", {"path": "foo.py"})
         is_dup = tracker.is_redundant("read_file", {"path": "bar.py"})
@@ -93,7 +93,7 @@ class TestToolDeduplicationTracker:
 
     def test_is_redundant_empty_history(self):
         """Test redundancy check with empty history."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
         is_dup = tracker.is_redundant("read_file", {"path": "foo.py"})
 
         assert is_dup is False
@@ -104,7 +104,7 @@ class TestSearchRedundancy:
 
     def test_exact_query_and_mode_match(self):
         """Test exact query+mode match detection."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "tool registration", "mode": "semantic"})
         # Same query, same mode → redundant
@@ -118,7 +118,7 @@ class TestSearchRedundancy:
 
     def test_synonym_query_not_redundant(self):
         """Synonym queries are allowed — agent may need different perspectives."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "tool registration"})
         is_dup = tracker.is_redundant("grep", {"query": "register tool"})
@@ -127,7 +127,7 @@ class TestSearchRedundancy:
 
     def test_substring_query_not_redundant(self):
         """Substring queries are allowed — agent may be narrowing/broadening search."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("code_search", {"query": "error handling in providers"})
         is_dup = tracker.is_redundant("code_search", {"query": "error handling"})
@@ -136,7 +136,7 @@ class TestSearchRedundancy:
 
     def test_different_queries_not_redundant(self):
         """Test that different queries are not redundant."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "tool registration"})
         is_dup = tracker.is_redundant("grep", {"query": "provider implementation"})
@@ -145,7 +145,7 @@ class TestSearchRedundancy:
 
     def test_search_pattern_parameter(self):
         """Test search with 'pattern' instead of 'query' parameter."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"pattern": "BaseProvider"})
         is_dup = tracker.is_redundant("grep", {"pattern": "BaseProvider"})
@@ -158,7 +158,7 @@ class TestFileRedundancy:
 
     def test_read_file_twice(self):
         """Test detection of reading same file twice."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("read_file", {"path": "foo.py"})
         is_dup = tracker.is_redundant("read_file", {"path": "foo.py"})
@@ -167,7 +167,7 @@ class TestFileRedundancy:
 
     def test_read_different_files(self):
         """Test that reading different files is not redundant."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("read_file", {"path": "foo.py"})
         is_dup = tracker.is_redundant("read_file", {"path": "bar.py"})
@@ -176,7 +176,7 @@ class TestFileRedundancy:
 
     def test_read_file_different_offsets(self):
         """Test that reading with different offsets is not redundant."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("read_file", {"path": "foo.py", "offset": 0})
         is_dup = tracker.is_redundant("read_file", {"path": "foo.py", "offset": 100})
@@ -185,7 +185,7 @@ class TestFileRedundancy:
 
     def test_read_file_after_external_change_not_redundant(self, tmp_path):
         """A reread should be allowed when the file changed on disk."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         file_path = tmp_path / "foo.py"
         file_path.write_text("print('before')\n")
@@ -204,7 +204,7 @@ class TestFileRedundancy:
 
     def test_canonical_and_alias_read_names_match(self):
         """Canonical and legacy read names should dedupe together."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("read", {"path": "foo.py"})
         is_dup = tracker.is_redundant("read_file", {"path": "foo.py"})
@@ -213,7 +213,7 @@ class TestFileRedundancy:
 
     def test_file_path_parameter_variations(self):
         """Test different parameter names for file path."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         # Test "file_path" parameter
         tracker.add_call("edit_file", {"file_path": "foo.py"})
@@ -232,7 +232,7 @@ class TestListRedundancy:
 
     def test_list_directory_twice(self):
         """Test detection of listing same directory twice."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("list_directory", {"path": "."})
         is_dup = tracker.is_redundant("list_directory", {"path": "."})
@@ -241,7 +241,7 @@ class TestListRedundancy:
 
     def test_list_different_directories(self):
         """Test that listing different directories is not redundant."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("list_directory", {"path": "."})
         is_dup = tracker.is_redundant("list_directory", {"path": "src"})
@@ -250,7 +250,7 @@ class TestListRedundancy:
 
     def test_list_default_path(self):
         """Test list with default path (no path parameter)."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("list_directory", {})
         is_dup = tracker.is_redundant("list_directory", {})
@@ -259,7 +259,7 @@ class TestListRedundancy:
 
     def test_canonical_and_alias_list_names_match(self):
         """Canonical and legacy list names should dedupe together."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("ls", {"path": "."})
         is_dup = tracker.is_redundant("list_directory", {"path": "."})
@@ -272,7 +272,7 @@ class TestUtilityMethods:
 
     def test_get_recent_calls(self):
         """Test getting recent calls."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         for i in range(5):
             tracker.add_call("test", {"index": i})
@@ -285,7 +285,7 @@ class TestUtilityMethods:
 
     def test_get_recent_calls_with_limit(self):
         """Test getting recent calls with limit."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         for i in range(10):
             tracker.add_call("test", {"index": i})
@@ -296,7 +296,7 @@ class TestUtilityMethods:
 
     def test_clear(self):
         """Test clearing tracker."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("test", {})
         assert len(tracker.recent_calls) > 0
@@ -306,7 +306,7 @@ class TestUtilityMethods:
 
     def test_get_duplicate_count(self):
         """Test getting duplicate count."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         # Add some duplicates
         tracker.add_call("read_file", {"path": "foo.py"})
@@ -323,14 +323,14 @@ class TestGlobalFunctions:
 
     def test_get_deduplication_tracker_singleton(self):
         """Test that get_deduplication_tracker returns singleton."""
-        tracker1 = get_deduplication_tracker()
-        tracker2 = get_deduplication_tracker()
+        tracker1 = get_tool_call_tracker()
+        tracker2 = get_tool_call_tracker()
 
         assert tracker1 is tracker2
 
     def test_is_redundant_call_convenience(self):
         """Test is_redundant_call convenience function."""
-        tracker = get_deduplication_tracker()
+        tracker = get_tool_call_tracker()
         tracker.clear()  # Clear any previous state
 
         # First call should not be redundant
@@ -346,7 +346,7 @@ class TestGlobalFunctions:
 
     def test_track_call_convenience(self):
         """Test track_call convenience function."""
-        tracker = get_deduplication_tracker()
+        tracker = get_tool_call_tracker()
         tracker.clear()
 
         track_call("test_tool", {"test": "args"})
@@ -361,7 +361,7 @@ class TestEdgeCases:
 
     def test_empty_args(self):
         """Test with empty args dictionary."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("test", {})
         is_dup = tracker.is_redundant("test", {})
@@ -370,7 +370,7 @@ class TestEdgeCases:
 
     def test_none_args_values(self):
         """Test with None values in args."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("test", {"path": None})
         is_dup = tracker.is_redundant("test", {"path": None})
@@ -379,7 +379,7 @@ class TestEdgeCases:
 
     def test_complex_args(self):
         """Test with complex nested args."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         args = {"path": "foo.py", "options": {"recursive": True, "depth": 3}}
         tracker.add_call("test", args)
@@ -389,7 +389,7 @@ class TestEdgeCases:
 
     def test_case_sensitivity_in_queries(self):
         """Test case sensitivity in query matching."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "Tool Registration"})
         is_dup = tracker.is_redundant("grep", {"query": "tool registration"})
@@ -399,7 +399,7 @@ class TestEdgeCases:
 
     def test_very_short_query(self):
         """Test with very short query (should not match substring)."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "tool registration"})
         is_dup = tracker.is_redundant("grep", {"query": "to"})  # < 3 chars
@@ -413,7 +413,7 @@ class TestPerformance:
 
     def test_redundancy_check_is_fast(self):
         """Test that redundancy check completes quickly."""
-        tracker = ToolDeduplicationTracker(window_size=10)
+        tracker = ToolCallTracker(window_size=10)
 
         # Fill tracker with calls
         for i in range(10):
@@ -429,7 +429,7 @@ class TestPerformance:
 
     def test_large_window_size(self):
         """Test with large window size."""
-        tracker = ToolDeduplicationTracker(window_size=1000)
+        tracker = ToolCallTracker(window_size=1000)
 
         # Add many calls
         for i in range(500):
@@ -445,7 +445,7 @@ class TestSemanticSimilarity:
 
     def test_error_handling_synonyms_not_blocked(self):
         """Synonym queries are allowed — exact match only for dedup."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "error handling"})
         is_dup = tracker.is_redundant("grep", {"query": "exception"})
@@ -454,7 +454,7 @@ class TestSemanticSimilarity:
 
     def test_provider_synonyms_not_blocked(self):
         """Synonym queries are allowed — exact match only for dedup."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "provider"})
         is_dup = tracker.is_redundant("grep", {"query": "llm provider"})
@@ -463,7 +463,7 @@ class TestSemanticSimilarity:
 
     def test_unrelated_queries(self):
         """Test that unrelated queries are not matched."""
-        tracker = ToolDeduplicationTracker()
+        tracker = ToolCallTracker()
 
         tracker.add_call("grep", {"query": "error handling"})
         is_dup = tracker.is_redundant("grep", {"query": "database connection"})

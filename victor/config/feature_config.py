@@ -58,6 +58,11 @@ DEFAULT_FEATURE_FLAGS = {
     "use_composition_over_inheritance": False,
     # Phase 5 - Tool Registration Strategy (disabled by default)
     "use_strategy_based_tool_registration": False,
+    # Phase 15 - Architecture Consolidation (disabled by default for safety)
+    "use_stategraph_agentic_loop": False,
+    "use_framework_coordinators": False,
+    "use_context_service_injection": False,
+    "use_framework_teams": False,
 }
 
 

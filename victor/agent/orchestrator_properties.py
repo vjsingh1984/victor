@@ -32,7 +32,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
+    from victor.agent.services.recovery_service import RecoveryService
     from victor.agent.services.chunk_runtime import ChunkGenerator
     from victor.agent.services.tool_planning_runtime import ToolPlanner
     from victor.agent.services.task_runtime import TaskCoordinator
@@ -110,9 +110,14 @@ def _sequence_tracker(self: "AgentOrchestrator") -> "ToolSequenceTracker":
     return self._sequence_tracker
 
 
-def _recovery_coordinator(self: "AgentOrchestrator") -> "StreamingRecoveryCoordinator":
-    """Get the canonical recovery coordinator for centralized recovery logic."""
-    return self._recovery_coordinator
+def _recovery_coordinator(self: "AgentOrchestrator") -> "RecoveryService":
+    """Get the canonical RecoveryService for centralized recovery logic.
+
+    Note: The property name 'recovery_coordinator' is retained for compatibility.
+    This now returns RecoveryService with native streaming runtime enabled.
+    """
+    # Access the private attribute directly to avoid property recursion
+    return object.__getattribute__(self, "_recovery_coordinator")
 
 
 def _chunk_generator(self: "AgentOrchestrator") -> "ChunkGenerator":

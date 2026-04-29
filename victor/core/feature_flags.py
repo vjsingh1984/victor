@@ -161,6 +161,13 @@ class FeatureFlag(Enum):
     USE_MULTI_HOP_RETRIEVAL = "use_multi_hop_retrieval"
     USE_GRAPH_ENHANCED_CONTEXT = "use_graph_enhanced_context"
 
+    # Phase 15 - Architecture Consolidation (Framework Primitives)
+    # These flags enable consolidation to use framework primitives (StateGraph, Teams)
+    USE_STATEGRAPH_AGENTIC_LOOP = "use_stategraph_agentic_loop"
+    USE_FRAMEWORK_COORDINATORS = "use_framework_coordinators"
+    USE_CONTEXT_SERVICE_INJECTION = "use_context_service_injection"
+    USE_FRAMEWORK_TEAMS = "use_framework_teams"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -192,6 +199,11 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_PROMPT_DICTIONARY_COMPRESSION,
             FeatureFlag.USE_PRIME_MEMORY_EVOLUTION,
             FeatureFlag.USE_EXTERNAL_AGENTIC_BENCHMARKS,
+            # Phase 15: Architecture Consolidation (opt-in for safety)
+            FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP,
+            FeatureFlag.USE_FRAMEWORK_COORDINATORS,
+            FeatureFlag.USE_CONTEXT_SERVICE_INJECTION,
+            FeatureFlag.USE_FRAMEWORK_TEAMS,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:

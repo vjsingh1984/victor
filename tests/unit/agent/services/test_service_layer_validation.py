@@ -41,20 +41,11 @@ class TestServiceBootstrap:
             assert p is not None
             assert hasattr(p, "__protocol_attrs__") or hasattr(p, "__abstractmethods__") or True
 
-    def test_all_three_adapters_importable(self):
-        """Service adapters must be importable (ChatServiceAdapter removed — Phase 2)."""
-        from victor.agent.services.adapters import (
-            ContextServiceAdapter,
-            SessionServiceAdapter,
-            ToolServiceAdapter,
-        )
+    def test_adapter_importable(self):
+        """Service adapter must be importable (SessionServiceAdapter, ToolServiceAdapter removed)."""
+        from victor.agent.services.adapters import ContextServiceAdapter
 
-        adapters = [
-            ToolServiceAdapter,
-            SessionServiceAdapter,
-            ContextServiceAdapter,
-        ]
-        assert len(adapters) == 3
+        assert ContextServiceAdapter is not None
 
     def test_all_six_service_implementations_importable(self):
         """All 6 service implementations must be importable."""

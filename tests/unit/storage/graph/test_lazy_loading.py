@@ -454,13 +454,14 @@ class TestLazyLoadingIntegration:
         """Test that lazy loading is used for large max_nodes."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 
-        # Create config with max_nodes set (use type hint for hasattr check)
+        # Create config with max_nodes and top_k set
         class MockConfig:
-            def __init__(self, max_nodes_val):
+            def __init__(self, max_nodes_val, top_k_val=100):
                 self.max_nodes = max_nodes_val
+                self.top_k = top_k_val
 
-        config_large = MockConfig(150)
-        config_small = MockConfig(50)
+        config_large = MockConfig(150, top_k_val=150)
+        config_small = MockConfig(50, top_k_val=50)
 
         retriever = MultiHopRetriever(populated_graph_store, config_large)
 

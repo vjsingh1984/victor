@@ -48,29 +48,15 @@ class TestFeatureFlagIntegration:
 class TestAdapterImports:
     """Test that adapter module imports work correctly."""
 
-    def test_import_tool_adapter(self):
-        from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
-
-        assert ToolServiceAdapter is not None
-
     def test_import_context_adapter(self):
         from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
 
         assert ContextServiceAdapter is not None
 
-    def test_import_session_adapter(self):
-        from victor.agent.services.adapters.session_adapter import SessionServiceAdapter
-
-        assert SessionServiceAdapter is not None
-
     def test_import_all_from_package(self):
-        from victor.agent.services.adapters import (
-            ToolServiceAdapter,
-            ContextServiceAdapter,
-            SessionServiceAdapter,
-        )
+        from victor.agent.services.adapters import ContextServiceAdapter
 
-        assert all([ToolServiceAdapter, ContextServiceAdapter, SessionServiceAdapter])
+        assert ContextServiceAdapter is not None
 
 
 class TestServiceProtocolImports:
@@ -185,33 +171,6 @@ class TestServiceProtocolImports:
 
 class TestAdapterProtocolConformance:
     """Test that adapters expose the expected interface methods."""
-
-    def test_tool_adapter_has_required_methods(self):
-        from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
-
-        adapter = ToolServiceAdapter(tool_service=MagicMock())
-        assert callable(getattr(adapter, "get_available_tools", None))
-        assert callable(getattr(adapter, "get_enabled_tools", None))
-        assert callable(getattr(adapter, "set_enabled_tools", None))
-        assert callable(getattr(adapter, "is_tool_enabled", None))
-        assert callable(getattr(adapter, "resolve_tool_alias", None))
-        assert callable(getattr(adapter, "execute_tool_with_retry", None))
-        assert callable(getattr(adapter, "parse_and_validate_tool_calls", None))
-        assert callable(getattr(adapter, "normalize_tool_arguments", None))
-        assert callable(getattr(adapter, "build_tool_access_context", None))
-        assert callable(getattr(adapter, "on_tool_complete", None))
-        assert callable(getattr(adapter, "is_healthy", None))
-
-    def test_session_adapter_has_required_methods(self):
-        from victor.agent.services.adapters.session_adapter import SessionServiceAdapter
-
-        adapter = SessionServiceAdapter(session_service=MagicMock())
-        assert callable(getattr(adapter, "get_recent_sessions", None))
-        assert callable(getattr(adapter, "recover_session", None))
-        assert callable(getattr(adapter, "get_session_stats", None))
-        assert callable(getattr(adapter, "save_checkpoint", None))
-        assert callable(getattr(adapter, "restore_checkpoint", None))
-        assert callable(getattr(adapter, "is_healthy", None))
 
     def test_context_adapter_has_required_methods(self):
         from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
@@ -563,14 +522,6 @@ class TestChatServiceBootstrapLaziness:
         obj._factory.create_service_streaming_runtime.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
-
-        recovery_service.bind_runtime_components.assert_called_once()
-        recovery_kwargs = recovery_service.bind_runtime_components.call_args.kwargs
-        assert recovery_kwargs["streaming_handler"] is obj._streaming_handler
-        assert recovery_kwargs["context_compactor"] is obj._context_compactor
-        assert recovery_kwargs["unified_tracker"] is obj.unified_tracker
-        assert recovery_kwargs["settings"] is obj.settings
-        assert recovery_kwargs["presentation"] is obj._presentation
 
     @pytest.mark.asyncio
     async def test_chat_service_runtime_handlers_use_service_first_helpers(self):

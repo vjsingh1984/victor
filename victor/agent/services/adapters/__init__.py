@@ -1,19 +1,35 @@
-"""Service adapters that bridge coordinators to service protocols.
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-These adapters implement the Strangler Fig pattern: they wrap existing
-coordinator implementations behind service protocol interfaces, enabling
-gradual migration from coordinator-based to service-based architecture.
+"""Service adapters for protocol compatibility.
 
-Feature-flagged via USE_SERVICE_LAYER — when disabled, the orchestrator
-continues using coordinators directly.
+This package provides adapters that bridge existing components to service
+protocols. Unlike deprecated coordinator shims, these adapters wrap
+canonical implementations without fallback paths.
+
+Deprecated adapter shims (ToolServiceAdapter, SessionServiceAdapter) were
+removed in the service-first architecture migration. Use the canonical
+services directly:
+- ToolService for tool operations
+- SessionService for session lifecycle
+- ContextServiceAdapter for conversation context
 """
 
-from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
+from __future__ import annotations
+
 from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
-from victor.agent.services.adapters.session_adapter import SessionServiceAdapter
 
 __all__ = [
-    "ToolServiceAdapter",
     "ContextServiceAdapter",
-    "SessionServiceAdapter",
 ]

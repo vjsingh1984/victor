@@ -160,8 +160,15 @@ class WorkflowContext:
         return {
             node_id: result.output
             for node_id, result in self.node_results.items()
-            if result.success and result.output is not None
+            if result.success
         }
+
+    def get_error(self) -> Optional[str]:
+        """Get the first error message from failed nodes."""
+        for result in self.node_results.values():
+            if result.status == ExecutorNodeStatus.FAILED and result.error:
+                return result.error
+        return None
 
 
 @dataclass

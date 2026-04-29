@@ -1117,16 +1117,16 @@ class OrchestratorServiceProvider:
         return StreamingConfidenceMonitor()
 
     def _create_recovery_coordinator(self) -> "StreamingRecoveryRuntimeProtocol":
-        """Create RecoveryCoordinator instance.
+        """Create RecoveryService instance (canonical replacement for StreamingRecoveryCoordinator).
 
-        The RecoveryCoordinator centralizes all recovery and error handling logic
+        The RecoveryService centralizes all recovery and error handling logic
         for streaming chat sessions, including condition checking, action handling,
         and recovery integration.
 
         Returns:
-            StreamingRecoveryCoordinator instance
+            RecoveryService instance with native streaming runtime enabled
         """
-        from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
+        from victor.agent.services.recovery_service import RecoveryService
         from victor.agent.protocols import (
             RecoveryHandlerProtocol,
             ContextCompactorProtocol,
@@ -1134,12 +1134,8 @@ class OrchestratorServiceProvider:
         )
         from victor.agent.services.protocols import StreamingHandlerProtocol
 
-        # Get recovery handler from DI container (optional)
-        recovery_handler = self.container.get_optional(RecoveryHandlerProtocol)
-
-        # Get recovery integration (optional)
-        # Note: OrchestratorRecoveryIntegration is not in DI yet, will be None for now
-        recovery_integration = None
+        # Create RecoveryService with native streaming runtime
+        recovery_service = RecoveryService()
 
         # Get streaming handler from DI container
         streaming_handler = self.container.get(StreamingHandlerProtocol)
@@ -1150,15 +1146,32 @@ class OrchestratorServiceProvider:
         # Get unified tracker from DI container
         unified_tracker = self.container.get(TaskTrackerProtocol)
 
-        return StreamingRecoveryCoordinator(
-            recovery_handler=recovery_handler,
-            recovery_integration=recovery_integration,
+        # Get recovery handler from DI container (optional)
+        recovery_handler = self.container.get_optional(RecoveryHandlerProtocol)
+
+        # Get recovery integration (optional)
+        recovery_integration = None
+
+        # Get presentation adapter (optional)
+        presentation = None
+        try:
+            from victor.agent.presentation import create_presentation_adapter
+            presentation = create_presentation_adapter()
+        except Exception:
+            pass
+
+        # Bind runtime components to enable native streaming
+        recovery_service.bind_runtime_components(
             streaming_handler=streaming_handler,
             context_compactor=context_compactor,
             unified_tracker=unified_tracker,
+            recovery_handler=recovery_handler,
+            recovery_integration=recovery_integration,
             settings=self._settings,
-            warn_on_init=False,
+            presentation=presentation,
         )
+
+        return recovery_service
 
     def _create_chunk_generator(self) -> "ChunkRuntimeProtocol":
         """Create ChunkGenerator instance.
@@ -1234,35 +1247,6 @@ class OrchestratorServiceProvider:
     # =========================================================================
     # New Coordinator Factory Methods (WS-D: Orchestrator SOLID Fixes)
     # =========================================================================
-
-    def _create_tool_coordinator(self) -> "Any | None":
-        """Create the deprecated ToolCoordinator compatibility shim.
-
-        The main runtime should resolve ToolService instead. This factory is
-        retained only for explicit backward-compatibility use.
-
-        Returns:
-            ToolCoordinator instance
-        """
-        from victor.agent.services.tool_compat import (
-            build_deprecated_tool_coordinator_from_container,
-        )
-
-        warnings.warn(
-            "OrchestratorServiceProvider._create_tool_coordinator() creates a deprecated "
-            "ToolCoordinator shim. Prefer ToolServiceProtocol.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        coordinator = build_deprecated_tool_coordinator_from_container(
-            container=self.container,
-            settings=self._settings,
-            strict=False,
-        )
-        if coordinator is None:
-            logger.debug("ToolPipeline or ToolRegistry not available for ToolCoordinator")
-        return coordinator
 
     def _create_state_runtime(
         self,

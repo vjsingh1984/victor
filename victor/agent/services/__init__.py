@@ -33,11 +33,8 @@ Deprecated compatibility exports retained here:
     PromptRuntimeAdapter: Canonical DI/runtime adapter for PromptRuntimeProtocol
     PromptRuntimeSupport: Canonical internal fallback support for orchestrator
         prompt helper seams when UnifiedPromptPipeline is unavailable
-    PromptCoordinator: Deprecated shim; canonical target is UnifiedPromptPipeline
-    StateCoordinator: Deprecated shim; live state belongs to ConversationController
-        and ConversationStateMachine, while StateService persists vertical state
-    StreamingRecoveryCoordinator: Deprecated shim; canonical target is RecoveryService
     SystemPromptCoordinator: Deprecated wrapper over UnifiedPromptPipeline
+    StreamingRecoveryContext: Moved to RecoveryService for canonical service ownership
 """
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
@@ -78,26 +75,12 @@ from victor.agent.services.prompt_runtime import (
     PromptRuntimeContext,
 )
 from victor.agent.services.prompt_runtime_support import PromptRuntimeSupport
-from victor.agent.services.prompt_compat import (
-    IPromptCoordinator,
-    PromptCoordinator,
-    PromptCoordinatorConfig,
-    TaskContext as PromptTaskContext,
-    create_prompt_coordinator,
-)
-from victor.agent.services.recovery_service import RecoveryService, RecoveryContextImpl
-from victor.agent.services.recovery_compat import (
+from victor.agent.services.recovery_service import (
+    RecoveryService,
+    RecoveryContextImpl,
     StreamingRecoveryContext,
-    StreamingRecoveryCoordinator,
 )
 from victor.agent.services.session_service import SessionService, SessionInfoImpl
-from victor.agent.services.state_compat import (
-    IStateCoordinator,
-    StageTransition,
-    StateCoordinator,
-    StateCoordinatorConfig,
-    create_state_coordinator,
-)
 from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
 from victor.agent.services.task_runtime import TaskCoordinator
 from victor.agent.services.planning_runtime import (
@@ -138,10 +121,6 @@ __all__ = [
     "PromptRuntimeConfig",
     "PromptRuntimeContext",
     "PromptRuntimeSupport",
-    "PromptCoordinator",
-    "PromptCoordinatorConfig",
-    "PromptTaskContext",
-    "IPromptCoordinator",
     "OrchestratorProtocolAdapter",
     "AsyncWriterQueue",
     "ProviderService",
@@ -152,13 +131,8 @@ __all__ = [
     "RuntimeIntelligenceService",
     "RuntimeIntelligenceSnapshot",
     "StreamingRecoveryContext",
-    "StreamingRecoveryCoordinator",
     "SessionService",
     "SessionInfoImpl",
-    "StateCoordinator",
-    "StateCoordinatorConfig",
-    "StageTransition",
-    "IStateCoordinator",
     "SystemPromptCoordinator",
     "TaskCoordinator",
     "ToolBudgetExceededError",
@@ -172,8 +146,6 @@ __all__ = [
     "ToolRetryExecutor",
     "TurnExecutor",
     "TurnResult",
-    "create_prompt_coordinator",
-    "create_state_coordinator",
     "create_metrics_coordinator",
     "analyze_prompt_rollout_experiment",
     "analyze_prompt_rollout_experiment_async",

@@ -307,7 +307,7 @@ class TestToolPipeline:
     @pytest.mark.asyncio
     async def test_redundant_code_search_skip_includes_recovery_payload(self, mock_tool_registry):
         """Repeated code_search calls should return actionable follow-up suggestions."""
-        from victor.agent.tool_deduplication import ToolDeduplicationTracker
+        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
 
         mock_executor = MagicMock()
         mock_executor.execute = AsyncMock(
@@ -354,7 +354,7 @@ class TestToolPipeline:
     @pytest.mark.asyncio
     async def test_redundant_refs_skip_includes_symbol_specific_recovery(self, mock_tool_registry):
         """Repeated refs calls should steer the model toward graph or text follow-up."""
-        from victor.agent.tool_deduplication import ToolDeduplicationTracker
+        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
 
         mock_executor = MagicMock()
         mock_executor.execute = AsyncMock(

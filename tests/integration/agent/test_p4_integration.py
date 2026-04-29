@@ -17,7 +17,7 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from victor.config.settings import Settings
 from victor.framework.search import HybridSearchEngine, create_hybrid_search_engine
 from victor.framework.rl.learners.semantic_threshold import SemanticThresholdLearner
-from victor.agent.tool_deduplication import ToolDeduplicationTracker
+from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 from victor.tools.base import ToolRegistry
 from victor.agent.tool_executor import ToolExecutor

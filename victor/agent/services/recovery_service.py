@@ -43,6 +43,50 @@ from victor.core.loop_thresholds import (
     DEFAULT_BLOCKED_TOTAL_THRESHOLD,
 )
 from victor.providers.base import StreamChunk
+from dataclasses import dataclass
+
+
+@dataclass
+class StreamingRecoveryContext:
+    """Context for streaming recovery decisions.
+
+    This dataclass encapsulates all state needed for streaming recovery coordination.
+    Moved from recovery_compat.py to recovery_service.py for canonical service ownership.
+
+    NOTE: This is distinct from victor.agent.recovery.protocols.StreamingRecoveryContext
+    which is used by the SOLID recovery system for failure detection/strategy.
+
+    Attributes:
+        iteration: Current iteration number
+        elapsed_time: Elapsed time since session start (seconds)
+        tool_calls_used: Number of tool calls made so far
+        tool_budget: Maximum allowed tool calls
+        max_iterations: Maximum allowed iterations
+        session_start_time: Unix timestamp when session started
+        last_quality_score: Quality score from last iteration (0-1)
+        streaming_context: StreamingChatContext for current session
+        provider_name: Name of current LLM provider
+        model: Name of current model
+        temperature: Current temperature setting
+        unified_task_type: Task type from UnifiedTaskTracker
+        is_analysis_task: Whether this is an analysis task
+        is_action_task: Whether this is an action task
+    """
+
+    iteration: int
+    elapsed_time: float
+    tool_calls_used: int
+    tool_budget: int
+    max_iterations: int
+    session_start_time: float
+    last_quality_score: float
+    streaming_context: "StreamingChatContext"
+    provider_name: str
+    model: str
+    temperature: float
+    unified_task_type: Any  # TaskType from UnifiedTaskTracker
+    is_analysis_task: bool
+    is_action_task: bool
 
 
 class RecoveryStrategy(str, Enum):

@@ -21,13 +21,8 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from typing import List, Any
 
-from victor.agent.tool_planner import ToolPlanner as LegacyToolPlanner
 from victor.agent.services.tool_planning_runtime import ToolPlanner
 from victor.config.settings import Settings
-
-
-def test_legacy_tool_planner_module_reexports_service_runtime():
-    assert LegacyToolPlanner is ToolPlanner
 
 
 @pytest.fixture

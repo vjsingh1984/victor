@@ -11,6 +11,36 @@ Core runtime code lives in `victor/`. The main boundaries worth knowing are:
 - `docs/`: MkDocs source. `site/` is generated output and should not be hand-edited unless the task is specifically about generated artifacts.
 - `ui/`, `web/ui/`, and `vscode-victor/`: separate frontend projects with their own `package.json` and lockfiles.
 
+## Database Architecture
+
+Victor uses a canonical two-database architecture (schema version 6):
+
+**Global Database** (`~/.victor/victor.db`) — User-wide data:
+- Settings, API keys, profiles
+- RL learning (rl_outcomes, rl_q_values, tool/model preferences)
+- Team composition stats
+- Cross-project patterns
+- TUI session persistence
+
+**Project Database** (`./.victor/project.db`) — Project-specific data:
+- Graph nodes/edges (symbols, references, definitions)
+- Conversations and messages
+- Project sessions, cache, entity memory
+- Change tracking
+
+**Access Pattern:**
+```python
+from victor.core.database import get_database, get_project_database
+
+global_db = get_database()  # ~/.victor/victor.db
+project_db = get_project_database()  # ./.victor/project.db
+```
+
+**Migration:**
+- Consolidation runs automatically on first access
+- Legacy databases backed up with `.bak.<timestamp>` suffix
+- Always use `get_database()` and `get_project_database()` accessors
+
 ## Generated Files & Repo Hygiene
 Prefer editing source, not generated output:
 - Do not hand-edit `site/`, `htmlcov/`, `dist/`, `build/`, `ui/dist/`, `.pytest_cache/`, `.mypy_cache/`, or `.ruff_cache/` unless the task explicitly targets generated artifacts.

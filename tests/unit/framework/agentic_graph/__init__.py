@@ -12,24 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""DEPRECATED: ToolPlanner has moved to services.
-
-.. deprecated::
-    Import ToolPlanner from victor.agent.services.tool_planning_runtime instead.
-    This module remains as a backward compatibility redirect.
-"""
-
-from __future__ import annotations
-
-import warnings
-
-warnings.warn(
-    "victor.agent.tool_planner is deprecated. "
-    "Import ToolPlanner from victor.agent.services.tool_planning_runtime instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-from victor.agent.services.tool_planning_runtime import ToolPlanner
-
-__all__ = ["ToolPlanner"]
+"""Tests for the agentic_graph module."""

@@ -1120,7 +1120,10 @@ class Schema:
 
 
 # Schema version for migrations
-CURRENT_SCHEMA_VERSION = 5
+# Version 6: Database consolidation - single canonical databases
+#   - Global: ~/.victor/victor.db (user-wide data)
+#   - Project: ./.victor/project.db (project-specific data)
+CURRENT_SCHEMA_VERSION = 6
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1197,6 +1200,20 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             Schema.GRAPH_SUBGRAPH,
             Schema.GRAPH_SUBGRAPH_NODE,
             Schema.GRAPH_RAG_INDEXES,
+        ],
+        # Version 5 -> 6: Database Consolidation - Single Canonical Databases
+        # This migration marks the consolidation where:
+        # - Global database: ~/.victor/victor.db (user-wide: settings, API keys, RL learning)
+        # - Project database: ./.victor/project.db (project-specific: graph, conversations, sessions)
+        # Legacy databases are migrated to their canonical locations
+        6: [
+            # Add consolidation metadata to track completion
+            f"INSERT OR REPLACE INTO {Tables.SYS_METADATA} (key, value, updated_at) VALUES ('consolidated_version', '6', datetime('now'))",
+            # Create additional indexes for performance
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_vertical ON {Tables.RL_OUTCOME}(vertical, created_at)",
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
+            # Ensure graph node FTS is up to date
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_file_line ON {Tables.GRAPH_NODE}(file, line)",
         ],
     }
 

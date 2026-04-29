@@ -57,7 +57,6 @@ if TYPE_CHECKING:
         ToolContextProtocol,
         ProviderContextProtocol,
     )
-    from victor.agent.token_tracker import TokenTracker
 
 
 @dataclass
@@ -142,7 +141,6 @@ class TurnExecutor:
         tool_context: "ToolContextProtocol",
         provider_context: "ProviderContextProtocol",
         execution_provider: Any,  # ExecutionProvider protocol
-        token_tracker: Optional["TokenTracker"] = None,
         exploration_coordinator: Optional[Any] = None,
     ) -> None:
         """Initialize the TurnExecutor.
@@ -152,9 +150,6 @@ class TurnExecutor:
             tool_context: Tool context protocol implementation
             provider_context: Provider context protocol implementation
             execution_provider: Execution provider protocol implementation
-            token_tracker: Optional centralized token tracker. When provided,
-                token usage is accumulated through the tracker instead of
-                direct dict mutation on chat_context.
             exploration_coordinator: Optional shared exploration runtime.
                 When omitted, TurnExecutor lazily creates the canonical
                 ExplorationCoordinator on first use.
@@ -163,7 +158,6 @@ class TurnExecutor:
         self._tool_context = tool_context
         self._provider_context = provider_context
         self._execution_provider = execution_provider
-        self._token_tracker = token_tracker
         self._exploration_coordinator = exploration_coordinator
         self._exploration_done = False  # Instance-level: fires once per conversation
         self._last_tool_follow_up_guidance_signature: Optional[tuple[str, ...]] = None
@@ -1253,21 +1247,16 @@ class TurnExecutor:
     def _accumulate_token_usage(self, response: CompletionResponse) -> None:
         """Accumulate token usage for evaluation tracking.
 
-        When a TokenTracker is configured, usage is accumulated through
-        the tracker (single source of truth). Otherwise falls back to
-        direct dict mutation on chat_context for backward compatibility.
+        Token usage is accumulated through chat_context._cumulative_token_usage.
 
         Args:
             response: Response from model
         """
         if response.usage:
-            if self._token_tracker is not None:
-                self._token_tracker.accumulate(response.usage)
-            else:
-                cum = self._chat_context._cumulative_token_usage
-                cum["prompt_tokens"] += response.usage.get("prompt_tokens", 0)
-                cum["completion_tokens"] += response.usage.get("completion_tokens", 0)
-                cum["total_tokens"] += response.usage.get("total_tokens", 0)
+            cum = self._chat_context._cumulative_token_usage
+            cum["prompt_tokens"] += response.usage.get("prompt_tokens", 0)
+            cum["completion_tokens"] += response.usage.get("completion_tokens", 0)
+            cum["total_tokens"] += response.usage.get("total_tokens", 0)
 
             # Feed actual prompt_tokens back to ConversationController so that
             # get_context_metrics() uses real counts instead of char estimation.

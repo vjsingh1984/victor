@@ -295,8 +295,40 @@ class PromptRuntimeAdapter:
         logger.debug("PromptRuntimeAdapter cleared")
 
 
+def create_prompt_coordinator(
+    config: Optional[PromptRuntimeConfig] = None,
+    base_identity: Optional[str] = None,
+    prompt_builder: Optional[PromptBuilder] = None,
+    vertical_context: Optional["VerticalContext"] = None,
+    on_prompt_built: Optional[Callable[[str, PromptRuntimeContext], None]] = None,
+    policy: Optional[SystemPromptPolicy] = None,
+) -> PromptRuntimeAdapter:
+    """Factory function to create a PromptRuntimeAdapter.
+
+    Args:
+        config: Optional configuration for the coordinator
+        base_identity: Optional base identity string
+        prompt_builder: Optional custom prompt builder
+        vertical_context: Optional vertical context
+        on_prompt_built: Optional callback for when prompts are built
+        policy: Optional system prompt policy
+
+    Returns:
+        A new PromptRuntimeAdapter instance
+    """
+    return PromptRuntimeAdapter(
+        prompt_builder=prompt_builder,
+        vertical_context=vertical_context,
+        config=config,
+        base_identity=base_identity,
+        on_prompt_built=on_prompt_built,
+        policy=policy,
+    )
+
+
 __all__ = [
     "PromptRuntimeAdapter",
     "PromptRuntimeConfig",
     "PromptRuntimeContext",
+    "create_prompt_coordinator",
 ]

@@ -3,134 +3,96 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Deprecation coverage for public compatibility shims."""
+"""Tests for removed compatibility shims.
+
+Note: tool_compat, recovery_compat, prompt_compat, and state_compat were
+removed as part of the service-first architecture migration. This test file
+verifies that the removed modules are no longer importable.
+"""
 
 from __future__ import annotations
 
-import warnings
-from unittest.mock import MagicMock
-
 import pytest
 
-from victor.agent.services.prompt_compat import (
-    PromptCoordinator,
-    create_prompt_coordinator,
-)
-from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
-from victor.agent.services.session_compat import (
-    SessionCoordinator,
-    create_session_coordinator,
-)
-from victor.agent.services.state_compat import (
-    StateCoordinator,
-    create_state_coordinator,
-)
-from victor.agent.services.tool_compat import ToolCoordinator
+# Removed compatibility shims - verify they cannot be imported
+def test_prompt_compat_module_removed():
+    """Verify that prompt_compat module has been removed."""
+    with pytest.raises(ImportError, match="prompt_compat"):
+        from victor.agent.services import prompt_compat  # noqa: F401
 
 
-def test_tool_coordinator_warns_with_tool_service_target():
-    with pytest.warns(DeprecationWarning, match="ToolService"):
-        ToolCoordinator(
-            tool_pipeline=MagicMock(),
-            tool_registry=MagicMock(),
-        )
+def test_state_compat_module_removed():
+    """Verify that state_compat module has been removed."""
+    with pytest.raises(ImportError, match="state_compat"):
+        from victor.agent.services import state_compat  # noqa: F401
 
 
-def test_tool_coordinator_can_suppress_init_warning():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        ToolCoordinator(
-            tool_pipeline=MagicMock(),
-            tool_registry=MagicMock(),
-            warn_on_init=False,
-        )
-
-    assert not caught
+def test_recovery_compat_module_removed():
+    """Verify that recovery_compat module has been removed."""
+    with pytest.raises(ImportError, match="recovery_compat"):
+        from victor.agent.services import recovery_compat  # noqa: F401
 
 
-def test_session_coordinator_warns_with_session_service_target():
-    with pytest.warns(DeprecationWarning, match="SessionService"):
-        SessionCoordinator(session_state_manager=MagicMock())
+# Verify canonical imports still work
+def test_canonical_prompt_runtime_imports():
+    """Verify canonical prompt runtime imports work."""
+    from victor.agent.services.prompt_runtime import (
+        PromptRuntimeAdapter,
+        PromptRuntimeConfig,
+        PromptRuntimeContext,
+    )
+
+    assert PromptRuntimeAdapter is not None
+    assert PromptRuntimeConfig is not None
+    assert PromptRuntimeContext is not None
 
 
-def test_create_session_coordinator_warns_with_session_service_target():
-    with pytest.warns(DeprecationWarning, match="SessionService"):
-        create_session_coordinator(session_state_manager=MagicMock())
+def test_canonical_state_runtime_imports():
+    """Verify canonical state runtime imports work."""
+    from victor.agent.services.state_runtime import StateRuntimeAdapter
+
+    assert StateRuntimeAdapter is not None
 
 
-def test_create_session_coordinator_can_suppress_warning():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        create_session_coordinator(
-            session_state_manager=MagicMock(),
-            warn_on_init=False,
-        )
+def test_canonical_recovery_service_imports():
+    """Verify canonical recovery service imports work."""
+    from victor.agent.services.recovery_service import (
+        RecoveryService,
+        StreamingRecoveryContext,
+    )
 
-    assert not caught
-
-
-def test_prompt_coordinator_warns_with_unified_prompt_pipeline_target():
-    with pytest.warns(DeprecationWarning, match="UnifiedPromptPipeline"):
-        PromptCoordinator()
+    assert RecoveryService is not None
+    assert StreamingRecoveryContext is not None
 
 
-def test_create_prompt_coordinator_warns_with_unified_prompt_pipeline_target():
-    with pytest.warns(DeprecationWarning, match="UnifiedPromptPipeline"):
-        create_prompt_coordinator()
+# Verify deprecated names are no longer exported from services/__init__.py
+def test_prompt_coordinator_not_exported_from_services():
+    """Verify PromptCoordinator is no longer exported from services."""
+    from victor.agent import services
+
+    assert "PromptCoordinator" not in dir(services)
+    assert "create_prompt_coordinator" not in dir(services)
 
 
-def test_create_prompt_coordinator_can_suppress_warning():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        create_prompt_coordinator(warn_on_init=False)
+def test_state_coordinator_not_exported_from_services():
+    """Verify StateCoordinator is no longer exported from services."""
+    from victor.agent import services
 
-    assert not caught
-
-
-def test_state_coordinator_warns_with_live_and_persisted_targets():
-    with pytest.warns(DeprecationWarning, match="ConversationController"):
-        StateCoordinator(conversation_controller=MagicMock())
+    assert "StateCoordinator" not in dir(services)
+    assert "create_state_coordinator" not in dir(services)
 
 
-def test_create_state_coordinator_warns_with_state_targets():
-    with pytest.warns(DeprecationWarning, match="StateService"):
-        create_state_coordinator(conversation_controller=MagicMock())
+# Verify deprecated names are no longer exported from coordinators/__init__.py
+def test_state_coordinator_not_exported_from_coordinators():
+    """Verify StateCoordinator is no longer exported from coordinators."""
+    from victor.agent import coordinators
 
+    # StateCoordinator should not be importable
+    with pytest.raises(AttributeError, match="has no attribute"):
+        coordinators.StateCoordinator()
 
-def test_create_state_coordinator_can_suppress_warning():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        create_state_coordinator(
-            conversation_controller=MagicMock(),
-            warn_on_init=False,
-        )
+    with pytest.raises(AttributeError, match="has no attribute"):
+        coordinators.StateCoordinatorConfig()
 
-    assert not caught
-
-
-def test_streaming_recovery_coordinator_warns_with_recovery_service_target():
-    with pytest.warns(DeprecationWarning, match="RecoveryService"):
-        StreamingRecoveryCoordinator(
-            recovery_handler=None,
-            recovery_integration=None,
-            streaming_handler=MagicMock(),
-            context_compactor=None,
-            unified_tracker=MagicMock(),
-            settings=MagicMock(),
-        )
-
-
-def test_streaming_recovery_coordinator_can_suppress_init_warning():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        StreamingRecoveryCoordinator(
-            recovery_handler=None,
-            recovery_integration=None,
-            streaming_handler=MagicMock(),
-            context_compactor=None,
-            unified_tracker=MagicMock(),
-            settings=MagicMock(),
-            warn_on_init=False,
-        )
-
-    assert not caught
+    with pytest.raises(AttributeError, match="has no attribute"):
+        coordinators.create_state_coordinator()

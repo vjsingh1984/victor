@@ -14,23 +14,17 @@
 
 """Coordinator package for Victor agentic AI framework.
 
-This package retains coordinator exports for backward compatibility, but the
-runtime has moved to service-first ownership for chat, tool, session, recovery,
-and provider flows. Deprecated coordinator exports remain available here as
-lazy compatibility shims so existing imports continue to work while making the
-migration boundary explicit.
+This package provides state-passed coordinators for specialized functionality.
+The deprecated service-first coordinators (chat, tool, session) have been removed.
 
-Preferred surfaces for new code:
+Preferred surfaces:
 - ``victor.agent.services`` for service-owned chat, tool, and session flows
-- ``OrchestrationFacade.chat_stream_runtime`` for the canonical streaming runtime
-- ``victor.agent.coordinators.ExplorationCoordinator`` for read-only exploration
-- ``victor.agent.coordinators.ExplorationStatePassedCoordinator``
-- ``victor.agent.coordinators.SystemPromptStatePassedCoordinator``
-- ``victor.agent.coordinators.SafetyStatePassedCoordinator``
+- ``victor.agent.coordinators.ExplorationStatePassedCoordinator`` for exploration
+- ``victor.agent.coordinators.SystemPromptStatePassedCoordinator`` for system prompts
+- ``victor.agent.coordinators.SafetyStatePassedCoordinator`` for safety
 
-If you already depend on orchestration facades, prefer the matching
-``OrchestrationFacade`` properties instead of reaching into deprecated
-coordinator shims.
+Note: ToolCoordinator, ChatCoordinator, SessionCoordinator have been removed.
+Use ToolService, ChatService, SessionService instead.
 """
 
 from __future__ import annotations
@@ -39,12 +33,8 @@ import importlib
 import warnings
 from typing import Any
 
-from victor.agent.services.chat_compat_telemetry import (
-    record_deprecated_chat_shim_access,
-)
-
 _SUBMODULE_MAP: dict[str, str] = {
-    # Deleted coordinator shims now import directly from services
+    # Runtime coordinators from services
     "ExplorationCoordinator": "services.exploration_runtime",
     "ExplorationResult": "services.exploration_runtime",
     "MetricsCoordinator": "services.metrics_service",
@@ -60,9 +50,7 @@ _SUBMODULE_MAP: dict[str, str] = {
     "PlanningConfig": "services.planning_runtime",
     "PlanningMode": "services.planning_runtime",
     "PlanningResult": "services.planning_runtime",
-    "SessionCoordinator": "services.session_compat",
-    "SessionInfo": "services.session_compat",
-    "create_session_coordinator": "services.session_compat",
+    # SDK-based coordinators
     "ConversationCoordinator": "victor_sdk.conversation",
     "TurnType": "victor_sdk.conversation",
     "ConversationTurn": "victor_sdk.conversation",
@@ -136,38 +124,6 @@ _DEPRECATED_EXPORTS = {
         "surface. Prefer ToolServiceProtocol and service-owned runtime boundaries "
         "from victor.agent.services."
     ),
-    "ChatCoordinator": (
-        "victor.agent.coordinators.ChatCoordinator is deprecated compatibility "
-        "surface. Prefer ChatService from victor.agent.services."
-    ),
-    "SyncChatCoordinator": (
-        "victor.agent.coordinators.SyncChatCoordinator is deprecated compatibility "
-        "surface. Prefer ChatService from victor.agent.services."
-    ),
-    "StreamingChatCoordinator": (
-        "victor.agent.coordinators.StreamingChatCoordinator is deprecated compatibility "
-        "surface. Prefer ChatService from victor.agent.services."
-    ),
-    "UnifiedChatCoordinator": (
-        "victor.agent.coordinators.UnifiedChatCoordinator is deprecated compatibility "
-        "surface. Prefer ChatService from victor.agent.services."
-    ),
-    "ToolCoordinator": (
-        "victor.agent.coordinators.ToolCoordinator is deprecated compatibility "
-        "surface. Prefer ToolService from victor.agent.services."
-    ),
-    "create_tool_coordinator": (
-        "victor.agent.coordinators.create_tool_coordinator is deprecated "
-        "compatibility surface. Prefer ToolService from victor.agent.services."
-    ),
-    "SessionCoordinator": (
-        "victor.agent.coordinators.SessionCoordinator is deprecated compatibility "
-        "surface. Prefer SessionService from victor.agent.services."
-    ),
-    "create_session_coordinator": (
-        "victor.agent.coordinators.create_session_coordinator is deprecated "
-        "compatibility surface. Prefer SessionService from victor.agent.services."
-    ),
 }
 
 
@@ -178,16 +134,9 @@ def __getattr__(name: str) -> Any:
     For chat_protocols: imports from services.protocols.chat_runtime.
     For other coordinators: imports from coordinators.{module_name}.
     """
-    # Service-level re-exports for deleted coordinator shims
+    # Service-level re-exports for coordinators
     if name in {
-        "ToolCoordinator",
-        "ToolCoordinatorConfig",
-        "TaskContext",
-        "IToolCoordinator",
-        "create_tool_coordinator",
-        "ToolObservabilityHandler",
-        "ToolRetryExecutor",
-        # Deleted coordinator shims
+        # Runtime coordinators from services
         "ExplorationCoordinator",
         "ExplorationResult",
         "MetricsCoordinator",
@@ -203,34 +152,15 @@ def __getattr__(name: str) -> Any:
         "PlanningConfig",
         "PlanningMode",
         "PlanningResult",
-        "SessionCoordinator",
-        "SessionInfo",
-        "create_session_coordinator",
+        # SDK-based coordinators
         "ConversationCoordinator",
         "TurnType",
         "ConversationTurn",
         "ConversationStats",
         "ConversationContext",
-        # Deleted chat coordinator shims
-        "ChatCoordinator",
-        "SyncChatCoordinator",
-        "StreamingChatCoordinator",
-        "UnifiedChatCoordinator",
     }:
         # Import from appropriate service module
-        if name in {
-            "ToolCoordinator",
-            "ToolCoordinatorConfig",
-            "TaskContext",
-            "IToolCoordinator",
-            "create_tool_coordinator",
-        }:
-            module = importlib.import_module("victor.agent.services.tool_compat")
-        elif name == "ToolObservabilityHandler":
-            module = importlib.import_module("victor.agent.services.tool_observability")
-        elif name == "ToolRetryExecutor":
-            module = importlib.import_module("victor.agent.services.tool_retry")
-        elif name in {"ExplorationCoordinator", "ExplorationResult"}:
+        if name in {"ExplorationCoordinator", "ExplorationResult"}:
             module = importlib.import_module("victor.agent.services.exploration_runtime")
         elif name in {"MetricsCoordinator", "create_metrics_coordinator"}:
             module = importlib.import_module("victor.agent.services.metrics_service")
@@ -247,8 +177,6 @@ def __getattr__(name: str) -> Any:
             module = importlib.import_module("victor.agent.services.system_prompt_runtime")
         elif name in {"PlanningCoordinator", "PlanningConfig", "PlanningMode", "PlanningResult"}:
             module = importlib.import_module("victor.agent.services.planning_runtime")
-        elif name in {"SessionCoordinator", "SessionInfo", "create_session_coordinator"}:
-            module = importlib.import_module("victor.agent.services.session_compat")
         elif name in {
             "ConversationCoordinator",
             "TurnType",
@@ -257,25 +185,10 @@ def __getattr__(name: str) -> Any:
             "ConversationContext",
         }:
             module = importlib.import_module("victor_sdk.conversation")
-        elif name == "ChatCoordinator":
-            module = importlib.import_module("victor.agent.services.chat_compat")
-        elif name == "SyncChatCoordinator":
-            module = importlib.import_module("victor.agent.services.sync_chat_compat")
-        elif name == "StreamingChatCoordinator":
-            module = importlib.import_module("victor.agent.services.streaming_chat_compat")
-        elif name == "UnifiedChatCoordinator":
-            module = importlib.import_module("victor.agent.services.unified_chat_compat")
 
         value = getattr(module, name)
         # Apply deprecation warning
         if name in _DEPRECATED_EXPORTS:
-            if name in {
-                "ChatCoordinator",
-                "SyncChatCoordinator",
-                "StreamingChatCoordinator",
-                "UnifiedChatCoordinator",
-            }:
-                record_deprecated_chat_shim_access("coordinators_package", name, "package_export")
             warnings.warn(_DEPRECATED_EXPORTS[name], DeprecationWarning, stacklevel=2)
         globals()[name] = value
         return value

@@ -75,7 +75,7 @@ from victor.agent.services.metrics_service import (
 if TYPE_CHECKING:
     # Type-only imports (created by factory, only used for type hints)
     from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
+    from victor.agent.services.recovery_service import RecoveryService
     from victor.agent.services.chunk_runtime import ChunkGenerator
     from victor.agent.services.tool_planning_runtime import ToolPlanner
     from victor.agent.services.task_runtime import TaskCoordinator
@@ -100,7 +100,6 @@ if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.provider_manager import ProviderManager
-    from victor.agent.provider.coordinator import ProviderCoordinator
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.safety import SafetyChecker
@@ -573,7 +572,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         self._coordination_runtime = create_coordination_runtime_components(
             factory=self._factory,
-            get_recovery_service=lambda: getattr(self, "_recovery_service", None),
         )
         self._recovery_coordinator = self._coordination_runtime.recovery_coordinator
         self._chunk_generator = self._coordination_runtime.chunk_generator
@@ -789,34 +787,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         elif self._provider_service is not None and hasattr(self, "provider"):
             self._provider_service._current_provider = self.provider
 
-        if self._recovery_service is not None and hasattr(
-            self._recovery_service, "bind_runtime_components"
-        ):
-            self._recovery_service.bind_runtime_components(
-                recovery_coordinator=self._recovery_coordinator,
-                recovery_handler=self._recovery_handler,
-                recovery_integration=self._recovery_integration,
-                streaming_handler=getattr(self, "_streaming_handler", None),
-                context_compactor=getattr(self, "_context_compactor", None),
-                unified_tracker=getattr(self, "unified_tracker", None),
-                settings=getattr(self, "settings", None),
-                event_bus=getattr(self, "_observability_bus", None),
-                presentation=getattr(self, "_presentation", None),
-            )
-
-            recovery_coordinator = getattr(self, "_recovery_coordinator", None)
-            resolved_recovery_coordinator = None
-            if recovery_coordinator is not None:
-                if hasattr(recovery_coordinator, "initialized"):
-                    if recovery_coordinator.initialized:
-                        resolved_recovery_coordinator = recovery_coordinator.get_instance()
-                else:
-                    resolved_recovery_coordinator = recovery_coordinator
-            if resolved_recovery_coordinator is not None and hasattr(
-                resolved_recovery_coordinator,
-                "bind_recovery_service",
-            ):
-                resolved_recovery_coordinator.bind_recovery_service(self._recovery_service)
+        # RecoveryService is now created with native streaming runtime enabled in service_provider.
+        # No additional binding is required. The _recovery_coordinator attribute is now
+        # the RecoveryService instance created by factory.create_recovery_coordinator().
 
         logger.info(
             "Service layer initialized: chat=%s, tool=%s, session=%s, "
@@ -4290,7 +4263,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             StreamingRecoveryContext with all necessary state
         """
-        from victor.agent.services.recovery_compat import StreamingRecoveryContext
+        from victor.agent.services.recovery_service import StreamingRecoveryContext
 
         # Get elapsed time from streaming controller
         elapsed_time = 0.0

@@ -497,7 +497,7 @@ class TestFileReadDedup:
     @pytest.mark.asyncio
     async def test_execute_read_after_file_change_not_skipped(self, tmp_path):
         """Pipeline should re-execute a read after the file changed."""
-        from victor.agent.tool_deduplication import ToolDeduplicationTracker
+        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
         from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
         from victor.agent.tool_executor import ToolExecutionResult
 

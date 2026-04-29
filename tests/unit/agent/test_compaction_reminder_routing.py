@@ -55,9 +55,9 @@ class TestCompactionReminderRouting:
         result = controller_without_manager.inject_compaction_context()
 
         assert result is True
-        # Should have inserted a direct system reminder, not assistant content.
+        # Should have inserted a direct user reminder (P0 FIX: user role for higher salience).
         msgs = controller_without_manager.messages
-        reminders = [m for m in msgs if m.role == "system" and "Context reminder" in m.content]
+        reminders = [m for m in msgs if m.role == "user" and "CONTEXT COMPACTED" in m.content]
         assert len(reminders) == 1
 
     def test_compaction_summary_updates_state(self, controller_with_manager, mock_reminder_manager):
@@ -78,8 +78,8 @@ class TestCompactionReminderRouting:
 
         assert result is True
         msgs = controller_without_manager.messages
-        # Direct injection uses system-role metadata rather than assistant-like content.
-        assert any("Context reminder" in m.content for m in msgs if m.role == "system")
+        # Direct injection uses user role for higher salience (P0 FIX).
+        assert any("CONTEXT COMPACTED" in m.content for m in msgs if m.role == "user")
 
     def test_compaction_summary_sanitizes_marker_for_reminder_manager(
         self, controller_with_manager, mock_reminder_manager
@@ -104,6 +104,6 @@ class TestCompactionReminderRouting:
         result = controller_without_manager.inject_compaction_context()
 
         assert result is True
-        reminders = [m for m in controller_without_manager.messages if m.role == "system"]
+        reminders = [m for m in controller_without_manager.messages if m.role == "user"]
         assert any("Final findings stay available next turn." in m.content for m in reminders)
         assert all(SUMMARY_MARKER not in m.content for m in reminders)

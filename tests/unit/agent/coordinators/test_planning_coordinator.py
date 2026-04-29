@@ -233,16 +233,12 @@ class TestPlanningCoordinatorIntegration:
         assert legacy_planning_coordinator is service_planning_coordinator
 
     def test_planning_entrypoints_exist(self):
-        """Planning should be canonical on ChatService and shimmed on ChatCoordinator."""
+        """Planning should be canonical on ChatService."""
         from victor.agent.services.chat_service import ChatService
         from victor.agent.services.protocols import ChatServiceProtocol
-        from victor.agent.services.chat_compat import ChatCoordinator
 
         assert hasattr(ChatServiceProtocol, "chat_with_planning")
         assert hasattr(ChatService, "chat_with_planning")
-        assert hasattr(ChatCoordinator, "__init__")
-        assert hasattr(ChatCoordinator, "_should_use_planning")
-        assert hasattr(ChatCoordinator, "_chat_with_planning")
 
     def test_config_settings_exist(self):
         """Test that planning settings exist in config."""

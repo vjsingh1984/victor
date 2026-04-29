@@ -27,7 +27,7 @@ Example:
     >>> from victor.core import get_container
     >>>
     >>> factory = CoordinatorFactory(get_container())
-    >>> tool_coordinator = factory.create_tool_coordinator()
+    >>> prompt_coordinator = factory.create_system_prompt_state_passed_coordinator()
 """
 
 from __future__ import annotations
@@ -72,7 +72,6 @@ class CoordinatorFactory:
     and provides protocol-based adapters for orchestrator functionality.
 
     Supported surfaces:
-        - ToolCoordinator: Deprecated tool execution shim
         - ExplorationCoordinator: Canonical read-only exploration runtime
         - ExplorationStatePassedCoordinator: Snapshot/transition exploration wrapper
         - SystemPromptCoordinator: Compatibility system prompt wrapper
@@ -84,9 +83,6 @@ class CoordinatorFactory:
 
     Example:
         >>> factory = CoordinatorFactory(container)
-        >>>
-        >>> # Create tool coordinator with protocol dependencies
-        >>> tool_coordinator = factory.create_tool_coordinator()
         >>>
         >>> # Create canonical state-passed prompt coordination
         >>> prompt_coordinator = factory.create_system_prompt_state_passed_coordinator()
@@ -101,41 +97,6 @@ class CoordinatorFactory:
         """
         self._container = container
         self._orchestrator_adapter: Optional[OrchestratorProtocolAdapter] = None
-
-    def create_tool_coordinator(self) -> Any:
-        """
-        Create the deprecated tool coordinator compatibility shim.
-
-        Returns:
-            ToolCoordinator instance with injected dependencies
-
-        Raises:
-            RuntimeError: If coordinator creation fails
-        """
-        try:
-            from victor.agent.services.tool_compat import (
-                build_deprecated_tool_coordinator_from_container,
-            )
-
-            warnings.warn(
-                "CoordinatorFactory.create_tool_coordinator() returns a deprecated "
-                "ToolCoordinator shim. Prefer ToolService.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-            coordinator = build_deprecated_tool_coordinator_from_container(
-                container=self._container,
-                settings=getattr(self._container, "_settings", None),
-                strict=True,
-            )
-
-            logger.debug("CoordinatorFactory: Created deprecated ToolCoordinator shim")
-            return coordinator
-
-        except Exception as e:
-            logger.error(f"CoordinatorFactory: Failed to create ToolCoordinator: {e}")
-            raise RuntimeError(f"Failed to create ToolCoordinator: {e}") from e
 
     def create_exploration_coordinator(self) -> Any:
         """

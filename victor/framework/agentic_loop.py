@@ -90,6 +90,10 @@ from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
 from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
 
+# StateGraph-based agentic loop (Phase 1 consolidation)
+# Import lazily to avoid circular dependency issues during consolidation
+_AgenticLoopGraphExecutor = None
+
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -583,6 +587,17 @@ class AgenticLoop:
         """
         import time
 
+        # Phase 1 Consolidation: Use StateGraph-based executor when enabled
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if is_feature_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP):
+            return await self._run_with_stategraph(
+                query=query,
+                context=context,
+                conversation_history=conversation_history,
+            )
+
+        # Legacy path: original while loop implementation
         start_time = time.time()
         iterations: List[LoopIteration] = []
         state: Dict[str, Any] = {"query": query, **(context or {})}
@@ -2456,3 +2471,92 @@ class AgenticLoop:
             )
 
         return False
+
+    async def _run_with_stategraph(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> LoopResult:
+        """Run agentic loop using StateGraph-based executor (Phase 1 consolidation).
+
+        This method uses the new StateGraph implementation when the
+        USE_STATEGRAPH_AGENTIC_LOOP feature flag is enabled.
+
+        Args:
+            query: User's natural language query
+            context: Additional execution context
+            conversation_history: Prior turns for multi-turn context
+
+        Returns:
+            LoopResult with all iterations and final state
+        """
+        import time
+
+        start_time = time.time()
+        global _AgenticLoopGraphExecutor
+
+        # Lazy import to avoid circular dependencies
+        if _AgenticLoopGraphExecutor is None:
+            from victor.framework.agentic_graph.executor import (
+                AgenticLoopGraphExecutor as _Executor,
+            )
+            _AgenticLoopGraphExecutor = _Executor
+
+        try:
+            # Create StateGraph executor
+            graph_executor = _AgenticLoopGraphExecutor(
+                execution_context=self.orchestrator,  # Pass orchestrator as context
+                max_iterations=self.max_iterations,
+                enable_fulfillment=self.enable_fulfillment_check,
+                enable_adaptive_iterations=self.enable_adaptive_iterations,
+            )
+
+            # Inject services if available
+            if self.turn_executor is not None:
+                graph_executor.turn_executor = self.turn_executor
+            if self.runtime_intelligence is not None:
+                graph_executor.runtime_intelligence = self.runtime_intelligence
+            if hasattr(self.orchestrator, "planning_coordinator"):
+                graph_executor.planning_coordinator = self.orchestrator.planning_coordinator
+            if self.enhanced_completion_evaluator is not None:
+                graph_executor.evaluator = self.enhanced_completion_evaluator
+            if self.fulfillment is not None:
+                graph_executor.fulfillment_detector = self.fulfillment
+
+            # Run the graph
+            graph_result = await graph_executor.run(
+                query=query,
+                context=context or {},
+            )
+
+            # Convert to LoopResult for compatibility
+            duration = time.time() - start_time
+            return LoopResult(
+                success=graph_result.success,
+                iterations=[],  # StateGraph path doesn't track individual iterations
+                final_state=graph_result.metadata.get("final_state", {}),
+                total_duration=duration,
+                metadata={
+                    "iterations_completed": graph_result.iterations,
+                    "max_iterations_reached": (
+                        graph_result.termination_reason == "max_iterations"
+                    ),
+                    "termination_reason": graph_result.termination_reason,
+                    "executor_type": "stategraph",
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"StateGraph executor error: {e}", exc_info=True)
+            duration = time.time() - start_time
+            return LoopResult(
+                success=False,
+                iterations=[],
+                final_state={"query": query, "error": str(e)},
+                total_duration=duration,
+                metadata={
+                    "error": str(e),
+                    "executor_type": "stategraph",
+                },
+            )
