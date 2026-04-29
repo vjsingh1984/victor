@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
 from victor.agent.action_authorizer import ActionIntent
+from victor.agent.turn_policy import SpinState
 from victor.framework.agentic_loop import AgenticLoop, LoopResult, LoopStage
 from victor.framework.evaluation_nodes import (
     EvaluationDecision,
@@ -627,6 +628,7 @@ class TestNudgeInjection:
     async def test_nudge_injected_on_no_tool_turns(self):
         """When agent doesn't use tools for 2+ turns, nudge is injected."""
         from victor.agent.services.turn_execution_runtime import TurnResult
+        from unittest.mock import patch, PropertyMock
 
         mock_coord = AsyncMock()
         mock_chat_ctx = MagicMock()
@@ -655,7 +657,21 @@ class TestNudgeInjection:
         )
         loop.perception.perceive = AsyncMock(return_value=perception)
 
-        await loop.run("Fix the bug")
+        # Mock spin detector state to return WARNING (triggers nudge injection)
+        # We use PropertyMock because state is a @property
+        with patch.object(
+            type(loop.spin_detector),
+            "state",
+            new_callable=PropertyMock,
+            return_value=SpinState.WARNING,
+        ):
+            # Also patch consecutive_no_tool_turns since the nudge message uses it
+            with patch.object(
+                loop.spin_detector,
+                "consecutive_no_tool_turns",
+                new=2,
+            ):
+                await loop.run("Fix the bug")
 
         # Check that nudge was injected into conversation
         add_calls = mock_chat_ctx.add_message.call_args_list
@@ -665,6 +681,7 @@ class TestNudgeInjection:
     async def test_spin_nudge_injected_on_blocked_tools(self):
         """When all tools are blocked by dedup, spin nudge is injected."""
         from victor.agent.services.turn_execution_runtime import TurnResult
+        from unittest.mock import patch, PropertyMock
 
         mock_coord = AsyncMock()
         mock_chat_ctx = MagicMock()
@@ -694,7 +711,14 @@ class TestNudgeInjection:
         )
         loop.perception.perceive = AsyncMock(return_value=perception)
 
-        await loop.run("Fix the bug")
+        # Mock spin detector state to return BLOCKED (triggers different tools nudge)
+        with patch.object(
+            type(loop.spin_detector),
+            "state",
+            new_callable=PropertyMock,
+            return_value=SpinState.BLOCKED,
+        ):
+            await loop.run("Fix the bug")
 
         # Check spin nudge was injected
         add_calls = mock_chat_ctx.add_message.call_args_list
