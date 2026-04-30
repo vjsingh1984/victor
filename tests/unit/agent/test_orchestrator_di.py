@@ -270,69 +270,13 @@ class TestOrchestratorServiceProvider:
 
         assert container.is_registered(ToolCoordinatorProtocol) is False
 
-    def test_create_tool_coordinator_builds_bound_compatibility_shim(self, mock_settings):
-        """Explicit ToolCoordinator factory still builds a service-bound shim."""
-        from victor.agent.protocols import (
-            IBudgetManager,
-            IToolAccessController,
-            ModeControllerProtocol,
-            ToolCacheProtocol,
-            ToolPipelineProtocol,
-            ToolRegistryProtocol,
-            ToolSelectorProtocol,
-        )
+    def test_service_provider_no_longer_exposes_tool_coordinator_factory(self, mock_settings):
+        """Deprecated tool-coordinator shims are no longer created by the service provider."""
         from victor.agent.service_provider import OrchestratorServiceProvider
-        from victor.agent.services.protocols import ToolServiceProtocol
-
-        tool_pipeline = MagicMock()
-        tool_registry = MagicMock()
-        tool_selector = MagicMock()
-        budget_manager = MagicMock()
-        tool_cache = MagicMock()
-        mode_controller = MagicMock()
-        tool_access_controller = MagicMock()
-        tool_service = MagicMock()
-
-        container = ServiceContainer()
-        container.register(ToolPipelineProtocol, lambda c: tool_pipeline, ServiceLifetime.SINGLETON)
-        container.register(ToolRegistryProtocol, lambda c: tool_registry, ServiceLifetime.SINGLETON)
-        container.register(ToolSelectorProtocol, lambda c: tool_selector, ServiceLifetime.SINGLETON)
-        container.register(IBudgetManager, lambda c: budget_manager, ServiceLifetime.SINGLETON)
-        container.register(ToolCacheProtocol, lambda c: tool_cache, ServiceLifetime.SINGLETON)
-        container.register(
-            ModeControllerProtocol,
-            lambda c: mode_controller,
-            ServiceLifetime.SINGLETON,
-        )
-        container.register(
-            IToolAccessController,
-            lambda c: tool_access_controller,
-            ServiceLifetime.SINGLETON,
-        )
-        container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
 
         provider = OrchestratorServiceProvider(mock_settings)
-        provider.container = container
-        coordinator = MagicMock()
 
-        with (
-            pytest.warns(
-                DeprecationWarning,
-                match="creates a deprecated ToolCoordinator shim",
-            ),
-            patch(
-                "victor.agent.services.tool_compat.build_deprecated_tool_coordinator_from_container",
-                return_value=coordinator,
-            ) as build_tool_coordinator,
-        ):
-            result = provider._create_tool_coordinator()
-
-        assert result is coordinator
-        build_tool_coordinator.assert_called_once_with(
-            container=container,
-            settings=mock_settings,
-            strict=False,
-        )
+        assert hasattr(provider, "_create_tool_coordinator") is False
 
     def test_create_rl_coordinator_uses_service_runtime_host(self, mock_settings):
         """RL coordinator factory should resolve through the service runtime host."""
