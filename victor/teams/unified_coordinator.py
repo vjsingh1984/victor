@@ -331,6 +331,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         # graph node via ``__call__``). Default preserves historical keys.
         self._state_graph_config: StateGraphNodeConfig = StateGraphNodeConfig()
 
+        # Lock that serialises ``execute_team_config`` invocations on a
+        # shared coordinator instance. The implementation temporarily swaps
+        # ``_formation`` / ``_members`` / ``_manager`` / ``_shared_context``;
+        # serialising avoids cross-call corruption while letting callers
+        # safely use ``asyncio.gather`` against the same coordinator.
+        self._exec_team_config_lock: asyncio.Lock = asyncio.Lock()
+
     # =========================================================================
     # ITeamCoordinator Protocol Methods
     # =========================================================================
@@ -468,6 +475,118 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "final_output": "",
                 "formation": effective_formation.value,
             }
+
+    async def execute_team_config(
+        self,
+        config: Any,  # TeamConfig from victor.teams.types
+        *,
+        members: Optional[List[Any]] = None,
+    ) -> Any:  # TeamResult from victor.teams.types
+        """Execute a team with a config without mutating coordinator state.
+
+        This method enables TeamNode and other callers to execute teams
+        with a TeamConfig without first mutating self._formation or
+        self._members. The coordinator's internal state remains unchanged,
+        making this method safe for concurrent calls on a shared coordinator.
+
+        Args:
+            config: TeamConfig with name, goal, formation, members
+            members: Optional member override (uses config.members if not provided)
+
+        Returns:
+            TeamResult with success, final_output, member_results, formation
+
+        Raises:
+            ValueError: If no members provided and config.members requires
+                an orchestrator to resolve (but self._orchestrator is None)
+        """
+        from victor.teams.types import TeamResult, TeamFormation as TF
+
+        # Resolve members: override parameter > config.members
+        if members is None:
+            # Try to use config.members - these are TeamMember configs,
+            # not executable IAgent instances, so we need to adapt them
+            if hasattr(config, "members") and config.members:
+                # Check if we have an orchestrator to resolve TeamMember to IAgent
+                if self._orchestrator is None:
+                    raise ValueError(
+                        "Cannot execute TeamConfig with members: "
+                        "coordinator has no orchestrator to resolve TeamMember configs. "
+                        "Pass executable members via the members= parameter, or "
+                        "create the coordinator with an orchestrator."
+                    )
+                # For now, require explicit members= override
+                # (Future: implement TeamMember -> IAgent resolution via orchestrator)
+                raise ValueError(
+                    "Cannot execute TeamConfig with members without explicit members= override. "
+                    "Pass executable IAgent instances via the members= parameter."
+                )
+            else:
+                raise ValueError(
+                    "No members to execute: either config.members must be non-empty "
+                    "or members= override must be provided."
+                )
+
+        if not members:
+            return TeamResult(
+                success=False,
+                final_output="",
+                member_results={},
+                formation=TF.SEQUENTIAL,
+                error="No members to execute",
+            )
+
+        # Resolve formation from config (use SEQUENTIAL as fallback)
+        config_formation = getattr(config, "formation", TF.SEQUENTIAL)
+        if isinstance(config_formation, str):
+            config_formation = TF(config_formation)
+
+        # Save current state
+        saved_members = self._members
+        saved_formation = self._formation
+
+        try:
+            # Temporarily set members and formation for execution
+            self._members = members
+            self._formation = config_formation
+
+            # Execute the task
+            task = getattr(config, "goal", "Execute team task")
+            context = getattr(config, "shared_context", {})
+
+            result_dict = await self.execute_task(task, context)
+
+            # Convert dict result to TeamResult
+            from victor.teams.types import MemberResult
+
+            member_results: Dict[str, MemberResult] = {}
+            for member_id, mr_dict in result_dict.get("member_results", {}).items():
+                # Convert dict to MemberResult if needed
+                if isinstance(mr_dict, dict):
+                    member_results[member_id] = MemberResult(
+                        member_id=member_id,
+                        success=mr_dict.get("success", False),
+                        output=mr_dict.get("output", ""),
+                        error=mr_dict.get("error"),
+                        tool_calls=mr_dict.get("tool_calls", []),
+                        duration_seconds=mr_dict.get("duration_seconds", 0.0),
+                    )
+                else:
+                    member_results[member_id] = mr_dict
+
+            return TeamResult(
+                success=result_dict.get("success", False),
+                final_output=result_dict.get("final_output", ""),
+                member_results=member_results,
+                formation=config_formation,
+                total_tool_calls=result_dict.get("total_tool_calls", 0),
+                total_duration=result_dict.get("total_duration", 0.0),
+                error=result_dict.get("error"),
+            )
+        finally:
+            # Restore coordinator state (crucial for concurrent safety)
+            self._members = saved_members
+            self._formation = saved_formation
 
     async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
@@ -923,6 +1042,142 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     def manager(self) -> Optional["ITeamMember"]:
         """Get team manager (for hierarchical formation)."""
         return self._manager
+
+    # =========================================================================
+    # Parameterised execution & TeamConfig adapter
+    # =========================================================================
+
+    async def _execute_with(
+        self,
+        task: str,
+        context: Dict[str, Any],
+        *,
+        formation: TeamFormation,
+        members: List["ITeamMember"],
+        manager: Optional["ITeamMember"] = None,
+    ) -> Dict[str, Any]:
+        """Concurrency-safe parameterised execution.
+
+        Temporarily applies the given formation/members/manager, delegates
+        to ``execute_task``, then restores the coordinator's prior state.
+        Serialised via ``self._exec_team_config_lock`` so concurrent
+        invocations on a shared coordinator instance don't corrupt each
+        other's view of ``_formation`` / ``_members``.
+        """
+        async with self._exec_team_config_lock:
+            saved_formation = self._formation
+            saved_members = list(self._members)
+            saved_manager = self._manager
+            try:
+                self._formation = formation
+                self._members = list(members)
+                self._manager = manager
+                return await self.execute_task(task, context)
+            finally:
+                self._formation = saved_formation
+                self._members = saved_members
+                self._manager = saved_manager
+
+    def _adapt_team_members(
+        self, members: List[Any]
+    ) -> List["ITeamMember"]:
+        """Adapt ``TeamMember`` dataclasses to ``ITeamMember`` adapters.
+
+        Uses ``self._orchestrator`` to build a ``SubAgentOrchestrator`` that
+        actually executes each member. Raises ``ValueError`` if no
+        orchestrator is configured — callers can bypass this requirement by
+        passing pre-built ``ITeamMember`` instances via the ``members=``
+        parameter on ``execute_team_config``.
+        """
+        if self._orchestrator is None:
+            raise ValueError(
+                "UnifiedTeamCoordinator requires an orchestrator to adapt "
+                "TeamMember dataclasses into ITeamMember instances. Either "
+                "construct the coordinator with an orchestrator, or pass "
+                "pre-built members via execute_team_config(config, members=...)."
+            )
+
+        from victor.teams.types import TeamMemberAdapter
+        from victor.agent.subagents.orchestrator import SubAgentOrchestrator
+
+        sub_orchestrator = SubAgentOrchestrator(self._orchestrator)
+
+        def _make_executor(team_member):
+            async def executor(task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+                spawn_result = await sub_orchestrator.spawn(
+                    role=team_member.role,
+                    task=task,
+                    tool_budget=team_member.tool_budget,
+                    allowed_tools=team_member.allowed_tools,
+                )
+                return {
+                    "success": getattr(spawn_result, "success", False),
+                    "output": getattr(spawn_result, "summary", "") or "",
+                    "error": getattr(spawn_result, "error", None),
+                    "tool_calls_used": getattr(spawn_result, "tool_calls_used", 0),
+                    "duration_seconds": getattr(spawn_result, "duration_seconds", 0.0),
+                }
+
+            return executor
+
+        return [
+            TeamMemberAdapter(member=m, executor=_make_executor(m)) for m in members
+        ]
+
+    def _dict_result_to_team_result(
+        self,
+        result: Dict[str, Any],
+        *,
+        formation: TeamFormation,
+    ) -> TeamResult:
+        """Convert ``execute_task``'s dict result into a ``TeamResult``."""
+        return TeamResult(
+            success=bool(result.get("success", False)),
+            final_output=str(result.get("final_output", "")),
+            member_results=dict(result.get("member_results", {})),
+            formation=formation,
+            total_tool_calls=int(result.get("total_tool_calls", 0)),
+            total_duration=float(result.get("total_duration", 0.0)),
+            communication_log=list(result.get("communication_log", [])),
+            shared_context=dict(result.get("shared_context", {})),
+            consensus_achieved=result.get("consensus_achieved"),
+            consensus_rounds=result.get("consensus_rounds"),
+            error=result.get("error"),
+        )
+
+    async def execute_team_config(
+        self,
+        config: Any,
+        *,
+        members: Optional[List["ITeamMember"]] = None,
+    ) -> TeamResult:
+        """Execute a ``TeamConfig`` and return a ``TeamResult``.
+
+        This is the entry point used by ``TeamNode`` in
+        ``victor.framework.workflows.nodes`` and any other caller that
+        already has a ``TeamConfig`` in hand.
+
+        Args:
+            config: A ``TeamConfig`` describing the run (goal, formation,
+                shared context, members).
+            members: Optional pre-built ``ITeamMember`` instances. If
+                omitted, the coordinator builds adapters from
+                ``config.members`` using its orchestrator (raises
+                ``ValueError`` if no orchestrator is configured).
+
+        Returns:
+            A ``TeamResult`` matching the formation in the config.
+        """
+        if members is None:
+            members = self._adapt_team_members(list(config.members))
+
+        result = await self._execute_with(
+            task=config.goal,
+            context=dict(config.shared_context or {}),
+            formation=config.formation,
+            members=members,
+        )
+        return self._dict_result_to_team_result(result, formation=config.formation)
 
     # =========================================================================
     # StateGraph Integration

@@ -14,6 +14,7 @@
 
 """Tests for UnifiedTeamCoordinator."""
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any, Dict, Optional
 from unittest.mock import AsyncMock, MagicMock
@@ -706,6 +707,197 @@ class TestStateGraphNodeConfig:
 
         assert "failure" in out
         assert "error" not in out
+
+
+class TestExecuteTeamConfig:
+    """Tests for ``execute_team_config(config, members=...)`` and the
+    ``_execute_with`` parameterized core.
+
+    ``execute_team_config`` exists so callers (notably ``TeamNode`` in
+    ``victor.framework.workflows.nodes``) can hand a ``TeamConfig`` to the
+    coordinator without first having to mutate ``self._formation`` or
+    ``self._members``. It must be safe to call concurrently on a shared
+    coordinator.
+    """
+
+    @staticmethod
+    def _make_config(members, formation=TeamFormation.SEQUENTIAL):
+        from victor.teams.types import TeamConfig, TeamMember
+        from victor.core.shared_types import SubAgentRole
+
+        # TeamConfig.members type is List[TeamMember]; for these tests we
+        # pass MockTeamMember instances via the ``members`` override
+        # parameter on execute_team_config, so config.members can be empty
+        # placeholders or real TeamMembers.
+        placeholder_members = [
+            TeamMember(id=m.id, role=SubAgentRole.RESEARCHER, name=m.id, goal="test")
+            for m in members
+        ]
+        return TeamConfig(
+            name="TestTeam",
+            goal="Test goal",
+            members=placeholder_members,
+            formation=formation,
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_team_result(self):
+        from victor.teams.types import TeamResult
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        members = [MockTeamMember("m1", "Done")]
+        config = self._make_config(members)
+
+        result = await coordinator.execute_team_config(config, members=members)
+
+        assert isinstance(result, TeamResult)
+        assert result.success is True
+        assert result.formation == TeamFormation.SEQUENTIAL
+        assert "m1" in result.member_results
+
+    @pytest.mark.asyncio
+    async def test_uses_config_formation(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        # Set a different default formation; config should override it
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        members = [MockTeamMember("m1"), MockTeamMember("m2")]
+        config = self._make_config(members, formation=TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_team_config(config, members=members)
+
+        assert result.formation == TeamFormation.PARALLEL
+        # And self._formation must NOT have been changed
+        assert coordinator.formation == TeamFormation.SEQUENTIAL
+
+    @pytest.mark.asyncio
+    async def test_does_not_mutate_self_state(self):
+        """Crucial: execute_team_config must never alter self._members or
+        self._formation, otherwise concurrent graph runs corrupt each other."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("baseline"))
+        coordinator.set_formation(TeamFormation.HIERARCHICAL)
+
+        baseline_members = list(coordinator.members)
+        baseline_formation = coordinator.formation
+
+        members = [MockTeamMember("m1"), MockTeamMember("m2")]
+        config = self._make_config(members, formation=TeamFormation.PARALLEL)
+        await coordinator.execute_team_config(config, members=members)
+
+        assert list(coordinator.members) == baseline_members
+        assert coordinator.formation == baseline_formation
+
+    @pytest.mark.asyncio
+    async def test_concurrent_calls_are_isolated(self):
+        """Two simultaneous execute_team_config calls must each see their
+        own formation/members — no cross-contamination."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+
+        members_a = [MockTeamMember("a1"), MockTeamMember("a2")]
+        members_b = [MockTeamMember("b1"), MockTeamMember("b2")]
+        config_a = self._make_config(members_a, formation=TeamFormation.PARALLEL)
+        config_b = self._make_config(members_b, formation=TeamFormation.SEQUENTIAL)
+
+        result_a, result_b = await asyncio.gather(
+            coordinator.execute_team_config(config_a, members=members_a),
+            coordinator.execute_team_config(config_b, members=members_b),
+        )
+
+        assert result_a.formation == TeamFormation.PARALLEL
+        assert result_b.formation == TeamFormation.SEQUENTIAL
+        assert set(result_a.member_results.keys()) == {"a1", "a2"}
+        assert set(result_b.member_results.keys()) == {"b1", "b2"}
+
+    @pytest.mark.asyncio
+    async def test_raises_without_members_or_orchestrator(self):
+        """If config.members can't be adapted (no orchestrator) and no
+        ``members=`` override is provided, the error must be explicit."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        members = [MockTeamMember("m1")]
+        config = self._make_config(members)
+
+        with pytest.raises(ValueError, match=r"orchestrator"):
+            # Pass no members override, force the adapter path
+            await coordinator.execute_team_config(config)
+
+    @pytest.mark.asyncio
+    async def test_team_node_dead_reference_now_works(self):
+        """``TeamNode._execute_team`` calls ``coordinator.execute_team_config``
+        at workflows/nodes.py:392. Before this refactor, that method did not
+        exist. This test exercises that exact code path against a stub
+        coordinator and asserts the call routes cleanly.
+        """
+        from victor.framework.workflows.nodes import TeamNode, TeamNodeConfig
+        from victor.teams.types import TeamMember, TeamResult, MemberResult
+        from victor.core.shared_types import SubAgentRole
+
+        # Build a UnifiedTeamCoordinator and stub execute_team_config so we
+        # don't need a real orchestrator to validate the path.
+        recorded: Dict[str, Any] = {}
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+
+        async def _stub_execute_team_config(
+            config, members=None
+        ):  # pragma: no cover - thin stub
+            recorded["called"] = True
+            recorded["config_name"] = config.name
+            recorded["formation"] = config.formation
+            return TeamResult(
+                success=True,
+                final_output="stub-output",
+                member_results={
+                    m.id: MemberResult(member_id=m.id, success=True, output="ok")
+                    for m in config.members
+                },
+                formation=config.formation,
+            )
+
+        # Monkey-patch onto this instance only.
+        coordinator.execute_team_config = _stub_execute_team_config  # type: ignore[assignment]
+
+        # Replace the create_coordinator factory so TeamNode picks up our stub.
+        import victor.framework.workflows.nodes as nodes_mod
+
+        original_create = nodes_mod.__dict__.get("create_coordinator")
+
+        def _stub_create_coordinator(**kwargs):  # noqa: ARG001
+            return coordinator
+
+        # TeamNode imports create_coordinator inside execute_async — patch the
+        # ``victor.teams`` module re-export so the late import sees our stub.
+        import victor.teams as teams_mod
+
+        original_teams_create = teams_mod.create_coordinator
+        teams_mod.create_coordinator = _stub_create_coordinator  # type: ignore[assignment]
+        try:
+            node = TeamNode(
+                id="t1",
+                name="TestTeam",
+                goal="Goal",
+                team_formation=TeamFormation.PARALLEL,
+                members=[
+                    TeamMember(
+                        id="m1",
+                        role=SubAgentRole.RESEARCHER,
+                        name="m1",
+                        goal="test",
+                    )
+                ],
+                config=TeamNodeConfig(timeout_seconds=None),
+            )
+            graph_state = {"task": "execute"}
+            out = await node.execute_async(orchestrator=None, graph_state=graph_state)
+        finally:
+            teams_mod.create_coordinator = original_teams_create  # type: ignore[assignment]
+            if original_create is not None:
+                nodes_mod.__dict__["create_coordinator"] = original_create
+
+        assert recorded.get("called") is True, "execute_team_config not invoked"
+        assert recorded["config_name"] == "TestTeam"
+        assert recorded["formation"] == TeamFormation.PARALLEL
+        # Result merged into graph state under TeamNodeConfig.output_key
+        assert "team_result" in out
 
 
 if __name__ == "__main__":

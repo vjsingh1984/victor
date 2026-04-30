@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     # Team member dependencies
-    from victor.agent.subagents.base import SubAgentRole
+    from victor.core.shared_types import SubAgentRole
     from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
     from victor.agent.presentation import PresentationProtocol
 
