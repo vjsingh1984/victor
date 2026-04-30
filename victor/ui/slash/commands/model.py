@@ -49,13 +49,11 @@ def _provider_info_value(info: dict, preferred: str, legacy: str, default: str =
 
 def _show_resume_selection(ctx: CommandContext) -> None:
     """Show session selection for resume."""
-    from victor.agent.sqlite_session_persistence import (
-        get_sqlite_session_persistence,
-    )
+    from victor.agent.conversation.store import ConversationStore
 
     try:
-        persistence = get_sqlite_session_persistence()
-        sessions = persistence.list_sessions(limit=20)
+        store = ConversationStore()
+        sessions = store.list_sessions(limit=20)
 
         if not sessions:
             ctx.console.print("[yellow]No sessions to resume[/]")
@@ -69,15 +67,15 @@ def _show_resume_selection(ctx: CommandContext) -> None:
         table.add_column("Messages", justify="right")
 
         for idx, session in enumerate(sessions, 1):
-            title = (
-                session["title"][:30] + "..." if len(session["title"]) > 30 else session["title"]
-            )
+            title = session.title or "Untitled"
+            if len(title) > 30:
+                title = title[:30] + "..."
             table.add_row(
                 str(idx),
-                session["session_id"],
+                session.session_id,
                 title,
-                session["model"],
-                str(session["message_count"]),
+                session.model or "unknown",
+                str(len(session.messages)),
             )
 
         ctx.console.print(table)
@@ -94,21 +92,19 @@ def _resume_session(ctx: CommandContext, session_id: str = None, index: int = No
     Returns:
         True if resume succeeded
     """
-    from victor.agent.sqlite_session_persistence import (
-        get_sqlite_session_persistence,
-    )
+    from victor.agent.conversation.store import ConversationStore
 
     try:
-        persistence = get_sqlite_session_persistence()
+        store = ConversationStore()
 
         if index is not None:
-            sessions = persistence.list_sessions(limit=20)
+            sessions = store.list_sessions(limit=20)
             if not sessions or index > len(sessions):
                 ctx.console.print(f"[red]Invalid session index:[/] {index}")
                 return False
-            session_id = sessions[index - 1]["session_id"]
+            session_id = sessions[index - 1].session_id
 
-        session_data = persistence.load_session(session_id)
+        session_data = store.load_session(session_id)
         if not session_data:
             ctx.console.print(f"[red]Session not found:[/] {session_id}")
             return False

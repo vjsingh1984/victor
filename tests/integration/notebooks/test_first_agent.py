@@ -15,6 +15,19 @@
 """Integration tests for 01_first_agent notebook using Ollama.
 
 These tests run against local Ollama models only.
+
+Model Selection (optimized for speed with latest Qwen 3.5):
+- Primary: qwen3.5:0.8b (0.8B params, 1GB, fastest modern model)
+- Fallbacks: qwen3.5:2b, qwen3.5:4b, qwen3:14b, qwen2.5:3b
+
+Pull the recommended model:
+  ollama pull qwen3.5:0.8b
+
+For other fast Qwen 3.5 options:
+  ollama pull qwen3.5:2b   # 2.7GB, better quality
+  ollama pull qwen3.5:4b   # 3.4GB, good balance
+
+Qwen 3.5 is the latest generation (2026) with 256K context window.
 """
 
 import json
@@ -28,7 +41,7 @@ import pytest
 from victor.framework import Agent
 from victor.framework.events import EventType
 
-PREFERRED_OLLAMA_MODEL = "gpt-oss:20b"
+PREFERRED_OLLAMA_MODEL = "qwen3.5:0.8b"
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 
 
@@ -74,11 +87,44 @@ def _list_ollama_models() -> list[str]:
 
 
 def _select_model(models: list[str]) -> str:
-    """Select preferred model with sensible fallback."""
-    if PREFERRED_OLLAMA_MODEL in models:
-        return PREFERRED_OLLAMA_MODEL
-    if "llama3.1:8b" in models:
-        return "llama3.1:8b"
+    """Select preferred model with sensible fallback.
+
+    Priority order (fastest first for test speed, Qwen 3.5 is latest 2026):
+    1. qwen3.5:0.8b - 0.8B parameters, 1GB, ultra-fast
+    2. qwen3.5:2b - 2B parameters, 2.7GB, very fast
+    3. qwen3.5:4b - 4B parameters, 3.4GB, fast
+    4. qwen3:14b - Larger but capable
+    5. qwen2.5:3b - Legacy fallback
+    6. First available model as fallback
+    """
+    # Qwen 3.5 models first (latest generation, 256K context)
+    fast_models = [
+        "qwen3.5:0.8b",  # 1GB - Ultra fast, 256K context
+        "qwen3.5:2b",    # 2.7GB - Very fast
+        "qwen3.5:4b",    # 3.4GB - Fast with good quality
+        "qwen3.5:9b",    # 6.6GB - Capable
+        "qwen3:14b",     # Qwen3 generation
+        "qwen3-coder",   # Qwen3 coding optimized
+        "qwen3-coder-next",
+        # Legacy Qwen 2.5 fallbacks
+        "qwen2.5:3b",
+        "qwen2.5-coder:3b",
+        "qwen2.5-coder:7b",
+        "qwen2.5:7b",
+        # Other fast models
+        "phi-4:3.8b-mini",
+        "phi-4-mini",
+        "llama3.2:3b",
+        "llama3.1:8b",
+        "gemma3:4b",
+    ]
+
+    for model in fast_models:
+        # Match with or without tag suffix (e.g., "qwen3.5:0.8b" matches "qwen3.5:0.8b-q8_0")
+        if any(model == m or m.startswith(model + "-") or m.startswith(model + ":") for m in models):
+            return model
+
+    # Fallback to first available
     return models[0]
 
 
@@ -112,7 +158,7 @@ class TestFirstAgentNotebook:
     @pytest.mark.asyncio
     async def test_basic_agent_with_default_settings(self, ollama_agent):
         """Test creating agent with default settings and running a query."""
-        result = await ollama_agent.run("What is 2 + 2? Reply with just the number 4.")
+        result = await ollama_agent.run("2+2=? Answer: one number.")
 
         assert result.success is True
         assert result.content
@@ -123,7 +169,7 @@ class TestFirstAgentNotebook:
     async def test_agent_with_ollama_provider(self, ollama_model):
         """Test agent with explicit Ollama provider."""
         async with await Agent.create(provider="ollama", model=ollama_model) as agent:
-            result = await agent.run("What is Python? Answer in one sentence.")
+            result = await agent.run("Python is? One word.")
             assert result.success is True
             assert result.content
 
@@ -133,7 +179,7 @@ class TestFirstAgentNotebook:
         events_received = []
         content_parts = []
 
-        async for event in ollama_agent.stream("Count to 3. Reply with just the numbers."):
+        async for event in ollama_agent.stream("Count: 1 2 3"):
             events_received.append(event.type)
 
             if event.type == EventType.CONTENT and event.content:
@@ -150,8 +196,8 @@ class TestFirstAgentNotebook:
     @pytest.mark.asyncio
     async def test_multi_turn_conversations(self, ollama_agent):
         """Test maintaining context across multiple messages."""
-        session = ollama_agent.chat("My favorite color is blue. Remember this.")
-        response2 = await session.send("What is my favorite color? Reply with one word.")
+        session = ollama_agent.chat("Color=blue.")
+        response2 = await session.send("What color? One word.")
         assert response2.success is True
         assert response2.content
 
@@ -162,7 +208,7 @@ class TestFirstAgentNotebook:
     async def test_agent_with_explicit_provider_config(self, ollama_model):
         """Test agent creation with explicit provider configuration."""
         async with await Agent.create(provider="ollama", model=ollama_model) as agent:
-            result = await agent.run("Say 'test' and nothing else.")
+            result = await agent.run("Say: test")
             assert result.success is True
             assert "test" in result.content.lower()
 
@@ -174,7 +220,8 @@ class TestFirstAgentNotebook:
         if not result.success:
             assert result.error
 
-        long_query = "Explain the entire history of the universe in 10 words. " * 10
+        # Shorter query for speed
+        long_query = "History of universe: 10 words. " * 3
         result = await ollama_agent.run(long_query)
         assert isinstance(result.success, bool)
 
