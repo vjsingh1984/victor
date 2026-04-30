@@ -50,8 +50,7 @@ class SkillRuntime:
                 runtime.inject_skills(matches)
                 runtime._last_skill_match_info = {
                     "auto_skills": [
-                        {"name": skill.name, "score": round(score, 2)}
-                        for skill, score in matches
+                        {"name": skill.name, "score": round(score, 2)} for skill, score in matches
                     ],
                 }
                 if analytics:

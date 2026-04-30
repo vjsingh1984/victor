@@ -27,9 +27,12 @@ References:
 """
 
 import json
+import logging
 import re
 import uuid
 from typing import Any, AsyncIterator, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from victor.providers.base import CompletionResponse, StreamChunk, ToolDefinition
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
@@ -291,9 +294,7 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
 
         dsml_calls = self._parse_dsml_tool_calls(response.content or "")
         if dsml_calls:
-            logger.debug(
-                "deepseek: recovered %d tool call(s) from DSML content", len(dsml_calls)
-            )
+            logger.debug("deepseek: recovered %d tool call(s) from DSML content", len(dsml_calls))
             return CompletionResponse(
                 content="",
                 role="assistant",

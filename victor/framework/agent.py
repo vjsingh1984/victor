@@ -843,6 +843,56 @@ class Agent:
         return self._orchestrator
 
     # =========================================================================
+    # Runtime Configuration (CLI/Runtime Override Support)
+    # =========================================================================
+
+    def set_tool_budget(self, budget: int, *, user_override: bool = False) -> None:
+        """Set the maximum number of tool calls allowed.
+
+        Args:
+            budget: Maximum tool calls allowed
+            user_override: Whether this is a user-specified override (takes precedence)
+
+        Example:
+            agent = await Agent.create()
+            agent.set_tool_budget(50)
+        """
+        if hasattr(self._orchestrator, "unified_tracker"):
+            self._orchestrator.unified_tracker.set_tool_budget(budget, user_override=user_override)
+
+    def set_max_iterations(self, max_iterations: int, *, user_override: bool = False) -> None:
+        """Set the maximum number of agentic loop iterations.
+
+        Args:
+            max_iterations: Maximum iterations allowed
+            user_override: Whether this is a user-specified override (takes precedence)
+
+        Example:
+            agent = await Agent.create()
+            agent.set_max_iterations(20)
+        """
+        if hasattr(self._orchestrator, "unified_tracker"):
+            self._orchestrator.unified_tracker.set_max_iterations(
+                max_iterations, user_override=user_override
+            )
+
+    def supports_streaming(self) -> bool:
+        """Check if the current provider supports streaming responses.
+
+        Returns:
+            True if streaming is supported, False otherwise
+
+        Example:
+            agent = await Agent.create()
+            if agent.supports_streaming():
+                async for event in agent.stream("Hello"):
+                    print(event.content)
+        """
+        if hasattr(self._orchestrator, "provider"):
+            return getattr(self._orchestrator.provider, "supports_streaming", lambda: True)()
+        return True
+
+    # =========================================================================
     # Observability
     # =========================================================================
 
@@ -1166,6 +1216,35 @@ class Agent:
         """
         if hasattr(self._orchestrator, "warm_up_kv_cache"):
             await self._orchestrator.warm_up_kv_cache()
+
+    async def graceful_shutdown(self) -> Dict[str, bool]:
+        """Perform graceful shutdown of all agent components.
+
+        Delegates to orchestrator's graceful_shutdown method if available.
+        Flushes analytics, stops health monitoring, and cleans up resources.
+        Call this before application exit for a clean shutdown.
+
+        Returns:
+            Dictionary with shutdown status for each component.
+            Returns empty dict if orchestrator doesn't support graceful_shutdown.
+        """
+        if self._orchestrator is None:
+            return {}
+
+        if hasattr(self._orchestrator, "graceful_shutdown"):
+            return await self._orchestrator.graceful_shutdown()
+
+        # Fallback to regular close if graceful_shutdown not available
+        await self.close()
+        return {}
+
+    async def shutdown(self) -> None:
+        """Shutdown the agent and clean up resources.
+
+        This is an alias for close() for compatibility with code that
+        expects a shutdown method.
+        """
+        await self.close()
 
     async def close(self) -> None:
         """Clean up resources."""

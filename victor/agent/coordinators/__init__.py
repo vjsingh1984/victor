@@ -90,6 +90,20 @@ _MODULE_MEMBERS = {
     "safety_state_passed": [
         "SafetyStatePassedCoordinator",
     ],
+    # Stage transition coordination (Phase 1 optimization)
+    "stage_transition_coordinator": [
+        "StageTransitionCoordinator",
+        "TransitionDecision",
+        "TransitionResult",
+        "TurnContext",
+    ],
+    "transition_strategies": [
+        "TransitionStrategyProtocol",
+        "HeuristicOnlyTransitionStrategy",
+        "EdgeModelTransitionStrategy",
+        "HybridTransitionStrategy",
+        "create_transition_strategy",
+    ],
     # NOTE: exploration_coordinator, metrics_coordinator, safety_coordinator,
     # system_prompt_coordinator, planning_coordinator, session_coordinator,
     # turn_executor, conversation_coordinator removed as deprecated shims.

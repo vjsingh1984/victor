@@ -118,6 +118,13 @@ class TestIntentDetector:
         )
         assert result.intent == ActionIntent.WRITE_ALLOWED
 
+        result = detector.detect("continue to fix remaining 3 files.")
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+        assert "continuation_with_payload" in result.matched_signals
+
+        result = detector.detect("continue implementing the remaining files")
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+
     def test_read_only_detection(self):
         """Test detection of read-only signals."""
         detector = IntentDetector()

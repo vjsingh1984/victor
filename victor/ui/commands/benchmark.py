@@ -1426,11 +1426,13 @@ async def _run_benchmark_async(
                 console.print("[dim]Edge model disabled (--no-edge-model)[/]")
 
             if provider_override:
-                # Direct provider creation bypassing profile's provider
+                # ✅ PROPER: Use VictorClient for normal profile path (else branch below)
+                # ⚠️ EXCEPTION: provider_override requires custom provider creation
+                # This is a benchmark-specific feature that bypasses profile configuration.
+                # TODO: Refactor VictorClient to support custom provider injection.
                 from victor.config.settings import load_settings
                 from victor.config.api_keys import get_api_key
                 from victor.providers.registry import ProviderRegistry
-                from victor.agent.orchestrator import AgentOrchestrator
 
                 settings = load_settings()
                 profiles = settings.load_profiles()
@@ -1472,6 +1474,13 @@ async def _run_benchmark_async(
                 use_thinking = (
                     hasattr(provider, "supports_thinking") and provider.supports_thinking()
                 )
+
+                # ⚠️ ARCHITECTURAL EXCEPTION: Direct AgentOrchestrator import
+                # Rationale: provider_override requires creating a custom provider
+                # and passing it to the orchestrator. VictorClient doesn't support
+                # this pattern yet. This is isolated to benchmark's provider_override path.
+                # Future work: Add VictorClient.with_provider(provider) method.
+                from victor.agent.orchestrator import AgentOrchestrator
 
                 orchestrator = AgentOrchestrator(
                     settings=settings,

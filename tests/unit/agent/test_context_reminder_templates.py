@@ -116,7 +116,7 @@ class TestReminderIntegration:
             priority=50,
         )
         assert config.frequency == 3
-        assert config.enabled == True
+        assert config.enabled is True
 
     def test_compaction_reminder_config_exists(self):
         """COMPACTION reminder type should exist."""

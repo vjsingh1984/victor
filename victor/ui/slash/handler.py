@@ -32,7 +32,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # ✅ PROPER: Only import Settings for type hints (no agent layer imports)
     from victor.config.settings import Settings
 
 from victor.core.async_utils import run_sync
@@ -53,7 +53,7 @@ class SlashCommandHandler:
         self,
         console: Console,
         settings: "Settings",
-        agent: Optional["AgentOrchestrator"] = None,
+        agent: Optional[Any] = None,  # ✅ PROPER: Use Any instead of AgentOrchestrator
         registry: Optional[CommandRegistry] = None,
         auto_discover: bool = True,
     ) -> None:
@@ -62,7 +62,7 @@ class SlashCommandHandler:
         Args:
             console: Rich console for output.
             settings: Application settings.
-            agent: Optional agent orchestrator (can be set later).
+            agent: Optional agent instance (any type - duck typing used).
             registry: Optional custom registry (defaults to global).
             auto_discover: Whether to auto-discover commands on init.
         """
@@ -88,8 +88,12 @@ class SlashCommandHandler:
 
             self._registry.register_class(HelpCommand)
 
-    def set_agent(self, agent: "AgentOrchestrator") -> None:
-        """Set the agent reference (for commands that need it)."""
+    def set_agent(self, agent: Any) -> None:
+        """Set the agent reference (for commands that need it).
+
+        Args:
+            agent: Agent instance (any type - duck typing used).
+        """
         self.agent = agent
 
     def set_exit_callback(self, callback: Optional[Callable[[], None]]) -> None:

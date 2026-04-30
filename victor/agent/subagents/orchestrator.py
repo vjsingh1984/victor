@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.subagents.protocols import RoleToolProvider
     from victor.providers.base import StreamChunk
+    from victor.workflows.definition import ConstraintsProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -290,6 +291,7 @@ class SubAgentOrchestrator:
         can_spawn_subagents: bool = False,
         timeout_seconds: int = 300,
         disable_embeddings: bool = False,
+        constraints: Optional["ConstraintsProtocol"] = None,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -305,6 +307,7 @@ class SubAgentOrchestrator:
             can_spawn_subagents: Whether sub-agent can spawn children
             timeout_seconds: Maximum execution time
             disable_embeddings: Disable codebase embeddings (workflow service mode)
+            constraints: Optional task constraints for write policy activation
 
         Returns:
             SubAgentResult with execution outcome
@@ -317,6 +320,17 @@ class SubAgentOrchestrator:
             if result.success:
                 print(result.summary)
         """
+        # Activate constraints if provided
+        if constraints:
+            from victor.agent.constraint_activation_service import get_constraint_activator
+
+            activator = get_constraint_activator()
+            result = activator.activate_constraints(constraints, self._vertical)
+            if not result.success:
+                logger.warning(f"SubAgent constraint activation failed: {result.error}")
+            else:
+                logger.debug(f"SubAgent constraints activated for role: {role.value}")
+
         # Apply role-specific defaults using the role provider (OCP-compliant)
         role_name = role.value if hasattr(role, "value") else str(role)
 
@@ -370,6 +384,13 @@ class SubAgentOrchestrator:
             )
         finally:
             self.active_subagents.discard(subagent)
+            # Deactivate constraints after spawn completes
+            if constraints:
+                from victor.agent.constraint_activation_service import get_constraint_activator
+
+                activator = get_constraint_activator()
+                activator.deactivate_constraints()
+                logger.debug(f"SubAgent constraints deactivated for role: {role.value}")
 
     async def fan_out(
         self,

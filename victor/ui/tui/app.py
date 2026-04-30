@@ -38,7 +38,7 @@ from victor.ui.tui.widgets import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+    # ✅ PROPER: Only import Settings for type hints (no agent layer imports)
     from victor.config.settings import Settings
 
 
@@ -593,7 +593,7 @@ class VictorTUI(App):
 
     def __init__(
         self,
-        agent: Optional["AgentOrchestrator"] = None,
+        agent: Optional[Any] = None,  # ✅ PROPER: Use Any instead of AgentOrchestrator
         provider: str = "anthropic",
         model: str = "claude-3-5-sonnet",
         stream: bool = True,
@@ -605,7 +605,7 @@ class VictorTUI(App):
         """Initialize Victor TUI.
 
         Args:
-            agent: Optional AgentOrchestrator instance
+            agent: Optional agent instance (any type)
             provider: Provider name for display
             model: Model name for display
             stream: Whether to stream responses
@@ -2061,7 +2061,7 @@ Slash Commands:
 
 
 async def run_tui(
-    agent: Optional["AgentOrchestrator"] = None,
+    agent: Optional[Any] = None,  # ✅ PROPER: Use Any instead of AgentOrchestrator
     provider: str = "anthropic",
     model: str = "claude-3-5-sonnet",
     stream: bool = True,
@@ -2070,7 +2070,7 @@ async def run_tui(
     """Run the Victor TUI.
 
     Args:
-        agent: Optional AgentOrchestrator instance
+        agent: Optional agent instance (any type)
         provider: Provider name for display
         model: Model name for display
         stream: Whether to stream responses

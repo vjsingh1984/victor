@@ -309,6 +309,24 @@ def test_workflow_definition_module_alias_warns() -> None:
     assert alias is TeamStepWorkflow
 
 
+def test_package_alias_warnings_publish_removal_milestone() -> None:
+    with pytest.warns(DeprecationWarning) as workflow_warning:
+        from victor.workflows import TeamNodeWorkflow
+
+    with pytest.warns(DeprecationWarning) as executor_warning:
+        from victor.workflows.executors import TeamNodeExecutor
+
+    workflow_message = str(workflow_warning[0].message)
+    executor_message = str(executor_warning[0].message)
+
+    assert "v0.9.0" in workflow_message
+    assert "2027-03-31" in workflow_message
+    assert "TeamStepWorkflow" in workflow_message
+    assert "v0.9.0" in executor_message
+    assert "2027-03-31" in executor_message
+    assert "TeamStepExecutor" in executor_message
+
+
 def test_adapter_execution_handler_uses_shared_sync_bridge_without_running_loop() -> None:
     adapter = WorkflowToGraphAdapter()
     executor = SimpleNamespace()

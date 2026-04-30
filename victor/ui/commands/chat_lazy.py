@@ -49,17 +49,26 @@ from victor.core.errors import (
 
 # Type hints only (don't import at runtime)
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import ProfileConfig
-    from victor.framework.shim import FrameworkShim
+
+    # ✅ PROPER: Use VictorClient instead of AgentOrchestrator and FrameworkShim
+    from victor.framework.client import VictorClient
+    from victor.framework.session_config import SessionConfig
 
 
 # Lazy import helpers
-def _get_orchestrator():
-    """Lazy import AgentOrchestrator only when needed."""
-    from victor.agent.orchestrator import AgentOrchestrator
+def _get_victor_client():
+    """Lazy import VictorClient only when needed."""
+    from victor.framework.client import VictorClient
 
-    return AgentOrchestrator
+    return VictorClient
+
+
+def _get_session_config():
+    """Lazy import SessionConfig only when needed."""
+    from victor.framework.session_config import SessionConfig
+
+    return SessionConfig
 
 
 def _get_load_settings():
@@ -67,13 +76,6 @@ def _get_load_settings():
     from victor.config.settings import load_settings
 
     return load_settings
-
-
-def _get_framework_shim():
-    """Lazy import FrameworkShim only when needed."""
-    from victor.framework.shim import FrameworkShim
-
-    return FrameworkShim
 
 
 def _get_verticals():
@@ -196,6 +198,7 @@ def chat(
         load_settings()
     )  # noqa: F841 - Used for type checking, will be used in full implementation
 
-    # Lazy load orchestrator only when creating agent
-    _Agent_orchestrator = _get_orchestrator()  # noqa: F841 - Will be used in full implementation
+    # ✅ PROPER: Lazy load VictorClient and SessionConfig (replaces AgentOrchestrator)
+    _VictorClient = _get_victor_client()  # noqa: F841 - Will be used in full implementation
+    _SessionConfig = _get_session_config()  # noqa: F841 - Will be used in full implementation
     # ... rest of implementation

@@ -67,6 +67,7 @@ logger = logging.getLogger(__name__)
 # Import fuzzy matching for robust typo-tolerant tool selection
 try:
     from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
+
     _FUZZY_MATCHING_AVAILABLE = True
 except ImportError:
     _FUZZY_MATCHING_AVAILABLE = False

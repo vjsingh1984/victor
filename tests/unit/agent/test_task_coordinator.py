@@ -21,6 +21,7 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from typing import Any
 
+from victor.agent.action_authorizer import ActionIntent, IntentClassification
 from victor.agent.services.task_runtime import TaskCoordinator
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.config.settings import Settings
@@ -213,6 +214,70 @@ class TestIntentDetection:
             "user", "[INTENT-GUARD: This is read-only analysis.]"
         )
 
+    def test_apply_intent_guard_continuation_carries_forward_write_intent(
+        self, task_coordinator, mock_task_analyzer, mock_conversation_controller
+    ):
+        """Continuation follow-ups should preserve prior write intent when underspecified."""
+        task_coordinator._current_intent = ActionIntent.WRITE_ALLOWED
+        mock_task_analyzer.detect_intent.return_value = IntentClassification(
+            intent=ActionIntent.DISPLAY_ONLY,
+            confidence=0.2,
+            matched_signals=[],
+            safe_actions=set(),
+            prompt_guard="READ ONLY MODE: Do not modify files.",
+        )
+
+        task_coordinator.apply_intent_guard(
+            "continue with the remaining files",
+            mock_conversation_controller,
+        )
+
+        assert task_coordinator.current_intent == ActionIntent.WRITE_ALLOWED
+        mock_conversation_controller.add_message.assert_not_called()
+
+    def test_apply_intent_guard_continuation_carries_forward_read_only_intent(
+        self, task_coordinator, mock_task_analyzer, mock_conversation_controller
+    ):
+        """Continuation follow-ups should preserve prior read-only intent when appropriate."""
+        task_coordinator._current_intent = ActionIntent.READ_ONLY
+        mock_task_analyzer.detect_intent.return_value = IntentClassification(
+            intent=ActionIntent.DISPLAY_ONLY,
+            confidence=0.2,
+            matched_signals=[],
+            safe_actions=set(),
+            prompt_guard="READ ONLY MODE: Do not modify files.",
+        )
+
+        task_coordinator.apply_intent_guard(
+            "continue reviewing the code",
+            mock_conversation_controller,
+        )
+
+        assert task_coordinator.current_intent == ActionIntent.READ_ONLY
+        mock_conversation_controller.add_message.assert_called_once()
+        role, content = mock_conversation_controller.add_message.call_args.args
+        assert role == "user"
+        assert content.startswith("[INTENT-GUARD:")
+        assert "read-only query" in content
+
+    def test_apply_intent_guard_bare_continue_uses_prior_intent(
+        self, task_coordinator, mock_task_analyzer, mock_conversation_controller
+    ):
+        """A bare continuation command should resume the prior intent, not reset it."""
+        task_coordinator._current_intent = ActionIntent.READ_ONLY
+        mock_task_analyzer.detect_intent.return_value = IntentClassification(
+            intent=ActionIntent.WRITE_ALLOWED,
+            confidence=0.9,
+            matched_signals=["continuation_keyword"],
+            safe_actions=set(),
+            prompt_guard="",
+        )
+
+        task_coordinator.apply_intent_guard("continue", mock_conversation_controller)
+
+        assert task_coordinator.current_intent == ActionIntent.READ_ONLY
+        mock_conversation_controller.add_message.assert_called_once()
+
     def test_apply_intent_guard_injects_database_task_hint_for_explicit_sqlite_request(
         self, task_coordinator, mock_task_analyzer, mock_conversation_controller
     ):
@@ -236,9 +301,7 @@ class TestIntentDetection:
         ]
         assert len(task_hint_calls) == 1
         assert "Prefer the db tool first" in task_hint_calls[0][0][1]
-        assert task_hint_calls[0].kwargs["metadata"] == build_internal_history_metadata(
-            "task_hint"
-        )
+        assert task_hint_calls[0].kwargs["metadata"] == build_internal_history_metadata("task_hint")
 
 
 class TestTaskGuidance:

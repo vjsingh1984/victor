@@ -54,6 +54,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.storage.embeddings.task_classifier import TaskTypeClassifier
     from victor.agent.task_analyzer import TaskAnalyzer
+    from victor.agent.services.tiered_decision_service import TieredDecisionService
 
 # Import native availability from shared location
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
@@ -61,6 +62,7 @@ from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 # Import fuzzy matching for robust typo-tolerant classification
 try:
     from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
+
     _FUZZY_MATCHING_AVAILABLE = True
 except ImportError:
     _FUZZY_MATCHING_AVAILABLE = False
@@ -435,7 +437,7 @@ def _find_keywords_with_positions(
 
     # Try fuzzy matching first if enabled and available
     if use_fuzzy and _FUZZY_MATCHING_AVAILABLE:
-        keywords_dict = {kw: weight for kw, weight in keywords}
+        keywords_dict = dict(keywords)
         fuzzy_matches, stats = match_keywords_cascading(
             message_lower, keywords_dict, use_fuzzy=True, min_similarity_ratio=min_similarity
         )
@@ -527,6 +529,7 @@ class UnifiedTaskClassifier:
         context_boost_factor: float = 0.15,
         decision_service: Optional[Any] = None,
         runtime_intelligence: Optional[Any] = None,
+        tiered_decision_service: Optional["TieredDecisionService"] = None,
     ):
         """Initialize the unified classifier.
 
@@ -537,6 +540,7 @@ class UnifiedTaskClassifier:
             context_boost_factor: How much to boost confidence from context (0-1)
             decision_service: Optional LLMDecisionService for low-confidence augmentation
             runtime_intelligence: Optional canonical runtime-intelligence service
+            tiered_decision_service: Optional TieredDecisionService for confidence-based triage
         """
         self._task_analyzer = task_analyzer
         self._enable_semantic = enable_semantic
@@ -544,6 +548,7 @@ class UnifiedTaskClassifier:
         self._context_boost = context_boost_factor
         self._decision_service = decision_service
         self._runtime_intelligence = runtime_intelligence
+        self._tiered_decision_service = tiered_decision_service
 
         # Lazy-loaded semantic classifier
         self._semantic_classifier: Optional["TaskTypeClassifier"] = None
@@ -824,8 +829,82 @@ class UnifiedTaskClassifier:
             temperature_adjustment=temp_adjustment,
         )
 
-        # LLM augmentation: if confidence is low and decision service available
-        if self._has_decision_support() and confidence < 0.7:
+        # Tiered triage: if confidence is low and tiered service available
+        # Priority: tiered triage > legacy LLM augmentation
+        if self._tiered_decision_service is not None and confidence < 0.8:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+                from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
+                from victor.agent.services.tiered_decision_service import ClassificationTriage
+
+                runtime_policy = RuntimeEvaluationPolicy()
+
+                # Only use triage if confidence is in grey area (below high threshold)
+                triage_result = self._tiered_decision_service.classify_with_triage(
+                    DecisionType.TASK_TYPE_CLASSIFICATION,
+                    context={"message_excerpt": message[:300]},
+                    heuristic_result=best_type,
+                    heuristic_confidence=confidence,
+                    runtime_policy=runtime_policy,
+                )
+
+                if triage_result.triage_outcome == ClassificationTriage.ACCEPT:
+                    # High confidence from tiered service - use it
+                    if hasattr(triage_result.result, "task_type"):
+                        triage_task_type = getattr(
+                            triage_result.result.task_type, "value", triage_result.result.task_type
+                        )
+                        type_map = {
+                            "analysis": ClassifierTaskType.ANALYSIS,
+                            "action": ClassifierTaskType.ACTION,
+                            "generation": ClassifierTaskType.GENERATION,
+                            "search": ClassifierTaskType.SEARCH,
+                            "edit": ClassifierTaskType.EDIT,
+                        }
+                        triage_type = type_map.get(triage_task_type)
+                        if triage_type is not None:
+                            result = ClassificationResult(
+                                task_type=triage_type,
+                                confidence=triage_result.confidence,
+                                is_action_task=triage_type
+                                in (
+                                    ClassifierTaskType.ACTION,
+                                    ClassifierTaskType.GENERATION,
+                                ),
+                                is_analysis_task=triage_type
+                                in (ClassifierTaskType.ANALYSIS, ClassifierTaskType.SEARCH),
+                                is_generation_task=triage_type == ClassifierTaskType.GENERATION,
+                                needs_execution=has_execution,
+                                source="triage",
+                                keyword_confidence=confidence,
+                                matched_keywords=non_negated,
+                                negated_keywords=negated,
+                                recommended_tool_budget=budget_map.get(triage_type, 20),
+                                temperature_adjustment=(
+                                    0.2 if triage_type == ClassifierTaskType.ANALYSIS else 0.0
+                                ),
+                            )
+                            logger.debug(
+                                "Tiered triage classified task type as %s (conf=%.2f, outcome=%s)",
+                                triage_type.value,
+                                triage_result.confidence,
+                                triage_result.triage_outcome,
+                            )
+                elif triage_result.triage_outcome == ClassificationTriage.REJECT:
+                    # Low confidence - use conservative DEFAULT
+                    result.task_type = ClassifierTaskType.DEFAULT
+                    result.confidence = max(confidence * 0.8, 0.3)
+                    result.source = "triage_rejected"
+                    logger.debug(
+                        "Tiered triage rejected classification (conf=%.2f), using DEFAULT",
+                        confidence,
+                    )
+                # VERIFY outcome: keep original result, verification already considered
+
+            except Exception:
+                logger.debug("Tiered triage failed, using base result", exc_info=True)
+        elif self._has_decision_support() and confidence < 0.7:
+            # Legacy LLM augmentation (fallback when tiered service not available)
             try:
                 from victor.agent.decisions.schemas import DecisionType
 

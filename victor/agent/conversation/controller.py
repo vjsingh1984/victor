@@ -498,6 +498,7 @@ class ConversationController:
         target_messages: Optional[int] = None,
         current_query: Optional[str] = None,
         task_type: Optional[str] = None,
+        force: bool = False,
     ) -> int:
         """Smart context compaction using configured strategy.
 
@@ -514,16 +515,19 @@ class ConversationController:
             target_messages: Target number of messages to keep (default: min_messages_to_keep)
             current_query: Current user query for semantic relevance scoring
             task_type: Optional task type for task-specific compaction configuration
+            force: If True, bypass threshold and interval checks (useful for testing/explicit calls)
 
         Returns:
             Number of messages removed
         """
         # Phase 4: Check if compaction should proceed (threshold + minimum interval)
-        # Calculate current context utilization
-        metrics = self.get_context_metrics()
-        current_utilization = metrics.utilization
-        if not self._should_compact(current_utilization):
-            return 0
+        # Skip checks if force=True (for explicit calls/testing)
+        if not force:
+            # Calculate current context utilization
+            metrics = self.get_context_metrics()
+            current_utilization = metrics.utilization
+            if not self._should_compact(current_utilization):
+                return 0
 
         import time
 

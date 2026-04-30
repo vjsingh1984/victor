@@ -172,6 +172,34 @@ READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
     (r"\.(db|sqlite|sqlite3)\b", "database_file"),
 ]
 
+CONTINUATION_KEYWORDS: tuple[str, ...] = (
+    "continue please",
+    "keep it up",
+    "keep going",
+    "go ahead",
+    "carry on",
+    "yes please",
+    "resume",
+    "continue",
+    "proceed",
+    "go on",
+    "okay",
+    "next",
+    "do it",
+    "yes",
+    "ok",
+    "go",
+)
+
+_CONTINUATION_CONNECTORS: tuple[str, ...] = (
+    "to ",
+    "and ",
+    "with ",
+    "by ",
+    "on ",
+    "please ",
+)
+
 # Mapping of intent to blocked tool sets
 INTENT_BLOCKED_TOOLS: dict[ActionIntent, frozenset[str]] = {
     ActionIntent.DISPLAY_ONLY: WRITE_TOOLS,
@@ -259,6 +287,46 @@ def has_explicit_readonly_shell_request(message: Optional[str]) -> bool:
         return False
     lowered = message.lower()
     return any(re.search(pattern, lowered, re.IGNORECASE) for pattern, _ in READONLY_SHELL_SIGNALS)
+
+
+def split_continuation_request(message: Optional[str]) -> tuple[bool, str]:
+    """Return whether the message is a continuation request and its trailing payload."""
+    if not message:
+        return False, ""
+
+    stripped = message.strip()
+    lowered = stripped.lower()
+
+    for keyword in CONTINUATION_KEYWORDS:
+        if lowered == keyword:
+            return True, ""
+
+        if not lowered.startswith(keyword):
+            continue
+
+        next_char_index = len(keyword)
+        if next_char_index >= len(lowered):
+            return True, ""
+
+        next_char = lowered[next_char_index]
+        if next_char.isalnum():
+            continue
+
+        remainder = stripped[next_char_index:].lstrip(" \t,.:;-")
+        lowered_remainder = remainder.lower()
+        for connector in _CONTINUATION_CONNECTORS:
+            if lowered_remainder.startswith(connector):
+                remainder = remainder[len(connector) :].lstrip()
+                break
+        return True, remainder
+
+    return False, ""
+
+
+def is_continuation_request(message: Optional[str]) -> bool:
+    """Return True when the message resumes or carries forward the prior task."""
+    is_continuation, _ = split_continuation_request(message)
+    return is_continuation
 
 
 def should_allow_shell_for_read_only_intent(
@@ -360,6 +428,13 @@ WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         r"\b(consolidate|merge|eliminate|deduplicate|remove|reduce)\s+\w+",
         0.85,
         "consolidate_action",
+    ),
+    (
+        r"\b(fix(?:ing)?|update(?:ing)?|modify(?:ing)?|edit(?:ing)?|implement(?:ing)?|"
+        r"apply(?:ing)?|finish(?:ing)?|complete(?:ing)?)\b.*\b(remaining|rest|last|final|"
+        r"these|those|the)\b.*\b(file|files|module|modules|artifact|artifacts|task|tasks)\b",
+        0.9,
+        "complete_remaining_artifacts",
     ),
 ]
 
@@ -688,25 +763,8 @@ class IntentDetector:
 
         # Short-circuit: bare continuation commands resume an in-progress task and
         # must not receive a DISPLAY_ONLY guard that blocks tool use and file writes.
-        _CONTINUATION_KEYWORDS = {
-            "continue",
-            "go",
-            "proceed",
-            "next",
-            "yes",
-            "ok",
-            "okay",
-            "go ahead",
-            "keep going",
-            "carry on",
-            "resume",
-            "do it",
-            "continue please",
-            "yes please",
-            "go on",
-            "keep it up",
-        }
-        if message.strip().lower() in _CONTINUATION_KEYWORDS:
+        is_continuation, continuation_payload = split_continuation_request(message)
+        if is_continuation and not continuation_payload:
             return IntentClassification(
                 intent=ActionIntent.WRITE_ALLOWED,
                 confidence=0.9,
@@ -715,12 +773,18 @@ class IntentDetector:
                 prompt_guard=PROMPT_GUARDS[ActionIntent.WRITE_ALLOWED],
             )
 
+        scoring_message = continuation_payload or message
+
         # Score each intent type
-        display_score, display_matched = self._score_patterns(message, self._display_patterns)
-        write_score, write_matched = self._score_patterns(message, self._write_patterns)
-        read_only_score, read_only_matched = self._score_patterns(message, self._read_only_patterns)
+        display_score, display_matched = self._score_patterns(
+            scoring_message, self._display_patterns
+        )
+        write_score, write_matched = self._score_patterns(scoring_message, self._write_patterns)
+        read_only_score, read_only_matched = self._score_patterns(
+            scoring_message, self._read_only_patterns
+        )
         compound_score, compound_matched = self._score_patterns(
-            message, self._compound_write_patterns
+            scoring_message, self._compound_write_patterns
         )
 
         # Determine intent based on scores
@@ -754,6 +818,9 @@ class IntentDetector:
             intent = self.default_intent
             confidence = 0.2
             matched = []
+
+        if is_continuation and continuation_payload:
+            matched = ["continuation_with_payload", *matched]
 
         return IntentClassification(
             intent=intent,

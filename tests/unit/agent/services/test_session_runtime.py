@@ -59,7 +59,9 @@ def test_session_runtime_recover_session_syncs_memory_session_id_on_success():
 
 def test_session_runtime_get_memory_context_passes_messages():
     host = _make_runtime_host(messages=[{"role": "assistant", "content": "cached"}])
-    host._session_service.get_memory_context.return_value = [{"role": "assistant", "content": "cached"}]
+    host._session_service.get_memory_context.return_value = [
+        {"role": "assistant", "content": "cached"}
+    ]
     runtime = SessionRuntime(OrchestratorProtocolAdapter(host))
 
     result = runtime.get_memory_context(max_tokens=200)

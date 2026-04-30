@@ -236,7 +236,7 @@ Use these patterns to:
 - Map abstraction layers and contracts
 """)
 
-    return '\n'.join(sections)
+    return "\n".join(sections)
 
 
 # Public constant for backward compatibility (assembled with static rules)
@@ -329,7 +329,9 @@ class InitSynthesizer:
         # Check for GEPA-evolved RULES section (not the full prompt)
         evolved_rules = self._get_evolved_rules(provider)
         if evolved_rules:
-            prompt = _build_synthesis_prompt(base_content, rules=evolved_rules, graph_context=graph_context)
+            prompt = _build_synthesis_prompt(
+                base_content, rules=evolved_rules, graph_context=graph_context
+            )
             logger.info(
                 "[init] Using GEPA-evolved rules (%d chars) in fixed frame",
                 len(evolved_rules),

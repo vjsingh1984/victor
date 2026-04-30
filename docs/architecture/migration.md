@@ -140,7 +140,7 @@ surfaces. `UnifiedTeamCoordinator` is the primary runtime abstraction.
 
 All changes are backward compatible. Compatibility aliases remain available
 during migration, but legacy `TeamNode*` names now emit `DeprecationWarning`
-to support a clean removal path in a future release.
+to support a clean removal path in `v0.9.0` (`2027-03-31`).
 
 ### Future Deprecations
 
@@ -151,7 +151,8 @@ The following will be deprecated in future releases:
    Use `UnifiedTeamCoordinator` directly for programmatic graphs.
 3. **Global service access** (use ExecutionContext)
 4. **Legacy `TeamNode*` workflow names**
-   Use `TeamStep*` names during the deprecation window.
+   Use `TeamStep*` names during the deprecation window. Removal target:
+   `v0.9.0` (`2027-03-31`).
 
 ## Performance
 

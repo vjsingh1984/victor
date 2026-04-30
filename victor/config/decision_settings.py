@@ -16,7 +16,7 @@ Follows the same pattern as GEPASettings/GEPATierManager.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -52,6 +52,16 @@ class DecisionServiceSettings(BaseModel):
     """
 
     enabled: bool = True
+
+    # Classification triage settings (confidence-based routing)
+    enable_classification_triage: bool = True
+    triage_verification_timeout_ms: int = 2000
+    triage_use_runtime_policy: bool = True  # Use RuntimeEvaluationPolicy thresholds
+
+    # Optional: Override thresholds (if not using RuntimeEvaluationPolicy)
+    # These are only used if triage_use_runtime_policy is False
+    triage_high_threshold: Optional[float] = None  # Default: 0.8
+    triage_medium_threshold: Optional[float] = None  # Default: 0.5
 
     # Tier definitions (provider-agnostic by default)
     edge: DecisionModelSpec = Field(
@@ -255,3 +265,7 @@ class DecisionServiceSettings(BaseModel):
                 result["valid"] = False
 
         return result
+
+
+# Rebuild the model to resolve forward references
+DecisionServiceSettings.model_rebuild()

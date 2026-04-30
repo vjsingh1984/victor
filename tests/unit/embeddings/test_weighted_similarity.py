@@ -33,11 +33,13 @@ class TestWeightedCosineSimilarity:
         """Create sample embeddings for testing."""
         # Create simple 3D embeddings for predictable behavior
         query_emb = np.array([0.577, 0.577, 0.577])  # Normalized
-        corpus_emb = np.array([
-            [0.707, 0.707, 0.0],    # Item 0: similar to query
-            [0.0, 0.0, 1.0],        # Item 1: different
-            [0.577, 0.577, 0.577],  # Item 2: identical to query
-        ])
+        corpus_emb = np.array(
+            [
+                [0.707, 0.707, 0.0],  # Item 0: similar to query
+                [0.0, 0.0, 1.0],  # Item 1: different
+                [0.577, 0.577, 0.577],  # Item 2: identical to query
+            ]
+        )
         return query_emb, corpus_emb
 
     def test_weighted_similarity_boosts_key_terms(self, sample_embeddings):
@@ -47,8 +49,8 @@ class TestWeightedCosineSimilarity:
         query_text = "analyze the framework"
         corpus_texts = [
             "review the architecture",  # Has "architecture" (1.2), "review" (1.4)
-            "create something",          # No key terms
-            "analyze structure",         # Has "analyze" (1.5), "structure" (1.2)
+            "create something",  # No key terms
+            "analyze structure",  # Has "analyze" (1.5), "structure" (1.2)
         ]
 
         similarities = EmbeddingService.weighted_cosine_similarity(
@@ -114,9 +116,9 @@ class TestWeightedCosineSimilarity:
 
         query_text = "analyze the code"
         corpus_texts = [
-            "analyze code",       # Should match "analyze"
-            "analysis code",      # Should match "analysis" (different word)
-            "create feature",     # Different task type - baseline
+            "analyze code",  # Should match "analyze"
+            "analysis code",  # Should match "analysis" (different word)
+            "create feature",  # Different task type - baseline
         ]
 
         similarities = EmbeddingService.weighted_cosine_similarity(
@@ -154,17 +156,15 @@ class TestWeightedCosineSimilarity:
         # Create realistic embeddings
         query_text = "framework structural analysis"
         corpus_texts = [
-            "analyze the structure",      # Should match strongly
-            "review the architecture",    # Should match moderately
-            "create a new file",          # Should not match
-            "general help request",       # Should not match
+            "analyze the structure",  # Should match strongly
+            "review the architecture",  # Should match moderately
+            "create a new file",  # Should not match
+            "general help request",  # Should not match
         ]
 
         # Generate embeddings
         query_emb = embedding_service.embed_text_sync(query_text)
-        corpus_emb = np.vstack([
-            embedding_service.embed_text_sync(text) for text in corpus_texts
-        ])
+        corpus_emb = np.vstack([embedding_service.embed_text_sync(text) for text in corpus_texts])
 
         # Test weighted similarity
         weighted_similarities = EmbeddingService.weighted_cosine_similarity(
@@ -172,9 +172,7 @@ class TestWeightedCosineSimilarity:
         )
 
         # Test base cosine similarity
-        base_similarities = EmbeddingService.cosine_similarity_matrix(
-            query_emb, corpus_emb
-        )
+        base_similarities = EmbeddingService.cosine_similarity_matrix(query_emb, corpus_emb)
 
         # "analyze the structure" should get higher or equal score with weighting
         # (may be equal if already at 1.0)
@@ -229,8 +227,8 @@ class TestWeightedCosineSimilarity:
         query_text = "analyze review audit framework"
         corpus_texts = [
             "analyze review audit framework",  # All 4 terms overlap
-            "analyze review",                  # 2 terms overlap
-            "create feature",                  # No overlap
+            "analyze review",  # 2 terms overlap
+            "create feature",  # No overlap
         ]
 
         similarities = EmbeddingService.weighted_cosine_similarity(
@@ -249,9 +247,9 @@ class TestWeightedCosineSimilarity:
 
         query_text = "analyze the framework structure"
         corpus_texts = [
-            "analyze framework",        # Partial overlap (2/3 terms)
-            "review structure",         # Partial overlap (1/3 terms)
-            "create new feature",       # No overlap
+            "analyze framework",  # Partial overlap (2/3 terms)
+            "review structure",  # Partial overlap (1/3 terms)
+            "create new feature",  # No overlap
         ]
 
         similarities = EmbeddingService.weighted_cosine_similarity(
@@ -331,9 +329,13 @@ class TestWeightedSimilarityIntegration:
         )
 
         items = [
-            CollectionItem(id="1", text="analyze the code structure", metadata={"task_type": "analyze"}),
+            CollectionItem(
+                id="1", text="analyze the code structure", metadata={"task_type": "analyze"}
+            ),
             CollectionItem(id="2", text="create a new file", metadata={"task_type": "create"}),
-            CollectionItem(id="3", text="review the architecture", metadata={"task_type": "analyze"}),
+            CollectionItem(
+                id="3", text="review the architecture", metadata={"task_type": "analyze"}
+            ),
             CollectionItem(id="4", text="search for functions", metadata={"task_type": "search"}),
         ]
 
@@ -354,10 +356,14 @@ class TestWeightedSimilarityIntegration:
         query = "framework structural analysis"
 
         # Standard search
-        results_standard = sample_collection.search_sync(query, top_k=4, use_weighted_similarity=False)
+        results_standard = sample_collection.search_sync(
+            query, top_k=4, use_weighted_similarity=False
+        )
 
         # Weighted search
-        results_weighted = sample_collection.search_sync(query, top_k=4, use_weighted_similarity=True)
+        results_weighted = sample_collection.search_sync(
+            query, top_k=4, use_weighted_similarity=True
+        )
 
         # Should return results in both cases
         assert len(results_standard) > 0
@@ -379,7 +385,9 @@ class TestWeightedSimilarityIntegration:
         results_default = sample_collection.search_sync(query, top_k=2)
 
         # Explicit standard call
-        results_standard = sample_collection.search_sync(query, top_k=2, use_weighted_similarity=False)
+        results_standard = sample_collection.search_sync(
+            query, top_k=2, use_weighted_similarity=False
+        )
 
         # Should return same results
         assert len(results_default) == len(results_standard)

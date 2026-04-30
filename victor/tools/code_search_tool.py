@@ -2099,9 +2099,13 @@ async def _get_or_build_index(
                 # Write manifest FIRST to prevent rebuild loop on next access
                 try:
                     write_codebase_index_manifest(persist_path, index_manifest)
-                    logger.info("[code_search] Wrote manifest for stale index, background rebuild in progress")
+                    logger.info(
+                        "[code_search] Wrote manifest for stale index, background rebuild in progress"
+                    )
                 except OSError as exc:
-                    logger.warning("[code_search] Failed to write manifest before stale return: %s", exc)
+                    logger.warning(
+                        "[code_search] Failed to write manifest before stale return: %s", exc
+                    )
 
                 # Spawn background rebuild task (fire and forget)
                 async def _rebuildInBackground():
@@ -2112,9 +2116,13 @@ async def _get_or_build_index(
                         # Write manifest after successful rebuild
                         try:
                             write_codebase_index_manifest(persist_path, index_manifest)
-                            logger.info("[code_search] Wrote manifest after background rebuild for %s", root)
+                            logger.info(
+                                "[code_search] Wrote manifest after background rebuild for %s", root
+                            )
                         except OSError as exc:
-                            logger.warning("[code_search] Failed to write manifest after rebuild: %s", exc)
+                            logger.warning(
+                                "[code_search] Failed to write manifest after rebuild: %s", exc
+                            )
                         # Update cache with fresh index after rebuild
                         current_cache = index_cache.get(str(root))
                         if current_cache:

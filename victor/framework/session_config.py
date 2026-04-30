@@ -105,6 +105,7 @@ class SessionConfig:
     mutations throughout the codebase.
 
     Attributes:
+        agent_profile: Agent profile name from ~/.victor/profiles.yaml (e.g., 'zai-coding', 'default').
         tool_budget: Override tool call budget for this session.
         max_iterations: Override maximum iterations for this session.
         compaction: Compaction threshold overrides.
@@ -124,6 +125,9 @@ class SessionConfig:
         compaction_min_threshold: Shorthand for adaptive min threshold.
         compaction_max_threshold: Shorthand for adaptive max threshold.
     """
+
+    # Agent profile (from ~/.victor/profiles.yaml)
+    agent_profile: Optional[str] = None
 
     # Agent behaviour
     tool_budget: Optional[int] = None
@@ -154,6 +158,7 @@ class SessionConfig:
     def from_cli_flags(
         cls,
         *,
+        agent_profile: Optional[str] = None,
         tool_budget: Optional[int] = None,
         max_iterations: Optional[int] = None,
         compaction_threshold: Optional[float] = None,
@@ -176,6 +181,7 @@ class SessionConfig:
         options and pass them here to get an immutable config object.
 
         Args:
+            agent_profile: Agent profile name from ~/.victor/profiles.yaml.
             tool_budget: Override tool call budget.
             max_iterations: Override max iterations.
             compaction_threshold: Compaction threshold (0.1-0.95).
@@ -205,6 +211,7 @@ class SessionConfig:
             agent = await Agent.create(session_config=config)
         """
         return cls(
+            agent_profile=agent_profile,
             tool_budget=tool_budget,
             max_iterations=max_iterations,
             planning_enabled=planning_enabled,

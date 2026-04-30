@@ -287,7 +287,7 @@ async def test_execute_tools_records_shell_alias_canonically():
 
     await handler.execute_tools(
         stream_ctx=stream_ctx,
-        tool_calls=[{"name": "bash", "arguments": {"cmd": "sqlite3 data.db \".tables\""}}],
+        tool_calls=[{"name": "bash", "arguments": {"cmd": 'sqlite3 data.db ".tables"'}}],
         user_message="Run bash",
         full_content="inspect the db",
         tool_calls_used=0,

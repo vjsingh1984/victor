@@ -706,6 +706,88 @@ class PromptBuilder:
         """Build the final prompt string from the canonical document."""
         return self.build_document().render()
 
+    def add_evolved_section(
+        self,
+        section_name: str,
+        provider: str = "",
+        model: str = "",
+        task_type: str = "default",
+        priority: int = 50,
+    ) -> "PromptBuilder":
+        """Add an evolvable section with automatic content resolution.
+
+        This method checks for evolved content via OptimizationInjector
+        and falls back to static defaults if no evolved version exists.
+
+        Args:
+            section_name: Name of the section (e.g., "ASI_TOOL_EFFECTIVENESS_GUIDANCE")
+            provider: Provider name for evolution lookup
+            model: Model name for evolution lookup
+            task_type: Task type for context
+            priority: Section priority for ordering
+
+        Returns:
+            Self for method chaining
+        """
+        from victor.agent.evolved_content_resolver import EvolvedContentResolver
+
+        # Get resolver (create if needed)
+        if not hasattr(self, "_evolved_resolver"):
+            from victor.agent.services.rl_runtime import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            injector = coordinator.get_learner("prompt_optimizer") if coordinator else None
+            self._evolved_resolver = EvolvedContentResolver(optimization_injector=injector)
+
+        # Get fallback text
+        fallback = self._get_section_fallback(section_name)
+
+        # Resolve evolved content
+        resolved = self._evolved_resolver.resolve_section(
+            section_name=section_name,
+            provider=provider,
+            model=model,
+            task_type=task_type,
+            fallback_text=fallback,
+        )
+
+        # Add to document
+        if resolved.text:
+            self.add_section(
+                name=section_name.lower(),
+                content=resolved.text,
+                priority=priority,
+            )
+            logger.debug(
+                f"Added evolved section '{section_name}' "
+                f"(source={resolved.source}, priority={priority})"
+            )
+
+        return self
+
+    def _get_section_fallback(self, section_name: str) -> str:
+        """Get static fallback text for a section.
+
+        Args:
+            section_name: Section name
+
+        Returns:
+            Static fallback text
+        """
+        # Import from legacy builder for consistency
+        from victor.agent.prompt_builder import (
+            ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+            GROUNDING_RULES,
+            COMPLETION_GUIDANCE,
+        )
+
+        fallbacks = {
+            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+            "GROUNDING_RULES": GROUNDING_RULES,
+            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
+        }
+        return fallbacks.get(section_name, "")
+
     def __repr__(self) -> str:
         """Return a string representation of the builder state."""
         return (

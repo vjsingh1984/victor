@@ -1670,9 +1670,7 @@ class TaskTypeClassifier:
         # Get top 20 results to ensure we see all task types
         # Use weighted similarity if enabled for better task classification
         results = self._collection.search_sync(
-            preprocessed,
-            top_k=20,
-            use_weighted_similarity=self.use_weighted_similarity
+            preprocessed, top_k=20, use_weighted_similarity=self.use_weighted_similarity
         )
 
         all_scores: Dict[TaskType, float] = {}

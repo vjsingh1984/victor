@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typer
 from typer.models import ArgumentInfo, OptionInfo
 import os
@@ -15,10 +17,16 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.text import Text
 
-from victor.agent.orchestrator import AgentOrchestrator
+# ✅ PROPER: Import VictorClient and SessionConfig
+from victor.framework.client import VictorClient
+from victor.framework.session_config import SessionConfig
 from victor.config.settings import get_project_paths, load_settings, ProfileConfig
 from victor.core.async_utils import run_sync
-from victor.framework.shim import FrameworkShim
+
+# ❌ REMOVED: Direct orchestrator and shim imports (architectural violation)
+# from victor.agent.orchestrator import AgentOrchestrator
+# ❌ REMOVED: FrameworkShim import (architectural violation)
+# ✅ PROPER: Use VictorClient instead
 from victor.core.verticals import get_vertical, list_verticals
 from victor.core.errors import (
     ConfigurationError,
@@ -1179,10 +1187,11 @@ async def run_oneshot(
 ) -> None:
     """Run a single message and exit.
 
-    By default, uses FrameworkShim to bridge CLI with framework features
+    By default, uses VictorClient to bridge CLI with framework features
     like observability and vertical configuration. Use legacy_mode=True
     to bypass the framework and use direct orchestrator creation.
     """
+    from victor.framework.agent_factory import InitializationError
     from victor.ui.output_formatter import create_formatter
 
     if formatter is None:
@@ -1204,16 +1213,30 @@ async def run_oneshot(
         show_status=show_cli_chrome,
     )
 
+    # ✅ PROPER: Create SessionConfig from CLI flags (no settings mutations)
+    config = SessionConfig.from_cli_flags(
+        tool_budget=tool_budget,
+        max_iterations=max_iterations,
+        compaction_threshold=compaction_threshold,
+        adaptive_threshold=adaptive_threshold,
+        compaction_min_threshold=compaction_min_threshold,
+        compaction_max_threshold=compaction_max_threshold,
+        enable_smart_routing=enable_smart_routing,
+        routing_profile=routing_profile,
+        fallback_chain=fallback_chain,
+        tool_preview=tool_preview,
+        enable_pruning=enable_pruning,
+        planning_enabled=enable_planning,
+        planning_model=planning_model,
+        mode=mode,
+        show_reasoning=show_reasoning,
+    )
+
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
 
-    # Apply tool output preview settings from flags
-    if not tool_preview:
-        settings.tool_settings.tool_output_preview_enabled = False
-    if enable_pruning:
-        settings.tool_settings.tool_output_pruning_enabled = True
-        settings.tool_settings.tool_output_pruning_safe_only = False
-
+    # ✅ SessionConfig handles tool output settings (no direct mutations needed)
+    # The settings will be applied when VictorClient is created via config.apply_to_settings()
     tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
     if show_cli_chrome:
         _print_tool_output_mode_banner(console, tool_settings)
@@ -1251,15 +1274,14 @@ async def run_oneshot(
             pass
 
     agent = None
-    shim: Optional[FrameworkShim] = None
+    # ✅ PROPER: No FrameworkShim needed (VictorClient handles framework features)
+    # shim: Optional[FrameworkShim] = None  # REMOVED
     provider_for_suggestions = getattr(settings.provider, "default_provider", "unknown")
-    try:
-        # Unified initialization via AgentFactory (replaces legacy/framework split)
-        from victor.framework.agent_factory import AgentFactory, InitializationError
+    client = None  # ✅ NEW: VictorClient (replaces orchestrator/shim)
 
-        # Pass original vertical string to AgentFactory (preserves name for error reporting)
-        # AgentFactory will resolve it to a class internally
-        vertical_param = vertical if vertical else None
+    try:
+        # ✅ PROPER: Create VictorClient with SessionConfig (replaces AgentFactory)
+        # VictorClient handles Agent.create() internally with proper service layering
 
         # Show initialization progress for first-time setup (can take 20-30s)
         status_context = (
@@ -1339,19 +1361,11 @@ async def run_oneshot(
                     console.print("Fix the issue above and run 'victor chat' again.\n")
                     raise typer.Exit(code=1)
 
-            # Step 2: Initialize factory
-            status.update("Initializing agent factory...")
+            # Step 2: Initialize VictorClient with SessionConfig
+            status.update("Initializing VictorClient...")
             try:
-                factory = AgentFactory(
-                    settings=settings,
-                    profile=profile,
-                    vertical=vertical_param,
-                    thinking=thinking,
-                    session_id=session_id,
-                    enable_observability=enable_observability,
-                    tool_budget=tool_budget,
-                    max_iterations=max_iterations if "max_iterations" in dir() else None,
-                )
+                # ✅ PROPER: Create VictorClient (AgentFactory is handled internally)
+                client = VictorClient(config)
             except ConfigurationError as e:
                 console.print(f"\n[red]✗[/] Configuration error: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
@@ -1386,10 +1400,11 @@ async def run_oneshot(
                     console.print(traceback.format_exc())
                 raise typer.Exit(code=1)
 
-            # Step 3: Create agent
+            # Step 3: Ensure VictorClient is initialized
             status.update("Creating agent...")
             try:
-                agent = await factory.create()
+                # ✅ PROPER: VictorClient creates Agent internally via Agent.create()
+                agent = await client._ensure_initialized()
             except ConfigurationError as e:
                 console.print(f"\n[red]✗[/] Configuration error during agent creation: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
@@ -1427,9 +1442,9 @@ async def run_oneshot(
             # Step 4: Configure agent settings
             status.update("Configuring agent settings...")
             if tool_budget is not None:
-                agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
+                agent.set_tool_budget(tool_budget, user_override=True)
             if max_iterations is not None:
-                agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
+                agent.set_max_iterations(max_iterations, user_override=True)
 
             _configure_agent_compaction(
                 agent,
@@ -1478,7 +1493,7 @@ async def run_oneshot(
                     )
 
             # Planning mode requires non-streaming (plan generation → step execution → summary)
-            use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
+            use_streaming = stream and agent.supports_streaming() and not enable_planning
 
             # Display skill auto-selection feedback before response
             if show_cli_chrome:
@@ -1581,12 +1596,8 @@ async def run_oneshot(
     finally:
         # Emit session end event
         duration = time.time() - start_time
-        if shim:
-            shim.emit_session_end(
-                tool_calls=tool_calls_made,
-                duration_seconds=duration,
-                success=success,
-            )
+        # ✅ PROPER: No shim needed - session cleanup handled by agent/services
+        # Note: shim.emit_session_end() removed (FrameworkShim no longer used)
         if agent:
             await graceful_shutdown(agent)
 
@@ -1623,7 +1634,7 @@ async def run_interactive(
 ) -> None:
     """Run interactive CLI mode.
 
-    By default, uses FrameworkShim to bridge CLI with framework features
+    By default, uses VictorClient to bridge CLI with framework features
     like observability and vertical configuration. Use legacy_mode=True
     to bypass the framework and use direct orchestrator creation.
 
@@ -1631,6 +1642,27 @@ async def run_interactive(
         use_tui: If True, use the modern TUI interface. If False, use simple CLI.
         show_reasoning: If True, show LLM reasoning/thinking content in output.
     """
+    # ✅ PROPER: Create SessionConfig from CLI flags (no settings mutations)
+    from victor.framework.session_config import SessionConfig
+
+    config = SessionConfig.from_cli_flags(
+        tool_budget=tool_budget,
+        max_iterations=max_iterations,
+        compaction_threshold=compaction_threshold,
+        adaptive_threshold=adaptive_threshold,
+        compaction_min_threshold=compaction_min_threshold,
+        compaction_max_threshold=compaction_max_threshold,
+        enable_smart_routing=enable_smart_routing,
+        routing_profile=routing_profile,
+        fallback_chain=fallback_chain,
+        tool_preview=tool_preview,
+        enable_pruning=enable_pruning,
+        planning_enabled=enable_planning,
+        planning_model=planning_model,
+        mode=mode,
+        show_reasoning=show_reasoning,
+    )
+
     # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
     if not show_reasoning:
         try:
@@ -1646,7 +1678,7 @@ async def run_interactive(
             pass
 
     agent = None
-    shim: Optional[FrameworkShim] = None
+    client = None  # ✅ NEW: VictorClient (replaces orchestrator/shim)
     start_time = time.time()
     session_id = str(uuid.uuid4())
     success = False
@@ -1747,17 +1779,10 @@ async def run_interactive(
         # Use "default" profile if profile_config is None (default settings)
         profile_to_use = profile if profile_config else "default"
 
-        factory = AgentFactory(
-            settings=settings,
-            profile=profile_to_use,
-            vertical=vertical_param,
-            thinking=thinking,
-            session_id=session_id,
-            enable_observability=enable_observability,
-            tool_budget=tool_budget,
-        )
+        # ✅ PROPER: Create VictorClient (replaces AgentFactory)
         try:
-            agent = await factory.create()
+            client = VictorClient(config)
+            agent = await client._ensure_initialized()
 
             # Set planning model override if provided (for planning coordinator)
             if planning_model:
@@ -1846,9 +1871,9 @@ async def run_interactive(
             raise typer.Exit(1)
 
         if tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
+            agent.set_tool_budget(tool_budget, user_override=True)
         if max_iterations is not None:
-            agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
+            agent.set_max_iterations(max_iterations, user_override=True)
         _configure_agent_compaction(
             agent,
             compaction_threshold=compaction_threshold,
@@ -2004,12 +2029,8 @@ async def run_interactive(
     finally:
         # Emit session end event
         duration = time.time() - start_time
-        if shim:
-            shim.emit_session_end(
-                tool_calls=tool_calls_made,
-                duration_seconds=duration,
-                success=success,
-            )
+        # ✅ PROPER: No shim needed - session cleanup handled by agent/services
+        # Note: shim.emit_session_end() removed (FrameworkShim no longer used)
         if agent:
             await graceful_shutdown(agent)
 
@@ -2671,12 +2692,10 @@ async def run_workflow_mode(
         has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
 
         if has_agent_nodes:
-            shim = FrameworkShim(
-                settings,
-                profile_name=profile,
-                vertical=get_vertical(vertical) if vertical else None,
-            )
-            orchestrator = await shim.create_orchestrator()
+            # ✅ PROPER: Use VictorClient instead of FrameworkShim
+            config = SessionConfig(profile=profile, vertical=vertical)
+            client = VictorClient(config)
+            orchestrator = await client._ensure_initialized()
 
         # Execute with StateGraphExecutor
         executor = StateGraphExecutor(

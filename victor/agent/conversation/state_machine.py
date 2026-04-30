@@ -298,8 +298,10 @@ class ConversationStateMachine:
     THRASHING_WINDOW_SECONDS: float = 120.0  # 2 min window
     THRASHING_COOLDOWN_SECONDS: float = 10.0  # Brief pause, not hard lock
 
-    # Minimum tools required to trigger stage transition
-    MIN_TOOLS_FOR_TRANSITION: int = 3
+    # Minimum tools required to trigger stage transition (increased from 3 to 5)
+    # Allows more work per turn while still skipping edge model when confident
+    # Session analysis shows this balances work-per-turn with optimization benefits
+    MIN_TOOLS_FOR_TRANSITION: int = 5
 
     # Confidence threshold for backward stage transitions
     BACKWARD_TRANSITION_THRESHOLD: float = 0.85
@@ -317,6 +319,7 @@ class ConversationStateMachine:
         state_manager: Optional[Any] = None,
         runtime_intelligence: Optional[Any] = None,
         action_intent: Optional[Any] = None,
+        transition_coordinator: Optional[Any] = None,
     ) -> None:
         """Initialize the state machine.
 
@@ -330,6 +333,8 @@ class ConversationStateMachine:
             runtime_intelligence: Optional canonical runtime-intelligence service for
                 stage-detection augmentation.
             action_intent: Optional ActionIntent for context-aware calibration.
+            transition_coordinator: Optional StageTransitionCoordinator for batching
+                tool executions and applying Phase 1 optimizations consistently.
         """
         self.state = ConversationState()
         self._last_transition_time: float = 0.0
@@ -344,6 +349,7 @@ class ConversationStateMachine:
         self._state_manager = state_manager  # Optional canonical state manager
         self._runtime_intelligence = runtime_intelligence
         self._action_intent = action_intent  # PHASE 2: For context-aware calibration
+        self._transition_coordinator = transition_coordinator  # PHASE 16: For batching
 
         # Edge model decision cache — avoid repeated calls with same input
         # Key: stage_value:message_prefix → (result_stage, confidence, timestamp)
@@ -431,8 +437,25 @@ class ConversationStateMachine:
         except Exception as e:
             logger.warning(f"Failed to sync state to manager: {e}")
 
+    def set_transition_coordinator(self, coordinator: Optional[Any]) -> None:
+        """Set or update the transition coordinator.
+
+        Args:
+            coordinator: Optional StageTransitionCoordinator for batching
+                tool executions and applying Phase 1 optimizations.
+        """
+        self._transition_coordinator = coordinator
+        logger.debug(
+            f"Transition coordinator {'enabled' if coordinator else 'disabled'} "
+            f"for ConversationStateMachine"
+        )
+
     def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
         """Record tool execution and potentially transition stage.
+
+        PHASE 16: When transition_coordinator is attached, tool executions
+        are batched and processed once per turn instead of per-tool.
+        This prevents Phase 1 optimization bypassing in the streaming path.
 
         Args:
             tool_name: Name of the executed tool
@@ -444,7 +467,13 @@ class ConversationStateMachine:
         if self._state_manager:
             self._sync_state_to_manager()
 
-        self._maybe_transition()
+        # PHASE 16: Use coordinator if available (batches tools, processes once per turn)
+        if self._transition_coordinator is not None:
+            # Just record the tool - coordinator will process batch at end_turn()
+            self._transition_coordinator.record_tool(tool_name, args)
+        else:
+            # Legacy behavior: check transition immediately for each tool
+            self._maybe_transition()
 
     def record_message(self, content: str, is_user: bool = True) -> None:
         """Record a message and potentially transition stage.

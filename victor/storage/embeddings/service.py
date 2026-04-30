@@ -68,6 +68,7 @@ def _ensure_numpy():
 # This module provides Levenshtein-based fuzzy matching to handle typos
 try:
     from victor.storage.embeddings.fuzzy_matcher import extract_key_terms_fuzzy
+
     _FUZZY_MATCHING_AVAILABLE = True
 except ImportError:
     _FUZZY_MATCHING_AVAILABLE = False
@@ -628,21 +629,42 @@ class EmbeddingService:
     # Task classification key term weights for boosting similarity
     TASK_KEY_TERMS = {
         # Analysis terms (highest boost)
-        "analyze": 1.5, "analysis": 1.5, "review": 1.4, "audit": 1.4,
-        "examine": 1.3, "inspect": 1.3, "investigate": 1.3,
+        "analyze": 1.5,
+        "analysis": 1.5,
+        "review": 1.4,
+        "audit": 1.4,
+        "examine": 1.3,
+        "inspect": 1.3,
+        "investigate": 1.3,
         # Structural/architecture terms
-        "structure": 1.2, "architecture": 1.2, "framework": 1.1,
-        "design": 1.1, "system": 1.0,
+        "structure": 1.2,
+        "architecture": 1.2,
+        "framework": 1.1,
+        "design": 1.1,
+        "system": 1.0,
         # Generation terms
-        "create": 1.3, "generate": 1.3, "write": 1.2, "make": 1.1,
+        "create": 1.3,
+        "generate": 1.3,
+        "write": 1.2,
+        "make": 1.1,
         # Edit/refactor terms
-        "edit": 1.2, "refactor": 1.3, "fix": 1.2, "modify": 1.2,
+        "edit": 1.2,
+        "refactor": 1.3,
+        "fix": 1.2,
+        "modify": 1.2,
         # Search terms
-        "search": 1.3, "find": 1.2, "locate": 1.2, "grep": 1.3,
+        "search": 1.3,
+        "find": 1.2,
+        "locate": 1.2,
+        "grep": 1.3,
         # Execution terms
-        "run": 1.2, "execute": 1.2, "deploy": 1.2,
+        "run": 1.2,
+        "execute": 1.2,
+        "deploy": 1.2,
         # Testing terms
-        "test": 1.2, "testing": 1.2, "coverage": 1.1,
+        "test": 1.2,
+        "testing": 1.2,
+        "coverage": 1.1,
     }
 
     @staticmethod
@@ -685,7 +707,7 @@ class EmbeddingService:
 
         # Extract key terms from query with fuzzy matching for typo tolerance
         query_lower = query_text.lower()
-        query_words = set(re.findall(r'\b\w+\b', query_lower))
+        query_words = set(re.findall(r"\b\w+\b", query_lower))
 
         # Use fuzzy matching if available, otherwise fall back to exact matching
         if _FUZZY_MATCHING_AVAILABLE:
@@ -703,7 +725,7 @@ class EmbeddingService:
 
         for i, doc_text in enumerate(corpus_texts):
             doc_lower = doc_text.lower()
-            doc_words = set(re.findall(r'\b\w+\b', doc_lower))
+            doc_words = set(re.findall(r"\b\w+\b", doc_lower))
             doc_key_terms = {w for w in doc_words if w in weights}
 
             # Find overlapping key terms

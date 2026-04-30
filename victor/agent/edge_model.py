@@ -344,3 +344,135 @@ def _check_model_available(base_url: str, model: str) -> bool:
     except Exception:
         pass
     return False
+
+
+# =============================================================================
+# Classification Verification (Tiered Triage Support)
+# =============================================================================
+
+
+@dataclass
+class EdgeLLMVerificationResult:
+    """Result of edge LLM verification for grey-area classifications.
+
+    When a classification falls in the VERIFY band (0.5-0.8 confidence),
+    the edge LLM is consulted to verify or correct the classification.
+
+    This is a duplicate of the dataclass in tiered_decision_service.py to
+    avoid circular imports. The two should be kept in sync.
+    """
+
+    original_result: Any  # Original classification result
+    original_confidence: float  # Original confidence score
+    verified_result: Any  # Verified/corrected result from edge LLM
+    verification_confidence: float  # Confidence of the verification
+    verification_passed: bool  # Whether verification passed (confidence ≥ high threshold)
+    latency_ms: float  # Verification latency in milliseconds
+    tokens_used: int  # Tokens used for verification
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging/serialization."""
+        return {
+            "original_result": str(self.original_result),
+            "original_confidence": self.original_confidence,
+            "verified_result": str(self.verified_result),
+            "verification_confidence": self.verification_confidence,
+            "verification_passed": self.verification_passed,
+            "latency_ms": self.latency_ms,
+            "tokens_used": self.tokens_used,
+        }
+
+
+def verify_classification_with_edge_llm(
+    service: Any,
+    decision_type: Any,
+    original_result: Any,
+    original_confidence: float,
+    context: Dict[str, Any],
+    high_confidence_threshold: float = 0.8,
+) -> EdgeLLMVerificationResult:
+    """Verify a grey-area classification using edge LLM.
+
+    This function provides a standalone verification capability that can be
+    used independently of TieredDecisionService. It's useful for callers
+    that already have an edge decision service instance.
+
+    Args:
+        service: LLMDecisionService (edge-backed)
+        decision_type: DecisionType enum value
+        original_result: Original classification result
+        original_confidence: Original confidence score
+        context: Classification context
+        high_confidence_threshold: Threshold for verification passing (default 0.8)
+
+    Returns:
+        EdgeLLMVerificationResult with verification outcome
+    """
+    import time
+
+    from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
+
+    start = time.monotonic()
+
+    if service is None:
+        return EdgeLLMVerificationResult(
+            original_result=original_result,
+            original_confidence=original_confidence,
+            verified_result=original_result,
+            verification_confidence=original_confidence,
+            verification_passed=False,
+            latency_ms=0.0,
+            tokens_used=0,
+        )
+
+    # Create verification context
+    verification_context = {
+        **context,
+        "original_classification": str(original_result),
+        "original_confidence": f"{original_confidence:.2f}",
+        "verification_task": "verify",
+    }
+
+    # Call edge LLM
+    try:
+        decision = service.decide_sync(
+            decision_type,
+            verification_context,
+            heuristic_result=original_result,
+            heuristic_confidence=original_confidence,
+        )
+
+        latency_ms = (time.monotonic() - start) * 1000
+
+        # Verification passes if confidence ≥ high threshold
+        verification_passed = decision.confidence >= high_confidence_threshold
+
+        logger.debug(
+            "Edge LLM verification: passed=%s, confidence=%.2f → %.2f (latency=%.1fms)",
+            verification_passed,
+            original_confidence,
+            decision.confidence,
+            latency_ms,
+        )
+
+        return EdgeLLMVerificationResult(
+            original_result=original_result,
+            original_confidence=original_confidence,
+            verified_result=decision.result,
+            verification_confidence=decision.confidence,
+            verification_passed=verification_passed,
+            latency_ms=latency_ms,
+            tokens_used=getattr(decision, "tokens_used", 0),
+        )
+
+    except Exception as e:
+        logger.warning("Edge LLM verification failed: %s", e)
+        return EdgeLLMVerificationResult(
+            original_result=original_result,
+            original_confidence=original_confidence,
+            verified_result=original_result,
+            verification_confidence=original_confidence,
+            verification_passed=False,
+            latency_ms=(time.monotonic() - start) * 1000,
+            tokens_used=0,
+        )

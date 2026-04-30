@@ -59,6 +59,8 @@ class GraphIndexConfig:
         embedding_neighborhood_radius: Radius for graph neighborhood in embeddings
         embedding_max_neighbors: Maximum neighbors to include in embedding context
         embedding_batch_size: Batch size for embedding generation
+        respect_gitignore: Whether to parse and include .gitignore patterns
+        detect_languages: Whether to detect languages and add their build dirs
     """
 
     root_path: Path
@@ -67,33 +69,25 @@ class GraphIndexConfig:
     enable_subgraph_cache: bool = True
     chunk_size: int = 50
     max_file_size_bytes: int = 1_000_000  # 1MB
-    exclude_patterns: List[str] = field(
-        default_factory=lambda: [
-            "**/.git/**",
-            "**/node_modules/**",
-            "**/venv/**",
-            "**/.venv/**",
-            "**/__pycache__/**",
-            "**/.mypy_cache/**",
-            "**/.pytest_cache/**",
-            "**/.ruff_cache/**",
-            "**/dist/**",
-            "**/build/**",
-            "**/target/**",  # Rust build artifacts
-            "**/*.min.js",
-            "**/*.min.css",
-            "**/package-lock.json",
-            "**/yarn.lock",
-            "**/Poetry.lock",
-            "**/*.pyc",
-            "**/.victor/**",  # Victor's own data directory
-        ]
-    )
+    exclude_patterns: List[str] = field(default_factory=list)  # Initialized via get_exclusion_patterns()
     include_patterns: List[str] = field(default_factory=list)
     subgraph_config: SubgraphConfig = field(default_factory=SubgraphConfig)
     embedding_neighborhood_radius: int = 2
     embedding_max_neighbors: int = 50
     embedding_batch_size: int = 100
+    respect_gitignore: bool = True
+    detect_languages: bool = True
+
+    def __post_init__(self):
+        """Initialize exclude patterns after instance creation."""
+        if not self.exclude_patterns:
+            from victor.core.graph_rag.exclude_patterns import get_exclusion_patterns
+
+            self.exclude_patterns = get_exclusion_patterns(
+                root_path=self.root_path,
+                respect_gitignore=self.respect_gitignore,
+                detect_languages=self.detect_languages,
+            )
 
 
 @dataclass

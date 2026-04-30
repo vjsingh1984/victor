@@ -13,7 +13,7 @@ from rich.prompt import Confirm
 from pathlib import Path
 import time
 
-from victor.agent.orchestrator import AgentOrchestrator
+# ✅ PROPER: No AgentOrchestrator import (use Any type instead)
 from victor.agent.safety import (
     ConfirmationRequest,
     OperationalRiskLevel,
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 console = Console()
 
-# Global reference for signal handler cleanup
-_current_agent: Optional[AgentOrchestrator] = None
+# Global reference for signal handler cleanup (use Any instead of AgentOrchestrator)
+_current_agent: Optional[Any] = None
 
 
 def _get_default_log_dir() -> Path:
@@ -304,8 +304,12 @@ def flush_logging() -> None:
         handler.flush()
 
 
-async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
-    """Perform graceful shutdown of the agent."""
+async def graceful_shutdown(agent: Optional[Any]) -> None:
+    """Perform graceful shutdown of the agent.
+
+    Args:
+        agent: Agent instance (any type - duck typing used for runtime access)
+    """
     if agent is None:
         return
     try:

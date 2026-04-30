@@ -415,7 +415,9 @@ class StaticEmbeddingCollection:
             )
         else:
             # Use standard cosine similarity (backward compatible)
-            similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
+            similarities = EmbeddingService.cosine_similarity_matrix(
+                query_embedding, self._embeddings
+            )
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]
@@ -467,7 +469,9 @@ class StaticEmbeddingCollection:
             )
         else:
             # Use standard cosine similarity (backward compatible)
-            similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
+            similarities = EmbeddingService.cosine_similarity_matrix(
+                query_embedding, self._embeddings
+            )
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]

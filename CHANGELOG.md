@@ -30,6 +30,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 32 documentation files reconciled (provider count 22→24, tool count 33→34)
 - Heavyweight dependencies (`sentence-transformers`, `lancedb`, `pyarrow`) moved to `[embeddings]` extra
 
+### Deprecated
+- **`TeamNode*` workflow compatibility aliases** (`TeamNode`, `TeamNodeConfig`, `TeamNodeWorkflow`, `TeamNodeExecutor`)
+  - Deprecated in: `Unreleased` on `2026-04-30`
+  - To be removed in: `v0.9.0`
+  - Target removal date: `2027-03-31`
+  - Replacement: `TeamStep*` workflow names
+  - Migration path: `docs/architecture/migration.md`
+  - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
+
 ### Fixed
 - Bare `except:` in `experiments.py` → `except (ValueError, TypeError)`
 - `_send_rl_reward_signal` test updated for CallbackCoordinator delegation

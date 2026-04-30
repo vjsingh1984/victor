@@ -344,7 +344,9 @@ class ArgumentNormalizer:
                 payload = parsed
 
         if isinstance(payload, list):
-            logger.info("[%s] Recovered wrapped edit payload from value envelope", self.provider_name)
+            logger.info(
+                "[%s] Recovered wrapped edit payload from value envelope", self.provider_name
+            )
             return {"ops": payload}
 
         if isinstance(payload, dict):

@@ -779,20 +779,23 @@ class TestEdgeModelStageTransitionFallback:
     def test_high_confidence_heuristic_skips_edge_model(self):
         """Phase 1 optimization: High confidence heuristic should skip edge model.
 
-        When tool overlap >= MIN_TOOLS_FOR_TRANSITION (3), heuristic is confident
+        When tool overlap >= MIN_TOOLS_FOR_TRANSITION (5), heuristic is confident
         and edge model call should be skipped.
         """
         from unittest.mock import patch, MagicMock
 
         sm = ConversationStateMachine()
         sm.state.stage = ConversationStage.INITIAL
-        sm.state.last_tools = ["edit", "write", "shell", "edit", "write"]  # 5 EXECUTION tools
+        # 5 unique EXECUTION tools to meet the new MIN_TOOLS_FOR_TRANSITION threshold
+        sm.state.last_tools = ["edit", "write", "shell", "git", "test"]
 
         mock_service = MagicMock()
 
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.EXECUTION),
-            patch.object(sm, "_get_tools_for_stage", return_value={"edit", "write", "shell"}),
+            patch.object(
+                sm, "_get_tools_for_stage", return_value={"edit", "write", "shell", "git", "test"}
+            ),
             patch("victor.agent.conversation.state_machine.get_container") as mock_container,
         ):
             mock_container.return_value.get.return_value = mock_service

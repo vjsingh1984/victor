@@ -261,11 +261,7 @@ class TestNormalizeArgumentsAST:
     def test_edit_value_envelope_with_raw_newline_json_string(self):
         """Canonical edit should recover wrapped JSON strings with raw newlines."""
         normalizer = ArgumentNormalizer()
-        args = {
-            "value": (
-                '{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}'
-            )
-        }
+        args = {"value": ('{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}')}
         result, strategy = normalizer.normalize_arguments(args, "edit")
         assert strategy == NormalizationStrategy.DIRECT
         assert isinstance(result["ops"], list)

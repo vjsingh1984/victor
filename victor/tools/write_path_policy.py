@@ -10,11 +10,11 @@ _VICTOR_DIR = ".victor"
 
 
 class WritePathTier(IntEnum):
-    OS_TEMP        = 0   # /tmp/** (macOS: /private/tmp/**)
-    LOCAL_ANALYSIS = 1   # .victor/analysis/**, ./tmp/**
-    DOCS_SAFE      = 2   # ./docs/** (extension-filtered)
-    PREFIXED_ROOT  = 3   # ./ANALYSIS-*.md, ./CHECKPOINT-*.md at repo root
-    SOURCE_CODE    = 4   # everything else — blocked in analysis mode
+    OS_TEMP = 0  # /tmp/** (macOS: /private/tmp/**)
+    LOCAL_ANALYSIS = 1  # .victor/analysis/**, ./tmp/**
+    DOCS_SAFE = 2  # ./docs/** (extension-filtered)
+    PREFIXED_ROOT = 3  # ./ANALYSIS-*.md, ./CHECKPOINT-*.md at repo root
+    SOURCE_CODE = 4  # everything else — blocked in analysis mode
 
 
 @dataclass(frozen=True)
@@ -29,9 +29,14 @@ class WritePathPolicy:
 
     max_tier: WritePathTier = WritePathTier.SOURCE_CODE
     docs_extensions: FrozenSet[str] = frozenset({".md", ".txt", ".adoc", ".rst"})
+    _read_only: bool = False  # Internal flag for read-only mode
 
     def allows(self, file_path: Path) -> bool:
         """Return True if file_path is writable under this policy."""
+        # Check read-only flag first
+        if self._read_only:
+            return False
+
         tier = self._classify(file_path)
         if tier > self.max_tier:
             return False
@@ -65,9 +70,7 @@ class WritePathPolicy:
         except ValueError:
             pass
 
-        if resolved.parent == cwd and re.match(
-            r"^(ANALYSIS|CHECKPOINT)-.*\.md$", resolved.name
-        ):
+        if resolved.parent == cwd and re.match(r"^(ANALYSIS|CHECKPOINT)-.*\.md$", resolved.name):
             return WritePathTier.PREFIXED_ROOT
 
         return WritePathTier.SOURCE_CODE
@@ -75,8 +78,7 @@ class WritePathPolicy:
     @classmethod
     def read_only(cls) -> "WritePathPolicy":
         """Block all writes. Backward-compat equivalent of write_allowed=False."""
-        # max_tier=-1: every real tier (≥0) satisfies tier > -1, so allows() always returns False
-        return cls(max_tier=WritePathTier(WritePathTier.OS_TEMP.value - 1))  # type: ignore[arg-type]
+        return cls(max_tier=WritePathTier.SOURCE_CODE, _read_only=True)
 
     @classmethod
     def analysis_safe(cls) -> "WritePathPolicy":

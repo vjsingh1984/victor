@@ -100,17 +100,19 @@ def _list_tools_lightweight() -> None:
 
 async def _list_tools_async(profile: str) -> None:
     """List tools with full agent initialization (shows enabled/disabled status)."""
-    from victor.agent.orchestrator import AgentOrchestrator
+    # ✅ PROPER: Import VictorClient and SessionConfig
+    from victor.framework.client import VictorClient
+    from victor.framework.session_config import SessionConfig
 
     console.print(f"[dim]Initializing agent with profile '{profile}' to list tools...[/]")
     settings = load_settings()
     agent = None
+    client = None
     try:
-        # Unified initialization via AgentFactory
-        from victor.framework.agent_factory import AgentFactory
-
-        factory = AgentFactory(settings=settings, profile=profile)
-        agent = await factory.create()
+        # ✅ PROPER: Create VictorClient (replaces AgentFactory)
+        config = SessionConfig()  # Default config for tools listing
+        client = VictorClient(config)
+        agent = await client._ensure_initialized()
 
         # Retrieve tools from the agent's ToolRegistry
         # list_tools(only_enabled=False) gets all registered tools, regardless of current enable/disable status

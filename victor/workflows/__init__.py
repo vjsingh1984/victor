@@ -621,6 +621,8 @@ __all__ = [
 _DEPRECATED_ALIAS_MAP = {
     "TeamNodeWorkflow": TeamStepWorkflow,
 }
+_TEAM_NODE_REMOVAL_VERSION = "v0.9.0"
+_TEAM_NODE_REMOVAL_DATE = "2027-03-31"
 
 
 def __getattr__(name: str) -> Any:
@@ -628,8 +630,10 @@ def __getattr__(name: str) -> Any:
         warnings.warn(
             f"{name} is deprecated; use "
             f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
-            "The TeamNode* compatibility aliases remain during the current "
-            "migration window and will be removed in a future release.",
+            f"This compatibility alias remains supported through "
+            f"{_TEAM_NODE_REMOVAL_VERSION} ({_TEAM_NODE_REMOVAL_DATE}) and "
+            "will be removed after that milestone. "
+            "See docs/architecture/migration.md for migration guidance.",
             DeprecationWarning,
             stacklevel=2,
         )

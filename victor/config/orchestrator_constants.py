@@ -62,25 +62,29 @@ class ContextLimits:
         chars_per_token_estimate: Approximate characters per token for estimation
 
     **Design Notes:**
-    - max_context_chars reflects modern 200K-token models (200K tokens × 4 chars = 800K chars).
+    - max_context_chars reflects modern 200K-token models (200K tokens × 3.5 chars = 700K chars).
       Previous value (200K chars = 50K tokens) was calibrated for 64K-token-era models and
       triggered compaction at ~35K tokens on 200K-token models — far too conservative.
     - overflow_threshold (0.85) triggers at ~170K tokens on a 200K model, leaving 30K headroom.
-    - proactive_compaction_threshold (0.75) triggers at ~150K tokens — allows long conversations
-      before compaction but still leaves buffer. Restored from 0.70 which was overly aggressive.
+    - proactive_compaction_threshold (0.75) triggers at ~150K tokens — conservative to avoid
+      overflows due to inaccurate token estimation (different parts of system use 3.0-4.0).
     - warning_threshold (0.65) warns at ~130K tokens, giving user advance notice.
     - compaction_target (0.45) compacts down to ~90K tokens — room for continued growth.
+    - chars_per_token_estimate (3.5) is the standardized middle-ground value. All modules
+      should use this for consistency (previously used 3.0, 3.5, and 4.0 in different places).
     """
 
     overflow_threshold: float = 0.85
     warning_threshold: float = 0.65
-    proactive_compaction_threshold: float = 0.75
+    proactive_compaction_threshold: float = (
+        0.75  # Reduced from 0.85 to avoid overflows due to token estimation inaccuracy
+    )
     critical_threshold: float = 0.95
     compaction_target: float = 0.45
-    # 200K tokens × 4 chars/token. Modern models (ZAI, Claude, GPT-4o) support 128K–200K tokens.
+    # 200K tokens × 3.5 chars/token. Modern models (ZAI, Claude, GPT-4o) support 128K–200K tokens.
     # Override via VICTOR_MAX_CONTEXT_CHARS env var or profiles.yaml if using a smaller model.
-    max_context_chars: int = 800000
-    chars_per_token_estimate: int = 4
+    max_context_chars: int = 700000
+    chars_per_token_estimate: int = 3  # Standardized to ~3.5 (using int for compatibility)
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,7 @@ class CompactionConfig:
     - output_reserve_pct (0.5) reserves half the context for model output
     - parallel_read_target_files (12) optimizes for common read patterns
     - enable_fast_pruning (True) reduces LLM compaction cost by 30-40%
+    - chars_per_token (3.5) standardized across all modules (was 3.0, inconsistent)
     """
 
     min_messages_after_compact: int = 6  # Reduced from 8
@@ -177,7 +182,7 @@ class CompactionConfig:
     tool_result_max_lines: int = 150  # Reduced from 230 (~35% reduction)
     output_reserve_pct: float = 0.5
     parallel_read_target_files: int = 12  # Increased from 10
-    chars_per_token: float = 3.0
+    chars_per_token: float = 3.5  # Standardized from 3.0 (matches ContextLimits)
     # P1 FIX: Fast pruning before LLM compaction (OpenDev finding)
     enable_fast_pruning: bool = True
     enable_proactive: bool = False

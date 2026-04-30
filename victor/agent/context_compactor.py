@@ -206,14 +206,15 @@ class CompactorConfig:
     enable_tool_truncation: bool = True
     enable_phase_aware: bool = True
     enable_fast_pruning: bool = COMPACTION_CONFIG.enable_fast_pruning
-    # Phase-specific thresholds: EXPLORATION (keep diverse), PLANNING (focus),
-    # EXECUTION (balance), REVIEW (comprehensive)
+    # Phase-specific thresholds (75% conservative to avoid overflows due to token estimation inaccuracy)
+    # Reduced from 85-90% to 75% to provide safety buffer for inconsistent chars_per_token values
+    # across different modules (ContextLimits: 3.0, CompactionConfig: 3.5, ConversationStore: 4.0)
     phase_thresholds: Dict[TaskPhase, float] = field(
         default_factory=lambda: {
-            TaskPhase.EXPLORATION: 0.80,  # Keep diverse file coverage
-            TaskPhase.PLANNING: 0.60,  # Focus on task-relevant messages
-            TaskPhase.EXECUTION: 0.70,  # Prioritize recent context
-            TaskPhase.REVIEW: 0.75,  # Full context for review
+            TaskPhase.EXPLORATION: 0.75,  # Reduced from 0.85 - safety buffer for token estimation
+            TaskPhase.PLANNING: 0.75,  # Reduced from 0.90 - avoid premature compaction
+            TaskPhase.EXECUTION: 0.75,  # Reduced from 0.85 - prioritize recent context
+            TaskPhase.REVIEW: 0.75,  # Reduced from 0.85 - full context for review
         }
     )
 

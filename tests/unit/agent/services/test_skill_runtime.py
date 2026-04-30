@@ -65,9 +65,7 @@ def test_skill_runtime_applies_multiple_matches_and_records_analytics():
             {"name": "refactor", "score": 0.88},
         ],
     }
-    analytics.record_multi_selection.assert_called_once_with(
-        [("debug", 0.9), ("refactor", 0.876)]
-    )
+    analytics.record_multi_selection.assert_called_once_with([("debug", 0.9), ("refactor", 0.876)])
     host.inject_skill.assert_not_called()
 
 

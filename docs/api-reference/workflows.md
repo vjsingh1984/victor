@@ -895,7 +895,7 @@ class TeamStep:
 
 `TeamNode` / `TeamNodeConfig` are deprecated compatibility aliases. Use
 `TeamStep` / `TeamStepConfig`; the legacy names remain available during the
-current migration window and will be removed in a future release.
+current migration window and will be removed in `v0.9.0` (`2027-03-31`).
 
 **YAML Example:**
 ```yaml

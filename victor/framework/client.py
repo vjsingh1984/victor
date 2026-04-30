@@ -178,12 +178,14 @@ class VictorClient:
         # Apply SessionConfig overrides to settings (ONLY place where settings is mutated)
         self._config.apply_to_settings(settings)
 
+        # Extract provider/model from settings (used only if no profile specified)
         provider_settings = getattr(settings, "provider", None)
         provider_name = getattr(provider_settings, "default_provider", None)
         model_name = getattr(provider_settings, "default_model", None)
 
-        # Create agent with SessionConfig
+        # Create agent with SessionConfig (including agent_profile if specified)
         self._agent = await Agent.create(
+            profile=self._config.agent_profile,  # Pass agent_profile from SessionConfig
             provider=provider_name,
             model=model_name,
             session_config=self._config,  # Pass SessionConfig
@@ -191,7 +193,8 @@ class VictorClient:
         self._initialized = True
 
         logger.info(
-            "VictorClient initialized (SessionConfig applied: tool_budget=%s, smart_routing=%s)",
+            "VictorClient initialized (SessionConfig applied: agent_profile=%s, tool_budget=%s, smart_routing=%s)",
+            self._config.agent_profile,
             self._config.tool_budget,
             self._config.smart_routing.enabled,
         )

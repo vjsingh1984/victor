@@ -342,18 +342,12 @@ def run_skill(
     async def _run():
         from victor.config.settings import load_settings
         from victor.core.verticals import get_vertical
-        from victor.framework.shim import FrameworkShim
+
+        # ✅ PROPER: Use VictorClient instead of FrameworkShim
+        from victor.framework.client import VictorClient
+        from victor.framework.session_config import SessionConfig
 
         settings = load_settings()
-
-        # Apply provider/model overrides
-        if provider:
-            settings.provider.default_provider = provider
-        if model:
-            settings.provider.default_model = model
-
-        # Set tool budget from skill
-        settings.tools.tool_call_budget = skill.max_tool_calls
 
         # Compose the skill system prompt
         skill_system_prompt = (
@@ -370,14 +364,19 @@ def run_skill(
         except Exception:
             pass  # No matching vertical — run without one
 
-        shim = FrameworkShim(
-            settings,
-            profile_name=profile,
+        # ✅ PROPER: Create SessionConfig with all overrides
+        config = SessionConfig.from_cli_flags(
+            provider=provider,
+            model=model,
+            tool_budget=skill.max_tool_calls,
             thinking=thinking,
-            vertical=vertical_class,
+            profile=profile,
+            vertical=vertical_class.__name__ if vertical_class else None,
             enable_observability=False,
         )
-        agent = await shim.create_orchestrator()
+
+        client = VictorClient(config)
+        agent = await client._ensure_initialized()
 
         # Inject skill prompt into the agent's system prompt
         if hasattr(agent, "_system_prompt"):

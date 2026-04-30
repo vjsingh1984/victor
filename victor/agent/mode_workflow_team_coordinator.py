@@ -26,11 +26,7 @@ from victor.framework.coordination_runtime import (
     ModeCoordinationConfig,
     RuleBasedTeamSelector,
     RuleBasedWorkflowSelector,
-    build_coordination_suggestion,
-    get_action_for_complexity,
-    recommend_teams_for_catalog,
-    recommend_workflows_for_catalog,
-    resolve_default_workflow_for_mode,
+    VerticalCoordinationAdvisor,
 )
 from victor.protocols.coordination import (
     CoordinationSuggestion,
@@ -54,31 +50,26 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         workflow_selector: Optional[Any] = None,
         mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
     ):
-        self._vertical_context = vertical_context
-        self._team_selector = team_selector or HybridTeamSelector(
-            RuleBasedTeamSelector(),
-            LearningBasedTeamSelector(),
+        self._advisor = VerticalCoordinationAdvisor(
+            vertical_context=vertical_context,
+            team_selector=team_selector,
+            workflow_selector=workflow_selector,
+            mode_configs=mode_configs,
         )
-        self._workflow_selector = workflow_selector or RuleBasedWorkflowSelector()
-        self._mode_configs = mode_configs or DEFAULT_MODE_CONFIGS.copy()
 
         logger.debug(
-            "ModeWorkflowTeamCoordinator initialized: team_selector=%s, workflow_selector=%s",
-            type(self._team_selector).__name__,
-            type(self._workflow_selector).__name__,
+            "ModeWorkflowTeamCoordinator initialized: advisor=%s",
+            type(self._advisor).__name__,
         )
 
     def set_vertical_context(self, context: "VerticalContext") -> None:
         """Set the vertical context."""
-        self._vertical_context = context
+        self._advisor.set_vertical_context(context)
         logger.debug("Coordinator vertical context set: %s", context.vertical_name)
 
     def set_team_learner(self, learner: "TeamCompositionLearner") -> None:
         """Set the team composition learner for learning-aware selectors."""
-        if isinstance(self._team_selector, HybridTeamSelector):
-            self._team_selector._learning_selector.set_learner(learner)
-        elif isinstance(self._team_selector, LearningBasedTeamSelector):
-            self._team_selector.set_learner(learner)
+        self._advisor.set_team_learner(learner)
 
     def suggest_for_task(
         self,
@@ -87,15 +78,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         mode: str,
     ) -> CoordinationSuggestion:
         """Suggest teams and workflows for a task."""
-        suggestion = build_coordination_suggestion(
-            task_type=task_type,
-            complexity=complexity,
-            mode=mode,
-            coordination_catalog=self._get_coordination_catalog(),
-            team_selector=self._team_selector,
-            workflow_selector=self._workflow_selector,
-            mode_configs=self._mode_configs,
-        )
+        suggestion = self._advisor.suggest_for_task(task_type, complexity, mode)
 
         logger.info(
             "Coordination suggestion: mode=%s, task=%s, complexity=%s, action=%s, "
@@ -111,11 +94,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
 
     def get_default_workflow(self, mode: str) -> Optional[str]:
         """Get the default workflow for a mode."""
-        return resolve_default_workflow_for_mode(
-            mode,
-            coordination_catalog=self._get_coordination_catalog(),
-            mode_configs=self._mode_configs,
-        )
+        return self._advisor.get_default_workflow(mode)
 
     def get_suggested_teams(
         self,
@@ -123,12 +102,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         complexity: str,
     ) -> List[Any]:
         """Get team suggestions for a task."""
-        return recommend_teams_for_catalog(
-            task_type=task_type,
-            complexity=complexity,
-            coordination_catalog=self._get_coordination_catalog(),
-            team_selector=self._team_selector,
-        )
+        return self._advisor.get_suggested_teams(task_type, complexity)
 
     def get_action_for_complexity(
         self,
@@ -136,17 +110,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         mode: str,
     ) -> Any:
         """Determine action based on complexity and mode."""
-        return get_action_for_complexity(
-            complexity,
-            mode,
-            mode_configs=self._mode_configs,
-        )
-
-    def _get_coordination_catalog(self) -> Any:
-        """Resolve the shared team/workflow catalog for the current vertical context."""
-        from victor.framework.team_runtime import resolve_vertical_coordination_catalog
-
-        return resolve_vertical_coordination_catalog(self._vertical_context)
+        return self._advisor.get_action_for_complexity(complexity, mode)
 
     def _get_workflow_recommendations(
         self,
@@ -154,12 +118,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         mode: str,
     ) -> List[Any]:
         """Get workflow recommendations for a task."""
-        return recommend_workflows_for_catalog(
-            task_type=task_type,
-            mode=mode,
-            coordination_catalog=self._get_coordination_catalog(),
-            workflow_selector=self._workflow_selector,
-        )
+        return self._advisor.get_workflow_recommendations(task_type, mode)
 
 
 def create_coordinator(

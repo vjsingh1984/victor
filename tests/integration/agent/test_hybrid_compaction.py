@@ -300,9 +300,9 @@ class TestConversationControllerIntegration:
             controller.add_user_message(f"Message {i}")
             controller.add_assistant_message(f"Response {i}")
 
-        # Check compaction works
+        # Check compaction works (use force=True to bypass threshold checks for testing)
         initial_count = controller.message_count
-        removed = controller.smart_compact_history(target_messages=10)
+        removed = controller.smart_compact_history(target_messages=10, force=True)
 
         assert removed > 0
         assert controller.message_count < initial_count

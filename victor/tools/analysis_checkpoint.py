@@ -7,6 +7,7 @@ recorded mtimes via the graph_file_mtime DB table (filesystem fallback when unav
 Token economics: reading a cached checkpoint (~500 tokens) vs re-running a deep analysis
 (8,000–15,000 tokens) gives a 15–30x saving when source files haven't changed.
 """
+
 from __future__ import annotations
 
 import re
@@ -52,9 +53,7 @@ def _check_staleness(source_files: List[Dict[str, Any]]) -> List[str]:
         project_db = get_project_database()
         for entry in source_files:
             path, recorded = entry["path"], float(entry["mtime"])
-            rows = project_db.query(
-                "SELECT mtime FROM graph_file_mtime WHERE file = ?", (path,)
-            )
+            rows = project_db.query("SELECT mtime FROM graph_file_mtime WHERE file = ?", (path,))
             if rows:
                 current = float(dict(rows[0])["mtime"])
             else:
@@ -203,20 +202,24 @@ async def analysis_checkpoint(
             try:
                 fm, _ = _parse_frontmatter(md_file.read_text())
                 stale = _check_staleness(fm.get("source_files", []))
-                results.append({
-                    "topic": fm.get("topic", md_file.stem),
-                    "path": str(md_file),
-                    "status": "stale" if stale else "current",
-                    "created_at": fm.get("created_at"),
-                    "source_files": [e["path"] for e in fm.get("source_files", [])],
-                    "stale_files": stale,
-                })
+                results.append(
+                    {
+                        "topic": fm.get("topic", md_file.stem),
+                        "path": str(md_file),
+                        "status": "stale" if stale else "current",
+                        "created_at": fm.get("created_at"),
+                        "source_files": [e["path"] for e in fm.get("source_files", [])],
+                        "stale_files": stale,
+                    }
+                )
             except Exception:
-                results.append({
-                    "topic": md_file.stem,
-                    "path": str(md_file),
-                    "status": "unknown",
-                })
+                results.append(
+                    {
+                        "topic": md_file.stem,
+                        "path": str(md_file),
+                        "status": "unknown",
+                    }
+                )
         return {"checkpoints": results, "count": len(results)}
 
     return {"error": f"Unknown mode: {mode!r}. Use 'read', 'write', or 'list'"}

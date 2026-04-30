@@ -138,6 +138,36 @@ class ComponentAssembler:
             hierarchical_manager=(factory.create_hierarchical_compaction_manager()),
         )
 
+        # Stage transition coordinator (Phase 16: Streaming Path Optimization)
+        # Batches tool executions and applies Phase 1 optimizations consistently
+        # across both streaming and non-streaming paths
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        if get_feature_flag_manager().is_enabled(FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR):
+            from victor.agent.coordinators import (
+                StageTransitionCoordinator,
+                HybridTransitionStrategy,
+            )
+
+            # Check if edge model is enabled for the hybrid strategy
+            edge_model_enabled = get_feature_flag_manager().is_enabled(FeatureFlag.USE_EDGE_MODEL)
+
+            orchestrator.transition_coordinator = StageTransitionCoordinator(
+                state_machine=orchestrator.conversation_state,
+                strategy=HybridTransitionStrategy(edge_model_enabled=edge_model_enabled),
+                cooldown_seconds=2.0,  # Phase 1 cooldown
+                min_tools_for_transition=5,  # Allow more work per turn
+            )
+
+            # Wire coordinator to state machine for batching
+            orchestrator.conversation_state.set_transition_coordinator(
+                orchestrator.transition_coordinator
+            )
+
+            logger.info("[ComponentAssembler] StageTransitionCoordinator enabled")
+        else:
+            orchestrator.transition_coordinator = None
+
         # Session ledger and lifecycle manager
         orchestrator._session_ledger = factory.create_session_ledger()
         orchestrator._lifecycle_manager = factory.create_lifecycle_manager(

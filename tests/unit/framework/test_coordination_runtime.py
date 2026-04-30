@@ -6,6 +6,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from victor.framework.coordination_runtime import (
+    VerticalCoordinationAdvisor,
     build_registered_coordination_suggestions,
     RuleBasedTeamSelector,
     RuleBasedWorkflowSelector,
@@ -208,3 +209,38 @@ def test_build_registered_coordination_suggestions_keeps_requested_vertical_even
     assert payload["vertical"] == "coding"
     assert payload["primary_team"] is None
     assert payload["primary_workflow"] is None
+
+
+def test_vertical_coordination_advisor_uses_shared_framework_catalogs() -> None:
+    context = create_vertical_context("coding")
+    context.apply_team_specs(
+        {
+            "feature_team": SimpleNamespace(
+                name="Feature Team",
+                formation="parallel",
+                members=[],
+                description="Handles feature implementation",
+            )
+        }
+    )
+    context.apply_workflows(
+        {
+            "feature_implementation": SimpleNamespace(
+                name="feature_implementation",
+                description="Implement features end-to-end",
+            )
+        }
+    )
+    advisor = VerticalCoordinationAdvisor(
+        vertical_context=context,
+        team_selector=RuleBasedTeamSelector(),
+        workflow_selector=RuleBasedWorkflowSelector(),
+    )
+
+    suggestion = advisor.suggest_for_task("feature", "high", "build")
+
+    assert suggestion.primary_team is not None
+    assert suggestion.primary_team.team_name == "feature_team"
+    assert suggestion.primary_workflow is not None
+    assert suggestion.primary_workflow.workflow_name == "feature_implementation"
+    assert advisor.get_default_workflow("build") == "feature_implementation"

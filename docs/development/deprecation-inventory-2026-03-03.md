@@ -9,6 +9,7 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 | `UnifiedWorkflowCompilerAdapter` legacy API surface | `victor/workflows/adapter.py` | Protocol-based compiler API (`victor.workflows.compiler`) | Architecture Lead | `v0.7.0` | `2026-06-30` |
 | ~~`UnifiedWorkflowCompiler`~~ | `victor/workflows/unified_compiler.py` | **Removed from deprecation** — canonical compiler API; `create_compiler` was never implemented. See M4 update below. | Architecture Lead | N/A | N/A |
 | `WorkflowGraph` alias from `victor.workflows.graph` | `victor/workflows/graph.py` | `BasicWorkflowGraph` or `victor.workflows.graph_dsl.WorkflowGraph` | Architecture Lead | `v0.8.0` | `2026-12-31` |
+| `TeamNode*` workflow compatibility aliases (`TeamNode`, `TeamNodeConfig`, `TeamNodeWorkflow`, `TeamNodeExecutor`) | `victor/framework/workflows/nodes.py`, `victor/workflows/{__init__,definition.py}`, `victor/workflows/executors/{__init__,team.py}` | `TeamStep*` workflow names | Architecture Lead | `v0.9.0` | `2027-03-31` |
 | Sync `AgentOrchestrator.switch_provider(...)` | `victor/agent/orchestrator.py` | Async `await orchestrator.switch_provider(...)` | Architecture Lead | `v0.8.0` | `2026-12-31` |
 | `get_tiered_tools()` extension hook | `victor/core/verticals/extension_loader.py` | `get_tiered_tool_config()` | Verticals Lead | `v0.7.0` | `2026-06-30` |
 | `TASK_TYPE_HINTS` and deprecated task-hint fallback path | `victor/agent/prompt_builder.py` | Vertical prompt contributors + `get_task_type_hint(..., prompt_contributors=[...])` | Architecture Lead | `v0.8.0` | `2026-12-31` |
@@ -25,6 +26,8 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 
 - Entries with explicit source-level targets were kept as-is (`v0.7.0` / `2026-06-30`).
 - Entries without explicit source targets are assigned provisional `v0.8.0` / `2026-12-31` per policy and should be re-validated at each milestone cut.
+- `TeamNode*` workflow aliases were deprecated after `0.7.0` and therefore use
+  the next compliant two-minor-release milestone: `v0.9.0` / `2027-03-31`.
 - `VerticalBase.create_agent()` and the legacy config-only vertical activation shim
   share the same provisional removal milestone: `v0.8.0` / `2026-12-31`.
 - Until that removal milestone lands, each release note set must include:

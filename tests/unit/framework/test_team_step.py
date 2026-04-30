@@ -43,6 +43,16 @@ class TestTeamStepCompatibilityAliases:
 
         assert TeamStep is alias
 
+    def test_alias_warning_mentions_removal_milestone(self):
+        """Legacy alias warnings should publish the concrete removal milestone."""
+        with pytest.warns(DeprecationWarning) as caught:
+            _ = nodes_module.TeamNode
+
+        message = str(caught[0].message)
+        assert "v0.9.0" in message
+        assert "2027-03-31" in message
+        assert "TeamStep" in message
+
 
 class TestTeamStepConfig:
     """Tests for TeamStepConfig dataclass."""

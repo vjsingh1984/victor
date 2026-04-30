@@ -407,6 +407,14 @@ class TurnExecutor:
         overrides = dict(runtime_context_overrides or {})
         runtime_snapshot = self._apply_runtime_context_overrides(overrides)
         try:
+            # PHASE 16: Begin turn for stage transition batching
+            # This batches tool executions and applies Phase 1 optimizations consistently
+            _orch = getattr(self, "_orchestrator", None) or getattr(
+                self._chat_context, "_orchestrator", None
+            )
+            if _orch and hasattr(_orch, "transition_coordinator") and _orch.transition_coordinator:
+                _orch.transition_coordinator.begin_turn()
+
             effective_tool_budget = self._coerce_int_override(overrides.get("tool_budget"))
             if effective_tool_budget is None:
                 effective_tool_budget = self._tool_context.tool_budget
@@ -542,6 +550,14 @@ class TurnExecutor:
                                 result.get("tool_name", "unknown"),
                                 result["error"],
                             )
+
+            # PHASE 16: End turn for stage transition batching
+            # Processes all batched tools and applies Phase 1 optimizations
+            new_stage = None
+            if _orch and hasattr(_orch, "transition_coordinator") and _orch.transition_coordinator:
+                new_stage = _orch.transition_coordinator.end_turn()
+                if new_stage:
+                    logger.debug(f"[TurnExecutor] Stage transitioned to {new_stage.name}")
 
             return TurnResult(
                 response=response,

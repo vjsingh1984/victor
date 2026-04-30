@@ -772,7 +772,10 @@ async def _execute_workflow_async(
     profile: Optional[str],
 ) -> None:
     from victor.config.settings import load_settings
-    from victor.framework.shim import FrameworkShim
+
+    # ✅ PROPER: Use VictorClient instead of FrameworkShim
+    from victor.framework.client import VictorClient
+    from victor.framework.session_config import SessionConfig
     from victor.ui.commands.utils import graceful_shutdown
     from victor.workflows import ExecutorConfig, StateGraphExecutor
     from victor.workflows.definition import AgentNode
@@ -808,12 +811,10 @@ async def _execute_workflow_async(
         for profile_name in sorted(all_profiles):
             try:
                 logger.debug(f"Creating orchestrator for profile: {profile_name}")
-                shim = FrameworkShim(
-                    settings,
-                    profile_name=profile_name,
-                    vertical=None,
-                )
-                orchestrator = await shim.create_orchestrator()
+                # ✅ PROPER: Use VictorClient instead of FrameworkShim
+                config = SessionConfig(profile=profile_name)
+                client = VictorClient(config)
+                orchestrator = await client._ensure_initialized()
                 orchestrators[profile_name] = orchestrator
                 logger.debug(f"Successfully created orchestrator for profile: {profile_name}")
                 console.print(f"  [dim]✓ Profile '{profile_name}' initialized[/]")
@@ -1130,7 +1131,10 @@ async def _generate_workflow_async(
     dry_run: bool,
 ) -> None:
     from victor.config.settings import load_settings
-    from victor.framework.shim import FrameworkShim
+
+    # ✅ PROPER: Use VictorClient instead of FrameworkShim
+    from victor.framework.client import VictorClient
+    from victor.framework.session_config import SessionConfig
     from victor.ui.commands.utils import graceful_shutdown
     from victor.workflows.generation import (
         PipelineMode,
@@ -1145,12 +1149,10 @@ async def _generate_workflow_async(
 
     profile_name = profile or "default"
     try:
-        shim = FrameworkShim(
-            settings,
-            profile_name=profile_name,
-            vertical=vertical,
-        )
-        orchestrator = await shim.create_orchestrator()
+        # ✅ PROPER: Use VictorClient instead of FrameworkShim
+        config = SessionConfig(profile=profile_name, vertical=vertical)
+        client = VictorClient(config)
+        orchestrator = await client._ensure_initialized()
         console.print(f"[dim]Using profile: {profile_name}[/]")
     except Exception as e:
         console.print(f"[bold red]Error:[/] Failed to create orchestrator: {e}")

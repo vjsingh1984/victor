@@ -24,12 +24,17 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Dict, Optional, Set
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 
 from victor.agent.decisions.schemas import DecisionType
 from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.config.decision_settings import DecisionServiceSettings
-from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
+from victor.framework.runtime_evaluation_policy import (
+    RuntimeEvaluationFeedback,
+    RuntimeEvaluationPolicy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +43,85 @@ FALLBACK_CHAIN = {
     "balanced": ["edge"],
     "edge": [],
 }
+
+
+# =============================================================================
+# Classification Triage Data Structures
+# =============================================================================
+
+
+class ClassificationTriage(str, Enum):
+    """Classification triage outcome.
+
+    Determines how to handle a classification result based on confidence:
+    - ACCEPT: High confidence (≥0.8), use immediately (fast path)
+    - VERIFY: Medium confidence (0.5-0.8), verify with edge LLM
+    - REJECT: Low confidence (<0.5), reject early (avoid waste)
+    """
+
+    ACCEPT = "accept"  # High confidence, use immediately
+    VERIFY = "verify"  # Medium confidence, verify with edge LLM
+    REJECT = "reject"  # Low confidence, reject early
+
+
+@dataclass
+class EdgeLLMVerificationResult:
+    """Result of edge LLM verification for grey-area classifications.
+
+    When a classification falls in the VERIFY band (0.5-0.8 confidence),
+    the edge LLM is consulted to verify or correct the classification.
+    """
+
+    original_result: Any  # Original classification result
+    original_confidence: float  # Original confidence score
+    verified_result: Any  # Verified/corrected result from edge LLM
+    verification_confidence: float  # Confidence of the verification
+    verification_passed: bool  # Whether verification passed (confidence ≥ high threshold)
+    latency_ms: float  # Verification latency in milliseconds
+    tokens_used: int  # Tokens used for verification
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging/serialization."""
+        return {
+            "original_result": str(self.original_result),
+            "original_confidence": self.original_confidence,
+            "verified_result": str(self.verified_result),
+            "verification_confidence": self.verification_confidence,
+            "verification_passed": self.verification_passed,
+            "latency_ms": self.latency_ms,
+            "tokens_used": self.tokens_used,
+        }
+
+
+@dataclass
+class TieredClassificationResult:
+    """Result of tiered classification with confidence-based triage.
+
+    Combines base classification with optional edge LLM verification
+    based on confidence bands (ACCEPT, VERIFY, REJECT).
+    """
+
+    result: Any  # The classification result (task type, intent, etc.)
+    confidence: float  # Final confidence score (0.0-1.0)
+    triage_outcome: ClassificationTriage  # Triage decision
+    source: str  # "keyword", "semantic", "llm", "edge_verification"
+    verification_result: Optional[EdgeLLMVerificationResult] = None  # Present if VERIFY
+    latency_ms: float = 0.0  # Total latency including verification
+    metadata: Dict[str, Any] = field(default_factory=dict)  # Additional metadata
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging/serialization."""
+        return {
+            "result": str(self.result),
+            "confidence": self.confidence,
+            "triage_outcome": self.triage_outcome.value,
+            "source": self.source,
+            "verification_result": (
+                self.verification_result.to_dict() if self.verification_result else None
+            ),
+            "latency_ms": self.latency_ms,
+            "metadata": dict(self.metadata),
+        }
 
 
 class TieredDecisionService:
@@ -450,6 +534,230 @@ class TieredDecisionService:
 
         return new_tier
 
+    def classify_with_triage(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+        runtime_policy: Optional[RuntimeEvaluationPolicy] = None,
+    ) -> TieredClassificationResult:
+        """Classify with confidence-based triage using canonical thresholds.
+
+        Triage Logic:
+        - confidence ≥ 0.8: ACCEPT (fast path, ~4-5μs)
+        - 0.5 ≤ confidence < 0.8: VERIFY (edge LLM, ~50-200ms)
+        - confidence < 0.5: REJECT (early rejection, ~1μs)
+
+        This method implements the core confidence-based triage system for
+        all classification types (task type, intent, tool selection, etc.).
+
+        Args:
+            decision_type: Type of classification
+            context: Classification context
+            heuristic_result: Pre-computed heuristic result
+            heuristic_confidence: Confidence of the heuristic (0.0-1.0)
+            runtime_policy: Optional runtime evaluation policy (uses defaults if None)
+
+        Returns:
+            TieredClassificationResult with triage outcome and optional verification
+        """
+        import time
+
+        start = time.monotonic()
+
+        # Use RuntimeEvaluationPolicy as canonical threshold source
+        if runtime_policy is None:
+            runtime_policy = RuntimeEvaluationPolicy()
+
+        # Get base classification result
+        base_result = self.decide_sync(
+            decision_type,
+            context,
+            heuristic_result=heuristic_result,
+            heuristic_confidence=heuristic_confidence,
+        )
+
+        base_latency_ms = (time.monotonic() - start) * 1000
+        confidence = base_result.confidence
+
+        # High confidence: Accept immediately (fast path)
+        if confidence >= runtime_policy.high_confidence_threshold:
+            logger.debug(
+                "Classification %s: high confidence (%.2f), accepting immediately (fast path)",
+                decision_type.value,
+                confidence,
+            )
+            return TieredClassificationResult(
+                result=base_result.result,
+                confidence=confidence,
+                triage_outcome=ClassificationTriage.ACCEPT,
+                source=base_result.source,
+                latency_ms=base_latency_ms,
+                metadata={
+                    "fast_path": True,
+                    "original_source": base_result.source,
+                },
+            )
+
+        # Medium confidence: Verify with edge LLM
+        if confidence >= runtime_policy.medium_confidence_threshold:
+            logger.debug(
+                "Classification %s: medium confidence (%.2f), triggering verification",
+                decision_type.value,
+                confidence,
+            )
+            verification = self._verify_with_edge_llm(
+                decision_type,
+                context,
+                base_result,
+                runtime_policy,
+            )
+            total_latency_ms = base_latency_ms + verification.latency_ms
+
+            # Use verified result if verification passed
+            final_result = (
+                verification.verified_result
+                if verification.verification_passed
+                else base_result.result
+            )
+            final_confidence = (
+                verification.verification_confidence
+                if verification.verification_passed
+                else confidence
+            )
+            final_source = (
+                "edge_verification" if verification.verification_passed else base_result.source
+            )
+
+            return TieredClassificationResult(
+                result=final_result,
+                confidence=final_confidence,
+                triage_outcome=ClassificationTriage.VERIFY,
+                source=final_source,
+                verification_result=verification,
+                latency_ms=total_latency_ms,
+                metadata={
+                    "verification_passed": verification.verification_passed,
+                    "original_source": base_result.source,
+                    "original_confidence": confidence,
+                },
+            )
+
+        # Low confidence: Reject early
+        logger.debug(
+            "Classification %s: low confidence (%.2f), rejecting early",
+            decision_type.value,
+            confidence,
+        )
+        return TieredClassificationResult(
+            result=heuristic_result,  # Fall back to heuristic
+            confidence=heuristic_confidence,
+            triage_outcome=ClassificationTriage.REJECT,
+            source="heuristic_fallback",
+            latency_ms=base_latency_ms,
+            metadata={
+                "reason": "confidence_below_threshold",
+                "original_source": base_result.source,
+                "original_confidence": confidence,
+                "threshold": runtime_policy.medium_confidence_threshold,
+            },
+        )
+
+    def _verify_with_edge_llm(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        original_result: DecisionResult,
+        runtime_policy: RuntimeEvaluationPolicy,
+    ) -> EdgeLLMVerificationResult:
+        """Verify grey-area classification with edge LLM.
+
+        This is a STRATEGY METHOD - can be overridden for different verification strategies.
+        Default implementation uses edge tier with verification prompt.
+
+        Args:
+            decision_type: Type of decision to verify
+            context: Original classification context
+            original_result: Original decision result to verify
+            runtime_policy: Runtime evaluation policy for thresholds
+
+        Returns:
+            EdgeLLMVerificationResult with verification outcome
+        """
+        import time
+
+        start = time.monotonic()
+
+        # Get edge tier service
+        edge_service = self._get_service("edge")
+        if edge_service is None:
+            # Edge unavailable - conservatively reject
+            logger.debug("Edge tier unavailable for verification, conservatively rejecting")
+            return EdgeLLMVerificationResult(
+                original_result=original_result.result,
+                original_confidence=original_result.confidence,
+                verified_result=original_result.result,
+                verification_confidence=original_result.confidence,
+                verification_passed=False,  # Conservative when edge unavailable
+                latency_ms=0.0,
+                tokens_used=0,
+            )
+
+        # Create verification context with original result
+        verification_context = {
+            **context,
+            "original_classification": str(original_result.result),
+            "original_confidence": f"{original_result.confidence:.2f}",
+            "verification_task": "verify",
+        }
+
+        # Call edge LLM for verification
+        try:
+            verification = edge_service.decide_sync(
+                decision_type,
+                verification_context,
+                heuristic_result=original_result.result,
+                heuristic_confidence=original_result.confidence,
+            )
+
+            latency_ms = (time.monotonic() - start) * 1000
+
+            # Verification passes if edge LLM confidence ≥ high threshold
+            verification_passed = (
+                verification.confidence >= runtime_policy.high_confidence_threshold
+            )
+
+            logger.debug(
+                "Edge LLM verification: passed=%s, confidence=%.2f → %.2f (latency=%.1fms)",
+                verification_passed,
+                original_result.confidence,
+                verification.confidence,
+                latency_ms,
+            )
+
+            return EdgeLLMVerificationResult(
+                original_result=original_result.result,
+                original_confidence=original_result.confidence,
+                verified_result=verification.result,
+                verification_confidence=verification.confidence,
+                verification_passed=verification_passed,
+                latency_ms=latency_ms,
+                tokens_used=getattr(verification, "tokens_used", 0),
+            )
+
+        except Exception as e:
+            logger.warning("Edge LLM verification failed: %s", e)
+            return EdgeLLMVerificationResult(
+                original_result=original_result.result,
+                original_confidence=original_result.confidence,
+                verified_result=original_result.result,
+                verification_confidence=original_result.confidence,
+                verification_passed=False,  # Conservative on error
+                latency_ms=(time.monotonic() - start) * 1000,
+                tokens_used=0,
+            )
+
     def get_tier(self, decision_type: DecisionType) -> str:
         """Get current tier for a decision type."""
         return self._tier_routing.get(decision_type.value, "edge")
@@ -469,6 +777,51 @@ class TieredDecisionService:
             "failed_tiers": list(self._failed_tiers),
             "routing": dict(self._tier_routing),
         }
+
+    @property
+    def budget_remaining(self) -> int:
+        """Number of LLM decision calls remaining in the current turn budget.
+
+        Sums budgets across all active tier services. Returns 0 if no services
+        are available or if none track budget.
+        """
+        total = 0
+        for service in self._services.values():
+            if hasattr(service, "budget_remaining"):
+                try:
+                    total += service.budget_remaining
+                except Exception:
+                    # Service may not support budget tracking
+                    pass
+        return total
+
+    def reset_budget(self) -> None:
+        """Reset the per-turn LLM call budget for all tier services.
+
+        Called at the start of each turn to ensure all services have
+        their full budget available.
+        """
+        for service in self._services.values():
+            if hasattr(service, "reset_budget"):
+                try:
+                    service.reset_budget()
+                except Exception as e:
+                    logger.warning(f"Failed to reset budget for service: {e}")
+
+    def is_healthy(self) -> bool:
+        """Check if the decision service is operational.
+
+        Returns True if at least one tier service is available and not failed.
+        """
+        # Service is healthy if we have at least one active service
+        # and not all tiers have failed
+        if not self._services:
+            # No services initialized yet - try to detect and initialize
+            return self._detect_active_provider() is not None
+
+        # Check if we have any non-failed services
+        active_tiers = set(self._services.keys()) - self._failed_tiers
+        return len(active_tiers) > 0
 
 
 def create_tiered_decision_service(

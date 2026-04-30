@@ -245,10 +245,46 @@ class TaskCoordinator:
         """
         from victor.agent.action_authorizer import (
             ActionIntent,
+            IntentClassification,
+            PROMPT_GUARDS,
+            SAFE_ACTIONS,
             has_explicit_readonly_shell_request,
+            split_continuation_request,
         )
 
+        previous_intent = self._current_intent
         intent_result = self.task_analyzer.detect_intent(user_message)
+        is_continuation, continuation_payload = split_continuation_request(user_message)
+
+        if (
+            is_continuation
+            and isinstance(previous_intent, ActionIntent)
+            and (
+                not continuation_payload
+                or (
+                    intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.AMBIGUOUS)
+                    and getattr(intent_result, "confidence", 0.0) <= 0.3
+                    and all(
+                        signal == "continuation_with_payload"
+                        for signal in list(getattr(intent_result, "matched_signals", []) or [])
+                    )
+                )
+            )
+        ):
+            carry_forward_signal = "continuation_carry_forward"
+            prior_matches = list(getattr(intent_result, "matched_signals", []) or [])
+            intent_result = IntentClassification(
+                intent=previous_intent,
+                confidence=max(getattr(intent_result, "confidence", 0.0), 0.85),
+                matched_signals=[carry_forward_signal, *prior_matches],
+                safe_actions=SAFE_ACTIONS[previous_intent].copy(),
+                prompt_guard=PROMPT_GUARDS[previous_intent],
+            )
+            logger.info(
+                "Continuation request detected; carrying forward prior intent: %s",
+                previous_intent.value,
+            )
+
         self._current_intent = intent_result.intent
 
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):

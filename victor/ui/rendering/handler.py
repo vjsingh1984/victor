@@ -7,7 +7,7 @@ source of truth for streaming response handling across all CLI modes.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from victor.agent.response_sanitizer import create_streaming_filter
 from victor.ui.rendering.protocol import StreamRenderer
@@ -19,12 +19,11 @@ from victor.ui.rendering.utils import (
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
+# ✅ PROPER: No TYPE_CHECKING imports needed (using Any for agent parameter)
 
 
 async def stream_response(
-    agent: AgentOrchestrator,
+    agent: Any,  # ✅ PROPER: Use Any instead of AgentOrchestrator (duck typing)
     message: str,
     renderer: StreamRenderer,
     suppress_thinking: bool = False,
@@ -48,7 +47,7 @@ async def stream_response(
     to regular content output.
 
     Args:
-        agent: The agent orchestrator to stream from
+        agent: The agent instance to stream from (any type with stream_chat method)
         message: The user message to send
         renderer: The renderer to use for output
         suppress_thinking: If True, completely hide thinking content

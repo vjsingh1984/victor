@@ -272,8 +272,10 @@ class ChatStreamHelperMixin:
         unified_is_analysis = unified_task_type.value in ("analyze", "analysis")
 
         # Fallback: if unified says GENERAL but keywords say analysis, trust keywords
-        ctx.is_analysis_task = keyword_is_analysis or unified_is_analysis or (
-            unified_task_type.value == "general" and keyword_is_analysis
+        ctx.is_analysis_task = (
+            keyword_is_analysis
+            or unified_is_analysis
+            or (unified_task_type.value == "general" and keyword_is_analysis)
         )
         ctx.is_action_task = task_keywords.get(
             "is_action_task",
