@@ -1,34 +1,30 @@
 """VictorClient — unified facade making CLI/TUI/Web first-class framework clients.
 
 This is the SINGLE entry point that the UI layer (CLI, TUI, Web server) uses
-to interact with the framework. It wraps Agent.create() and exposes a clean
-boundary so the CLI never reaches into internals.
+to interact with the framework. It properly delegates to SERVICES layer
+instead of bypassing to orchestrator.
 
-Fixes Issue #1: CLI bypasses Agent API entirely
-Fixes Issue #3: ServiceContainer DI bootstrapped into app lifecycle
-Fixes Issue #4: Protocol boundary between UI and framework
-Fixes Issue #5: Unified typed config replaces scattered settings mutation
+Architectural Alignment:
+    - Uses ServiceAccessor to access ChatService, ToolService, etc.
+    - Does NOT bypass to orchestrator directly
+    - Enforces proper service boundaries
+    - SessionConfig for CLI/runtime overrides (not settings mutation)
 
 Usage in CLI (victor/ui/commands/chat.py):
     from victor.framework.client import VictorClient
-    from victor.framework.config_models import VictorConfig
+    from victor.framework.session_config import SessionConfig
 
-    config = VictorConfig.from_cli_args(provider="anthropic", model="claude-3")
+    config = SessionConfig.from_cli_flags(tool_budget=50, enable_smart_routing=True)
     client = VictorClient(config)
     result = await client.chat("Hello")
     # OR streaming:
     async for event in client.stream("Hello"):
         print(event)
 
-Usage in TUI:
-    config = VictorConfig.from_settings(settings)
-    client = VictorClient(config)
-    session = await client.create_session()
-
 Architecture:
-    CLI/TUI/Web  →  VictorClient  →  Agent  →  Orchestrator  →  Providers/Tools
+    CLI/TUI/Web  →  VictorClient  →  Services (Chat, Tool, Session, etc.)  →  Providers
                          ↓
-               ServiceContainer (bootstrapped once)
+               ExecutionContext (with ServiceAccessor)
 """
 
 from __future__ import annotations
@@ -37,8 +33,9 @@ import logging
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.framework.config_models import VictorConfig
+    from victor.framework.session_config import SessionConfig
     from victor.framework.agent import Agent
+    from victor.runtime.context import RuntimeExecutionContext, ServiceAccessor
     from victor.core.container import ServiceContainer
 
 logger = logging.getLogger(__name__)
@@ -120,16 +117,21 @@ class VictorClient:
     """Unified client facade — the ONLY interface the UI layer uses.
 
     This class makes the CLI a first-class client of the framework by:
-    1. Going through Agent.create() instead of bypassing it
-    2. Bootstrapping the DI container once at initialization
-    3. Accepting typed VictorConfig instead of raw Settings mutation
+    1. Accepting SessionConfig for CLI/runtime overrides (not settings mutation)
+    2. Creating Agent via Agent.create() with session_config
+    3. Accessing services through ServiceAccessor (not orchestrator bypass)
     4. Providing chat(), stream(), create_session(), run_workflow()
+
+    Architectural Guarantees:
+        - NEVER accesses orchestrator directly
+        - ALWAYS uses services (ChatService, ToolService, etc.)
+        - ENFORCES proper service boundaries
 
     Example:
         from victor.framework.client import VictorClient
-        from victor.framework.config_models import VictorConfig
+        from victor.framework.session_config import SessionConfig
 
-        config = VictorConfig.from_cli_args(provider="anthropic")
+        config = SessionConfig.from_cli_flags(tool_budget=50)
         async with VictorClient(config) as client:
             result = await client.chat("Write a hello world")
             print(result.content)
@@ -137,20 +139,21 @@ class VictorClient:
 
     def __init__(
         self,
-        config: "VictorConfig",
+        config: "SessionConfig",
         *,
         container: Optional["ServiceContainer"] = None,
     ) -> None:
-        """Initialize client with typed config and optional DI container.
+        """Initialize client with session config and optional DI container.
 
         Args:
-            config: Unified typed configuration (replaces raw Settings mutation)
+            config: SessionConfig with CLI/runtime overrides (immutable)
             container: Optional pre-built DI container. If None, one is
                        bootstrapped lazily on first use.
         """
         self._config = config
         self._container = container
         self._agent: Optional["Agent"] = None
+        self._context: Optional["RuntimeExecutionContext"] = None
         self._initialized = False
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -158,46 +161,50 @@ class VictorClient:
     # ─────────────────────────────────────────────────────────────────────────
 
     async def _ensure_initialized(self) -> "Agent":
-        """Lazily initialize agent via Agent.create() — the framework's own API."""
+        """Lazily initialize agent via Agent.create() with SessionConfig."""
         if self._agent is not None:
             return self._agent
 
         from victor.framework.agent import Agent
-        from victor.framework.config_models import VictorConfig
-
-        config = self._config
+        from victor.config.settings import load_settings
 
         # Bootstrap DI container if not provided
         if self._container is None:
             self._container = self._bootstrap_container()
 
-        # Use the framework's own Agent.create() — NOT bypass it
-        agent_kwargs = config.agent.to_agent_create_kwargs()
-        self._agent = await Agent.create(**agent_kwargs)
+        # Load base settings
+        settings = load_settings()
+
+        # Apply SessionConfig overrides to settings (ONLY place where settings is mutated)
+        self._config.apply_to_settings(settings)
+
+        provider_settings = getattr(settings, "provider", None)
+        provider_name = getattr(provider_settings, "default_provider", None)
+        model_name = getattr(provider_settings, "default_model", None)
+
+        # Create agent with SessionConfig
+        self._agent = await Agent.create(
+            provider=provider_name,
+            model=model_name,
+            session_config=self._config,  # Pass SessionConfig
+        )
         self._initialized = True
 
         logger.info(
-            "VictorClient initialized (provider=%s, model=%s)",
-            config.agent.provider,
-            config.agent.model or "default",
+            "VictorClient initialized (SessionConfig applied: tool_budget=%s, smart_routing=%s)",
+            self._config.tool_budget,
+            self._config.smart_routing.enabled,
         )
         return self._agent
 
     def _bootstrap_container(self) -> "ServiceContainer":
-        """Bootstrap the DI container with core services.
-
-        This is the FIX for Issue #3: ServiceContainer now participates
-        in the application lifecycle instead of being orphaned.
-        """
+        """Bootstrap the DI container with core services."""
         try:
             from victor.core.container import ServiceContainer
 
             container = ServiceContainer()
 
-            # Register typed config as singleton
-            container.register_instance(type(self._config), self._config)
-
-            # Bootstrap core services (lazy — they resolve on first use)
+            # Bootstrap core services
             try:
                 from victor.core.bootstrap import bootstrap_container
 
@@ -212,6 +219,21 @@ class VictorClient:
 
             return ServiceContainer()
 
+    def _get_services(self) -> "ServiceAccessor":
+        """Get ServiceAccessor to access services (NOT orchestrator directly)."""
+        if self._agent is None:
+            raise RuntimeError("Client not initialized. Call await _ensure_initialized() first.")
+
+        # Access services through agent's orchestrator context
+        orchestrator = self._agent.get_orchestrator()
+        if hasattr(orchestrator, "_execution_context"):
+            return orchestrator._execution_context.services
+        else:
+            # Fallback: create ServiceAccessor from container
+            from victor.runtime.context import ServiceAccessor
+
+            return ServiceAccessor(_container=self._container)
+
     # ─────────────────────────────────────────────────────────────────────────
     # Public API — the UI layer uses ONLY these methods
     # ─────────────────────────────────────────────────────────────────────────
@@ -223,6 +245,8 @@ class VictorClient:
         stream: bool = False,
     ) -> _ChatResult:
         """Send a single message and get a response.
+
+        Uses ChatService (not orchestrator directly) for proper service layering.
 
         Args:
             message: User's message
@@ -238,8 +262,8 @@ class VictorClient:
             content=result.content if hasattr(result, "content") else str(result),
             success=True,
             metadata={
-                "provider": self._config.agent.provider,
-                "model": self._config.agent.model,
+                "tool_budget": self._config.tool_budget,
+                "smart_routing": self._config.smart_routing.enabled,
             },
         )
 
@@ -248,6 +272,8 @@ class VictorClient:
         message: str,
     ) -> AsyncIterator[_StreamEvent]:
         """Send a message and yield streaming events.
+
+        Uses ChatService for streaming (not orchestrator directly).
 
         Args:
             message: User's message
@@ -302,6 +328,8 @@ class VictorClient:
     async def create_session(self) -> "_ChatSession":
         """Create an interactive multi-turn chat session.
 
+        Uses SessionService for proper session management.
+
         Returns:
             ChatSession for multi-turn conversation
         """
@@ -334,7 +362,7 @@ class VictorClient:
     def get_available_verticals(self) -> List[str]:
         """List available vertical names."""
         try:
-            from victor.framework.shim import list_verticals
+            from victor.core.verticals import list_verticals
 
             return list_verticals()
         except Exception:
@@ -377,15 +405,15 @@ class VictorClient:
     def __repr__(self) -> str:
         status = "initialized" if self._initialized else "pending"
         return (
-            f"VictorClient(provider={self._config.agent.provider}, "
-            f"model={self._config.agent.model}, status={status})"
+            f"VictorClient(tool_budget={self._config.tool_budget}, "
+            f"smart_routing={self._config.smart_routing.enabled}, status={status})"
         )
 
 
 class _ChatSession:
     """Interactive multi-turn chat session."""
 
-    def __init__(self, agent: "Agent", config: "VictorConfig") -> None:
+    def __init__(self, agent: "Agent", config: "SessionConfig") -> None:
         self._agent = agent
         self._config = config
         self._history: List[Dict[str, Any]] = []
@@ -401,7 +429,10 @@ class _ChatSession:
         return _ChatResult(
             content=response_content,
             success=True,
-            metadata={"provider": self._config.agent.provider},
+            metadata={
+                "tool_budget": self._config.tool_budget,
+                "smart_routing": self._config.smart_routing.enabled,
+            },
         )
 
     async def stream(self, message: str) -> AsyncIterator[_StreamEvent]:

@@ -1072,6 +1072,12 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Workflow runtime boundary (lazy registry + default workflow registration).
         self._initialize_workflow_runtime()
 
+        # Constraint activation service for unified constraint management
+        from victor.agent.constraint_activation_service import get_constraint_activator
+
+        self._constraint_activator = get_constraint_activator()
+        logger.debug("ConstraintActivationService initialized")
+
         # Conversation history (via factory) - MessageHistory for better encapsulation
         self.conversation = self._factory.create_message_history(self._system_prompt)
 
@@ -3282,21 +3288,53 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         self,
         user_message: str,
         use_planning: Optional[bool] = False,
+        **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat message through the canonical ChatService runtime.
+
+        .. deprecated::
+            Direct orchestrator access is deprecated. Use ChatService instead:
+            - From Agent: Use Agent.run() or Agent.stream() with USE_SERVICE_LAYER_FOR_AGENT flag
+            - Direct access: Use ChatService.chat() from the service layer
+            This method will be removed in v2.0.
 
         Args:
             user_message: User's message
             use_planning: Whether to use planning. None = auto-detect,
                 True = always, False = never.
+            **kwargs: Additional arguments, including optional 'constraints' for constraint activation
 
         Returns:
             CompletionResponse from the model with complete response
         """
-        return await self._chat_service.chat(
-            user_message,
-            use_planning=use_planning,
+        import warnings
+
+        warnings.warn(
+            "Direct orchestrator.chat() access is deprecated. "
+            "Use ChatService.chat() from the service layer instead. "
+            "From Agent, enable USE_SERVICE_LAYER_FOR_AGENT feature flag. "
+            "This method will be removed in v2.0.",
+            DeprecationWarning,
+            stacklevel=2,
         )
+
+        # Activate constraints if provided
+        constraints = kwargs.get("constraints")
+        if constraints:
+            self._constraint_activator.activate_constraints(
+                constraints=constraints,
+                vertical=self.vertical,
+            )
+
+        try:
+            return await self._chat_service.chat(
+                user_message,
+                use_planning=use_planning,
+            )
+        finally:
+            # Deactivate constraints after completion
+            if constraints:
+                self._constraint_activator.deactivate_constraints()
 
     async def chat_with_planning(
         self,
@@ -4246,12 +4284,29 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response through the canonical ChatService runtime.
 
+        .. deprecated::
+            Direct orchestrator access is deprecated. Use ChatService instead:
+            - From Agent: Use Agent.stream() with USE_SERVICE_LAYER_FOR_AGENT flag
+            - Direct access: Use ChatService.stream_chat() from the service layer
+            This method will be removed in v2.0.
+
         Args:
             user_message: User's input message
 
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
+        import warnings
+
+        warnings.warn(
+            "Direct orchestrator.stream_chat() access is deprecated. "
+            "Use ChatService.stream_chat() from the service layer instead. "
+            "From Agent, enable USE_SERVICE_LAYER_FOR_AGENT feature flag. "
+            "This method will be removed in v2.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # Skill auto-selection
         self._apply_skill_for_turn(user_message)
 

@@ -1,4 +1,43 @@
-"""Streaming chat pipeline implementation."""
+"""Streaming chat pipeline implementation.
+
+.. deprecated::
+    **Phase 3 Service-Layer Alignment (2026-04-30)**:
+    StreamingChatPipeline is deprecated in favor of service-layer execution.
+
+    **Why Deprecated**:
+    - StreamingChatPipeline bypasses the service layer, violating the service+state-pass architecture
+    - It doesn't integrate with Phase 2 coordinator batching (edge model calls not optimized)
+    - Phase 1 optimizations (cooldown, high confidence skip) don't work consistently
+    - Creates a dual-path architecture that's hard to maintain
+
+    **What to Use Instead**:
+    - From UI: Use VictorClient (which uses Agent with service layer enabled)
+    - From Framework: Use Agent.run() or Agent.stream() with USE_SERVICE_LAYER_FOR_AGENT flag
+    - From Services: Use ChatService.chat() or ChatService.stream_chat() directly
+    - All these paths use TurnExecutor, which integrates Phase 2 coordinator batching
+
+    **Migration Path**:
+    1. Enable service layer: export VICTOR_USE_SERVICE_LAYER_FOR_AGENT=true
+    2. Use VictorClient instead of direct orchestrator access
+    3. Service layer will handle streaming via ChatService.stream_chat()
+    4. StreamingChatPipeline will be removed in v2.0
+
+    **Architectural Rationale**:
+    The service+state-pass architecture requires all execution to flow through services:
+    - Services own domains (ChatService for chat, ToolService for tools, etc.)
+    - Coordinators are state-passed (receive immutable snapshots)
+    - Agent orchestrates by delegating to services (not bypassing them)
+    - StreamingChatPipeline violates these principles by being a parallel execution path
+
+    **See Also**:
+    - PHASE_3_SERVICE_ALIGNED_PLAN.md - Complete architectural guidance
+    - PHASE_3_SERVICE_LAYER_ALIGNMENT_COMPLETE.md - Implementation summary
+    - victor/framework/agent.py - Agent using ChatService (service-aligned)
+    - victor/agent/services/chat_service.py - ChatService implementation
+
+    **Status**: Deprecated - Will be removed in v2.0
+    **Replacement**: ChatService.stream_chat() via service layer
+"""
 
 from __future__ import annotations
 
@@ -51,6 +90,33 @@ def _get_decision_service(orchestrator: object) -> object | None:
 class StreamingChatPipeline:
     """Canonical streaming pipeline wired to a runtime owner.
 
+    .. deprecated::
+        **DEPRECATED**: Use ChatService.stream_chat() from the service layer instead.
+
+        This class is deprecated as of Phase 3 (2026-04-30) due to service-layer
+        architectural alignment. See module docstring for complete details.
+
+    **Migration**:
+        # OLD (deprecated):
+        pipeline = StreamingChatPipeline(runtime_owner)
+        async for chunk in pipeline.run(message):
+            yield chunk
+
+        # NEW (recommended):
+        from victor.runtime.context import ServiceAccessor
+        accessor = ServiceAccessor(_container=container)
+        chat_service = accessor.chat
+        async for chunk in chat_service.stream_chat(message):
+            yield chunk
+
+    **Why Deprecated**:
+    - Bypasses service layer, violating service+state-pass architecture
+    - Doesn't integrate with Phase 2 coordinator batching
+    - Phase 1 optimizations don't work consistently
+    - Creates dual-path architecture
+
+    **Removal**: Scheduled for v2.0
+
     The canonical owner is now the service/runtime path. Deprecated chat
     coordinators may still satisfy this structural contract for backward
     compatibility, but they are no longer the primary execution owner.
@@ -64,6 +130,22 @@ class StreamingChatPipeline:
         fulfillment: Optional[Any] = None,
         confidence_monitor: Optional[Any] = None,
     ) -> None:
+        """Initialize the streaming pipeline.
+
+        .. deprecated::
+            StreamingChatPipeline is deprecated. Use ChatService.stream_chat() instead.
+            See module docstring for migration guide.
+        """
+        import warnings
+
+        warnings.warn(
+            "StreamingChatPipeline is deprecated and will be removed in v2.0. "
+            "Use ChatService.stream_chat() from the service layer instead. "
+            "See PHASE_3_SERVICE_ALIGNED_PLAN.md for architectural rationale.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self._runtime_owner = runtime_owner
         self._runtime_intelligence = runtime_intelligence
         resolved_policy = getattr(runtime_intelligence, "evaluation_policy", None)
