@@ -62,6 +62,8 @@ class SessionContextLinker:
         conversation_store: Optional["ConversationStore"] = None,
         embedding_service: Optional["EmbeddingService"] = None,
     ):
+        self._conversation_store: Optional["ConversationStore"] = None
+
         # Normalize to single persistence parameter
         # If session_persistence is ConversationStore, use it directly
         # If session_persistence is SQLiteSessionPersistence, use it with deprecation warning
@@ -71,6 +73,7 @@ class SessionContextLinker:
             # New canonical path
             self._persistence = conversation_store
             self._persistence_type = "ConversationStore"
+            self._conversation_store = conversation_store
         elif session_persistence is not None:
             # Check type
             if isinstance(session_persistence, str):
@@ -82,6 +85,7 @@ class SessionContextLinker:
                 if class_name == "ConversationStore":
                     self._persistence = session_persistence
                     self._persistence_type = "ConversationStore"
+                    self._conversation_store = session_persistence
                 elif class_name == "SQLiteSessionPersistence":
                     self._persistence = session_persistence
                     self._persistence_type = "SQLiteSessionPersistence"
