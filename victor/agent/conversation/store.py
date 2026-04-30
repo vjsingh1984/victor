@@ -944,6 +944,303 @@ class ConversationStore:
 
         return session
 
+    def save_session(
+        self,
+        conversation: Any,  # MessageHistory or list of messages
+        model: str,
+        provider: str,
+        profile: str = "default",
+        session_id: Optional[str] = None,
+        title: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        conversation_state: Optional[Any] = None,
+        tool_selection_stats: Optional[Dict[str, Any]] = None,
+        execution_state: Optional[Any] = None,
+        session_ledger: Optional[Any] = None,
+        compaction_hierarchy: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Save session with rich metadata (compatibility shim for SQLiteSessionPersistence).
+
+        Args:
+            conversation: MessageHistory instance or list of ConversationMessage dicts
+            model: Model name used in the session
+            provider: Provider name
+            profile: Profile name
+            session_id: Optional custom session ID (auto-generated if not provided)
+            title: Optional custom title (auto-generated if not provided)
+            tags: Optional list of tags
+            conversation_state: Optional ConversationStateMachine state
+            tool_selection_stats: Optional tool usage statistics (ignored for now)
+            execution_state: Optional ExecutionState state
+            session_ledger: Optional SessionLedger state
+            compaction_hierarchy: Optional message compaction hierarchy
+
+        Returns:
+            The session ID
+        """
+        # Convert conversation to messages list
+        if hasattr(conversation, "to_dict"):
+            conversation_data = conversation.to_dict()
+            messages = conversation_data.get("messages", [])
+        elif isinstance(conversation, dict):
+            messages = conversation.get("messages", [])
+        elif isinstance(conversation, list):
+            messages = conversation
+        else:
+            messages = []
+
+        # Generate session ID if not provided
+        if not session_id:
+            session_id = self._generate_session_id()
+
+        # Generate title if not provided (use first user message)
+        if not title and messages:
+            # Find first user message for title
+            for msg in messages:
+                if isinstance(msg, dict):
+                    if msg.get("role") == "user":
+                        title = msg.get("content", "")[:50]
+                        break
+                elif hasattr(msg, "role") and msg.role == MessageRole.USER:
+                    title = msg.content[:50]
+                    break
+
+        # Convert state objects to dict if they have to_dict method
+        conv_state_dict = (
+            conversation_state.to_dict()
+            if hasattr(conversation_state, "to_dict")
+            else conversation_state
+        )
+        exec_state_dict = (
+            execution_state.to_dict() if hasattr(execution_state, "to_dict") else execution_state
+        )
+        ledger_dict = (
+            session_ledger.to_dict() if hasattr(session_ledger, "to_dict") else session_ledger
+        )
+
+        # Create or update session
+        session = self.get_session(session_id)
+        if not session:
+            # Create new session with rich metadata
+            session = self.create_session(
+                session_id=session_id,
+                provider=provider,
+                model=model,
+                profile=profile,
+            )
+
+        # Update rich metadata fields
+        session.title = title
+        session.tags = tags or []
+        session.conversation_state = conv_state_dict
+        session.execution_state = exec_state_dict
+        session.session_ledger = ledger_dict
+        session.compaction_hierarchy = compaction_hierarchy
+
+        # Add messages to session
+        for msg in messages:
+            if isinstance(msg, dict):
+                role = MessageRole(msg["role"])
+                content = msg["content"]
+                # Extract optional fields
+                token_count = msg.get("token_count", 0)
+                priority = MessagePriority(msg.get("priority", 3))  # Default NORMAL
+                tool_name = msg.get("tool_name")
+                tool_call_id = msg.get("tool_call_id")
+                metadata = msg.get("metadata", {})
+                timestamp_str = msg.get("timestamp")
+                timestamp = (
+                    datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.now()
+                )
+
+                conversation_msg = ConversationMessage(
+                    role=role,
+                    content=content,
+                    token_count=token_count,
+                    priority=priority,
+                    tool_name=tool_name,
+                    tool_call_id=tool_call_id,
+                    metadata=metadata,
+                    timestamp=timestamp,
+                )
+            elif isinstance(msg, ConversationMessage):
+                conversation_msg = msg
+            else:
+                continue  # Skip unknown message types
+
+            # Add message if not already in session
+            if conversation_msg not in session.messages:
+                session.messages.append(conversation_msg)
+
+        # Persist session with rich metadata
+        self._persist_session(session)
+
+        logger.info(f"Saved session {session_id} with title: {title}")
+
+        return session_id
+
+    def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Load session with rich metadata (compatibility shim for SQLiteSessionPersistence).
+
+        Returns dict with structure:
+        {
+            "metadata": {session_id, created_at, title, tags, model, provider, ...},
+            "conversation": {"messages": [...], "preview_messages": [...]},
+            "conversation_state": Optional[Dict],
+            "tool_selection_stats": Optional[Dict],
+            "execution_state": Optional[Dict],
+            "session_ledger": Optional[Dict],
+            "compaction_hierarchy": Optional[Dict]
+        }
+
+        Args:
+            session_id: Session ID to load
+
+        Returns:
+            Session dictionary or None if not found
+        """
+        # Load session using existing method
+        session = self.get_session(session_id)
+        if not session:
+            logger.warning(f"Session not found: {session_id}")
+            return None
+
+        # Split messages into conversation and preview
+        conversation_messages = []
+        preview_messages = []
+
+        for msg in session.messages:
+            # Check if message is a preview message
+            if isinstance(msg, ConversationMessage):
+                msg_dict = {
+                    "role": msg.role.value,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                    "token_count": msg.token_count,
+                    "priority": msg.priority.value if msg.priority else None,
+                    "tool_name": msg.tool_name,
+                    "tool_call_id": msg.tool_call_id,
+                    "metadata": msg.metadata if msg.metadata else {},
+                }
+
+                # Check metadata flag for preview
+                if msg.metadata and msg.metadata.get("is_preview"):
+                    preview_messages.append(msg_dict)
+                else:
+                    conversation_messages.append(msg_dict)
+
+        # Generate title if not set
+        title = session.title
+        if not title and conversation_messages:
+            # Use first user message as title
+            for msg in conversation_messages:
+                if msg["role"] == "user":
+                    title = msg["content"][:50]
+                    break
+
+        if not title:
+            title = "Untitled"
+
+        # Build return dict matching SQLiteSessionPersistence format
+        session_data = {
+            "metadata": {
+                "session_id": session.session_id,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.last_activity.isoformat(),
+                "model": session.model or "unknown",
+                "provider": session.provider or "unknown",
+                "profile": session.profile or "default",
+                "message_count": len(conversation_messages),
+                "title": title,
+                "tags": session.tags or [],
+            },
+            "conversation": {
+                "messages": conversation_messages,
+                "preview_messages": preview_messages,
+            },
+            "conversation_state": session.conversation_state,
+            "tool_selection_stats": None,  # Not stored in new schema
+            "execution_state": session.execution_state,
+            "session_ledger": session.session_ledger,
+            "compaction_hierarchy": session.compaction_hierarchy,
+        }
+
+        logger.info(f"Loaded session {session_id} from ConversationStore")
+
+        return session_data
+
+    def search_sessions(
+        self,
+        query: str,
+        limit: int = 10,
+        project_path: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Search sessions by title or content.
+
+        Args:
+            query: Search query string
+            limit: Maximum results
+            project_path: Optional project path filter
+
+        Returns:
+            List of matching session dicts (SQLiteSessionPersistence format)
+        """
+        try:
+            sessions = []
+            lowered_query = query.lower()
+
+            # List sessions (optionally filtered by project_path)
+            all_sessions = self.list_sessions(project_path=project_path, limit=100000)
+
+            for session in all_sessions:
+                # Check title match
+                title = session.title or "Untitled"
+                if lowered_query in title.lower():
+                    # Convert to SQLiteSessionPersistence format
+                    session_dict = {
+                        "session_id": session.session_id,
+                        "created_at": session.created_at.isoformat(),
+                        "updated_at": session.last_activity.isoformat(),
+                        "model": session.model or "unknown",
+                        "provider": session.provider or "unknown",
+                        "profile": session.profile or "default",
+                        "message_count": len(session.messages),
+                        "title": title,
+                        "tags": session.tags or [],
+                    }
+                    sessions.append(session_dict)
+                    continue
+
+                # Check message content
+                query_found = False
+                for msg in session.messages:
+                    if lowered_query in msg.content.lower():
+                        query_found = True
+                        break
+
+                if query_found:
+                    session_dict = {
+                        "session_id": session.session_id,
+                        "created_at": session.created_at.isoformat(),
+                        "updated_at": session.last_activity.isoformat(),
+                        "model": session.model or "unknown",
+                        "provider": session.provider or "unknown",
+                        "profile": session.profile or "default",
+                        "message_count": len(session.messages),
+                        "title": title,
+                        "tags": session.tags or [],
+                    }
+                    sessions.append(session_dict)
+
+                if len(sessions) >= limit:
+                    break
+
+            return sessions[:limit]
+
+        except Exception as e:
+            logger.error(f"Failed to search sessions: {e}")
+            return []
+
     def get_session(self, session_id: str) -> Optional[ConversationSession]:
         """Get a session by ID.
 
