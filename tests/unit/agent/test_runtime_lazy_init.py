@@ -110,18 +110,18 @@ class TestRuntimeLazyInitialization:
                 assert hasattr(interaction_runtime, "chat_coordinator") is False
                 assert hasattr(interaction_runtime, "tool_coordinator") is False
 
-                # Deprecated compatibility shims still exist on the orchestrator.
-                session_coordinator = orchestrator._deprecated_session_coordinator
-                assert session_coordinator is not None, "session_coordinator shim should exist"
-                assert getattr(session_coordinator, "initialized", False) is False
+                # Deprecated session/tool/chat shims are no longer installed as
+                # bootstrap-time orchestrator slots. They are mediated through
+                # the orchestration facade when compatibility access is needed.
+                assert hasattr(orchestrator, "_deprecated_session_coordinator") is False
+                assert hasattr(orchestrator, "_deprecated_chat_coordinator") is False
+                assert hasattr(orchestrator, "_deprecated_tool_coordinator") is False
 
-                chat_coordinator = orchestrator._deprecated_chat_coordinator
-                assert chat_coordinator is not None, "chat_coordinator shim should exist"
-                assert getattr(chat_coordinator, "initialized", False) is False
-
-                tool_coordinator = orchestrator._deprecated_tool_coordinator
-                assert tool_coordinator is not None, "tool_coordinator shim should exist"
-                assert getattr(tool_coordinator, "initialized", False) is False
+                orchestration_facade = getattr(orchestrator, "_orchestration_facade", None)
+                assert orchestration_facade is not None, "orchestration_facade should exist"
+                assert (
+                    orchestration_facade.initialized is False
+                ), "orchestration_facade should remain lazy after Agent.create()"
 
             finally:
                 await agent.close()
