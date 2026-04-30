@@ -18,11 +18,10 @@ Tests dependency injection container resolution and service lifetime.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock
 
 from victor.agent.service_provider import OrchestratorServiceProvider
 from victor.agent.services.protocols import StreamingRecoveryRuntimeProtocol
-from victor.config.settings import Settings
 
 
 @pytest.fixture
@@ -111,11 +110,11 @@ class TestRecoveryCoordinatorDI:
         # Resolve RecoveryCoordinator
         recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
-        # Verify it's not None and has expected attributes
+        # Verify it's not None and has expected bound runtime state
         assert recovery_coordinator is not None
-        assert hasattr(recovery_coordinator, "streaming_handler")
-        assert hasattr(recovery_coordinator, "unified_tracker")
-        assert hasattr(recovery_coordinator, "settings")
+        assert hasattr(recovery_coordinator, "_streaming_handler")
+        assert hasattr(recovery_coordinator, "_unified_tracker")
+        assert hasattr(recovery_coordinator, "_settings")
 
     def test_recovery_coordinator_singleton_lifetime(self, service_provider):
         """Test that RecoveryCoordinator has SINGLETON lifetime."""
@@ -135,10 +134,10 @@ class TestRecoveryCoordinatorDI:
         # Resolve RecoveryCoordinator
         recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
-        # Verify required dependencies are injected
-        assert recovery_coordinator.streaming_handler is not None
-        assert recovery_coordinator.unified_tracker is not None
-        assert recovery_coordinator.settings is not None
+        # Verify required runtime collaborators are injected
+        assert recovery_coordinator._streaming_handler is not None
+        assert recovery_coordinator._unified_tracker is not None
+        assert recovery_coordinator._settings is not None
 
     def test_recovery_coordinator_optional_dependencies(self, service_provider):
         """Test that RecoveryCoordinator optional dependencies are handled correctly."""
@@ -147,13 +146,10 @@ class TestRecoveryCoordinatorDI:
         # Resolve RecoveryCoordinator
         recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
-        # Verify optional dependencies (may be None if not registered)
-        # recovery_handler is optional
-        # context_compactor is optional
-        # recovery_integration is optional
-        assert hasattr(recovery_coordinator, "recovery_handler")
-        assert hasattr(recovery_coordinator, "context_compactor")
-        assert hasattr(recovery_coordinator, "recovery_integration")
+        # Verify optional collaborators have bound slots even when unset.
+        assert hasattr(recovery_coordinator, "_recovery_handler")
+        assert hasattr(recovery_coordinator, "_context_compactor")
+        assert hasattr(recovery_coordinator, "_recovery_integration")
 
     def test_recovery_coordinator_factory_method(self, service_provider):
         """Test that RecoveryCoordinator is created via factory method."""
@@ -164,11 +160,10 @@ class TestRecoveryCoordinatorDI:
         recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify it's the correct type (duck typing check)
-        assert hasattr(recovery_coordinator, "check_time_limit")
-        assert hasattr(recovery_coordinator, "check_iteration_limit")
         assert hasattr(recovery_coordinator, "check_natural_completion")
         assert hasattr(recovery_coordinator, "handle_empty_response")
         assert hasattr(recovery_coordinator, "apply_recovery_action")
+        assert hasattr(recovery_coordinator, "check_blocked_threshold")
 
     def test_recovery_coordinator_methods_callable(self, service_provider):
         """Test that RecoveryCoordinator methods are callable."""
@@ -177,21 +172,17 @@ class TestRecoveryCoordinatorDI:
         recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify key methods are callable
-        assert callable(recovery_coordinator.check_time_limit)
-        assert callable(recovery_coordinator.check_iteration_limit)
         assert callable(recovery_coordinator.check_natural_completion)
         assert callable(recovery_coordinator.check_tool_budget)
-        assert callable(recovery_coordinator.check_progress)
         assert callable(recovery_coordinator.handle_empty_response)
-        assert callable(recovery_coordinator.handle_blocked_tool)
         assert callable(recovery_coordinator.apply_recovery_action)
         assert callable(recovery_coordinator.filter_blocked_tool_calls)
         assert callable(recovery_coordinator.truncate_tool_calls)
+        assert callable(recovery_coordinator.check_blocked_threshold)
+        assert callable(recovery_coordinator.check_force_action)
 
     def test_orchestrator_factory_creates_recovery_coordinator(self, service_provider):
         """Test that OrchestratorFactory can create RecoveryCoordinator."""
-        from unittest.mock import MagicMock
-
         from victor.agent.orchestrator_factory import OrchestratorFactory
 
         # Create mock provider
@@ -211,15 +202,13 @@ class TestRecoveryCoordinatorDI:
         # Create RecoveryCoordinator via factory
         recovery_coordinator = factory.create_recovery_coordinator()
 
-        # Verify it's not None and has expected attributes
+        # Verify it's not None and has expected bound runtime state
         assert recovery_coordinator is not None
-        assert hasattr(recovery_coordinator, "streaming_handler")
-        assert hasattr(recovery_coordinator, "unified_tracker")
+        assert hasattr(recovery_coordinator, "_streaming_handler")
+        assert hasattr(recovery_coordinator, "_unified_tracker")
 
     def test_orchestrator_factory_recovery_coordinator_is_singleton(self, service_provider):
         """Test that OrchestratorFactory returns same RecoveryCoordinator instance."""
-        from unittest.mock import MagicMock
-
         from victor.agent.orchestrator_factory import OrchestratorFactory
 
         # Create mock provider
@@ -249,8 +238,6 @@ class TestRecoveryCoordinatorDIIntegration:
 
     def test_full_orchestrator_initialization_with_recovery_coordinator(self, service_provider):
         """Test full orchestrator initialization includes RecoveryCoordinator."""
-        from unittest.mock import MagicMock
-
         from victor.agent.orchestrator_factory import OrchestratorFactory
 
         # Create mock provider
@@ -297,14 +284,14 @@ class TestRecoveryCoordinatorDIIntegration:
         # Resolve RecoveryCoordinator
         recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
-        # Verify all expected attributes exist (even if some are None)
+        # Verify all expected runtime slots exist (even if some are None)
         expected_attrs = [
-            "recovery_handler",
-            "recovery_integration",
-            "streaming_handler",
-            "context_compactor",
-            "unified_tracker",
-            "settings",
+            "_recovery_handler",
+            "_recovery_integration",
+            "_streaming_handler",
+            "_context_compactor",
+            "_unified_tracker",
+            "_settings",
         ]
 
         for attr in expected_attrs:
