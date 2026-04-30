@@ -39,7 +39,8 @@ import asyncio
 import copy
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.coordination.formations import (
@@ -70,6 +71,36 @@ if TYPE_CHECKING:
     from victor.protocols.team import ITeamMember
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# StateGraph Node Configuration
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class StateGraphNodeConfig:
+    """Configuration for ``UnifiedTeamCoordinator`` used as a StateGraph node.
+
+    The default values match the historical behaviour of ``__call__``: the
+    node reads the task from ``state["task"]`` (falling back to
+    ``state["query"]``) and writes the team result under ``"result"`` /
+    ``"team_output"`` / ``"error"``. Override any field to map the node onto
+    an existing graph schema without renaming state keys.
+
+    ``formation_strategy`` is an optional callable that receives the original
+    state and returns a ``TeamFormation``. Its result is injected into the
+    per-call context as ``formation_hint`` so the coordinator's existing
+    ``_resolve_effective_formation`` does the work — ``self._formation`` is
+    never mutated, which keeps concurrent ``__call__`` invocations safe.
+    """
+
+    task_key: str = "task"
+    query_key: str = "query"
+    result_key: str = "result"
+    output_key: str = "team_output"
+    error_key: str = "error"
+    formation_strategy: Optional[Callable[[Any], TeamFormation]] = None
 
 
 # =============================================================================
@@ -295,6 +326,10 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             TeamFormation.PIPELINE: PipelineFormation(),
             TeamFormation.CONSENSUS: ConsensusFormation(),
         }
+
+        # StateGraph node config (used when the coordinator is invoked as a
+        # graph node via ``__call__``). Default preserves historical keys.
+        self._state_graph_config: StateGraphNodeConfig = StateGraphNodeConfig()
 
     # =========================================================================
     # ITeamCoordinator Protocol Methods
@@ -893,53 +928,96 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     # StateGraph Integration
     # =========================================================================
 
+    def with_state_graph_config(
+        self, config: StateGraphNodeConfig
+    ) -> "UnifiedTeamCoordinator":
+        """Configure how this coordinator behaves when used as a StateGraph node.
+
+        ``__call__`` reads/writes the input/output keys named in ``config``.
+        The default config preserves historical behaviour (``task`` / ``query``
+        in, ``result`` / ``team_output`` / ``error`` out).
+
+        Returns ``self`` for fluent chaining.
+        """
+        self._state_graph_config = config
+        return self
+
     async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Execute as a StateGraph node.
 
         This makes the coordinator directly usable in StateGraph:
             graph.add_node("team", coordinator)
 
-        The coordinator extracts the task/query from the state, executes
-        the team with the configured formation, and returns an updated
-        state with the results.
+        The coordinator reads the task from ``state[task_key]`` (with a
+        fallback to ``state[query_key]``), executes the team with the
+        configured formation, and returns a *new* state dict with the
+        results. The caller's input dict is never mutated.
+
+        Use ``with_state_graph_config(...)`` to map the node onto a graph
+        schema with different key names. For declarative workflow YAML with
+        timeout/retry/merge-strategy configuration, use ``TeamNode`` from
+        ``victor.framework.workflows.nodes`` instead — ``__call__`` is the
+        lean programmatic path.
 
         Args:
-            state: Current graph state. Expected keys:
-                - "task" or "query": The task to execute
-                - Other keys are passed as execution context
+            state: Current graph state. The task is read from
+                ``state[config.task_key]`` (default ``"task"``), falling
+                back to ``state[config.query_key]`` (default ``"query"``).
+                All other keys are passed through as execution context.
 
         Returns:
-            Updated state with:
-                - "result": Final output string
-                - "team_output": Full team execution result dict
-                - "error": Error message if execution failed
+            New state dict with:
+                - ``config.result_key`` (default ``"result"``): final output
+                  string when execution succeeded.
+                - ``config.output_key`` (default ``"team_output"``): full
+                  team execution result dict.
+                - ``config.error_key`` (default ``"error"``): error message
+                  when execution failed.
 
-        Example:
+        Example::
+
             from victor.framework import StateGraph
-            from victor.teams import UnifiedTeamCoordinator, TeamFormation
+            from victor.teams import (
+                UnifiedTeamCoordinator,
+                TeamFormation,
+                StateGraphNodeConfig,
+            )
 
             coordinator = UnifiedTeamCoordinator(orchestrator)
             coordinator.set_formation(TeamFormation.PARALLEL)
             coordinator.add_member(agent1).add_member(agent2)
+            coordinator.with_state_graph_config(
+                StateGraphNodeConfig(task_key="instruction", result_key="answer")
+            )
 
             graph = StateGraph(AgentState)
-            graph.add_node("research_team", coordinator)  # Direct usage!
+            graph.add_node("research_team", coordinator)
         """
-        # Extract task from state (try both "task" and "query" keys)
-        task = state.get("task", state.get("query", ""))
+        config = self._state_graph_config
 
-        # Extract context (everything except task/query keys)
-        context = {k: v for k, v in state.items() if k not in ("task", "query")}
+        # Extract task using configured keys (task takes precedence over query)
+        task = state.get(config.task_key, state.get(config.query_key, ""))
+
+        # Build context excluding task/query keys
+        context = {
+            k: v
+            for k, v in state.items()
+            if k not in (config.task_key, config.query_key)
+        }
 
         # Execute team task
         result = await self.execute_task(task, context)
 
-        # Update state with results
+        # Build the return state as a shallow copy so the caller's dict is
+        # never mutated. StateGraph executors already isolate state via
+        # CopyOnWriteState, but well-behaved nodes still avoid in-place writes
+        # so the function is safe to use programmatically too.
+        new_state = dict(state)
         if result.get("success"):
-            state["result"] = result.get("final_output", "")
-            state["team_output"] = result
+            new_state[config.result_key] = result.get("final_output", "")
+            new_state[config.output_key] = result
         else:
-            state["error"] = result.get("error", "Unknown error")
-            state["team_output"] = result
+            new_state[config.error_key] = result.get("error", "Unknown error")
+            new_state[config.output_key] = result
 
-        return state
+        return new_state

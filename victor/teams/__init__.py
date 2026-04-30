@@ -237,6 +237,11 @@ def __getattr__(name: str) -> Any:
 
         globals()["UnifiedTeamCoordinator"] = UnifiedTeamCoordinator
         return UnifiedTeamCoordinator
+    if name == "StateGraphNodeConfig":
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        globals()["StateGraphNodeConfig"] = StateGraphNodeConfig
+        return StateGraphNodeConfig
     if name in {
         "IAgent",
         "IEnhancedTeamCoordinator",

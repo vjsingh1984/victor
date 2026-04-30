@@ -504,5 +504,209 @@ class TestClearAndReset:
         assert result is coordinator
 
 
+class TestStateGraphNodeIntegration:
+    """Tests for UnifiedTeamCoordinator usage as a StateGraph node (`__call__`).
+
+    The coordinator implements ``async __call__(state) -> state`` so it can be
+    passed directly to ``StateGraph.add_node``. This class covers the dict-state
+    contract:
+
+    - Reads task from ``state['task']`` (or falls back to ``state['query']``).
+    - Builds context excluding the task/query keys.
+    - Returns a new dict (does NOT mutate the caller's input).
+    - On success: writes ``result`` and ``team_output``.
+    - On failure: writes ``error`` and ``team_output``.
+    """
+
+    @pytest.mark.asyncio
+    async def test_success_writes_result_and_team_output(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "First"))
+        coordinator.add_member(MockTeamMember("m2", "Second"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+        out = await coordinator({"task": "demo"})
+
+        assert "result" in out
+        assert "team_output" in out
+        assert out["team_output"]["success"] is True
+        assert "error" not in out
+
+    @pytest.mark.asyncio
+    async def test_failure_writes_error_and_team_output(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        # No members → execute_task returns success=False
+        out = await coordinator({"task": "demo"})
+
+        assert "error" in out
+        assert "team_output" in out
+        assert out["team_output"]["success"] is False
+        assert "result" not in out
+
+    @pytest.mark.asyncio
+    async def test_uses_task_key(self):
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+
+        await coordinator({"task": "build the thing"})
+
+        assert captured == ["build the thing"]
+
+    @pytest.mark.asyncio
+    async def test_query_key_fallback(self):
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+
+        await coordinator({"query": "find auth code"})
+
+        assert captured == ["find auth code"]
+
+    @pytest.mark.asyncio
+    async def test_context_excludes_task_and_query_keys(self):
+        captured_contexts: list[Dict[str, Any]] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured_contexts.append(dict(context))
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+
+        await coordinator(
+            {"task": "T", "query": "Q", "scope": "auth", "max_workers": 3}
+        )
+
+        assert captured_contexts, "member.execute_task was not invoked"
+        ctx = captured_contexts[0]
+        assert "task" not in ctx
+        assert "query" not in ctx
+        assert ctx["scope"] == "auth"
+        assert ctx["max_workers"] == 3
+
+    @pytest.mark.asyncio
+    async def test_no_members_returns_error_state(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        out = await coordinator({"task": "anything"})
+
+        assert "error" in out
+        assert out["team_output"]["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_does_not_mutate_caller_state(self):
+        """The caller's dict must not be mutated; __call__ returns a new dict."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "ok"))
+
+        original = {"task": "build", "scope": "auth"}
+        snapshot = dict(original)
+
+        out = await coordinator(original)
+
+        assert original == snapshot, "input dict was mutated"
+        assert out is not original
+        assert out["task"] == "build"  # input keys preserved in output
+        assert out["scope"] == "auth"
+
+
+class TestStateGraphNodeConfig:
+    """Tests for ``StateGraphNodeConfig`` and the ``with_state_graph_config``
+    fluent setter.
+
+    Configuration is the seam that keeps the StateGraph node usable across
+    different graph schemas without forcing every consumer to rename their
+    state keys to match an internal convention.
+    """
+
+    def test_default_config_preserves_keys(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        config = StateGraphNodeConfig()
+        assert config.task_key == "task"
+        assert config.query_key == "query"
+        assert config.result_key == "result"
+        assert config.output_key == "team_output"
+        assert config.error_key == "error"
+        assert config.formation_strategy is None
+
+    def test_with_state_graph_config_returns_self_for_chaining(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        result = coordinator.with_state_graph_config(StateGraphNodeConfig())
+        assert result is coordinator
+
+    @pytest.mark.asyncio
+    async def test_custom_keys_honored_on_input(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(task_key="instruction", query_key="prompt")
+        )
+
+        await coordinator({"instruction": "do work", "prompt": "ignored"})
+        assert captured == ["do work"]
+
+    @pytest.mark.asyncio
+    async def test_custom_keys_honored_on_output(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(
+                result_key="final",
+                output_key="team_run",
+                error_key="failure",
+            )
+        )
+
+        out = await coordinator({"task": "run"})
+
+        assert out["final"] == "Done"
+        assert "team_run" in out
+        # Default keys MUST NOT be written when overrides are configured.
+        assert "result" not in out
+        assert "team_output" not in out
+
+    @pytest.mark.asyncio
+    async def test_custom_error_key_used_on_failure(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        # No members → guaranteed failure
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(error_key="failure")
+        )
+
+        out = await coordinator({"task": "run"})
+
+        assert "failure" in out
+        assert "error" not in out
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
