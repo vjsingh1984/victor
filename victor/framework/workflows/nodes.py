@@ -242,13 +242,9 @@ class TeamNode:
                 timeout_seconds=int(self.config.timeout_seconds or 600),
             )
 
-            # Add members to coordinator
-            from victor.teams.types import TeamMemberAdapter
-
-            for member in self.members:
-                # Create adapter that bridges TeamMember to ITeamMember
-                # The coordinator handles actual execution
-                pass  # Members already configured in TeamConfig
+            # Members are passed through the TeamConfig — UnifiedTeamCoordinator
+            # adapts them to ITeamMember instances inside ``execute_team_config``
+            # using the supplied orchestrator. No node-side wiring needed.
 
             # Execute team with timeout
             if self.config.timeout_seconds:

@@ -14,15 +14,30 @@
 
 """SQLite-based session persistence for Victor conversations.
 
-This module provides SQLiteSessionPersistence, which stores sessions
-and messages in the project database (.victor/project.db), eliminating
-duplication with JSON file storage.
+.. deprecated:: 0.7.0
+    This module is DEPRECATED and will be removed in version 0.10.0.
+    Use ``ConversationStore`` from ``victor.agent.conversation.store`` instead.
 
-Key Features:
-- Single source of truth for sessions in SQLite
-- Fast queries and filtering
-- Efficient storage with indexing
-- Fallback to JSON for migration/import/export
+Migration guide:
+    # Old API (deprecated):
+    from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+    persistence = get_sqlite_session_persistence()
+    sessions = persistence.list_sessions()
+    session = persistence.load_session(session_id)
+
+    # New API (canonical):
+    from victor.agent.conversation.store import ConversationStore
+    store = ConversationStore()
+    sessions = store.list_sessions()
+    session = store.load_session(session_id)
+
+The ConversationStore provides feature parity and additional capabilities:
+- Token-aware context window management
+- Priority-based message pruning
+- Semantic relevance scoring
+- ML/RL-friendly aggregation queries
+- Full-text search support
+- Rich session metadata (title, tags, state persistence)
 """
 
 from __future__ import annotations
@@ -81,10 +96,16 @@ class SQLiteSessionPersistence:
 
         Args:
             db_path: Path to project database (default: .victor/project.db)
+
+        .. deprecated:: 0.7.0
+            Use ConversationStore from victor.agent.conversation.store instead.
+            This class will be removed in version 0.10.0.
         """
         warnings.warn(
-            "SQLiteSessionPersistence is deprecated. Use ConversationStore from "
-            "victor.agent.conversation.store instead. This will be removed in version 0.10.0.",
+            "SQLiteSessionPersistence is deprecated and will be removed in v0.10.0. "
+            "Migrate to ConversationStore from victor.agent.conversation.store. "
+            "See module docstring for migration guide. "
+            "All features have feature parity in ConversationStore.",
             DeprecationWarning,
             stacklevel=2,
         )

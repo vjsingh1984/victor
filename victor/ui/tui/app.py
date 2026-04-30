@@ -1320,25 +1320,23 @@ class VictorTUI(App):
 
     def action_resume_project_session(self) -> None:
         """Resume a project session from the project SQLite database."""
-        from victor.agent.sqlite_session_persistence import (
-            get_sqlite_session_persistence,
-        )
+        from victor.agent.conversation.store import ConversationStore
 
-        persistence = get_sqlite_session_persistence()
-        sessions = persistence.list_sessions(limit=20)
+        store = ConversationStore()
+        sessions = store.list_sessions(limit=20)
         if not sessions:
             self._add_system_message("No project sessions found")
             return
         mapped = [
             {
-                "id": session["session_id"],
-                "name": session.get("title") or session["session_id"][:8],
+                "id": session.session_id,
+                "name": session.title or session.session_id[:8],
                 "source": "Project",
-                "key": f"project:{session['session_id']}",
-                "provider": session.get("provider", ""),
-                "model": session.get("model", ""),
-                "updated_at": session.get("updated_at", ""),
-                "message_count": session.get("message_count", 0),
+                "key": f"project:{session.session_id}",
+                "provider": session.provider or "",
+                "model": session.model or "",
+                "updated_at": session.last_activity.isoformat(),
+                "message_count": len(session.messages),
             }
             for session in sessions
         ]
@@ -1349,16 +1347,14 @@ class VictorTUI(App):
 
     def action_resume_any_session(self) -> None:
         """Resume a session from either TUI or project history."""
-        from victor.agent.sqlite_session_persistence import (
-            get_sqlite_session_persistence,
-        )
+        from victor.agent.conversation.store import ConversationStore
         from victor.ui.tui.session import SessionManager
 
         manager = SessionManager()
         tui_sessions = manager.list_sessions(limit=20)
 
-        persistence = get_sqlite_session_persistence()
-        project_sessions = persistence.list_sessions(limit=20)
+        store = ConversationStore()
+        project_sessions = store.list_sessions(limit=20)
 
         combined = []
         for session in tui_sessions:
@@ -1377,14 +1373,14 @@ class VictorTUI(App):
         for session in project_sessions:
             combined.append(
                 {
-                    "id": session["session_id"],
-                    "name": session.get("title") or session["session_id"][:8],
+                    "id": session.session_id,
+                    "name": session.title or session.session_id[:8],
                     "source": "Project",
-                    "key": f"project:{session['session_id']}",
-                    "provider": session.get("provider", ""),
-                    "model": session.get("model", ""),
-                    "updated_at": session.get("updated_at", ""),
-                    "message_count": session.get("message_count", 0),
+                    "key": f"project:{session.session_id}",
+                    "provider": session.provider or "",
+                    "model": session.model or "",
+                    "updated_at": session.last_activity.isoformat(),
+                    "message_count": len(session.messages),
                 }
             )
 
@@ -1453,12 +1449,10 @@ class VictorTUI(App):
         """Load a project session with progress indication."""
         from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import (
-            get_sqlite_session_persistence,
-        )
+        from victor.agent.conversation.store import ConversationStore
 
-        persistence = get_sqlite_session_persistence()
-        session = persistence.load_session(session_id)
+        store = ConversationStore()
+        session = store.load_session(session_id)
         if not session:
             self._add_error_message(f"Project session not found: {session_id}")
             return
@@ -1736,12 +1730,10 @@ class VictorTUI(App):
     async def _load_project_session_async(self, session_id: str) -> None:
         """Async project session loader using chunked replay."""
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import (
-            get_sqlite_session_persistence,
-        )
+        from victor.agent.conversation.store import ConversationStore
 
-        persistence = get_sqlite_session_persistence()
-        session = await asyncio.to_thread(persistence.load_session, session_id)
+        store = ConversationStore()
+        session = await asyncio.to_thread(store.load_session, session_id)
         if not session:
             self._add_error_message(f"Project session not found: {session_id}")
             return
