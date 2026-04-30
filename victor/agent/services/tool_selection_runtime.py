@@ -60,12 +60,63 @@ class ToolSelectionRuntime:
             runtime.use_semantic_selection,
             conversation_depth,
         )
-        tools = runtime.tool_selector.prioritize_by_stage(context_msg, tools)
+        # Stage prioritization should stay anchored to the user's request.
+        # Feeding assistant progress narration here can wrongly push the
+        # conversation state machine back toward analysis/search-heavy tools.
+        tools = runtime.tool_selector.prioritize_by_stage(user_message_anchor, tools)
         current_intent = getattr(runtime, "_current_intent", None)
         tools = runtime._tool_planner.filter_tools_by_intent(
             tools,
             current_intent,
             user_message=user_message_anchor,
         )
+        tools = self._prioritize_explicit_database_tools(tools, user_message_anchor)
         tools = runtime._apply_kv_tool_strategy(tools)
         return runtime._sort_tools_for_kv_stability(tools)
+
+    @staticmethod
+    def _tool_name(tool: Any) -> str:
+        """Extract a tool name from dict- or object-style definitions."""
+        if hasattr(tool, "name"):
+            return str(tool.name or "")
+        if isinstance(tool, dict):
+            return str(tool.get("name", "") or "")
+        return ""
+
+    def _prioritize_explicit_database_tools(
+        self,
+        tools: Any,
+        user_message: str | None,
+    ) -> Any:
+        """Move db/database and shell to the front for explicit DB inspection requests."""
+        if not tools:
+            return tools
+
+        from victor.agent.action_authorizer import has_explicit_readonly_shell_request
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+        from victor.tools.decorators import resolve_tool_name
+
+        if not has_explicit_readonly_shell_request(user_message):
+            return tools
+
+        preferred_groups = ({"db", "database"}, {"shell"})
+        grouped: list[list[Any]] = [[] for _ in preferred_groups]
+        remainder: list[Any] = []
+
+        for tool in tools:
+            name = self._tool_name(tool)
+            canonical_name = canonicalize_core_tool_name(resolve_tool_name(name))
+            for idx, preferred_names in enumerate(preferred_groups):
+                if canonical_name in preferred_names:
+                    grouped[idx].append(tool)
+                    break
+            else:
+                remainder.append(tool)
+
+        reordered = [tool for group in grouped for tool in group] + remainder
+        if reordered != list(tools):
+            logger.info(
+                "Explicit database request detected: prioritizing database inspection tools "
+                "at the front of the candidate list"
+            )
+        return reordered

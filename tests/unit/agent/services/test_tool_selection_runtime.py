@@ -143,8 +143,94 @@ async def test_tool_selection_runtime_preserves_user_request_as_anchor():
         conversation_depth=2,
         planned_tools=None,
     )
+    tool_selector.prioritize_by_stage.assert_called_once_with(
+        "query the sqllite db directly using shell or database tools",
+        selected_tools,
+    )
     tool_planner.filter_tools_by_intent.assert_called_once_with(
         selected_tools,
         "display_only",
         user_message="query the sqllite db directly using shell or database tools",
     )
+
+
+@pytest.mark.asyncio
+async def test_tool_selection_runtime_prioritizes_database_tools_for_explicit_request():
+    provider = MagicMock()
+    provider.supports_tools.return_value = True
+    tool_selector = MagicMock()
+    selected_tools = [
+        SimpleNamespace(name="graph"),
+        SimpleNamespace(name="read"),
+        SimpleNamespace(name="shell"),
+        SimpleNamespace(name="db"),
+    ]
+    tool_selector.select_tools = AsyncMock(return_value=selected_tools)
+    tool_selector.prioritize_by_stage.return_value = selected_tools
+    tool_planner = MagicMock()
+    tool_planner.filter_tools_by_intent.return_value = selected_tools
+    conversation = SimpleNamespace(message_count=MagicMock(return_value=2))
+    host = SimpleNamespace(
+        provider=provider,
+        _model_supports_tool_calls=MagicMock(return_value=True),
+        _should_skip_tools_for_turn=MagicMock(return_value=False),
+        observed_files=set(),
+        _tool_planner=tool_planner,
+        conversation=conversation,
+        messages=[_Message("user", "inspect the sqlite db directly")],
+        tool_selector=tool_selector,
+        use_semantic_selection=True,
+        _current_intent="display_only",
+        _current_user_message="inspect the sqllite db directly using shell or database tools",
+        _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
+        _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
+    )
+    runtime = ToolSelectionRuntime(OrchestratorProtocolAdapter(host))
+
+    result = await runtime.select_tools_for_turn(
+        "Now let me inspect the prompt optimizer implementation.",
+        goals=None,
+    )
+
+    assert [tool.name for tool in result] == ["db", "shell", "graph", "read"]
+
+
+@pytest.mark.asyncio
+async def test_tool_selection_runtime_preserves_order_without_explicit_database_request():
+    provider = MagicMock()
+    provider.supports_tools.return_value = True
+    tool_selector = MagicMock()
+    selected_tools = [
+        SimpleNamespace(name="graph"),
+        SimpleNamespace(name="read"),
+        SimpleNamespace(name="shell"),
+        SimpleNamespace(name="db"),
+    ]
+    tool_selector.select_tools = AsyncMock(return_value=selected_tools)
+    tool_selector.prioritize_by_stage.return_value = selected_tools
+    tool_planner = MagicMock()
+    tool_planner.filter_tools_by_intent.return_value = selected_tools
+    conversation = SimpleNamespace(message_count=MagicMock(return_value=2))
+    host = SimpleNamespace(
+        provider=provider,
+        _model_supports_tool_calls=MagicMock(return_value=True),
+        _should_skip_tools_for_turn=MagicMock(return_value=False),
+        observed_files=set(),
+        _tool_planner=tool_planner,
+        conversation=conversation,
+        messages=[_Message("user", "inspect prompt evolution")],
+        tool_selector=tool_selector,
+        use_semantic_selection=True,
+        _current_intent="display_only",
+        _current_user_message="inspect prompt evolution in the repo",
+        _apply_kv_tool_strategy=MagicMock(side_effect=lambda tools: tools),
+        _sort_tools_for_kv_stability=MagicMock(side_effect=lambda tools: tools),
+    )
+    runtime = ToolSelectionRuntime(OrchestratorProtocolAdapter(host))
+
+    result = await runtime.select_tools_for_turn(
+        "Now let me inspect the prompt optimizer implementation.",
+        goals=None,
+    )
+
+    assert [tool.name for tool in result] == ["graph", "read", "shell", "db"]
