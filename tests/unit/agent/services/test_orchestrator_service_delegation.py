@@ -991,6 +991,34 @@ class TestChatServiceBootstrapLaziness:
         assert result == {"enabled": True}
         helper.get_session_stats.assert_called_once_with()
 
+    def test_record_prompt_optimization_metadata_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._session_runtime = helper
+        turn_context = MagicMock(name="turn_context")
+
+        AgentOrchestrator._record_prompt_optimization_metadata(obj, turn_context)
+
+        helper.record_prompt_optimization_metadata.assert_called_once_with(turn_context)
+
+    def test_get_active_prompt_optimization_metadata_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_active_prompt_optimization_metadata.return_value = {
+            "entries": [],
+            "by_section": {},
+        }
+        obj._session_runtime = helper
+
+        result = AgentOrchestrator.get_active_prompt_optimization_metadata(obj)
+
+        assert result == {"entries": [], "by_section": {}}
+        helper.get_active_prompt_optimization_metadata.assert_called_once_with()
+
     def test_get_task_guidance_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.agent.services.task_guidance_runtime import TaskGuidanceRuntime

@@ -7,7 +7,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class SessionRuntime:
@@ -60,3 +63,42 @@ class SessionRuntime:
         """Get statistics for the current memory session."""
         self.sync_runtime_state()
         return self._runtime._session_service.get_session_stats()
+
+    def record_prompt_optimization_metadata(self, turn_context: Any) -> None:
+        """Persist the active live prompt-optimization identity for the session."""
+        runtime = self._runtime
+        metadata = getattr(turn_context, "prompt_optimization_metadata", None)
+        if not isinstance(metadata, dict):
+            return
+
+        normalized = {
+            "entries": list(metadata.get("entries") or []),
+            "by_section": dict(metadata.get("by_section") or {}),
+        }
+        runtime._active_prompt_optimization_metadata = normalized
+
+        if runtime._session_service is None or not hasattr(
+            runtime._session_service, "update_session_metadata"
+        ):
+            return
+
+        try:
+            if (
+                hasattr(runtime._session_service, "_current_session")
+                and runtime._session_service._current_session is not None
+            ):
+                runtime._session_service.update_session_metadata(
+                    {"prompt_optimization": normalized}
+                )
+        except Exception as exc:
+            logger.debug("Failed to update session prompt-optimization metadata: %s", exc)
+
+    def get_active_prompt_optimization_metadata(self) -> Dict[str, Any]:
+        """Return the canonical prompt-optimization metadata for the live session."""
+        payload = getattr(self._runtime, "_active_prompt_optimization_metadata", None)
+        if not isinstance(payload, dict):
+            return {"entries": [], "by_section": {}}
+        return {
+            "entries": list(payload.get("entries") or []),
+            "by_section": dict(payload.get("by_section") or {}),
+        }
