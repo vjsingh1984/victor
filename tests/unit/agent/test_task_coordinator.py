@@ -213,6 +213,33 @@ class TestIntentDetection:
             "user", "[INTENT-GUARD: This is read-only analysis.]"
         )
 
+    def test_apply_intent_guard_injects_database_task_hint_for_explicit_sqlite_request(
+        self, task_coordinator, mock_task_analyzer, mock_conversation_controller
+    ):
+        """Explicit database inspection requests should get a concrete task hint."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        intent_result = Mock()
+        intent_result.intent = ActionIntent.DISPLAY_ONLY
+        intent_result.prompt_guard = "READ ONLY MODE: Do not modify files."
+        mock_task_analyzer.detect_intent.return_value = intent_result
+
+        task_coordinator.apply_intent_guard(
+            "review the sqllite db directly and inspect the schema",
+            mock_conversation_controller,
+        )
+
+        task_hint_calls = [
+            call
+            for call in mock_conversation_controller.add_message.call_args_list
+            if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
+        ]
+        assert len(task_hint_calls) == 1
+        assert "Prefer the db tool first" in task_hint_calls[0][0][1]
+        assert task_hint_calls[0].kwargs["metadata"] == build_internal_history_metadata(
+            "task_hint"
+        )
+
 
 class TestTaskGuidance:
     """Tests for task-specific guidance."""

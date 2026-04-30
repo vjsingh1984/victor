@@ -47,6 +47,23 @@ def test_task_guidance_runtime_apply_intent_guard_syncs_runtime_state():
     assert runtime_host._current_user_message == "read this file"
 
 
+def test_task_guidance_runtime_apply_intent_guard_preserves_explicit_sqlite_request_message():
+    task_coordinator = MagicMock()
+    task_coordinator.current_intent = "display_only"
+    runtime_host = SimpleNamespace(
+        task_coordinator=task_coordinator,
+        conversation_controller=MagicMock(name="conversation_controller"),
+        _current_intent=None,
+        _current_user_message=None,
+    )
+
+    runtime = TaskGuidanceRuntime(runtime_host)
+    runtime.apply_intent_guard("inspect the sqllite db directly")
+
+    assert runtime_host._current_intent == "display_only"
+    assert runtime_host._current_user_message == "inspect the sqllite db directly"
+
+
 def test_task_guidance_runtime_apply_task_guidance_syncs_temperature_and_budget():
     task_coordinator = MagicMock()
     task_coordinator.temperature = 0.1

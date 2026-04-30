@@ -243,7 +243,10 @@ class TaskCoordinator:
             user_message: The user's input message
             conversation_controller: Conversation controller for message injection
         """
-        from victor.agent.action_authorizer import ActionIntent
+        from victor.agent.action_authorizer import (
+            ActionIntent,
+            has_explicit_readonly_shell_request,
+        )
 
         intent_result = self.task_analyzer.detect_intent(user_message)
         self._current_intent = intent_result.intent
@@ -256,6 +259,19 @@ class TaskCoordinator:
                 logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
         elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
             logger.info("Intent: write_allowed, no prompt guard needed")
+
+        if has_explicit_readonly_shell_request(user_message):
+            conversation_controller.add_message(
+                "user",
+                (
+                    "[TASK-HINT: The user explicitly wants direct database/SQLite inspection. "
+                    "Prefer the db tool first. If SQLite CLI inspection is more direct, use a "
+                    "focused readonly shell command. Do not substitute repo/code inspection for "
+                    "the requested database query step.]"
+                ),
+                metadata=build_internal_history_metadata("task_hint"),
+            )
+            logger.info("Injected direct database inspection task hint")
 
     # =====================================================================
     # Task Guidance
