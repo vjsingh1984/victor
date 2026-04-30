@@ -725,6 +725,21 @@ class TestChatServiceBootstrapLaziness:
         assert first is second
         assert first._runtime is adapter
 
+    def test_get_tool_execution_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.tool_execution_runtime import ToolExecutionRuntime
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_tool_execution_runtime()
+        second = obj._get_tool_execution_runtime()
+
+        assert isinstance(first, ToolExecutionRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
     @pytest.mark.asyncio
     async def test_run_planning_chat_runtime_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -880,6 +895,23 @@ class TestChatServiceBootstrapLaziness:
 
         assert result.content == "Recovered"
         helper.apply_recovery_action.assert_called_once_with(recovery_action, stream_ctx)
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.execute_tool_calls = AsyncMock(return_value=[{"name": "read", "success": True}])
+        obj._tool_execution_runtime = helper
+
+        result = await AgentOrchestrator.execute_tool_calls(
+            obj,
+            [{"name": "read", "arguments": {}}],
+        )
+
+        assert result == [{"name": "read", "success": True}]
+        helper.execute_tool_calls.assert_awaited_once_with([{"name": "read", "arguments": {}}])
 
     def test_get_task_guidance_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator

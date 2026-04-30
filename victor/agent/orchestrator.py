@@ -4181,6 +4181,16 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self._recovery_runtime = runtime
         return runtime
 
+    def _get_tool_execution_runtime(self) -> Any:
+        """Get the canonical service-owned tool execution runtime helper."""
+        runtime = getattr(self, "_tool_execution_runtime", None)
+        if runtime is None:
+            from victor.agent.services.tool_execution_runtime import ToolExecutionRuntime
+
+            runtime = ToolExecutionRuntime(self.protocol_adapter)
+            self._tool_execution_runtime = runtime
+        return runtime
+
     def create_recovery_context(
         self,
         stream_ctx: "StreamingChatContext",
@@ -4313,54 +4323,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             List of result dicts with keys: name, success, elapsed, args,
             error, follow_up_suggestions.
         """
-        if not tool_calls:
-            return []
-
-        tool_calls = [tool_call for tool_call in tool_calls if isinstance(tool_call, dict)]
-        if not tool_calls:
-            return []
-
-        # Delegate execution to ToolPipeline
-        pipeline_result = await self._tool_pipeline.execute_tool_calls(
-            tool_calls=tool_calls,
-            context=self._get_tool_context(),
-        )
-
-        # Sync budget from pipeline
-        self.tool_calls_used = self._tool_pipeline.calls_used
-
-        # Delegate post-processing to the canonical ToolService path
-        from victor.agent.services.tool_service import ToolResultContext
-
-        ctx = ToolResultContext(
-            executed_tools=self.executed_tools,
-            observed_files=self.observed_files,
-            failed_tool_signatures=self.failed_tool_signatures,
-            shown_tool_errors=self._shown_tool_errors,
-            continuation_prompts=self._continuation_prompts,
-            asking_input_prompts=self._asking_input_prompts,
-            tool_calls_used=self.tool_calls_used,
-            record_tool_execution=self._record_tool_execution,
-            conversation_state=self.conversation_state,
-            unified_tracker=self.unified_tracker,
-            usage_logger=self.usage_logger,
-            add_message=self.add_message,
-            format_tool_output=self._format_tool_output,
-            console=self.console,
-            presentation=self._presentation,
-            stream_context=(
-                self._current_stream_context if hasattr(self, "_current_stream_context") else None
-            ),
-            task_type=getattr(self, "_current_task_type", getattr(self, "_task_type", "unknown")),
-        )
-
-        results = self._tool_service.process_tool_results(pipeline_result, ctx)
-
-        # Sync mutable state back from context
-        self._continuation_prompts = ctx.continuation_prompts
-        self._asking_input_prompts = ctx.asking_input_prompts
-
-        return results
+        return await self._get_tool_execution_runtime().execute_tool_calls(tool_calls)
 
     def _get_tool_context(self) -> dict:
         """Get cached tool execution context dict.
