@@ -2696,62 +2696,27 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         return result
 
+    def _get_skill_runtime(self) -> Any:
+        """Get the canonical service-owned skill runtime helper."""
+        runtime = getattr(self, "_skill_runtime", None)
+        if runtime is None:
+            from victor.agent.services.skill_runtime import SkillRuntime
+
+            runtime = SkillRuntime(self.protocol_adapter)
+            self._skill_runtime = runtime
+        return runtime
+
     def _apply_skill_for_turn(self, user_message: str) -> None:
         """Apply skill auto-selection for a turn (used by both sync and streaming paths).
 
         Clears previous skill, matches new skill(s), injects into prompt,
         and records analytics.
         """
-        self.clear_active_skills()
-
-        matcher = getattr(self, "_skill_matcher", None)
-        if (
-            matcher is None
-            or not getattr(matcher, "_initialized", False)
-            or getattr(self, "_skill_auto_disabled", False)
-            or getattr(self, "_manual_skill_active", False)
-        ):
-            return
-
-        try:
-            matches = matcher.match_multiple_sync(user_message)
-            if matches:
-                if len(matches) == 1:
-                    skill, score = matches[0]
-                    logger.info("Auto-selected skill: %s (score=%.2f)", skill.name, score)
-                    self.inject_skill(skill)
-                    self._last_skill_match_info = {
-                        "auto_skill": skill.name,
-                        "auto_skill_score": round(score, 2),
-                    }
-                else:
-                    names = [s.name for s, _ in matches]
-                    logger.info("Auto-selected %d skills: %s", len(matches), " → ".join(names))
-                    self.inject_skills(matches)
-                    self._last_skill_match_info = {
-                        "auto_skills": [
-                            {"name": s.name, "score": round(sc, 2)} for s, sc in matches
-                        ],
-                    }
-
-                # Record analytics
-                analytics = getattr(self, "_skill_analytics", None)
-                if analytics:
-                    if len(matches) == 1:
-                        analytics.record_selection(matches[0][0].name, matches[0][1])
-                    else:
-                        analytics.record_multi_selection([(s.name, sc) for s, sc in matches])
-            else:
-                analytics = getattr(self, "_skill_analytics", None)
-                if analytics:
-                    analytics.record_miss()
-                self._last_skill_match_info = None
-        except Exception:
-            logger.debug("Skill auto-selection failed", exc_info=True)
+        self._get_skill_runtime().apply_skill_for_turn(user_message)
 
     def get_last_skill_match_info(self) -> Optional[Dict[str, Any]]:
         """Return metadata about the last skill match for response attachment."""
-        return getattr(self, "_last_skill_match_info", None)
+        return self._get_skill_runtime().get_last_skill_match_info()
 
     def clear_active_skills(self) -> None:
         """Remove any active skill injection.

@@ -1414,6 +1414,30 @@ class TestChatServiceBootstrapLaziness:
         with pytest.raises(RuntimeError, match="stream failed"):
             _ = [c async for c in obj.stream_chat("hello")]
 
+    def test_apply_skill_for_turn_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._skill_runtime = helper
+
+        AgentOrchestrator._apply_skill_for_turn(obj, "hello")
+
+        helper.apply_skill_for_turn.assert_called_once_with("hello")
+
+    def test_get_last_skill_match_info_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_last_skill_match_info.return_value = {"auto_skill": "debug"}
+        obj._skill_runtime = helper
+
+        result = AgentOrchestrator.get_last_skill_match_info(obj)
+
+        assert result == {"auto_skill": "debug"}
+        helper.get_last_skill_match_info.assert_called_once_with()
+
     @pytest.mark.asyncio
     async def test_orchestrator_chat_delegates_to_chat_service(self):
         from victor.agent.orchestrator import AgentOrchestrator
