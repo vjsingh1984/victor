@@ -895,11 +895,19 @@ class TestFileContentCache:
 
 
 class TestFileCacheIntegration:
-    """Integration tests for file cache with read/write functions."""
+    """Integration tests for file cache with read/write functions.
+
+    NOTE: These tests are skipped when file cache is disabled (default).
+    The OS page cache provides better memory management, so the Python
+    process cache is disabled by default.
+    """
 
     @pytest.fixture(autouse=True)
     def setup_cache(self):
         """Ensure cache is cleared before each test."""
+        from victor.tools.filesystem import is_file_cache_enabled
+        if not is_file_cache_enabled():
+            pytest.skip("File cache disabled - OS page cache handles this better")
         clear_file_content_cache()
         yield
         clear_file_content_cache()

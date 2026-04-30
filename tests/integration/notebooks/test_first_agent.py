@@ -16,18 +16,18 @@
 
 These tests run against local Ollama models only.
 
-Model Selection (optimized for speed with latest Qwen 3.5):
-- Primary: qwen3.5:0.8b (0.8B params, 1GB, fastest modern model)
-- Fallbacks: qwen3.5:2b, qwen3.5:4b, qwen3:14b, qwen2.5:3b
+Model Selection (Qwen 3.5 - latest 2026 generation):
+- Primary: qwen3.5:4b (4B params, 3.4GB, 256K context, tool calling + coding)
+- Fallbacks: qwen3.5:2b, qwen3.5:0.8b, qwen3-coder, qwen2.5:3b
 
 Pull the recommended model:
-  ollama pull qwen3.5:0.8b
+  ollama pull qwen3.5:4b
 
-For other fast Qwen 3.5 options:
-  ollama pull qwen3.5:2b   # 2.7GB, better quality
-  ollama pull qwen3.5:4b   # 3.4GB, good balance
-
-Qwen 3.5 is the latest generation (2026) with 256K context window.
+Qwen 3.5 features:
+- 256K context window
+- Native tool calling support
+- Multimodal (text + image)
+- 201 languages
 """
 
 import json
@@ -41,7 +41,7 @@ import pytest
 from victor.framework import Agent
 from victor.framework.events import EventType
 
-PREFERRED_OLLAMA_MODEL = "qwen3.5:0.8b"
+PREFERRED_OLLAMA_MODEL = "qwen3.5:4b"
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 
 
@@ -89,21 +89,20 @@ def _list_ollama_models() -> list[str]:
 def _select_model(models: list[str]) -> str:
     """Select preferred model with sensible fallback.
 
-    Priority order (fastest first for test speed, Qwen 3.5 is latest 2026):
-    1. qwen3.5:0.8b - 0.8B parameters, 1GB, ultra-fast
-    2. qwen3.5:2b - 2B parameters, 2.7GB, very fast
-    3. qwen3.5:4b - 4B parameters, 3.4GB, fast
-    4. qwen3:14b - Larger but capable
+    Priority order (Qwen 3.5 first - latest 2026 generation):
+    1. qwen3.5:4b - 4B parameters, 3.4GB, 256K context, tool calling
+    2. qwen3.5:2b - 2B parameters, 2.7GB
+    3. qwen3.5:0.8b - 0.8B parameters, 1GB
+    4. qwen3-coder - Coding optimized
     5. qwen2.5:3b - Legacy fallback
     6. First available model as fallback
     """
     # Qwen 3.5 models first (latest generation, 256K context)
     fast_models = [
-        "qwen3.5:0.8b",  # 1GB - Ultra fast, 256K context
+        "qwen3.5:4b",    # 3.4GB - Best balance: speed + tool calling
         "qwen3.5:2b",    # 2.7GB - Very fast
-        "qwen3.5:4b",    # 3.4GB - Fast with good quality
+        "qwen3.5:0.8b",  # 1GB - Ultra fast
         "qwen3.5:9b",    # 6.6GB - Capable
-        "qwen3:14b",     # Qwen3 generation
         "qwen3-coder",   # Qwen3 coding optimized
         "qwen3-coder-next",
         # Legacy Qwen 2.5 fallbacks
@@ -120,7 +119,7 @@ def _select_model(models: list[str]) -> str:
     ]
 
     for model in fast_models:
-        # Match with or without tag suffix (e.g., "qwen3.5:0.8b" matches "qwen3.5:0.8b-q8_0")
+        # Match with or without tag suffix (e.g., "qwen3.5:4b" matches "qwen3.5:4b-q4_K_M")
         if any(model == m or m.startswith(model + "-") or m.startswith(model + ":") for m in models):
             return model
 

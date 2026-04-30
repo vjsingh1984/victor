@@ -1197,7 +1197,100 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._state_graph_config = config
         return self
 
-    async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def _classify_state(state: Any) -> str:
+        """Classify the incoming graph state.
+
+        Returns one of ``"cow"``, ``"pydantic"``, or ``"dict"``. The
+        coordinator branches on this when reading task/context and when
+        writing back the team result, so the integration works against any
+        of the state schemas StateGraph supports.
+        """
+        # Lazy imports to keep victor/teams from depending on pydantic at
+        # module load time.
+        from victor.framework.graph import CopyOnWriteState
+
+        if isinstance(state, CopyOnWriteState):
+            return "cow"
+
+        try:
+            from pydantic import BaseModel
+        except ImportError:  # pragma: no cover - pydantic is a hard dep here
+            return "dict"
+        if isinstance(state, BaseModel):
+            return "pydantic"
+        return "dict"
+
+    @staticmethod
+    def _read_state(state: Any, kind: str, key: str, default: Any = None) -> Any:
+        if kind == "pydantic":
+            return getattr(state, key, default)
+        if kind == "cow":
+            return state.get(key, default)
+        return state.get(key, default)
+
+    @staticmethod
+    def _build_call_context(
+        state: Any, kind: str, *, exclude: set
+    ) -> Dict[str, Any]:
+        if kind == "pydantic":
+            dump = state.model_dump()
+            return {k: v for k, v in dump.items() if k not in exclude}
+        if kind == "cow":
+            return {k: state[k] for k in state.keys() if k not in exclude}
+        return {k: v for k, v in state.items() if k not in exclude}
+
+    @staticmethod
+    def _apply_updates(state: Any, kind: str, updates: Dict[str, Any]) -> Any:
+        """Write ``updates`` back into the original state container.
+
+        - ``dict``: returns a new dict (caller's input is not mutated).
+        - ``pydantic``: returns ``state.model_copy(update=updates)``. If the
+          model rejects unknown fields, raises ``ValueError`` naming the
+          offending key so users know to either widen ``model_config`` with
+          ``extra='allow'`` or remap keys via ``StateGraphNodeConfig``.
+        - ``cow``: assigns each key via ``__setitem__`` and returns the
+          same wrapper, so the StateGraph executor sees the mutation.
+        """
+        if kind == "pydantic":
+            # ``model_copy(update=...)`` in Pydantic v2 does not run validation,
+            # so a strict (extra='forbid') model would silently drop unknown
+            # keys. Detect that case up front and raise a clear error so users
+            # know to either remap keys or widen ``model_config``.
+            extra_policy = getattr(state.model_config, "get", lambda *_: None)("extra")
+            if extra_policy is None and isinstance(state.model_config, dict):
+                extra_policy = state.model_config.get("extra")
+            declared = set(getattr(type(state), "model_fields", {}).keys())
+            unknown = [k for k in updates if k not in declared]
+            if unknown and extra_policy not in ("allow",):
+                hint = (
+                    "Either remap the keys via StateGraphNodeConfig "
+                    "(e.g. result_key='context') or set "
+                    "model_config = {'extra': 'allow'} on your state model."
+                )
+                raise ValueError(
+                    f"Cannot write team result into Pydantic state of type "
+                    f"{type(state).__name__}: fields {unknown} are not declared "
+                    f"and the model does not allow extras. {hint}"
+                )
+            try:
+                return state.model_copy(update=updates)
+            except Exception as exc:  # pydantic.ValidationError on assignment
+                raise ValueError(
+                    f"Failed to write team result into Pydantic state of type "
+                    f"{type(state).__name__}: {exc}. Consider remapping keys "
+                    f"via StateGraphNodeConfig."
+                ) from exc
+        if kind == "cow":
+            for k, v in updates.items():
+                state[k] = v
+            return state
+        # dict
+        new_state = dict(state)
+        new_state.update(updates)
+        return new_state
+
+    async def __call__(self, state: Any) -> Any:
         """Execute as a StateGraph node.
 
         This makes the coordinator directly usable in StateGraph:
@@ -1249,30 +1342,32 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             graph.add_node("research_team", coordinator)
         """
         config = self._state_graph_config
+        kind = self._classify_state(state)
 
-        # Extract task using configured keys (task takes precedence over query)
-        task = state.get(config.task_key, state.get(config.query_key, ""))
+        # Extract task using configured keys (task takes precedence over query).
+        # ``None`` from a missing pydantic optional is treated like missing.
+        task = self._read_state(state, kind, config.task_key, default=None)
+        if not task:
+            task = self._read_state(state, kind, config.query_key, default="")
 
-        # Build context excluding task/query keys
-        context = {
-            k: v
-            for k, v in state.items()
-            if k not in (config.task_key, config.query_key)
-        }
+        # Build context excluding task/query keys.
+        context = self._build_call_context(
+            state, kind, exclude={config.task_key, config.query_key}
+        )
 
-        # Execute team task
+        # Execute team task.
         result = await self.execute_task(task, context)
 
-        # Build the return state as a shallow copy so the caller's dict is
-        # never mutated. StateGraph executors already isolate state via
-        # CopyOnWriteState, but well-behaved nodes still avoid in-place writes
-        # so the function is safe to use programmatically too.
-        new_state = dict(state)
+        # Compose updates and apply via the type-aware writer. dict inputs
+        # are returned as a new dict (caller's state is not mutated), Pydantic
+        # inputs are returned via model_copy, CoW wrappers are mutated via
+        # __setitem__ so the executor sees the change.
+        updates: Dict[str, Any] = {}
         if result.get("success"):
-            new_state[config.result_key] = result.get("final_output", "")
-            new_state[config.output_key] = result
+            updates[config.result_key] = result.get("final_output", "")
+            updates[config.output_key] = result
         else:
-            new_state[config.error_key] = result.get("error", "Unknown error")
-            new_state[config.output_key] = result
+            updates[config.error_key] = result.get("error", "Unknown error")
+            updates[config.output_key] = result
 
-        return new_state
+        return self._apply_updates(state, kind, updates)

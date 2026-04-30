@@ -399,7 +399,9 @@ async def test_graph_tool_file_deps_with_directory_path_falls_back_to_overview(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
+    # Mock both the fast-path check and the index builder
     monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -437,7 +439,9 @@ async def test_graph_tool_file_deps_with_file_path_uses_path_as_subject(
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
+    # Mock both the fast-path check and the index builder
     monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -508,7 +512,9 @@ async def test_graph_tool_requires_graph_support(monkeypatch, tmp_path: Path):
     async def _fake_get_or_build_index(*args, **kwargs):
         return fake_index, False
 
+    # Mock fast-path check to force the old code path
     monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_has_data", lambda *args, **kwargs: False)
 
     exec_ctx = {"settings": SimpleNamespace(codebase_graph_store="memory")}
 
@@ -519,7 +525,8 @@ async def test_graph_tool_requires_graph_support(monkeypatch, tmp_path: Path):
     )
 
     assert result["success"] is False
-    assert "graph_store" in result["error"]
+    # Error message should indicate graph data is unavailable
+    assert "unavailable" in result["error"].lower() or "graph_store" in result["error"]
 
 
 @pytest.mark.asyncio

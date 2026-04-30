@@ -227,7 +227,7 @@ class CapabilityNegotiator:
             dep_name = dep.extension_name
 
             # Check if extension is registered
-            registered = VerticalRegistry.is_registered(dep_name)
+            registered = VerticalRegistry.get(dep_name) is not None
             installed = False
             installed_version = None
 

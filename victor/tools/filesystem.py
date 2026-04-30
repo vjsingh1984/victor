@@ -206,19 +206,21 @@ class FileContentCacheStats:
 class FileContentCache:
     """Session-level cache for file contents.
 
-    Features:
+    NOTE: DISABLED by default (_cache_enabled=False).
+    The OS page cache is more efficient for this purpose - it keeps
+    recently accessed file pages in memory at the kernel level with
+    better memory management across the entire system.
+
+    This cache adds unnecessary memory pressure in the Python process
+    for minimal benefit. Re-enable only if profiling shows a proven
+    bottleneck in file I/O for repeated reads of the same files.
+
+    Features (when enabled):
     - Caches file contents keyed by normalized absolute path
     - Auto-invalidates when file modification time changes
     - Thread-safe operations
     - Memory-bounded with LRU eviction
     - Tracks hit/miss statistics
-
-    Usage:
-        cache = FileContentCache(max_entries=100, max_total_bytes=10_000_000)
-        content = cache.get("/path/to/file")  # Returns None on miss
-        cache.set("/path/to/file", content, mtime, size)
-        cache.invalidate("/path/to/file")  # On write
-        cache.clear()  # On session end
     """
 
     def __init__(
@@ -435,9 +437,10 @@ class FileContentCache:
 
 
 # Global file content cache instance (session-level)
-# This is shared across all filesystem tool invocations within a session
+# DISABLED by default - OS page cache is more efficient.
+# Can be re-enabled via settings if needed for specific use cases.
 _file_content_cache: Optional[FileContentCache] = None
-_cache_enabled: bool = True  # Can be disabled via settings
+_cache_enabled: bool = False  # Disabled - OS page cache handles this better
 
 
 # ============================================================================
@@ -1168,15 +1171,15 @@ TEXT_EXTENSIONS = {
         "reading source code files",
         "viewing configuration files",
         "examining text documents",
-        "searching within code files",
-        "looking at specific lines",
+        "pattern search within a single file (use code_search for multi-file)",
+        "viewing specific line ranges with offset/limit",
     ],
     examples=[
         "read the file src/main.py",
         "show me the contents of config.yaml",
         "what's in the README",
-        "search for 'def calculate' in utils.py",
         "show first 50 lines of main.py",
+        "search for 'def calculate' in utils.py (single file)",
     ],
     mandatory_keywords=[
         "read file",
@@ -1193,7 +1196,8 @@ TEXT_EXTENSIONS = {
         "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
-        "Use search parameter for efficient grep-like targeted lookups",
+        "SINGLE-FILE SEARCH: Use search parameter for grep-like pattern search within one file",
+        "MULTI-FILE SEARCH: Use code_search(mode='text', query='pattern', path='.') for searching across multiple files",
         "Use ls first to check file sizes before reading",
     ],
 )
@@ -1221,22 +1225,41 @@ async def read(
     PAGINATION (for large files):
     - Use offset/limit: read(path, offset=0, limit=200), then offset=200, etc.
     - Or let auto-truncation guide you with the offset value in output
-    - Use search param to find specific content without reading entire file
+
+    SEARCH OPTIONS:
+    - Single-file: Use search param for grep-like pattern search within one file
+    - Multi-file: Use code_search(mode='text', query='pattern', path='.') for searching across files
+    - Semantic: Use code_search(mode='semantic', query='concept') for conceptual search
 
     Args:
         path: File path (MUST be a file, NOT a directory)
         offset: Start line (0=beginning). Use for pagination of large files.
         limit: Max lines to read (0=auto, applies configured limits).
                Set explicit limit to override auto-truncation.
-        search: Grep pattern - efficient for finding specific content
-        ctx: Context lines around matches
-        regex: Pattern is regex
+        search: Grep pattern for single-file search (use code_search for multi-file)
+        ctx: Context lines around search matches
+        regex: Pattern is regex (default: False for literal match)
         line_start: Alias for offset (some models use this name)
         line_end: Alias for limit (some models use this name)
 
     Returns:
         File content with line numbers. If truncated, includes continuation hint
-        with exact offset to use for next read.
+        with exact offset to use for next read. If search param is used, returns
+        matching lines with context.
+
+    Examples:
+        # Read entire file (with auto-truncation)
+        read('src/main.py')
+
+        # Read with pagination
+        read('src/main.py', offset=0, limit=200)
+        read('src/main.py', offset=200, limit=200)
+
+        # Single-file pattern search
+        read('src/main.py', search='TODO', ctx=2)
+
+        # Multi-file search (use code_search instead)
+        code_search(mode='text', query='TODO', path='src/', k=10)
 
     Note: If you need to list files in a directory, use ls(path='directory/') instead.
     """

@@ -1028,6 +1028,9 @@ class ConversationStore:
                 model=model,
                 profile=profile,
             )
+        else:
+            # Clear existing messages for update (will be repopulated from conversation)
+            session.messages.clear()
 
         # Update rich metadata fields
         session.title = title
@@ -1044,7 +1047,7 @@ class ConversationStore:
                 content = msg["content"]
                 # Extract optional fields
                 token_count = msg.get("token_count", 0)
-                priority = MessagePriority(msg.get("priority", 3))  # Default NORMAL
+                priority = MessagePriority(msg.get("priority", 50))  # Default MEDIUM
                 tool_name = msg.get("tool_name")
                 tool_call_id = msg.get("tool_call_id")
                 metadata = msg.get("metadata", {})
@@ -1129,6 +1132,21 @@ class ConversationStore:
                 else:
                     conversation_messages.append(msg_dict)
 
+        # Also include messages from session.preview_messages
+        for msg in session.preview_messages:
+            if isinstance(msg, ConversationMessage):
+                msg_dict = {
+                    "role": msg.role.value,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                    "token_count": msg.token_count,
+                    "priority": msg.priority.value if msg.priority else None,
+                    "tool_name": msg.tool_name,
+                    "tool_call_id": msg.tool_call_id,
+                    "metadata": msg.metadata if msg.metadata else {},
+                }
+                preview_messages.append(msg_dict)
+
         # Generate title if not set
         title = session.title
         if not title and conversation_messages:
@@ -1193,6 +1211,9 @@ class ConversationStore:
             all_sessions = self.list_sessions(project_path=project_path, limit=100000)
 
             for session in all_sessions:
+                # Reload session from DB to get persisted messages (cache may not have them)
+                session = self.get_session(session.session_id) or session
+
                 # Check title match
                 title = session.title or "Untitled"
                 if lowered_query in title.lower():
@@ -2187,6 +2208,20 @@ class ConversationStore:
                 "execution_state": session.execution_state,
                 "session_ledger": session.session_ledger,
                 "compaction_hierarchy": session.compaction_hierarchy,
+                # Preview messages (converted to dicts for JSON serialization)
+                "preview_messages": [
+                    {
+                        "role": msg.role.value,
+                        "content": msg.content,
+                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                        "token_count": msg.token_count,
+                        "priority": msg.priority.value if msg.priority else 50,
+                        "tool_name": msg.tool_name,
+                        "tool_call_id": msg.tool_call_id,
+                        "metadata": msg.metadata if msg.metadata else {},
+                    }
+                    for msg in session.preview_messages
+                ],
             }
 
             conn.execute(
@@ -2688,6 +2723,23 @@ class ConversationStore:
             except ValueError:
                 context_size = ContextSize.MEDIUM
 
+        # Load preview messages from metadata
+        preview_messages_data = metadata.get("preview_messages", [])
+        preview_messages = []
+        for pm in preview_messages_data:
+            if isinstance(pm, dict):
+                preview_msg = ConversationMessage(
+                    role=MessageRole(pm.get("role", "user")),
+                    content=pm.get("content", ""),
+                    timestamp=datetime.fromisoformat(pm["timestamp"]) if pm.get("timestamp") else datetime.now(),
+                    token_count=pm.get("token_count", 0),
+                    priority=MessagePriority(pm.get("priority", 50)),
+                    tool_name=pm.get("tool_name"),
+                    tool_call_id=pm.get("tool_call_id"),
+                    metadata=pm.get("metadata", {}),
+                )
+                preview_messages.append(preview_msg)
+
         return ConversationSession(
             session_id=row["session_id"],
             created_at=datetime.fromisoformat(row["created_at"]),
@@ -2716,6 +2768,8 @@ class ConversationStore:
             execution_state=metadata.get("execution_state"),
             session_ledger=metadata.get("session_ledger"),
             compaction_hierarchy=metadata.get("compaction_hierarchy"),
+            # Preview messages (loaded from metadata)
+            preview_messages=preview_messages,
         )
 
     def _message_from_row(self, row: sqlite3.Row) -> ConversationMessage:

@@ -167,6 +167,8 @@ class SessionContextLinker:
         summary_parts = ["[Resumed session"]
 
         metadata = session_data.get("metadata", {})
+        if metadata.get("title"):
+            summary_parts.append(f"\"{metadata['title']}\"")
         if metadata.get("updated_at"):
             summary_parts.append(f"last active: {metadata['updated_at']}")
 

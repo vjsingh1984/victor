@@ -900,5 +900,168 @@ class TestExecuteTeamConfig:
         assert "team_result" in out
 
 
+class TestPydanticAndCopyOnWriteState:
+    """Tests that ``__call__`` cleanly handles non-dict state types.
+
+    StateGraph (`victor/framework/graph.py`) accepts dict, ``CopyOnWriteState``
+    wrapper, and arbitrary Pydantic ``BaseModel`` schemas. The coordinator
+    must work in all three without forcing the caller's hand.
+    """
+
+    @pytest.mark.asyncio
+    async def test_call_with_pydantic_extra_allow_state(self):
+        """A BaseModel with ``extra='allow'`` must accept the result/output
+        keys via model_copy and return a model of the same type."""
+        from pydantic import BaseModel, ConfigDict
+
+        class FlexibleState(BaseModel):
+            model_config = ConfigDict(extra="allow")
+            task: str = ""
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+
+        state = FlexibleState(task="run analysis")
+        out = await coordinator(state)
+
+        assert isinstance(out, FlexibleState), "Pydantic input must yield Pydantic output"
+        assert getattr(out, "result", None) == "Done"
+        assert getattr(out, "team_output", None) is not None
+        assert out.task == "run analysis"  # original field preserved
+
+    @pytest.mark.asyncio
+    async def test_call_with_strict_pydantic_raises_clear_error(self):
+        """A strict (extra='forbid') BaseModel with no result/output fields
+        must raise a clear error naming the missing key."""
+        from pydantic import BaseModel, ConfigDict
+
+        class StrictState(BaseModel):
+            model_config = ConfigDict(extra="forbid")
+            task: str = ""
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+
+        with pytest.raises(ValueError, match=r"(result|team_output|extra='allow')"):
+            await coordinator(StrictState(task="x"))
+
+    @pytest.mark.asyncio
+    async def test_call_with_copy_on_write_state(self):
+        """When the StateGraph executor wraps state in CopyOnWriteState the
+        coordinator must still find the task and write the results so that
+        the wrapper sees the mutation."""
+        from victor.framework.graph import CopyOnWriteState
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+
+        cow = CopyOnWriteState({"task": "build", "scope": "auth"})
+        out = await coordinator(cow)
+
+        # Output is the same wrapper, mutated via __setitem__.
+        assert isinstance(out, CopyOnWriteState)
+        assert out["result"] == "Done"
+        assert out["team_output"]["success"] is True
+        assert out["scope"] == "auth"  # passthrough preserved
+
+    @pytest.mark.asyncio
+    async def test_call_with_agentic_loop_state_model_uses_query_field(self):
+        """``AgenticLoopStateModel`` has a ``query`` field but no ``task``
+        field. Default config falls back to query — and writing to the
+        coordinator's default ``result_key`` requires extra='allow'."""
+        from victor.framework.agentic_graph.state import AgenticLoopStateModel
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+        # Map outputs into the model's existing ``context`` dict field so the
+        # strict schema doesn't reject them.
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(
+                result_key="context",
+                output_key="evaluation",
+                error_key="evaluation",
+            )
+        )
+
+        state = AgenticLoopStateModel(query="explore the repo")
+        out = await coordinator(state)
+
+        assert captured == ["explore the repo"]
+        assert isinstance(out, AgenticLoopStateModel)
+
+
+class TestFormationStrategy:
+    """Tests for the optional ``formation_strategy`` slot on
+    ``StateGraphNodeConfig``.
+
+    The strategy turns ``select_formation`` (an existing utility in
+    ``victor/framework/agentic_graph/team_selector.py``) into a real
+    production seam — its result is injected into the per-call context as
+    ``formation_hint``, which the existing ``_resolve_effective_formation``
+    consumes. Crucially this does NOT mutate ``self._formation``, so two
+    concurrent ``__call__`` invocations can still pick different formations
+    without corrupting each other.
+    """
+
+    @pytest.mark.asyncio
+    async def test_no_strategy_uses_self_formation(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        out = await coordinator({"task": "x"})
+
+        assert out["team_output"]["formation"] == "parallel"
+
+    @pytest.mark.asyncio
+    async def test_strategy_overrides_default_via_hint(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(formation_strategy=lambda _state: TeamFormation.PARALLEL)
+        )
+
+        out = await coordinator({"task": "x"})
+
+        assert out["team_output"]["formation"] == "parallel"
+        # Self-formation must NOT be mutated.
+        assert coordinator.formation == TeamFormation.SEQUENTIAL
+
+    @pytest.mark.asyncio
+    async def test_select_formation_works_as_strategy(self):
+        """The shipped ``select_formation`` utility is plug-and-play: pass it
+        as the ``formation_strategy`` and it picks based on dict context."""
+        from victor.framework.agentic_graph.team_selector import select_formation
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(formation_strategy=select_formation)
+        )
+
+        # task_type="research" is a select_formation override → PARALLEL
+        out = await coordinator(
+            {"task": "x", "context": {"task_type": "research", "team_size": 2}}
+        )
+
+        assert out["team_output"]["formation"] == "parallel"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

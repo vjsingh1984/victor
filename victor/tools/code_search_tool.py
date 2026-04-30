@@ -2049,6 +2049,50 @@ async def _get_or_build_index(
 
         if force_reindex or not has_persistent_data or not has_compatible_manifest:
             # First time or forced - full index
+            # Check if we have stale persistent data we can use immediately
+            has_usable_stale_data = has_persistent_data and not has_compatible_manifest
+
+            if has_usable_stale_data and not force_reindex:
+                # Mark current index as usable with stale data
+                if hasattr(index, "_is_indexed"):
+                    index._is_indexed = True
+                logger.info(
+                    "[code_search] Returning stale index immediately (manifest mismatch), rebuilding in background"
+                )
+
+                # Spawn background rebuild task (fire and forget)
+                async def _rebuildInBackground():
+                    try:
+                        logger.info("[code_search] Background rebuild started for %s", root)
+                        await index.index_codebase()
+                        await _finalize_index_storage(index)
+                        # Update cache with fresh index after rebuild
+                        current_cache = index_cache.get(str(root))
+                        if current_cache:
+                            current_cache["stale"] = False
+                            current_cache["latest_mtime"] = _latest_mtime(root)
+                            current_cache["index_manifest"] = index_manifest
+                        logger.info("[code_search] Background rebuild complete for %s", root)
+                    except Exception as exc:
+                        logger.warning("[code_search] Background rebuild failed for %s: %s", root, exc)
+
+                # Spawn background task
+                asyncio.create_task(_rebuildInBackground())
+
+                # Cache stale index for immediate use
+                index_cache[str(root)] = {
+                    "index": index,
+                    "latest_mtime": latest,
+                    "indexed_at": time.time(),
+                    "index_manifest": index_manifest,
+                    "watcher_subscribed": False,
+                    "stale": True,  # Mark as stale since rebuild is in progress
+                }
+
+                # Return immediately with stale data
+                return index, False  # Not rebuilt from caller's perspective
+
+            # No stale data available, must block for initial build
             await index.index_codebase()
             await _finalize_index_storage(index)
             rebuilt = True

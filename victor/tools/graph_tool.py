@@ -939,11 +939,31 @@ async def _load_graph(
     reindex: bool = False,
     exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> LoadedGraph:
+    """Load graph data with fast-path: use project database immediately, rebuild index asynchronously.
+
+    Priority order:
+    1. Project graph database (fast, non-blocking)
+    2. CodebaseIndex with graph_store (if available)
+    3. Fallback to project database (if index unavailable)
+
+    Index rebuilds happen asynchronously in the background and don't block queries.
+    """
     root_path = _resolve_root_path(path)
     settings = _ctx_value(exec_ctx, "settings")
     if settings is None:
         settings = load_settings()
 
+    # Fast path: Check if project graph database exists and has data
+    # This is non-blocking and serves from existing structural bridge data
+    if not reindex and _project_graph_has_data(root_path):
+        try:
+            logger.info("[graph] Using existing project graph database (fast path)")
+            return await _load_graph_from_project_store(root_path)
+        except Exception as exc:
+            logger.debug("[graph] Project database load failed, falling back to index: %s", exc)
+
+    # Secondary path: Try CodebaseIndex if available
+    # Only blocks if reindex=True or project database doesn't exist
     try:
         index, rebuilt = await _get_or_build_index(
             root_path,
@@ -951,31 +971,26 @@ async def _load_graph(
             force_reindex=reindex,
             exec_ctx=exec_ctx,
         )
-    except (ImportError, RuntimeError, ValueError) as exc:
-        try:
-            loaded = await _load_graph_from_project_store(root_path)
-            logger.info(
-                "[graph] Loaded persisted project graph for %s after index bootstrap failure: %s",
+        graph_store = getattr(index, "graph_store", None)
+        if graph_store is not None:
+            return await _materialize_loaded_graph(
                 root_path,
-                exc,
+                index=index,
+                graph_store=graph_store,
+                rebuilt=rebuilt,
             )
-            return loaded
-        except Exception:
-            raise exc
+    except (ImportError, RuntimeError, ValueError) as exc:
+        logger.debug("[graph] CodebaseIndex unavailable, trying project database: %s", exc)
 
-    graph_store = getattr(index, "graph_store", None)
-    if graph_store is None:
-        try:
-            return await _load_graph_from_project_store(root_path)
-        except Exception:
-            raise ValueError("Index does not provide graph_store support")
-
-    return await _materialize_loaded_graph(
-        root_path,
-        index=index,
-        graph_store=graph_store,
-        rebuilt=rebuilt,
-    )
+    # Fallback: Project database (even if empty, better than nothing)
+    try:
+        loaded = await _load_graph_from_project_store(root_path)
+        logger.info("[graph] Loaded persisted project graph for %s (fallback)", root_path)
+        return loaded
+    except Exception as exc:
+        raise ValueError(
+            f"Graph data unavailable. CodebaseIndex failed and project database is empty: {exc}"
+        ) from exc
 
 
 def _default_edge_types(mode: GraphMode, *, only_runtime: bool) -> Optional[List[str]]:
@@ -1681,7 +1696,7 @@ async def _handle_multi_mode(
     ],
     aliases=["graph_tool"],
     availability_check=_graph_tool_is_available,
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph(
     mode: GraphMode = GraphMode.NEIGHBORS,
@@ -2176,7 +2191,7 @@ async def graph(
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
     keywords=["graph", "search", "find", "query"],
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph_search(
     query: str,
@@ -2213,7 +2228,7 @@ async def graph_search(
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
     keywords=["graph", "neighbors", "callers", "callees", "relationships"],
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph_neighbors(
     node: str,
@@ -2259,7 +2274,7 @@ async def graph_neighbors(
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
     keywords=["graph", "analytics", "metrics", "pagerank", "centrality", "stats"],
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph_analytics(
     path: str = ".",
@@ -2305,7 +2320,7 @@ async def graph_analytics(
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
     keywords=["graph", "path", "trace", "flow", "dependencies"],
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph_path(
     source: str,
@@ -2345,7 +2360,7 @@ async def graph_path(
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
     keywords=["graph", "semantic", "discovery", "similarity", "architectural patterns"],
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph_semantic(
     node: str,
@@ -2429,7 +2444,7 @@ async def graph_query(
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
     keywords=["graph", "dependencies", "file", "imports", "impact"],
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph_dependencies(
     path: str = ".",
@@ -2466,7 +2481,7 @@ async def graph_dependencies(
     danger_level=DangerLevel.SAFE,
     execution_category=ExecutionCategory.READ_ONLY,
     keywords=["graph", "patterns", "anti-patterns", "structure"],
-    timeout=60.0,
+    timeout=180.0,
 )
 async def graph_patterns(
     query: str,

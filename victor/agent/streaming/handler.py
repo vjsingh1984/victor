@@ -1105,8 +1105,11 @@ class StreamingChatHandler:
         if was_pruned:
             metadata["tool_result"]["was_pruned"] = True
         if result is not None:
-            # Include tool output for preview (will be truncated by formatter)
-            metadata["tool_result"]["result"] = str(result)[:2000]  # Limit to 2000 chars
+            # Show brief metadata-only message instead of full content
+            # User can expand with /expand or Ctrl+O to see full output
+            metadata["tool_result"]["result"] = (
+                "Tool completed successfully. Use /expand or Ctrl+O at prompt to see full output."
+            )
         if original_result is not None:
             metadata["tool_result"]["original_result"] = str(original_result)
         return StreamChunk(content="", metadata=metadata)
