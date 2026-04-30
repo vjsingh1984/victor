@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import threading
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from os import PathLike
 
 from victor_sdk.constants import get_canonical_name
 from victor_sdk.verticals.protocols.tools import (
@@ -33,8 +34,8 @@ class ToolDependencyLoadError(Exception):
         message: Detailed error message.
     """
 
-    def __init__(self, path: str, message: str = ""):
-        self.path = path
+    def __init__(self, path: str | PathLike[str], message: str = ""):
+        self.path = str(path)
         self.message = message or f"Failed to load tool dependencies from {path}"
         super().__init__(self.message)
 
@@ -624,7 +625,7 @@ def invalidate_provider_cache(yaml_path: Optional[str] = None) -> None:
 def create_vertical_tool_dependency_provider(
     vertical_name: str,
     config: Optional[ToolDependencyConfig] = None,
-) -> BaseToolDependencyProvider:
+) -> ToolDependencyProviderProtocol:
     """Create a tool dependency provider for a vertical.
 
     Args:

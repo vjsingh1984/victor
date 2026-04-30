@@ -24,13 +24,13 @@ class WorkflowMetadataMixin:
     @classmethod
     def get_initial_stage(cls) -> Optional[str]:
         """Return the initial stage name for this vertical workflow."""
-        stages = cls.get_stages()
+        stages = cls.get_stages()  # type: ignore[attr-defined]
         return next(iter(stages.keys()), None)
 
     @classmethod
     def get_workflow_spec(cls) -> Dict[str, Any]:
         """Return serializable workflow metadata for this vertical."""
-        return {"stage_order": list(cls.get_stages().keys())}
+        return {"stage_order": list(cls.get_stages().keys())}  # type: ignore[attr-defined]
 
     @classmethod
     def get_provider_hints(cls) -> Dict[str, Any]:

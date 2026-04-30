@@ -11,22 +11,9 @@ until then, ``vertical`` is the public noun at the SDK layer.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Set, Type
+from typing import Any, Callable, List, Optional, Set, Type
 
-from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
-
-
-@dataclass
-class ExtensionDependency:
-    """Dependency on another extension or vertical package."""
-
-    extension_name: str
-    min_version: Optional[str] = None
-    optional: bool = False
-
-    def __post_init__(self) -> None:
-        if not self.extension_name:
-            raise ValueError("extension_name cannot be empty")
+from victor_sdk.verticals.manifest import ExtensionDependency, ExtensionManifest, ExtensionType
 
 
 def register_vertical(
@@ -46,13 +33,13 @@ def register_vertical(
     requires_features: Optional[Set[str]] = None,
     excludes_features: Optional[Set[str]] = None,
     lazy_load: bool = True,
-) -> Callable[[Type], Type]:
+) -> Callable[[Type[Any]], Type[Any]]:
     """Attach manifest metadata to a vertical class without runtime registration."""
 
     if not name:
         raise ValueError("Vertical name cannot be empty")
 
-    def decorator(cls: Type) -> Type:
+    def decorator(cls: Type[Any]) -> Type[Any]:
         manifest = ExtensionManifest(
             api_version=api_version,
             name=name,
@@ -70,19 +57,19 @@ def register_vertical(
             excludes_features=excludes_features or set(),
             lazy_load=lazy_load,
         )
-        cls._victor_manifest = manifest  # type: ignore[attr-defined]
+        cls._victor_manifest = manifest
 
         if not getattr(cls, "name", None):
-            cls.name = name  # type: ignore[attr-defined]
+            cls.name = name
         if not getattr(cls, "version", None):
-            cls.version = version  # type: ignore[attr-defined]
+            cls.version = version
 
         return cls
 
     return decorator
 
 
-def get_vertical_manifest(vertical_class: Type) -> Optional[ExtensionManifest]:
+def get_vertical_manifest(vertical_class: Type[Any]) -> Optional[ExtensionManifest]:
     """Return the attached SDK manifest for a decorated vertical class."""
 
     manifest = getattr(vertical_class, "_victor_manifest", None)

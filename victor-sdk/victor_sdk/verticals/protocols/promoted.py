@@ -500,12 +500,10 @@ class StageValidator:
                 ValidationError.INVALID_DESCRIPTION,
                 f"Stage '{sname}' missing 'name' attribute",
             )
+        description = stage_def.get("description")
         if "description" not in stage_def:
             result.add_warning(f"Stage '{sname}' missing 'description' attribute")
-        elif (
-            not isinstance(stage_def.get("description"), str)
-            or not stage_def.get("description").strip()
-        ):
+        elif not isinstance(description, str) or not description.strip():
             result.add_error(
                 ValidationError.INVALID_DESCRIPTION,
                 f"Stage '{sname}' has invalid 'description' (must be non-empty string)",

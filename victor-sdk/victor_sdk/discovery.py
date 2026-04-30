@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib.metadata
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Type, Callable
+from typing import Any, Callable, Dict, List, Optional, Type, cast
 
 from victor_sdk.core.plugins import VictorPlugin
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
@@ -144,7 +144,7 @@ class ProtocolRegistry:
         self._enrichment_providers: List[EnrichmentProvider] = []
 
         self._capability_providers: Dict[str, Any] = {}
-        self._validators: Dict[str, Callable] = {}
+        self._validators: Dict[str, Callable[..., Any]] = {}
         self._verticals: Dict[str, Type[Any]] = {}
 
         # Metadata tracking
@@ -432,11 +432,11 @@ class ProtocolRegistry:
         """Get all capability providers."""
         return self._capability_providers.copy()
 
-    def get_validator(self, name: str) -> Optional[Callable]:
+    def get_validator(self, name: str) -> Optional[Callable[..., Any]]:
         """Get a specific validator by name."""
         return self._validators.get(name)
 
-    def get_validators(self) -> Dict[str, Callable]:
+    def get_validators(self) -> Dict[str, Callable[..., Any]]:
         """Get all validators."""
         return self._validators.copy()
 
@@ -459,9 +459,8 @@ class ProtocolRegistry:
             Dictionary of protocol metadata.
         """
         if name:
-            return (
-                {name: self._protocol_metadata.get(name)} if name in self._protocol_metadata else {}
-            )
+            metadata = self._protocol_metadata.get(name)
+            return {name: metadata} if name in self._protocol_metadata and metadata is not None else {}
         return self._protocol_metadata.copy()
 
     def get_discovery_stats(self) -> DiscoveryStats:
@@ -667,18 +666,19 @@ def discover_protocols(
         return {f"team_{i}": p for i, p in enumerate(registry.get_team_providers())}
     else:
         # Return all protocols as a flat dict
-        all_protocols = {}
+        # Build dict directly to avoid list type inference issues
+        result: Dict[str, Any] = {}
         for i, p in enumerate(registry.get_tool_providers()):
-            all_protocols[f"tool_{i}"] = p
-        for i, p in enumerate(registry.get_safety_providers()):
-            all_protocols[f"safety_{i}"] = p
-        for i, p in enumerate(registry.get_workflow_providers()):
-            all_protocols[f"workflow_{i}"] = p
-        for i, p in enumerate(registry.get_prompt_providers()):
-            all_protocols[f"prompt_{i}"] = p
-        for i, p in enumerate(registry.get_team_providers()):
-            all_protocols[f"team_{i}"] = p
-        return all_protocols
+            result[f"tool_{i}"] = p
+        for i, p in enumerate(registry.get_safety_providers()):  # type: ignore
+            result[f"safety_{i}"] = p
+        for i, p in enumerate(registry.get_workflow_providers()):  # type: ignore
+            result[f"workflow_{i}"] = p
+        for i, p in enumerate(registry.get_prompt_providers()):  # type: ignore
+            result[f"prompt_{i}"] = p
+        for i, p in enumerate(registry.get_team_providers()):  # type: ignore
+            result[f"team_{i}"] = p
+        return result
 
 
 def get_discovery_summary() -> str:
@@ -732,8 +732,9 @@ def get_discovery_summary() -> str:
         lines.append("")
         lines.append(f"Failed Loads ({stats.failed_loads}):")
         for name in registry.get_failed_loads():
-            meta = metadata.get(name, {})
-            lines.append(f"  - {name}: {meta.load_error if meta else 'unknown error'}")
+            meta = metadata.get(name)
+            load_error = meta.load_error if meta and hasattr(meta, "load_error") else "unknown error"
+            lines.append(f"  - {name}: {load_error}")
 
     return "\n".join(lines)
 

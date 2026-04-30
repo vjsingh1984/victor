@@ -399,7 +399,7 @@ class VerticalBase(
 
         if not use_cache:
             return _build()
-        return cls._get_cached_extension("vertical_extensions", _build)
+        return cls._get_cached_extension("vertical_extensions", _build)  # type: ignore[no-any-return]
 
     @classmethod
     def get_tier(cls) -> Tier:

@@ -258,7 +258,7 @@ class CapabilityConfigService:
         for name, config in configs.items():
             self.set_config(name, config, merge_policy=merge_policy, scope_key=scope_key)
 
-    def list_names(self, *, scope_key: Optional[str] = None) -> list:
+    def list_names(self, *, scope_key: Optional[str] = None) -> list[str]:
         """List all config names in a scope."""
         return sorted(self._get_scope_bucket(scope_key).keys())
 
@@ -421,13 +421,13 @@ def load_capability_config(
     if service is not None:
         if legacy_service_names:
             if service.has_config(name, scope_key=scope_key):
-                return service.get_config(name, default_copy, scope_key=scope_key)
+                return service.get_config(name, default_copy, scope_key=scope_key)  # type: ignore[no-any-return]
             for legacy_name in legacy_service_names:
                 if service.has_config(legacy_name, scope_key=scope_key):
-                    return service.get_config(legacy_name, default_copy, scope_key=scope_key)
+                    return service.get_config(legacy_name, default_copy, scope_key=scope_key)  # type: ignore[no-any-return]
             return default_copy
 
-        return service.get_config(name, default_copy, scope_key=scope_key)
+        return service.get_config(name, default_copy, scope_key=scope_key)  # type: ignore[no-any-return]
 
     target_attr = fallback_attr or name
     _ensure_not_private_fallback(target_attr, operation="read")

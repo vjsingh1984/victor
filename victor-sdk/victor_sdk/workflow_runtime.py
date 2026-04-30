@@ -10,7 +10,7 @@ path toward descriptor-first workflows.
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.framework.workflows import BaseYAMLWorkflowProvider
@@ -23,7 +23,6 @@ __all__ = [
     "workflow",
 ]
 
-
 _LAZY_IMPORTS = {
     "BaseYAMLWorkflowProvider": "victor.framework.workflows",
     "WorkflowBuilder": "victor.workflows.definition",
@@ -32,7 +31,7 @@ _LAZY_IMPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Resolve workflow runtime helpers lazily from the Victor host runtime."""
     module_name = _LAZY_IMPORTS.get(name)
     if module_name is None:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, TypeAlias, Union
+from typing import Any, Dict, Iterator, List, Optional, Set, TypeAlias, Union
 
 from victor_sdk.core.exceptions import VerticalConfigurationError
 
@@ -345,7 +345,7 @@ class ToolSet:
         """Return number of tools in this set."""
         return len(self.names)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         """Iterate over tool names."""
         return iter(self.names)
 
@@ -805,10 +805,11 @@ def normalize_team_definition(
     if isinstance(team, TeamDefinition):
         return team
     if isinstance(team, dict):
-        resolved_team_id = team.get("team_id", team_id)
+        resolved_team_id = team.get("team_id", team_id) or team_id
+        team_name = team.get("name") or resolved_team_id
         return TeamDefinition(
             team_id=resolved_team_id,
-            name=team.get("name", resolved_team_id),
+            name=team_name,
             description=team.get("description", ""),
             formation=_normalize_team_formation(team.get("formation", "sequential")),
             members=normalize_team_member_definitions(list(team.get("members", []))),
@@ -1000,7 +1001,7 @@ class VerticalConfig:
         """Get list of stage names."""
         return list(self.stages.keys())
 
-    def with_metadata(self, **kwargs) -> VerticalConfig:
+    def with_metadata(self, **kwargs: Any) -> VerticalConfig:
         """Return a new config with additional metadata."""
         new_metadata = {**self.metadata, **kwargs}
         return VerticalConfig(

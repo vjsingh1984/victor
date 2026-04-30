@@ -35,7 +35,7 @@ _LAZY_IMPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Resolve handler helpers lazily from the Victor host runtime."""
     if name == "BaseHandler":
         return _load_base_handler()
@@ -50,20 +50,20 @@ def __getattr__(name: str):
     return getattr(module, name)
 
 
-def _load_base_handler():
+def _load_base_handler() -> type:
     """Resolve BaseHandler from the host runtime or provide a compatibility shim."""
     try:
         module = importlib.import_module("victor.framework.workflows.base_handler")
-        return module.BaseHandler
+        return module.BaseHandler  # type: ignore[no-any-return]
     except Exception:
 
         class BaseHandler:
             """Compatibility base class for class-based workflow handlers."""
 
-            async def execute(self, node: Any, context: Any, tool_registry: Any):
+            async def execute(self, node: Any, context: Any, tool_registry: Any) -> Any:
                 raise NotImplementedError("BaseHandler.execute() must be implemented")
 
-            async def __call__(self, node: Any, context: Any, tool_registry: Any):
+            async def __call__(self, node: Any, context: Any, tool_registry: Any) -> Any:
                 from victor_sdk.workflow_executor_runtime import ExecutorNodeStatus, NodeResult
 
                 start_time = time.time()
@@ -95,7 +95,7 @@ def _load_base_handler():
         return BaseHandler
 
 
-def _load_handler_decorator():
+def _load_handler_decorator() -> Any:
     """Resolve handler_decorator from the host runtime or provide a compatibility shim."""
     try:
         module = importlib.import_module("victor.framework.handler_registry")
@@ -107,10 +107,10 @@ def _load_handler_decorator():
             *,
             vertical: str | None = None,
             description: str | None = None,
-        ):
+        ) -> Any:
             """Decorator compatibility shim for class-based handlers."""
 
-            def _decorator(handler_cls):
+            def _decorator(handler_cls: type) -> type:
                 try:
                     instance = handler_cls()
                 except Exception:

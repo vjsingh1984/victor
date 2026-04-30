@@ -148,7 +148,7 @@ def _get_manifest(vertical_cls: Type[Any]) -> Optional[ExtensionManifest]:
     """Extract manifest from a vertical class."""
     manifest = getattr(vertical_cls, "_victor_manifest", None)
     if manifest is not None and isinstance(manifest, ExtensionManifest):
-        return manifest
+        return manifest  # type: ignore[no-any-return]
     get_fn = getattr(vertical_cls, "get_manifest", None)
     if callable(get_fn):
         try:
@@ -179,7 +179,7 @@ def _extract_top_level_imports(filepath: Path) -> Set[str]:
     return modules
 
 
-def _get_stdlib_modules() -> Set[str]:
+def _get_stdlib_modules() -> Set[str] | frozenset[str]:
     """Get standard library module names."""
     if hasattr(sys, "stdlib_module_names"):
         return sys.stdlib_module_names  # Python 3.10+

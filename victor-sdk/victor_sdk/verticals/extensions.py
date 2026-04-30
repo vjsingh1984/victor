@@ -49,21 +49,21 @@ class VerticalExtensions:
 
     def __init__(
         self,
-        middleware: Union[List[Any], Callable, None] = None,
-        safety_extensions: Union[List[Any], Callable, None] = None,
-        prompt_contributors: Union[List[Any], Callable, None] = None,
-        mode_config_provider: Union[Any, Callable, None] = None,
-        tool_dependency_provider: Union[Any, Callable, None] = None,
-        workflow_provider: Union[Any, Callable, None] = None,
-        service_provider: Union[Any, Callable, None] = None,
-        rl_config_provider: Union[Any, Callable, None] = None,
-        team_spec_provider: Union[Any, Callable, None] = None,
-        enrichment_strategy: Union[Any, Callable, None] = None,
-        tool_selection_strategy: Union[Any, Callable, None] = None,
-        tiered_tool_config: Union[Any, Callable, None] = None,
+        middleware: Union[List[Any], Callable[[], Any], None] = None,
+        safety_extensions: Union[List[Any], Callable[[], Any], None] = None,
+        prompt_contributors: Union[List[Any], Callable[[], Any], None] = None,
+        mode_config_provider: Union[Any, Callable[[], Any], None] = None,
+        tool_dependency_provider: Union[Any, Callable[[], Any], None] = None,
+        workflow_provider: Union[Any, Callable[[], Any], None] = None,
+        service_provider: Union[Any, Callable[[], Any], None] = None,
+        rl_config_provider: Union[Any, Callable[[], Any], None] = None,
+        team_spec_provider: Union[Any, Callable[[], Any], None] = None,
+        enrichment_strategy: Union[Any, Callable[[], Any], None] = None,
+        tool_selection_strategy: Union[Any, Callable[[], Any], None] = None,
+        tiered_tool_config: Union[Any, Callable[[], Any], None] = None,
     ) -> None:
         self._resolved: Dict[str, Any] = {}
-        self._factories: Dict[str, Callable] = {}
+        self._factories: Dict[str, Callable[[], Any]] = {}
 
         args = {
             "middleware": middleware,
@@ -102,7 +102,7 @@ class VerticalExtensions:
             self._resolved[name] = value
             return value
         is_list = any(n == name and il for n, il in self._FIELDS)
-        val = [] if is_list else None
+        val: Any = [] if is_list else None
         self._resolved[name] = val
         return val
 
@@ -110,7 +110,7 @@ class VerticalExtensions:
 
     @property
     def middleware(self) -> List[Any]:
-        return self._resolve("middleware")
+        return self._resolve("middleware")  # type: ignore[no-any-return]
 
     @middleware.setter
     def middleware(self, value: Any) -> None:
@@ -119,7 +119,7 @@ class VerticalExtensions:
 
     @property
     def safety_extensions(self) -> List[Any]:
-        return self._resolve("safety_extensions")
+        return self._resolve("safety_extensions")  # type: ignore[no-any-return]
 
     @safety_extensions.setter
     def safety_extensions(self, value: Any) -> None:
@@ -128,7 +128,7 @@ class VerticalExtensions:
 
     @property
     def prompt_contributors(self) -> List[Any]:
-        return self._resolve("prompt_contributors")
+        return self._resolve("prompt_contributors")  # type: ignore[no-any-return]
 
     @prompt_contributors.setter
     def prompt_contributors(self, value: Any) -> None:
@@ -233,7 +233,7 @@ class VerticalExtensions:
 
     def get_all_mode_configs(self) -> Dict[str, Any]:
         if self.mode_config_provider:
-            return self.mode_config_provider.get_mode_configs()
+            return self.mode_config_provider.get_mode_configs()  # type: ignore[no-any-return]
         return {}
 
     @property

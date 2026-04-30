@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.security.safety.code_patterns import (
@@ -90,7 +90,7 @@ _LAZY_IMPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Resolve safety pattern helpers lazily from the Victor host runtime."""
     module_name = _LAZY_IMPORTS.get(name)
     if module_name is None:

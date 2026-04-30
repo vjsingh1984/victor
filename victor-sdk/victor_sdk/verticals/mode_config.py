@@ -184,7 +184,7 @@ class ModeDefinition:
             allowed_tools=self.allowed_tools,
         )
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
             "tool_budget": self.tool_budget,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.framework.enrichment import (
@@ -46,7 +46,7 @@ _LAZY_IMPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Resolve enrichment helpers lazily from the Victor host runtime."""
     module_name = _LAZY_IMPORTS.get(name)
     if module_name is None:

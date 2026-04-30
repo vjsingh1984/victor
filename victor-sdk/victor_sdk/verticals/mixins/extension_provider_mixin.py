@@ -99,7 +99,7 @@ class ExtensionProviderMixin:
     @classmethod
     def get_tool_requirements(cls) -> List[ToolRequirementLike]:
         """Return required tools for this vertical definition."""
-        return cls.get_tools()
+        return cls.get_tools()  # type: ignore[attr-defined,no-any-return]
 
     @classmethod
     def get_capability_requirements(cls) -> List[CapabilityRequirementLike]:
