@@ -536,7 +536,23 @@ async def _do_disconnect(
     priority=Priority.MEDIUM,  # Task-specific database operations
     access_mode=AccessMode.MIXED,  # Reads and can modify database
     danger_level=DangerLevel.MEDIUM,  # Database modifications have impact
-    keywords=["database", "sql", "query", "connect", "tables", "sqlite", "postgres"],
+    mandatory_keywords=[
+        "database",
+        "sqlite",
+        "sqlite3",
+        "sql",
+        "query",
+        "tables",
+        "schema",
+        ".tables",
+        "SELECT",
+        "postgres",
+        "mysql",
+        "database file",
+        ".db",
+        ".sqlite",
+    ],
+    keywords=["database", "sql", "query", "connect", "tables", "sqlite", "sqlite3", "postgres", "mysql", "schema", "db", "rows"],
 )
 async def database(
     action: str,
@@ -550,6 +566,10 @@ async def database(
 ) -> Dict[str, Any]:
     """
     Execute SQL queries and manage database schemas.
+
+    For SQLite database files (.db, .sqlite), you can either:
+    1. Use this tool: database(action="connect", connection=DatabaseConnection(db_type="sqlite", database="path/to/file.db"))
+    2. Use shell: shell(cmd='sqlite3 file.db ".tables"') for quick inspection
 
     Actions:
     - connect: Connect to a database
@@ -578,26 +598,24 @@ async def database(
         - For schema: tables with their columns
         - error: Error message if failed
 
-    Example:
-        # Connect to PostgreSQL
-        conn = DatabaseConnection(
-            db_type="postgresql",
-            database="mydb",
-            host="localhost",
-            username="user",
-            password="pass"
-        )
-        database(action="connect", connection=conn)
+    Examples:
+        # SQLite - Connect
+        database(action="connect", connection=DatabaseConnection(db_type="sqlite", database="data.db"))
 
-        # Query with returned connection_id
-        database(action="query", connection_id="postgresql_123",
-                sql="SELECT * FROM users LIMIT 10")
+        # SQLite - List tables
+        database(action="tables", connection_id="sqlite_12345")
 
-        # List tables
-        database(action="tables", connection_id="postgresql_123")
+        # SQLite - Query
+        database(action="query", connection_id="sqlite_12345", sql="SELECT * FROM users LIMIT 10")
 
-        # Describe table
-        database(action="describe", connection_id="postgresql_123", table="users")
+        # PostgreSQL - Connect
+        database(action="connect", connection=DatabaseConnection(
+            db_type="postgresql", database="mydb", host="localhost", username="user", password="pass"
+        ))
+
+        # Quick shell alternative for SQLite:
+        # shell(cmd='sqlite3 file.db ".tables"')
+        # shell(cmd='sqlite3 file.db "SELECT * FROM users LIMIT 10"')
     """
     action_lower = action.lower().strip()
 

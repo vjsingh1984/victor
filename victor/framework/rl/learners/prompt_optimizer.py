@@ -1384,6 +1384,43 @@ class PromptOptimizerLearner(BaseLearner):
         """Return one exact prompt candidate for targeted evaluation/runtime binding."""
         return self._find_candidate(section_name, provider, text_hash)
 
+    def get_candidates(
+        self,
+        *,
+        section_name: str,
+        provider: str = "default",
+    ) -> List[PromptCandidate]:
+        """Return all candidates for one section/provider ordered by creation."""
+        candidates = self._candidates.get(self._candidate_key(section_name, provider), [])
+        return sorted(candidates, key=lambda c: (c.generation, c.text_hash))
+
+    def resolve_candidate(
+        self,
+        *,
+        section_name: str,
+        provider: str = "default",
+        selector: str,
+    ) -> Optional[PromptCandidate]:
+        """Resolve a candidate by hash prefix or ordinal string."""
+        normalized = selector.strip()
+        if not normalized:
+            return None
+        candidates = self.get_candidates(section_name=section_name, provider=provider)
+        if normalized.isdigit():
+            generation = int(normalized)
+            matches = [candidate for candidate in candidates if candidate.generation == generation]
+            if matches:
+                return matches[-1]
+            return None
+        matches = [
+            candidate
+            for candidate in candidates
+            if candidate.text_hash == normalized or candidate.text_hash.startswith(normalized)
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
     def record_benchmark_result(
         self,
         section_name: str,

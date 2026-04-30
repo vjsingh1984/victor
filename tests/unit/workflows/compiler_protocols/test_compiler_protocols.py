@@ -285,10 +285,10 @@ class TestConcreteImplementations:
         assert not executor.supports_node_type("agent")
 
     def test_team_executor_satisfies_protocol(self):
-        """Verify TeamNodeExecutor satisfies protocol."""
-        from victor.workflows.executors.team import TeamNodeExecutor
+        """Verify TeamStepExecutor satisfies protocol."""
+        from victor.workflows.executors.team import TeamStepExecutor
 
-        executor = TeamNodeExecutor(context=None)
+        executor = TeamStepExecutor(context=None)
 
         assert hasattr(executor, "execute")
         assert callable(executor.execute)

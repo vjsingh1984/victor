@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""TeamNode - Multi-agent team workflow node.
+"""TeamStep - declarative workflow adapter for multi-agent teams.
 
-This module provides the TeamNode, which enables spawning ad-hoc multi-agent
-teams within workflow graphs. Teams use the victor/teams/ infrastructure
-for coordination and merge results back into the graph state.
+This module provides the workflow-layer adapter for invoking ad-hoc
+multi-agent teams within workflow graphs. Teams use the ``victor.teams``
+runtime infrastructure for coordination and merge results back into graph
+state.
 
 Design Principles (SOLID):
-    - Single Responsibility: TeamNode only handles team orchestration
+    - Single Responsibility: TeamStep only handles team orchestration
     - Open/Closed: Extensible via custom merge strategies
     - Liskov Substitution: Compatible with other WorkflowNode types
     - Interface Segregation: Lean interfaces for specific use cases
@@ -33,7 +34,7 @@ Key Features:
     - Full compatibility with checkpointing
 
 Example:
-    from victor.framework.workflows.nodes import TeamNode
+    from victor.framework.workflows.nodes import TeamStep
     from victor.teams import TeamFormation, TeamMember, TeamConfig
     from victor.agent.subagents import SubAgentRole
 
@@ -53,8 +54,8 @@ Example:
         ),
     ]
 
-    # Create team node
-    team_node = TeamNode(
+    # Create declarative team step
+    team_step = TeamStep(
         id="research_team",
         name="Research Team",
         goal="Conduct comprehensive research",
@@ -66,7 +67,7 @@ Example:
     )
 
     # Use in workflow
-    workflow.add_node(team_node)
+    workflow.add_node(team_step)
 """
 
 from __future__ import annotations
@@ -74,6 +75,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import inspect
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -102,8 +104,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class TeamNodeConfig:
-    """Configuration for TeamNode execution.
+class TeamStepConfig:
+    """Configuration for TeamStep execution.
 
     Attributes:
         timeout_seconds: Maximum execution time (None = no limit)
@@ -127,11 +129,13 @@ class TeamNodeConfig:
 
 
 @dataclass
-class TeamNode:
-    """Node that spawns an ad-hoc multi-agent team.
+class TeamStep:
+    """Declarative workflow adapter that invokes a multi-agent team.
 
-    TeamNode bridges the gap between workflow graphs and multi-agent teams,
-    allowing teams to be spawned as part of a larger workflow.
+    ``UnifiedTeamCoordinator`` is the primary runtime team abstraction.
+    ``TeamStep`` exists for workflow-definition surfaces that need to invoke
+    that capability from declarative config. It should be treated as an
+    adapter layer, not as a distinct team runtime model.
 
     Attributes:
         id: Unique node identifier
@@ -139,7 +143,7 @@ class TeamNode:
         goal: Overall goal for the team
         team_formation: How to organize the team (SEQUENTIAL, PARALLEL, etc.)
         members: List of team members with their configurations
-        config: TeamNode execution configuration
+        config: TeamStep execution configuration
         shared_context: Initial context to share with all team members
         max_iterations: Maximum iterations for team execution
         total_tool_budget: Total tool budget across all members
@@ -152,7 +156,7 @@ class TeamNode:
     goal: str
     team_formation: TeamFormation
     members: List[TeamMember]
-    config: TeamNodeConfig = field(default_factory=TeamNodeConfig)
+    config: TeamStepConfig = field(default_factory=TeamStepConfig)
     shared_context: Dict[str, Any] = field(default_factory=dict)
     max_iterations: int = 50
     total_tool_budget: int = 100
@@ -272,7 +276,7 @@ class TeamNode:
             # Log success
             duration = time.time() - start_time
             logger.info(
-                f"TeamNode '{self.id}' completed successfully in {duration:.2f}s "
+                f"Team step '{self.id}' completed successfully in {duration:.2f}s "
                 f"({len(team_result.member_results)} members)"
             )
 
@@ -280,7 +284,7 @@ class TeamNode:
 
         except asyncio.TimeoutError:
             duration = time.time() - start_time
-            error_msg = f"TeamNode '{self.id}' timed out after {duration:.2f}s"
+            error_msg = f"Team step '{self.id}' timed out after {duration:.2f}s"
             logger.warning(error_msg)
 
             if self.config.continue_on_error:
@@ -299,7 +303,7 @@ class TeamNode:
 
         except Exception as e:
             duration = time.time() - start_time
-            error_msg = f"TeamNode '{self.id}' failed: {e}"
+            error_msg = f"Team step '{self.id}' failed: {e}"
             logger.error(error_msg, exc_info=True)
 
             if self.config.continue_on_error:
@@ -362,31 +366,43 @@ class TeamNode:
         Returns:
             Team result from execution
         """
-        # Import unified coordinator to access execute_task method
-        from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+        def _get_explicit_callable(name: str):
+            if hasattr(type(coordinator), name) or name in vars(coordinator):
+                candidate = getattr(coordinator, name, None)
+                if callable(candidate):
+                    return candidate
+            return None
 
-        if not isinstance(coordinator, UnifiedTeamCoordinator):
-            # Fallback for lightweight coordinators
-            # For now, create a mock result
-            from victor.teams.types import TeamResult, MemberResult
+        execute_team_config = _get_explicit_callable("execute_team_config")
+        if execute_team_config is not None:
+            result = execute_team_config(team_config)
+            if inspect.isawaitable(result):
+                return await result
+            return result
 
-            return TeamResult(
-                success=True,
-                final_output=f"Team '{team_config.name}' executed with {len(team_config.members)} members",
-                member_results={
-                    m.id: MemberResult(
-                        member_id=m.id,
-                        success=True,
-                        output=f"Member {m.name} completed task",
-                    )
-                    for m in team_config.members
-                },
-                formation=team_config.formation,
-            )
+        run = _get_explicit_callable("run")
+        if run is not None:
+            result = run(team_config)
+            if inspect.isawaitable(result):
+                return await result
+            return result
 
-        # Execute via unified coordinator
-        result = await coordinator.execute_team_config(team_config)
-        return result
+        # Fallback for lightweight coordinators
+        from victor.teams.types import TeamResult, MemberResult
+
+        return TeamResult(
+            success=True,
+            final_output=f"Team '{team_config.name}' executed with {len(team_config.members)} members",
+            member_results={
+                m.id: MemberResult(
+                    member_id=m.id,
+                    success=True,
+                    output=f"Member {m.name} completed task",
+                )
+                for m in team_config.members
+            },
+            formation=team_config.formation,
+        )
 
     def _merge_team_result(
         self,
@@ -453,7 +469,7 @@ class TeamNode:
             else:
                 # Log warning but continue with graph state
                 logger.warning(
-                    f"State merge failed for TeamNode '{self.id}': {e}. "
+                    f"State merge failed for team step '{self.id}': {e}. "
                     f"Continuing with graph state."
                 )
                 return graph_state
@@ -487,14 +503,14 @@ class TeamNode:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamNode":
+    def from_dict(cls, data: Dict[str, Any]) -> "TeamStep":
         """Deserialize node from dictionary.
 
         Args:
             data: Dictionary representation of the node
 
         Returns:
-            TeamNode instance
+            TeamStep instance
         """
         from victor.core.shared_types import SubAgentRole
 
@@ -529,7 +545,7 @@ class TeamNode:
 
         # Deserialize config
         config_data = data.get("config", {})
-        config = TeamNodeConfig(
+        config = TeamStepConfig(
             timeout_seconds=config_data.get("timeout_seconds"),
             merge_strategy=config_data.get("merge_strategy", "dict"),
             merge_mode=MergeMode(config_data.get("merge_mode", "team_wins")),
@@ -563,7 +579,16 @@ class TeamNode:
         )
 
 
+# Backward-compatible aliases. ``TeamStep`` / ``TeamStepConfig`` are the
+# preferred names because this workflow surface is an adapter step that invokes
+# a team runtime, not a distinct graph-runtime primitive.
+TeamNodeConfig = TeamStepConfig
+TeamNode = TeamStep
+
+
 __all__ = [
+    "TeamStep",
+    "TeamStepConfig",
     "TeamNode",
     "TeamNodeConfig",
 ]

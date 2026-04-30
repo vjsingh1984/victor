@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for TeamNode."""
+"""Unit tests for the team-step workflow adapter."""
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 
 import victor.framework.workflows.nodes as nodes_module
-from victor.framework.workflows.nodes import TeamNode, TeamNodeConfig
+from victor.framework.workflows.nodes import TeamNode, TeamNodeConfig, TeamStep, TeamStepConfig
 from victor.framework.state_merging import MergeMode, StateMergeError
 from victor.teams.types import TeamFormation, TeamMember
 from victor.agent.subagents import SubAgentRole
@@ -28,6 +28,10 @@ from victor.agent.subagents import SubAgentRole
 
 class TestTeamNodeConfig:
     """Tests for TeamNodeConfig dataclass."""
+
+    def test_preferred_aliases(self):
+        """The step terminology is preferred, but legacy aliases remain."""
+        assert TeamStepConfig is TeamNodeConfig
 
     def test_default_config(self):
         """Test creating default config."""
@@ -64,6 +68,10 @@ class TestTeamNodeConfig:
 
 class TestTeamNode:
     """Tests for TeamNode class."""
+
+    def test_preferred_step_alias(self):
+        """The workflow adapter now prefers TeamStep terminology."""
+        assert TeamStep is TeamNode
 
     @pytest.fixture
     def sample_members(self):

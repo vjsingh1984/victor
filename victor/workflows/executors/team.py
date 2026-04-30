@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Team node executor.
+"""Team step executor.
 
-Executes TeamNodeWorkflow definitions using the framework TeamNode runtime.
+Executes declarative team-step workflow definitions using the framework
+team-step adapter runtime.
 """
 
 from __future__ import annotations
@@ -24,38 +25,38 @@ import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.workflows.definition import TeamNodeWorkflow
+    from victor.workflows.definition import TeamStepWorkflow
     from victor.workflows.runtime_types import WorkflowState
 
 logger = logging.getLogger(__name__)
 
 
-class TeamNodeExecutor:
-    """Executor for ad-hoc team workflow nodes."""
+class TeamStepExecutor:
+    """Executor for declarative team workflow steps."""
 
     def __init__(self, context: Any = None):
         self._context = context
 
-    async def execute(self, node: "TeamNodeWorkflow", state: "WorkflowState") -> "WorkflowState":
-        """Execute a team node and merge its output back into workflow state."""
+    async def execute(self, node: "TeamStepWorkflow", state: "WorkflowState") -> "WorkflowState":
+        """Execute a team step and merge its output back into workflow state."""
         from victor.agent.subagents import SubAgentRole
         from victor.framework.state_merging import MergeMode
-        from victor.framework.workflows.nodes import TeamNode, TeamNodeConfig
+        from victor.framework.workflows.nodes import TeamStep, TeamStepConfig
         from victor.teams.types import TeamFormation, TeamMember
         from victor.workflows.runtime_types import GraphNodeResult
 
-        logger.info("Executing team node: %s", node.id)
+        logger.info("Executing team step: %s", node.id)
         start_time = time.time()
         current_state = dict(state)
 
         try:
-            team_node = TeamNode(
+            team_step = TeamStep(
                 id=node.id,
                 name=node.name,
                 goal=node.goal,
                 team_formation=self._resolve_team_formation(node.team_formation, TeamFormation),
                 members=self._build_members(node.members, SubAgentRole, TeamMember),
-                config=TeamNodeConfig(
+                config=TeamStepConfig(
                     timeout_seconds=node.timeout_seconds,
                     merge_strategy=node.merge_strategy,
                     merge_mode=self._resolve_merge_mode(node.merge_mode, MergeMode),
@@ -69,7 +70,7 @@ class TeamNodeExecutor:
                 retry_policy=node.retry_policy,
             )
 
-            merged_state = await team_node.execute_async(
+            merged_state = await team_step.execute_async(
                 self._get_orchestrator(),
                 current_state,
             )
@@ -178,3 +179,7 @@ class TeamNodeExecutor:
     def supports_node_type(self, node_type: str) -> bool:
         """Return whether this executor supports the given workflow node type."""
         return node_type == "team"
+
+
+# Backward-compatible alias for existing imports.
+TeamNodeExecutor = TeamStepExecutor

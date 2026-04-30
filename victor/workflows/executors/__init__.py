@@ -23,7 +23,7 @@ Executors:
 - TransformNodeExecutor: Handles transform nodes (state transformations)
 - ParallelNodeExecutor: Handles parallel nodes (concurrent execution)
 - ConditionNodeExecutor: Handles condition nodes (branching logic)
-- TeamNodeExecutor: Handles team nodes (ad-hoc multi-agent teams)
+- TeamStepExecutor: Handles declarative team steps (ad-hoc multi-agent teams)
 - HITLNodeExecutor: Handles HITL nodes (resume-time metadata + result recording)
 - Registry helpers: Support plugin/application registration of custom node types
 """

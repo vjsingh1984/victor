@@ -29,7 +29,7 @@ import asyncio
 import argparse
 from victor.integrations.mcp import MCPServer, MCPResource
 from victor.tools.base import ToolRegistry
-from victor.tools.bash import shell_readonly
+from victor.tools.bash import shell
 from victor.tools.filesystem import read, write, ls
 from victor.tools.git_tool import git
 
@@ -48,7 +48,7 @@ async def demo_server():
     tool_registry.register(read)
     tool_registry.register(write)
     tool_registry.register(ls)
-    tool_registry.register(shell_readonly)
+    tool_registry.register(shell)
     tool_registry.register(git)
 
     tools_list = tool_registry.list_tools()
@@ -230,7 +230,7 @@ async def run_stdio_server():
     tool_registry.register(read)
     tool_registry.register(write)
     tool_registry.register(ls)
-    tool_registry.register(shell_readonly)
+    tool_registry.register(shell)
     tool_registry.register(git)
 
     # Create and start server

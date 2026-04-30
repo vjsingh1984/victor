@@ -92,15 +92,23 @@ coordinator.add_member(agent1).add_member(agent2)
 result = await coordinator.execute_task("Task", {})
 ```
 
-**After** (Use UnifiedTeamCoordinator directly as a StateGraph node):
+**After** (Use `UnifiedTeamCoordinator` directly as a `StateGraph` step):
 ```python
 from victor.framework import StateGraph
-from victor.teams import UnifiedTeamCoordinator, TeamFormation
+from victor.framework.agentic_graph.team_selector import select_formation
+from victor.teams import (
+    StateGraphNodeConfig,
+    TeamFormation,
+    UnifiedTeamCoordinator,
+)
 
 # Create coordinator
 coordinator = UnifiedTeamCoordinator(orchestrator)
 coordinator.set_formation(TeamFormation.PARALLEL)
 coordinator.add_member(agent1).add_member(agent2)
+coordinator.with_state_graph_config(
+    StateGraphNodeConfig(formation_strategy=select_formation)
+)
 
 # Use directly in StateGraph
 graph = StateGraph(AgentState)
@@ -109,52 +117,36 @@ graph.add_edge("analyze", "parallel_research")
 graph.add_edge("parallel_research", "synthesize")
 ```
 
-**With formation selection:**
+**Why this layering matters:**
 ```python
-from victor.framework.agentic_graph.team_selector import select_formation
-
-formation = select_formation(state)
-coordinator.set_formation(formation)
+# StateGraph owns control flow between steps.
+# UnifiedTeamCoordinator owns collaboration inside one step.
+# TeamStep is only the declarative workflow adapter surface.
 ```
 
-## Feature Flags
+## Terminology
 
-Control consolidation behavior with environment variables:
+- **Team**: a coordinated group of agents under one formation.
+- **Formation**: the intra-team collaboration mode (`PARALLEL`, `HIERARCHICAL`, etc.).
+- **Step**: the workflow surface that invokes a capability from the graph.
+- **Node**: a generic graph runtime concept owned by `StateGraph`.
 
-| Flag | Default | Purpose |
-|------|---------|---------|
-| `VICTOR_USE_STATEGRAPH_AGENTIC_LOOP` | `false` | Enable StateGraph-based agentic loop |
-| `VICTOR_USE_FRAMEWORK_COORDINATORS` | `false` | Use framework coordinator nodes |
-| `VICTOR_USE_CONTEXT_SERVICE_INJECTION` | `false` | Enable service injection via context |
-| `VICTOR_USE_FRAMEWORK_TEAMS` | `false` | Use framework team formations |
-
-## Rollback
-
-If you encounter issues, disable specific phases:
-
-```bash
-# Rollback to legacy agentic loop
-export VICTOR_USE_STATEGRAPH_AGENTIC_LOOP=false
-
-# Rollback to legacy coordinators
-export VICTOR_USE_FRAMEWORK_COORDINATORS=false
-
-# Rollback to legacy team handling
-export VICTOR_USE_FRAMEWORK_TEAMS=false
-```
+Prefer the term **team step** or **team invocation** for declarative workflow
+surfaces. `UnifiedTeamCoordinator` is the primary runtime abstraction.
 
 ## Breaking Changes
 
 ### None During Migration
 
-All changes are backward compatible. Legacy code paths remain available via feature flags.
+All changes are backward compatible. Compatibility aliases remain available during migration.
 
 ### Future Deprecations
 
 The following will be deprecated in future releases:
 
 1. **Direct while-loop execution** in AgenticLoop
-2. **Direct coordinator instantiation** (use nodes instead)
+2. **Workflow-only wrappers as the primary team API**
+   Use `UnifiedTeamCoordinator` directly for programmatic graphs.
 3. **Global service access** (use ExecutionContext)
 
 ## Performance

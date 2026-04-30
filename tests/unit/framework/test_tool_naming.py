@@ -63,7 +63,7 @@ class TestToolNamesConstants:
     def test_shell_tools(self):
         """Verify shell/command execution tool names."""
         assert ToolNames.SHELL == "shell"
-        assert ToolNames.SHELL_READONLY == "shell_readonly"
+        assert not hasattr(ToolNames, "SHELL_READONLY")
         assert ToolNames.SANDBOX == "sandbox"
         assert ToolNames.SANDBOX_UPLOAD == "sandbox_upload"
 
@@ -210,6 +210,7 @@ class TestToolAliases:
     def test_shell_aliases(self):
         """Verify shell execution aliases."""
         assert TOOL_ALIASES["execute_bash"] == "shell"
+        assert "shell_readonly" not in TOOL_ALIASES
         assert TOOL_ALIASES["run"] == "shell"
         assert TOOL_ALIASES["bash"] == "shell"
         assert TOOL_ALIASES["execute"] == "shell"
@@ -322,6 +323,7 @@ class TestGetCanonicalName:
     def test_alias_returns_canonical(self):
         """Aliases return their canonical form."""
         assert get_canonical_name("execute_bash") == "shell"
+        assert get_canonical_name("shell_readonly") == "shell_readonly"
         assert get_canonical_name("read_file") == "read"
         assert get_canonical_name("edit_files") == "edit"
         assert get_canonical_name("edit_file") == "edit"
@@ -358,6 +360,7 @@ class TestGetAliases:
         """Returns aliases for canonical names with aliases."""
         aliases = get_aliases("shell")
         assert "execute_bash" in aliases
+        assert "shell_readonly" not in aliases
         assert "bash" in aliases
         assert "run" in aliases
 
@@ -388,6 +391,7 @@ class TestIsValidToolName:
         assert is_valid_tool_name("read_file") is True
         assert is_valid_tool_name("edit_files") is True
         assert is_valid_tool_name("git_status") is True
+        assert is_valid_tool_name("shell_readonly") is False
 
     def test_unknown_names_invalid(self):
         """Unknown names are invalid."""
@@ -427,6 +431,7 @@ class TestGetAllCanonicalNames:
         """Does not contain alias names."""
         names = get_all_canonical_names()
         assert "execute_bash" not in names
+        assert "shell_readonly" not in names
         assert "read_file" not in names
         assert "edit_files" not in names
 
@@ -450,6 +455,7 @@ class TestGetNameMapping:
         """Aliases map to their canonical names."""
         mapping = get_name_mapping()
         assert mapping["execute_bash"] == "shell"
+        assert "shell_readonly" not in mapping
         assert mapping["read_file"] == "read"
         assert mapping["edit_files"] == "edit"
 

@@ -31,7 +31,6 @@ class ToolNames:
     LS = "ls"
     PLAN = "plan"
     SHELL = "shell"
-    SHELL_READONLY = "shell_readonly"
     SANDBOX = "sandbox"
     SANDBOX_UPLOAD = "sandbox_upload"
     GREP = "grep"
@@ -160,7 +159,6 @@ TOOL_ALIASES: Dict[str, str] = {
     "pipeline_analyzer": ToolNames.PIPELINE,
     "iac_scanner": ToolNames.IAC,
 }
-
 
 CANONICAL_TO_ALIASES: Dict[str, Set[str]] = {}
 for alias, canonical in TOOL_ALIASES.items():

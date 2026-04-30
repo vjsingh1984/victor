@@ -717,6 +717,28 @@ class TestToolPipelineNormalization:
         assert args["mode"] == "bugs"
         assert strategy is not None
 
+    def test_normalize_tool_call_defaults_shell_to_readonly(self, pipeline):
+        """Canonical shell calls should default readonly=True."""
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "shell",
+            {"cmd": "git status"},
+        )
+
+        assert tool_name == "shell"
+        assert args["readonly"] is True
+        assert strategy is not None
+
+    def test_normalize_tool_call_does_not_expand_shell_readonly(self, pipeline):
+        """Legacy shell_readonly should no longer be rewritten by the pipeline."""
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "shell_readonly",
+            {"cmd": "git status"},
+        )
+
+        assert tool_name == "shell_readonly"
+        assert "readonly" not in args
+        assert strategy is not None
+
     def test_normalize_tool_call_reroutes_semantic_bug_search(self, pipeline):
         """Bug-style semantic_code_search queries should route to code_search."""
         pipeline.search_router = SearchRouter()

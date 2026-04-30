@@ -264,11 +264,11 @@ class TransformNode(WorkflowNode):
 
 
 @dataclass
-class TeamNodeWorkflow(WorkflowNode):
-    """Node that spawns an ad-hoc multi-agent team.
+class TeamStepWorkflow(WorkflowNode):
+    """Workflow-definition step that invokes an ad-hoc multi-agent team.
 
-    This node type enables hybrid orchestration by spawning teams within
-    workflow graphs. Teams use the victor/teams/ infrastructure.
+    This step type enables hybrid orchestration by invoking teams within
+    workflow graphs. Teams use the ``victor.teams`` runtime infrastructure.
 
     Attributes:
         goal: Overall goal for the team
@@ -319,6 +319,12 @@ class TeamNodeWorkflow(WorkflowNode):
             }
         )
         return d
+
+
+# Backward-compatible alias. ``TeamStepWorkflow`` is the preferred name
+# because the workflow definition describes a step that invokes a team
+# capability rather than introducing a special graph-runtime primitive.
+TeamNodeWorkflow = TeamStepWorkflow
 
 
 class ConstraintsProtocol(ABC):
@@ -1265,6 +1271,8 @@ __all__ = [
     "ConditionNode",
     "ParallelNode",
     "TransformNode",
+    "TeamStepWorkflow",
+    "TeamNodeWorkflow",
     # Constraints (extensible protocol + standard implementations)
     "ConstraintsProtocol",
     "TaskConstraints",

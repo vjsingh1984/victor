@@ -875,23 +875,25 @@ nodes:
     next: [apply_changes]
 ```
 
-### TeamNode
+### TeamStep
 
 Spawn an ad-hoc multi-agent team.
 
 ```python
 @dataclass
-class TeamNode:
+class TeamStep:
     id: str
     name: str
     goal: str
     team_formation: TeamFormation    # SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE, CONSENSUS
     members: List[TeamMember]
-    config: TeamNodeConfig
+    config: TeamStepConfig
     shared_context: Dict[str, Any]
     max_iterations: int = 50
     total_tool_budget: int = 100
 ```
+
+`TeamNode` / `TeamNodeConfig` remain compatibility aliases.
 
 **YAML Example:**
 ```yaml

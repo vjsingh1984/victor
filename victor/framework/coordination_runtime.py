@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from inspect import getattr_static
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from victor.framework.team_runtime import VerticalCoordinationCatalog
 from victor.protocols.coordination import (
@@ -57,6 +57,27 @@ class ModeCoordinationConfig:
     )
     tool_priorities: Dict[str, float] = field(default_factory=dict)
     system_prompt_addition: str = ""
+
+
+@dataclass(frozen=True)
+class CatalogCoordinationSuggestion:
+    """Serializable recommendation resolved from a shared coordination catalog."""
+
+    vertical: str
+    suggestion: CoordinationSuggestion
+    available_teams: Tuple[str, ...] = ()
+    available_workflows: Tuple[str, ...] = ()
+    default_workflow: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable representation."""
+        return serialize_coordination_suggestion(
+            self.suggestion,
+            vertical=self.vertical,
+            available_teams=self.available_teams,
+            available_workflows=self.available_workflows,
+            default_workflow=self.default_workflow,
+        )
 
 
 DEFAULT_MODE_CONFIGS: Dict[str, ModeCoordinationConfig] = {
@@ -563,6 +584,70 @@ def build_coordination_suggestion(
     )
 
 
+def build_registered_coordination_suggestions(
+    *,
+    task_type: str,
+    complexity: str,
+    mode: str = "build",
+    vertical: Optional[str] = None,
+    team_selector: Optional[TeamSelectionStrategyProtocol] = None,
+    workflow_selector: Optional[WorkflowSelectionStrategyProtocol] = None,
+    mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
+) -> List[CatalogCoordinationSuggestion]:
+    """Build shared coordination recommendations for registered vertical catalogs."""
+    from victor.framework.team_runtime import resolve_registered_coordination_catalogs
+
+    requested_vertical = vertical.strip() if isinstance(vertical, str) and vertical.strip() else None
+    resolved_mode_configs = mode_configs or DEFAULT_MODE_CONFIGS
+    resolved_team_selector = team_selector or HybridTeamSelector(
+        RuleBasedTeamSelector(),
+        LearningBasedTeamSelector(),
+    )
+    resolved_workflow_selector = workflow_selector or RuleBasedWorkflowSelector()
+    coordination_catalogs = resolve_registered_coordination_catalogs()
+
+    if requested_vertical is not None:
+        selected_verticals = (
+            [requested_vertical] if requested_vertical in coordination_catalogs else []
+        )
+    else:
+        selected_verticals = sorted(coordination_catalogs)
+
+    suggestions: List[CatalogCoordinationSuggestion] = []
+    for vertical_name in selected_verticals:
+        coordination_catalog = coordination_catalogs.get(vertical_name)
+        if coordination_catalog is None:
+            continue
+
+        suggestion = build_coordination_suggestion(
+            task_type=task_type,
+            complexity=complexity,
+            mode=mode,
+            coordination_catalog=coordination_catalog,
+            team_selector=resolved_team_selector,
+            workflow_selector=resolved_workflow_selector,
+            mode_configs=resolved_mode_configs,
+        )
+        catalog_suggestion = CatalogCoordinationSuggestion(
+            vertical=vertical_name,
+            suggestion=suggestion,
+            available_teams=tuple(coordination_catalog.list_team_names()),
+            available_workflows=tuple(coordination_catalog.list_workflow_names()),
+            default_workflow=resolve_default_workflow_for_mode(
+                mode,
+                coordination_catalog=coordination_catalog,
+                mode_configs=resolved_mode_configs,
+            ),
+        )
+        if _should_include_catalog_suggestion(
+            catalog_suggestion,
+            force_include=requested_vertical is not None,
+        ):
+            suggestions.append(catalog_suggestion)
+
+    return suggestions
+
+
 def build_runtime_coordination_suggestion(
     *,
     runtime_subject: Any,
@@ -676,6 +761,53 @@ def _resolve_runtime_mode_configs(runtime_subject: Any) -> Dict[str, ModeCoordin
     return DEFAULT_MODE_CONFIGS
 
 
+def serialize_coordination_suggestion(
+    suggestion: CoordinationSuggestion,
+    *,
+    vertical: Optional[str] = None,
+    available_teams: Optional[Tuple[str, ...]] = None,
+    available_workflows: Optional[Tuple[str, ...]] = None,
+    default_workflow: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Serialize a coordination suggestion for CLI/API surfaces."""
+    payload: Dict[str, Any] = {
+        "mode": suggestion.mode,
+        "task_type": suggestion.task_type,
+        "complexity": suggestion.complexity.value,
+        "action": suggestion.action.value,
+        "should_spawn_team": suggestion.should_spawn_team,
+        "should_suggest_team": suggestion.should_suggest_team,
+        "primary_team": _serialize_team_recommendation(suggestion.primary_team),
+        "primary_workflow": _serialize_workflow_recommendation(suggestion.primary_workflow),
+        "team_recommendations": [
+            _serialize_team_recommendation(recommendation)
+            for recommendation in suggestion.team_recommendations
+        ],
+        "workflow_recommendations": [
+            _serialize_workflow_recommendation(recommendation)
+            for recommendation in suggestion.workflow_recommendations
+        ],
+        "system_prompt_additions": suggestion.system_prompt_additions,
+        "tool_priorities": dict(suggestion.tool_priorities),
+        "metadata": dict(suggestion.metadata),
+    }
+    if vertical is not None:
+        payload["vertical"] = vertical
+    if available_teams is not None:
+        payload["available_teams"] = list(available_teams)
+    if available_workflows is not None:
+        payload["available_workflows"] = list(available_workflows)
+    payload["default_workflow"] = default_workflow
+    return payload
+
+
+def serialize_catalog_coordination_suggestions(
+    suggestions: List[CatalogCoordinationSuggestion],
+) -> List[Dict[str, Any]]:
+    """Serialize catalog coordination suggestions for user-facing surfaces."""
+    return [suggestion.to_dict() for suggestion in suggestions]
+
+
 def _should_delegate_to_coordination_surface(coordination: Any) -> bool:
     """Whether to fall back to a runtime-provided coordination surface."""
     if coordination is None:
@@ -687,6 +819,49 @@ def _should_delegate_to_coordination_surface(coordination: Any) -> bool:
         _has_declared_attribute(coordination, attr_name)
         for attr_name in ("_team_selector", "_workflow_selector", "_mode_configs")
     )
+
+
+def _serialize_team_recommendation(recommendation: Optional[TeamRecommendation]) -> Optional[Dict[str, Any]]:
+    """Serialize a team recommendation for JSON output."""
+    if recommendation is None:
+        return None
+    return {
+        "team_name": recommendation.team_name,
+        "confidence": recommendation.confidence,
+        "reason": recommendation.reason,
+        "formation": recommendation.formation,
+        "suggested_budget": recommendation.suggested_budget,
+        "role_distribution": dict(recommendation.role_distribution or {}),
+        "source": recommendation.source,
+    }
+
+
+def _serialize_workflow_recommendation(
+    recommendation: Optional[WorkflowRecommendation],
+) -> Optional[Dict[str, Any]]:
+    """Serialize a workflow recommendation for JSON output."""
+    if recommendation is None:
+        return None
+    return {
+        "workflow_name": recommendation.workflow_name,
+        "confidence": recommendation.confidence,
+        "reason": recommendation.reason,
+        "trigger_condition": recommendation.trigger_condition,
+        "estimated_steps": recommendation.estimated_steps,
+    }
+
+
+def _should_include_catalog_suggestion(
+    suggestion: CatalogCoordinationSuggestion,
+    *,
+    force_include: bool,
+) -> bool:
+    """Decide whether a registered catalog recommendation is worth surfacing."""
+    if force_include:
+        return True
+    if suggestion.suggestion.has_team_suggestion or suggestion.suggestion.has_workflow_suggestion:
+        return True
+    return suggestion.default_workflow is not None
 
 
 def _has_declared_attribute(subject: Any, attr_name: str) -> bool:
@@ -701,16 +876,20 @@ def _has_declared_attribute(subject: Any, attr_name: str) -> bool:
 
 
 __all__ = [
+    "CatalogCoordinationSuggestion",
     "DEFAULT_MODE_CONFIGS",
     "HybridTeamSelector",
     "LearningBasedTeamSelector",
     "ModeCoordinationConfig",
     "RuleBasedTeamSelector",
     "RuleBasedWorkflowSelector",
+    "build_registered_coordination_suggestions",
     "build_coordination_suggestion",
     "build_runtime_coordination_suggestion",
     "get_action_for_complexity",
     "recommend_teams_for_catalog",
     "recommend_workflows_for_catalog",
     "resolve_default_workflow_for_mode",
+    "serialize_catalog_coordination_suggestions",
+    "serialize_coordination_suggestion",
 ]

@@ -996,13 +996,26 @@ class TurnExecutor:
         # Prioritize by stage
         tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
-        # Issue 4: Filter write/generation tools when intent is read-only or display-only.
-        if tools and intent:
+        # Delegate intent filtering to the canonical planner when available.
+        planner = getattr(self._tool_context, "_tool_planner", None)
+        if tools and intent and planner and hasattr(planner, "filter_tools_by_intent"):
+            try:
+                from victor.agent.action_authorizer import ActionIntent
+
+                tools = planner.filter_tools_by_intent(
+                    tools,
+                    current_intent=ActionIntent(intent),
+                    user_message=user_message,
+                )
+            except (ValueError, ImportError, AttributeError):
+                pass
+        # Backward-compatible fallback for shim contexts that have not yet been wired
+        # through the canonical planner service.
+        elif tools and intent:
             try:
                 from victor.agent.action_authorizer import ActionIntent, is_tool_blocked_for_intent
 
                 action_intent = ActionIntent(intent)
-                before = len(tools)
                 tools = [
                     t
                     for t in tools
@@ -1012,13 +1025,6 @@ class TurnExecutor:
                         user_message,
                     )
                 ]
-                removed = before - len(tools)
-                if removed > 0:
-                    logger.debug(
-                        "Intent filter (%s): removed %d blocked tools",
-                        intent,
-                        removed,
-                    )
             except (ValueError, ImportError, AttributeError):
                 pass
 

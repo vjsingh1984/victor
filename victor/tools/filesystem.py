@@ -787,7 +787,7 @@ MAGIC_SIGNATURES: List[Tuple[bytes, int, FileTypeInfo]] = [
             mime_type="application/x-sqlite3",
             description="SQLite database",
             extensions=(".db", ".sqlite", ".sqlite3"),
-            suggestion="Use `sqlite3 file.db '.tables'` to explore the database.",
+            suggestion="Use shell(cmd='sqlite3 file.db \".tables\"') to list tables, or database(action='connect', connection=DatabaseConnection(db_type='sqlite', database='file.db')) for structured access.",
         ),
     ),
     # Media
@@ -2099,37 +2099,6 @@ async def write(
     return f"Successfully {action} {path} ({len(content)} characters){lsp_suffix}. Use /undo to revert."
 
 
-@tool(
-    category="filesystem",
-    priority=Priority.HIGH,
-    access_mode=AccessMode.WRITE,
-    danger_level=DangerLevel.LOW,
-    signature_params=["path"],
-    stages=["initial", "planning", "writing"],
-    task_types=["edit", "refactor", "create"],
-    execution_category=ExecutionCategory.WRITE,
-    keywords=[
-        "write",
-        "lsp",
-        "validate",
-        "format",
-        "diagnostics",
-        "type-check",
-        "syntax-check",
-    ],
-    use_cases=[
-        "writing code with LSP validation",
-        "formatting code with language formatters",
-        "checking code before writing",
-        "getting diagnostic feedback",
-    ],
-    examples=[
-        "write main.py with validation",
-        "create validated Python file",
-        "write formatted Rust code",
-        "check code before writing",
-    ],
-)
 @tool(
     category="filesystem",
     priority=Priority.CRITICAL,  # Always available for selection

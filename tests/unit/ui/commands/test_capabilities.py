@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
-from victor.ui.commands.capabilities import CapabilityDiscovery
+from typer.testing import CliRunner
+
+from victor.ui.commands.capabilities import CapabilityDiscovery, capabilities_app
+
+
+runner = CliRunner()
 
 
 def test_discover_all_uses_shared_team_and_workflow_catalog_surfaces() -> None:
@@ -63,3 +69,70 @@ def test_discover_by_vertical_uses_shared_team_and_workflow_catalog_surfaces() -
     assert manifest["teams"] == ["feature_team"]
     assert manifest["workflows"] == ["feature_workflow"]
     resolve_catalogs.assert_called_once_with()
+
+
+def test_recommend_for_task_uses_shared_framework_coordination_runtime() -> None:
+    discovery = CapabilityDiscovery()
+    serialized = [{"vertical": "coding", "primary_team": {"team_name": "feature_team"}}]
+
+    with (
+        patch(
+            "victor.framework.coordination_runtime.build_registered_coordination_suggestions",
+            return_value=["raw-suggestion"],
+        ) as build_suggestions,
+        patch(
+            "victor.framework.coordination_runtime.serialize_catalog_coordination_suggestions",
+            return_value=serialized,
+        ) as serialize_suggestions,
+    ):
+        payload = discovery.recommend_for_task(
+            task_type="feature",
+            complexity="high",
+            mode="build",
+            vertical="coding",
+        )
+
+    assert payload == {
+        "task_type": "feature",
+        "complexity": "high",
+        "mode": "build",
+        "vertical": "coding",
+        "count": 1,
+        "recommendations": serialized,
+    }
+    build_suggestions.assert_called_once_with(
+        task_type="feature",
+        complexity="high",
+        mode="build",
+        vertical="coding",
+    )
+    serialize_suggestions.assert_called_once_with(["raw-suggestion"])
+
+
+def test_recommend_command_json_uses_shared_framework_recommendation_surface() -> None:
+    payload = {
+        "task_type": "feature",
+        "complexity": "high",
+        "mode": "build",
+        "vertical": "coding",
+        "count": 1,
+        "recommendations": [{"vertical": "coding", "action": "auto_spawn"}],
+    }
+
+    with patch(
+        "victor.ui.commands.capabilities.get_capability_discovery",
+        return_value=type(
+            "Discovery",
+            (),
+            {
+                "recommend_for_task": lambda self, **_: payload,
+            },
+        )(),
+    ):
+        result = runner.invoke(
+            capabilities_app,
+            ["recommend", "feature", "high", "--mode", "build", "--vertical", "coding", "--json"],
+        )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == payload

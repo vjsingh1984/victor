@@ -181,6 +181,35 @@ class CapabilityDiscovery:
 
         return result
 
+    def recommend_for_task(
+        self,
+        *,
+        task_type: str,
+        complexity: str,
+        mode: str = "build",
+        vertical: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Recommend teams/workflows using the shared framework coordination surface."""
+        from victor.framework.coordination_runtime import (
+            build_registered_coordination_suggestions,
+            serialize_catalog_coordination_suggestions,
+        )
+
+        recommendations = build_registered_coordination_suggestions(
+            task_type=task_type,
+            complexity=complexity,
+            mode=mode,
+            vertical=vertical,
+        )
+        return {
+            "task_type": task_type,
+            "complexity": complexity,
+            "mode": mode,
+            "vertical": vertical,
+            "count": len(recommendations),
+            "recommendations": serialize_catalog_coordination_suggestions(recommendations),
+        }
+
     def _discover_tools(self) -> List[str]:
         """Discover all registered tools."""
         try:
@@ -457,6 +486,51 @@ def _display_vertical_capabilities(vertical: str, manifest: Dict[str, Any]) -> N
     console.print()
 
 
+def _display_coordination_recommendations(
+    *,
+    task_type: str,
+    complexity: str,
+    mode: str,
+    vertical: Optional[str],
+    recommendations: List[Dict[str, Any]],
+) -> None:
+    """Display shared coordination recommendations in rich format."""
+    console.print()
+    title = "[bold cyan]Coordination Recommendations[/bold cyan]\n"
+    title += f"[dim]{task_type} / {complexity} / {mode}[/dim]"
+    if vertical:
+        title += f"\n[dim]vertical={vertical}[/dim]"
+    console.print(Panel.fit(title, border_style="cyan"))
+    console.print()
+
+    if not recommendations:
+        scope = f" for {vertical}" if vertical else ""
+        console.print(f"[yellow]No coordination recommendations found{scope}.[/yellow]")
+        console.print()
+        return
+
+    table = Table(show_header=True, title="Recommended Coordination Paths")
+    table.add_column("Vertical", style="cyan")
+    table.add_column("Action", style="green")
+    table.add_column("Primary Team")
+    table.add_column("Primary Workflow")
+    table.add_column("Default Workflow", style="dim")
+
+    for recommendation in recommendations:
+        primary_team = recommendation.get("primary_team") or {}
+        primary_workflow = recommendation.get("primary_workflow") or {}
+        table.add_row(
+            recommendation.get("vertical", "-"),
+            recommendation.get("action", "none"),
+            primary_team.get("team_name", "-"),
+            primary_workflow.get("workflow_name", "-"),
+            recommendation.get("default_workflow") or "-",
+        )
+
+    console.print(table)
+    console.print()
+
+
 @capabilities_app.command("tools")
 def list_tools(
     category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
@@ -491,6 +565,36 @@ def list_tools(
     for tool in sorted(manifest.tools):
         console.print(f"  [dim]{tool}[/dim]")
     console.print()
+
+
+@capabilities_app.command("recommend")
+def recommend_coordination(
+    task_type: str = typer.Argument(..., help="Task type or short task label"),
+    complexity: str = typer.Argument(..., help="Task complexity, e.g. low, medium, high"),
+    mode: str = typer.Option("build", "--mode", "-m", help="Mode policy to apply"),
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
+    json_output: bool = create_json_option(),
+) -> None:
+    """Recommend teams and workflows using shared framework coordination logic."""
+    discovery = get_capability_discovery()
+    payload = discovery.recommend_for_task(
+        task_type=task_type,
+        complexity=complexity,
+        mode=mode,
+        vertical=vertical,
+    )
+
+    if json_output:
+        print_json_data(payload)
+        return
+
+    _display_coordination_recommendations(
+        task_type=task_type,
+        complexity=complexity,
+        mode=mode,
+        vertical=vertical,
+        recommendations=payload["recommendations"],
+    )
 
 
 @capabilities_app.command("verticals")

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
 from types import SimpleNamespace
 
 from victor.framework.coordination_runtime import (
+    build_registered_coordination_suggestions,
     RuleBasedTeamSelector,
     RuleBasedWorkflowSelector,
     build_coordination_suggestion,
@@ -135,3 +137,72 @@ def test_build_runtime_coordination_suggestion_uses_runtime_mode_and_vertical_co
     assert suggestion.primary_team.team_name == "feature_team"
     assert suggestion.primary_workflow is not None
     assert suggestion.primary_workflow.workflow_name == "feature_implementation"
+
+
+def test_build_registered_coordination_suggestions_uses_shared_registered_catalogs() -> None:
+    context = create_vertical_context("coding")
+    context.apply_team_specs(
+        {
+            "feature_team": SimpleNamespace(
+                name="Feature Team",
+                formation="parallel",
+                members=[],
+                description="Handles feature implementation",
+            )
+        }
+    )
+    context.apply_workflows(
+        {
+            "feature_implementation": SimpleNamespace(
+                name="feature_implementation",
+                description="Implement features end-to-end",
+            )
+        }
+    )
+
+    with patch(
+        "victor.framework.team_runtime.resolve_registered_coordination_catalogs",
+        return_value={"coding": resolve_vertical_coordination_catalog(context)},
+    ):
+        suggestions = build_registered_coordination_suggestions(
+            task_type="feature",
+            complexity="high",
+            mode="build",
+        )
+
+    assert [suggestion.vertical for suggestion in suggestions] == ["coding"]
+    payload = suggestions[0].to_dict()
+    assert payload["primary_team"]["team_name"] == "feature_team"
+    assert payload["primary_workflow"]["workflow_name"] == "feature_implementation"
+    assert payload["default_workflow"] == "feature_implementation"
+
+
+def test_build_registered_coordination_suggestions_keeps_requested_vertical_even_without_match() -> None:
+    context = create_vertical_context("coding")
+    context.apply_team_specs(
+        {
+            "feature_team": SimpleNamespace(
+                name="Feature Team",
+                formation="parallel",
+                members=[],
+                description="Handles feature implementation",
+            )
+        }
+    )
+
+    with patch(
+        "victor.framework.team_runtime.resolve_registered_coordination_catalogs",
+        return_value={"coding": resolve_vertical_coordination_catalog(context)},
+    ):
+        suggestions = build_registered_coordination_suggestions(
+            task_type="documentation",
+            complexity="low",
+            mode="build",
+            vertical="coding",
+        )
+
+    assert len(suggestions) == 1
+    payload = suggestions[0].to_dict()
+    assert payload["vertical"] == "coding"
+    assert payload["primary_team"] is None
+    assert payload["primary_workflow"] is None

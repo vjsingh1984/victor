@@ -96,8 +96,8 @@ if TYPE_CHECKING:
         ComputeNode,
         ConditionNode,
         ParallelNode,
+        TeamStepWorkflow,
         TransformNode,
-        TeamNodeWorkflow,
         WorkflowDefinition,
         WorkflowNode,
     )
@@ -219,7 +219,7 @@ class NodeExecutorFactory(CompatibilityNodeExecutorFactory):
     def create_transform_executor(self, node: "TransformNode") -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
-    def create_team_executor(self, node: "TeamNodeWorkflow") -> Callable[[Dict[str, Any]], Any]:
+    def create_team_executor(self, node: "TeamStepWorkflow") -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
     def supports_node_type(self, node_type: str) -> bool:

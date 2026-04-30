@@ -78,6 +78,15 @@ class TestTaskCompletionDetector:
         assert len(state.completed_deliverables) == 1
         assert state.completed_deliverables[0].artifact_path == "/test/file.py"
 
+    def test_record_tool_result_normalizes_edit_aliases(self, detector):
+        """Edit aliases should count as file-modifying deliverables."""
+        detector.analyze_intent("Update a file")
+        detector.record_tool_result("edit_file", {"success": True, "path": "/test/file.py"})
+
+        state = detector.get_state()
+        assert len(state.completed_deliverables) == 1
+        assert state.completed_deliverables[0].artifact_path == "/test/file.py"
+
     def test_completion_signal_detection(self, detector):
         """Test detection of completion signals in response text."""
         detector.analyze_response("The file has been created successfully.")

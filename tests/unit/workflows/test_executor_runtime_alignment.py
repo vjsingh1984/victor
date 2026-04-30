@@ -21,7 +21,7 @@ from victor.workflows.definition import (
     ComputeNode,
     ConditionNode,
     ParallelNode,
-    TeamNodeWorkflow,
+    TeamStepWorkflow,
     TransformNode,
 )
 from victor.workflows.executors.agent import AgentNodeExecutor
@@ -194,7 +194,7 @@ async def test_agent_executor_returns_placeholder_without_orchestrator() -> None
 
 @pytest.mark.asyncio
 async def test_team_executor_records_runtime_graph_node_result(monkeypatch) -> None:
-    from victor.workflows.executors.team import TeamNodeExecutor
+    from victor.workflows.executors.team import TeamStepExecutor
 
     class FakeTeamNode:
         def __init__(self, **kwargs):
@@ -211,10 +211,10 @@ async def test_team_executor_records_runtime_graph_node_result(monkeypatch) -> N
                 },
             }
 
-    monkeypatch.setattr("victor.framework.workflows.nodes.TeamNode", FakeTeamNode)
+    monkeypatch.setattr("victor.framework.workflows.nodes.TeamStep", FakeTeamNode)
 
-    executor = TeamNodeExecutor(context=None)
-    node = TeamNodeWorkflow(
+    executor = TeamStepExecutor(context=None)
+    node = TeamStepWorkflow(
         id="team",
         name="Team",
         goal="Review $ctx.subject",

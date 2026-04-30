@@ -896,6 +896,21 @@ class TestChatServiceBootstrapLaziness:
         assert first is second
         assert first._runtime is adapter
 
+    def test_get_tool_selection_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.tool_selection_runtime import ToolSelectionRuntime
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_tool_selection_runtime()
+        second = obj._get_tool_selection_runtime()
+
+        assert isinstance(first, ToolSelectionRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
     def test_prepare_task_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
@@ -945,6 +960,24 @@ class TestChatServiceBootstrapLaziness:
             needs_execution=False,
             max_exploration_iterations=8,
         )
+
+    @pytest.mark.asyncio
+    async def test_select_tools_for_turn_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.select_tools_for_turn = AsyncMock(return_value=[{"name": "search"}])
+        obj._tool_selection_runtime = helper
+
+        result = await AgentOrchestrator._select_tools_for_turn(
+            obj,
+            "inspect the repo",
+            ["analyze"],
+        )
+
+        assert result == [{"name": "search"}]
+        helper.select_tools_for_turn.assert_awaited_once_with("inspect the repo", ["analyze"])
 
     def test_get_context_limit_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator

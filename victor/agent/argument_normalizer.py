@@ -153,7 +153,6 @@ class ArgumentNormalizer:
         # Built-in aliases for common model hallucinations (LLMs use wrong param names)
         _builtin_aliases: Dict[str, Dict[str, str]] = {
             "shell": {"command": "cmd"},
-            "shell_readonly": {"command": "cmd"},
             "read": {"file_path": "path", "filename": "path"},
             "write": {
                 "file_path": "path",

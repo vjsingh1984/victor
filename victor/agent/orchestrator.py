@@ -3469,6 +3469,16 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             self._task_guidance_runtime = runtime
         return runtime
 
+    def _get_tool_selection_runtime(self) -> Any:
+        """Get the canonical service-owned tool selection runtime helper."""
+        runtime = getattr(self, "_tool_selection_runtime", None)
+        if runtime is None:
+            from victor.agent.services.tool_selection_runtime import ToolSelectionRuntime
+
+            runtime = ToolSelectionRuntime(self.protocol_adapter)
+            self._tool_selection_runtime = runtime
+        return runtime
+
     def _prepare_task(
         self, user_message: str, unified_task_type: TrackerTaskType
     ) -> tuple[Any, int]:
@@ -3521,47 +3531,10 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         clarification), tool selection and broadcasting are skipped entirely.
         This saves ~2-4K tokens per conversational turn.
         """
-        provider_supports_tools = self.provider.supports_tools()
-        tooling_allowed = provider_supports_tools and self._model_supports_tool_calls()
-
-        if not tooling_allowed:
-            return None
-
-        # --- TOOL_NECESSITY gate: skip tools for pure Q&A turns ---
-        if self._should_skip_tools_for_turn(context_msg):
-            return None
-
-        planned_tools = None
-        if goals:
-            available_inputs = ["query"]
-            if self.observed_files:
-                available_inputs.append("file_contents")
-            planned_tools = self._tool_planner.plan_tools(goals, available_inputs)
-            logger.info(f"available_inputs={available_inputs}")
-
-        conversation_depth = self.conversation.message_count()
-        conversation_history = (
-            [msg.model_dump() for msg in self.messages] if self.messages else None
-        )
-        tools = await self.tool_selector.select_tools(
+        return await self._get_tool_selection_runtime().select_tools_for_turn(
             context_msg,
-            use_semantic=self.use_semantic_selection,
-            conversation_history=conversation_history,
-            conversation_depth=conversation_depth,
-            planned_tools=planned_tools,
+            goals,
         )
-        logger.info(
-            f"context_msg={context_msg}\nuse_semantic={self.use_semantic_selection}\nconversation_depth={conversation_depth}"
-        )
-        tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
-        current_intent = getattr(self, "_current_intent", None)
-        tools = self._tool_planner.filter_tools_by_intent(
-            tools,
-            current_intent,
-            user_message=context_msg,
-        )
-        tools = self._apply_kv_tool_strategy(tools)
-        return self._sort_tools_for_kv_stability(tools)
 
     # ------------------------------------------------------------------
     # Tool Necessity Gate (HDPO-inspired Q&A bypass)

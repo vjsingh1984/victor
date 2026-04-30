@@ -22,6 +22,7 @@ Example:
 
 from __future__ import annotations
 
+import difflib
 import logging
 
 from rich.panel import Panel
@@ -42,7 +43,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
         return CommandMetadata(
             name="prompt-optimize",
             description="Evolve system prompt sections using execution trace analysis (GEPA)",
-            usage="/prompt-optimize [section|--status]",
+            usage="/prompt-optimize [section|--status|--show SECTION|--diff SECTION]",
             aliases=["optimize-prompt", "evolve-prompt"],
             category="advanced",
             requires_agent=False,
@@ -51,6 +52,8 @@ class PromptOptimizeCommand(BaseSlashCommand):
     def execute(self, ctx: CommandContext) -> None:
         args = ctx.args if ctx.args else []
         show_status = "--status" in args or "status" in args
+        show_section = self._option_value(args, "--show")
+        diff_section = self._option_value(args, "--diff")
 
         try:
             from victor.framework.rl.coordinator import get_rl_coordinator
@@ -67,6 +70,14 @@ class PromptOptimizeCommand(BaseSlashCommand):
 
             if show_status:
                 self._show_status(ctx, learner, coordinator.db_path)
+                return
+
+            if show_section:
+                self._show_candidate(ctx, learner, show_section, coordinator.db_path, args)
+                return
+
+            if diff_section:
+                self._diff_candidates(ctx, learner, diff_section, coordinator.db_path, args)
                 return
 
             # Determine which sections to evolve
@@ -87,21 +98,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     )
                     return
 
-            # Get current prompt text for each section
-            from victor.agent.prompt_builder import (
-                ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-                COMPLETION_GUIDANCE,
-                GROUNDING_RULES,
-            )
-            from victor.framework.init_synthesizer import SYNTHESIS_RULES
-
-            section_text = {
-                "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
-                "GROUNDING_RULES": GROUNDING_RULES,
-                "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
-                "FEW_SHOT_EXAMPLES": "",  # No static text; MIPROv2 mines from traces
-                "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
-            }
+            section_text = self._get_section_text()
 
             # Run evolution
             results = Table(title="GEPA Prompt Evolution Results")
@@ -150,6 +147,138 @@ class PromptOptimizeCommand(BaseSlashCommand):
         except Exception as e:
             ctx.console.print(f"[red]Prompt optimization failed:[/] {e}")
             logger.exception("Prompt optimization error")
+
+    @staticmethod
+    def _option_value(args: list[str], flag: str) -> str | None:
+        """Return one flag value from slash-command args."""
+        if flag not in args:
+            return None
+        index = args.index(flag)
+        if index + 1 >= len(args):
+            return None
+        return args[index + 1]
+
+    @staticmethod
+    def _get_section_text() -> dict[str, str]:
+        """Return the static baseline text for evolvable prompt sections."""
+        from victor.agent.prompt_builder import (
+            ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+            COMPLETION_GUIDANCE,
+            GROUNDING_RULES,
+        )
+        from victor.framework.init_synthesizer import SYNTHESIS_RULES
+
+        return {
+            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+            "GROUNDING_RULES": GROUNDING_RULES,
+            "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
+            "FEW_SHOT_EXAMPLES": "",
+            "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
+        }
+
+    def _resolve_candidate_or_baseline(
+        self,
+        learner,
+        section: str,
+        provider: str,
+        selector: str,
+    ) -> tuple[str, str] | None:
+        """Resolve a text selector into (label, text) for show/diff."""
+        normalized = selector.strip()
+        if normalized.lower() == "baseline":
+            baseline_text = self._get_section_text().get(section)
+            if baseline_text is None:
+                return None
+            return (f"{section}:baseline", baseline_text)
+
+        candidate = learner.resolve_candidate(
+            section_name=section,
+            provider=provider,
+            selector=normalized,
+        )
+        if candidate is None:
+            return None
+        return (f"{section}:{provider}:{candidate.generation}", candidate.text)
+
+    def _show_candidate(self, ctx: CommandContext, learner, section: str, db_path, args) -> None:
+        """Display the full text for one stored prompt candidate."""
+        provider = self._option_value(args, "--provider") or "default"
+        selector = self._option_value(args, "--hash") or self._option_value(args, "--ordinal")
+        selector = selector or "baseline"
+        if selector.strip().lower() == "baseline":
+            resolved = self._resolve_candidate_or_baseline(learner, section, provider, selector)
+            if resolved is None:
+                ctx.console.print(
+                    f"[red]No prompt candidate found for {section} selector '{selector}' (provider={provider}).[/]"
+                )
+                return
+            label, text = resolved
+            subtitle = f"Database: {db_path}"
+        else:
+            candidate = learner.resolve_candidate(
+                section_name=section,
+                provider=provider,
+                selector=selector,
+            )
+            if candidate is None:
+                ctx.console.print(
+                    f"[red]No prompt candidate found for {section} selector '{selector}' (provider={provider}).[/]"
+                )
+                return
+            label = (
+                f"{section}:{provider}:{candidate.generation}"
+                f" [{candidate.text_hash[:8]}]"
+            )
+            text = candidate.text
+            subtitle = f"Hash: {candidate.text_hash} | Parent: {candidate.parent_hash} | Database: {db_path}"
+        ctx.console.print(
+            Panel(
+                text,
+                title=f"Prompt Candidate: {label}",
+                subtitle=subtitle,
+                border_style="blue",
+            )
+        )
+
+    def _diff_candidates(self, ctx: CommandContext, learner, section: str, db_path, args) -> None:
+        """Display a unified diff between two prompt candidates or baseline."""
+        provider = self._option_value(args, "--provider") or "default"
+        from_selector = self._option_value(args, "--from") or "baseline"
+        to_selector = self._option_value(args, "--to")
+        if not to_selector:
+            ctx.console.print(
+                "[red]Missing --to selector for /prompt-optimize --diff.[/]"
+            )
+            return
+
+        left = self._resolve_candidate_or_baseline(learner, section, provider, from_selector)
+        right = self._resolve_candidate_or_baseline(learner, section, provider, to_selector)
+        if left is None or right is None:
+            ctx.console.print(
+                f"[red]Unable to resolve diff selectors for {section} "
+                f"(from={from_selector}, to={to_selector}, provider={provider}).[/]"
+            )
+            return
+
+        left_label, left_text = left
+        right_label, right_text = right
+        diff = "\n".join(
+            difflib.unified_diff(
+                left_text.splitlines(),
+                right_text.splitlines(),
+                fromfile=left_label,
+                tofile=right_label,
+                lineterm="",
+            )
+        )
+        ctx.console.print(
+            Panel(
+                diff or "[no textual diff]",
+                title=f"Prompt Diff: {section}",
+                subtitle=f"Database: {db_path}",
+                border_style="blue",
+            )
+        )
 
     def _show_status(self, ctx: CommandContext, learner, db_path) -> None:
         """Display current prompt candidates and their scores."""

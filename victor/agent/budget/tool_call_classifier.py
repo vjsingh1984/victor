@@ -25,8 +25,8 @@ import logging
 from enum import Enum
 from typing import Optional, Set
 
+from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
 from victor.agent.protocols import IToolCallClassifier
-from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -40,17 +40,15 @@ class OperationType(str, Enum):
 
 
 # Default set of write tools (can be extended via OCP)
-DEFAULT_WRITE_TOOLS: Set[str] = frozenset(
-    {
-        "write",
-        "edit",
-        "shell",
-        "git_commit",
-        "git_push",
-        "delete_file",
-        "create_directory",
-        "mkdir",
-    }
+DEFAULT_WRITE_TOOLS: Set[str] = build_write_tool_set(
+    "git_commit",
+    "git_push",
+    "delete_file",
+    "create_directory",
+    "mkdir",
+    "create_file",
+    "rename_file",
+    "notebook_edit",
 )
 
 
@@ -91,7 +89,7 @@ class ToolCallClassifier(IToolCallClassifier):
         Returns:
             True if this is a write/modify operation
         """
-        return get_canonical_name(tool_name.lower()) in self._write_tools
+        return normalize_tool_name_for_policy(tool_name.lower()) in self._write_tools
 
     def classify_operation(self, tool_name: str) -> OperationType:
         """Classify tool operation type.
@@ -102,7 +100,7 @@ class ToolCallClassifier(IToolCallClassifier):
         Returns:
             Operation type enum value
         """
-        tool_lower = get_canonical_name(tool_name.lower())
+        tool_lower = normalize_tool_name_for_policy(tool_name.lower())
 
         if tool_lower in self._write_tools:
             return OperationType.WRITE
@@ -120,7 +118,7 @@ class ToolCallClassifier(IToolCallClassifier):
             tool_name: Name of the tool to add
         """
         self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
-        self._write_tools.add(get_canonical_name(tool_name.lower()))
+        self._write_tools.add(normalize_tool_name_for_policy(tool_name.lower()))
         logger.debug(f"ToolCallClassifier: added write tool '{tool_name}'")
 
     def remove_write_tool(self, tool_name: str) -> None:
@@ -129,7 +127,7 @@ class ToolCallClassifier(IToolCallClassifier):
         Args:
             tool_name: Name of the tool to remove
         """
-        canonical_tool_name = get_canonical_name(tool_name.lower())
+        canonical_tool_name = normalize_tool_name_for_policy(tool_name.lower())
         if canonical_tool_name in self._write_tools:
             self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
             self._write_tools.discard(canonical_tool_name)

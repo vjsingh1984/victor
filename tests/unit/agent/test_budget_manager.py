@@ -106,6 +106,10 @@ class TestIsWriteTool:
         """Legacy execute_bash alias should still resolve as a write tool."""
         assert is_write_tool("execute_bash") is True
 
+    def test_recognizes_notebook_edit_as_write_tool(self):
+        """Notebook edits should be treated as write operations consistently."""
+        assert is_write_tool("notebook_edit") is True
+
 
 # =============================================================================
 # BudgetState Tests

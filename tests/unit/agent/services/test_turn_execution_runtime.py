@@ -1,7 +1,7 @@
 """Focused tests for TurnExecutor runtime behavior."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -169,6 +169,35 @@ async def test_execute_tool_calls_requires_canonical_tool_context_method():
         await executor._execute_tool_calls([{"name": "read", "arguments": {}}])
 
     legacy_handle_tool_calls.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_select_tools_for_turn_delegates_intent_filtering_to_tool_planner():
+    executor = _make_executor()
+    executor._chat_context.messages = []
+    executor._chat_context.conversation.message_count.return_value = 0
+    executor._tool_context.use_semantic_selection = False
+    executor._tool_context.tool_selector.select_tools = AsyncMock(
+        return_value=[{"name": "shell"}, {"name": "write"}]
+    )
+    executor._tool_context.tool_selector.prioritize_by_stage.return_value = [
+        {"name": "shell"},
+        {"name": "write"},
+    ]
+    executor._tool_context._tool_planner = MagicMock()
+    executor._tool_context._tool_planner.filter_tools_by_intent.return_value = [{"name": "shell"}]
+
+    result = await executor._select_tools_for_turn(
+        "use shell tool with sqlite commands to inspect the database",
+        intent="read_only",
+    )
+
+    executor._tool_context._tool_planner.filter_tools_by_intent.assert_called_once_with(
+        [{"name": "shell"}, {"name": "write"}],
+        current_intent=ANY,
+        user_message="use shell tool with sqlite commands to inspect the database",
+    )
+    assert result == [{"name": "shell"}]
 
 
 @pytest.mark.asyncio

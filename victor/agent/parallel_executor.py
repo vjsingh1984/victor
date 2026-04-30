@@ -34,8 +34,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
 from victor.agent.tool_executor import ToolExecutionResult, ToolExecutor
-from victor.tools.tool_names import get_canonical_name
 
 
 def _get_embedding_config():
@@ -79,7 +79,13 @@ READ_TOOLS = frozenset(
         "git",
     }
 )
-WRITE_TOOLS = frozenset({"write", "edit", "shell", "docker"})
+WRITE_TOOLS = build_write_tool_set(
+    "docker",
+    "create_file",
+    "delete_file",
+    "rename_file",
+    "notebook_edit",
+)
 NETWORK_TOOLS = frozenset({"web_search", "web_fetch", "http"})
 
 # TOOL_CATEGORIES dictionary for backward compatibility with tests
@@ -92,7 +98,7 @@ TOOL_CATEGORIES: Dict[str, ToolCategory] = {
 
 def _canonical_tool_name(tool_name: str) -> str:
     """Normalize aliases to the canonical runtime tool name."""
-    return get_canonical_name(tool_name)
+    return normalize_tool_name_for_policy(tool_name)
 
 
 def _extract_paths_from_arguments(tool_name: str, arguments: Dict[str, Any]) -> List[str]:

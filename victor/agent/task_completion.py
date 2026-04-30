@@ -42,6 +42,9 @@ from victor.core.completion_markers import (
     detect_active_completion_marker,
     strip_active_completion_markers,
 )
+from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.tool_names import get_canonical_name
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -339,12 +342,7 @@ class TaskCompletionDetector:
     )
 
     # Tools that produce file deliverables
-    WRITE_TOOLS: frozenset = frozenset(
-        {
-            "write",
-            "edit",
-        }
-    )
+    WRITE_TOOLS: frozenset = build_write_tool_set("create_file", "delete_file", "rename_file")
 
     # Tools that execute code
     EXECUTE_TOOLS: frozenset = frozenset(
@@ -605,7 +603,7 @@ class TaskCompletionDetector:
             tool_name: Name of the tool that was executed
             result: Result dictionary from tool execution
         """
-        tool_lower = tool_name.lower()
+        tool_lower = get_canonical_name(canonicalize_core_tool_name(tool_name.lower()))
         success = result.get("success", True)  # Assume success if not specified
 
         if not success:

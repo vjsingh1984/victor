@@ -47,6 +47,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import yaml
 
+from victor.agent.action_authorizer import build_write_tool_set
 from victor.core.loop_thresholds import (
     DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
     derive_blocked_total_threshold,
@@ -148,6 +149,15 @@ CANONICAL_WRITE_TOOL = ToolNames.WRITE
 CANONICAL_EDIT_TOOL = ToolNames.EDIT
 CANONICAL_SHELL_TOOL = ToolNames.SHELL
 CANONICAL_TEST_TOOL = ToolNames.TEST
+
+FALLBACK_SIGNATURE_PARAMS: Dict[str, Tuple[str, ...]] = {
+    CANONICAL_READ_TOOL: ("path",),
+    CANONICAL_LIST_TOOL: ("path",),
+    CANONICAL_WRITE_TOOL: ("path",),
+    CANONICAL_SHELL_TOOL: ("cmd",),
+    ToolNames.GREP: ("query", "pattern", "path"),
+    ToolNames.CODE_SEARCH: ("query", "path"),
+}
 
 
 # =============================================================================
@@ -841,19 +851,18 @@ class UnifiedTaskTracker(ModeAwareMixin):
     # =========================================================================
 
     # Tools that perform write/modify actions (don't count toward exploration limit)
-    WRITE_TOOLS = {
-        CANONICAL_EDIT_TOOL,
-        CANONICAL_WRITE_TOOL,
-        CANONICAL_SHELL_TOOL,
-        "git_commit",
-        "git_push",
-        "create_file",
-        "delete_file",
-        "rename_file",
-        "notebook_edit",
-        "refactor",
-        "rename",
-    }
+    WRITE_TOOLS = set(
+        build_write_tool_set(
+            "git_commit",
+            "git_push",
+            "create_file",
+            "delete_file",
+            "rename_file",
+            "notebook_edit",
+            "refactor",
+            "rename",
+        )
+    )
 
     def record_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Record a tool call - updates milestones, loops, and budgets.
@@ -1525,6 +1534,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
         """
         canonical_tool_name = get_canonical_name(tool_name)
         params = list(get_signature_params(canonical_tool_name))
+        if not params:
+            params = list(FALLBACK_SIGNATURE_PARAMS.get(canonical_tool_name, ()))
         if params:
             # Use only declared signature_params - explicit positive allowlist
             sig_parts = [canonical_tool_name]

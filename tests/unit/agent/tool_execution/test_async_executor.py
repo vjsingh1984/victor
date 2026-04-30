@@ -62,6 +62,7 @@ class TestToolCategorization:
             "docker",
             "patch",
             "create_file",
+            "notebook_edit",
         ]
 
         for tool_name in write_tools:

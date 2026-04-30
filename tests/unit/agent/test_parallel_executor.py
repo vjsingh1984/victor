@@ -98,6 +98,7 @@ class TestParallelToolExecutor:
         executor = ParallelToolExecutor(self.mock_tool_executor)
         assert executor._get_category("read_file") == ToolCategory.READ_ONLY
         assert executor._get_category("execute_bash") == ToolCategory.WRITE
+        assert executor._get_category("notebook_edit") == ToolCategory.WRITE
 
     def test_get_category_unknown_tool(self):
         """Test category defaults to COMPUTE for unknown tools."""

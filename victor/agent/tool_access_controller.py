@@ -50,6 +50,7 @@ from victor.agent.protocols import (
 from victor.agent.action_authorizer import (
     get_write_tools_for_policy,
     is_tool_blocked_for_intent,
+    normalize_tool_name_for_policy,
     should_allow_shell_for_read_only_intent,
 )
 from victor.protocols.mode_aware import ModeAwareMixin
@@ -64,8 +65,8 @@ logger = logging.getLogger(__name__)
 
 
 def _core_tool_name(tool_name: str) -> str:
-    """Canonicalize only the compact file/shell tool aliases."""
-    return canonicalize_core_tool_name(tool_name, preserve_variants=True)
+    """Canonicalize compact tool aliases for shared access-policy decisions."""
+    return normalize_tool_name_for_policy(tool_name)
 
 
 def _tool_matches(tool_name: str, names: Set[str]) -> bool:

@@ -16,7 +16,7 @@
 
 import asyncio
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TypedDict
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -783,7 +783,7 @@ class TestExecuteTeamConfig:
     """Tests for ``execute_team_config(config, members=...)`` and the
     ``_execute_with`` parameterized core.
 
-    ``execute_team_config`` exists so callers (notably ``TeamNode`` in
+    ``execute_team_config`` exists so callers (notably ``TeamStep`` in
     ``victor.framework.workflows.nodes``) can hand a ``TeamConfig`` to the
     coordinator without first having to mutate ``self._formation`` or
     ``self._members``. It must be safe to call concurrently on a shared
@@ -891,13 +891,13 @@ class TestExecuteTeamConfig:
             await coordinator.execute_team_config(config)
 
     @pytest.mark.asyncio
-    async def test_team_node_dead_reference_now_works(self):
-        """``TeamNode._execute_team`` calls ``coordinator.execute_team_config``
+    async def test_team_step_adapter_calls_execute_team_config(self):
+        """``TeamStep._execute_team`` calls ``coordinator.execute_team_config``
         at workflows/nodes.py:392. Before this refactor, that method did not
         exist. This test exercises that exact code path against a stub
         coordinator and asserts the call routes cleanly.
         """
-        from victor.framework.workflows.nodes import TeamNode, TeamNodeConfig
+        from victor.framework.workflows.nodes import TeamStep, TeamStepConfig
         from victor.teams.types import TeamMember, TeamResult, MemberResult
         from victor.core.shared_types import SubAgentRole
 
@@ -926,7 +926,7 @@ class TestExecuteTeamConfig:
         # Monkey-patch onto this instance only.
         coordinator.execute_team_config = _stub_execute_team_config  # type: ignore[assignment]
 
-        # Replace the create_coordinator factory so TeamNode picks up our stub.
+        # Replace the create_coordinator factory so TeamStep picks up our stub.
         import victor.framework.workflows.nodes as nodes_mod
 
         original_create = nodes_mod.__dict__.get("create_coordinator")
@@ -934,14 +934,14 @@ class TestExecuteTeamConfig:
         def _stub_create_coordinator(**kwargs):  # noqa: ARG001
             return coordinator
 
-        # TeamNode imports create_coordinator inside execute_async — patch the
+        # TeamStep imports create_coordinator inside execute_async — patch the
         # ``victor.teams`` module re-export so the late import sees our stub.
         import victor.teams as teams_mod
 
         original_teams_create = teams_mod.create_coordinator
         teams_mod.create_coordinator = _stub_create_coordinator  # type: ignore[assignment]
         try:
-            node = TeamNode(
+            node = TeamStep(
                 id="t1",
                 name="TestTeam",
                 goal="Goal",
@@ -954,7 +954,7 @@ class TestExecuteTeamConfig:
                         goal="test",
                     )
                 ],
-                config=TeamNodeConfig(timeout_seconds=None),
+                config=TeamStepConfig(timeout_seconds=None),
             )
             graph_state = {"task": "execute"}
             out = await node.execute_async(orchestrator=None, graph_state=graph_state)
@@ -966,7 +966,7 @@ class TestExecuteTeamConfig:
         assert recorded.get("called") is True, "execute_team_config not invoked"
         assert recorded["config_name"] == "TestTeam"
         assert recorded["formation"] == TeamFormation.PARALLEL
-        # Result merged into graph state under TeamNodeConfig.output_key
+        # Result merged into graph state under TeamStepConfig.output_key
         assert "team_result" in out
 
 
@@ -1131,6 +1131,74 @@ class TestFormationStrategy:
         )
 
         assert out["team_output"]["formation"] == "parallel"
+
+    @pytest.mark.asyncio
+    async def test_async_strategy_is_rejected(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        async def async_strategy(_state):
+            return TeamFormation.PARALLEL
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(formation_strategy=async_strategy)
+        )
+
+        with pytest.raises(TypeError, match="synchronously"):
+            await coordinator({"task": "x"})
+
+    @pytest.mark.asyncio
+    async def test_strategy_works_with_copy_on_write_state(self):
+        from victor.framework.agentic_graph.team_selector import select_formation
+        from victor.framework.graph import CopyOnWriteState
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(formation_strategy=select_formation)
+        )
+
+        out = await coordinator(
+            CopyOnWriteState(
+                {"task": "x", "context": {"task_type": "research", "team_size": 2}}
+            )
+        )
+
+        assert out["team_output"]["formation"] == "parallel"
+
+
+class TestEndToEndStateGraphIntegration:
+    """End-to-end coverage for using the coordinator directly as a graph node."""
+
+    @pytest.mark.asyncio
+    async def test_state_graph_invokes_coordinator_node(self):
+        from victor.framework.graph import END, StateGraph
+
+        class TeamState(TypedDict, total=False):
+            task: str
+            result: str
+            team_output: Dict[str, Any]
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Research complete"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+        graph = StateGraph(TeamState)
+        graph.add_node("research_team", coordinator)
+        graph.add_edge("research_team", END)
+        graph.set_entry_point("research_team")
+
+        compiled = graph.compile()
+        result = await compiled.invoke({"task": "Inspect the auth flow"})
+        final_state = result.state
+
+        assert final_state["result"] == "Research complete"
+        assert final_state["team_output"]["success"] is True
+        assert final_state["team_output"]["formation"] == "sequential"
 
 
 if __name__ == "__main__":

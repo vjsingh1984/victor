@@ -208,6 +208,21 @@ class TestIntentFiltering:
         assert "shell" in tool_names
         assert "write" not in tool_names
 
+    def test_filter_tools_read_only_intent_does_not_rewrite_unknown_shell_variant(
+        self, tool_planner
+    ):
+        """Unknown shell variants should pass through unchanged."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        result = tool_planner.filter_tools_by_intent(
+            [{"name": "shell_readonly"}],
+            ActionIntent.READ_ONLY,
+            user_message="use shell tool with sqlite commands to inspect the database",
+        )
+
+        assert len(result) == 1
+        assert result[0]["name"] == "shell_readonly"
+
     def test_filter_tools_write_allowed_intent(self, tool_planner):
         """Test filtering with WRITE_ALLOWED intent."""
         from victor.agent.action_authorizer import ActionIntent

@@ -458,8 +458,13 @@ def _is_dangerous(command: str) -> bool:
         # Count operations (from MANDATORY_TOOL_KEYWORDS)
         "count",
         "how many",
+        # Database operations
+        "database",
+        "sqlite",
+        "query",
+        "sql",
     ],  # Force inclusion
-    keywords=["bash", "shell", "command", "run", "execute", "terminal", "cli"],
+    keywords=["bash", "shell", "command", "run", "execute", "terminal", "cli", "sqlite3", "database", "sql"],
 )
 async def shell(
     cmd: str,
@@ -472,7 +477,17 @@ async def shell(
 ) -> Dict[str, Any]:
     """Execute a shell command. The `cmd` parameter is required.
 
-    Example: shell(cmd="ls -la") or shell(cmd="git status")
+    Examples:
+        shell(cmd="ls -la")
+        shell(cmd="git status")
+        shell(cmd='sqlite3 data.db ".tables"')  # Database operations
+        shell(cmd='sqlite3 data.db "SELECT * FROM users LIMIT 10"')
+
+    For database files (SQLite, PostgreSQL, MySQL):
+    - Use shell(cmd='sqlite3 file.db ".tables"') to list tables
+    - Use shell(cmd='sqlite3 file.db "SELECT * FROM table LIMIT 10"') to query
+    - Use shell(cmd='psql -h localhost -U user -d db -c "SELECT * FROM table"') for PostgreSQL
+    - Use shell(cmd='mysql -u user -p db -e "SHOW TABLES"') for MySQL
 
     For multiline scripts or quote-heavy payloads, prefer a heredoc inside
     `cmd` instead of deeply nested shell escaping. Example:

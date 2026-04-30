@@ -95,7 +95,7 @@ class NodeExecutorFactory:
         from victor.workflows.executors.condition import ConditionNodeExecutor
         from victor.workflows.executors.hitl import HITLNodeExecutor
         from victor.workflows.executors.parallel import ParallelNodeExecutor
-        from victor.workflows.executors.team import TeamNodeExecutor
+        from victor.workflows.executors.team import TeamStepExecutor
         from victor.workflows.executors.transform import TransformNodeExecutor
 
         self.register_executor_type("agent", AgentNodeExecutor, replace=True)
@@ -103,7 +103,7 @@ class NodeExecutorFactory:
         self.register_executor_type("transform", TransformNodeExecutor, replace=True)
         self.register_executor_type("parallel", ParallelNodeExecutor, replace=True)
         self.register_executor_type("condition", ConditionNodeExecutor, replace=True)
-        self.register_executor_type("team", TeamNodeExecutor, replace=True)
+        self.register_executor_type("team", TeamStepExecutor, replace=True)
         self.register_executor_type("hitl", HITLNodeExecutor, replace=True)
 
     def _register_extension_executor_types(self) -> None:

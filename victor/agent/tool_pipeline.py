@@ -1046,23 +1046,6 @@ class ToolPipeline:
 
         return routed_tool_name, routed_args, changed
 
-    def _apply_tool_variant_expansion(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> tuple[str, Dict[str, Any], bool]:
-        """Expand tool variants that modify default parameters.
-
-        Examples:
-            shell_readonly -> shell with readonly=True (legacy alias)
-        """
-        if tool_name == "shell_readonly":
-            # Map shell_readonly to shell with readonly=True
-            expanded_args = dict(arguments)
-            expanded_args["readonly"] = True
-            logger.debug("Expanded shell_readonly to shell with readonly=True")
-            return "shell", expanded_args, True
-
-        return tool_name, arguments, False
-
     @staticmethod
     def _coerce_bool_like(value: Any) -> Any:
         """Coerce common boolean-like strings for tool parameters."""
@@ -1074,7 +1057,7 @@ class ToolPipeline:
                 return False
         return value
 
-    def _apply_shell_readonly_policy(
+    def _apply_shell_policy(
         self,
         tool_name: str,
         arguments: Dict[str, Any],
@@ -1127,22 +1110,18 @@ class ToolPipeline:
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[str, Dict[str, Any], NormalizationStrategy]:
         """Normalize a full tool call, including search-routing adjustments."""
-        # Apply tool variant expansion first (e.g., shell_readonly -> shell with readonly=True)
-        expanded_tool_name, expanded_args, variant_changed = self._apply_tool_variant_expansion(
-            tool_name, arguments
-        )
         normalized_args, strategy = self._normalize_arguments(
-            expanded_tool_name, expanded_args, context=context
+            tool_name, arguments, context=context
         )
-        normalized_args, readonly_changed = self._apply_shell_readonly_policy(
-            expanded_tool_name,
+        normalized_args, readonly_changed = self._apply_shell_policy(
+            tool_name,
             normalized_args,
             context=context,
         )
         normalized_tool_name, normalized_args, search_changed = self._apply_search_routing(
-            expanded_tool_name, normalized_args
+            tool_name, normalized_args
         )
-        changed = variant_changed or readonly_changed or search_changed
+        changed = readonly_changed or search_changed
         if changed and strategy == NormalizationStrategy.DIRECT:
             strategy = NormalizationStrategy.MANUAL_REPAIR
         return normalized_tool_name, normalized_args, strategy

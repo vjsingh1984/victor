@@ -37,11 +37,11 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, Iterable, List, Optional, Set, Tuple
 
 from victor.agent.safety import get_write_tool_names
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
-from victor.tools.tool_names import ToolNames
+from victor.tools.tool_names import ToolNames, get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +55,17 @@ SHELL_TOOL_ALIASES = frozenset({ToolNames.SHELL, "execute_bash", "bash"})
 
 def _canonicalize_tool_set(tools: Set[str]) -> Set[str]:
     """Canonicalize only the compact file/shell tool aliases."""
-    return {canonicalize_core_tool_name(tool, preserve_variants=True) for tool in tools}
+    return {canonicalize_core_tool_name(tool) for tool in tools}
 
 
 def _canonicalize_tool_name(tool_name: str) -> str:
-    """Canonicalize tool names while preserving safe runtime variants."""
-    return canonicalize_core_tool_name(tool_name, preserve_variants=True)
+    """Canonicalize compact file/shell aliases for shared policy lookups."""
+    return canonicalize_core_tool_name(tool_name)
+
+
+def normalize_tool_name_for_policy(tool_name: str) -> str:
+    """Normalize a tool name for shared policy/classification lookups."""
+    return get_canonical_name(_canonicalize_tool_name(tool_name))
 
 
 class ActionIntent(Enum):
@@ -151,6 +156,14 @@ READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
         r"\b(shell|bash|terminal)\b.*\b(read|review|inspect|query|check|look\s+at)\b",
         "explicit_shell_request_reverse",
     ),
+    # Database-related signals - allow shell for database operations
+    (r"\b(read|query|inspect|check|view|explore)\b.*\b(database|db|table|schema)\b", "database_read"),
+    (r"\b(database|db|table|schema)\b.*\b(read|query|inspect|check|view|list)\b", "database_read_reverse"),
+    (r"\b(list|show)\s+(all\s+)?(tables|rows|data)\b", "database_list"),
+    (r"\b\.tables\b", "sqlite_dot_tables"),
+    (r"\bSELECT\b.*\bFROM\b", "sql_query"),
+    # File extensions that indicate databases
+    (r"\.(db|sqlite|sqlite3)\b", "database_file"),
 ]
 
 # Mapping of intent to blocked tool sets
@@ -209,9 +222,17 @@ def _coerce_action_intent(intent: Optional[object]) -> Optional[ActionIntent]:
 
 def get_write_tools_for_policy() -> frozenset[str]:
     """Return the canonical write/execute tool set used by intent policy."""
-    dynamic_tools = _canonicalize_tool_set(set(get_write_tool_names()))
-    static_tools = _canonicalize_tool_set(set(WRITE_TOOLS))
-    return frozenset(dynamic_tools | static_tools)
+    return build_write_tool_set()
+
+
+def build_write_tool_set(*extra_tool_names: str) -> frozenset[str]:
+    """Build a shared write-tool set with canonical and compatibility spellings."""
+    tool_names: Set[str] = set(get_write_tool_names()) | set(WRITE_TOOLS)
+    tool_names.update(extra_tool_names)
+    normalized = {normalize_tool_name_for_policy(name) for name in tool_names if name}
+    raw = {name for name in tool_names if name}
+    canonicalized = {_canonicalize_tool_name(name) for name in tool_names if name}
+    return frozenset(normalized | raw | canonicalized)
 
 
 def get_intent_blocked_tools(intent: ActionIntent) -> frozenset[str]:
@@ -254,7 +275,7 @@ def is_tool_blocked_for_intent(
     intent = _coerce_action_intent(intent)
     if intent is None:
         return False
-    canonical_tool_name = _canonicalize_tool_name(tool_name)
+    canonical_tool_name = normalize_tool_name_for_policy(tool_name)
     if canonical_tool_name == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
         intent, user_message
     ):

@@ -39,6 +39,7 @@ import asyncio
 import copy
 import logging
 import time
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional
 
@@ -88,11 +89,12 @@ class StateGraphNodeConfig:
     ``"team_output"`` / ``"error"``. Override any field to map the node onto
     an existing graph schema without renaming state keys.
 
-    ``formation_strategy`` is an optional callable that receives the original
-    state and returns a ``TeamFormation``. Its result is injected into the
-    per-call context as ``formation_hint`` so the coordinator's existing
-    ``_resolve_effective_formation`` does the work — ``self._formation`` is
-    never mutated, which keeps concurrent ``__call__`` invocations safe.
+    ``formation_strategy`` is an optional synchronous callable that receives
+    the original state and returns a ``TeamFormation``. Its result is injected
+    into the per-call context as ``formation_hint`` so the coordinator's
+    existing ``_resolve_effective_formation`` does the work —
+    ``self._formation`` is never mutated, which keeps concurrent ``__call__``
+    invocations safe. Async strategies are intentionally not supported here.
     """
 
     task_key: str = "task"
@@ -101,6 +103,17 @@ class StateGraphNodeConfig:
     output_key: str = "team_output"
     error_key: str = "error"
     formation_strategy: Optional[Callable[[Any], TeamFormation]] = None
+
+
+@dataclass
+class _CoordinatorExecutionState:
+    """Per-call execution state for concurrent-safe team runs."""
+
+    members: List["ITeamMember"]
+    formation: TeamFormation
+    manager: Optional["ITeamMember"]
+    shared_context: Dict[str, Any]
+    message_history: List[AgentMessage] = field(default_factory=list)
 
 
 # =============================================================================
@@ -331,12 +344,13 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         # graph node via ``__call__``). Default preserves historical keys.
         self._state_graph_config: StateGraphNodeConfig = StateGraphNodeConfig()
 
-        # Lock that serialises ``execute_team_config`` invocations on a
-        # shared coordinator instance. The implementation temporarily swaps
-        # ``_formation`` / ``_members`` / ``_manager`` / ``_shared_context``;
-        # serialising avoids cross-call corruption while letting callers
-        # safely use ``asyncio.gather`` against the same coordinator.
-        self._exec_team_config_lock: asyncio.Lock = asyncio.Lock()
+        # Per-task execution state keeps parameterised runs concurrency-safe
+        # without mutating coordinator defaults like ``_formation`` or
+        # ``_members``.
+        self._execution_state: ContextVar[Optional[_CoordinatorExecutionState]] = ContextVar(
+            "unified_team_execution_state",
+            default=None,
+        )
 
     # =========================================================================
     # ITeamCoordinator Protocol Methods
@@ -397,196 +411,14 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 - final_output: Synthesized final output
                 - formation: Formation used
         """
-        if not self._members:
-            return {
-                "success": False,
-                "error": "No team members added",
-                "member_results": {},
-                "final_output": "",
-                "formation": self._formation.value,
-            }
-
-        # Initialize shared context (deep copy for isolation)
-        self._shared_context = copy.deepcopy(dict(context))
-        self._message_history = []
-        start_time = time.time()
-        effective_formation = self._resolve_effective_formation(context)
-
-        # Emit start event
-        self._emit_team_event(
-            "started",
-            {
-                "task": task,
-                "formation": effective_formation.value,
-                "member_count": len(self._members),
-            },
+        return await self._execute_with(
+            task=task,
+            context=context,
+            formation=self._formation,
+            members=list(self._members),
+            manager=self._manager,
+            persist_execution_state=True,
         )
-
-        try:
-            # Dispatch to formation executor
-            result = await self._execute_formation(
-                task,
-                context,
-                formation_override=effective_formation,
-            )
-
-            # Record RL outcome
-            duration = time.time() - start_time
-            failed_count = sum(
-                1 for r in result.get("member_results", {}).values() if not r.success
-            )
-            quality = self._compute_quality_score(
-                success=result.get("success", False),
-                member_count=len(self._members),
-                total_tool_calls=result.get("total_tool_calls", 0),
-                duration_seconds=duration,
-                failed_members=failed_count,
-            )
-
-            self._record_team_rl_outcome(
-                team_name=context.get("team_name", "UnifiedTeam"),
-                formation=effective_formation.value,
-                success=result.get("success", False),
-                quality_score=quality,
-                metadata={
-                    "member_count": len(self._members),
-                    "duration": duration,
-                },
-            )
-
-            # Emit completion event
-            self._emit_team_event(
-                "completed",
-                {
-                    "success": result.get("success", False),
-                    "duration": duration,
-                },
-            )
-
-            return result
-
-        except Exception as e:
-            self._emit_team_event("error", {"error": str(e)})
-            logger.error(f"Team execution failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "member_results": {},
-                "final_output": "",
-                "formation": effective_formation.value,
-            }
-
-    async def execute_team_config(
-        self,
-        config: Any,  # TeamConfig from victor.teams.types
-        *,
-        members: Optional[List[Any]] = None,
-    ) -> Any:  # TeamResult from victor.teams.types
-        """Execute a team with a config without mutating coordinator state.
-
-        This method enables TeamNode and other callers to execute teams
-        with a TeamConfig without first mutating self._formation or
-        self._members. The coordinator's internal state remains unchanged,
-        making this method safe for concurrent calls on a shared coordinator.
-
-        Args:
-            config: TeamConfig with name, goal, formation, members
-            members: Optional member override (uses config.members if not provided)
-
-        Returns:
-            TeamResult with success, final_output, member_results, formation
-
-        Raises:
-            ValueError: If no members provided and config.members requires
-                an orchestrator to resolve (but self._orchestrator is None)
-        """
-        from victor.teams.types import TeamResult, TeamFormation as TF
-
-        # Resolve members: override parameter > config.members
-        if members is None:
-            # Try to use config.members - these are TeamMember configs,
-            # not executable IAgent instances, so we need to adapt them
-            if hasattr(config, "members") and config.members:
-                # Check if we have an orchestrator to resolve TeamMember to IAgent
-                if self._orchestrator is None:
-                    raise ValueError(
-                        "Cannot execute TeamConfig with members: "
-                        "coordinator has no orchestrator to resolve TeamMember configs. "
-                        "Pass executable members via the members= parameter, or "
-                        "create the coordinator with an orchestrator."
-                    )
-                # For now, require explicit members= override
-                # (Future: implement TeamMember -> IAgent resolution via orchestrator)
-                raise ValueError(
-                    "Cannot execute TeamConfig with members without explicit members= override. "
-                    "Pass executable IAgent instances via the members= parameter."
-                )
-            else:
-                raise ValueError(
-                    "No members to execute: either config.members must be non-empty "
-                    "or members= override must be provided."
-                )
-
-        if not members:
-            return TeamResult(
-                success=False,
-                final_output="",
-                member_results={},
-                formation=TF.SEQUENTIAL,
-                error="No members to execute",
-            )
-
-        # Resolve formation from config (use SEQUENTIAL as fallback)
-        config_formation = getattr(config, "formation", TF.SEQUENTIAL)
-        if isinstance(config_formation, str):
-            config_formation = TF(config_formation)
-
-        # Save current state
-        saved_members = self._members
-        saved_formation = self._formation
-
-        try:
-            # Temporarily set members and formation for execution
-            self._members = members
-            self._formation = config_formation
-
-            # Execute the task
-            task = getattr(config, "goal", "Execute team task")
-            context = getattr(config, "shared_context", {})
-
-            result_dict = await self.execute_task(task, context)
-
-            # Convert dict result to TeamResult
-            from victor.teams.types import MemberResult
-
-            member_results: Dict[str, MemberResult] = {}
-            for member_id, mr_dict in result_dict.get("member_results", {}).items():
-                # Convert dict to MemberResult if needed
-                if isinstance(mr_dict, dict):
-                    member_results[member_id] = MemberResult(
-                        member_id=member_id,
-                        success=mr_dict.get("success", False),
-                        output=mr_dict.get("output", ""),
-                        error=mr_dict.get("error"),
-                        tool_calls=mr_dict.get("tool_calls", []),
-                        duration_seconds=mr_dict.get("duration_seconds", 0.0),
-                    )
-                else:
-                    member_results[member_id] = mr_dict
-
-            return TeamResult(
-                success=result_dict.get("success", False),
-                final_output=result_dict.get("final_output", ""),
-                member_results=member_results,
-                formation=config_formation,
-                total_tool_calls=result_dict.get("total_tool_calls", 0),
-                total_duration=result_dict.get("total_duration", 0.0),
-                error=result_dict.get("error"),
-            )
-        finally:
-            # Restore coordinator state (crucial for concurrent safety)
-            self._members = saved_members
-            self._formation = saved_formation
 
     async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
@@ -598,16 +430,16 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             List of responses from members
         """
         async with self._message_lock:
-            self._message_history.append(message)
+            self._active_message_history().append(message)
         responses: List[Optional[AgentMessage]] = []
 
-        for member in self._members:
+        for member in self._active_members():
             if member.id != message.sender_id:  # Don't send to sender
                 try:
                     response = await member.receive_message(message)
                     if response:
                         async with self._message_lock:
-                            self._message_history.append(response)
+                            self._active_message_history().append(response)
                     responses.append(response)
                 except Exception as e:
                     logger.warning(f"Member {member.id} failed to receive: {e}")
@@ -628,16 +460,16 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             return None
 
         async with self._message_lock:
-            self._message_history.append(message)
+            self._active_message_history().append(message)
 
         # Find recipient
-        for member in self._members:
+        for member in self._active_members():
             if member.id == message.recipient_id:
                 try:
                     response = await member.receive_message(message)
                     if response:
                         async with self._message_lock:
-                            self._message_history.append(response)
+                            self._active_message_history().append(response)
                     return response
                 except Exception as e:
                     logger.warning(f"Member {member.id} failed to receive: {e}")
@@ -657,7 +489,41 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     @property
     def shared_memory(self) -> Dict[str, Any]:
         """Get shared memory context."""
+        return self._active_shared_context()
+
+    def _current_execution_state(self) -> Optional[_CoordinatorExecutionState]:
+        """Return the active per-call execution state, if any."""
+        return self._execution_state.get()
+
+    def _active_members(self) -> List["ITeamMember"]:
+        state = self._current_execution_state()
+        if state is not None:
+            return list(state.members)
+        return list(self._members)
+
+    def _active_formation(self) -> TeamFormation:
+        state = self._current_execution_state()
+        if state is not None:
+            return state.formation
+        return self._formation
+
+    def _active_manager(self) -> Optional["ITeamMember"]:
+        state = self._current_execution_state()
+        if state is not None:
+            return state.manager
+        return self._manager
+
+    def _active_shared_context(self) -> Dict[str, Any]:
+        state = self._current_execution_state()
+        if state is not None:
+            return state.shared_context
         return self._shared_context
+
+    def _active_message_history(self) -> List[AgentMessage]:
+        state = self._current_execution_state()
+        if state is not None:
+            return state.message_history
+        return self._message_history
 
     @property
     def lsp(self) -> Optional[Any]:
@@ -702,19 +568,21 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             Result dictionary
         """
         # Get the formation strategy
-        active_formation = formation_override or self._formation
+        active_formation = formation_override or self._active_formation()
         strategy = self._formations[active_formation]
 
         # Wrap team members with adapters
-        shared_state_with_manager = dict(self._shared_context)
-        if self._manager is not None:
-            shared_state_with_manager["explicit_manager_id"] = self._manager.id
+        shared_state_with_manager = self._active_shared_context()
+        active_manager = self._active_manager()
+        if active_manager is not None:
+            shared_state_with_manager["explicit_manager_id"] = active_manager.id
 
         max_workers = self._extract_max_workers(context, shared_state_with_manager)
         execution_members = self._limit_execution_members(
-            self._members,
+            self._active_members(),
             active_formation,
             max_workers,
+            manager=active_manager,
         )
         worktree_plan = self._plan_worktree_execution(
             execution_members,
@@ -784,7 +652,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             # Determine final output based on formation
             # For pipeline, use only the last stage's output
             # For other formations, join all outputs
-            if self._formation == TeamFormation.PIPELINE and final_outputs:
+            if active_formation == TeamFormation.PIPELINE and final_outputs:
                 final_output = final_outputs[-1]  # Last stage's output only
             else:
                 final_output = "\n\n".join(final_outputs)
@@ -796,8 +664,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "final_output": final_output,
                 "formation": active_formation.value,
                 "total_tool_calls": total_tool_calls,
-                "communication_log": self._message_history,
-                "shared_context": self._shared_context,
+                "communication_log": list(self._active_message_history()),
+                "shared_context": dict(shared_state_with_manager),
             }
 
             # Add consensus metadata if any member result has it
@@ -1008,17 +876,23 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             logger.debug("Worktree cleanup failed: %s", exc)
             return {"removed": [], "skipped": [], "errors": [str(exc)]}
 
-    def _resolve_effective_formation(self, context: Dict[str, Any]) -> TeamFormation:
+    def _resolve_effective_formation(
+        self,
+        context: Dict[str, Any],
+        *,
+        default_formation: Optional[TeamFormation] = None,
+    ) -> TeamFormation:
         """Resolve formation override hints without mutating the default formation."""
+        fallback_formation = default_formation or self._active_formation()
         raw_hint = context.get("formation_hint") or context.get("topology_formation_hint")
         if not raw_hint:
-            return self._formation
+            return fallback_formation
 
         normalized = str(raw_hint).strip().lower()
         for formation in TeamFormation:
             if formation.value == normalized:
                 return formation
-        return self._formation
+        return fallback_formation
 
     @staticmethod
     def _extract_max_workers(
@@ -1040,15 +914,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         members: List["ITeamMember"],
         formation: TeamFormation,
         max_workers: Optional[int],
+        *,
+        manager: Optional["ITeamMember"] = None,
     ) -> List["ITeamMember"]:
         """Limit members for a single execution while preserving a hierarchical manager."""
         if max_workers is None or max_workers >= len(members):
             return list(members)
 
-        if formation == TeamFormation.HIERARCHICAL and self._manager in members:
-            selected: List["ITeamMember"] = [self._manager]
+        if formation == TeamFormation.HIERARCHICAL and manager in members:
+            selected: List["ITeamMember"] = [manager]
             for member in members:
-                if member is self._manager:
+                if member is manager:
                     continue
                 selected.append(member)
                 if len(selected) >= max_workers:
@@ -1100,28 +976,105 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         formation: TeamFormation,
         members: List["ITeamMember"],
         manager: Optional["ITeamMember"] = None,
+        persist_execution_state: bool = False,
     ) -> Dict[str, Any]:
-        """Concurrency-safe parameterised execution.
+        """Execute a team run with per-call members/formation overrides.
 
-        Temporarily applies the given formation/members/manager, delegates
-        to ``execute_task``, then restores the coordinator's prior state.
-        Serialised via ``self._exec_team_config_lock`` so concurrent
-        invocations on a shared coordinator instance don't corrupt each
-        other's view of ``_formation`` / ``_members``.
+        The coordinator's defaults remain unchanged. Per-call state lives in a
+        task-local ``ContextVar`` so concurrent invocations can execute against
+        the same coordinator instance without serialisation or instance swaps.
         """
-        async with self._exec_team_config_lock:
-            saved_formation = self._formation
-            saved_members = list(self._members)
-            saved_manager = self._manager
+        execution_members = list(members)
+        if not execution_members:
+            return {
+                "success": False,
+                "error": "No team members added",
+                "member_results": {},
+                "final_output": "",
+                "formation": formation.value,
+            }
+
+        execution_state = _CoordinatorExecutionState(
+            members=execution_members,
+            formation=formation,
+            manager=manager,
+            shared_context=copy.deepcopy(dict(context)),
+        )
+        token = self._execution_state.set(execution_state)
+        try:
+            start_time = time.time()
+            effective_formation = self._resolve_effective_formation(
+                context,
+                default_formation=formation,
+            )
+
+            self._emit_team_event(
+                "started",
+                {
+                    "task": task,
+                    "formation": effective_formation.value,
+                    "member_count": len(execution_members),
+                },
+            )
             try:
-                self._formation = formation
-                self._members = list(members)
-                self._manager = manager
-                return await self.execute_task(task, context)
-            finally:
-                self._formation = saved_formation
-                self._members = saved_members
-                self._manager = saved_manager
+                result = await self._execute_formation(
+                    task,
+                    context,
+                    formation_override=effective_formation,
+                )
+
+                duration = time.time() - start_time
+                failed_count = sum(
+                    1 for r in result.get("member_results", {}).values() if not r.success
+                )
+                quality = self._compute_quality_score(
+                    success=result.get("success", False),
+                    member_count=len(execution_members),
+                    total_tool_calls=result.get("total_tool_calls", 0),
+                    duration_seconds=duration,
+                    failed_members=failed_count,
+                )
+
+                self._record_team_rl_outcome(
+                    team_name=context.get("team_name", "UnifiedTeam"),
+                    formation=effective_formation.value,
+                    success=result.get("success", False),
+                    quality_score=quality,
+                    metadata={
+                        "member_count": len(execution_members),
+                        "duration": duration,
+                    },
+                )
+
+                self._emit_team_event(
+                    "completed",
+                    {
+                        "success": result.get("success", False),
+                        "duration": duration,
+                    },
+                )
+                if persist_execution_state:
+                    self._shared_context = dict(
+                        result.get("shared_context", execution_state.shared_context)
+                    )
+                    self._message_history = list(execution_state.message_history)
+                return result
+
+            except Exception as e:
+                self._emit_team_event("error", {"error": str(e)})
+                logger.error(f"Team execution failed: {e}")
+                if persist_execution_state:
+                    self._shared_context = dict(execution_state.shared_context)
+                    self._message_history = list(execution_state.message_history)
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "member_results": {},
+                    "final_output": "",
+                    "formation": effective_formation.value,
+                }
+        finally:
+            self._execution_state.reset(token)
 
     def _adapt_team_members(
         self, members: List[Any]
@@ -1198,7 +1151,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     ) -> TeamResult:
         """Execute a ``TeamConfig`` and return a ``TeamResult``.
 
-        This is the entry point used by ``TeamNode`` in
+        This is the entry point used by the declarative team-step adapter in
         ``victor.framework.workflows.nodes`` and any other caller that
         already has a ``TeamConfig`` in hand.
 
@@ -1348,7 +1301,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
         Use ``with_state_graph_config(...)`` to map the node onto a graph
         schema with different key names. For declarative workflow YAML with
-        timeout/retry/merge-strategy configuration, use ``TeamNode`` from
+        timeout/retry/merge-strategy configuration, use ``TeamStep`` from
         ``victor.framework.workflows.nodes`` instead — ``__call__`` is the
         lean programmatic path.
 
@@ -1399,12 +1352,21 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         context = self._build_call_context(
             state, kind, exclude={config.task_key, config.query_key}
         )
+        strategy_state = state.get_state() if kind == "cow" else state
         if callable(config.formation_strategy):
             try:
-                selected_formation = config.formation_strategy(state)
+                selected_formation = config.formation_strategy(strategy_state)
             except Exception as exc:
                 logger.debug("Formation strategy failed; keeping default formation: %s", exc)
             else:
+                if asyncio.iscoroutine(selected_formation):
+                    close_coro = getattr(selected_formation, "close", None)
+                    if callable(close_coro):
+                        close_coro()
+                    raise TypeError(
+                        "StateGraphNodeConfig.formation_strategy must return a "
+                        "TeamFormation synchronously; async strategies are not supported."
+                    )
                 if isinstance(selected_formation, TeamFormation):
                     context["formation_hint"] = selected_formation.value
                 elif selected_formation is not None:

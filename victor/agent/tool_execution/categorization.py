@@ -24,8 +24,8 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set
-from victor.tools.tool_names import get_canonical_name
 
+from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -94,17 +94,7 @@ READ_TOOLS = frozenset(
     }
 )
 
-WRITE_TOOLS = frozenset(
-    {
-        "write",
-        "edit",
-        "shell",
-        "docker",
-        "patch",
-        "create_file",
-        "notebook_edit",
-    }
-)
+WRITE_TOOLS = build_write_tool_set("docker", "patch", "create_file", "notebook_edit")
 
 NETWORK_TOOLS = frozenset(
     {
@@ -151,7 +141,7 @@ def categorize_tool_call(tool_name: str, arguments: Dict[str, Any]) -> ToolCateg
     Returns:
         ToolCategory for the tool call
     """
-    canonical_tool_name = get_canonical_name(tool_name)
+    canonical_tool_name = normalize_tool_name_for_policy(tool_name)
 
     # Check metadata first
     if canonical_tool_name in TOOL_METADATA:
