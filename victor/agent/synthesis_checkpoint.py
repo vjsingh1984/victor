@@ -376,6 +376,73 @@ class ErrorRateCheckpoint(SynthesisCheckpoint):
         )
 
 
+class UnifiedTaskTrackerCheckpoint(SynthesisCheckpoint):
+    """Checkpoint that delegates to UnifiedTaskTracker for sophisticated loop detection.
+
+    Phase 3 Enhancement: Replaces primitive heuristic-based checkpoints (DuplicateTool,
+    SimilarArgs, NoProgress) with UnifiedTaskTracker's sophisticated detection:
+
+    - Offset-aware file read loop detection (same file + offset + limit)
+    - Signature-based deduplication with permanent blocking
+    - Task-type aware thresholds (different for EDIT vs. ANALYZE)
+    - Mode-aware limits (exploration multiplier)
+    - Progress tracking and plateau detection
+
+    This is MORE sophisticated than primitive counting and aligns with the refined
+    execution optimization plan's goal of trusting UnifiedTaskTracker over heuristics.
+    """
+
+    def __init__(self, tracker: Optional[Any] = None) -> None:
+        """Initialize with optional UnifiedTaskTracker instance.
+
+        Args:
+            tracker: UnifiedTaskTracker instance. If None, will be looked up from task_context.
+        """
+        self._tracker = tracker
+
+    @property
+    def name(self) -> str:
+        return "unified_task_tracker"
+
+    def check(
+        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+    ) -> CheckpointResult:
+        # Get tracker from instance or task_context
+        tracker = self._tracker or task_context.get("unified_task_tracker")
+        if not tracker:
+            return CheckpointResult(
+                should_synthesize=False,
+                reason="UnifiedTaskTracker not available",
+            )
+
+        # Query UnifiedTaskTracker for loop warning
+        try:
+            warning = tracker.check_loop_warning()
+            if warning:
+                return CheckpointResult(
+                    should_synthesize=True,
+                    reason=f"UnifiedTaskTracker loop detection: {warning}",
+                    suggested_prompt=(
+                        f"UnifiedTaskTracker detected a potential loop: {warning}\n\n"
+                        "Please synthesize your findings so far and try a different approach. "
+                        "The system has detected repeated patterns that suggest you may be stuck."
+                    ),
+                    priority=9,  # High priority (loops are serious)
+                    metadata={"warning": warning, "checkpoint": "unified_task_tracker"},
+                )
+        except Exception as e:
+            logger.warning(f"UnifiedTaskTracker checkpoint failed: {e}")
+            return CheckpointResult(
+                should_synthesize=False,
+                reason=f"UnifiedTaskTracker checkpoint error: {e}",
+            )
+
+        return CheckpointResult(
+            should_synthesize=False,
+            reason="UnifiedTaskTracker: No loop detected",
+        )
+
+
 class CompositeSynthesisCheckpoint(SynthesisCheckpoint):
     """Combines multiple checkpoints with priority-based selection."""
 
@@ -426,42 +493,49 @@ class CompositeSynthesisCheckpoint(SynthesisCheckpoint):
 
 
 def create_default_checkpoint() -> CompositeSynthesisCheckpoint:
-    """Create a checkpoint with default configuration."""
+    """Create a checkpoint with default configuration.
+
+    Phase 3 Enhancement: Replaces primitive heuristic-based checkpoints (DuplicateTool,
+    SimilarArgs, NoProgress) with UnifiedTaskTracker's sophisticated loop detection.
+
+    Kept: ToolCount, TimeoutApproaching, ErrorRate (provide unique value)
+    Replaced: DuplicateTool, SimilarArgs, NoProgress → UnifiedTaskTrackerCheckpoint
+    """
     return CompositeSynthesisCheckpoint(
         [
             ToolCountCheckpoint(max_calls=12),
-            DuplicateToolCheckpoint(threshold=3),
-            SimilarArgsCheckpoint(window_size=5),
+            UnifiedTaskTrackerCheckpoint(),  # Replaces DuplicateTool, SimilarArgs, NoProgress
             TimeoutApproachingCheckpoint(warning_threshold=0.7),
-            NoProgressCheckpoint(window_size=4),
             ErrorRateCheckpoint(error_threshold=0.5),
         ]
     )
 
 
 def create_aggressive_checkpoint() -> CompositeSynthesisCheckpoint:
-    """Create a checkpoint that triggers synthesis earlier (for simple tasks)."""
+    """Create a checkpoint that triggers synthesis earlier (for simple tasks).
+
+    Phase 3 Enhancement: Uses UnifiedTaskTracker instead of primitive heuristics.
+    """
     return CompositeSynthesisCheckpoint(
         [
             ToolCountCheckpoint(max_calls=5),
-            DuplicateToolCheckpoint(threshold=2),
-            SimilarArgsCheckpoint(window_size=3),
+            UnifiedTaskTrackerCheckpoint(),  # Replaces DuplicateTool, SimilarArgs, NoProgress
             TimeoutApproachingCheckpoint(warning_threshold=0.5),
-            NoProgressCheckpoint(window_size=3),
             ErrorRateCheckpoint(error_threshold=0.3),
         ]
     )
 
 
 def create_relaxed_checkpoint() -> CompositeSynthesisCheckpoint:
-    """Create a checkpoint that allows more exploration (for complex tasks)."""
+    """Create a checkpoint that allows more exploration (for complex tasks).
+
+    Phase 3 Enhancement: Uses UnifiedTaskTracker instead of primitive heuristics.
+    """
     return CompositeSynthesisCheckpoint(
         [
             ToolCountCheckpoint(max_calls=20),
-            DuplicateToolCheckpoint(threshold=4),
-            SimilarArgsCheckpoint(window_size=7),
+            UnifiedTaskTrackerCheckpoint(),  # Replaces DuplicateTool, SimilarArgs, NoProgress
             TimeoutApproachingCheckpoint(warning_threshold=0.8),
-            NoProgressCheckpoint(window_size=6),
             ErrorRateCheckpoint(error_threshold=0.6),
         ]
     )

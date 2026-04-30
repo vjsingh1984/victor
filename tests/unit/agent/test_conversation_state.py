@@ -743,6 +743,275 @@ class TestEdgeModelStageTransitionFallback:
             assert "current_stage" in context
             assert "detected_stage_heuristic" in context
 
+    def test_cooldown_prevents_edge_model_call(self):
+        """Phase 1 optimization: Cooldown should prevent edge model calls.
+
+        When in cooldown period, _maybe_transition should return early
+        without calling edge model, since transition won't happen anyway.
+        """
+        import time
+        from unittest.mock import patch, MagicMock
+
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.READING
+        sm.state.last_tools = ["read", "grep", "code_search"]  # 3 READING tools
+        sm._last_transition_time = time.time()  # Just transitioned
+
+        mock_service = MagicMock()
+
+        with (
+            patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.ANALYSIS),
+            patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            # Call _maybe_transition while in cooldown
+            sm._maybe_transition()
+
+            # Edge model should NOT have been called (early exit in cooldown)
+            mock_service.decide_sync.assert_not_called()
+            # Stage should not have changed (cooldown blocked it)
+            assert sm.state.stage == ConversationStage.READING
+
+    def test_high_confidence_heuristic_skips_edge_model(self):
+        """Phase 1 optimization: High confidence heuristic should skip edge model.
+
+        When tool overlap >= MIN_TOOLS_FOR_TRANSITION (3), heuristic is confident
+        and edge model call should be skipped.
+        """
+        from unittest.mock import patch, MagicMock
+
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.INITIAL
+        sm.state.last_tools = ["edit", "write", "shell", "edit", "write"]  # 5 EXECUTION tools
+
+        mock_service = MagicMock()
+
+        with (
+            patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.EXECUTION),
+            patch.object(sm, "_get_tools_for_stage", return_value={"edit", "write", "shell"}),
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+        ):
+            mock_container.return_value.get.return_value = mock_service
+
+            sm._maybe_transition()
+
+            # Edge model should NOT have been called (high confidence heuristic)
+            mock_service.decide_sync.assert_not_called()
+            # Should have transitioned directly based on heuristic
+            assert sm.state.stage == ConversationStage.EXECUTION
+
+
+class TestPhase2ContextAwareCalibration:
+    """Tests for Phase 2: Context-Aware Calibration of edge model results.
+
+    Phase 2 adds intelligent calibration to prevent edge model bias:
+    - Calibrates when agent reads many files without editing
+    - Corrects for intent bias (READ_ONLY tasks shouldn't EXECUTE)
+    - Uses actual behavior instead of primitive counters
+    """
+
+    def _make_decision_result(self, stage: str, confidence: float, source: str = "llm"):
+        """Create a mock DecisionResult."""
+        from unittest.mock import MagicMock
+
+        result = MagicMock()
+        result.result.stage = stage
+        result.confidence = confidence
+        result.source = source
+        return result
+
+    def test_context_calibration_read_only_without_edits(self):
+        """Phase 2: Edge model suggesting EXECUTION should be calibrated to ANALYSIS
+        when agent has read 10+ files without any edits.
+        """
+        from unittest.mock import patch, MagicMock
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.WRITE_ALLOWED)
+        sm.state.stage = ConversationStage.READING
+
+        # Simulate reading 15 files without editing
+        for i in range(15):
+            sm.state.observed_files.add(f"file_{i}.py")
+
+        # Edge model says EXECUTION with high confidence (bias behavior)
+        decision = self._make_decision_result("execution", 0.97)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with (
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+
+            # Should calibrate to ANALYSIS despite edge model saying EXECUTION
+            assert result == (ConversationStage.ANALYSIS, 0.7)
+
+    def test_context_calibration_read_only_intent(self):
+        """Phase 2: READ_ONLY intent should bias-correct edge model EXECUTION suggestions."""
+        from unittest.mock import patch, MagicMock
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.READ_ONLY)
+        sm.state.stage = ConversationStage.ANALYSIS
+
+        # Edge model says EXECUTION
+        decision = self._make_decision_result("execution", 0.92)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with (
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            result = sm._detect_stage_with_edge_model(ConversationStage.ANALYSIS)
+
+            # Should calibrate confidence down for READ_ONLY intent
+            stage, confidence = result
+            assert stage == ConversationStage.ANALYSIS
+            assert confidence == 0.92 * 0.8  # Calibrated down
+
+    def test_context_calibration_display_only_intent(self):
+        """Phase 2: DISPLAY_ONLY intent should bias-correct edge model EXECUTION suggestions."""
+        from unittest.mock import patch, MagicMock
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.DISPLAY_ONLY)
+        sm.state.stage = ConversationStage.READING
+
+        # Edge model says EXECUTION
+        decision = self._make_decision_result("execution", 0.88)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with (
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+
+            # Should calibrate confidence down for DISPLAY_ONLY intent
+            stage, confidence = result
+            assert stage == ConversationStage.ANALYSIS  # Calibrated to ANALYSIS, not READING
+            assert confidence == 0.88 * 0.8  # Calibrated down
+
+    def test_context_calibration_no_effect_when_files_modified(self):
+        """Phase 2: Calibration should NOT apply when agent has actually modified files."""
+        from unittest.mock import patch, MagicMock
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.WRITE_ALLOWED)
+        sm.state.stage = ConversationStage.ANALYSIS
+
+        # Simulate reading 15 files AND modifying 3 of them
+        for i in range(15):
+            sm.state.observed_files.add(f"file_{i}.py")
+        for i in range(3):
+            sm.state.modified_files.add(f"file_{i}.py")
+
+        # Edge model says EXECUTION with high confidence
+        decision = self._make_decision_result("execution", 0.97)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with (
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            result = sm._detect_stage_with_edge_model(ConversationStage.ANALYSIS)
+
+            # Should NOT calibrate (agent is actually editing)
+            assert result == (ConversationStage.EXECUTION, 0.97)
+
+    def test_context_calibration_no_effect_below_threshold(self):
+        """Phase 2: Calibration should NOT apply when edge model confidence < 0.95."""
+        from unittest.mock import patch, MagicMock
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.WRITE_ALLOWED)
+        sm.state.stage = ConversationStage.READING
+
+        # Simulate reading 15 files without editing
+        for i in range(15):
+            sm.state.observed_files.add(f"file_{i}.py")
+
+        # Edge model says EXECUTION but confidence is below threshold
+        decision = self._make_decision_result("execution", 0.90)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with (
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+
+            # Should NOT calibrate (confidence below 0.95 threshold)
+            assert result == (ConversationStage.EXECUTION, 0.90)
+
+    def test_set_action_intent_method(self):
+        """Phase 2: set_action_intent() should update the intent."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.AMBIGUOUS)
+
+        # Update intent to READ_ONLY
+        sm.set_action_intent(ActionIntent.READ_ONLY)
+
+        # Intent should be updated
+        assert sm._action_intent == ActionIntent.READ_ONLY
+
+        # Update again to DISPLAY_ONLY
+        sm.set_action_intent(ActionIntent.DISPLAY_ONLY)
+
+        # Intent should be updated again
+        assert sm._action_intent == ActionIntent.DISPLAY_ONLY
+
+    def test_write_allowed_intent_no_calibration(self):
+        """Phase 2: WRITE_ALLOWED intent should NOT trigger calibration."""
+        from unittest.mock import patch, MagicMock
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.WRITE_ALLOWED)
+        sm.state.stage = ConversationStage.ANALYSIS
+
+        # Edge model says EXECUTION
+        decision = self._make_decision_result("execution", 0.95)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with (
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            result = sm._detect_stage_with_edge_model(ConversationStage.ANALYSIS)
+
+            # Should NOT calibrate (WRITE_ALLOWED permits execution)
+            assert result == (ConversationStage.EXECUTION, 0.95)
+
 
 class TestNaturalStageProgression:
     """Tests for decision pipeline reordering — natural stage progression.
@@ -830,7 +1099,17 @@ class TestNaturalStageProgression:
         assert sm.MIN_TOOLS_FOR_TRANSITION == default_min_tools
 
     def test_force_execution_after_5_reads(self):
-        """After MAX_READS_WITHOUT_EDIT reads, force READING→EXECUTION."""
+        """After MAX_READS_WITHOUT_EDIT reads, force READING→EXECUTION.
+
+        DISABLED: Force transition logic disabled in favor of UnifiedTaskTracker.
+        UnifiedTaskTracker has sophisticated loop detection:
+        - Offset-aware file read detection
+        - Task-type aware thresholds
+        - Mode-aware exploration limits
+        - Read-only loop detection (>20 files read, 0 modified)
+
+        This test now verifies that the primitive heuristic is disabled.
+        """
         sm = ConversationStateMachine()
         sm._transition_to(ConversationStage.READING, confidence=0.8)
 
@@ -838,7 +1117,8 @@ class TestNaturalStageProgression:
         for i in range(sm.MAX_READS_WITHOUT_EDIT):
             sm.state.observed_files.add(f"file_{i}.py")
 
-        assert sm._should_force_execution_transition() is True
+        # DISABLED: Force transition is disabled, trust UnifiedTaskTracker
+        assert sm._should_force_execution_transition() is False
 
 
 class TestStageRegressionPrevention:

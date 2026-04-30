@@ -1699,6 +1699,9 @@ class ToolPipeline:
                 "elapsed_time": context.get("elapsed_time", 0),
                 "timeout": context.get("timeout", 180),
                 "task_type": context.get("task_type", "unknown"),
+                "unified_task_tracker": context.get(
+                    "unified_task_tracker"
+                ),  # Phase 3: Pass UnifiedTaskTracker
             }
             checkpoint_result = self._synthesis_checkpoint.check(tool_history, task_context)
             if checkpoint_result.should_synthesize:

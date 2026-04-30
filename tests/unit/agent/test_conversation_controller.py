@@ -316,7 +316,10 @@ class TestSmartCompaction:
 
     def test_smart_compact_history_simple_strategy(self):
         """Test smart compaction with SIMPLE strategy."""
-        config = ConversationConfig(compaction_strategy=CompactionStrategy.SIMPLE)
+        config = ConversationConfig(
+            compaction_strategy=CompactionStrategy.SIMPLE,
+            compaction_threshold=0.0,  # Phase 4: Set to 0 to bypass threshold check for this test
+        )
         controller = ConversationController(config=config)
 
         # Add many messages
@@ -526,3 +529,113 @@ class TestSmartCompaction:
         assert result == [
             "[Prior context summary (relevance: 0.88)]: Preserve pending architecture findings."
         ]
+
+
+class TestPhase4CompactionFrequency:
+    """Tests for Phase 4: Fix Compaction Frequency.
+
+    Verifies that compaction respects minimum interval between compactions
+    to prevent aggressive context loss.
+    """
+
+    def test_should_compact_below_threshold(self):
+        """Test that compaction is skipped when utilization is below threshold."""
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+
+        # Utilization below threshold
+        result = controller._should_compact(0.70)
+        assert result is False
+
+    def test_should_compact_above_threshold(self):
+        """Test that compaction proceeds when utilization exceeds threshold."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = 0.0  # Long time ago
+
+        # Utilization above threshold
+        result = controller._should_compact(0.90)
+        assert result is True
+
+    def test_should_compact_respects_minimum_interval(self):
+        """Test that compaction is blocked when minimum interval not elapsed."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = time.time()  # Just compacted
+
+        # Utilization above threshold but minimum interval not elapsed
+        result = controller._should_compact(0.90)
+        assert result is False
+
+    def test_should_compact_after_minimum_interval(self):
+        """Test that compaction proceeds after minimum interval elapses."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = time.time() - 70.0  # 70 seconds ago (> 60s minimum)
+
+        # Utilization above threshold and minimum interval elapsed
+        result = controller._should_compact(0.90)
+        assert result is True
+
+    def test_compaction_interval_constant(self):
+        """Test that MIN_COMPACTION_INTERVAL_SECONDS is set correctly."""
+        controller = ConversationController()
+        assert controller.MIN_COMPACTION_INTERVAL_SECONDS == 60.0
+
+    def test_smart_compact_checks_interval(self):
+        """Test that smart_compact_history respects minimum interval."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = time.time()  # Just compacted
+
+        # Add many messages to trigger compaction
+        for i in range(20):
+            controller.add_message("user", f"Message {i}")
+
+        # smart_compact_history should return 0 (blocked by minimum interval)
+        removed = controller.smart_compact_history(target_messages=5)
+        assert removed == 0
+
+    def test_smart_compact_updates_last_compaction_time(self):
+        """Test that smart_compact_history updates _last_compaction_time."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.0  # Set to 0 to always trigger compaction
+        controller._last_compaction_time = 0.0  # Long time ago
+
+        # Add many messages to trigger compaction
+        for i in range(20):
+            controller.add_message("user", f"Message {i}")
+
+        # Get initial time
+        initial_time = controller._last_compaction_time
+        assert initial_time == 0.0
+
+        # Compact (should update _last_compaction_time)
+        removed = controller.smart_compact_history(target_messages=5)
+
+        # Verify _last_compaction_time was updated
+        assert controller._last_compaction_time > initial_time
+        assert removed > 0  # Compaction should have occurred
+
+    def test_compaction_threshold_config_default(self):
+        """Test that compaction_threshold has correct default value."""
+        controller = ConversationController()
+        assert controller.config.compaction_threshold == 0.85
+
+    def test_compaction_threshold_config_custom(self):
+        """Test that compaction_threshold can be customized."""
+        from victor.agent.conversation.controller import ConversationConfig
+
+        config = ConversationConfig(compaction_threshold=0.90)
+        controller = ConversationController(config=config)
+        assert controller.config.compaction_threshold == 0.90

@@ -133,6 +133,9 @@ class ConversationConfig:
     enable_stage_tracking: bool = True
     enable_context_monitoring: bool = True
     compaction_strategy: CompactionStrategy = CompactionStrategy.TIERED
+    compaction_threshold: float = (
+        0.85  # Phase 4: Utilization threshold for triggering compaction (85%)
+    )
     min_messages_to_keep: int = 6
     tool_result_retention_weight: float = COMPACTION_CONFIG.tool_result_retention_weight
     recent_message_weight: float = COMPACTION_CONFIG.recent_message_weight
@@ -148,6 +151,15 @@ class ConversationConfig:
 
 
 class ConversationController:
+    """Controls conversation state, history, and context management.
+
+    Phase 4 Enhancement: Added minimum interval between compactions to prevent
+    aggressive context loss. Compaction now requires both threshold overflow AND
+    minimum time elapsed (MIN_COMPACTION_INTERVAL_SECONDS).
+    """
+
+    # Phase 4: Minimum interval between compactions (prevents aggressive compaction)
+    MIN_COMPACTION_INTERVAL_SECONDS: float = 60.0
 
     def __init__(
         self,
@@ -178,6 +190,8 @@ class ConversationController:
         self._current_plan: Optional[Any] = None
         self._context_reminder_manager = context_reminder_manager
         self._hierarchical_manager = hierarchical_manager
+        # Phase 4: Track last compaction time for minimum interval enforcement
+        self._last_compaction_time: float = 0.0
         # PromptNormalizer for input deduplication (DIP compliance)
         self._normalizer = prompt_normalizer or get_prompt_normalizer()
         # Token accounting: actual API-returned token counts replace char estimation
@@ -445,6 +459,40 @@ class ConversationController:
         logger.info(f"Compacted history: removed {removed} messages")
         return removed
 
+    def _should_compact(self, current_utilization: float) -> bool:
+        """Check if compaction should be triggered based on threshold and minimum interval.
+
+        Phase 4 Enhancement: Compaction now requires BOTH:
+        1. Context utilization exceeds threshold
+        2. Minimum time elapsed since last compaction (MIN_COMPACTION_INTERVAL_SECONDS)
+
+        This prevents aggressive compaction that causes context loss and maintains
+        conversation continuity.
+
+        Args:
+            current_utilization: Current context utilization (0.0 to 1.0)
+
+        Returns:
+            True if compaction should proceed, False otherwise
+        """
+        import time
+
+        # Check threshold first (cheap check)
+        if current_utilization < self.config.compaction_threshold:
+            return False
+
+        # Check minimum interval (prevents aggressive compaction)
+        time_since_last = time.time() - self._last_compaction_time
+        if time_since_last < self.MIN_COMPACTION_INTERVAL_SECONDS:
+            logger.debug(
+                f"Compaction blocked: only {time_since_last:.1f}s since last compaction "
+                f"(need {self.MIN_COMPACTION_INTERVAL_SECONDS}s). "
+                f"Utilization={current_utilization:.2f}, threshold={self.config.compaction_threshold:.2f}"
+            )
+            return False
+
+        return True
+
     def smart_compact_history(
         self,
         target_messages: Optional[int] = None,
@@ -470,6 +518,17 @@ class ConversationController:
         Returns:
             Number of messages removed
         """
+        # Phase 4: Check if compaction should proceed (threshold + minimum interval)
+        # Calculate current context utilization
+        metrics = self.get_context_metrics()
+        current_utilization = metrics.utilization
+        if not self._should_compact(current_utilization):
+            return 0
+
+        import time
+
+        self._last_compaction_time = time.time()  # Update last compaction time
+
         # Use task-specific config if available
         if task_type and task_type in TASK_COMPACTION_CONFIGS:
             task_config = TASK_COMPACTION_CONFIGS[task_type]

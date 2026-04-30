@@ -316,6 +316,7 @@ class ConversationStateMachine:
         event_bus: Optional[ObservabilityBus] = None,
         state_manager: Optional[Any] = None,
         runtime_intelligence: Optional[Any] = None,
+        action_intent: Optional[Any] = None,
     ) -> None:
         """Initialize the state machine.
 
@@ -328,6 +329,7 @@ class ConversationStateMachine:
                           If provided, state will be synced to the manager.
             runtime_intelligence: Optional canonical runtime-intelligence service for
                 stage-detection augmentation.
+            action_intent: Optional ActionIntent for context-aware calibration.
         """
         self.state = ConversationState()
         self._last_transition_time: float = 0.0
@@ -341,6 +343,7 @@ class ConversationStateMachine:
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
         self._runtime_intelligence = runtime_intelligence
+        self._action_intent = action_intent  # PHASE 2: For context-aware calibration
 
         # Edge model decision cache — avoid repeated calls with same input
         # Key: stage_value:message_prefix → (result_stage, confidence, timestamp)
@@ -513,6 +516,21 @@ class ConversationStateMachine:
             "recommended_tools": list(self.get_stage_tools()),
         }
 
+    def set_action_intent(self, intent: Any) -> None:
+        """Update the action intent for context-aware calibration.
+
+        Phase 2 Enhancement: Allows dynamic intent updates for edge model calibration.
+        The intent is used to bias-correct edge model decisions (e.g., READ_ONLY tasks
+        should not transition to EXECUTION even if edge model suggests it).
+
+        Args:
+            intent: ActionIntent enum value (WRITE_ALLOWED, READ_ONLY, DISPLAY_ONLY, etc.)
+        """
+        from victor.agent.action_authorizer import ActionIntent
+
+        self._action_intent = intent
+        logger.debug(f"ActionIntent updated: {intent.value if intent else None}")
+
     def _detect_stage_from_content(self, content: str) -> Optional[ConversationStage]:
         """Detect stage from message content using configurable strategy order.
 
@@ -671,6 +689,51 @@ class ConversationStateMachine:
                 "completion": ConversationStage.COMPLETION,
             }
             result = stage_map.get(stage_name)
+
+            # ============================================================================
+            # PHASE 2: Context-Aware Calibration
+            # Calibrate edge model results based on actual behavior, not counting
+            # ============================================================================
+            if result == ConversationStage.EXECUTION and confidence >= 0.95:
+                files_read = len(self.state.observed_files)
+                files_modified = len(self.state.modified_files)
+
+                # If reading many files without editing, distrust EXECUTION
+                # This happens when edge model is overconfident or biased
+                if files_read > 10 and files_modified == 0:
+                    logger.warning(
+                        f"Edge model calibration: {stage_name} ({confidence:.2f}) → ANALYSIS. "
+                        f"Reason: Agent has read {files_read} files without any edits. "
+                        f"High confidence EXECUTION is likely biased/overconfident."
+                    )
+                    return ConversationStage.ANALYSIS, 0.7
+
+            # Correct for intent bias
+            if self._action_intent and result:
+                from victor.agent.action_authorizer import ActionIntent
+
+                # Read-only tasks shouldn't be in EXECUTION stage
+                if (
+                    self._action_intent == ActionIntent.READ_ONLY
+                    and result == ConversationStage.EXECUTION
+                ):
+                    logger.warning(
+                        f"Edge model calibration: {stage_name} ({confidence:.2f}) → ANALYSIS. "
+                        f"Reason: Task intent is READ_ONLY, EXECUTION is inappropriate."
+                    )
+                    return ConversationStage.ANALYSIS, confidence * 0.8
+
+                # Display-only tasks shouldn't be in EXECUTION stage
+                if (
+                    self._action_intent == ActionIntent.DISPLAY_ONLY
+                    and result == ConversationStage.EXECUTION
+                ):
+                    logger.warning(
+                        f"Edge model calibration: {stage_name} ({confidence:.2f}) → ANALYSIS. "
+                        f"Reason: Task intent is DISPLAY_ONLY, EXECUTION is inappropriate."
+                    )
+                    return ConversationStage.ANALYSIS, confidence * 0.8
+
             if result:
                 logger.info(f"Edge stage detection: {stage_name} (confidence={confidence:.2f})")
             return result, confidence
@@ -764,9 +827,37 @@ class ConversationStateMachine:
         return None
 
     def _maybe_transition(self) -> None:
-        """Check if we should transition to a new stage."""
-        # Force READING → EXECUTION if we've read too many files without editing
-        # This prevents infinite exploration in SWE-bench style bug fix tasks
+        """Check if we should transition to a new stage.
+
+        Refined optimization (Phase 1):
+        - Check cooldown FIRST before any expensive operations
+        - Only call edge model when heuristic is uncertain
+        - Skip edge model calls that won't change outcome
+        """
+        import time
+
+        # ============================================================================
+        # FIX 1.1: Check cooldown FIRST before ANY expensive operations
+        # Prevents 80%+ of edge model calls by skipping during cooldown period
+        # ============================================================================
+        current_time = time.time()
+        time_since_last = current_time - self._last_transition_time
+
+        if time_since_last < self.TRANSITION_COOLDOWN_SECONDS:
+            logger.debug(
+                f"_maybe_transition: In cooldown ({time_since_last:.1f}s < "
+                f"{self.TRANSITION_COOLDOWN_SECONDS}s), skipping all checks including edge model"
+            )
+            return  # Early exit - don't call edge model, don't check anything
+
+        # DISABLED: Trust UnifiedTaskTracker's sophisticated loop detection instead
+        # UnifiedTaskTracker has:
+        # - Offset-aware file read detection (distinguishes different offsets)
+        # - Task-type aware thresholds (different for EDIT vs. ANALYZE tasks)
+        # - Mode-aware exploration limits (adaptive mode support)
+        # - Signature-based deduplication with permanent blocking
+        # - Read-only loop detection (>20 files read, 0 modified)
+        # Primitive counting is redundant and inferior.
         if self._should_force_execution_transition():
             logger.info(
                 f"Forcing READING→EXECUTION: {len(self.state.observed_files)} files read, "
@@ -775,44 +866,62 @@ class ConversationStateMachine:
             self._transition_to(ConversationStage.EXECUTION, confidence=0.8)
             return
 
+        # ============================================================================
+        # FIX 1.2: Only call edge model when heuristic is uncertain
+        # Reduces edge model calls by 90%+ by skipping when heuristic is confident
+        # ============================================================================
         detected = self._detect_stage_from_tools()
         if detected and detected != self.state.stage:
-            # Only transition if we have strong evidence
             stage_tools = self._get_tools_for_stage(detected)
             recent_overlap = len(set(self.state.last_tools) & stage_tools)
 
             logger.debug(
                 f"_maybe_transition: current={self.state.stage.name}, detected={detected.name}, "
-                f"recent_overlap={recent_overlap}, min_threshold={self.MIN_TOOLS_FOR_TRANSITION}, "
+                f"overlap={recent_overlap}, min_threshold={self.MIN_TOOLS_FOR_TRANSITION}, "
                 f"stage_tools_count={len(stage_tools)}"
             )
 
-            # Use class constant for minimum tools threshold
+            # HIGH CONFIDENCE: Heuristic is certain, skip edge model
+            # When overlap >= MIN_TOOLS_FOR_TRANSITION (3), we have strong evidence
+            # No need to call expensive edge model
             if recent_overlap >= self.MIN_TOOLS_FOR_TRANSITION:
-                self._transition_to(detected, confidence=0.6 + (recent_overlap * 0.1))
-            else:
-                # Heuristic uncertain — consult edge model only if in chain
-                from victor.agent.decisions.chain import should_use_llm
-
-                heuristic_confidence = 0.6 + (recent_overlap * 0.1)
-                if not should_use_llm("stage_detection"):
-                    logger.debug("_maybe_transition: LLM not in chain, skipping edge tiebreaker")
-                    return
-
-                edge_stage, edge_confidence = self._try_edge_model_transition(
-                    detected, heuristic_confidence
+                confidence = 0.6 + (recent_overlap * 0.1)
+                logger.debug(
+                    f"_maybe_transition: High heuristic confidence ({confidence:.2f}), "
+                    f"skipping edge model call and transitioning directly"
                 )
-                if edge_stage is not None and edge_confidence > heuristic_confidence:
-                    logger.info(
-                        f"Edge model override: {detected.name}→{edge_stage.name} "
-                        f"(edge={edge_confidence:.2f} > heuristic={heuristic_confidence:.2f})"
-                    )
-                    self._transition_to(edge_stage, confidence=edge_confidence)
-                else:
-                    logger.debug(
-                        f"_maybe_transition: Transition blocked - overlap {recent_overlap} "
-                        f"< threshold {self.MIN_TOOLS_FOR_TRANSITION}, edge model did not override"
-                    )
+                self._transition_to(detected, confidence=confidence)
+                return
+
+            # LOW CONFIDENCE: Consult edge model only when uncertain
+            # When overlap < MIN_TOOLS_FOR_TRANSITION, heuristic is uncertain
+            # Edge model provides valuable tiebreaker in this case
+            logger.debug(
+                f"_maybe_transition: Low heuristic confidence (overlap={recent_overlap} < "
+                f"{self.MIN_TOOLS_FOR_TRANSITION}), consulting edge model for tiebreaker"
+            )
+
+            # Check if edge model is in decision chain
+            from victor.agent.decisions.chain import should_use_llm
+
+            if not should_use_llm("stage_detection"):
+                logger.debug("_maybe_transition: Edge model not in chain, keeping current stage")
+                return
+
+            edge_stage, edge_confidence = self._try_edge_model_transition(
+                detected, heuristic_confidence=0.6 + (recent_overlap * 0.1)
+            )
+            if edge_stage is not None and edge_confidence > 0.6:
+                logger.info(
+                    f"Edge model override: {detected.name}→{edge_stage.name} "
+                    f"(edge={edge_confidence:.2f} > heuristic=0.6)"
+                )
+                self._transition_to(edge_stage, confidence=edge_confidence)
+            else:
+                logger.debug(
+                    f"_maybe_transition: Edge model declined (confidence={edge_confidence:.2f}), "
+                    f"keeping current stage {self.state.stage.name}"
+                )
 
     def _try_edge_model_transition(
         self,
@@ -845,35 +954,23 @@ class ConversationStateMachine:
     def _should_force_execution_transition(self) -> bool:
         """Check if we should force transition from READING to EXECUTION.
 
-        Conditions:
-        1. Current stage is READING (or ANALYSIS)
-        2. We've observed many files (> MAX_READS_WITHOUT_EDIT)
-        3. We haven't modified any files yet
+        DISABLED: Trust UnifiedTaskTracker's sophisticated loop detection instead.
 
-        This prevents the agent from getting stuck in endless exploration
-        for SWE-bench style bug fix tasks.
+        UnifiedTaskTracker already handles:
+        - Read-only loop detection (>20 files read, 0 modified)
+        - File read overlap detection (same offset/limit repeated)
+        - Search query repetition (similar searches)
+        - Signature-based deduplication (permanent blocking after warning)
+        - Task-type aware thresholds (different for EDIT vs. ANALYZE)
+        - Mode-aware limits (exploration multiplier)
+
+        Primitive counting (consecutive reads, unique files) is redundant and inferior.
 
         Returns:
-            True if we should force transition to EXECUTION
+            False (disabled - trust UnifiedTaskTracker)
         """
-        # Only force from READING or ANALYSIS stages
-        if self.state.stage not in {
-            ConversationStage.READING,
-            ConversationStage.ANALYSIS,
-        }:
-            return False
-
-        # Only force if we've read many files but haven't edited any
-        files_read = len(self.state.observed_files)
-        files_modified = len(self.state.modified_files)
-
-        if files_read >= self.MAX_READS_WITHOUT_EDIT and files_modified == 0:
-            logger.debug(
-                f"_should_force_execution: files_read={files_read} >= {self.MAX_READS_WITHOUT_EDIT}, "
-                f"files_modified={files_modified}"
-            )
-            return True
-
+        # DISABLED: Trust UnifiedTaskTracker's sophisticated loop detection
+        # This primitive heuristic is redundant with UnifiedTaskTracker's superior detection
         return False
 
     def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5) -> None:

@@ -28,6 +28,7 @@ from victor.agent.synthesis_checkpoint import (
     TimeoutApproachingCheckpoint,
     NoProgressCheckpoint,
     ErrorRateCheckpoint,
+    UnifiedTaskTrackerCheckpoint,  # Phase 3: New checkpoint
     CompositeSynthesisCheckpoint,
     create_default_checkpoint,
     create_aggressive_checkpoint,
@@ -393,10 +394,14 @@ class TestFactoryFunctions:
     """Tests for factory functions."""
 
     def test_create_default_checkpoint(self):
-        """Test default checkpoint creation."""
+        """Test default checkpoint creation.
+
+        Phase 3: Checkpoint count reduced from 6 to 4 (replaced 3 primitive checkpoints
+        with 1 UnifiedTaskTrackerCheckpoint).
+        """
         checkpoint = create_default_checkpoint()
         assert isinstance(checkpoint, CompositeSynthesisCheckpoint)
-        assert len(checkpoint._checkpoints) == 6
+        assert len(checkpoint._checkpoints) == 4  # Phase 3: Was 6, now 4
 
     def test_create_aggressive_checkpoint(self):
         """Test aggressive checkpoint has lower thresholds."""
@@ -482,3 +487,181 @@ class TestEdgeCases:
         result = checkpoint.check(history, {})
         # Empty tool names shouldn't falsely trigger
         assert result.should_synthesize is False
+
+
+class TestUnifiedTaskTrackerCheckpoint:
+    """Tests for UnifiedTaskTrackerCheckpoint (Phase 3 enhancement)."""
+
+    def test_checkpoint_without_tracker(self):
+        """Test checkpoint returns no-synthesis when UnifiedTaskTracker not available."""
+        from unittest.mock import MagicMock
+
+        checkpoint = UnifiedTaskTrackerCheckpoint()
+        history = [{"tool": "read"}, {"tool": "grep"}]
+        context = {}  # No unified_task_tracker in context
+
+        result = checkpoint.check(history, context)
+
+        assert result.should_synthesize is False
+        assert "not available" in result.reason
+
+    def test_checkpoint_with_no_loop_warning(self):
+        """Test checkpoint when UnifiedTaskTracker detects no loop."""
+        from unittest.mock import MagicMock
+
+        mock_tracker = MagicMock()
+        mock_tracker.check_loop_warning.return_value = None  # No loop
+
+        checkpoint = UnifiedTaskTrackerCheckpoint(tracker=mock_tracker)
+        history = [{"tool": "read"}, {"tool": "grep"}]
+        context = {}
+
+        result = checkpoint.check(history, context)
+
+        assert result.should_synthesize is False
+        assert "No loop detected" in result.reason
+        mock_tracker.check_loop_warning.assert_called_once()
+
+    def test_checkpoint_with_loop_warning(self):
+        """Test checkpoint triggers synthesis when UnifiedTaskTracker detects loop."""
+        from unittest.mock import MagicMock
+
+        mock_tracker = MagicMock()
+        mock_tracker.check_loop_warning.return_value = "Approaching loop (2/3): read|file.py|0|100"
+
+        checkpoint = UnifiedTaskTrackerCheckpoint(tracker=mock_tracker)
+        history = [{"tool": "read"}, {"tool": "grep"}]
+        context = {}
+
+        result = checkpoint.check(history, context)
+
+        assert result.should_synthesize is True
+        assert "UnifiedTaskTracker loop detection" in result.reason
+        assert "Approaching loop" in result.reason
+        assert result.priority == 9  # High priority for loops
+        assert result.suggested_prompt is not None
+        assert "synthesize" in result.suggested_prompt.lower()
+
+    def test_checkpoint_gets_tracker_from_context(self):
+        """Test checkpoint can get UnifiedTaskTracker from task_context."""
+        from unittest.mock import MagicMock
+
+        mock_tracker = MagicMock()
+        mock_tracker.check_loop_warning.return_value = None
+
+        checkpoint = UnifiedTaskTrackerCheckpoint()  # No tracker passed to __init__
+        history = [{"tool": "read"}]
+        context = {"unified_task_tracker": mock_tracker}
+
+        result = checkpoint.check(history, context)
+
+        assert result.should_synthesize is False
+        mock_tracker.check_loop_warning.assert_called_once()
+
+    def test_checkpoint_handles_exception_gracefully(self):
+        """Test checkpoint handles UnifiedTaskTracker exceptions gracefully."""
+        from unittest.mock import MagicMock
+
+        mock_tracker = MagicMock()
+        mock_tracker.check_loop_warning.side_effect = Exception("Tracker error")
+
+        checkpoint = UnifiedTaskTrackerCheckpoint(tracker=mock_tracker)
+        history = [{"tool": "read"}]
+        context = {}
+
+        result = checkpoint.check(history, context)
+
+        # Should not raise, should return error result
+        assert result.should_synthesize is False
+        assert "error" in result.reason.lower()
+
+    def test_checkpoint_name(self):
+        """Test checkpoint has correct name."""
+        checkpoint = UnifiedTaskTrackerCheckpoint()
+        assert checkpoint.name == "unified_task_tracker"
+
+
+class TestPhase3CheckpointFactoryUpdates:
+    """Tests for Phase 3 updates to factory functions.
+
+    Verifies that create_default_checkpoint, create_aggressive_checkpoint, and
+    create_relaxed_checkpoint now use UnifiedTaskTrackerCheckpoint instead of
+    primitive heuristic checkpoints (DuplicateTool, SimilarArgs, NoProgress).
+    """
+
+    def test_default_checkpoint_uses_unified_tracker(self):
+        """Test default checkpoint includes UnifiedTaskTrackerCheckpoint."""
+        checkpoint = create_default_checkpoint()
+
+        # Should include UnifiedTaskTrackerCheckpoint
+        has_unified = any(
+            isinstance(c, UnifiedTaskTrackerCheckpoint) for c in checkpoint._checkpoints
+        )
+        assert has_unified, "Default checkpoint should include UnifiedTaskTrackerCheckpoint"
+
+        # Should NOT include primitive checkpoints
+        has_duplicate = any(isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints)
+        has_similar = any(isinstance(c, SimilarArgsCheckpoint) for c in checkpoint._checkpoints)
+        has_no_progress = any(isinstance(c, NoProgressCheckpoint) for c in checkpoint._checkpoints)
+
+        assert (
+            not has_duplicate
+        ), "Should not include DuplicateToolCheckpoint (replaced by UnifiedTaskTracker)"
+        assert (
+            not has_similar
+        ), "Should not include SimilarArgsCheckpoint (replaced by UnifiedTaskTracker)"
+        assert (
+            not has_no_progress
+        ), "Should not include NoProgressCheckpoint (replaced by UnifiedTaskTracker)"
+
+        # Should still include unique-value checkpoints
+        has_tool_count = any(isinstance(c, ToolCountCheckpoint) for c in checkpoint._checkpoints)
+        has_timeout = any(
+            isinstance(c, TimeoutApproachingCheckpoint) for c in checkpoint._checkpoints
+        )
+        has_error_rate = any(isinstance(c, ErrorRateCheckpoint) for c in checkpoint._checkpoints)
+
+        assert has_tool_count, "Should include ToolCountCheckpoint (unique value)"
+        assert has_timeout, "Should include TimeoutApproachingCheckpoint (unique value)"
+        assert has_error_rate, "Should include ErrorRateCheckpoint (unique value)"
+
+    def test_aggressive_checkpoint_uses_unified_tracker(self):
+        """Test aggressive checkpoint includes UnifiedTaskTrackerCheckpoint."""
+        checkpoint = create_aggressive_checkpoint()
+
+        # Should include UnifiedTaskTrackerCheckpoint
+        has_unified = any(
+            isinstance(c, UnifiedTaskTrackerCheckpoint) for c in checkpoint._checkpoints
+        )
+        assert has_unified
+
+        # Should NOT include primitive checkpoints
+        has_duplicate = any(isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints)
+        assert not has_duplicate
+
+    def test_relaxed_checkpoint_uses_unified_tracker(self):
+        """Test relaxed checkpoint includes UnifiedTaskTrackerCheckpoint."""
+        checkpoint = create_relaxed_checkpoint()
+
+        # Should include UnifiedTaskTrackerCheckpoint
+        has_unified = any(
+            isinstance(c, UnifiedTaskTrackerCheckpoint) for c in checkpoint._checkpoints
+        )
+        assert has_unified
+
+        # Should NOT include primitive checkpoints
+        has_duplicate = any(isinstance(c, DuplicateToolCheckpoint) for c in checkpoint._checkpoints)
+        assert not has_duplicate
+
+    def test_checkpoint_count_reduced(self):
+        """Test that replacing 3 primitive checkpoints with 1 UnifiedTaskTracker reduces count."""
+        default = create_default_checkpoint()
+
+        # Phase 3: 4 checkpoints (was 6 before Phase 3)
+        # Removed: DuplicateTool, SimilarArgs, NoProgress (3 checkpoints)
+        # Added: UnifiedTaskTrackerCheckpoint (1 checkpoint)
+        # Kept: ToolCount, TimeoutApproaching, ErrorRate (3 checkpoints)
+        # Total: 4 checkpoints
+        assert (
+            len(default._checkpoints) == 4
+        ), f"Expected 4 checkpoints, got {len(default._checkpoints)}"
