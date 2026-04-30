@@ -444,7 +444,7 @@ mod tests {
         let count = count_tokens_fast("the quick brown fox jumps");
         // 5 words, each short — should be roughly 5 tokens.
         assert!(
-            count >= 4 && count <= 8,
+            (4..=8).contains(&count),
             "expected ~5 tokens, got {}",
             count
         );

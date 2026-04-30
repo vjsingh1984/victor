@@ -228,7 +228,7 @@ pub fn repair_quotes(value: &str) -> String {
 /// Smart quote replacement preserving string content.
 fn smart_quote_replace(value: &str) -> String {
     let mut result = String::with_capacity(value.len() + 10);
-    let mut chars = value.chars().peekable();
+    let chars = value.chars().peekable();
     let mut in_string = false;
     let mut string_char = '"';
     let mut prev_was_escape = false;
@@ -301,7 +301,7 @@ fn repair_trailing_comma(value: &str) -> String {
 
         if !in_string && c == ',' {
             // Look ahead for } or ]
-            let mut peek_chars = chars.clone();
+            let peek_chars = chars.clone();
             let mut found_closing = false;
             for pc in peek_chars {
                 if pc.is_whitespace() {
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_coerce_null() {
-        let (t, v, c) = coerce_string_type("null");
+        let (t, _v, c) = coerce_string_type("null");
         assert_eq!(t, "null");
         assert_eq!(c, 1.0);
 
