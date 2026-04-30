@@ -64,6 +64,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Import fuzzy matching for robust typo-tolerant tool selection
+try:
+    from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
+    _FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    _FUZZY_MATCHING_AVAILABLE = False
+
 _PREFERRED_SEQUENCE_TOOL_ALIASES = {
     "read": "read_file",
     "write": "write_file",
@@ -769,18 +776,36 @@ class SemanticToolSelector:
         return list(set(relevant_tools))
 
     def _is_analysis_query(self, query: str) -> bool:
-        """Heuristic check for analysis/review intents."""
+        """Heuristic check for analysis/review intents with fuzzy matching for typos."""
         query_lower = query.lower()
-        analysis_keywords = [
-            "analyze",
-            "analysis",
-            "review",
-            "check",
-            "scan",
-            "audit",
-            "inspect",
-        ]
-        return any(kw in query_lower for kw in analysis_keywords)
+
+        # Use fuzzy matching if available
+        if _FUZZY_MATCHING_AVAILABLE:
+            analysis_keywords = {
+                "analyze": 1.0,
+                "analysis": 1.0,
+                "review": 1.0,
+                "check": 1.0,
+                "scan": 1.0,
+                "audit": 1.0,
+                "inspect": 1.0,
+                "examine": 1.0,
+                "investigate": 1.0,
+            }
+            matches, _ = match_keywords_cascading(query_lower, analysis_keywords, use_fuzzy=True)
+            return len(matches) > 0
+        else:
+            # Fallback to exact matching
+            analysis_keywords = [
+                "analyze",
+                "analysis",
+                "review",
+                "check",
+                "scan",
+                "audit",
+                "inspect",
+            ]
+            return any(kw in query_lower for kw in analysis_keywords)
 
     def _extract_pending_actions(self, conversation_history: List[Dict[str, Any]]) -> List[str]:
         """Extract actions mentioned in original request but not yet completed.

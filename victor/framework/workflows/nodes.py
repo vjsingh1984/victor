@@ -73,9 +73,10 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
-import inspect
+import warnings
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -580,11 +581,33 @@ class TeamStep:
         )
 
 
-# Backward-compatible aliases. ``TeamStep`` / ``TeamStepConfig`` are the
-# preferred names because this workflow surface is an adapter step that invokes
-# a team runtime, not a distinct graph-runtime primitive.
-TeamNodeConfig = TeamStepConfig
-TeamNode = TeamStep
+_DEPRECATED_ALIAS_MAP = {
+    "TeamNode": TeamStep,
+    "TeamNodeConfig": TeamStepConfig,
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_ALIAS_MAP:
+        warnings.warn(
+            f"{name} is deprecated; use "
+            f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
+            "The TeamNode* compatibility aliases remain during the current "
+            "migration window and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED_ALIAS_MAP[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> List[str]:
+    return sorted(set(globals()) | set(_DEPRECATED_ALIAS_MAP))
+
+
+if TYPE_CHECKING:
+    TeamNode = TeamStep
+    TeamNodeConfig = TeamStepConfig
 
 
 __all__ = [

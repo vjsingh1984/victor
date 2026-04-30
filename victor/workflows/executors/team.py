@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import time
+import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -181,5 +182,24 @@ class TeamStepExecutor:
         return node_type == "team"
 
 
-# Backward-compatible alias for existing imports.
-TeamNodeExecutor = TeamStepExecutor
+_DEPRECATED_ALIAS_MAP = {
+    "TeamNodeExecutor": TeamStepExecutor,
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_ALIAS_MAP:
+        warnings.warn(
+            f"{name} is deprecated; use "
+            f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
+            "The TeamNode* compatibility aliases remain during the current "
+            "migration window and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED_ALIAS_MAP[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_DEPRECATED_ALIAS_MAP))

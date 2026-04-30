@@ -119,6 +119,8 @@ dev = [
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
+    # Fuzzy matching for robust classification
+    "Levenshtein>=0.25.1",  # Fast C implementation for typo tolerance
     # Testing
     "pytest>=8.0",
     "pytest-asyncio>=0.23",

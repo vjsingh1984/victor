@@ -20,22 +20,36 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 
 import victor.framework.workflows.nodes as nodes_module
-from victor.framework.workflows.nodes import TeamNode, TeamNodeConfig, TeamStep, TeamStepConfig
+from victor.framework.workflows.nodes import TeamStep, TeamStepConfig
 from victor.framework.state_merging import MergeMode, StateMergeError
 from victor.teams.types import TeamFormation, TeamMember
 from victor.agent.subagents import SubAgentRole
 
 
-class TestTeamNodeConfig:
-    """Tests for TeamNodeConfig dataclass."""
+class TestTeamStepCompatibilityAliases:
+    """Tests for deprecated TeamNode* compatibility aliases."""
 
     def test_preferred_aliases(self):
-        """The step terminology is preferred, but legacy aliases remain."""
-        assert TeamStepConfig is TeamNodeConfig
+        """Legacy config alias emits a deprecation warning and maps to TeamStepConfig."""
+        with pytest.warns(DeprecationWarning, match="TeamNodeConfig"):
+            alias = nodes_module.TeamNodeConfig
+
+        assert TeamStepConfig is alias
+
+    def test_preferred_step_alias(self):
+        """Legacy step alias emits a deprecation warning and maps to TeamStep."""
+        with pytest.warns(DeprecationWarning, match="TeamNode"):
+            alias = nodes_module.TeamNode
+
+        assert TeamStep is alias
+
+
+class TestTeamStepConfig:
+    """Tests for TeamStepConfig dataclass."""
 
     def test_default_config(self):
         """Test creating default config."""
-        config = TeamNodeConfig()
+        config = TeamStepConfig()
 
         assert config.timeout_seconds is None
         assert config.merge_strategy == "dict"
@@ -47,7 +61,7 @@ class TestTeamNodeConfig:
 
     def test_custom_config(self):
         """Test creating custom config."""
-        config = TeamNodeConfig(
+        config = TeamStepConfig(
             timeout_seconds=300,
             merge_strategy="list",
             merge_mode=MergeMode.GRAPH_WINS,
@@ -66,12 +80,8 @@ class TestTeamNodeConfig:
         assert config.required_keys == ["key1", "key2"]
 
 
-class TestTeamNode:
-    """Tests for TeamNode class."""
-
-    def test_preferred_step_alias(self):
-        """The workflow adapter now prefers TeamStep terminology."""
-        assert TeamStep is TeamNode
+class TestTeamStep:
+    """Tests for TeamStep."""
 
     @pytest.fixture
     def sample_members(self):
@@ -95,8 +105,8 @@ class TestTeamNode:
 
     @pytest.fixture
     def sample_config(self):
-        """Create sample team node config."""
-        return TeamNodeConfig(
+        """Create sample team-step config."""
+        return TeamStepConfig(
             timeout_seconds=300,
             merge_strategy="dict",
             merge_mode=MergeMode.TEAM_WINS,
@@ -104,9 +114,9 @@ class TestTeamNode:
         )
 
     @pytest.fixture
-    def sample_team_node(self, sample_members, sample_config):
-        """Create a sample TeamNode."""
-        return TeamNode(
+    def sample_team_step(self, sample_members, sample_config):
+        """Create a sample TeamStep."""
+        return TeamStep(
             id="test_team",
             name="Test Team",
             goal="Test goal",
@@ -117,19 +127,19 @@ class TestTeamNode:
             total_tool_budget=50,
         )
 
-    def test_team_node_creation(self, sample_team_node):
-        """Test creating a TeamNode."""
-        assert sample_team_node.id == "test_team"
-        assert sample_team_node.name == "Test Team"
-        assert sample_team_node.goal == "Test goal"
-        assert sample_team_node.team_formation == TeamFormation.SEQUENTIAL
-        assert len(sample_team_node.members) == 2
-        assert sample_team_node.max_iterations == 30
-        assert sample_team_node.total_tool_budget == 50
+    def test_team_step_creation(self, sample_team_step):
+        """Test creating a TeamStep."""
+        assert sample_team_step.id == "test_team"
+        assert sample_team_step.name == "Test Team"
+        assert sample_team_step.goal == "Test goal"
+        assert sample_team_step.team_formation == TeamFormation.SEQUENTIAL
+        assert len(sample_team_step.members) == 2
+        assert sample_team_step.max_iterations == 30
+        assert sample_team_step.total_tool_budget == 50
 
-    def test_team_node_to_dict(self, sample_team_node):
-        """Test serializing TeamNode to dictionary."""
-        data = sample_team_node.to_dict()
+    def test_team_step_to_dict(self, sample_team_step):
+        """Test serializing TeamStep to dictionary."""
+        data = sample_team_step.to_dict()
 
         assert data["id"] == "test_team"
         assert data["name"] == "Test Team"
@@ -140,8 +150,8 @@ class TestTeamNode:
         assert data["max_iterations"] == 30
         assert data["total_tool_budget"] == 50
 
-    def test_team_node_from_dict(self):
-        """Test deserializing TeamNode from dictionary."""
+    def test_team_step_from_dict(self):
+        """Test deserializing TeamStep from dictionary."""
         data = {
             "id": "test_team",
             "name": "Test Team",
@@ -173,7 +183,7 @@ class TestTeamNode:
             "total_tool_budget": 50,
         }
 
-        node = TeamNode.from_dict(data)
+        node = TeamStep.from_dict(data)
 
         assert node.id == "test_team"
         assert node.name == "Test Team"
@@ -188,7 +198,7 @@ class TestTeamNode:
     def test_build_goal_with_substitution(self, sample_members, sample_config):
         """Test building goal with context variable substitution."""
         # Create a node with goal containing placeholders
-        node = TeamNode(
+        node = TeamStep(
             id="test_team",
             name="Test Team",
             goal="Work on: ${user_task} with priority: ${priority}",
@@ -210,7 +220,7 @@ class TestTeamNode:
         assert "Implement feature X" in goal
         assert "high" in goal
 
-    def test_extract_context(self, sample_team_node):
+    def test_extract_context(self, sample_team_step):
         """Test extracting context from graph state."""
         graph_state = {
             "user_task": "Implement X",
@@ -218,7 +228,7 @@ class TestTeamNode:
             "_task": "task",
         }
 
-        context = sample_team_node._extract_context(graph_state)
+        context = sample_team_step._extract_context(graph_state)
 
         # Should include user_task
         assert "user_task" in context
@@ -228,7 +238,7 @@ class TestTeamNode:
         assert "_task" in context
 
     @pytest.mark.asyncio
-    async def test_execute_async_success(self, sample_team_node):
+    async def test_execute_async_success(self, sample_team_step):
         """Test successful team execution."""
         # Mock the team coordinator
         mock_coordinator = MagicMock()
@@ -252,7 +262,7 @@ class TestTeamNode:
                 mock_run.return_value = mock_result
 
                 graph_state = {"user_task": "Test task"}
-                result = await sample_team_node.execute_async(None, graph_state)
+                result = await sample_team_step.execute_async(None, graph_state)
 
                 # Should have team result
                 assert "team_result" in result
@@ -260,7 +270,7 @@ class TestTeamNode:
                 # Note: actual output format may differ, just check success
 
     @pytest.mark.asyncio
-    async def test_execute_async_timeout(self, sample_team_node):
+    async def test_execute_async_timeout(self, sample_team_step):
         """Test team execution with timeout."""
 
         # Mock that times out
@@ -273,15 +283,15 @@ class TestTeamNode:
             return_value=MagicMock(),
         ):
             with patch.object(
-                sample_team_node,
+                sample_team_step,
                 "_execute_team",
                 side_effect=timeout_execute,
             ):
                 # Set short timeout
-                sample_team_node.config.timeout_seconds = 0.1
+                sample_team_step.config.timeout_seconds = 0.1
 
                 graph_state = {"user_task": "Test task"}
-                result = await sample_team_node.execute_async(None, graph_state)
+                result = await sample_team_step.execute_async(None, graph_state)
 
                 # Should have error but continue (continue_on_error=True)
                 assert "_error" in result
@@ -289,44 +299,44 @@ class TestTeamNode:
                 assert "timed out" in result["_error"].lower()
 
     @pytest.mark.asyncio
-    async def test_execute_async_exception_continue(self, sample_team_node):
+    async def test_execute_async_exception_continue(self, sample_team_step):
         """Test team execution with exception and continue_on_error."""
         with patch(
             "victor.teams.create_coordinator",
             return_value=MagicMock(),
         ):
             with patch.object(
-                sample_team_node,
+                sample_team_step,
                 "_execute_team",
                 side_effect=Exception("Team execution failed"),
             ):
-                sample_team_node.config.continue_on_error = True
+                sample_team_step.config.continue_on_error = True
                 graph_state = {"user_task": "Test task"}
-                result = await sample_team_node.execute_async(None, graph_state)
+                result = await sample_team_step.execute_async(None, graph_state)
 
                 # Should have error but continue
                 assert "_error" in result
                 assert "Team execution failed" in result["_error"]
 
     @pytest.mark.asyncio
-    async def test_execute_async_exception_raise(self, sample_team_node):
+    async def test_execute_async_exception_raise(self, sample_team_step):
         """Test team execution with exception and continue_on_error=False."""
         with patch(
             "victor.teams.create_coordinator",
             return_value=MagicMock(),
         ):
             with patch.object(
-                sample_team_node,
+                sample_team_step,
                 "_execute_team",
                 side_effect=Exception("Team execution failed"),
             ):
-                sample_team_node.config.continue_on_error = False
+                sample_team_step.config.continue_on_error = False
                 graph_state = {"user_task": "Test task"}
 
                 with pytest.raises(Exception, match="Team execution failed"):
-                    await sample_team_node.execute_async(None, graph_state)
+                    await sample_team_step.execute_async(None, graph_state)
 
-    def test_merge_team_result_team_wins(self, sample_team_node):
+    def test_merge_team_result_team_wins(self, sample_team_step):
         """Test merging team result with team_wins mode."""
         from victor.teams.types import TeamResult
 
@@ -337,16 +347,16 @@ class TestTeamNode:
         team_result.shared_context = {"key": "team_value"}
         team_result.formation = TeamFormation.SEQUENTIAL
 
-        result = sample_team_node._merge_team_result(graph_state, team_result)
+        result = sample_team_step._merge_team_result(graph_state, team_result)
 
         # Team wins on conflict
         assert result["key"] == "team_value"
 
-    def test_merge_team_result_graph_wins(self, sample_team_node):
+    def test_merge_team_result_graph_wins(self, sample_team_step):
         """Test merging team result with graph_wins mode."""
         from victor.teams.types import TeamResult
 
-        sample_team_node.config.merge_mode = MergeMode.GRAPH_WINS
+        sample_team_step.config.merge_mode = MergeMode.GRAPH_WINS
 
         graph_state = {"key": "graph_value"}
         team_result = MagicMock()
@@ -355,16 +365,16 @@ class TestTeamNode:
         team_result.shared_context = {"key": "team_value"}
         team_result.formation = TeamFormation.SEQUENTIAL
 
-        result = sample_team_node._merge_team_result(graph_state, team_result)
+        result = sample_team_step._merge_team_result(graph_state, team_result)
 
         # Graph wins on conflict
         assert result["key"] == "graph_value"
 
-    def test_merge_team_result_error_mode(self, sample_team_node):
+    def test_merge_team_result_error_mode(self, sample_team_step):
         """Test merging team result with error mode raises on conflict."""
         from victor.teams.types import TeamResult
 
-        sample_team_node.config.merge_mode = MergeMode.ERROR
+        sample_team_step.config.merge_mode = MergeMode.ERROR
 
         graph_state = {"key": "graph_value"}
         team_result = MagicMock()
@@ -374,10 +384,10 @@ class TestTeamNode:
         team_result.formation = TeamFormation.SEQUENTIAL
 
         with pytest.raises(StateMergeError):
-            sample_team_node._merge_team_result(graph_state, team_result)
+            sample_team_step._merge_team_result(graph_state, team_result)
 
 
-class TestTeamNodeFormations:
+class TestTeamStepFormations:
     """Tests for different team formations."""
 
     @pytest.fixture
@@ -412,8 +422,8 @@ class TestTeamNodeFormations:
         ]
 
     def test_sequential_formation(self, hierarchical_members):
-        """Test creating sequential team node."""
-        node = TeamNode(
+        """Test creating a sequential team step."""
+        node = TeamStep(
             id="sequential_team",
             name="Sequential Team",
             goal="Execute sequentially",
@@ -424,8 +434,8 @@ class TestTeamNodeFormations:
         assert node.team_formation == TeamFormation.SEQUENTIAL
 
     def test_parallel_formation(self, hierarchical_members):
-        """Test creating parallel team node."""
-        node = TeamNode(
+        """Test creating a parallel team step."""
+        node = TeamStep(
             id="parallel_team",
             name="Parallel Team",
             goal="Execute in parallel",
@@ -436,8 +446,8 @@ class TestTeamNodeFormations:
         assert node.team_formation == TeamFormation.PARALLEL
 
     def test_hierarchical_formation(self, hierarchical_members):
-        """Test creating hierarchical team node."""
-        node = TeamNode(
+        """Test creating a hierarchical team step."""
+        node = TeamStep(
             id="hierarchical_team",
             name="Hierarchical Team",
             goal="Execute with hierarchy",
@@ -448,8 +458,8 @@ class TestTeamNodeFormations:
         assert node.team_formation == TeamFormation.HIERARCHICAL
 
     def test_pipeline_formation(self, hierarchical_members):
-        """Test creating pipeline team node."""
-        node = TeamNode(
+        """Test creating a pipeline team step."""
+        node = TeamStep(
             id="pipeline_team",
             name="Pipeline Team",
             goal="Execute as pipeline",
@@ -460,8 +470,8 @@ class TestTeamNodeFormations:
         assert node.team_formation == TeamFormation.PIPELINE
 
     def test_consensus_formation(self, hierarchical_members):
-        """Test creating consensus team node."""
-        node = TeamNode(
+        """Test creating a consensus team step."""
+        node = TeamStep(
             id="consensus_team",
             name="Consensus Team",
             goal="Execute with consensus",
@@ -472,13 +482,13 @@ class TestTeamNodeFormations:
         assert node.team_formation == TeamFormation.CONSENSUS
 
 
-class TestTeamNodeSyncExecute:
+class TestTeamStepSyncExecute:
     """Tests for synchronous execute method."""
 
     @pytest.fixture
-    def simple_team_node(self):
-        """Create a simple team node for sync tests."""
-        return TeamNode(
+    def simple_team_step(self):
+        """Create a simple team step for sync tests."""
+        return TeamStep(
             id="test_team",
             name="Test Team",
             goal="Test goal",
@@ -494,13 +504,13 @@ class TestTeamNodeSyncExecute:
             ],
         )
 
-    def test_sync_execute_wraps_async(self, simple_team_node):
+    def test_sync_execute_wraps_async(self, simple_team_step):
         """Test that sync execute properly wraps async execute."""
         coro = object()
 
         with (
             patch.object(
-                simple_team_node,
+                simple_team_step,
                 "execute_async",
                 new=Mock(return_value=coro),
             ) as mock_execute,
@@ -512,7 +522,7 @@ class TestTeamNodeSyncExecute:
         ):
             graph_state = {"key": "value"}
 
-            result = simple_team_node.execute(None, graph_state)
+            result = simple_team_step.execute(None, graph_state)
 
             mock_execute.assert_called_once()
             mock_run_sync.assert_called_once_with(coro)
@@ -521,14 +531,14 @@ class TestTeamNodeSyncExecute:
     @pytest.mark.asyncio
     async def test_sync_execute_uses_worker_thread_bridge_inside_running_loop(
         self,
-        simple_team_node,
+        simple_team_step,
     ):
         """Test that sync execute uses the shared bridge from async contexts."""
         coro = object()
 
         with (
             patch.object(
-                simple_team_node,
+                simple_team_step,
                 "execute_async",
                 new=Mock(return_value=coro),
             ) as mock_execute,
@@ -538,15 +548,15 @@ class TestTeamNodeSyncExecute:
                 return_value={"team_result": "ok"},
             ) as mock_run_sync,
         ):
-            result = simple_team_node.execute(None, {"key": "value"})
+            result = simple_team_step.execute(None, {"key": "value"})
 
         mock_execute.assert_called_once_with(None, {"key": "value"})
         mock_run_sync.assert_called_once_with(coro)
         assert result == {"team_result": "ok"}
 
 
-class TestTeamNodeRichPersona:
-    """Tests for rich persona support in TeamNode."""
+class TestTeamStepRichPersona:
+    """Tests for rich persona support in TeamStep members."""
 
     def test_team_member_with_rich_persona(self):
         """Test creating team member with rich persona attributes."""

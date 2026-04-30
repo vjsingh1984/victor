@@ -229,6 +229,11 @@ class ComponentAssembler:
         from victor.agent.task_analyzer import get_task_analyzer
 
         orchestrator._task_analyzer = get_task_analyzer()
+        if hasattr(orchestrator._task_analyzer, "set_runtime_subject"):
+            try:
+                orchestrator._task_analyzer.set_runtime_subject(orchestrator)
+            except Exception as exc:
+                logger.debug("Task analyzer runtime-subject binding skipped: %s", exc)
         orchestrator._prompt_runtime_support = factory.create_prompt_runtime_support(
             prompt_builder=orchestrator.prompt_builder,
             get_context_window=orchestrator._get_model_context_window,

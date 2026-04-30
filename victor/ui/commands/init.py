@@ -31,6 +31,7 @@ async def _generate_init_content_async(
     exclude_dirs: Optional[List[str]] = None,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    graph_context: Optional[dict] = None,
 ) -> str:
     """Unified async content generator for all init analysis modes.
 
@@ -44,6 +45,7 @@ async def _generate_init_content_async(
         exclude_dirs: Directories to exclude from analysis.
         provider: Override LLM provider (e.g., "anthropic", "openai"). Enhanced mode only.
         model: Override LLM model (e.g., "claude-sonnet-4-20250514"). Enhanced mode only.
+        graph_context: Optional graph statistics (CCG, patterns) for LLM synthesis.
 
     Returns:
         Generated init.md content string.
@@ -59,15 +61,44 @@ async def _generate_init_content_async(
         if provider and use_llm:
             agent = await _create_init_agent(provider, model)
 
-        return await generate_enhanced_init_md(
-            use_llm=use_llm,
-            include_conversations=include_conversations,
-            on_progress=on_progress,
-            force=force,
-            include_dirs=include_dirs,
-            exclude_dirs=exclude_dirs,
-            agent=agent,
-        )
+        # Try to pass graph_context if the function supports it
+        # (victor-coding package may not have this parameter yet)
+        try:
+            import inspect
+            sig = inspect.signature(generate_enhanced_init_md)
+            if 'graph_context' in sig.parameters:
+                return await generate_enhanced_init_md(
+                    use_llm=use_llm,
+                    include_conversations=include_conversations,
+                    on_progress=on_progress,
+                    force=force,
+                    include_dirs=include_dirs,
+                    exclude_dirs=exclude_dirs,
+                    agent=agent,
+                    graph_context=graph_context,
+                )
+            else:
+                # victor-coding doesn't support graph_context yet, skip it
+                return await generate_enhanced_init_md(
+                    use_llm=use_llm,
+                    include_conversations=include_conversations,
+                    on_progress=on_progress,
+                    force=force,
+                    include_dirs=include_dirs,
+                    exclude_dirs=exclude_dirs,
+                    agent=agent,
+                )
+        except TypeError:
+            # Fallback if signature check fails
+            return await generate_enhanced_init_md(
+                use_llm=use_llm,
+                include_conversations=include_conversations,
+                on_progress=on_progress,
+                force=force,
+                include_dirs=include_dirs,
+                exclude_dirs=exclude_dirs,
+                agent=agent,
+            )
     elif mode == "index":
         generate_victor_md_from_index = cast(
             Callable[..., Awaitable[str]],
@@ -101,6 +132,7 @@ def _generate_init_content(
     exclude_dirs: Optional[List[str]] = None,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    graph_context: Optional[dict] = None,
 ) -> str:
     """Sync wrapper for _generate_init_content_async."""
     if mode == "quick":
@@ -124,6 +156,7 @@ def _generate_init_content(
             exclude_dirs=exclude_dirs,
             provider=provider,
             model=model,
+            graph_context=graph_context,
         )
     )
 
@@ -161,6 +194,151 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
     if model:
         kwargs["model"] = model
     return await Agent.create(**kwargs)
+
+
+async def _gather_graph_context(root: Path) -> Optional[dict]:
+    """Gather graph statistics for synthesis prompt.
+
+    Focus on universal patterns that generalize across projects:
+    - CCG: Control flow, data dependencies, control dependencies
+    - Generic patterns: Decorator, Registry, Protocol (not Victor-specific)
+    """
+    try:
+        from victor.storage.graph import create_graph_store
+        from victor.storage.graph.edge_types import EdgeType
+
+        graph_store = create_graph_store("sqlite", project_path=root)
+        await graph_store.initialize()
+
+        # Get all edges
+        all_edges = await graph_store.get_all_edges()
+
+        # CCG breakdown (universal - applies to any codebase)
+        cfg_edges = [e for e in all_edges if EdgeType.is_cfg_edge(e.type)]
+        cdg_edges = [e for e in all_edges if EdgeType.is_cdg_edge(e.type)]
+        ddg_edges = [e for e in all_edges if EdgeType.is_ddg_edge(e.type)]
+
+        # Generic pattern detection (not Victor-specific)
+        decorator_edges = [e for e in all_edges if e.type == 'DECORATES']
+        protocol_edges = [e for e in all_edges if e.type == 'IMPLEMENTS']
+        registry_edges = [e for e in all_edges if e.type == 'REGISTERS']
+
+        # Detect other common patterns
+        inheritance_edges = [e for e in all_edges if e.type == 'INHERITS']
+        calls_edges = [e for e in all_edges if e.type == 'CALLS']
+        imports_edges = [e for e in all_edges if e.type == 'IMPORTS']
+
+        # Calculate complexity metrics
+        total_nodes = len(await graph_store.get_all_nodes())
+        total_edges = len(all_edges)
+        ccg_coverage = len(cfg_edges) + len(cdg_edges) + len(ddg_edges)
+
+        return {
+            "project_path": str(root),
+            "has_ccg": ccg_coverage > 0,
+            "has_synthetic_edges": len(decorator_edges) + len(protocol_edges) + len(registry_edges) > 0,
+            "stats": {
+                "total_nodes": total_nodes,
+                "total_edges": total_edges,
+                "ccg_edges": ccg_coverage,
+                "cfg_edges": len(cfg_edges),
+                "cdg_edges": len(cdg_edges),
+                "ddg_edges": len(ddg_edges),
+            },
+            "patterns": {
+                "decorator": len(decorator_edges),
+                "protocol": len(protocol_edges),
+                "registry": len(registry_edges),
+                "inheritance": len(inheritance_edges),
+                "calls": len(calls_edges),
+            },
+            "complexity": {
+                "ccg_ratio": ccg_coverage / total_edges if total_edges > 0 else 0,
+                "avg_branching": total_edges / total_nodes if total_nodes > 0 else 0,
+            }
+        }
+    except Exception as exc:
+        console.print(f"[dim]  Failed to gather graph context: {exc}[/]")
+        return None
+
+
+def _format_graph_context_for_prompt(graph_context: dict) -> str:
+    """Format graph context for LLM synthesis prompt.
+
+    Uses generic pattern terminology that applies to any project:
+    - "Decorator pattern" not "@tool decorator"
+    - "Registry pattern" not "tool registry"
+    - "Protocol/Interface" not "Victor protocol"
+    """
+    if not graph_context:
+        return ""
+
+    stats = graph_context.get("stats", {})
+    patterns = graph_context.get("patterns", {})
+    complexity = graph_context.get("complexity", {})
+
+    sections = []
+
+    # CCG section (universal - applies to any codebase)
+    if graph_context.get("has_ccg", False):
+        ccg_ratio = complexity.get("ccg_ratio", 0) * 100
+        sections.append(f"""
+## Code Structure Analysis
+
+This project has been analyzed with Code Context Graph (CCG) providing:
+- **Control Flow Graph (CFG)**: {stats.get('cfg_edges', 0)} edges showing execution paths
+- **Control Dependence Graph (CDG)**: {stats.get('cdg_edges', 0)} edges showing decision dependencies
+- **Data Dependence Graph (DDG)**: {stats.get('ddg_edges', 0)} edges showing data flow
+
+CCG Coverage: {ccg_ratio:.1f}% of graph edges have statement-level granularity.
+
+When analyzing, leverage these to:
+- Identify control flow complexity hotspots (deep nesting, complex branching)
+- Trace data dependencies and side effects
+- Understand decision points and their impact
+""")
+
+    # Generic design patterns (not Victor-specific)
+    pattern_sections = []
+
+    if patterns.get("decorator", 0) > 0:
+        pattern_sections.append(f"""
+- **Decorator Pattern**: {patterns['decorator']} decorated symbols detected.
+  Analyze how decorators modify behavior and cross-cutting concerns.
+""")
+
+    if patterns.get("protocol", 0) > 0:
+        pattern_sections.append(f"""
+- **Protocol/Interface Pattern**: {patterns['protocol']} implementation relationships.
+  Map abstraction hierarchies and contract implementations.
+""")
+
+    if patterns.get("registry", 0) > 0:
+        pattern_sections.append(f"""
+- **Registry/Plugin Pattern**: {patterns['registry']} registration relationships.
+  Identify extensibility points and plugin architecture.
+""")
+
+    if patterns.get("inheritance", 0) > 0:
+        pattern_sections.append(f"""
+- **Inheritance Pattern**: {patterns['inheritance']} inheritance relationships.
+  Analyze class hierarchies and method overrides.
+""")
+
+    if pattern_sections:
+        sections.append(f"""
+## Design Pattern Analysis
+
+The following design patterns have been detected in the codebase:
+{''.join(pattern_sections)}
+
+Use these patterns to:
+- Understand the architectural approach
+- Identify extensibility mechanisms
+- Map abstraction layers and contracts
+""")
+
+    return '\n'.join(sections)
 
 
 def _ensure_profile_preset(
@@ -262,6 +440,9 @@ def init(
     ),
     quick: bool = typer.Option(
         False, "--quick", "-q", help="Fast regex-only analysis (no LLM, no indexing)"
+    ),
+    ccg: bool = typer.Option(
+        True, "--ccg/--no-ccg", help="Enable Code Context Graph for statement-level analysis (default: on)"
     ),
     symlinks: bool = typer.Option(
         False, "--symlinks", "-l", help="Create CLAUDE.md and other tool aliases"
@@ -449,6 +630,8 @@ providers:
                 )
                 console.print("  [cyan]victor init --index[/]    Multi-language symbol indexing")
                 console.print("  [cyan]victor init --deep[/]     LLM-powered deep analysis")
+                console.print("  [cyan]victor init --no-ccg[/]   Disable Code Context Graph (faster)")
+                console.print("  [cyan]victor init --ccg[/]      Enable Code Context Graph (default)")
                 return
 
         # Handle --quick flag (overrides everything)
@@ -456,6 +639,7 @@ providers:
             deep = False
             learn = False
             index = False
+            ccg = False
 
         include_dirs: List[str] = []
         exclude_dirs: List[str] = []
@@ -539,12 +723,14 @@ providers:
             exclude_dirs = [d.strip() for d in exclude_str.split(",")]
 
         # Determine analysis mode
-        if deep or learn:
-            mode = "enhanced"
+        if quick:
+            mode = "quick"
         elif index:
             mode = "index"
+        elif deep or learn or ccg:
+            mode = "enhanced"
         else:
-            mode = "quick"
+            mode = "enhanced"  # Default
 
         # Print status (include provider override if specified)
         provider_note = ""
@@ -553,16 +739,20 @@ providers:
             if model:
                 provider_note += f"/{model}"
 
+        ccg_note = " + CCG" if ccg and mode not in ("quick", "index") else ""
+
         if deep and learn:
             console.print(
-                f"[dim]Comprehensive analysis: Index → Learn → LLM{provider_note} (default)...[/]"
+                f"[dim]Comprehensive analysis: Index → Learn → LLM{provider_note}{ccg_note} (default)...[/]"
             )
         elif deep:
             console.print(
-                f"[dim]Analysis: Index → LLM{provider_note} (no conversation insights)...[/]"
+                f"[dim]Analysis: Index → LLM{provider_note}{ccg_note} (no conversation insights)...[/]"
             )
         elif learn:
-            console.print("[dim]Analysis: Index → Learn (no LLM)...[/]")
+            console.print(f"[dim]Analysis: Index → Learn{ccg_note} (no LLM)...[/]")
+        elif ccg:
+            console.print(f"[dim]Analysis: Index + CCG (no LLM, no conversation)...[/]")
         elif index:
             console.print("[dim]Analysis: Index only (no LLM, no conversation)...[/]")
         else:
@@ -573,22 +763,10 @@ providers:
             def on_progress(stage: str, msg: str) -> None:
                 console.print(f"[dim]  {msg}[/]")
 
-            try:
-                new_content = _generate_init_content(
-                    mode=mode,
-                    use_llm=deep,
-                    include_conversations=learn,
-                    on_progress=on_progress,
-                    force=force,
-                    include_dirs=include_dirs or None,
-                    exclude_dirs=exclude_dirs or None,
-                    provider=provider,
-                    model=model,
-                )
-            except ImportError:
-                console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
-                return
+            # Build graph data BEFORE LLM synthesis so the LLM can leverage it
+            # Order: Synthetic edges → CCG → LLM synthesis
 
+            # 1. Synthetic edges enrichment (IMPLEMENTS, DECORATES, REGISTERS)
             try:
                 stats = ensure_project_graph_enriched(Path.cwd())
                 if stats.total_edges:
@@ -600,6 +778,61 @@ providers:
                     )
             except Exception as exc:
                 console.print(f"[yellow]![/] Graph enrichment skipped: {exc}")
+
+            # 2. CCG indexing (if enabled and not in quick/index mode)
+            if ccg and mode not in ("quick", "index"):
+                try:
+                    from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+                    from victor.storage.graph import create_graph_store
+
+                    console.print("[dim]  Building Code Context Graph...[/]")
+                    import asyncio
+
+                    async def _build_ccg_index():
+                        graph_store = create_graph_store("sqlite", project_path=Path.cwd())
+                        config = GraphIndexConfig(
+                            root_path=Path.cwd(),
+                            enable_ccg=True,
+                            enable_embeddings=False,  # Skip embeddings for faster init
+                        )
+                        pipeline = GraphIndexingPipeline(graph_store, config)
+                        return await pipeline.index_repository()
+
+                    stats = asyncio.run(_build_ccg_index())
+                    console.print(
+                        f"[green]✓[/] CCG index built ({stats.files_processed} files, "
+                        f"{stats.nodes_created} nodes, {stats.edges_created} edges)"
+                    )
+                except ImportError:
+                    console.print("[yellow]![/] CCG requires graph dependencies. Run: pip install 'victor-ai[graph]'")
+                except Exception as exc:
+                    console.print(f"[yellow]![/] CCG indexing skipped: {exc}")
+
+            # 3. Gather graph context for LLM synthesis (only when using LLM)
+            graph_ctx = None
+            if deep:  # Only gather for LLM synthesis
+                import asyncio
+                graph_ctx = asyncio.run(_gather_graph_context(Path.cwd()))
+                if graph_ctx:
+                    console.print("[dim]  Gathered graph context for LLM synthesis[/]")
+
+            # 4. LLM synthesis (now has access to synthetic edges, CCG data, and graph context)
+            try:
+                new_content = _generate_init_content(
+                    mode=mode,
+                    use_llm=deep,
+                    include_conversations=learn,
+                    on_progress=on_progress,
+                    force=force,
+                    include_dirs=include_dirs or None,
+                    exclude_dirs=exclude_dirs or None,
+                    provider=provider,
+                    model=model,
+                    graph_context=graph_ctx,
+                )
+            except ImportError:
+                console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
+                return
 
             if update and existing_content:
                 from victor.ui.slash.commands.codebase import InitCommand

@@ -239,6 +239,14 @@ class ConversationManager:
         self._session_id = self._session.session_id
         logger.info(f"Created new session: {self._session_id}")
 
+        # Ensure .victor/ subdirs exist including .victor/analysis/ for checkpoints
+        try:
+            from victor.config.settings import ProjectPaths
+
+            ProjectPaths().ensure_project_dirs()
+        except Exception:
+            pass
+
     # =========================================================================
     # MESSAGE MANAGEMENT
     # =========================================================================

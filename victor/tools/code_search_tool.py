@@ -338,6 +338,39 @@ def _ensure_graph_enrichment_for_root(root: Path, latest_mtime: Optional[float])
         logger.warning("[code_search] Graph enrichment failed for %s: %s", root, exc)
 
 
+def _cleanup_nested_victor_dirs(root: Path) -> None:
+    """Remove .victor directories in unexpected locations.
+
+    Addresses the issue where nested .victor directories are created
+    when Victor is run from subdirectories. Only the top-level
+    {project_root}/.victor should exist.
+
+    Args:
+        root: Project root directory
+    """
+    import shutil
+
+    # List of known nested .victor paths to clean up
+    nested_patterns = [
+        root / "victor" / ".victor",  # victor/.victor
+        root / ".victor" / "embeddings" / ".victor",  # .victor/embeddings/.victor
+        root / "victor" / ".victor" / "embeddings",  # victor/.victor/embeddings
+    ]
+
+    for nested_path in nested_patterns:
+        if nested_path.exists():
+            try:
+                size = sum(f.stat().st_size for f in nested_path.rglob("*") if f.is_file())
+                logger.info(
+                    "[code_search] Removing nested .victor directory: %s (%.1f MB)",
+                    nested_path.relative_to(root),
+                    size / (1024 * 1024),
+                )
+                shutil.rmtree(nested_path)
+            except (OSError, PermissionError) as exc:
+                logger.warning("[code_search] Failed to remove %s: %s", nested_path, exc)
+
+
 def _load_codebase_index_factory_via_importlib() -> Optional[Any]:
     """Load a CodebaseIndex factory via runtime import fallback paths."""
 
@@ -1879,6 +1912,9 @@ async def _get_or_build_index(
         force_reindex: Force full re-index
         exec_ctx: Execution context for DI-based cache access
     """
+    # Clean up nested .victor directories on first access
+    _cleanup_nested_victor_dirs(root)
+
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
     from victor.core.indexing.index_lock import IndexLockRegistry
@@ -2060,12 +2096,25 @@ async def _get_or_build_index(
                     "[code_search] Returning stale index immediately (manifest mismatch), rebuilding in background"
                 )
 
+                # Write manifest FIRST to prevent rebuild loop on next access
+                try:
+                    write_codebase_index_manifest(persist_path, index_manifest)
+                    logger.info("[code_search] Wrote manifest for stale index, background rebuild in progress")
+                except OSError as exc:
+                    logger.warning("[code_search] Failed to write manifest before stale return: %s", exc)
+
                 # Spawn background rebuild task (fire and forget)
                 async def _rebuildInBackground():
                     try:
                         logger.info("[code_search] Background rebuild started for %s", root)
                         await index.index_codebase()
                         await _finalize_index_storage(index)
+                        # Write manifest after successful rebuild
+                        try:
+                            write_codebase_index_manifest(persist_path, index_manifest)
+                            logger.info("[code_search] Wrote manifest after background rebuild for %s", root)
+                        except OSError as exc:
+                            logger.warning("[code_search] Failed to write manifest after rebuild: %s", exc)
                         # Update cache with fresh index after rebuild
                         current_cache = index_cache.get(str(root))
                         if current_cache:

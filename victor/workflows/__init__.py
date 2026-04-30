@@ -52,6 +52,9 @@ Example (YAML):
             goal: "Analyze data patterns"
 """
 
+import warnings
+from typing import Any
+
 from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.base import BaseWorkflow
 from victor.workflows.context import (
@@ -66,7 +69,6 @@ from victor.workflows.definition import (
     ConditionNode,
     ParallelNode,
     TeamStepWorkflow,
-    TeamNodeWorkflow,
     TransformNode,
     WorkflowDefinition,
     WorkflowBuilder,
@@ -615,3 +617,25 @@ __all__ = [
     "UnifiedWorkflowCompiler",
     "create_unified_compiler",
 ]
+
+_DEPRECATED_ALIAS_MAP = {
+    "TeamNodeWorkflow": TeamStepWorkflow,
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_ALIAS_MAP:
+        warnings.warn(
+            f"{name} is deprecated; use "
+            f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
+            "The TeamNode* compatibility aliases remain during the current "
+            "migration window and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED_ALIAS_MAP[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_DEPRECATED_ALIAS_MAP))

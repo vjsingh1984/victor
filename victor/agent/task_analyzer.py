@@ -117,12 +117,14 @@ class TaskAnalyzer:
         self,
         coordinator: Optional["ModeWorkflowTeamCoordinator"] = None,
         runtime_intelligence: Optional[Any] = None,
+        runtime_subject: Optional[Any] = None,
     ):
         """Initialize task analyzer.
 
         Args:
-            coordinator: Optional ModeWorkflowTeamCoordinator for team/workflow suggestions
+            coordinator: Optional ModeWorkflowTeamCoordinator compatibility fallback
             runtime_intelligence: Optional canonical runtime-intelligence service
+            runtime_subject: Optional orchestrator-like runtime for shared coordination suggestions
         """
         self._complexity_classifier = None
         self._action_authorizer = None
@@ -131,6 +133,7 @@ class TaskAnalyzer:
         self._intent_classifier = None
         self._coordinator = coordinator
         self._runtime_intelligence = runtime_intelligence
+        self._runtime_subject = runtime_subject
 
     def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
         """Set the coordinator for team/workflow suggestions.
@@ -144,6 +147,10 @@ class TaskAnalyzer:
         """Attach the canonical runtime-intelligence service to this analyzer."""
         self._runtime_intelligence = runtime_intelligence
         self._unified_classifier = None
+
+    def set_runtime_subject(self, runtime_subject: Any) -> None:
+        """Attach the orchestrator-like runtime used for shared coordination suggestions."""
+        self._runtime_subject = runtime_subject
 
     @property
     def complexity_classifier(self) -> ComplexityClassifier:
@@ -274,7 +281,8 @@ class TaskAnalyzer:
         """Analyze task and get coordination suggestions.
 
         This extends the base analyze() method by adding coordination suggestions
-        from the ModeWorkflowTeamCoordinator based on task type and complexity.
+        from the shared framework coordination runtime, with coordinator fallback
+        for older compatibility surfaces.
 
         Args:
             message: User message to analyze
@@ -294,24 +302,17 @@ class TaskAnalyzer:
             context=context,
         )
 
-        # Add coordination suggestions if coordinator is available
-        if self._coordinator:
+        if self._runtime_subject is not None or self._coordinator is not None:
             try:
-                # Map complexity to string
                 complexity_str = analysis.complexity.value.lower()
-
-                # Get task type string
                 task_type_str = analysis.unified_task_type.value.lower()
-
-                # Get suggestions from coordinator
-                suggestion = self._coordinator.suggest_for_task(
+                suggestion = self._build_coordination_suggestion(
                     task_type=task_type_str,
                     complexity=complexity_str,
                     mode=mode,
                 )
                 analysis.coordination_suggestion = suggestion
 
-                # Log if there are team suggestions for high complexity
                 if suggestion.has_team_suggestion:
                     logger.debug(
                         f"Task analysis with suggestions: task={task_type_str}, "
@@ -323,6 +324,31 @@ class TaskAnalyzer:
                 logger.warning(f"Failed to get coordination suggestions: {e}")
 
         return analysis
+
+    def _build_coordination_suggestion(
+        self,
+        *,
+        task_type: str,
+        complexity: str,
+        mode: str,
+    ) -> "CoordinationSuggestion":
+        """Build coordination suggestions from the shared runtime or compatibility fallback."""
+        if self._runtime_subject is not None:
+            from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
+
+            return build_runtime_coordination_suggestion(
+                runtime_subject=self._runtime_subject,
+                task_type=task_type,
+                complexity=complexity,
+                mode=mode,
+            )
+
+        assert self._coordinator is not None
+        return self._coordinator.suggest_for_task(
+            task_type=task_type,
+            complexity=complexity,
+            mode=mode,
+        )
 
     def classify_complexity(self, message: str) -> TaskClassification:
         return self.complexity_classifier.classify(message)

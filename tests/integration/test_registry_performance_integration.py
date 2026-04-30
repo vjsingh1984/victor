@@ -156,7 +156,7 @@ class TestFeatureFlagCacheIntegration:
         # Check multiple flags
         flags_to_check = [
             FeatureFlag.USE_SERVICE_LAYER,
-            FeatureFlag.USE_AGENTIC_LOOP,
+            FeatureFlag.USE_LEARNING_FROM_EXECUTION,
             FeatureFlag.USE_EDGE_MODEL,
         ]
 
@@ -179,7 +179,7 @@ class TestFeatureFlagCacheIntegration:
 
         # Cache some flags
         cache.is_enabled(FeatureFlag.USE_SERVICE_LAYER)
-        cache.is_enabled(FeatureFlag.USE_AGENTIC_LOOP)
+        cache.is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
 
         stats_before = cache.get_stats()
         assert stats_before["cache_size"] >= 1

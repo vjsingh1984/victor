@@ -2409,6 +2409,7 @@ class TestInitSyncBridge:
             exclude_dirs=["tests"],
             provider=None,
             model=None,
+            graph_context=None,
         )
         mock_run_sync.assert_called_once_with(coro)
 
@@ -2438,6 +2439,7 @@ class TestInitSyncBridge:
             exclude_dirs=["tests"],
             provider=None,
             model=None,
+            graph_context=None,
         )
         mock_run_sync.assert_called_once_with(coro)
 

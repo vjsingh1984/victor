@@ -893,7 +893,9 @@ class TeamStep:
     total_tool_budget: int = 100
 ```
 
-`TeamNode` / `TeamNodeConfig` remain compatibility aliases.
+`TeamNode` / `TeamNodeConfig` are deprecated compatibility aliases. Use
+`TeamStep` / `TeamStepConfig`; the legacy names remain available during the
+current migration window and will be removed in a future release.
 
 **YAML Example:**
 ```yaml

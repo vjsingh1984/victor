@@ -36,6 +36,7 @@ from victor.config.groups.analytics_config import AnalyticsSettings
 from victor.config.groups.network_config import NetworkSettings
 from victor.config.groups.embedding_config import EmbeddingSettings
 from victor.config.groups.tool_selection_config import ToolSelectionSettings
+from victor.config.groups.fuzzy_matching_config import FuzzyMatchingSettings
 
 __all__ = [
     # Provider configuration
@@ -71,4 +72,6 @@ __all__ = [
     "EmbeddingSettings",
     # Tool selection configuration
     "ToolSelectionSettings",
+    # Fuzzy matching configuration
+    "FuzzyMatchingSettings",
 ]

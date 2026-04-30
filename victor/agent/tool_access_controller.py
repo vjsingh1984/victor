@@ -217,6 +217,20 @@ class ModeLayer(AccessLayer, ModeAwareMixin):
 
         # Use mode controller's is_tool_allowed
         if not self.is_tool_allowed_by_mode(tool_name):
+            # Allow write/edit through when an analysis-safe policy is active;
+            # enforce_sandbox_path() gates individual paths inside the tool itself.
+            if tool_name in {"write", "edit", "write_file", "edit_files"}:
+                try:
+                    from victor.tools.write_path_policy import (
+                        WritePathTier,
+                        get_active_write_policy,
+                    )
+
+                    policy = get_active_write_policy()
+                    if policy is not None and policy.max_tier >= WritePathTier.LOCAL_ANALYSIS:
+                        return True, "Write tool allowed: analysis-safe path policy active"
+                except Exception:
+                    pass  # policy unavailable — fall through to mode block
             mode_name = self.current_mode_name
             return False, f"Tool '{tool_name}' not allowed in {mode_name} mode"
 

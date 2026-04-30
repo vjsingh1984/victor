@@ -111,6 +111,10 @@ class BufferedRenderer:
         """Handle transition out of thinking state."""
         pass
 
+    def had_tool_calls(self) -> bool:
+        """Return True if at least one tool call was processed this turn."""
+        return bool(self._tool_calls)
+
     def finalize(self) -> str:
         """Return accumulated content."""
         return "".join(self._content_chunks)

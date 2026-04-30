@@ -92,6 +92,10 @@ class StreamRenderer(Protocol):
         """Handle transition out of thinking state."""
         ...
 
+    def had_tool_calls(self) -> bool:
+        """Return True if at least one tool call was processed this turn."""
+        ...
+
     def finalize(self) -> str:
         """Finalize the response and return accumulated content."""
         ...

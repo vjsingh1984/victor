@@ -96,6 +96,7 @@ dmypy.json
 # Temporary files
 tmp/
 temp/
+victor/analysis/
 *.tmp
 coverage.json
 victor_debug.log

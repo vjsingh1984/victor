@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from victor.agent.runtime.component_assembler import ComponentAssembler
 
@@ -102,11 +102,14 @@ def test_assemble_conversation_prefers_canonical_prompt_runtime_support_surface(
         _session_id="test-session",
     )
 
-    ComponentAssembler.assemble_conversation(
-        orchestrator,
-        provider=MagicMock(),
-        model="claude-3-sonnet",
-    )
+    analyzer = MagicMock()
+
+    with patch("victor.agent.task_analyzer.get_task_analyzer", return_value=analyzer):
+        ComponentAssembler.assemble_conversation(
+            orchestrator,
+            provider=MagicMock(),
+            model="claude-3-sonnet",
+        )
 
     factory.create_prompt_runtime_support.assert_called_once()
     kwargs = factory.create_prompt_runtime_support.call_args.kwargs
@@ -114,7 +117,9 @@ def test_assemble_conversation_prefers_canonical_prompt_runtime_support_surface(
     assert kwargs["get_context_window"] is orchestrator._get_model_context_window
     assert kwargs["provider_name"] == orchestrator.provider_name
     assert kwargs["model_name"] == orchestrator.model
-    assert kwargs["task_analyzer"] is orchestrator._task_analyzer
+    assert orchestrator._task_analyzer is analyzer
+    analyzer.set_runtime_subject.assert_called_once_with(orchestrator)
+    assert kwargs["task_analyzer"] is analyzer
     assert callable(kwargs["get_tools"])
     assert callable(kwargs["get_mode_controller"])
     assert (

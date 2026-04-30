@@ -2417,10 +2417,20 @@ async def graph_query(
     - graph_edge (src, dst, type, weight, metadata)
     - graph_file_mtime (file, mtime, indexed_at)
 
+    IMPORTANT — column names are exact. Common mistakes:
+    - There is NO 'module' column. graph_analytics returns a computed 'module' field that
+      does NOT exist as a SQL column. To extract the top-level package name (e.g. 'victor'
+      from 'victor/core/foo.py') use: SUBSTR(file, 1, INSTR(file || '/', '/') - 1)
+      Note: this returns the first path component, not the full dotted module path.
+      Top-level files with no slash (e.g. 'setup.py') return the full filename.
+    - graph_edge has NO 'file' column — joins must go through graph_node on src/dst = node_id.
+
     Examples:
     - Find most imported modules: "SELECT count(*) as count, dst FROM graph_edge WHERE type='IMPORTS' GROUP BY dst ORDER BY count DESC LIMIT 10"
     - Count symbols by type: "SELECT type, count(*) as count FROM graph_node GROUP BY type ORDER BY count DESC"
     - Find files with most symbols: "SELECT file, count(*) as count FROM graph_node GROUP BY file ORDER BY count DESC LIMIT 10"
+    - Group by top-level package: "SELECT SUBSTR(file, 1, INSTR(file || '/', '/') - 1) as pkg, count(*) as cnt FROM graph_node GROUP BY pkg ORDER BY cnt DESC LIMIT 20"
+    - Cross-package coupling (imports between packages): "SELECT SUBSTR(n1.file, 1, INSTR(n1.file || '/', '/') - 1) as src_pkg, SUBSTR(n2.file, 1, INSTR(n2.file || '/', '/') - 1) as dst_pkg, count(*) as edges FROM graph_edge e JOIN graph_node n1 ON e.src = n1.node_id JOIN graph_node n2 ON e.dst = n2.node_id WHERE e.type='IMPORTS' GROUP BY src_pkg, dst_pkg ORDER BY edges DESC LIMIT 20"
 
     Args:
         query: SQL SELECT query to execute

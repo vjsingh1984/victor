@@ -1006,6 +1006,9 @@ class IsolationMapper:
 
         # AirgappedConstraints: Maximum isolation without network
         if isinstance(constraints, AirgappedConstraints):
+            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+            set_active_write_policy(WritePathPolicy.read_only())
             sandbox_type = "none"  # No external dependencies
             network_allowed = False
             filesystem_readonly = True
@@ -1013,6 +1016,9 @@ class IsolationMapper:
 
         # ComputeOnlyConstraints: Process isolation, no LLM
         elif isinstance(constraints, ComputeOnlyConstraints):
+            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+            set_active_write_policy(WritePathPolicy.read_only())
             if sandbox_type == "none":
                 sandbox_type = "process"  # Upgrade to process isolation
             network_allowed = constraints.network_allowed
@@ -1020,6 +1026,9 @@ class IsolationMapper:
 
         # FullAccessConstraints: Docker if available
         elif isinstance(constraints, FullAccessConstraints):
+            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+            set_active_write_policy(WritePathPolicy.full_access())
             sandbox_type = "docker"
             network_allowed = True
             filesystem_readonly = False
@@ -1035,8 +1044,20 @@ class IsolationMapper:
             if hasattr(constraints, "network_allowed"):
                 network_allowed = constraints.network_allowed
 
-            # Check write setting for filesystem
-            if hasattr(constraints, "write_allowed"):
+            # Path-tiered write policy takes precedence over binary write_allowed
+            write_path_policy = getattr(constraints, "write_path_policy", None)
+            if write_path_policy is not None:
+                from victor.tools.write_path_policy import set_active_write_policy
+
+                set_active_write_policy(write_path_policy)
+                filesystem_readonly = False  # per-path enforcement governs
+            elif hasattr(constraints, "write_allowed"):
+                from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+                if constraints.write_allowed:
+                    set_active_write_policy(WritePathPolicy.full_access())
+                else:
+                    set_active_write_policy(WritePathPolicy.read_only())
                 filesystem_readonly = not constraints.write_allowed
 
             # Update timeout from constraints

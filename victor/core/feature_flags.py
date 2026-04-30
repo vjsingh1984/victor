@@ -112,8 +112,11 @@ class FeatureFlag(Enum):
     # Phase 8 - Edge Model for micro-decisions
     USE_EDGE_MODEL = "use_edge_model"
 
-    # Phase 10 - Agentic Loop (single-turn execution with perception/evaluation)
-    USE_AGENTIC_LOOP = "use_agentic_loop"
+    # Phase 14 - Fuzzy Matching for robust classification
+    # Enables Levenshtein-based fuzzy matching across all classification systems
+    # to handle typos and spelling variations while maintaining high precision.
+    # Default: True (enabled by default for better UX)
+    USE_FUZZY_MATCHING = "use_fuzzy_matching"
 
     # Optimization flags (default: False — opt-in only)
     USE_SEMANTIC_RESPONSE_CACHE = "use_semantic_response_cache"
@@ -162,11 +165,13 @@ class FeatureFlag(Enum):
     USE_GRAPH_ENHANCED_CONTEXT = "use_graph_enhanced_context"
 
     # Phase 15 - Architecture Consolidation (Framework Primitives)
-    # These flags enable consolidation to use framework primitives (StateGraph, Teams)
+    # USE_STATEGRAPH_AGENTIC_LOOP gates the StateGraph executor inside
+    # AgenticLoop.run() (see victor/framework/agentic_loop.py:593). The other
+    # Phase-15 placeholders (USE_FRAMEWORK_TEAMS, USE_FRAMEWORK_COORDINATORS,
+    # USE_CONTEXT_SERVICE_INJECTION) were removed — they were defined but
+    # never read by production code. Coordinator/team consolidation now ships
+    # unconditionally; teams use UnifiedTeamCoordinator directly.
     USE_STATEGRAPH_AGENTIC_LOOP = "use_stategraph_agentic_loop"
-    USE_FRAMEWORK_COORDINATORS = "use_framework_coordinators"
-    USE_CONTEXT_SERVICE_INJECTION = "use_context_service_injection"
-    USE_FRAMEWORK_TEAMS = "use_framework_teams"
 
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
@@ -201,9 +206,6 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_EXTERNAL_AGENTIC_BENCHMARKS,
             # Phase 15: Architecture Consolidation (opt-in for safety)
             FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP,
-            FeatureFlag.USE_FRAMEWORK_COORDINATORS,
-            FeatureFlag.USE_CONTEXT_SERVICE_INJECTION,
-            FeatureFlag.USE_FRAMEWORK_TEAMS,
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:

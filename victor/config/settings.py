@@ -185,6 +185,15 @@ class ProjectPaths:
         return self.project_victor_dir / "conversations"
 
     @property
+    def analysis_dir(self) -> Path:
+        """Get project-local analysis checkpoint directory (.victor/analysis/).
+
+        Stores persistent cross-session analysis artifacts with YAML frontmatter
+        manifests for mtime-based staleness detection. Already gitignored via .victor/.
+        """
+        return self.project_victor_dir / "analysis"
+
+    @property
     def mcp_config(self) -> Path:
         """Get project-local MCP configuration file."""
         return self.project_victor_dir / "mcp.yaml"
@@ -241,6 +250,7 @@ class ProjectPaths:
         self.backups_dir.mkdir(parents=True, exist_ok=True)
         self.changes_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        self.analysis_dir.mkdir(parents=True, exist_ok=True)
 
     def ensure_global_dirs(self) -> None:
         """Create global directories if they don't exist."""
@@ -515,6 +525,7 @@ from victor.config.groups import (
     NetworkSettings,
     EmbeddingSettings,
     ToolSelectionSettings,
+    FuzzyMatchingSettings,
 )
 
 # Old config imports (to be migrated to groups)
@@ -611,6 +622,7 @@ _NESTED_GROUPS = {
     "network": NetworkSettings,
     "embedding": EmbeddingSettings,
     "tool_selection": ToolSelectionSettings,
+    "fuzzy_matching": FuzzyMatchingSettings,
 }
 
 
@@ -1111,6 +1123,7 @@ class Settings(BaseSettings):
     network: Optional[NetworkSettings] = Field(default=None, exclude=True, repr=False)
     embedding: Optional[EmbeddingSettings] = Field(default=None, exclude=True, repr=False)
     tool_selection: Optional[ToolSelectionSettings] = Field(default=None, exclude=True, repr=False)
+    fuzzy_matching: Optional[FuzzyMatchingSettings] = Field(default=None, exclude=True, repr=False)
 
     tool_settings: Optional[ToolSettings] = Field(
         default_factory=ToolSettings, exclude=True, repr=False

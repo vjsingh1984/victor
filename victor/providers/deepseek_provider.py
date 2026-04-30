@@ -26,9 +26,12 @@ References:
 - https://api-docs.deepseek.com/guides/reasoning_model
 """
 
-from typing import Any, Dict, List, Optional
+import json
+import re
+import uuid
+from typing import Any, AsyncIterator, Dict, List, Optional
 
-from victor.providers.base import ToolDefinition
+from victor.providers.base import CompletionResponse, StreamChunk, ToolDefinition
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
@@ -212,3 +215,141 @@ class DeepSeekProvider(HttpxOpenAICompatProvider):
             {"id": model_id, "object": "model", **info}
             for model_id, info in DEEPSEEK_MODELS.items()
         ]
+
+    # ── DSML fallback parser ──────────────────────────────────────────────────
+    #
+    # DeepSeek intermittently outputs tool calls as raw DSML (DeepSeek Markup
+    # Language) text in the `content` field with finish_reason="stop" and
+    # tool_calls=null, instead of the proper OpenAI-compatible tool_calls JSON.
+    # This is a known API bug (~10% failure rate) documented in:
+    #   https://github.com/deepseek-ai/DeepSeek-V3/issues/1244
+    #
+    # DSML uses fullwidth vertical bars (U+FF5C) as delimiters:
+    #   <｜｜DSML｜｜tool_calls>
+    #     <｜｜DSML｜｜invoke name="TOOL_NAME">
+    #       <｜｜DSML｜｜parameter name="P" string="true">VALUE</｜｜DSML｜｜parameter>
+    #     </｜｜DSML｜｜invoke>
+    #   </｜｜DSML｜｜tool_calls>
+
+    # U+FF5C fullwidth vertical line — used in DSML delimiters
+    _FVB = "｜"
+    _DSML_OPEN = re.compile(
+        r"<｜{1,2}DSML｜{1,2}tool_calls\s*>",
+        re.IGNORECASE,
+    )
+    _DSML_INVOKE = re.compile(
+        r'<｜{1,2}DSML｜{1,2}invoke\s+name="([^"]+)"\s*>(.*?)</｜{0,2}DSML｜{0,2}invoke\s*>',
+        re.DOTALL | re.IGNORECASE,
+    )
+    _DSML_PARAM = re.compile(
+        r'<｜{1,2}DSML｜{1,2}parameter\s+name="([^"]+)"\s+string="(true|false)"\s*>(.*?)</｜{0,2}DSML｜{0,2}parameter\s*>',
+        re.DOTALL | re.IGNORECASE,
+    )
+
+    @classmethod
+    def _parse_dsml_tool_calls(cls, content: str) -> Optional[List[Dict[str, Any]]]:
+        """Parse DeepSeek DSML tool-call markup from a content string.
+
+        Returns a list of tool call dicts (same shape as parse_openai_tool_calls)
+        if DSML is found, otherwise None.
+        """
+        if not cls._DSML_OPEN.search(content):
+            return None
+
+        tool_calls = []
+        for invoke_match in cls._DSML_INVOKE.finditer(content):
+            tool_name = invoke_match.group(1).strip()
+            params_block = invoke_match.group(2)
+            arguments: Dict[str, Any] = {}
+            for param_match in cls._DSML_PARAM.finditer(params_block):
+                param_name = param_match.group(1).strip()
+                is_string = param_match.group(2).lower() == "true"
+                raw_value = param_match.group(3).strip()
+                if is_string:
+                    arguments[param_name] = raw_value
+                else:
+                    try:
+                        arguments[param_name] = json.loads(raw_value)
+                    except Exception:
+                        arguments[param_name] = raw_value
+            tool_calls.append(
+                {
+                    "id": f"call_{uuid.uuid4().hex[:8]}",
+                    "name": tool_name,
+                    "arguments": arguments,
+                }
+            )
+        return tool_calls if tool_calls else None
+
+    # ── Path overrides that add DSML recovery ────────────────────────────────
+
+    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+        """Extend base parser with DSML-in-content recovery."""
+        response = super()._parse_response(result, model)
+        if response.tool_calls:
+            return response
+
+        dsml_calls = self._parse_dsml_tool_calls(response.content or "")
+        if dsml_calls:
+            logger.debug(
+                "deepseek: recovered %d tool call(s) from DSML content", len(dsml_calls)
+            )
+            return CompletionResponse(
+                content="",
+                role="assistant",
+                tool_calls=dsml_calls,
+                stop_reason="tool_calls",
+                usage=response.usage,
+                model=response.model,
+                raw_response=response.raw_response,
+                metadata=response.metadata,
+            )
+        return response
+
+    async def stream(
+        self,
+        messages: List[Any],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Buffer full stream to detect and recover DSML tool calls in content."""
+        buffered: List[StreamChunk] = []
+        async for chunk in super().stream(
+            messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            **kwargs,
+        ):
+            buffered.append(chunk)
+
+        # If the stream already produced proper tool calls, yield as-is.
+        if any(c.tool_calls for c in buffered):
+            for chunk in buffered:
+                yield chunk
+            return
+
+        # Check whether accumulated content is DSML.
+        full_content = "".join(c.content or "" for c in buffered)
+        dsml_calls = self._parse_dsml_tool_calls(full_content)
+        if dsml_calls:
+            logger.debug(
+                "deepseek stream: recovered %d tool call(s) from DSML content",
+                len(dsml_calls),
+            )
+            # Suppress DSML text; yield a single tool-call chunk.
+            yield StreamChunk(
+                content="",
+                tool_calls=dsml_calls,
+                stop_reason="tool_calls",
+                is_final=True,
+            )
+            return
+
+        for chunk in buffered:
+            yield chunk

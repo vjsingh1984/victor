@@ -247,7 +247,7 @@ class TestSmartRoutingFeatureFlag:
         monkeypatch.setenv("VICTOR_USE_SMART_ROUTING", "true")
 
         # Disable another flag
-        monkeypatch.setenv("VICTOR_USE_AGENTIC_LOOP", "false")
+        monkeypatch.setenv("VICTOR_USE_LEARNING_FROM_EXECUTION", "false")
 
         from victor.core.feature_flags import reset_feature_flag_manager
 
@@ -257,8 +257,8 @@ class TestSmartRoutingFeatureFlag:
         # Smart routing should be enabled
         assert manager.is_enabled(FeatureFlag.USE_SMART_ROUTING)
 
-        # Agentic loop should be disabled
-        assert not manager.is_enabled(FeatureFlag.USE_AGENTIC_LOOP)
+        # Learning-from-execution should be disabled
+        assert not manager.is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
 
         # Other flags should use defaults
         assert manager.is_enabled(FeatureFlag.USE_EDGE_MODEL)

@@ -243,7 +243,8 @@ async def stream_response(
 
         # FAIL-SAFE: Verify content was displayed
         final_content = renderer.finalize()
-        if not final_content:
+        # Tool-only turns are valid; only warn when neither text nor tool calls were produced.
+        if not final_content and not renderer.had_tool_calls():
             logger.warning("stream_response returned empty content - this may indicate a bug")
 
         return final_content

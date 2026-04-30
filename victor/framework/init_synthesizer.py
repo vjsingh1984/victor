@@ -143,9 +143,100 @@ SYNTHESIS_RULES = """RULES:
 - End with: "Run `/init --update` to refresh after code changes.\""""
 
 
-def _build_synthesis_prompt(base_content: str, rules: str = SYNTHESIS_RULES) -> str:
-    """Assemble the full synthesis prompt from frame + rules + data."""
-    return _SYNTHESIS_FRAME_BEFORE.format(rules=rules, base_content=base_content)
+def _build_synthesis_prompt(
+    base_content: str, rules: str = SYNTHESIS_RULES, graph_context: Optional[dict] = None
+) -> str:
+    """Assemble the full synthesis prompt from frame + rules + data + graph context."""
+    # Format graph context if available
+    graph_section = ""
+    if graph_context:
+        graph_section = _format_graph_context_for_prompt(graph_context)
+
+    # Inject graph context between rules and base content
+    data_section = base_content
+    if graph_section:
+        data_section = f"{graph_section}\n\n---\n\n{base_content}"
+
+    return _SYNTHESIS_FRAME_BEFORE.format(rules=rules, base_content=data_section)
+
+
+def _format_graph_context_for_prompt(graph_context: dict) -> str:
+    """Format graph context for LLM synthesis prompt.
+
+    Uses generic pattern terminology that applies to any project:
+    - "Decorator pattern" not "@tool decorator"
+    - "Registry pattern" not "tool registry"
+    - "Protocol/Interface" not "Victor protocol"
+    """
+    if not graph_context:
+        return ""
+
+    stats = graph_context.get("stats", {})
+    patterns = graph_context.get("patterns", {})
+    complexity = graph_context.get("complexity", {})
+
+    sections = []
+
+    # CCG section (universal - applies to any codebase)
+    if graph_context.get("has_ccg", False):
+        ccg_ratio = complexity.get("ccg_ratio", 0) * 100
+        sections.append(f"""
+## Code Structure Analysis
+
+This project has been analyzed with Code Context Graph (CCG) providing:
+- **Control Flow Graph (CFG)**: {stats.get('cfg_edges', 0)} edges showing execution paths
+- **Control Dependence Graph (CDG)**: {stats.get('cdg_edges', 0)} edges showing decision dependencies
+- **Data Dependence Graph (DDG)**: {stats.get('ddg_edges', 0)} edges showing data flow
+
+CCG Coverage: {ccg_ratio:.1f}% of graph edges have statement-level granularity.
+
+When analyzing, leverage these to:
+- Identify control flow complexity hotspots (deep nesting, complex branching)
+- Trace data dependencies and side effects
+- Understand decision points and their impact
+""")
+
+    # Generic design patterns (not Victor-specific)
+    pattern_sections = []
+
+    if patterns.get("decorator", 0) > 0:
+        pattern_sections.append(f"""
+- **Decorator Pattern**: {patterns['decorator']} decorated symbols detected.
+  Analyze how decorators modify behavior and cross-cutting concerns.
+""")
+
+    if patterns.get("protocol", 0) > 0:
+        pattern_sections.append(f"""
+- **Protocol/Interface Pattern**: {patterns['protocol']} implementation relationships.
+  Map abstraction hierarchies and contract implementations.
+""")
+
+    if patterns.get("registry", 0) > 0:
+        pattern_sections.append(f"""
+- **Registry/Plugin Pattern**: {patterns['registry']} registration relationships.
+  Identify extensibility points and plugin architecture.
+""")
+
+    if patterns.get("inheritance", 0) > 0:
+        pattern_sections.append(f"""
+- **Inheritance Pattern**: {patterns['inheritance']} inheritance relationships.
+  Analyze class hierarchies and method overrides.
+""")
+
+    if pattern_sections:
+        sections.append(f"""
+## Design Pattern Analysis
+
+The following design patterns have been detected in the codebase:
+{''.join(pattern_sections)}
+
+Use these patterns to:
+- Understand the architectural approach
+- Identify extensibility mechanisms
+- Map abstraction layers and contracts
+""")
+
+    return '\n'.join(sections)
 
 
 # Public constant for backward compatibility (assembled with static rules)
@@ -209,6 +300,7 @@ class InitSynthesizer:
         agent: Optional["AgentOrchestrator"] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
+        graph_context: Optional[dict] = None,
     ) -> str:
         """Synthesize init.md from pre-built base content via Agent framework.
 
@@ -217,6 +309,7 @@ class InitSynthesizer:
             agent: Existing orchestrator to reuse (from slash command context).
             provider: Provider name for fresh Agent (CLI path). Ignored if agent given.
             model: Model name for fresh Agent. Ignored if agent given.
+            graph_context: Optional graph statistics (CCG, patterns) for synthesis.
 
         Returns:
             Synthesized init.md markdown content.
@@ -236,13 +329,13 @@ class InitSynthesizer:
         # Check for GEPA-evolved RULES section (not the full prompt)
         evolved_rules = self._get_evolved_rules(provider)
         if evolved_rules:
-            prompt = _build_synthesis_prompt(base_content, rules=evolved_rules)
+            prompt = _build_synthesis_prompt(base_content, rules=evolved_rules, graph_context=graph_context)
             logger.info(
                 "[init] Using GEPA-evolved rules (%d chars) in fixed frame",
                 len(evolved_rules),
             )
         else:
-            prompt = _build_synthesis_prompt(base_content)
+            prompt = _build_synthesis_prompt(base_content, graph_context=graph_context)
 
         if agent:
             return await self._run_with_orchestrator(agent, prompt)
@@ -291,7 +384,7 @@ class InitSynthesizer:
 
         try:
             # Always prefer a direct provider call for init synthesis — bypass AgenticLoop.
-            # AgentOrchestrator.chat() routes through USE_AGENTIC_LOOP → edge model (Ollama)
+            # AgentOrchestrator.chat() routes through AgenticLoop → edge model (Ollama)
             # calls for task classification + tool selection even when we just need one LLM
             # call: prompt → markdown. Use the already-initialized provider directly instead.
 

@@ -14,7 +14,8 @@
 
 """Tests for the unified TaskAnalyzer."""
 
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 from victor.agent.task_analyzer import (
     TaskAnalyzer,
     TaskAnalysis,
@@ -314,6 +315,45 @@ class TestTaskAnalyzer:
         assert isinstance(result, TaskAnalysis)
         # No coordinator means no suggestions
         assert not result.has_team_suggestion
+
+    def test_analyze_with_suggestions_uses_shared_framework_runtime_subject(self):
+        """TaskAnalyzer should prefer the shared framework runtime helper when available."""
+        analyzer = TaskAnalyzer(runtime_subject=SimpleNamespace(name="runtime"))
+        suggestion = MagicMock()
+        suggestion.has_team_suggestion = True
+        suggestion.team_recommendations = [MagicMock()]
+        suggestion.action.value = "auto_spawn"
+
+        with patch(
+            "victor.framework.coordination_runtime.build_runtime_coordination_suggestion",
+            return_value=suggestion,
+        ) as build_suggestion:
+            result = analyzer.analyze_with_suggestions("Refactor this code", mode="build")
+
+        assert result.coordination_suggestion is suggestion
+        build_suggestion.assert_called_once_with(
+            runtime_subject=analyzer._runtime_subject,
+            task_type=result.unified_task_type.value.lower(),
+            complexity=result.complexity.value.lower(),
+            mode="build",
+        )
+
+    def test_analyze_with_suggestions_falls_back_to_coordinator(self):
+        """TaskAnalyzer should keep the coordinator as a compatibility fallback."""
+        coordinator = MagicMock()
+        suggestion = MagicMock()
+        suggestion.has_team_suggestion = False
+        coordinator.suggest_for_task.return_value = suggestion
+        analyzer = TaskAnalyzer(coordinator=coordinator)
+
+        result = analyzer.analyze_with_suggestions("Refactor this code", mode="plan")
+
+        assert result.coordination_suggestion is suggestion
+        coordinator.suggest_for_task.assert_called_once_with(
+            task_type=result.unified_task_type.value.lower(),
+            complexity=result.complexity.value.lower(),
+            mode="plan",
+        )
 
     def test_analyze_with_history_context(self):
         """Test analyze with proper history context."""

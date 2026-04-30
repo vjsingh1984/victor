@@ -74,14 +74,19 @@ class GraphIndexConfig:
             "**/venv/**",
             "**/.venv/**",
             "**/__pycache__/**",
+            "**/.mypy_cache/**",
+            "**/.pytest_cache/**",
+            "**/.ruff_cache/**",
             "**/dist/**",
             "**/build/**",
+            "**/target/**",  # Rust build artifacts
             "**/*.min.js",
             "**/*.min.css",
             "**/package-lock.json",
             "**/yarn.lock",
             "**/Poetry.lock",
             "**/*.pyc",
+            "**/.victor/**",  # Victor's own data directory
         ]
     )
     include_patterns: List[str] = field(default_factory=list)

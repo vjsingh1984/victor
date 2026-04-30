@@ -433,6 +433,10 @@ class LiveDisplayRenderer:
             self.console.print(f"[dim]  {tool_name} still running{dots} ({elapsed:.1f}s)[/]")
             self.resume()  # Resume after printing progress update
 
+    def had_tool_calls(self) -> bool:
+        """Return True if at least one tool call was processed this turn."""
+        return self._tool_section_shown
+
     def finalize(self) -> str:
         """Finalize response and return accumulated content.
 

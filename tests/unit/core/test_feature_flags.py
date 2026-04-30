@@ -487,14 +487,18 @@ class TestThreadSafety:
 
 
 class TestConsolidationFeatureFlags:
-    """Tests for architecture consolidation feature flags (Phase 15)."""
+    """Tests for architecture consolidation feature flags (Phase 15).
+
+    Only ``USE_STATEGRAPH_AGENTIC_LOOP`` remains — the other three Phase-15
+    placeholders (``USE_FRAMEWORK_TEAMS``, ``USE_FRAMEWORK_COORDINATORS``,
+    ``USE_CONTEXT_SERVICE_INJECTION``) were removed because they were never
+    read by production code. Coordinator/team consolidation now ships
+    unconditionally.
+    """
 
     def test_consolidation_flags_exist(self):
-        """Test that all consolidation feature flags are defined."""
+        """Test that the surviving consolidation feature flag is defined."""
         assert hasattr(FeatureFlag, "USE_STATEGRAPH_AGENTIC_LOOP")
-        assert hasattr(FeatureFlag, "USE_FRAMEWORK_COORDINATORS")
-        assert hasattr(FeatureFlag, "USE_CONTEXT_SERVICE_INJECTION")
-        assert hasattr(FeatureFlag, "USE_FRAMEWORK_TEAMS")
 
     def test_consolidation_flags_have_valid_env_vars(self):
         """Test that consolidation flags have valid environment variable names."""
@@ -502,34 +506,21 @@ class TestConsolidationFeatureFlags:
             FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_env_var_name()
             == "VICTOR_USE_STATEGRAPH_AGENTIC_LOOP"
         )
-        assert (
-            FeatureFlag.USE_FRAMEWORK_COORDINATORS.get_env_var_name()
-            == "VICTOR_USE_FRAMEWORK_COORDINATORS"
-        )
-        assert (
-            FeatureFlag.USE_CONTEXT_SERVICE_INJECTION.get_env_var_name()
-            == "VICTOR_USE_CONTEXT_SERVICE_INJECTION"
-        )
-        assert FeatureFlag.USE_FRAMEWORK_TEAMS.get_env_var_name() == "VICTOR_USE_FRAMEWORK_TEAMS"
 
     def test_consolidation_flags_default_to_false(self):
         """Test that consolidation flags are opt-in (disabled by default)."""
         config = FeatureFlagConfig(default_enabled=True)
         manager = FeatureFlagManager(config)
 
-        # Consolidation flags should default to False (opt-in for safety)
+        # Consolidation flag should default to False (opt-in for safety)
         assert not manager.is_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
-        assert not manager.is_enabled(FeatureFlag.USE_FRAMEWORK_COORDINATORS)
-        assert not manager.is_enabled(FeatureFlag.USE_CONTEXT_SERVICE_INJECTION)
-        assert not manager.is_enabled(FeatureFlag.USE_FRAMEWORK_TEAMS)
 
     def test_consolidation_flags_can_be_enabled_via_env(self):
         """Test that consolidation flags can be enabled via environment variables."""
         import os
 
-        # Set environment variables
+        # Set environment variable
         os.environ["VICTOR_USE_STATEGRAPH_AGENTIC_LOOP"] = "true"
-        os.environ["VICTOR_USE_FRAMEWORK_COORDINATORS"] = "1"
 
         try:
             # Reset manager to pick up new env vars
@@ -537,13 +528,9 @@ class TestConsolidationFeatureFlags:
             manager = get_feature_flag_manager()
 
             assert manager.is_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
-            assert manager.is_enabled(FeatureFlag.USE_FRAMEWORK_COORDINATORS)
-            assert not manager.is_enabled(FeatureFlag.USE_CONTEXT_SERVICE_INJECTION)
-            assert not manager.is_enabled(FeatureFlag.USE_FRAMEWORK_TEAMS)
         finally:
             # Clean up
             del os.environ["VICTOR_USE_STATEGRAPH_AGENTIC_LOOP"]
-            del os.environ["VICTOR_USE_FRAMEWORK_COORDINATORS"]
             reset_feature_flag_manager()
 
     def test_consolidation_flags_can_be_enabled_at_runtime(self):
@@ -551,7 +538,7 @@ class TestConsolidationFeatureFlags:
         config = FeatureFlagConfig(default_enabled=False)
         manager = FeatureFlagManager(config)
 
-        # All should be disabled initially
+        # Should be disabled initially
         assert not manager.is_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
 
         # Enable at runtime
@@ -567,12 +554,6 @@ class TestConsolidationFeatureFlags:
         assert (
             FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_yaml_key() == "use_stategraph_agentic_loop"
         )
-        assert FeatureFlag.USE_FRAMEWORK_COORDINATORS.get_yaml_key() == "use_framework_coordinators"
-        assert (
-            FeatureFlag.USE_CONTEXT_SERVICE_INJECTION.get_yaml_key()
-            == "use_context_service_injection"
-        )
-        assert FeatureFlag.USE_FRAMEWORK_TEAMS.get_yaml_key() == "use_framework_teams"
 
     def test_consolidation_flags_from_yaml(self):
         """Test loading consolidation flags from YAML config."""
@@ -583,9 +564,6 @@ class TestConsolidationFeatureFlags:
 
             flags = {
                 "use_stategraph_agentic_loop": True,
-                "use_framework_coordinators": False,
-                "use_context_service_injection": True,
-                "use_framework_teams": False,
             }
 
             save_feature_flags_to_yaml(flags, config_path)
@@ -595,6 +573,3 @@ class TestConsolidationFeatureFlags:
             manager = FeatureFlagManager(config)
 
             assert manager.is_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
-            assert not manager.is_enabled(FeatureFlag.USE_FRAMEWORK_COORDINATORS)
-            assert manager.is_enabled(FeatureFlag.USE_CONTEXT_SERVICE_INJECTION)
-            assert not manager.is_enabled(FeatureFlag.USE_FRAMEWORK_TEAMS)

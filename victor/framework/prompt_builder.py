@@ -51,6 +51,7 @@ import asyncio
 import logging
 import sys
 from dataclasses import dataclass, field
+from textwrap import dedent
 from enum import Enum
 from pathlib import Path
 from typing import (
@@ -639,6 +640,28 @@ class PromptBuilder:
                     kind="tool_hints",
                 )
             )
+
+        document.upsert(
+            PromptBlock(
+                name="analysis_efficiency",
+                content=dedent("""\
+                    Before starting any structural or architectural analysis of the codebase:
+                    1. Call `analysis_checkpoint(mode="list", topic="")` to see available cached analyses.
+                    2. Call `analysis_checkpoint(mode="read", topic="<topic>")` for the relevant topic.
+                    3. If status is "current" — use the cached content directly. Skip tool-intensive analysis.
+                    4. If status is "stale" — re-analyze only the changed files listed in stale_files, then
+                       update: `analysis_checkpoint(mode="write", topic="...", source_files=[...], content="...")`.
+                    5. If status is "not_found" — run analysis, then write a checkpoint on completion.
+
+                    Checkpoints live in `.victor/analysis/{slug}-analysis.md` with YAML frontmatter tracking
+                    source file mtimes. Staleness is auto-detected via the graph_file_mtime table.
+                    Reading a checkpoint costs ~500 tokens vs 8,000–15,000 for a fresh deep analysis.\
+                """),
+                priority=self.PRIORITY_TOOL_GUIDANCE,
+                header="## Analysis Efficiency",
+                kind="analysis_efficiency",
+            )
+        )
 
         if self._safety_rules:
             rules_lines = [f"- {rule}" for rule in self._safety_rules]

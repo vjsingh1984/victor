@@ -28,6 +28,9 @@ Executors:
 - Registry helpers: Support plugin/application registration of custom node types
 """
 
+import warnings
+from typing import Any
+
 from victor.workflows.executors.factory import NodeExecutorFactory
 from victor.workflows.executors.registry import (
     WorkflowNodeExecutorRegistration,
@@ -36,7 +39,29 @@ from victor.workflows.executors.registry import (
     get_workflow_node_executor_registry,
     register_workflow_node_executor,
 )
-from victor.workflows.executors.team import TeamNodeExecutor, TeamStepExecutor
+from victor.workflows.executors.team import TeamStepExecutor
+
+_DEPRECATED_ALIAS_MAP = {
+    "TeamNodeExecutor": TeamStepExecutor,
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_ALIAS_MAP:
+        warnings.warn(
+            f"{name} is deprecated; use "
+            f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
+            "The TeamNode* compatibility aliases remain during the current "
+            "migration window and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED_ALIAS_MAP[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_DEPRECATED_ALIAS_MAP))
 
 __all__ = [
     "NodeExecutorFactory",

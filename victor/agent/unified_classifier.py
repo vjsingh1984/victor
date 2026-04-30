@@ -58,6 +58,13 @@ if TYPE_CHECKING:
 # Import native availability from shared location
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 
+# Import fuzzy matching for robust typo-tolerant classification
+try:
+    from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
+    _FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    _FUZZY_MATCHING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Log native availability for classifier
@@ -407,13 +414,18 @@ def _is_keyword_negated(message: str, keyword: str, position: int) -> bool:
 
 
 def _find_keywords_with_positions(
-    message: str, keywords: List[Tuple[str, float]]
+    message: str,
+    keywords: List[Tuple[str, float]],
+    use_fuzzy: bool = True,
+    min_similarity: float = 0.75,
 ) -> List[KeywordMatch]:
     """Find all keyword matches with positions and weights.
 
     Args:
         message: Message to search
         keywords: List of (keyword, weight) tuples
+        use_fuzzy: Whether to use fuzzy matching for typos (default True)
+        min_similarity: Minimum similarity ratio for fuzzy matching (default 0.75)
 
     Returns:
         List of KeywordMatch objects
@@ -421,6 +433,36 @@ def _find_keywords_with_positions(
     message_lower = message.lower()
     matches = []
 
+    # Try fuzzy matching first if enabled and available
+    if use_fuzzy and _FUZZY_MATCHING_AVAILABLE:
+        keywords_dict = {kw: weight for kw, weight in keywords}
+        fuzzy_matches, stats = match_keywords_cascading(
+            message_lower, keywords_dict, use_fuzzy=True, min_similarity_ratio=min_similarity
+        )
+
+        # If fuzzy matches found, use them
+        if fuzzy_matches and stats["method"] == "fuzzy":
+            # Create KeywordMatch objects for fuzzy matches
+            for matched_keyword in fuzzy_matches:
+                weight = keywords_dict[matched_keyword]
+                # Find position in message (use first occurrence)
+                pattern = rf"\b{re.escape(matched_keyword)}\b"
+                match_obj = re.search(pattern, message_lower, re.IGNORECASE)
+                if match_obj:
+                    pos = match_obj.start()
+                    negated = _is_keyword_negated(message, matched_keyword, pos)
+                    matches.append(
+                        KeywordMatch(
+                            keyword=matched_keyword,
+                            category="",  # Set by caller
+                            position=pos,
+                            negated=negated,
+                            weight=weight,
+                        )
+                    )
+            return matches
+
+    # Fall back to exact matching (original behavior)
     for keyword, weight in keywords:
         # Use word boundary matching for single words
         if " " not in keyword:

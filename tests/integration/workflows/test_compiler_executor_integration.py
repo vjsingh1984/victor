@@ -213,7 +213,7 @@ class TestNodeExecutorFactory:
     async def test_factory_creates_all_executor_types(self, container):
         """Test that factory can create all executor types."""
         from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
-        from victor.workflows.definition import AgentNode, ComputeNode, TeamNodeWorkflow
+        from victor.workflows.definition import AgentNode, ComputeNode, TeamStepWorkflow
         from victor.workflows.hitl import HITLNode, HITLNodeType
 
         factory = container.get(NodeExecutorFactoryProtocol)
@@ -238,13 +238,13 @@ class TestNodeExecutorFactory:
         assert compute_executor is not None
         assert callable(compute_executor)
 
-        team_node = TeamNodeWorkflow(
+        team_step = TeamStepWorkflow(
             id="team",
             name="Team",
             goal="Coordinate",
             members=[{"id": "lead", "role": "researcher", "goal": "Inspect"}],
         )
-        team_executor = factory.create_executor(team_node)
+        team_executor = factory.create_executor(team_step)
         assert team_executor is not None
         assert callable(team_executor)
 

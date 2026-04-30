@@ -272,15 +272,41 @@ def test_adapter_workflow_state_alias_remains_available() -> None:
 
 
 def test_executor_package_exports_team_step_aliases() -> None:
-    from victor.workflows.executors import TeamNodeExecutor, TeamStepExecutor
+    with pytest.warns(DeprecationWarning, match="TeamNodeExecutor"):
+        from victor.workflows.executors import TeamNodeExecutor
+
+    from victor.workflows.executors import TeamStepExecutor
 
     assert TeamStepExecutor is TeamNodeExecutor
 
 
 def test_workflows_package_exports_team_step_workflow_aliases() -> None:
-    from victor.workflows import TeamNodeWorkflow, TeamStepWorkflow
+    with pytest.warns(DeprecationWarning, match="TeamNodeWorkflow"):
+        from victor.workflows import TeamNodeWorkflow
+
+    from victor.workflows import TeamStepWorkflow
 
     assert TeamStepWorkflow is TeamNodeWorkflow
+
+
+def test_team_executor_module_alias_warns() -> None:
+    import victor.workflows.executors.team as team_module
+    from victor.workflows.executors.team import TeamStepExecutor
+
+    with pytest.warns(DeprecationWarning, match="TeamNodeExecutor"):
+        alias = team_module.TeamNodeExecutor
+
+    assert alias is TeamStepExecutor
+
+
+def test_workflow_definition_module_alias_warns() -> None:
+    import victor.workflows.definition as definition_module
+    from victor.workflows.definition import TeamStepWorkflow
+
+    with pytest.warns(DeprecationWarning, match="TeamNodeWorkflow"):
+        alias = definition_module.TeamNodeWorkflow
+
+    assert alias is TeamStepWorkflow
 
 
 def test_adapter_execution_handler_uses_shared_sync_bridge_without_running_loop() -> None:

@@ -877,34 +877,7 @@ class TestLLMRefinement:
         assert result is heuristic
 
 
-# ============================================================================
-# Feature Flag Integration Tests
-# ============================================================================
-
-
-class TestFeatureFlagIntegration:
-    """Tests USE_AGENTIC_LOOP feature flag controls execution path."""
-
-    def test_flag_defaults_to_enabled(self):
-        from victor.core.feature_flags import FeatureFlag, FeatureFlagManager
-
-        # Use a fresh manager to avoid pollution from other tests
-        fresh_mgr = FeatureFlagManager()
-        assert fresh_mgr.is_enabled(FeatureFlag.USE_AGENTIC_LOOP) is True
-
-    def test_flag_can_be_disabled(self):
-        from unittest.mock import patch as mock_patch
-
-        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
-
-        mgr = get_feature_flag_manager()
-        mgr.disable(FeatureFlag.USE_AGENTIC_LOOP)
-        try:
-            assert mgr.is_enabled(FeatureFlag.USE_AGENTIC_LOOP) is False
-        finally:
-            mgr.enable(FeatureFlag.USE_AGENTIC_LOOP)
-
-    def test_flag_env_var_name(self):
-        from victor.core.feature_flags import FeatureFlag
-
-        assert FeatureFlag.USE_AGENTIC_LOOP.get_env_var_name() == "VICTOR_USE_AGENTIC_LOOP"
+# Note: feature-flag plumbing tests live in tests/unit/core/test_feature_flags.py.
+# The previous TestFeatureFlagIntegration class here referenced USE_AGENTIC_LOOP
+# claiming it controlled the execution path; it never did, and the flag has been
+# removed. See AgenticLoop.run() for the real seam (USE_STATEGRAPH_AGENTIC_LOOP).

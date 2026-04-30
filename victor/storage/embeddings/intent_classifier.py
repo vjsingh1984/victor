@@ -36,6 +36,13 @@ from victor.storage.embeddings.collections import (
 )
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
+# Import fuzzy matching for robust typo-tolerant intent classification
+try:
+    from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
+    _FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    _FUZZY_MATCHING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Module-level optional reference to LLMDecisionService (set during bootstrap)
@@ -155,6 +162,105 @@ def _has_stuck_loop_heuristic(text: str) -> bool:
         return True
 
     return False
+
+
+def _has_continuation_heuristic_fuzzy(text: str) -> bool:
+    """Check for continuation patterns with fuzzy matching for typos.
+
+    This function provides a fallback that uses fuzzy matching to detect
+    continuation intent even when the user makes typos in keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if continuation patterns detected with fuzzy matching
+    """
+    if not _FUZZY_MATCHING_AVAILABLE:
+        return False
+
+    # Keywords from CONTINUATION_HEURISTIC_PATTERNS
+    continuation_keywords = {
+        "continue": 1.5,
+        "read": 1.3,
+        "check": 1.3,
+        "examine": 1.3,
+        "analyze": 1.3,
+        "review": 1.3,
+        "explore": 1.2,
+        "investigate": 1.2,
+        "look": 1.1,
+        "next": 1.4,
+        "proceed": 1.4,
+    }
+
+    matches, stats = match_keywords_cascading(text, continuation_keywords, use_fuzzy=True)
+    return len(matches) > 0
+
+
+def _has_stuck_loop_heuristic_fuzzy(text: str) -> bool:
+    """Check for stuck loop patterns with fuzzy matching for typos.
+
+    This function provides a fallback that uses fuzzy matching to detect
+    stuck loop patterns even when the user makes typos in keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if stuck loop patterns detected with fuzzy matching
+    """
+    if not _FUZZY_MATCHING_AVAILABLE:
+        return False
+
+    # Keywords from STUCK_LOOP_HEURISTIC_PATTERNS
+    stuck_loop_keywords = {
+        "going": 1.2,
+        "will": 1.1,
+        "read": 1.3,
+        "examine": 1.3,
+        "check": 1.3,
+        "call": 1.2,
+        "use": 1.2,
+        "begin": 1.1,
+        "start": 1.1,
+    }
+
+    matches, stats = match_keywords_cascading(text, stuck_loop_keywords, use_fuzzy=True)
+
+    # Need multiple planning keywords to indicate stuck loop
+    return len(matches) >= 2
+
+
+def _has_asking_input_heuristic_fuzzy(text: str) -> bool:
+    """Check for asking input patterns with fuzzy matching for typos.
+
+    This function provides a fallback that uses fuzzy matching to detect
+    asking input intent even when the user makes typos in keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if asking input patterns detected with fuzzy matching
+    """
+    if not _FUZZY_MATCHING_AVAILABLE:
+        return False
+
+    # Keywords from ASKING_INPUT_HEURISTIC_PATTERNS
+    asking_input_keywords = {
+        "should": 1.3,
+        "prefer": 1.3,
+        "like": 1.2,
+        "confirm": 1.3,
+        "approve": 1.3,
+        "would": 1.2,
+        "want": 1.2,
+        "know": 1.1,
+    }
+
+    matches, stats = match_keywords_cascading(text, asking_input_keywords, use_fuzzy=True)
+    return len(matches) > 0
 
 
 # Compiled regex patterns for explicit asking-for-input detection
@@ -491,7 +597,7 @@ def _classify_with_heuristics(
         )
 
     # HEURISTIC OVERRIDE 1: Check for stuck loop patterns
-    if _has_stuck_loop_heuristic(text):
+    if _has_stuck_loop_heuristic(text) or _has_stuck_loop_heuristic_fuzzy(text):
         top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
         logger.debug("STUCK_LOOP detected via heuristic override (conf=0.85)")
         return IntentResult(
@@ -501,7 +607,7 @@ def _classify_with_heuristics(
         )
 
     # HEURISTIC OVERRIDE 2: Check for explicit continuation patterns
-    if _has_continuation_heuristic(text):
+    if _has_continuation_heuristic(text) or _has_continuation_heuristic_fuzzy(text):
         heuristic_confidence = max(best_continuation, 0.75)
         top_matches.append(("heuristic:continuation_pattern", heuristic_confidence))
         logger.debug(
@@ -527,7 +633,7 @@ def _classify_with_heuristics(
         )
 
     # HEURISTIC OVERRIDE 4: Check for explicit asking-for-input patterns
-    if _has_asking_input_heuristic(text):
+    if _has_asking_input_heuristic(text) or _has_asking_input_heuristic_fuzzy(text):
         heuristic_confidence = max(best_asking_input, 0.75)
         top_matches.append(("heuristic:asking_input_pattern", heuristic_confidence))
         logger.debug(

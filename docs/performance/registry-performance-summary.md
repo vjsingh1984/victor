@@ -207,7 +207,7 @@ from victor.core.feature_flag_cache import FeatureFlagCache
 # Automatic caching in bulk operations:
 with FeatureFlagCache.scope() as cache:
     for tool in tools:
-        if cache.is_enabled(FeatureFlag.USE_AGENTIC_LOOP):
+        if cache.is_enabled(FeatureFlag.USE_EDGE_MODEL):
             # Cached check, 1.6× faster
             pass
 ```

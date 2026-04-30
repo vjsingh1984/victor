@@ -85,7 +85,7 @@ class FeatureFlagCache:
         Example:
             >>> with FeatureFlagCache.scope() as cache:
             ...     for tool in tools:
-            ...         if cache.is_enabled(FeatureFlag.use_agentic_loop):
+            ...         if cache.is_enabled(FeatureFlag.use_edge_model):
             ...             # Cached check, faster than env var lookup
             ...             pass
         """
@@ -247,7 +247,7 @@ def cached_is_enabled(flag: FeatureFlag, default: bool = False) -> bool:
     Example:
         >>> # Use cached check in bulk operations
         >>> for tool in tools:
-        ...     if cached_is_enabled(FeatureFlag.use_agentic_loop):
+        ...     if cached_is_enabled(FeatureFlag.use_edge_model):
         ...         # Cached check, faster than env var lookup
         ...         pass
     """

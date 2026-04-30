@@ -485,25 +485,43 @@ def enforce_sandbox_path(file_path: Path) -> None:
         file_path: The resolved file path being written to
 
     Raises:
-        PermissionError: If path is outside sandbox in restricted mode
+        PermissionError: If path is outside the active write policy or sandbox
     """
+    from victor.tools.write_path_policy import get_active_write_policy
+
+    policy = get_active_write_policy()
+    if policy is not None:
+        if not policy.allows(file_path):
+            try:
+                from victor.agent.mode_controller import get_mode_controller
+
+                mode = get_mode_controller().current_mode.value.upper()
+            except Exception:
+                mode = "RESTRICTED"
+            raise PermissionError(
+                f"[{mode} MODE] Cannot write to '{file_path}'.\n"
+                f"Analysis-safe paths: .victor/analysis/, ./tmp/, ./docs/*.md, "
+                f"./ANALYSIS-*.md, ./CHECKPOINT-*.md, /tmp/**"
+            )
+        return  # Policy satisfied — skip legacy sandbox check
+
+    # Legacy sandbox path (no policy set — unchanged behavior)
     sandbox = get_sandbox_path()
 
     if sandbox is None:
-        # No sandbox restriction in effect
         return
 
-    # Ensure sandbox exists
     sandbox.mkdir(parents=True, exist_ok=True)
 
-    # Check if the path is within the sandbox
     try:
         file_path.resolve().relative_to(sandbox.resolve())
     except ValueError:
-        # Path is not within sandbox
-        from victor.agent.mode_controller import get_mode_controller
+        try:
+            from victor.agent.mode_controller import get_mode_controller
 
-        mode = get_mode_controller().current_mode.value.upper()
+            mode = get_mode_controller().current_mode.value.upper()
+        except Exception:
+            mode = "RESTRICTED"
         raise PermissionError(
             f"[{mode} MODE] Cannot write to '{file_path}'.\n"
             f"In {mode} mode, edits are restricted to the sandbox directory: {sandbox}\n"

@@ -27,6 +27,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -61,6 +62,15 @@ def _ensure_numpy():
 
         np = numpy
     return np
+
+
+# Import fuzzy matching for robust classification
+# This module provides Levenshtein-based fuzzy matching to handle typos
+try:
+    from victor.storage.embeddings.fuzzy_matcher import extract_key_terms_fuzzy
+    _FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    _FUZZY_MATCHING_AVAILABLE = False
 
 
 # Default embedding model - matches unified_embedding_model in settings.py
@@ -614,6 +624,102 @@ class EmbeddingService:
         # Dot product
         similarities = np.dot(corpus_norms, query_norm)
         return np.asarray(similarities)
+
+    # Task classification key term weights for boosting similarity
+    TASK_KEY_TERMS = {
+        # Analysis terms (highest boost)
+        "analyze": 1.5, "analysis": 1.5, "review": 1.4, "audit": 1.4,
+        "examine": 1.3, "inspect": 1.3, "investigate": 1.3,
+        # Structural/architecture terms
+        "structure": 1.2, "architecture": 1.2, "framework": 1.1,
+        "design": 1.1, "system": 1.0,
+        # Generation terms
+        "create": 1.3, "generate": 1.3, "write": 1.2, "make": 1.1,
+        # Edit/refactor terms
+        "edit": 1.2, "refactor": 1.3, "fix": 1.2, "modify": 1.2,
+        # Search terms
+        "search": 1.3, "find": 1.2, "locate": 1.2, "grep": 1.3,
+        # Execution terms
+        "run": 1.2, "execute": 1.2, "deploy": 1.2,
+        # Testing terms
+        "test": 1.2, "testing": 1.2, "coverage": 1.1,
+    }
+
+    @staticmethod
+    def weighted_cosine_similarity(
+        query: np.ndarray,
+        query_text: str,
+        corpus: np.ndarray,
+        corpus_texts: List[str],
+        key_term_weights: Optional[Dict[str, float]] = None,
+    ) -> np.ndarray:
+        """Calculate weighted cosine similarity with key term boosting.
+
+        Combines semantic similarity from embeddings with lexical matching
+        of key task terms. This handles cases like:
+        - "structural analysis" vs "analyze the structure"
+        - "framework review" vs "review the framework"
+
+        The boost is applied logarithmically to avoid over-boosting:
+        boost = 1.0 + ln(avg_weight_of_overlapping_terms)
+
+        Args:
+            query: Query embedding vector (shape: [dimension])
+            query_text: Query text for tokenization
+            corpus: Corpus embeddings matrix (shape: [n_items, dimension])
+            corpus_texts: Corpus texts for tokenization
+            key_term_weights: Optional custom term weights (default: TASK_KEY_TERMS)
+
+        Returns:
+            Weighted similarity scores (shape: [n_items]), capped at 1.0
+        """
+        import re
+
+        _ensure_numpy()
+
+        # Use provided weights or default task classification weights
+        weights = key_term_weights or EmbeddingService.TASK_KEY_TERMS
+
+        # Calculate base cosine similarity
+        base_similarities = EmbeddingService.cosine_similarity_matrix(query, corpus)
+
+        # Extract key terms from query with fuzzy matching for typo tolerance
+        query_lower = query_text.lower()
+        query_words = set(re.findall(r'\b\w+\b', query_lower))
+
+        # Use fuzzy matching if available, otherwise fall back to exact matching
+        if _FUZZY_MATCHING_AVAILABLE:
+            query_key_terms = extract_key_terms_fuzzy(query_words, weights)
+        else:
+            # Fallback to exact matching
+            query_key_terms = {w for w in query_words if w in weights}
+
+        # If no key terms in query, return base similarities
+        if not query_key_terms:
+            return base_similarities
+
+        # Calculate term overlap boosts for each corpus item
+        boosts = np.ones(len(corpus_texts))
+
+        for i, doc_text in enumerate(corpus_texts):
+            doc_lower = doc_text.lower()
+            doc_words = set(re.findall(r'\b\w+\b', doc_lower))
+            doc_key_terms = {w for w in doc_words if w in weights}
+
+            # Find overlapping key terms
+            overlap = query_key_terms & doc_key_terms
+
+            if overlap:
+                # Calculate average boost weight for overlapping terms
+                avg_boost = sum(weights[t] for t in overlap) / len(overlap)
+                # Apply boost logarithmically to avoid over-boosting
+                # This ensures: 1.0 = no boost, ~1.4 = strong boost
+                boosts[i] = 1.0 + np.log(max(avg_boost, 1.0))
+
+        # Combine: base similarity * boost, capped at 1.0
+        weighted_similarities = np.minimum(base_similarities * boosts, 1.0)
+
+        return np.asarray(weighted_similarities)
 
 
 def get_embedding_service(

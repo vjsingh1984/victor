@@ -6,19 +6,7 @@ definitions onto the AgentOrchestrator class.
 
 import pytest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
-
-from victor.agent.services.chat_compat_telemetry import (
-    get_deprecated_chat_shim_telemetry,
-    reset_deprecated_chat_shim_telemetry,
-)
-
-
-@pytest.fixture(autouse=True)
-def _reset_chat_compat_telemetry():
-    reset_deprecated_chat_shim_telemetry()
-    yield
-    reset_deprecated_chat_shim_telemetry()
+from unittest.mock import MagicMock
 
 
 class TestOrchestratorPropertyInstallation:
@@ -64,9 +52,6 @@ class TestOrchestratorPropertyInstallation:
         lazy_props = [
             "protocol_adapter",
             "turn_executor",
-            "sync_chat_coordinator",
-            "streaming_chat_coordinator",
-            "unified_chat_coordinator",
             "intelligent_integration",
             "subagent_orchestrator",
             "coordination",
@@ -78,6 +63,19 @@ class TestOrchestratorPropertyInstallation:
             assert isinstance(
                 getattr(AgentOrchestrator, prop_name), property
             ), f"'{prop_name}' should be a property descriptor"
+
+    def test_specialized_chat_coordinators_are_not_installed_on_orchestrator(self):
+        """Deprecated specialized chat shims now live on the orchestration facade only."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        removed_props = [
+            "sync_chat_coordinator",
+            "streaming_chat_coordinator",
+            "unified_chat_coordinator",
+        ]
+
+        for prop_name in removed_props:
+            assert hasattr(AgentOrchestrator, prop_name) is False
 
     def test_properties_module_has_install_function(self):
         """The module should export install_properties."""
@@ -102,102 +100,18 @@ class TestOrchestratorPropertyInstallation:
 
         assert orchestrator.skill_matcher is matcher
 
-    def test_tool_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
-        """The legacy _tool_coordinator alias should warn and proxy the shim."""
+    def test_removed_compatibility_aliases_are_not_installed_on_orchestrator(self):
+        """Deprecated chat/session/tool coordinator aliases now live off-orchestrator."""
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orchestrator = object.__new__(AgentOrchestrator)
-        shim = MagicMock(name="tool_shim")
-        orchestrator._deprecated_tool_coordinator = shim
+        removed_aliases = [
+            "_tool_coordinator",
+            "_chat_coordinator",
+            "_session_coordinator",
+        ]
 
-        with pytest.warns(
-            DeprecationWarning,
-            match="AgentOrchestrator._tool_coordinator is deprecated compatibility surface",
-        ):
-            result = orchestrator._tool_coordinator
-
-        assert result is shim
-
-    def test_tool_coordinator_alias_setter_warns(self):
-        """The legacy _tool_coordinator setter should warn and update the shim slot."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        shim = MagicMock(name="tool_shim")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="AgentOrchestrator._tool_coordinator is deprecated compatibility surface",
-        ):
-            orchestrator._tool_coordinator = shim
-
-        assert orchestrator._deprecated_tool_coordinator is shim
-
-    def test_chat_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
-        """The legacy _chat_coordinator alias should warn and proxy the shim."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        shim = MagicMock(name="chat_shim")
-        orchestrator._deprecated_chat_coordinator = shim
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="AgentOrchestrator._chat_coordinator is deprecated compatibility surface",
-        ):
-            result = orchestrator._chat_coordinator
-
-        assert result is shim
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["agent_orchestrator._chat_coordinator_get.compat_property"] == 1
-
-    def test_chat_coordinator_alias_setter_warns(self):
-        """The legacy _chat_coordinator setter should warn and update the shim slot."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        shim = MagicMock(name="chat_shim")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="AgentOrchestrator._chat_coordinator is deprecated compatibility surface",
-        ):
-            orchestrator._chat_coordinator = shim
-
-        assert orchestrator._deprecated_chat_coordinator is shim
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["agent_orchestrator._chat_coordinator_set.compat_property"] == 1
-
-    def test_session_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
-        """The legacy _session_coordinator alias should warn and proxy the shim."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        shim = MagicMock(name="session_shim")
-        orchestrator._deprecated_session_coordinator = shim
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="AgentOrchestrator._session_coordinator is deprecated compatibility surface",
-        ):
-            result = orchestrator._session_coordinator
-
-        assert result is shim
-
-    def test_session_coordinator_alias_setter_warns(self):
-        """The legacy _session_coordinator setter should warn and update the shim slot."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        shim = MagicMock(name="session_shim")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="AgentOrchestrator._session_coordinator is deprecated compatibility surface",
-        ):
-            orchestrator._session_coordinator = shim
-
-        assert orchestrator._deprecated_session_coordinator is shim
+        for prop_name in removed_aliases:
+            assert hasattr(AgentOrchestrator, prop_name) is False
 
     def test_provider_coordinator_alias_warns_and_derives_from_provider_runtime(self):
         """The legacy _provider_coordinator alias should warn and derive from provider_runtime."""
@@ -285,74 +199,6 @@ class TestOrchestratorPropertyInstallation:
             ),
         ):
             assert orchestrator._provider_switch_coordinator is shim
-
-    def test_specialized_chat_coordinators_use_deprecated_backing_slots(self):
-        """Lazy chat coordinator properties should store instances in deprecated slots."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        orchestrator._deprecated_sync_chat_coordinator = MagicMock(name="sync")
-        orchestrator._deprecated_streaming_chat_coordinator = MagicMock(name="streaming")
-        orchestrator._deprecated_unified_chat_coordinator = MagicMock(name="unified")
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="AgentOrchestrator.sync_chat_coordinator is deprecated compatibility surface",
-        ):
-            assert orchestrator.sync_chat_coordinator._mock_name == "sync"
-
-        with pytest.warns(
-            DeprecationWarning,
-            match=(
-                "AgentOrchestrator.streaming_chat_coordinator is deprecated "
-                "compatibility surface"
-            ),
-        ):
-            assert orchestrator.streaming_chat_coordinator._mock_name == "streaming"
-
-        with pytest.warns(
-            DeprecationWarning,
-            match=(
-                "AgentOrchestrator.unified_chat_coordinator is deprecated " "compatibility surface"
-            ),
-        ):
-            assert orchestrator.unified_chat_coordinator._mock_name == "unified"
-
-        telemetry = get_deprecated_chat_shim_telemetry()
-        assert telemetry["agent_orchestrator.sync_chat_coordinator.compat_property"] == 1
-        assert telemetry["agent_orchestrator.streaming_chat_coordinator.compat_property"] == 1
-        assert telemetry["agent_orchestrator.unified_chat_coordinator.compat_property"] == 1
-
-    def test_sync_chat_coordinator_helper_passes_protocol_adapter_runtime(self):
-        """Sync chat shim creation should depend on the protocol adapter, not the concrete orchestrator."""
-        from victor.agent.orchestrator import AgentOrchestrator
-        from victor.agent.orchestrator_properties import _ensure_sync_chat_coordinator
-
-        orchestrator = object.__new__(AgentOrchestrator)
-        adapter = MagicMock(name="protocol_adapter")
-        chat_service = MagicMock(name="chat_service")
-        orchestrator._protocol_adapter = adapter
-        orchestrator._deprecated_sync_chat_coordinator = None
-        orchestrator._chat_service = chat_service
-
-        with (
-            patch("victor.agent.services.sync_chat_compat.SyncChatCoordinator") as coordinator_cls,
-            patch("victor.agent.query_classifier.QueryClassifier") as query_classifier_cls,
-        ):
-            shim = MagicMock(name="sync_chat_shim")
-            coordinator_cls.return_value = shim
-
-            result = _ensure_sync_chat_coordinator(orchestrator)
-
-        assert result is shim
-        assert orchestrator._deprecated_sync_chat_coordinator is shim
-        kwargs = coordinator_cls.call_args.kwargs
-        assert kwargs["chat_context"] is adapter
-        assert kwargs["tool_context"] is adapter
-        assert kwargs["provider_context"] is adapter
-        assert kwargs["orchestrator"] is adapter
-        assert kwargs["chat_service"] is chat_service
-        assert kwargs["query_classifier"] is query_classifier_cls.return_value
 
     @pytest.mark.parametrize(
         ("property_name", "backing_attr", "facade_attr", "facade_value_attr"),

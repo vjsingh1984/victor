@@ -73,7 +73,7 @@ class TestFeatureFlagCache:
         with FeatureFlagCache.scope() as cache:
             # Perform some checks
             cache.is_enabled(FeatureFlag.USE_EDGE_MODEL)
-            cache.is_enabled(FeatureFlag.USE_AGENTIC_LOOP)
+            cache.is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
 
             stats = cache.get_stats()
             assert stats["cache_size"] >= 1
@@ -101,7 +101,7 @@ class TestFeatureFlagCache:
 
         # Cache multiple flags
         cache.is_enabled(FeatureFlag.USE_EDGE_MODEL)
-        cache.is_enabled(FeatureFlag.USE_AGENTIC_LOOP)
+        cache.is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
         cache.is_enabled(FeatureFlag.USE_SERVICE_LAYER)
 
         stats = cache.get_stats()
@@ -205,7 +205,7 @@ class TestClearGlobalCache:
         """Test clearing global feature flag cache."""
         # Add some entries to global cache
         cached_is_enabled(FeatureFlag.USE_EDGE_MODEL)
-        cached_is_enabled(FeatureFlag.USE_AGENTIC_LOOP)
+        cached_is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
 
         # Clear global cache
         FeatureFlagCache.clear_global_cache()

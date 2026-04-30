@@ -263,10 +263,18 @@ class ChatStreamHelperMixin:
         ctx.complexity_tool_budget = complexity_tool_budget
 
         task_type_val = task_keywords.get("task_type", "default")
-        ctx.is_analysis_task = task_keywords.get(
+        # Use keyword-based classification as fallback when embedding classifier returns GENERAL
+        # but keywords suggest analysis (e.g., "structural analysis", "framework analysis")
+        keyword_is_analysis = task_keywords.get(
             "is_analysis_task",
             task_type_val in ("analysis", "analyze"),
-        ) or unified_task_type.value in ("analyze", "analysis")
+        )
+        unified_is_analysis = unified_task_type.value in ("analyze", "analysis")
+
+        # Fallback: if unified says GENERAL but keywords say analysis, trust keywords
+        ctx.is_analysis_task = keyword_is_analysis or unified_is_analysis or (
+            unified_task_type.value == "general" and keyword_is_analysis
+        )
         ctx.is_action_task = task_keywords.get(
             "is_action_task",
             task_type_val in ("action", "create_simple", "create_complex"),

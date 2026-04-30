@@ -36,6 +36,9 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+_STRUCTURED_PARSE_FAILED = object()
+
+
 class ToolStats(BaseModel):
     """Statistics for tool argument normalization (Pydantic v2)."""
 
@@ -245,6 +248,121 @@ class ArgumentNormalizer:
             or ("\\'" in value and any(token in value for token in ("{", "[", ":")))
         )
 
+    def _escape_control_chars_in_json_strings(self, json_str: str) -> str:
+        """Escape raw control characters embedded inside JSON string literals."""
+        result: list[str] = []
+        in_string = False
+        escape_next = False
+
+        for char in json_str:
+            if escape_next:
+                result.append(char)
+                escape_next = False
+                continue
+
+            if char == "\\":
+                result.append(char)
+                escape_next = True
+                continue
+
+            if char == '"':
+                in_string = not in_string
+                result.append(char)
+                continue
+
+            if in_string:
+                if char == "\n":
+                    result.append("\\n")
+                    continue
+                if char == "\t":
+                    result.append("\\t")
+                    continue
+                if char == "\r":
+                    result.append("\\r")
+                    continue
+                if ord(char) < 32:
+                    result.append(f"\\u{ord(char):04x}")
+                    continue
+
+            result.append(char)
+
+        return "".join(result)
+
+    def _parse_structured_string(self, value: str) -> Any:
+        """Best-effort parse for top-level JSON/Python structured strings."""
+        if not isinstance(value, str) or not self._looks_like_structured_string(value):
+            return _STRUCTURED_PARSE_FAILED
+
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError as exc:
+            if "control character" in str(exc).lower():
+                try:
+                    repaired = self._escape_control_chars_in_json_strings(value)
+                    return json.loads(repaired)
+                except json.JSONDecodeError:
+                    pass
+        except (TypeError, ValueError):
+            pass
+
+        try:
+            return ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            pass
+
+        if _NATIVE_AVAILABLE:
+            try:
+                repaired = native_repair_json(value)
+                if repaired:
+                    return json.loads(repaired)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                pass
+
+        return _STRUCTURED_PARSE_FAILED
+
+    def _looks_like_edit_operation(self, value: Dict[str, Any]) -> bool:
+        """Heuristic check for a single edit operation dict."""
+        if not isinstance(value, dict):
+            return False
+        op_keys = {"type", "path", "content", "old_str", "new_str", "new_path"}
+        return bool(op_keys & set(value.keys()))
+
+    def _unwrap_tool_specific_value_envelope(
+        self, arguments: Dict[str, Any], tool_name: str
+    ) -> Dict[str, Any]:
+        """Recover known tool payloads wrapped in a generic ``value`` envelope."""
+        if canonicalize_core_tool_name(tool_name) != "edit":
+            return arguments
+
+        if set(arguments.keys()) != {"value"}:
+            return arguments
+
+        payload = arguments.get("value")
+        if isinstance(payload, str):
+            parsed = self._parse_structured_string(payload)
+            if parsed is not _STRUCTURED_PARSE_FAILED:
+                payload = parsed
+
+        if isinstance(payload, list):
+            logger.info("[%s] Recovered wrapped edit payload from value envelope", self.provider_name)
+            return {"ops": payload}
+
+        if isinstance(payload, dict):
+            if "ops" in payload or "operations" in payload:
+                logger.info(
+                    "[%s] Recovered wrapped edit payload from value envelope",
+                    self.provider_name,
+                )
+                return payload
+            if self._looks_like_edit_operation(payload):
+                logger.info(
+                    "[%s] Recovered single wrapped edit operation from value envelope",
+                    self.provider_name,
+                )
+                return {"ops": [payload]}
+
+        return arguments
+
     def normalize_arguments(
         self, arguments: Dict[str, Any], tool_name: str
     ) -> Tuple[Dict[str, Any], NormalizationStrategy]:
@@ -260,6 +378,8 @@ class ArgumentNormalizer:
         """
         tool_name = canonicalize_core_tool_name(tool_name)
         self.stats.total_calls += 1
+
+        arguments = self._unwrap_tool_specific_value_envelope(arguments, tool_name)
 
         # Track per-tool stats
         if tool_name not in self.stats.by_tool:
