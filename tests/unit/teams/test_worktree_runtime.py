@@ -59,6 +59,14 @@ def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True)
 
 
+def _write_and_commit(worktree_path: Path, relative_path: str, content: str, message: str) -> None:
+    target = worktree_path / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+    subprocess.run(["git", "add", relative_path], cwd=worktree_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", message], cwd=worktree_path, check=True, capture_output=True)
+
+
 def test_git_worktree_runtime_materializes_collects_changes_and_cleans_up(tmp_path):
     repo_root = tmp_path / "repo"
     _init_git_repo(repo_root)
@@ -101,3 +109,93 @@ def test_git_worktree_runtime_materializes_collects_changes_and_cleans_up(tmp_pa
     cleanup = runtime.cleanup(session)
     assert cleanup["errors"] == []
     assert not Path(assignment.worktree_path).exists()
+
+
+def test_git_worktree_runtime_executes_guarded_merge_for_disjoint_commits(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [
+            SimpleNamespace(id="worker_a", is_manager=False),
+            SimpleNamespace(id="worker_b", is_manager=False),
+        ],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+            "member_write_scopes": {
+                "worker_a": ["src/auth"],
+                "worker_b": ["tests/auth"],
+            },
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+
+    runtime = GitWorktreeRuntime()
+    session = runtime.materialize(plan)
+    assignment_a = session.assignment_for("worker_a")
+    assignment_b = session.assignment_for("worker_b")
+    assert assignment_a is not None
+    assert assignment_b is not None
+
+    _write_and_commit(
+        Path(assignment_a.worktree_path),
+        "src/auth/service.py",
+        "print('a')\n",
+        "worker a change",
+    )
+    _write_and_commit(
+        Path(assignment_b.worktree_path),
+        "tests/auth/test_service.py",
+        "print('b')\n",
+        "worker b change",
+    )
+
+    execution = runtime.execute_merge_orchestration(
+        session,
+        merge_analysis={"risk_level": "low", "recommended_merge_order": ["worker_a", "worker_b"]},
+    )
+
+    assert execution["status"] == "success"
+    assert execution["executed"] is True
+    assert execution["merged_members"] == ["worker_a", "worker_b"]
+    assert execution["cleanup"]["branch_deleted"] is True
+
+    runtime.cleanup(session)
+
+
+def test_git_worktree_runtime_blocks_risky_merge_without_override(tmp_path):
+    repo_root = tmp_path / "repo"
+    _init_git_repo(repo_root)
+
+    planner = WorktreeIsolationPlanner()
+    plan = planner.plan(
+        [SimpleNamespace(id="worker", is_manager=False)],
+        context={
+            "team_name": "Feature Team",
+            "worktree_isolation": True,
+            "repo_root": str(repo_root),
+            "worktree_parent": str(tmp_path / "worktrees"),
+            "member_write_scopes": {"worker": ["src/auth"]},
+        },
+        formation=TeamFormation.PARALLEL,
+    )
+    assert plan is not None
+
+    runtime = GitWorktreeRuntime()
+    session = runtime.materialize(plan)
+
+    execution = runtime.execute_merge_orchestration(
+        session,
+        merge_analysis={"risk_level": "high", "recommended_merge_order": ["worker"]},
+    )
+
+    assert execution["status"] == "blocked"
+    assert execution["executed"] is False
+    assert execution["blocked_reason"] == "merge_risk_high"
+
+    runtime.cleanup(session)

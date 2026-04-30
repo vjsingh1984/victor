@@ -397,6 +397,76 @@ class TestErrorHandling:
         assert result["member_results"]["m1"].metadata["changed_files"] == ["src/auth/service.py"]
         assert result["worktree_cleanup"]["removed"] == ["/tmp/feature-m1"]
 
+    @pytest.mark.asyncio
+    async def test_auto_merge_worktrees_executes_guarded_merge_plan(self):
+        """Auto-merge should invoke the runtime merge executor when explicitly enabled."""
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.materialized = True
+                self.dry_run = False
+                self.plan = MagicMock(merge_order=("m1",))
+                self.assignments = [
+                    SimpleNamespace(
+                        member_id="m1",
+                        branch_name="victor/feature/m1-1",
+                        worktree_path="/tmp/feature-m1",
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-m1",
+                            "materialized_worktree": True,
+                        },
+                        to_dict=lambda: {
+                            "member_id": "m1",
+                            "branch_name": "victor/feature/m1-1",
+                            "worktree_path": "/tmp/feature-m1",
+                            "materialized": True,
+                        },
+                    )
+                ]
+
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    "materialized": True,
+                    "dry_run": False,
+                    "assignments": [self.assignments[0].to_dict()],
+                }
+
+            def assignment_for(self, member_id: str):
+                return self.assignments[0] if member_id == "m1" else None
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(return_value=FakeSession()),
+            collect_changed_files=MagicMock(return_value=("src/auth/service.py",)),
+            build_merge_orchestration=MagicMock(
+                return_value={"recommended_merge_order": ["m1"], "materialized": True}
+            ),
+            execute_merge_orchestration=MagicMock(
+                return_value={"status": "success", "executed": True, "merged_members": ["m1"]}
+            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        member = StructuredMember("m1", "Done", changed_files=[])
+        coordinator.add_member(member)
+
+        result = await coordinator.execute_task(
+            "Implement feature",
+            {
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+                "materialize_worktrees": True,
+                "auto_merge_worktrees": True,
+            },
+        )
+
+        fake_runtime.execute_merge_orchestration.assert_called_once()
+        assert result["merge_execution"]["status"] == "success"
+
 
 class TestBroadcast:
     """Tests for message broadcasting."""

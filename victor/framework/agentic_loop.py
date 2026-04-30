@@ -648,6 +648,7 @@ class AgenticLoop:
                     task_type = context.get("task_type", "unknown") if context else "unknown"
                     tool_budget = context.get("tool_budget", 10) if context else 10
                     planning_routing_hints: Dict[str, Any] = {}
+                    structured_routing_policy = None
 
                     # Try to get query complexity from perception if available
                     # Otherwise use simple heuristics
@@ -667,7 +668,30 @@ class AgenticLoop:
                             if temp_override is not None:
                                 state["temperature_override"] = temp_override
 
-                    if hasattr(self.runtime_intelligence, "get_planning_routing_context"):
+                    if hasattr(self.runtime_intelligence, "get_structured_routing_policy"):
+                        structured_routing_policy = (
+                            self.runtime_intelligence.get_structured_routing_policy(
+                                query=query,
+                                scope_context={
+                                    **(context or {}),
+                                    "task_type": task_type,
+                                    "tool_budget": tool_budget,
+                                },
+                            )
+                        )
+                        if (
+                            structured_routing_policy is not None
+                            and hasattr(structured_routing_policy, "planning_context")
+                        ):
+                            resolved_planning_hints = structured_routing_policy.planning_context()
+                            if isinstance(resolved_planning_hints, dict):
+                                planning_routing_hints = resolved_planning_hints
+                                state["_structured_routing_policy_obj"] = structured_routing_policy
+                                if hasattr(structured_routing_policy, "to_dict"):
+                                    serialized_policy = structured_routing_policy.to_dict()
+                                    if isinstance(serialized_policy, dict):
+                                        state["structured_routing_policy"] = serialized_policy
+                    elif hasattr(self.runtime_intelligence, "get_planning_routing_context"):
                         planning_routing_hints = (
                             self.runtime_intelligence.get_planning_routing_context(
                                 query=query,
@@ -678,8 +702,8 @@ class AgenticLoop:
                                 },
                             )
                         )
-                        if planning_routing_hints:
-                            state["planning_routing_hints"] = dict(planning_routing_hints)
+                    if planning_routing_hints:
+                        state["planning_routing_hints"] = dict(planning_routing_hints)
 
                     # Check with planning gate
                     use_llm_planning = self.planning_gate.should_use_llm_planning(
@@ -1076,6 +1100,7 @@ class AgenticLoop:
                     "progress_scores": list(self._progress_scores),
                     "planning_events": list(state.get("planning_events", [])),
                     "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
+                    "structured_routing_policy": dict(state.get("structured_routing_policy", {})),
                     "topology_events": list(state.get("topology_events", [])),
                     "degradation_events": list(state.get("degradation_events", [])),
                 },
@@ -1099,6 +1124,7 @@ class AgenticLoop:
                     "progress_scores": list(self._progress_scores),
                     "planning_events": list(state.get("planning_events", [])),
                     "planning_routing_hints": dict(state.get("planning_routing_hints", {})),
+                    "structured_routing_policy": dict(state.get("structured_routing_policy", {})),
                     "topology_events": list(state.get("topology_events", [])),
                     "degradation_events": list(state.get("degradation_events", [])),
                 },
@@ -1263,6 +1289,34 @@ class AgenticLoop:
                     provider_candidates.append(fallback)
             if provider_candidates:
                 routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
+        structured_routing_policy = state.get("_structured_routing_policy_obj")
+        if (
+            structured_routing_policy is not None
+            and hasattr(structured_routing_policy, "selector_context")
+        ):
+            learned_topology_context = structured_routing_policy.selector_context()
+            if isinstance(learned_topology_context, dict) and learned_topology_context:
+                routing_context.update(learned_topology_context)
+        elif hasattr(self.runtime_intelligence, "get_structured_routing_policy"):
+            learned_scope_context = dict(routing_context)
+            learned_scope_context.setdefault("task_type", task_type)
+            try:
+                structured_routing_policy = self.runtime_intelligence.get_structured_routing_policy(
+                    query=query,
+                    scope_context=learned_scope_context,
+                )
+            except Exception as exc:
+                logger.debug("Runtime intelligence structured routing policy unavailable: %s", exc)
+            else:
+                if structured_routing_policy is not None:
+                    state["_structured_routing_policy_obj"] = structured_routing_policy
+                    if hasattr(structured_routing_policy, "to_dict"):
+                        serialized_policy = structured_routing_policy.to_dict()
+                        if isinstance(serialized_policy, dict):
+                            state["structured_routing_policy"] = serialized_policy
+                    learned_topology_context = structured_routing_policy.selector_context()
+                    if isinstance(learned_topology_context, dict) and learned_topology_context:
+                        routing_context.update(learned_topology_context)
         if hasattr(self.runtime_intelligence, "get_topology_routing_context"):
             learned_scope_context = dict(routing_context)
             learned_scope_context.setdefault("task_type", task_type)
@@ -1273,7 +1327,7 @@ class AgenticLoop:
             except Exception as exc:
                 logger.debug("Runtime intelligence topology routing hints unavailable: %s", exc)
             else:
-                if learned_topology_context:
+                if isinstance(learned_topology_context, dict) and learned_topology_context:
                     routing_context.update(learned_topology_context)
 
         topology_input = self.paradigm_router.build_topology_input(

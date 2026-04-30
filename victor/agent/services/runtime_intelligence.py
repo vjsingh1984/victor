@@ -35,6 +35,7 @@ from victor.evaluation.runtime_feedback import (
     save_session_topology_runtime_feedback,
 )
 from victor.framework.perception_integration import PerceptionIntegration
+from victor.framework.routing_policy import StructuredRoutingPolicy
 from victor.framework.runtime_evaluation_policy import (
     ClarificationDecision,
     RuntimeEvaluationFeedback,
@@ -2022,6 +2023,77 @@ class RuntimeIntelligenceService:
         """Return long-horizon degradation preferences derived from runtime feedback metadata."""
         return self._persisted_degradation_routing_feedback
 
+    def get_structured_routing_policy(
+        self,
+        *,
+        query: Optional[str] = None,
+        scope_context: Optional[Dict[str, Any]] = None,
+        min_coverage: float = 0.2,
+        min_reward: float = 0.45,
+        min_observations: int = 2,
+    ) -> StructuredRoutingPolicy:
+        """Return one typed routing policy spanning topology, planning, and recovery."""
+        resolved_scope_context = self._resolve_routing_scope_context(scope_context)
+
+        topology_hints: Dict[str, Any] = {}
+        topology_feedback = self.get_topology_routing_feedback()
+        if topology_feedback is not None:
+            topology_hints.update(
+                topology_feedback.to_routing_context(
+                    min_coverage=min_coverage,
+                    min_reward=min_reward,
+                    min_observations=min_observations,
+                    scope_context=resolved_scope_context,
+                )
+            )
+
+        team_hints: Dict[str, Any] = {}
+        team_feedback = self.resolve_team_routing_feedback(scope_context=resolved_scope_context)
+        if team_feedback is not None:
+            team_hints.update(team_feedback.to_routing_context())
+        global_team_feedback = self.get_team_routing_feedback()
+        if global_team_feedback is not None and global_team_feedback is not team_feedback:
+            for key, value in global_team_feedback.to_routing_context().items():
+                team_hints.setdefault(key, value)
+
+        degradation_hints: Dict[str, Any] = {}
+        degradation_feedback = self.get_degradation_routing_feedback()
+        if degradation_feedback is not None:
+            degradation_hints.update(degradation_feedback.to_routing_context())
+
+        experiment_hints = self.get_experiment_routing_context(
+            query=query,
+            scope_context=resolved_scope_context,
+        )
+        planning_hints = self.get_planning_routing_context(
+            query=query,
+            scope_context=resolved_scope_context,
+        )
+
+        metadata: Dict[str, Any] = {}
+        if topology_feedback is not None:
+            metadata["topology_feedback"] = topology_feedback.to_metadata()
+        if team_feedback is not None:
+            metadata["team_feedback"] = team_feedback.to_metadata()
+        elif global_team_feedback is not None:
+            metadata["team_feedback"] = global_team_feedback.to_metadata()
+        if degradation_feedback is not None:
+            metadata["degradation_feedback"] = degradation_feedback.to_metadata()
+        if experiment_hints:
+            metadata["experiment_hints"] = dict(experiment_hints)
+        if planning_hints:
+            metadata["planning_hints"] = dict(planning_hints)
+
+        return StructuredRoutingPolicy(
+            scope_context=dict(resolved_scope_context),
+            topology_hints=topology_hints,
+            team_hints=team_hints,
+            degradation_hints=degradation_hints,
+            experiment_hints=dict(experiment_hints),
+            planning_hints=dict(planning_hints),
+            metadata=metadata,
+        )
+
     def resolve_team_routing_feedback(
         self,
         *,
@@ -2072,37 +2144,14 @@ class RuntimeIntelligenceService:
         scope_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Return soft topology-routing hints from validated feedback and experiment memory."""
-        resolved_scope_context = self._resolve_routing_scope_context(scope_context)
-        routing_context: Dict[str, Any] = {}
-
-        feedback = self.get_topology_routing_feedback()
-        if feedback is not None:
-            routing_context.update(
-                feedback.to_routing_context(
-                    min_coverage=min_coverage,
-                    min_reward=min_reward,
-                    min_observations=min_observations,
-                    scope_context=resolved_scope_context,
-                )
-            )
-        team_feedback = self.resolve_team_routing_feedback(scope_context=resolved_scope_context)
-        if team_feedback is not None:
-            routing_context.update(team_feedback.to_routing_context())
-        global_team_feedback = self.get_team_routing_feedback()
-        if global_team_feedback is not None and global_team_feedback is not team_feedback:
-            for key, value in global_team_feedback.to_routing_context().items():
-                routing_context.setdefault(key, value)
-        degradation_feedback = self.get_degradation_routing_feedback()
-        if degradation_feedback is not None:
-            routing_context.update(degradation_feedback.to_routing_context())
-
-        experiment_hints = self.get_experiment_routing_context(
+        policy = self.get_structured_routing_policy(
             query=query,
-            scope_context=resolved_scope_context,
+            scope_context=scope_context,
+            min_coverage=min_coverage,
+            min_reward=min_reward,
+            min_observations=min_observations,
         )
-        if experiment_hints:
-            routing_context.update(experiment_hints)
-        return routing_context
+        return policy.selector_context()
 
     def _resolve_routing_scope_context(
         self,
@@ -2528,10 +2577,13 @@ class RuntimeIntelligenceService:
         routing_scope_context = dict(context or {})
         if task_analysis is not None and "task_type" not in routing_scope_context:
             routing_scope_context["task_type"] = getattr(task_analysis, "task_type", None)
-        routing_hints = self.get_topology_routing_context(
+        routing_policy = self.get_structured_routing_policy(
             query=query,
             scope_context=routing_scope_context,
         )
+        routing_hints = routing_policy.selector_context()
+        if not routing_policy.is_empty():
+            metadata["structured_routing_policy"] = routing_policy.to_dict()
         if routing_hints:
             metadata["topology_routing_hints"] = routing_hints
             experiment_memory_hints = {
@@ -2541,6 +2593,9 @@ class RuntimeIntelligenceService:
             }
             if experiment_memory_hints:
                 metadata["experiment_memory_hints"] = experiment_memory_hints
+        planning_hints = routing_policy.planning_context()
+        if planning_hints:
+            metadata["planning_routing_hints"] = planning_hints
 
         return RuntimeIntelligenceSnapshot(
             query=query,

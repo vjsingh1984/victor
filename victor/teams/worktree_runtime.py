@@ -446,6 +446,12 @@ class GitWorktreeRuntime:
             if isinstance(merge_analysis, dict)
             else list(session.plan.merge_order)
         )
+        merge_risk_level = merge_analysis.get("risk_level") if isinstance(merge_analysis, dict) else None
+        executable_without_override = (
+            bool(session.materialized)
+            and not bool(session.dry_run)
+            and merge_risk_level == "low"
+        )
         return {
             "materialized": session.materialized,
             "dry_run": session.dry_run,
@@ -453,8 +459,12 @@ class GitWorktreeRuntime:
             "branches": {item.member_id: item.branch_name for item in session.assignments},
             "worktree_paths": {item.member_id: item.worktree_path for item in session.assignments},
             "merge_base": session.plan.base_ref,
-            "merge_risk_level": (
-                merge_analysis.get("risk_level") if isinstance(merge_analysis, dict) else None
+            "merge_risk_level": merge_risk_level,
+            "merge_execution_eligible": executable_without_override,
+            "recommended_mode": (
+                "auto_apply_safe"
+                if executable_without_override
+                else ("preview_only" if session.dry_run else "manual_review")
             ),
             "conflict_paths": [
                 item.get("path")
@@ -467,6 +477,150 @@ class GitWorktreeRuntime:
                 if item.get("path")
             ],
         }
+
+    def execute_merge_orchestration(
+        self,
+        session: WorktreeMaterializationSession,
+        *,
+        merge_analysis: Optional[Dict[str, Any]] = None,
+        allow_risky: bool = False,
+        preserve_artifacts: bool = False,
+    ) -> Dict[str, Any]:
+        """Execute a guarded merge plan in an isolated integration worktree."""
+        orchestration = self.build_merge_orchestration(session, merge_analysis=merge_analysis)
+        risk_level = str(orchestration.get("merge_risk_level") or "").strip().lower()
+        recommended_merge_order = list(orchestration.get("recommended_merge_order") or [])
+
+        result: Dict[str, Any] = {
+            "status": "skipped",
+            "executed": False,
+            "eligible": bool(orchestration.get("merge_execution_eligible")),
+            "materialized": session.materialized,
+            "dry_run": session.dry_run,
+            "risk_level": risk_level or None,
+            "recommended_merge_order": recommended_merge_order,
+            "merged_members": [],
+            "attempted_members": [],
+            "blocked_reason": None,
+            "integration_branch": None,
+            "integration_worktree_path": None,
+            "conflict_paths": list(orchestration.get("conflict_paths") or []),
+            "cleanup": {"removed": [], "skipped": [], "errors": [], "branch_deleted": False},
+        }
+
+        if not session.materialized:
+            result["blocked_reason"] = "worktrees_not_materialized"
+            return result
+        if session.dry_run:
+            result["status"] = "dry_run"
+            result["blocked_reason"] = "dry_run_session"
+            return result
+        if risk_level and risk_level != "low" and not allow_risky:
+            result["status"] = "blocked"
+            result["blocked_reason"] = f"merge_risk_{risk_level}"
+            return result
+
+        integration_branch = f"{session.plan.branch_prefix}/integration"
+        integration_worktree_path = str(
+            Path(session.plan.parent_dir) / f"{_slug(session.plan.team_name)}-integration"
+        )
+        result["integration_branch"] = integration_branch
+        result["integration_worktree_path"] = integration_worktree_path
+
+        if Path(integration_worktree_path).exists():
+            result["status"] = "error"
+            result["blocked_reason"] = "integration_worktree_path_exists"
+            return result
+
+        created_worktree = False
+        try:
+            self._run_git(
+                session.plan.repo_root,
+                "worktree",
+                "add",
+                "-B",
+                integration_branch,
+                integration_worktree_path,
+                session.plan.base_ref,
+            )
+            created_worktree = True
+
+            for member_id in recommended_merge_order:
+                assignment = session.assignment_for(member_id)
+                if assignment is None:
+                    continue
+                result["attempted_members"].append(member_id)
+                try:
+                    self._run_git(
+                        integration_worktree_path,
+                        "merge",
+                        "--no-ff",
+                        "--no-edit",
+                        assignment.branch_name,
+                    )
+                except Exception as exc:
+                    result["status"] = "conflict"
+                    result["blocked_reason"] = "merge_conflict"
+                    result["error"] = str(exc)
+                    try:
+                        self._run_git(integration_worktree_path, "merge", "--abort")
+                    except Exception:
+                        pass
+                    return result
+                result["merged_members"].append(member_id)
+
+            result["status"] = "success"
+            result["executed"] = True
+            return result
+        except Exception as exc:
+            result["status"] = "error"
+            result["blocked_reason"] = "merge_execution_failed"
+            result["error"] = str(exc)
+            return result
+        finally:
+            if created_worktree and not preserve_artifacts:
+                result["cleanup"] = self._cleanup_integration_artifacts(
+                    repo_root=session.plan.repo_root,
+                    worktree_path=integration_worktree_path,
+                    branch_name=integration_branch,
+                )
+
+    def _cleanup_integration_artifacts(
+        self,
+        *,
+        repo_root: str,
+        worktree_path: str,
+        branch_name: str,
+    ) -> Dict[str, Any]:
+        summary = {"removed": [], "skipped": [], "errors": [], "branch_deleted": False}
+        if Path(worktree_path).exists():
+            try:
+                self._run_git(repo_root, "worktree", "remove", "--force", worktree_path)
+                summary["removed"].append(worktree_path)
+            except Exception as exc:
+                summary["errors"].append(f"{worktree_path}: {exc}")
+        else:
+            summary["skipped"].append(worktree_path)
+
+        if self._branch_exists(repo_root, branch_name):
+            try:
+                self._run_git(repo_root, "branch", "-D", branch_name)
+                summary["branch_deleted"] = True
+            except Exception as exc:
+                summary["errors"].append(f"{branch_name}: {exc}")
+        return summary
+
+    @staticmethod
+    def _branch_exists(repo_root: str, branch_name: str) -> bool:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", branch_name],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        return result.returncode == 0
 
     def cleanup(
         self,

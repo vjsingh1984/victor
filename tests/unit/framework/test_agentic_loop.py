@@ -31,6 +31,7 @@ from victor.framework.agentic_loop import (
 from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
 from victor.framework.fulfillment import FulfillmentResult, FulfillmentStatus, TaskType
 from victor.framework.perception_integration import Perception
+from victor.framework.routing_policy import StructuredRoutingPolicy
 from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.framework.task.protocols import TaskComplexity
 from victor.providers.base import CompletionResponse
@@ -605,13 +606,19 @@ class TestAgenticLoop:
             confidence=0.73,
             to_dict=MagicMock(return_value={"paradigm": "fast", "model_tier": "small"}),
         )
-        loop.runtime_intelligence.get_planning_routing_context = MagicMock(
-            return_value={
-                "planning_force_llm": True,
-                "planning_force_reason": "experiment_constraints: tests_pass",
-                "planning_constraint_tags": ["tests_pass"],
-                "planning_experiment_support": 0.3333,
-            }
+        loop.runtime_intelligence.get_structured_routing_policy = MagicMock(
+            return_value=StructuredRoutingPolicy(
+                scope_context={"task_type": "action", "tool_budget": 1},
+                planning_hints={
+                    "planning_force_llm": True,
+                    "planning_force_reason": "experiment_constraints: tests_pass",
+                    "planning_constraint_tags": ["tests_pass"],
+                    "planning_experiment_support": 0.3333,
+                },
+                experiment_hints={
+                    "experiment_memory_constraint_tags": ["tests_pass"],
+                },
+            )
         )
 
         result = await loop.run(
@@ -630,8 +637,11 @@ class TestAgenticLoop:
         assert result.metadata["planning_routing_hints"]["planning_force_reason"] == (
             "experiment_constraints: tests_pass"
         )
+        assert result.metadata["structured_routing_policy"]["planning_hints"][
+            "planning_force_llm"
+        ] is True
         planning_scope_context = (
-            loop.runtime_intelligence.get_planning_routing_context.call_args.kwargs["scope_context"]
+            loop.runtime_intelligence.get_structured_routing_policy.call_args.kwargs["scope_context"]
         )
         assert planning_scope_context["task_type"] == "action"
 

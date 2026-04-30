@@ -14,6 +14,7 @@ from victor.agent.topology_contract import (
     TopologyKind,
 )
 from victor.agent.topology_grounder import GroundedTopologyPlan
+from victor.framework.routing_policy import StructuredRoutingPolicy
 from victor.framework.task import TaskComplexity
 from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.providers.base import StreamChunk
@@ -184,13 +185,16 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
     orch.provider = SimpleNamespace()
     orch.task_coordinator = SimpleNamespace(tool_budget=200)
     orch._runtime_intelligence = SimpleNamespace(
-        get_topology_routing_context=MagicMock(
-            return_value={
-                "learned_topology_action": "team_plan",
-                "learned_provider_hint": "anthropic",
-                "learned_formation_hint": "parallel",
-                "learned_topology_support": 0.75,
-            }
+        get_structured_routing_policy=MagicMock(
+            return_value=StructuredRoutingPolicy(
+                scope_context={"task_type": "design", "provider_hint": "smart-router"},
+                topology_hints={
+                    "learned_topology_action": "team_plan",
+                    "learned_provider_hint": "anthropic",
+                    "learned_formation_hint": "parallel",
+                    "learned_topology_support": 0.75,
+                },
+            )
         )
     )
     orch._tool_service = SimpleNamespace(
@@ -295,13 +299,14 @@ async def test_service_streaming_runtime_create_stream_context_applies_topology_
     assert orch.tool_budget == 4
     assert orch._runtime_tool_context_overrides["max_workers"] == 3
     assert len(ctx.topology_events) == 1
+    assert ctx.structured_routing_policy is not None
     topology_context = runtime._paradigm_router.build_topology_input.call_args.kwargs["context"]
     assert topology_context["learned_topology_action"] == "team_plan"
     assert topology_context["learned_provider_hint"] == "anthropic"
     learned_scope_context = (
-        orch._runtime_intelligence.get_topology_routing_context.call_args.kwargs["scope_context"]
+        orch._runtime_intelligence.get_structured_routing_policy.call_args.kwargs["scope_context"]
     )
-    assert orch._runtime_intelligence.get_topology_routing_context.call_args.kwargs["query"] == (
+    assert orch._runtime_intelligence.get_structured_routing_policy.call_args.kwargs["query"] == (
         "hello"
     )
     assert learned_scope_context["task_type"] == "design"

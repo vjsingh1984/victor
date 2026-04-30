@@ -822,6 +822,14 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                     )
                     if merge_orchestration is not None:
                         result_dict["merge_orchestration"] = merge_orchestration
+                    if self._should_execute_merge_orchestration(context):
+                        merge_execution = self._execute_merge_orchestration(
+                            worktree_session,
+                            merge_analysis=merge_analysis.to_dict(),
+                            context=context,
+                        )
+                        if merge_execution is not None:
+                            result_dict["merge_execution"] = merge_execution
 
             return result_dict
         finally:
@@ -946,6 +954,43 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         except Exception as exc:
             logger.debug("Merge orchestration build failed: %s", exc)
             return None
+
+    def _should_execute_merge_orchestration(self, context: Dict[str, Any]) -> bool:
+        return self._coerce_context_flag(context, "auto_merge_worktrees", default=False)
+
+    def _execute_merge_orchestration(
+        self,
+        worktree_session: WorktreeMaterializationSession,
+        *,
+        merge_analysis: Optional[Dict[str, Any]] = None,
+        context: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        executor = getattr(self._worktree_runtime, "execute_merge_orchestration", None)
+        if not callable(executor):
+            return None
+        try:
+            return executor(
+                worktree_session,
+                merge_analysis=merge_analysis,
+                allow_risky=self._coerce_context_flag(
+                    context,
+                    "allow_risky_worktree_merge",
+                    default=False,
+                ),
+                preserve_artifacts=self._coerce_context_flag(
+                    context,
+                    "preserve_merge_workspace",
+                    default=False,
+                ),
+            )
+        except Exception as exc:
+            logger.debug("Merge orchestration execution failed: %s", exc)
+            return {
+                "status": "error",
+                "executed": False,
+                "blocked_reason": "merge_execution_failed",
+                "error": str(exc),
+            }
 
     def _should_cleanup_worktrees(self, context: Dict[str, Any]) -> bool:
         return self._coerce_context_flag(context, "cleanup_worktrees", default=True)
@@ -1354,6 +1399,16 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         context = self._build_call_context(
             state, kind, exclude={config.task_key, config.query_key}
         )
+        if callable(config.formation_strategy):
+            try:
+                selected_formation = config.formation_strategy(state)
+            except Exception as exc:
+                logger.debug("Formation strategy failed; keeping default formation: %s", exc)
+            else:
+                if isinstance(selected_formation, TeamFormation):
+                    context["formation_hint"] = selected_formation.value
+                elif selected_formation is not None:
+                    context["formation_hint"] = str(selected_formation)
 
         # Execute team task.
         result = await self.execute_task(task, context)

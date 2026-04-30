@@ -842,6 +842,62 @@ def test_runtime_intelligence_exposes_team_routing_hints_from_feedback(tmp_path)
     assert hints["learned_materialize_worktrees_hint"] is True
 
 
+def test_runtime_intelligence_builds_structured_routing_policy(tmp_path):
+    feedback_path = save_runtime_evaluation_feedback(
+        RuntimeEvaluationFeedback(
+            metadata={
+                "source": "benchmark_truth_feedback",
+                "topology_feedback_coverage": 0.7,
+                "avg_topology_reward": 0.74,
+                "avg_topology_confidence": 0.79,
+                "topology_final_actions": {"team_plan": 4},
+                "topology_final_kinds": {"team": 4},
+                "topology_execution_modes": {"team_execution": 4},
+                "topology_providers": {"anthropic": 4},
+                "topology_formations": {"parallel": 4},
+                "team_feedback_coverage": 0.8,
+                "tasks_with_team_feedback": 4,
+                "team_formations": {"parallel": 4},
+                "team_worktree_plan_count": 4,
+                "team_worktree_materialized_count": 3,
+                "team_low_risk_task_count": 3,
+                "avg_team_assignments": 3.0,
+                "avg_team_scoped_members": 3.0,
+                "degradation_feedback_coverage": 0.7,
+                "degradation_event_count": 4,
+                "degraded_task_count": 3,
+                "avg_degradation_drift_score": 0.63,
+                "degradation_drift_rate": 0.66,
+                "degradation_intervention_rate": 0.33,
+                "degradation_stability_score": 0.4,
+                "degradation_sources": {"provider_performance": 4},
+                "degradation_kinds": {"persistent_provider_degradation": 2},
+            }
+        ),
+        path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=feedback_path,
+    )
+
+    policy = service.get_structured_routing_policy(
+        query="inspect the degraded provider path",
+        scope_context={"task_type": "analysis", "provider": "openai", "model": "gpt-5"},
+    )
+
+    assert policy.scope_context["task_type"] == "analysis"
+    assert policy.topology_hints["learned_topology_action"] == "team_plan"
+    assert policy.team_hints["learned_worktree_isolation_hint"] is True
+    assert policy.degradation_hints["learned_degradation_conservative_routing_hint"] is True
+    assert policy.selector_context()["learned_provider_hint"] == "anthropic"
+    assert "planning_force_llm" not in policy.selector_context()
+
+
 def test_runtime_intelligence_team_feedback_prefers_safer_parallelism_when_risk_is_high(tmp_path):
     feedback_path = save_runtime_evaluation_feedback(
         RuntimeEvaluationFeedback(
@@ -1545,6 +1601,9 @@ async def test_analyze_turn_includes_topology_feedback_metadata(tmp_path):
     assert snapshot.metadata["topology_routing_hints"]["learned_topology_action"] == (
         "single_agent"
     )
+    assert snapshot.metadata["structured_routing_policy"]["selector_context"][
+        "learned_topology_action"
+    ] == "single_agent"
 
 
 @pytest.mark.asyncio
