@@ -4198,6 +4198,16 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     # Recovery Coordination Helper
     # =====================================================================
 
+    def _get_recovery_runtime(self) -> Any:
+        """Get the canonical service-owned recovery runtime helper."""
+        runtime = getattr(self, "_recovery_runtime", None)
+        if runtime is None:
+            from victor.agent.services.recovery_runtime import RecoveryRuntime
+
+            runtime = RecoveryRuntime(self.protocol_adapter)
+            self._recovery_runtime = runtime
+        return runtime
+
     def create_recovery_context(
         self,
         stream_ctx: "StreamingChatContext",
@@ -4213,33 +4223,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             StreamingRecoveryContext with all necessary state
         """
-        from victor.agent.services.recovery_service import StreamingRecoveryContext
-
-        # Get elapsed time from streaming controller
-        elapsed_time = 0.0
-        if self._streaming_controller.current_session:
-            elapsed_time = time.time() - self._streaming_controller.current_session.start_time
-
-        return StreamingRecoveryContext(
-            iteration=stream_ctx.total_iterations,
-            elapsed_time=elapsed_time,
-            tool_calls_used=self.tool_calls_used,
-            tool_budget=self.tool_budget,
-            max_iterations=stream_ctx.max_total_iterations,
-            session_start_time=(
-                self._streaming_controller.current_session.start_time
-                if self._streaming_controller.current_session
-                else time.time()
-            ),
-            last_quality_score=stream_ctx.last_quality_score,
-            streaming_context=stream_ctx,
-            provider_name=self.provider_name,
-            model=self.model,
-            temperature=self.temperature,
-            unified_task_type=stream_ctx.unified_task_type,
-            is_analysis_task=stream_ctx.is_analysis_task,
-            is_action_task=stream_ctx.is_action_task,
-        )
+        return self._get_recovery_runtime().create_recovery_context(stream_ctx)
 
     # =====================================================================
     # Recovery Facade Methods
@@ -4269,16 +4253,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             RecoveryAction with action to take (continue, retry, abort, force_summary)
         """
-        # Create recovery context from current state
-        recovery_ctx = self.create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryService (canonical runtime path)
-        return await self._recovery_service.handle_recovery_with_integration(
-            recovery_ctx,
+        return await self._get_recovery_runtime().handle_recovery_with_integration(
+            stream_ctx,
             full_content,
             tool_calls,
             mentioned_tools,
-            message_adder=self.add_message,
         )
 
     def _apply_recovery_action(
@@ -4298,12 +4277,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             StreamChunk if action requires immediate yield, None otherwise
         """
-        # Create recovery context from current state
-        recovery_ctx = self.create_recovery_context(stream_ctx)
-
-        # Delegate to RecoveryService (canonical runtime path)
-        return self._recovery_service.apply_recovery_action(
-            recovery_action, recovery_ctx, message_adder=self.add_message
+        return self._get_recovery_runtime().apply_recovery_action(
+            recovery_action,
+            stream_ctx,
         )
 
     def _parse_and_validate_tool_calls(

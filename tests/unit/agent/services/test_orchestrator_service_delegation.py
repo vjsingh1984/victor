@@ -710,6 +710,21 @@ class TestChatServiceBootstrapLaziness:
         assert first is second
         assert first._runtime is adapter
 
+    def test_get_recovery_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.recovery_runtime import RecoveryRuntime
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_recovery_runtime()
+        second = obj._get_recovery_runtime()
+
+        assert isinstance(first, RecoveryRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
     @pytest.mark.asyncio
     async def test_run_planning_chat_runtime_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -808,6 +823,63 @@ class TestChatServiceBootstrapLaziness:
 
         assert result == {"provider_name": "openai"}
         helper.get_current_provider_info.assert_called_once_with()
+
+    def test_create_recovery_context_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.create_recovery_context.return_value = {"iteration": 1}
+        obj._recovery_runtime = helper
+        stream_ctx = MagicMock(name="stream_ctx")
+
+        result = AgentOrchestrator.create_recovery_context(obj, stream_ctx)
+
+        assert result == {"iteration": 1}
+        helper.create_recovery_context.assert_called_once_with(stream_ctx)
+
+    @pytest.mark.asyncio
+    async def test_handle_recovery_with_integration_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.handle_recovery_with_integration = AsyncMock(
+            return_value=SimpleNamespace(action="continue")
+        )
+        obj._recovery_runtime = helper
+        stream_ctx = MagicMock(name="stream_ctx")
+
+        result = await AgentOrchestrator._handle_recovery_with_integration(
+            obj,
+            stream_ctx,
+            "response",
+            [{"name": "read_file"}],
+            ["read_file"],
+        )
+
+        assert result.action == "continue"
+        helper.handle_recovery_with_integration.assert_awaited_once_with(
+            stream_ctx,
+            "response",
+            [{"name": "read_file"}],
+            ["read_file"],
+        )
+
+    def test_apply_recovery_action_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.apply_recovery_action.return_value = StreamChunk(content="Recovered", is_final=True)
+        obj._recovery_runtime = helper
+        stream_ctx = MagicMock(name="stream_ctx")
+        recovery_action = MagicMock(name="recovery_action")
+
+        result = AgentOrchestrator._apply_recovery_action(obj, recovery_action, stream_ctx)
+
+        assert result.content == "Recovered"
+        helper.apply_recovery_action.assert_called_once_with(recovery_action, stream_ctx)
 
     def test_get_task_guidance_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator
