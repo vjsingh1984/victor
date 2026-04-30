@@ -357,20 +357,29 @@ class TestChatSessionFlagsIntegration:
         prefix = None
         for prefix_len in range(15, 6, -1):  # Try longer prefixes first
             candidate_prefix = session_id_1[:prefix_len]
-            if (not session_id_2.startswith(candidate_prefix) and
-                not session_id_3.startswith(candidate_prefix)):
+            if not session_id_2.startswith(candidate_prefix) and not session_id_3.startswith(
+                candidate_prefix
+            ):
                 prefix = candidate_prefix
                 break  # Found a unique prefix
 
         if not prefix or len(prefix) < 6:
             # If no unique prefix found, skip this test
-            pytest.skip(f"Could not find unique prefix for test. session_id_1={session_id_1[:20]}, session_id_2={session_id_2[:20]}, session_id_3={session_id_3[:20]}")
+            pytest.skip(
+                f"Could not find unique prefix for test. session_id_1={session_id_1[:20]}, session_id_2={session_id_2[:20]}, session_id_3={session_id_3[:20]}"
+            )
 
         # Verify that the prefix actually matches session_id_1
-        assert session_id_1.startswith(prefix), f"Prefix {prefix} should match session_id_1 {session_id_1}"
+        assert session_id_1.startswith(
+            prefix
+        ), f"Prefix {prefix} should match session_id_1 {session_id_1}"
         # Verify that the prefix doesn't match other sessions
-        assert not session_id_2.startswith(prefix), f"Prefix {prefix} should NOT match session_id_2 {session_id_2}"
-        assert not session_id_3.startswith(prefix), f"Prefix {prefix} should NOT match session_id_3 {session_id_3}"
+        assert not session_id_2.startswith(
+            prefix
+        ), f"Prefix {prefix} should NOT match session_id_2 {session_id_2}"
+        assert not session_id_3.startswith(
+            prefix
+        ), f"Prefix {prefix} should NOT match session_id_3 {session_id_3}"
 
         # Clear sessions matching prefix
         result = runner.invoke(sessions_app, ["clear", prefix, "--yes"])

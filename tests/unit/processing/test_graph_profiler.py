@@ -220,7 +220,9 @@ class TestGraphProfiler:
 
         assert len(report.recommendations) > 0
         # Check for slow operation recommendation
-        assert any("slow_frequent" in r for r in report.recommendations) or any("error" in r.lower() for r in report.recommendations)
+        assert any("slow_frequent" in r for r in report.recommendations) or any(
+            "error" in r.lower() for r in report.recommendations
+        )
 
     def test_reset(self):
         """Test resetting profiler data."""

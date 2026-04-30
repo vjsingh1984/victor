@@ -9,7 +9,6 @@ from typer.testing import CliRunner
 
 from victor.ui.commands.capabilities import CapabilityDiscovery, capabilities_app
 
-
 runner = CliRunner()
 
 

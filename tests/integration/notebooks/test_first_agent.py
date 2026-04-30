@@ -99,11 +99,11 @@ def _select_model(models: list[str]) -> str:
     """
     # Qwen 3.5 models first (latest generation, 256K context)
     fast_models = [
-        "qwen3.5:4b",    # 3.4GB - Best balance: speed + tool calling
-        "qwen3.5:2b",    # 2.7GB - Very fast
+        "qwen3.5:4b",  # 3.4GB - Best balance: speed + tool calling
+        "qwen3.5:2b",  # 2.7GB - Very fast
         "qwen3.5:0.8b",  # 1GB - Ultra fast
-        "qwen3.5:9b",    # 6.6GB - Capable
-        "qwen3-coder",   # Qwen3 coding optimized
+        "qwen3.5:9b",  # 6.6GB - Capable
+        "qwen3-coder",  # Qwen3 coding optimized
         "qwen3-coder-next",
         # Legacy Qwen 2.5 fallbacks
         "qwen2.5:3b",
@@ -120,7 +120,9 @@ def _select_model(models: list[str]) -> str:
 
     for model in fast_models:
         # Match with or without tag suffix (e.g., "qwen3.5:4b" matches "qwen3.5:4b-q4_K_M")
-        if any(model == m or m.startswith(model + "-") or m.startswith(model + ":") for m in models):
+        if any(
+            model == m or m.startswith(model + "-") or m.startswith(model + ":") for m in models
+        ):
             return model
 
     # Fallback to first available

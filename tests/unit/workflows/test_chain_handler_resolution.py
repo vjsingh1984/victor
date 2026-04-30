@@ -28,7 +28,6 @@ from victor.workflows.executors.compute import ComputeNodeExecutor
 from victor.workflows.definition import ComputeNode, TaskConstraints
 from victor.workflows.context import WorkflowContext
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -38,6 +37,7 @@ from victor.workflows.context import WorkflowContext
 def reset_chain_registry():
     """Reset chain registry before each test."""
     from victor.framework.chain_registry import reset_chain_registry
+
     reset_chain_registry()
     yield
     reset_chain_registry()
@@ -65,7 +65,7 @@ class TestGetComputeHandler:
 
     def test_chain_prefix_routing(self, executor):
         """Chain: prefix routes to _resolve_chain_handler."""
-        with patch.object(executor, '_resolve_chain_handler') as mock_resolve:
+        with patch.object(executor, "_resolve_chain_handler") as mock_resolve:
             mock_resolve.return_value = "mocked_handler"
             result = executor._get_compute_handler("chain:vertical:name")
             assert result == "mocked_handler"
@@ -75,7 +75,7 @@ class TestGetComputeHandler:
         """Non-chain: prefix uses get_compute_handler."""
         # Note: get_compute_handler is imported inside _get_compute_handler,
         # so we patch it at its source location
-        with patch('victor.workflows.compute_registry.get_compute_handler') as mock_get:
+        with patch("victor.workflows.compute_registry.get_compute_handler") as mock_get:
             mock_get.return_value = "regular_handler"
             result = executor._get_compute_handler("regular_handler")
             assert result == "regular_handler"
@@ -397,7 +397,9 @@ class TestStateIsolation:
     """Unit tests for state isolation between chain executions."""
 
     @pytest.mark.asyncio
-    async def test_context_changes_isolated_between_executions(self, executor, reset_chain_registry):
+    async def test_context_changes_isolated_between_executions(
+        self, executor, reset_chain_registry
+    ):
         """Changes during chain execution don't affect original context until merged."""
         from victor.framework.chain_registry import chain
         from victor.tools.composition import RunnableLambda
@@ -499,7 +501,9 @@ class TestEdgeCases:
         assert mock_context.get("string_result") == "just_a_string"
 
     @pytest.mark.asyncio
-    async def test_chain_returns_complex_nested_structure(self, executor, reset_chain_registry, mock_context):
+    async def test_chain_returns_complex_nested_structure(
+        self, executor, reset_chain_registry, mock_context
+    ):
         """Handle chains that return complex nested data structures."""
         from victor.framework.chain_registry import chain
         from victor.tools.composition import RunnableLambda
@@ -507,16 +511,18 @@ class TestEdgeCases:
 
         @chain("complex_test:nested")
         def nested_chain():
-            return RunnableLambda(lambda x: {
-                "level1": {
-                    "level2": {
-                        "level3": ["a", "b", "c"],
-                        "count": 3,
+            return RunnableLambda(
+                lambda x: {
+                    "level1": {
+                        "level2": {
+                            "level3": ["a", "b", "c"],
+                            "count": 3,
+                        },
+                        "metadata": {"version": 1.0},
                     },
-                    "metadata": {"version": 1.0},
-                },
-                "top_level": "value",
-            })
+                    "top_level": "value",
+                }
+            )
 
         handler = executor._resolve_chain_handler("chain:complex_test:nested")
         node = ComputeNode(
@@ -575,10 +581,12 @@ class TestFullWorkflowIntegration:
 
         @chain("workflow_test:analyze")
         def analyze_chain():
-            return RunnableLambda(lambda x: {
-                "score": x.get("complexity", 1) * 10,
-                "issues": ["minor"] if x.get("complexity", 1) < 5 else ["major"],
-            })
+            return RunnableLambda(
+                lambda x: {
+                    "score": x.get("complexity", 1) * 10,
+                    "issues": ["minor"] if x.get("complexity", 1) < 5 else ["major"],
+                }
+            )
 
         executor = ComputeNodeExecutor()
         handler = executor._resolve_chain_handler("chain:workflow_test:analyze")

@@ -314,10 +314,7 @@ def top_function():
 
         # Find base_function node
         all_nodes = await graph_store.get_all_nodes()
-        base_func = next(
-            (n for n in all_nodes if n.name == "base_function"),
-            None
-        )
+        base_func = next((n for n in all_nodes if n.name == "base_function"), None)
         assert base_func is not None
 
         # Forward impact analysis (what calls base_function)
@@ -452,7 +449,9 @@ def authentication(username, password):
                 symbol_names.append(node.name)
 
         # Should find the authentication function
-        assert any("authentication" in name.lower() for name in symbol_names), f"Expected 'authentication' in {symbol_names}"
+        assert any(
+            "authentication" in name.lower() for name in symbol_names
+        ), f"Expected 'authentication' in {symbol_names}"
 
         await graph_store.close()
 

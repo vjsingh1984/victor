@@ -658,9 +658,7 @@ class TestStateGraphNodeIntegration:
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
         coordinator.add_member(CapturingMember("m1"))
 
-        await coordinator(
-            {"task": "T", "query": "Q", "scope": "auth", "max_workers": 3}
-        )
+        await coordinator({"task": "T", "query": "Q", "scope": "auth", "max_workers": 3})
 
         assert captured_contexts, "member.execute_task was not invoked"
         ctx = captured_contexts[0]
@@ -769,9 +767,7 @@ class TestStateGraphNodeConfig:
 
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
         # No members → guaranteed failure
-        coordinator.with_state_graph_config(
-            StateGraphNodeConfig(error_key="failure")
-        )
+        coordinator.with_state_graph_config(StateGraphNodeConfig(error_key="failure"))
 
         out = await coordinator({"task": "run"})
 
@@ -907,9 +903,7 @@ class TestExecuteTeamConfig:
 
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
 
-        async def _stub_execute_team_config(
-            config, members=None
-        ):  # pragma: no cover - thin stub
+        async def _stub_execute_team_config(config, members=None):  # pragma: no cover - thin stub
             recorded["called"] = True
             recorded["config_name"] = config.name
             recorded["formation"] = config.formation
@@ -1126,9 +1120,7 @@ class TestFormationStrategy:
         )
 
         # task_type="research" is a select_formation override → PARALLEL
-        out = await coordinator(
-            {"task": "x", "context": {"task_type": "research", "team_size": 2}}
-        )
+        out = await coordinator({"task": "x", "context": {"task_type": "research", "team_size": 2}})
 
         assert out["team_output"]["formation"] == "parallel"
 
@@ -1141,9 +1133,7 @@ class TestFormationStrategy:
 
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
         coordinator.add_member(MockTeamMember("m1"))
-        coordinator.with_state_graph_config(
-            StateGraphNodeConfig(formation_strategy=async_strategy)
-        )
+        coordinator.with_state_graph_config(StateGraphNodeConfig(formation_strategy=async_strategy))
 
         with pytest.raises(TypeError, match="synchronously"):
             await coordinator({"task": "x"})
@@ -1163,9 +1153,7 @@ class TestFormationStrategy:
         )
 
         out = await coordinator(
-            CopyOnWriteState(
-                {"task": "x", "context": {"task_type": "research", "team_size": 2}}
-            )
+            CopyOnWriteState({"task": "x", "context": {"task_type": "research", "team_size": 2}})
         )
 
         assert out["team_output"]["formation"] == "parallel"

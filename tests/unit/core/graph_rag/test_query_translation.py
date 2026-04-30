@@ -286,10 +286,12 @@ class TestQueryTemplate:
             ],
         )
 
-        is_valid, errors = template.validate_parameters({
-            "node_id": "test_node",
-            "limit": 20,
-        })
+        is_valid, errors = template.validate_parameters(
+            {
+                "node_id": "test_node",
+                "limit": 20,
+            }
+        )
 
         assert is_valid is True
         assert len(errors) == 0
@@ -320,10 +322,12 @@ class TestQueryTemplate:
             template_string="neighbors(node_id={node_id}, direction={direction})",
         )
 
-        result = template.render({
-            "node_id": "test_node",
-            "direction": "out",
-        })
+        result = template.render(
+            {
+                "node_id": "test_node",
+                "direction": "out",
+            }
+        )
 
         assert result == "neighbors(node_id=test_node, direction=out)"
 
@@ -421,21 +425,27 @@ class TestTemplateRegistry:
         """Test finding templates by type."""
         registry = TemplateRegistry()
 
-        registry.register(QueryTemplate(
-            name="neighbors1",
-            query_type=QueryType.NEIGHBORS,
-            description="Test 1",
-        ))
-        registry.register(QueryTemplate(
-            name="neighbors2",
-            query_type=QueryType.NEIGHBORS,
-            description="Test 2",
-        ))
-        registry.register(QueryTemplate(
-            name="path",
-            query_type=QueryType.PATH,
-            description="Path template",
-        ))
+        registry.register(
+            QueryTemplate(
+                name="neighbors1",
+                query_type=QueryType.NEIGHBORS,
+                description="Test 1",
+            )
+        )
+        registry.register(
+            QueryTemplate(
+                name="neighbors2",
+                query_type=QueryType.NEIGHBORS,
+                description="Test 2",
+            )
+        )
+        registry.register(
+            QueryTemplate(
+                name="path",
+                query_type=QueryType.PATH,
+                description="Path template",
+            )
+        )
 
         neighbors_templates = registry.find_by_type(QueryType.NEIGHBORS)
 
@@ -446,13 +456,15 @@ class TestTemplateRegistry:
         """Test matching templates to query."""
         registry = TemplateRegistry()
 
-        registry.register(QueryTemplate(
-            name="neighbors",
-            query_type=QueryType.NEIGHBORS,
-            description="Find neighbors",
-            keywords=["neighbors", "connected"],
-            priority=5,
-        ))
+        registry.register(
+            QueryTemplate(
+                name="neighbors",
+                query_type=QueryType.NEIGHBORS,
+                description="Find neighbors",
+                keywords=["neighbors", "connected"],
+                priority=5,
+            )
+        )
 
         match = registry.match("find neighbors of node X")
 
@@ -465,12 +477,14 @@ class TestTemplateRegistry:
         """Test matching with no matching template."""
         registry = TemplateRegistry()
 
-        registry.register(QueryTemplate(
-            name="path",
-            query_type=QueryType.PATH,
-            description="Find path",
-            keywords=["path", "route"],
-        ))
+        registry.register(
+            QueryTemplate(
+                name="path",
+                query_type=QueryType.PATH,
+                description="Find path",
+                keywords=["path", "route"],
+            )
+        )
 
         match = registry.match("find neighbors")  # No matching keywords
 
@@ -480,20 +494,24 @@ class TestTemplateRegistry:
         """Test that higher priority templates are preferred."""
         registry = TemplateRegistry()
 
-        registry.register(QueryTemplate(
-            name="low_priority",
-            query_type=QueryType.NEIGHBORS,
-            description="Low priority",
-            keywords=["neighbors"],
-            priority=1,
-        ))
-        registry.register(QueryTemplate(
-            name="high_priority",
-            query_type=QueryType.NEIGHBORS,
-            description="High priority",
-            keywords=["neighbors"],
-            priority=10,
-        ))
+        registry.register(
+            QueryTemplate(
+                name="low_priority",
+                query_type=QueryType.NEIGHBORS,
+                description="Low priority",
+                keywords=["neighbors"],
+                priority=1,
+            )
+        )
+        registry.register(
+            QueryTemplate(
+                name="high_priority",
+                query_type=QueryType.NEIGHBORS,
+                description="High priority",
+                keywords=["neighbors"],
+                priority=10,
+            )
+        )
 
         match = registry.match("find neighbors")
 
@@ -505,24 +523,30 @@ class TestTemplateRegistry:
         """Test listing all templates."""
         registry = TemplateRegistry()
 
-        registry.register(QueryTemplate(
-            name="enabled1",
-            query_type=QueryType.NEIGHBORS,
-            description="Enabled 1",
-            enabled=True,
-        ))
-        registry.register(QueryTemplate(
-            name="enabled2",
-            query_type=QueryType.PATH,
-            description="Enabled 2",
-            enabled=True,
-        ))
-        registry.register(QueryTemplate(
-            name="disabled",
-            query_type=QueryType.COUNT,
-            description="Disabled",
-            enabled=False,
-        ))
+        registry.register(
+            QueryTemplate(
+                name="enabled1",
+                query_type=QueryType.NEIGHBORS,
+                description="Enabled 1",
+                enabled=True,
+            )
+        )
+        registry.register(
+            QueryTemplate(
+                name="enabled2",
+                query_type=QueryType.PATH,
+                description="Enabled 2",
+                enabled=True,
+            )
+        )
+        registry.register(
+            QueryTemplate(
+                name="disabled",
+                query_type=QueryType.COUNT,
+                description="Disabled",
+                enabled=False,
+            )
+        )
 
         all_templates = registry.list_all(enabled_only=True)
 
@@ -533,18 +557,22 @@ class TestTemplateRegistry:
         """Test listing all templates including disabled."""
         registry = TemplateRegistry()
 
-        registry.register(QueryTemplate(
-            name="enabled",
-            query_type=QueryType.NEIGHBORS,
-            description="Enabled",
-            enabled=True,
-        ))
-        registry.register(QueryTemplate(
-            name="disabled",
-            query_type=QueryType.PATH,
-            description="Disabled",
-            enabled=False,
-        ))
+        registry.register(
+            QueryTemplate(
+                name="enabled",
+                query_type=QueryType.NEIGHBORS,
+                description="Enabled",
+                enabled=True,
+            )
+        )
+        registry.register(
+            QueryTemplate(
+                name="disabled",
+                query_type=QueryType.PATH,
+                description="Disabled",
+                enabled=False,
+            )
+        )
 
         all_templates = registry.list_all(enabled_only=False)
 
@@ -840,6 +868,7 @@ class TestPublicAPI:
     @pytest.mark.asyncio
     async def test_translate_query(self):
         """Test translate_query public API."""
+
         class MockGraphStore:
             async def stats(self):
                 return {"nodes": 100}
@@ -992,6 +1021,7 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_end_to_end_translation(self):
         """Test complete translation flow."""
+
         class MockGraphStore:
             async def stats(self):
                 return {"nodes": 1000, "edges": 5000}
@@ -1021,6 +1051,7 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_batch_translation(self):
         """Test batch translation."""
+
         class MockGraphStore:
             async def stats(self):
                 return {"nodes": 100}

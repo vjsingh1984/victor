@@ -498,9 +498,18 @@ class TestConsolidationFeatureFlags:
 
     def test_consolidation_flags_have_valid_env_vars(self):
         """Test that consolidation flags have valid environment variable names."""
-        assert FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_env_var_name() == "VICTOR_USE_STATEGRAPH_AGENTIC_LOOP"
-        assert FeatureFlag.USE_FRAMEWORK_COORDINATORS.get_env_var_name() == "VICTOR_USE_FRAMEWORK_COORDINATORS"
-        assert FeatureFlag.USE_CONTEXT_SERVICE_INJECTION.get_env_var_name() == "VICTOR_USE_CONTEXT_SERVICE_INJECTION"
+        assert (
+            FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_env_var_name()
+            == "VICTOR_USE_STATEGRAPH_AGENTIC_LOOP"
+        )
+        assert (
+            FeatureFlag.USE_FRAMEWORK_COORDINATORS.get_env_var_name()
+            == "VICTOR_USE_FRAMEWORK_COORDINATORS"
+        )
+        assert (
+            FeatureFlag.USE_CONTEXT_SERVICE_INJECTION.get_env_var_name()
+            == "VICTOR_USE_CONTEXT_SERVICE_INJECTION"
+        )
         assert FeatureFlag.USE_FRAMEWORK_TEAMS.get_env_var_name() == "VICTOR_USE_FRAMEWORK_TEAMS"
 
     def test_consolidation_flags_default_to_false(self):
@@ -555,9 +564,14 @@ class TestConsolidationFeatureFlags:
 
     def test_consolidation_flags_yaml_keys(self):
         """Test that consolidation flags have valid YAML keys."""
-        assert FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_yaml_key() == "use_stategraph_agentic_loop"
+        assert (
+            FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP.get_yaml_key() == "use_stategraph_agentic_loop"
+        )
         assert FeatureFlag.USE_FRAMEWORK_COORDINATORS.get_yaml_key() == "use_framework_coordinators"
-        assert FeatureFlag.USE_CONTEXT_SERVICE_INJECTION.get_yaml_key() == "use_context_service_injection"
+        assert (
+            FeatureFlag.USE_CONTEXT_SERVICE_INJECTION.get_yaml_key()
+            == "use_context_service_injection"
+        )
         assert FeatureFlag.USE_FRAMEWORK_TEAMS.get_yaml_key() == "use_framework_teams"
 
     def test_consolidation_flags_from_yaml(self):

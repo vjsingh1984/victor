@@ -540,9 +540,7 @@ class TestSearchSessions:
         # Create sessions with different content
         temp_store.save_session(
             conversation={
-                "messages": [
-                    {"role": "user", "content": "Help me implement a binary search tree"}
-                ]
+                "messages": [{"role": "user", "content": "Help me implement a binary search tree"}]
             },
             model="claude-3-5-sonnet-20241022",
             provider="anthropic",
@@ -550,9 +548,7 @@ class TestSearchSessions:
 
         temp_store.save_session(
             conversation={
-                "messages": [
-                    {"role": "user", "content": "Create a graph visualization"}
-                ]
+                "messages": [{"role": "user", "content": "Create a graph visualization"}]
             },
             model="claude-3-5-sonnet-20241022",
             provider="anthropic",

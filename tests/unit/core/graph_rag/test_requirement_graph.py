@@ -30,7 +30,6 @@ from victor.core.graph_rag.requirement_graph import (
     RequirementSimilarityCalculator,
 )
 
-
 # =============================================================================
 # Tests for Requirement Enums (PH5-001)
 # =============================================================================
@@ -463,7 +462,9 @@ class TestRequirementSimilarityCalculator:
         """Test finding similar requirements."""
         # Setup mock
         mock_graph_store.get_node_by_id = AsyncMock(
-            side_effect=lambda nid: next((r for r in mock_requirement_nodes if r.node_id == nid), None)
+            side_effect=lambda nid: next(
+                (r for r in mock_requirement_nodes if r.node_id == nid), None
+            )
         )
         mock_graph_store.find_nodes = AsyncMock(return_value=mock_requirement_nodes)
 
@@ -487,7 +488,9 @@ class TestRequirementSimilarityCalculator:
     ) -> None:
         """Test that low-similarity requirements are filtered."""
         mock_graph_store.get_node_by_id = AsyncMock(
-            side_effect=lambda nid: next((r for r in mock_requirement_nodes if r.node_id == nid), None)
+            side_effect=lambda nid: next(
+                (r for r in mock_requirement_nodes if r.node_id == nid), None
+            )
         )
         mock_graph_store.find_nodes = AsyncMock(return_value=mock_requirement_nodes)
 
@@ -510,7 +513,9 @@ class TestRequirementSimilarityCalculator:
         """Test creating similarity edges."""
         mock_graph_store.find_nodes = AsyncMock(return_value=mock_requirement_nodes)
         mock_graph_store.get_node_by_id = AsyncMock(
-            side_effect=lambda nid: next((r for r in mock_requirement_nodes if r.node_id == nid), None)
+            side_effect=lambda nid: next(
+                (r for r in mock_requirement_nodes if r.node_id == nid), None
+            )
         )
 
         edge_count = await similarity_calculator.create_similarity_edges(threshold=0.1)

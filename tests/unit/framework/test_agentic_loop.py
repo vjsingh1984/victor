@@ -637,11 +637,14 @@ class TestAgenticLoop:
         assert result.metadata["planning_routing_hints"]["planning_force_reason"] == (
             "experiment_constraints: tests_pass"
         )
-        assert result.metadata["structured_routing_policy"]["planning_hints"][
-            "planning_force_llm"
-        ] is True
+        assert (
+            result.metadata["structured_routing_policy"]["planning_hints"]["planning_force_llm"]
+            is True
+        )
         planning_scope_context = (
-            loop.runtime_intelligence.get_structured_routing_policy.call_args.kwargs["scope_context"]
+            loop.runtime_intelligence.get_structured_routing_policy.call_args.kwargs[
+                "scope_context"
+            ]
         )
         assert planning_scope_context["task_type"] == "action"
 

@@ -256,7 +256,9 @@ class TestSearchFunctionality:
         )
 
         store.save_session(
-            conversation={"messages": [{"role": "user", "content": "Create a graph visualization"}]},
+            conversation={
+                "messages": [{"role": "user", "content": "Create a graph visualization"}]
+            },
             model="claude-3-5-sonnet-20241022",
             provider="anthropic",
             title="Visualization",

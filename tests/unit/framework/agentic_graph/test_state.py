@@ -198,16 +198,18 @@ class TestStateTransition:
         state = AgenticLoopStateModel(query="Fix the bug")
 
         # After perceive
-        perceived = state.model_copy(update={
-            "stage": "perceive",
-            "perception": {
-                "intent": "write",
-                "complexity": "medium",
+        perceived = state.model_copy(
+            update={
+                "stage": "perceive",
+                "perception": {
+                    "intent": "write",
+                    "complexity": "medium",
+                    "task_type": "debugging",
+                },
                 "task_type": "debugging",
-            },
-            "task_type": "debugging",
-            "complexity": "medium",
-        })
+                "complexity": "medium",
+            }
+        )
         assert perceived.stage == "perceive"
         assert perceived.perception["intent"] == "write"
 
@@ -220,10 +222,12 @@ class TestStateTransition:
         )
 
         # After plan
-        planned = state.model_copy(update={
-            "stage": "plan",
-            "plan": {"tool_calls": ["edit_file"]},
-        })
+        planned = state.model_copy(
+            update={
+                "stage": "plan",
+                "plan": {"tool_calls": ["edit_file"]},
+            }
+        )
         assert planned.stage == "plan"
         assert planned.plan["tool_calls"] == ["edit_file"]
 
@@ -235,11 +239,13 @@ class TestStateTransition:
         )
 
         # After act
-        acted = state.model_copy(update={
-            "stage": "act",
-            "action_result": {"output": "File edited"},
-            "tool_results": [{"tool": "edit_file", "result": "success"}],
-        })
+        acted = state.model_copy(
+            update={
+                "stage": "act",
+                "action_result": {"output": "File edited"},
+                "tool_results": [{"tool": "edit_file", "result": "success"}],
+            }
+        )
         assert acted.stage == "act"
         assert acted.action_result["output"] == "File edited"
 
@@ -251,11 +257,13 @@ class TestStateTransition:
         )
 
         # After evaluate
-        evaluated = state.model_copy(update={
-            "stage": "evaluate",
-            "evaluation": {"decision": "continue", "score": 0.6},
-            "progress_scores": [0.6],
-        })
+        evaluated = state.model_copy(
+            update={
+                "stage": "evaluate",
+                "evaluation": {"decision": "continue", "score": 0.6},
+                "progress_scores": [0.6],
+            }
+        )
         assert evaluated.stage == "evaluate"
         assert evaluated.evaluation["decision"] == "continue"
         assert evaluated.progress_scores == [0.6]

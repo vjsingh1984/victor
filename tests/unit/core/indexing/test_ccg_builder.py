@@ -361,13 +361,15 @@ class TestCodeContextGraphBuilder:
 
             async def build_ccg_for_file(self, file_path, language=None):
                 self.called = True
-                return [GraphNode(
-                    node_id="enhanced",
-                    type="statement",
-                    name="enhanced",
-                    file=str(file_path),
-                    line=1,
-                )], []
+                return [
+                    GraphNode(
+                        node_id="enhanced",
+                        type="statement",
+                        name="enhanced",
+                        file=str(file_path),
+                        line=1,
+                    )
+                ], []
 
         # Reset the registry to ensure clean state
         CapabilityRegistry.reset()

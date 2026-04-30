@@ -208,6 +208,25 @@ class TestIntentFiltering:
         assert "shell" in tool_names
         assert "write" not in tool_names
 
+    def test_filter_tools_display_only_intent_keeps_shell_for_sqllite_db_review(self, tool_planner):
+        """Observed typo variants like 'sqllite db' should still preserve shell."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        shell_tool = Mock()
+        shell_tool.name = "shell"
+        read_tool = Mock()
+        read_tool.name = "read"
+
+        result = tool_planner.filter_tools_by_intent(
+            [read_tool, shell_tool],
+            ActionIntent.DISPLAY_ONLY,
+            user_message="also review the sqllite db for evolved prompts",
+        )
+
+        tool_names = [t.name for t in result]
+        assert "read" in tool_names
+        assert "shell" in tool_names
+
     def test_filter_tools_read_only_intent_does_not_rewrite_unknown_shell_variant(
         self, tool_planner
     ):

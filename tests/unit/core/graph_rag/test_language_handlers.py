@@ -52,14 +52,39 @@ class TestLanguageHandlerRegistry:
     def test_all_handlers_registered(self):
         """Test that all handlers are registered via victor_coding."""
         # victor_coding provides handlers for these languages
-        expected = {"python", "py", "javascript", "js", "typescript", "ts",
-                   "tsx", "jsx", "go", "golang", "rust", "rs", "java", "cpp", "c++",
-                   "csharp", "cs", "kotlin", "kt", "swift", "c", "ruby", "rb", "php"}
+        expected = {
+            "python",
+            "py",
+            "javascript",
+            "js",
+            "typescript",
+            "ts",
+            "tsx",
+            "jsx",
+            "go",
+            "golang",
+            "rust",
+            "rs",
+            "java",
+            "cpp",
+            "c++",
+            "csharp",
+            "cs",
+            "kotlin",
+            "kt",
+            "swift",
+            "c",
+            "ruby",
+            "rb",
+            "php",
+        }
         # Check that we can get handlers for all expected languages
         for lang in expected:
             handler = get_edge_handler(lang)
             assert handler is not None, f"No handler found for {lang}"
-            assert isinstance(handler, _VictorCodingPluginAdapter), f"Handler for {lang} should use victor_coding adapter"
+            assert isinstance(
+                handler, _VictorCodingPluginAdapter
+            ), f"Handler for {lang} should use victor_coding adapter"
 
     def test_get_python_handler(self):
         """Test getting Python handler."""
@@ -154,7 +179,7 @@ class TestTypeScriptEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('typescript')
+        plugin = get_plugin_by_language("typescript")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -205,8 +230,7 @@ function compute(calc: Calculator): number {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
 
 
 @pytest.mark.unit
@@ -223,7 +247,7 @@ class TestCppEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('cpp')
+        plugin = get_plugin_by_language("cpp")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -277,8 +301,7 @@ int compute(Calculator* calc) {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
 
     @pytest.mark.asyncio
     async def test_detect_namespace_calls(self, handler, tmp_path):
@@ -302,8 +325,7 @@ void caller() {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "caller" and "helper" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "caller" and "helper" in callee for caller, callee in call_edges)
 
 
 @pytest.mark.unit
@@ -320,7 +342,7 @@ class TestCEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('c')
+        plugin = get_plugin_by_language("c")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -361,7 +383,7 @@ class TestCSharpEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('csharp')
+        plugin = get_plugin_by_language("csharp")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -415,8 +437,7 @@ class Program {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "Compute" and "Add" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "Compute" and "Add" in callee for caller, callee in call_edges)
 
 
 @pytest.mark.unit
@@ -433,7 +454,7 @@ class TestKotlinEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('kotlin')
+        plugin = get_plugin_by_language("kotlin")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -483,8 +504,7 @@ fun compute(calc: Calculator): Int {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
 
 
 @pytest.mark.unit
@@ -501,7 +521,7 @@ class TestSwiftEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('swift')
+        plugin = get_plugin_by_language("swift")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -551,8 +571,7 @@ func compute(calc: Calculator) -> Int {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
 
 
 @pytest.mark.unit
@@ -569,7 +588,7 @@ class TestRubyEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('ruby')
+        plugin = get_plugin_by_language("ruby")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -619,8 +638,7 @@ end
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
 
 
 @pytest.mark.unit
@@ -637,7 +655,7 @@ class TestPhpEdgeHandler:
         if not registry.list_languages():
             registry.discover_plugins()
 
-        plugin = get_plugin_by_language('php')
+        plugin = get_plugin_by_language("php")
         return _VictorCodingPluginAdapter(plugin)
 
     @pytest.mark.asyncio
@@ -689,8 +707,7 @@ function compute($calc) {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "compute" and "add" in callee
-                  for caller, callee in call_edges)
+        assert any(caller == "compute" and "add" in callee for caller, callee in call_edges)
 
     @pytest.mark.asyncio
     async def test_detect_static_calls(self, handler, tmp_path):
@@ -716,6 +733,4 @@ function caller() {
 
         assert len(result.calls) > 0
         call_edges = [(c.caller_name, c.callee_name) for c in result.calls]
-        assert any(caller == "caller" and "process" in callee
-                  for caller, callee in call_edges)
-
+        assert any(caller == "caller" and "process" in callee for caller, callee in call_edges)

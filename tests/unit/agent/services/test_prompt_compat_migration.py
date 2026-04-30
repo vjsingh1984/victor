@@ -60,9 +60,7 @@ class TestPromptRuntimeContextParity:
 
     def test_additional_context_field(self):
         """TaskContext.additional_context -> PromptRuntimeContext.additional_context"""
-        context = PromptRuntimeContext(
-            message="test", additional_context={"project": "victor"}
-        )
+        context = PromptRuntimeContext(message="test", additional_context={"project": "victor"})
         assert context.additional_context == {"project": "victor"}
 
     def test_default_values_match(self):
@@ -209,6 +207,7 @@ class TestPromptRuntimeAdapterParity:
         """PromptCoordinator.vertical_context -> PromptRuntimeAdapter.vertical_context"""
         adapter = PromptRuntimeAdapter()
         from unittest.mock import MagicMock
+
         mock_context = MagicMock()
         adapter.vertical_context = mock_context
         assert adapter.vertical_context == mock_context

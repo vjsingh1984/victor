@@ -172,10 +172,13 @@ class TestLoopResult:
 
         # Create state properly
         from victor.framework.agentic_graph.state import AgenticLoopStateModel
+
         state = AgenticLoopStateModel(query="Test", iteration=3)
-        state = state.model_copy(update={
-            "action_result": {"response": "Done"},
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"response": "Done"},
+            }
+        )
         graph_result.state = state
 
         result = LoopResult.from_graph_result(graph_result, state)

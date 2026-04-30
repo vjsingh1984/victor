@@ -63,8 +63,12 @@ def _write_and_commit(worktree_path: Path, relative_path: str, content: str, mes
     target = worktree_path / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
-    subprocess.run(["git", "add", relative_path], cwd=worktree_path, check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", message], cwd=worktree_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "add", relative_path], cwd=worktree_path, check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "commit", "-m", message], cwd=worktree_path, check=True, capture_output=True
+    )
 
 
 def test_git_worktree_runtime_materializes_collects_changes_and_cleans_up(tmp_path):

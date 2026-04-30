@@ -75,10 +75,7 @@ async def test_query_translation_path():
 @pytest.mark.asyncio
 async def test_query_translation_impact_analysis():
     """Test translating natural language to impact query."""
-    result = await translate_query(
-        "What depends on authenticate_user?",
-        graph_store=None
-    )
+    result = await translate_query("What depends on authenticate_user?", graph_store=None)
 
     assert result is not None
     assert result.matched_template is not None
@@ -91,10 +88,7 @@ async def test_query_translation_impact_analysis():
 @pytest.mark.asyncio
 async def test_query_translation_callers():
     """Test translating natural language to callers query."""
-    result = await translate_query(
-        "What calls process_data?",
-        graph_store=None
-    )
+    result = await translate_query("What calls process_data?", graph_store=None)
 
     assert result is not None
     assert result.matched_template is not None
@@ -106,8 +100,7 @@ async def test_query_translation_callers():
 async def test_query_translation_semantic_search():
     """Test translating natural language to semantic search."""
     result = await translate_query(
-        "Find functions related to user authentication",
-        graph_store=None
+        "Find functions related to user authentication", graph_store=None
     )
 
     assert result is not None
@@ -191,10 +184,7 @@ def send_response(resp):
         await pipeline.index_repository()
 
         # Test query translation with graph store
-        result = await translate_query(
-            "What calls validate_request?",
-            graph_store=graph_store
-        )
+        result = await translate_query("What calls validate_request?", graph_store=graph_store)
 
         assert result is not None
         assert result.matched_template is not None
@@ -228,8 +218,7 @@ async def test_query_translation_fallback():
     """Test query translation fallback for unrecognized queries."""
     # Unusual query that should still translate
     result = await translate_query(
-        "Show me the things that do stuff with the data",
-        graph_store=None
+        "Show me the things that do stuff with the data", graph_store=None
     )
 
     # Should still return a result (fallback to semantic search)

@@ -405,7 +405,10 @@ class TestPaginationSupport:
                 return {"path"}
             return set()
 
-        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+        mocker.patch(
+            "victor.agent.unified_task_tracker.get_signature_params",
+            side_effect=mock_get_signature_params,
+        )
 
         # Get signatures for pagination calls
         sig1 = tracker._get_signature("read", {"path": "src/main.py", "offset": 0, "limit": 500})
@@ -413,7 +416,9 @@ class TestPaginationSupport:
         sig3 = tracker._get_signature("read", {"path": "src/main.py", "offset": 1000, "limit": 100})
 
         # All should have the SAME signature because offset/limit are NOT in signature_params
-        assert sig1 == sig2 == sig3, f"Pagination should generate same signature: {sig1}, {sig2}, {sig3}"
+        assert (
+            sig1 == sig2 == sig3
+        ), f"Pagination should generate same signature: {sig1}, {sig2}, {sig3}"
         # Verify only path is in the signature
         assert "src/main.py" in sig1
         assert "offset" not in sig1.lower()
@@ -431,7 +436,10 @@ class TestPaginationSupport:
                 return {"path"}
             return set()
 
-        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+        mocker.patch(
+            "victor.agent.unified_task_tracker.get_signature_params",
+            side_effect=mock_get_signature_params,
+        )
 
         sig1 = tracker._get_signature("read", {"path": "src/main.py", "offset": 0})
         sig2 = tracker._get_signature("read", {"path": "src/utils.py", "offset": 0})
@@ -455,14 +463,19 @@ class TestPaginationSupport:
                 return {"query", "path", "mode"}
             return set()
 
-        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+        mocker.patch(
+            "victor.agent.unified_task_tracker.get_signature_params",
+            side_effect=mock_get_signature_params,
+        )
 
         sig1 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 10})
         sig2 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 20})
         sig3 = tracker._get_signature("code_search", {"query": "dataclass", "path": ".", "k": 50})
 
         # All should have the SAME signature because k is NOT in signature_params
-        assert sig1 == sig2 == sig3, f"Pagination with different k should generate same signature: {sig1}, {sig2}, {sig3}"
+        assert (
+            sig1 == sig2 == sig3
+        ), f"Pagination with different k should generate same signature: {sig1}, {sig2}, {sig3}"
 
     def test_ls_depth_is_progress(self, mocker):
         """ls with different depth values generates DIFFERENT signatures (meaningful exploration)."""
@@ -476,7 +489,10 @@ class TestPaginationSupport:
                 return {"path", "depth", "pattern"}
             return set()
 
-        mocker.patch("victor.agent.unified_task_tracker.get_signature_params", side_effect=mock_get_signature_params)
+        mocker.patch(
+            "victor.agent.unified_task_tracker.get_signature_params",
+            side_effect=mock_get_signature_params,
+        )
 
         sig1 = tracker._get_signature("ls", {"path": "src", "depth": 1})
         sig2 = tracker._get_signature("ls", {"path": "src", "depth": 2})

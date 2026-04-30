@@ -59,7 +59,7 @@ class TestFormationCriteria:
                 "complexity": "high",
                 "task_type": "feature",
                 "team_size": 2,
-            }
+            },
         )
 
         criteria = FormationCriteria.from_state(state)
@@ -126,12 +126,14 @@ class TestSelectFormation:
     def test_select_with_state(self):
         """Test formation selection directly from state."""
         state = create_initial_state(query="Complex multi-agent task")
-        state = state.model_copy(update={
-            "context": {
-                "complexity": "high",
-                "team_size": 3,
+        state = state.model_copy(
+            update={
+                "context": {
+                    "complexity": "high",
+                    "team_size": 3,
+                }
             }
-        })
+        )
 
         formation = select_formation(state)
         assert formation == TeamFormation.HIERARCHICAL

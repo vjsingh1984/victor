@@ -56,9 +56,7 @@ async def main() -> None:
     coordinator.add_member(DemoMember("researcher", "Collected findings"))
     coordinator.add_member(DemoMember("summarizer", "Summarized findings"))
     coordinator.set_formation(TeamFormation.SEQUENTIAL)
-    coordinator.with_state_graph_config(
-        StateGraphNodeConfig(formation_strategy=select_formation)
-    )
+    coordinator.with_state_graph_config(StateGraphNodeConfig(formation_strategy=select_formation))
 
     graph = StateGraph(ResearchState)
     graph.add_node("research_team", coordinator)

@@ -161,7 +161,11 @@ class TestCoordinatorAdapter:
         mock_coordinator = AsyncMock()
 
         # Create mock transition
-        from victor.agent.coordinators.state_context import TransitionBatch, StateTransition, TransitionType
+        from victor.agent.coordinators.state_context import (
+            TransitionBatch,
+            StateTransition,
+            TransitionType,
+        )
 
         batch = TransitionBatch()
         batch.update_state("test_key", "test_value", "conversation")
@@ -186,7 +190,10 @@ class TestExplorationNode:
         """Test exploration node without coordinator (graceful skip)."""
         state = create_initial_state(query="Find all Python files")
 
-        with patch("victor.agent.coordinators.exploration_state_passed.ExplorationStatePassedCoordinator", side_effect=ImportError):
+        with patch(
+            "victor.agent.coordinators.exploration_state_passed.ExplorationStatePassedCoordinator",
+            side_effect=ImportError,
+        ):
             result = await exploration_node(state)
             assert result.query == "Find all Python files"
 
@@ -227,7 +234,10 @@ class TestSafetyNode:
         state = create_initial_state(query="Run tests")
         state = state.model_copy(update={"plan": {"tool_calls": ["pytest"]}})
 
-        with patch("victor.agent.coordinators.safety_state_passed.SafetyStatePassedCoordinator", side_effect=ImportError):
+        with patch(
+            "victor.agent.coordinators.safety_state_passed.SafetyStatePassedCoordinator",
+            side_effect=ImportError,
+        ):
             result = await safety_node(state)
             assert result.query == "Run tests"
 
@@ -269,7 +279,10 @@ class TestSystemPromptNode:
         """Test system prompt node without coordinator (graceful skip)."""
         state = create_initial_state(query="Write code")
 
-        with patch("victor.agent.coordinators.system_prompt_state_passed.SystemPromptStatePassedCoordinator", side_effect=ImportError):
+        with patch(
+            "victor.agent.coordinators.system_prompt_state_passed.SystemPromptStatePassedCoordinator",
+            side_effect=ImportError,
+        ):
             result = await system_prompt_node(state)
             assert result.query == "Write code"
 
@@ -299,7 +312,9 @@ class TestSystemPromptNode:
         mock_task_analyzer = MagicMock()
         mock_orchestrator.task_analyzer = mock_task_analyzer
 
-        with patch("victor.agent.coordinators.system_prompt_state_passed.SystemPromptStatePassedCoordinator") as MockCoord:
+        with patch(
+            "victor.agent.coordinators.system_prompt_state_passed.SystemPromptStatePassedCoordinator"
+        ) as MockCoord:
             mock_coordinator = AsyncMock()
             mock_result = MagicMock()
             mock_result.transitions = MagicMock()
@@ -351,7 +366,9 @@ class TestNodeIntegration:
         mock_safety.check = AsyncMock(return_value=mock_safety_result)
 
         # Add single tool call to state for safety check
-        state = state.model_copy(update={"plan": {"tool_calls": [{"name": "git", "arguments": ["status"]}]}})
+        state = state.model_copy(
+            update={"plan": {"tool_calls": [{"name": "git", "arguments": ["status"]}]}}
+        )
         state = await safety_node(state, safety_coordinator=mock_safety)
 
         # Verify both ran

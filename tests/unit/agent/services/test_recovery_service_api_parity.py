@@ -68,9 +68,9 @@ class TestRecoveryServiceAPIParity:
         from victor.agent.services.recovery_service import RecoveryService
 
         service = RecoveryService()
-        assert service.has_native_streaming_runtime() is False, (
-            "RecoveryService should not have native streaming runtime until components are bound"
-        )
+        assert (
+            service.has_native_streaming_runtime() is False
+        ), "RecoveryService should not have native streaming runtime until components are bound"
 
     def test_recovery_service_has_native_streaming_runtime_returns_true_after_binding(self):
         """has_native_streaming_runtime() must return True after binding required components."""
@@ -92,9 +92,9 @@ class TestRecoveryServiceAPIParity:
             recovery_integration=mock_recovery_integration,
         )
 
-        assert service.has_native_streaming_runtime() is True, (
-            "RecoveryService should have native streaming runtime after binding required components"
-        )
+        assert (
+            service.has_native_streaming_runtime() is True
+        ), "RecoveryService should have native streaming runtime after binding required components"
 
     def test_bind_runtime_components_accepts_all_collaborators(self):
         """bind_runtime_components() must accept all optional collaborators."""
@@ -175,7 +175,9 @@ class TestRecoveryServiceDelegationBehavior:
             "event_bus": mock_event_bus,
         }
 
-    def test_check_natural_completion_uses_native_runtime(self, recovery_service_with_native_runtime):
+    def test_check_natural_completion_uses_native_runtime(
+        self, recovery_service_with_native_runtime
+    ):
         """check_natural_completion() should use streaming_handler when native runtime is enabled."""
         service, mocks = recovery_service_with_native_runtime
 
@@ -189,7 +191,9 @@ class TestRecoveryServiceDelegationBehavior:
         mock_ctx.streaming_context = Mock()
 
         # Call method
-        result = service.check_natural_completion(mock_ctx, has_tool_calls=False, content_length=100)
+        result = service.check_natural_completion(
+            mock_ctx, has_tool_calls=False, content_length=100
+        )
 
         # Verify delegation to streaming_handler
         mocks["streaming_handler"].check_natural_completion.assert_called_once_with(
@@ -234,7 +238,9 @@ class TestRecoveryServiceDelegationBehavior:
         )
         assert result is None
 
-    def test_filter_blocked_tool_calls_uses_native_runtime(self, recovery_service_with_native_runtime):
+    def test_filter_blocked_tool_calls_uses_native_runtime(
+        self, recovery_service_with_native_runtime
+    ):
         """filter_blocked_tool_calls() should use streaming_handler when native runtime is enabled."""
         service, mocks = recovery_service_with_native_runtime
 
@@ -256,7 +262,9 @@ class TestRecoveryServiceDelegationBehavior:
         assert filtered == tool_calls
         assert count == 0
 
-    def test_check_blocked_threshold_uses_native_runtime(self, recovery_service_with_native_runtime):
+    def test_check_blocked_threshold_uses_native_runtime(
+        self, recovery_service_with_native_runtime
+    ):
         """check_blocked_threshold() should use streaming_handler when native runtime is enabled."""
         service, mocks = recovery_service_with_native_runtime
 
@@ -284,9 +292,7 @@ class TestRecoveryServiceDelegationBehavior:
 
         # Setup mock
         mocks["recovery_integration"].enabled = True
-        expected_action = OrchestratorRecoveryAction(
-            action="continue", reason="test"
-        )
+        expected_action = OrchestratorRecoveryAction(action="continue", reason="test")
         mocks["recovery_integration"].handle_response = AsyncMock(return_value=expected_action)
 
         # Create mock context
@@ -329,7 +335,9 @@ class TestRecoveryServiceDelegationBehavior:
 
         assert result is None
 
-    def test_apply_recovery_action_handles_retry_with_message(self, recovery_service_with_native_runtime):
+    def test_apply_recovery_action_handles_retry_with_message(
+        self, recovery_service_with_native_runtime
+    ):
         """apply_recovery_action() should add user message for retry action."""
         from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
@@ -350,7 +358,9 @@ class TestRecoveryServiceDelegationBehavior:
         assert result is None
         message_adder.assert_called_once_with("user", "Please try again")
 
-    def test_apply_recovery_action_handles_force_summary(self, recovery_service_with_native_runtime):
+    def test_apply_recovery_action_handles_force_summary(
+        self, recovery_service_with_native_runtime
+    ):
         """apply_recovery_action() should set force_completion for force_summary action."""
         from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
@@ -376,9 +386,7 @@ class TestRecoveryServiceDelegationBehavior:
         service, mocks = recovery_service_with_native_runtime
 
         action = OrchestratorRecoveryAction(
-            action="abort",
-            reason="Critical error",
-            failure_type="auth"
+            action="abort", reason="Critical error", failure_type="auth"
         )
         mock_ctx = Mock()
         mock_ctx.iteration = 5
@@ -393,14 +401,9 @@ class TestRecoveryServiceDelegationBehavior:
         """truncate_tool_calls() should enforce budget limit."""
         service, mocks = recovery_service_with_native_runtime
 
-        tool_calls = [
-            {"name": f"tool_{i}", "args": {}}
-            for i in range(10)
-        ]
+        tool_calls = [{"name": f"tool_{i}", "args": {}} for i in range(10)]
 
-        truncated, was_truncated = service.truncate_tool_calls(
-            Mock(), tool_calls, max_calls=5
-        )
+        truncated, was_truncated = service.truncate_tool_calls(Mock(), tool_calls, max_calls=5)
 
         assert len(truncated) == 5
         assert was_truncated is True
@@ -409,14 +412,9 @@ class TestRecoveryServiceDelegationBehavior:
         """truncate_tool_calls() should not truncate when under budget."""
         service, mocks = recovery_service_with_native_runtime
 
-        tool_calls = [
-            {"name": f"tool_{i}", "args": {}}
-            for i in range(3)
-        ]
+        tool_calls = [{"name": f"tool_{i}", "args": {}} for i in range(3)]
 
-        truncated, was_truncated = service.truncate_tool_calls(
-            Mock(), tool_calls, max_calls=5
-        )
+        truncated, was_truncated = service.truncate_tool_calls(Mock(), tool_calls, max_calls=5)
 
         assert len(truncated) == 3
         assert was_truncated is False

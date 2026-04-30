@@ -194,10 +194,12 @@ class TestResultCompatibility:
         from victor.framework.agentic_graph.state import AgenticLoopStateModel
 
         state = AgenticLoopStateModel(query="Test", iteration=2)
-        state = state.model_copy(update={
-            "action_result": {"response": "Complete"},
-            "evaluation": {"decision": "complete"},
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"response": "Complete"},
+                "evaluation": {"decision": "complete"},
+            }
+        )
 
         mock_graph_result = MagicMock()
 

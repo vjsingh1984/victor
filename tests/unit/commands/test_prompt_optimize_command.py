@@ -22,7 +22,10 @@ from victor.ui.slash.protocol import CommandContext
 def _make_context(args):
     stream = io.StringIO()
     console = Console(file=stream, width=120, force_terminal=False, color_system=None)
-    return CommandContext(console=console, settings=SimpleNamespace(), agent=None, args=args), stream
+    return (
+        CommandContext(console=console, settings=SimpleNamespace(), agent=None, args=args),
+        stream,
+    )
 
 
 def _make_learner():

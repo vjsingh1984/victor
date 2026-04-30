@@ -271,6 +271,18 @@ def test_adapter_workflow_state_alias_remains_available() -> None:
     assert AdapterWorkflowStateAlias is AdapterWorkflowState
 
 
+def test_executor_package_exports_team_step_aliases() -> None:
+    from victor.workflows.executors import TeamNodeExecutor, TeamStepExecutor
+
+    assert TeamStepExecutor is TeamNodeExecutor
+
+
+def test_workflows_package_exports_team_step_workflow_aliases() -> None:
+    from victor.workflows import TeamNodeWorkflow, TeamStepWorkflow
+
+    assert TeamStepWorkflow is TeamNodeWorkflow
+
+
 def test_adapter_execution_handler_uses_shared_sync_bridge_without_running_loop() -> None:
     adapter = WorkflowToGraphAdapter()
     executor = SimpleNamespace()

@@ -177,7 +177,9 @@ def test_build_registered_coordination_suggestions_uses_shared_registered_catalo
     assert payload["default_workflow"] == "feature_implementation"
 
 
-def test_build_registered_coordination_suggestions_keeps_requested_vertical_even_without_match() -> None:
+def test_build_registered_coordination_suggestions_keeps_requested_vertical_even_without_match() -> (
+    None
+):
     context = create_vertical_context("coding")
     context.apply_team_specs(
         {

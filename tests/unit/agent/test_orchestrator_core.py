@@ -68,6 +68,7 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_tool_svc.get_available_tools.return_value = set(all_tool_names)
     mock_tool_svc.is_tool_enabled.side_effect = lambda name: name in enabled_tools
     mock_tool_svc.set_enabled_tools.side_effect = lambda tools: enabled_tools.update(tools)
+
     # process_tool_results returns tool results formatted for response
     # Default implementation converts pipeline results to dict format
     def mock_process_results(pipeline_result, ctx):
@@ -80,6 +81,7 @@ def orchestrator(mock_provider, orchestrator_settings):
             }
             for r in pipeline_result.results
         ]
+
     mock_tool_svc.process_tool_results.side_effect = mock_process_results
     orch._tool_service = mock_tool_svc
 
@@ -3328,7 +3330,9 @@ class TestGetRecentSessions:
         }
 
         # Mock session_service to return the session
-        orchestrator._session_service.get_recent_sessions = MagicMock(return_value=[expected_session])
+        orchestrator._session_service.get_recent_sessions = MagicMock(
+            return_value=[expected_session]
+        )
 
         result = orchestrator.get_recent_sessions(limit=5)
 
@@ -3394,7 +3398,9 @@ class TestGetMemoryContext:
         # Mock session_service to return fallback messages
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "user", "content": "test"}
-        orchestrator._session_service.get_memory_context = MagicMock(return_value=[{"role": "user", "content": "test"}])
+        orchestrator._session_service.get_memory_context = MagicMock(
+            return_value=[{"role": "user", "content": "test"}]
+        )
 
         result = orchestrator.get_memory_context()
 
@@ -3405,7 +3411,9 @@ class TestGetMemoryContext:
     def test_falls_back_when_no_session_id(self, orchestrator):
         """Test falls back when no session ID."""
         # Mock session_service to return fallback messages
-        orchestrator._session_service.get_memory_context = MagicMock(return_value=[{"role": "assistant", "content": "hello"}])
+        orchestrator._session_service.get_memory_context = MagicMock(
+            return_value=[{"role": "assistant", "content": "hello"}]
+        )
 
         result = orchestrator.get_memory_context()
 
@@ -3429,7 +3437,9 @@ class TestGetMemoryContext:
     def test_handles_exception_with_fallback(self, orchestrator):
         """Test handles exception and falls back to in-memory."""
         # Mock session_service to return fallback on exception
-        orchestrator._session_service.get_memory_context = MagicMock(return_value=[{"role": "user", "content": "fallback"}])
+        orchestrator._session_service.get_memory_context = MagicMock(
+            return_value=[{"role": "user", "content": "fallback"}]
+        )
 
         result = orchestrator.get_memory_context()
 
@@ -3447,9 +3457,7 @@ class TestGetSessionStats:
     def test_returns_disabled_when_no_memory_manager(self, orchestrator):
         """Test returns disabled stats when no memory manager."""
         # Mock session_service to return disabled stats
-        orchestrator._session_service.get_session_stats = MagicMock(
-            return_value={"enabled": False}
-        )
+        orchestrator._session_service.get_session_stats = MagicMock(return_value={"enabled": False})
 
         result = orchestrator.get_session_stats()
 
@@ -3459,9 +3467,7 @@ class TestGetSessionStats:
     def test_returns_error_when_session_not_found(self, orchestrator):
         """Test returns error when session not found (empty stats from memory_manager)."""
         # Mock session_service to return enabled but empty stats
-        orchestrator._session_service.get_session_stats = MagicMock(
-            return_value={"enabled": True}
-        )
+        orchestrator._session_service.get_session_stats = MagicMock(return_value={"enabled": True})
 
         result = orchestrator.get_session_stats()
 
@@ -3500,9 +3506,7 @@ class TestGetSessionStats:
     def test_handles_exception_gracefully(self, orchestrator):
         """Test handles exception and returns error via SessionService."""
         # Mock session_service to return enabled stats despite exception
-        orchestrator._session_service.get_session_stats = MagicMock(
-            return_value={"enabled": True}
-        )
+        orchestrator._session_service.get_session_stats = MagicMock(return_value={"enabled": True})
 
         result = orchestrator.get_session_stats()
 

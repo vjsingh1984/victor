@@ -251,9 +251,7 @@ class TestContextServiceNode:
 
         mock_services = MagicMock()
         mock_context = AsyncMock()
-        mock_context.retrieve_context = AsyncMock(
-            return_value=MagicMock(items=["item1", "item2"])
-        )
+        mock_context.retrieve_context = AsyncMock(return_value=MagicMock(items=["item1", "item2"]))
         mock_services.context = mock_context
 
         mock_ctx = MagicMock()
@@ -315,9 +313,7 @@ class TestProviderServiceNode:
         state = inject_execution_context(state, mock_ctx)
 
         result = await provider_service_node(
-            state,
-            provider_name="override-provider",
-            model_name="override-model"
+            state, provider_name="override-provider", model_name="override-model"
         )
 
         assert result.context.get("current_provider") == "override-provider"
@@ -368,9 +364,7 @@ class TestServiceIntegration:
             return_value={"provider": "test", "model": "test-model"}
         )
         mock_context = AsyncMock()
-        mock_context.retrieve_context = AsyncMock(
-            return_value=MagicMock(items=["ctx1"])
-        )
+        mock_context.retrieve_context = AsyncMock(return_value=MagicMock(items=["ctx1"]))
         mock_services.chat = mock_chat
         mock_services.provider = mock_provider
         mock_services.context = mock_context

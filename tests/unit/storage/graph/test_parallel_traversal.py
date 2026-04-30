@@ -67,16 +67,11 @@ async def populated_graph_store(graph_store: SqliteGraphStore) -> SqliteGraphSto
         )
 
     # Create edges - center to each branch
-    edges = [
-        GraphEdge(src="center", dst=f"branch_{i}", type="CALLS")
-        for i in range(20)
-    ]
+    edges = [GraphEdge(src="center", dst=f"branch_{i}", type="CALLS") for i in range(20)]
 
     # Create some cross-branch edges
     for i in range(10):
-        edges.append(
-            GraphEdge(src=f"branch_{i}", dst=f"branch_{i+10}", type="REFERENCES")
-        )
+        edges.append(GraphEdge(src=f"branch_{i}", dst=f"branch_{i+10}", type="REFERENCES"))
 
     await graph_store.upsert_nodes(nodes)
     await graph_store.upsert_edges(edges)
@@ -98,9 +93,7 @@ class TestParallelNeighborBatch:
     @pytest.mark.asyncio
     async def test_get_neighbors_batch_multiple(self, populated_graph_store: SqliteGraphStore):
         """Test getting neighbors for multiple nodes in parallel."""
-        result = await populated_graph_store.get_neighbors_batch(
-            ["center", "branch_0", "branch_1"]
-        )
+        result = await populated_graph_store.get_neighbors_batch(["center", "branch_0", "branch_1"])
 
         # All nodes should have results
         assert "center" in result
@@ -129,9 +122,7 @@ class TestParallelNeighborBatch:
         """Test getting neighbors for nonexistent nodes."""
         await graph_store.initialize()
 
-        result = await graph_store.get_neighbors_batch(
-            ["nonexistent1", "nonexistent2"]
-        )
+        result = await graph_store.get_neighbors_batch(["nonexistent1", "nonexistent2"])
 
         assert "nonexistent1" in result
         assert "nonexistent2" in result
@@ -229,7 +220,9 @@ class TestParallelMultiHopTraversal:
         assert len(result.nodes) <= 5
 
     @pytest.mark.asyncio
-    async def test_parallel_traverse_with_edge_filter(self, populated_graph_store: SqliteGraphStore):
+    async def test_parallel_traverse_with_edge_filter(
+        self, populated_graph_store: SqliteGraphStore
+    ):
         """Test parallel traversal with edge type filtering."""
         result = await populated_graph_store.multi_hop_traverse_parallel(
             start_node_ids=["center"],

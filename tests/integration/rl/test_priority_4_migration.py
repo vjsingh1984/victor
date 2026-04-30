@@ -305,7 +305,9 @@ class TestPriority4Migration:
 
     def test_current_schema_version_is_6(self):
         """Verify current schema version is 6."""
-        assert CURRENT_SCHEMA_VERSION == 6, f"Current schema version should be 6, got {CURRENT_SCHEMA_VERSION}"
+        assert (
+            CURRENT_SCHEMA_VERSION == 6
+        ), f"Current schema version should be 6, got {CURRENT_SCHEMA_VERSION}"
 
     def test_rl_outcome_with_session_id(self):
         """Test RLOutcome can be created with session_id."""

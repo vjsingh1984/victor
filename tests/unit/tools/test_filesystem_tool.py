@@ -906,6 +906,7 @@ class TestFileCacheIntegration:
     def setup_cache(self):
         """Ensure cache is cleared before each test."""
         from victor.tools.filesystem import is_file_cache_enabled
+
         if not is_file_cache_enabled():
             pytest.skip("File cache disabled - OS page cache handles this better")
         clear_file_content_cache()

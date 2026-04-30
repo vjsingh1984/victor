@@ -329,9 +329,9 @@ async def test_batch_size_optimization():
     """Test dynamic batch size optimization."""
     # Simulate different performance scenarios
     scenarios = [
-        (100, 50, 10, 100),   # Fast operation, small batch -> increase
-        (100, 500, 10, 50),    # Slow operation, large batch -> decrease
-        (100, 100, 10, 100),   # Medium performance -> keep same
+        (100, 50, 10, 100),  # Fast operation, small batch -> increase
+        (100, 500, 10, 50),  # Slow operation, large batch -> decrease
+        (100, 100, 10, 100),  # Medium performance -> keep same
     ]
 
     for current_size, avg_time, node_count, expected_range in scenarios:
@@ -392,7 +392,7 @@ class MyClass:
         # Analyze and get recommendations
         hints = await optimizer.analyze_graph(
             graph_store=graph_store,
-            profile_data={"nodes": stats.nodes_created, "edges": stats.edges_created}
+            profile_data={"nodes": stats.nodes_created, "edges": stats.edges_created},
         )
 
         assert hints is not None

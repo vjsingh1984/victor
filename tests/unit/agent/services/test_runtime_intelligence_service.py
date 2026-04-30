@@ -1601,9 +1601,12 @@ async def test_analyze_turn_includes_topology_feedback_metadata(tmp_path):
     assert snapshot.metadata["topology_routing_hints"]["learned_topology_action"] == (
         "single_agent"
     )
-    assert snapshot.metadata["structured_routing_policy"]["selector_context"][
-        "learned_topology_action"
-    ] == "single_agent"
+    assert (
+        snapshot.metadata["structured_routing_policy"]["selector_context"][
+            "learned_topology_action"
+        ]
+        == "single_agent"
+    )
 
 
 @pytest.mark.asyncio
@@ -1658,9 +1661,10 @@ async def test_analyze_turn_includes_degradation_feedback_metadata(tmp_path):
 
     assert snapshot.metadata["degradation_feedback"]["dominant_source"] == "provider_performance"
     assert snapshot.metadata["degradation_feedback"]["severity_score"] > 0.4
-    assert snapshot.metadata["topology_routing_hints"][
-        "learned_degradation_conservative_routing_hint"
-    ] is True
+    assert (
+        snapshot.metadata["topology_routing_hints"]["learned_degradation_conservative_routing_hint"]
+        is True
+    )
 
 
 @pytest.mark.asyncio

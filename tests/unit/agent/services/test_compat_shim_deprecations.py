@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+
 # Removed compatibility shims - verify they cannot be imported
 def test_prompt_compat_module_removed():
     """Verify that prompt_compat module has been removed."""

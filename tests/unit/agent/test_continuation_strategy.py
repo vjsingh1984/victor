@@ -461,6 +461,21 @@ class TestDetermineContinuationAction:
         assert result["action"] == "request_summary"
         assert result["updates"].get("max_prompts_summary_requested") is True
 
+    def test_prompt_tool_call_for_yes_let_me_short_preamble(self, strategy, base_kwargs):
+        """Interjections before 'let me' should still trigger continuation."""
+        base_kwargs["content_length"] = 83
+        base_kwargs["full_content"] = (
+            "Yes! Let me find and query the SQLite databases directly. Let me locate them first:"
+        )
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] == "prompt_tool_call"
+        assert "didn't complete" in result["message"]
+
     def test_finish_default(self, strategy, base_kwargs):
         """Test finishes by default when no conditions met."""
         mock_intent = MagicMock()

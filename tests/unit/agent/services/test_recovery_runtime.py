@@ -21,9 +21,7 @@ def _make_stream_ctx(**overrides):
 
 def _make_runtime_host(**overrides):
     values = {
-        "_streaming_controller": SimpleNamespace(
-            current_session=SimpleNamespace(start_time=100.0)
-        ),
+        "_streaming_controller": SimpleNamespace(current_session=SimpleNamespace(start_time=100.0)),
         "_recovery_service": MagicMock(),
         "tool_calls_used": 3,
         "tool_budget": 10,

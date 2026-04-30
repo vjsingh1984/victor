@@ -29,6 +29,8 @@ from victor.agent.action_authorizer import (
     IntentClassification,
     IntentDetector,
     detect_intent,
+    has_explicit_readonly_shell_request,
+    is_tool_blocked_for_intent,
     is_write_authorized,
     get_prompt_guard,
     get_safe_tools,
@@ -978,3 +980,21 @@ class TestIntentClassificationDataclass:
         result.safe_actions.add("new_action")
         # Modifying result should not affect SAFE_ACTIONS constant
         assert "new_action" not in SAFE_ACTIONS[ActionIntent.DISPLAY_ONLY]
+
+
+class TestReadonlyShellSignals:
+    """Tests for readonly shell/SQLite authorization signals."""
+
+    def test_misspelled_sqllite_request_is_recognized(self):
+        assert has_explicit_readonly_shell_request(
+            "also review the sqllite db for evolved prompts and explain significance"
+        )
+
+    def test_review_db_request_keeps_shell_available(self):
+        blocked = is_tool_blocked_for_intent(
+            "shell",
+            ActionIntent.DISPLAY_ONLY,
+            user_message="review the sqllite db directly",
+        )
+
+        assert blocked is False

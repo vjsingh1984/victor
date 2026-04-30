@@ -99,10 +99,12 @@ class TestPlanNode:
     async def test_plan_node_with_planning_enabled(self):
         """Test planning when LLM planning is enabled."""
         state = create_initial_state(query="Write tests")
-        state = state.model_copy(update={
-            "perception": {"intent": "write"},
-            "task_type": "code_generation",
-        })
+        state = state.model_copy(
+            update={
+                "perception": {"intent": "write"},
+                "task_type": "code_generation",
+            }
+        )
 
         mock_coordinator = AsyncMock()
         mock_coordinator.chat_with_planning = AsyncMock(
@@ -112,7 +114,9 @@ class TestPlanNode:
             )
         )
 
-        result = await plan_node(state, planning_coordinator=mock_coordinator, use_llm_planning=True)
+        result = await plan_node(
+            state, planning_coordinator=mock_coordinator, use_llm_planning=True
+        )
 
         assert result.stage == "plan"
         assert result.plan is not None
@@ -121,10 +125,12 @@ class TestPlanNode:
     async def test_plan_node_fast_path(self):
         """Test planning with fast path (no LLM)."""
         state = create_initial_state(query="Simple task")
-        state = state.model_copy(update={
-            "perception": {"intent": "read"},
-            "complexity": "low",
-        })
+        state = state.model_copy(
+            update={
+                "perception": {"intent": "read"},
+                "complexity": "low",
+            }
+        )
 
         result = await plan_node(state, use_llm_planning=False)
 
@@ -141,10 +147,12 @@ class TestActNode:
     async def test_act_node_with_turn_executor(self):
         """Test action execution via TurnExecutor."""
         state = create_initial_state(query="Write code")
-        state = state.model_copy(update={
-            "plan": {"tool_calls": ["write_file"]},
-            "task_type": "code_generation",
-        })
+        state = state.model_copy(
+            update={
+                "plan": {"tool_calls": ["write_file"]},
+                "task_type": "code_generation",
+            }
+        )
 
         mock_executor = AsyncMock()
         mock_executor.execute_turn = AsyncMock(
@@ -179,10 +187,12 @@ class TestEvaluateNode:
     async def test_evaluate_node_continue(self):
         """Test evaluation that returns continue decision."""
         state = create_initial_state(query="Write code")
-        state = state.model_copy(update={
-            "action_result": {"output": "Started"},
-            "progress_scores": [0.3],
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"output": "Started"},
+                "progress_scores": [0.3],
+            }
+        )
 
         evaluator = AsyncMock()
         evaluator.evaluate = AsyncMock(
@@ -204,10 +214,12 @@ class TestEvaluateNode:
     async def test_evaluate_node_complete(self):
         """Test evaluation that returns complete decision."""
         state = create_initial_state(query="Simple task")
-        state = state.model_copy(update={
-            "action_result": {"output": "Done"},
-            "progress_scores": [0.9],
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"output": "Done"},
+                "progress_scores": [0.9],
+            }
+        )
 
         evaluator = AsyncMock()
         evaluator.evaluate = AsyncMock(
@@ -226,9 +238,11 @@ class TestEvaluateNode:
     async def test_evaluate_node_with_fulfillment_check(self):
         """Test evaluation with fulfillment detector."""
         state = create_initial_state(query="Write function")
-        state = state.model_copy(update={
-            "action_result": {"output": "Function written"},
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"output": "Function written"},
+            }
+        )
 
         detector = MagicMock()
         detector.is_fulfilled = MagicMock(return_value=True)
@@ -252,10 +266,12 @@ class TestDecideEdge:
     def test_decide_edge_continue(self):
         """Test decide edge routes to perceive for continue."""
         state = create_initial_state(query="Task")
-        state = state.model_copy(update={
-            "evaluation": {"decision": "continue"},
-            "iteration": 1,
-        })
+        state = state.model_copy(
+            update={
+                "evaluation": {"decision": "continue"},
+                "iteration": 1,
+            }
+        )
 
         next_node = decide_edge(state)
         assert next_node == "perceive"
@@ -263,9 +279,11 @@ class TestDecideEdge:
     def test_decide_edge_complete(self):
         """Test decide edge routes to END for complete."""
         state = create_initial_state(query="Task")
-        state = state.model_copy(update={
-            "evaluation": {"decision": "complete"},
-        })
+        state = state.model_copy(
+            update={
+                "evaluation": {"decision": "complete"},
+            }
+        )
 
         next_node = decide_edge(state)
         assert next_node == "__end__"
@@ -273,9 +291,11 @@ class TestDecideEdge:
     def test_decide_edge_fail(self):
         """Test decide edge routes to END for fail."""
         state = create_initial_state(query="Task")
-        state = state.model_copy(update={
-            "evaluation": {"decision": "fail"},
-        })
+        state = state.model_copy(
+            update={
+                "evaluation": {"decision": "fail"},
+            }
+        )
 
         next_node = decide_edge(state)
         assert next_node == "__end__"
@@ -283,9 +303,11 @@ class TestDecideEdge:
     def test_decide_edge_retry(self):
         """Test decide edge routes to act for retry."""
         state = create_initial_state(query="Task")
-        state = state.model_copy(update={
-            "evaluation": {"decision": "retry"},
-        })
+        state = state.model_copy(
+            update={
+                "evaluation": {"decision": "retry"},
+            }
+        )
 
         next_node = decide_edge(state)
         assert next_node == "act"
@@ -293,10 +315,12 @@ class TestDecideEdge:
     def test_decide_edge_max_iterations(self):
         """Test decide edge stops at max iterations."""
         state = create_initial_state(query="Task", max_iterations=3)
-        state = state.model_copy(update={
-            "iteration": 3,
-            "evaluation": {"decision": "continue"},
-        })
+        state = state.model_copy(
+            update={
+                "iteration": 3,
+                "evaluation": {"decision": "continue"},
+            }
+        )
 
         next_node = decide_edge(state)
         assert next_node == "__end__"
@@ -316,10 +340,12 @@ class TestFastPathPlanning:
     def test_fast_path_plan_write_intent(self):
         """Test fast-path plan for write intent."""
         state = create_initial_state(query="Write code")
-        state = state.model_copy(update={
-            "perception": {"intent": "write"},
-            "task_type": "code_generation",
-        })
+        state = state.model_copy(
+            update={
+                "perception": {"intent": "write"},
+                "task_type": "code_generation",
+            }
+        )
 
         plan = _build_fast_path_plan(state)
 
@@ -329,9 +355,11 @@ class TestFastPathPlanning:
     def test_fast_path_plan_read_intent(self):
         """Test fast-path plan for read intent."""
         state = create_initial_state(query="Read code")
-        state = state.model_copy(update={
-            "perception": {"intent": "read"},
-        })
+        state = state.model_copy(
+            update={
+                "perception": {"intent": "read"},
+            }
+        )
 
         plan = _build_fast_path_plan(state)
 
@@ -340,9 +368,11 @@ class TestFastPathPlanning:
     def test_fast_path_plan_debugging(self):
         """Test fast-path plan for debugging tasks."""
         state = create_initial_state(query="Fix bug")
-        state = state.model_copy(update={
-            "task_type": "debugging",
-        })
+        state = state.model_copy(
+            update={
+                "task_type": "debugging",
+            }
+        )
 
         plan = _build_fast_path_plan(state)
 
@@ -355,9 +385,11 @@ class TestDefaultEvaluation:
     def test_default_evaluation_error(self):
         """Test evaluation with error result."""
         state = create_initial_state(query="Test")
-        state = state.model_copy(update={
-            "action_result": {"error": "Something failed"},
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"error": "Something failed"},
+            }
+        )
 
         evaluation = _default_evaluation(state)
 
@@ -367,9 +399,11 @@ class TestDefaultEvaluation:
     def test_default_evaluation_complete(self):
         """Test evaluation detects completion."""
         state = create_initial_state(query="Test")
-        state = state.model_copy(update={
-            "action_result": {"response": "Task completed successfully"},
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"response": "Task completed successfully"},
+            }
+        )
 
         evaluation = _default_evaluation(state)
 
@@ -379,9 +413,11 @@ class TestDefaultEvaluation:
     def test_default_evaluation_continue(self):
         """Test evaluation defaults to continue."""
         state = create_initial_state(query="Test")
-        state = state.model_copy(update={
-            "action_result": {"response": "Making progress"},
-        })
+        state = state.model_copy(
+            update={
+                "action_result": {"response": "Making progress"},
+            }
+        )
 
         evaluation = _default_evaluation(state)
 

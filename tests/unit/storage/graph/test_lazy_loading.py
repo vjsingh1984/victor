@@ -98,9 +98,7 @@ class TestLazyNodeIteration:
         """Test iterating nodes with filters."""
         # Filter by file
         batches = []
-        async for batch in populated_graph_store.iter_nodes(
-            batch_size=5, file="file_0.py"
-        ):
+        async for batch in populated_graph_store.iter_nodes(batch_size=5, file="file_0.py"):
             batches.append(batch)
 
         # file_0.py should have nodes 0-9 (10 nodes)
@@ -116,9 +114,7 @@ class TestLazyNodeIteration:
     async def test_iter_nodes_by_type(self, populated_graph_store: SqliteGraphStore):
         """Test iterating nodes filtered by type."""
         batches = []
-        async for batch in populated_graph_store.iter_nodes(
-            batch_size=10, type="function"
-        ):
+        async for batch in populated_graph_store.iter_nodes(batch_size=10, type="function"):
             batches.append(batch)
 
         # All nodes should be functions
@@ -171,9 +167,7 @@ class TestLazyEdgeIteration:
     async def test_iter_edges_filtered(self, populated_graph_store: SqliteGraphStore):
         """Test iterating edges filtered by type."""
         batches = []
-        async for batch in populated_graph_store.iter_edges(
-            batch_size=20, edge_types=["CALLS"]
-        ):
+        async for batch in populated_graph_store.iter_edges(batch_size=20, edge_types=["CALLS"]):
             batches.append(batch)
 
         # Should only have CALLS edges (99)
@@ -286,9 +280,7 @@ class TestLazyNeighborIteration:
         await graph_store.initialize()
 
         batches = []
-        async for batch in graph_store.iter_neighbors(
-            node_id="nonexistent", batch_size=10
-        ):
+        async for batch in graph_store.iter_neighbors(node_id="nonexistent", batch_size=10):
             batches.append(batch)
 
         # Should have no batches
@@ -308,9 +300,7 @@ class TestLazyLoadingMemoryEfficiency:
     """Tests for memory efficiency of lazy loading."""
 
     @pytest.mark.asyncio
-    async def test_iter_nodes_memory_efficient(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_iter_nodes_memory_efficient(self, populated_graph_store: SqliteGraphStore):
         """Test that lazy iteration doesn't load all nodes at once."""
         batch_count = 0
         max_batch_size = 0
@@ -327,9 +317,7 @@ class TestLazyLoadingMemoryEfficiency:
         assert max_batch_size == 10
 
     @pytest.mark.asyncio
-    async def test_iter_edges_memory_efficient(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_iter_edges_memory_efficient(self, populated_graph_store: SqliteGraphStore):
         """Test that lazy iteration doesn't load all edges at once."""
         max_batch_size = 0
 
@@ -343,9 +331,7 @@ class TestLazyLoadingMemoryEfficiency:
         assert max_batch_size == 25
 
     @pytest.mark.asyncio
-    async def test_early_termination(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_early_termination(self, populated_graph_store: SqliteGraphStore):
         """Test that early termination works correctly."""
         batch_count = 0
         max_batches = 2
@@ -363,9 +349,7 @@ class TestLazyLoadingIntegration:
     """Integration tests for lazy loading with MultiHopRetriever."""
 
     @pytest.mark.asyncio
-    async def test_retriever_uses_lazy_loading(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_retriever_uses_lazy_loading(self, populated_graph_store: SqliteGraphStore):
         """Test that MultiHopRetriever can use lazy loading."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 
@@ -386,9 +370,7 @@ class TestLazyLoadingIntegration:
         assert retriever._use_lazy_loading(config) is True
 
     @pytest.mark.asyncio
-    async def test_retriever_lazy_neighbor_loading(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_retriever_lazy_neighbor_loading(self, populated_graph_store: SqliteGraphStore):
         """Test lazy neighbor loading in retriever."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 
@@ -406,18 +388,14 @@ class TestLazyLoadingIntegration:
         retriever = MultiHopRetriever(populated_graph_store, config)
 
         # Get neighbors using lazy loading
-        neighbors = await retriever._get_neighbors_lazy(
-            "n0", None, config
-        )
+        neighbors = await retriever._get_neighbors_lazy("n0", None, config)
 
         # Should have neighbors
         assert len(neighbors) > 0
         assert all(isinstance(n, GraphEdge) for n in neighbors)
 
     @pytest.mark.asyncio
-    async def test_retriever_lazy_fallback(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_retriever_lazy_fallback(self, populated_graph_store: SqliteGraphStore):
         """Test fallback to regular get_neighbors when lazy loading fails."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 
@@ -439,18 +417,14 @@ class TestLazyLoadingIntegration:
         retriever = MultiHopRetriever(mock_store, config)
 
         # Should fall back to get_neighbors
-        neighbors = await retriever._get_neighbors_lazy(
-            "n0", None, config
-        )
+        neighbors = await retriever._get_neighbors_lazy("n0", None, config)
 
         # Should have called get_neighbors as fallback
         mock_store.get_neighbors.assert_called_once()
         assert neighbors == []
 
     @pytest.mark.asyncio
-    async def test_retriever_lazy_based_on_size(
-        self, populated_graph_store: SqliteGraphStore
-    ):
+    async def test_retriever_lazy_based_on_size(self, populated_graph_store: SqliteGraphStore):
         """Test that lazy loading is used for large max_nodes."""
         from victor.core.graph_rag.retrieval import MultiHopRetriever
 

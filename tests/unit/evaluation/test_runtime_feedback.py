@@ -504,9 +504,7 @@ def test_load_runtime_feedback_builds_scoped_team_worktree_metrics(tmp_path):
     assert scope_metrics["provider"]["anthropic"]["team_cleanup_error_task_count"] == pytest.approx(
         1.0
     )
-    assert scope_metrics["model_family"]["gpt"]["team_formations"]["parallel"] == pytest.approx(
-        2.0
-    )
+    assert scope_metrics["model_family"]["gpt"]["team_formations"]["parallel"] == pytest.approx(2.0)
 
 
 def test_load_runtime_feedback_aggregates_long_horizon_degradation_metrics(tmp_path):
