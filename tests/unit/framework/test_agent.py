@@ -129,6 +129,27 @@ def mock_stream_chunk():
     return chunk
 
 
+@pytest.fixture(autouse=True)
+def reset_feature_flags_for_agent_tests():
+    """Reset feature flags and disable service layer for Agent tests.
+
+    These tests test Agent behavior, not service layer integration.
+    Disabling USE_SERVICE_LAYER_FOR_AGENT ensures tests continue to work
+    with the legacy path (Agent → orchestrator.chat()) without needing
+    to mock the entire service layer.
+    """
+    from victor.core.feature_flags import reset_feature_flag_manager, FeatureFlag, get_feature_flag_manager
+
+    reset_feature_flag_manager()
+    # Disable service layer to test legacy Agent behavior
+    manager = get_feature_flag_manager()
+    manager.disable(FeatureFlag.USE_SERVICE_LAYER_FOR_AGENT)
+
+    yield
+
+    reset_feature_flag_manager()
+
+
 # =============================================================================
 # Agent Initialization Tests (lines 98-108)
 # =============================================================================
