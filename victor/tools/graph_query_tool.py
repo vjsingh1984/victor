@@ -36,28 +36,15 @@ logger = logging.getLogger(__name__)
 # Tool Input Models
 # =============================================================================
 
+
 class GraphSemanticSearchInput(BaseModel):
     """Input for graph_semantic_search tool."""
 
-    query: str = Field(
-        description="Natural language query about the codebase"
-    )
-    path: str = Field(
-        default=".",
-        description="Path to search within (default: current directory)"
-    )
-    mode: str = Field(
-        default="semantic",
-        description="Query mode: semantic, structural, or hybrid"
-    )
-    max_hops: int = Field(
-        default=2,
-        description="Maximum hops for graph traversal (1-3)"
-    )
-    max_results: int = Field(
-        default=10,
-        description="Maximum number of results to return"
-    )
+    query: str = Field(description="Natural language query about the codebase")
+    path: str = Field(default=".", description="Path to search within (default: current directory)")
+    mode: str = Field(default="semantic", description="Query mode: semantic, structural, or hybrid")
+    max_hops: int = Field(default=2, description="Maximum hops for graph traversal (1-3)")
+    max_results: int = Field(default=10, description="Maximum number of results to return")
 
 
 class ImpactAnalysisInput(BaseModel):
@@ -67,26 +54,19 @@ class ImpactAnalysisInput(BaseModel):
         description="Target symbol or file:line (e.g., 'my_function' or 'src/main.py:42')"
     )
     analysis_type: str = Field(
-        default="forward",
-        description="Analysis type: forward (downstream) or backward (upstream)"
+        default="forward", description="Analysis type: forward (downstream) or backward (upstream)"
     )
-    max_depth: int = Field(
-        default=3,
-        description="Maximum depth for impact analysis (1-5)"
-    )
+    max_depth: int = Field(default=3, description="Maximum depth for impact analysis (1-5)")
     include_test_impact: bool = Field(
-        default=True,
-        description="Whether to include test impact in analysis"
+        default=True, description="Whether to include test impact in analysis"
     )
-    path: str = Field(
-        default=".",
-        description="Path to search within (default: current directory)"
-    )
+    path: str = Field(default=".", description="Path to search within (default: current directory)")
 
 
 # =============================================================================
 # Tool Implementations
 # =============================================================================
+
 
 @tool(
     name="graph_semantic_search",
@@ -97,7 +77,7 @@ class ImpactAnalysisInput(BaseModel):
         "Finding related code",
         "Analyzing change impact",
         "Tracing function calls",
-        "Discovering code relationships"
+        "Discovering code relationships",
     ],
     priority=Priority.MEDIUM,
     access_mode=AccessMode.READONLY,
@@ -152,7 +132,7 @@ async def graph_semantic_search(
             "results": [],
             "query": query,
             "error": "Graph query tool is not enabled. "
-                    "Set VICTOR_USE_GRAPH_QUERY_TOOL=true to enable.",
+            "Set VICTOR_USE_GRAPH_QUERY_TOOL=true to enable.",
             "execution_time_ms": (time.time() - start_time) * 1000,
         }
 
@@ -182,16 +162,18 @@ async def graph_semantic_search(
         # Format results
         formatted_results = []
         for node in result.nodes[:max_results]:
-            formatted_results.append({
-                "name": node.name,
-                "type": node.type,
-                "file": node.file,
-                "line": node.line,
-                "signature": node.signature,
-                "docstring": node.docstring,
-                "relevance_score": result.scores.get(node.node_id, 0.0),
-                "hop_distance": result.hop_distances.get(node.node_id, 0),
-            })
+            formatted_results.append(
+                {
+                    "name": node.name,
+                    "type": node.type,
+                    "file": node.file,
+                    "line": node.line,
+                    "signature": node.signature,
+                    "docstring": node.docstring,
+                    "relevance_score": result.scores.get(node.node_id, 0.0),
+                    "hop_distance": result.hop_distances.get(node.node_id, 0),
+                }
+            )
 
         return {
             "results": formatted_results,
@@ -223,7 +205,7 @@ async def graph_semantic_search(
         "Finding what depends on a function",
         "Understanding upstream dependencies",
         "Checking if code is safe to modify",
-        "Identifying downstream effects"
+        "Identifying downstream effects",
     ],
     priority=Priority.HIGH,
     access_mode=AccessMode.READONLY,
@@ -279,7 +261,7 @@ async def impact_analysis(
             "target": target,
             "impacted_symbols": [],
             "error": "Graph query tool is not enabled. "
-                    "Set VICTOR_USE_GRAPH_QUERY_TOOL=true to enable.",
+            "Set VICTOR_USE_GRAPH_QUERY_TOOL=true to enable.",
             "execution_time_ms": (time.time() - start_time) * 1000,
         }
 
@@ -326,13 +308,15 @@ async def impact_analysis(
         for node_id in impacted_node_ids:
             node = await graph_store.get_node_by_id(node_id)
             if node:
-                impacted_symbols.append({
-                    "name": node.name,
-                    "type": node.type,
-                    "file": node.file,
-                    "line": node.line,
-                    "relationship": _get_relationship_type(node, analysis_type),
-                })
+                impacted_symbols.append(
+                    {
+                        "name": node.name,
+                        "type": node.type,
+                        "file": node.file,
+                        "line": node.line,
+                        "relationship": _get_relationship_type(node, analysis_type),
+                    }
+                )
 
         # Find test impact if requested
         test_impact = []
@@ -377,6 +361,7 @@ async def impact_analysis(
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 async def _resolve_target(
     target: str,
@@ -456,11 +441,13 @@ async def _find_test_impact(
         for edge in edges:
             test_node = await graph_store.get_node_by_id(edge.src)
             if test_node and "test" in test_node.file.lower():
-                test_impact.append({
-                    "file": test_node.file,
-                    "name": test_node.name,
-                    "type": test_node.type,
-                })
+                test_impact.append(
+                    {
+                        "file": test_node.file,
+                        "name": test_node.name,
+                        "type": test_node.type,
+                    }
+                )
 
     return test_impact
 
@@ -502,11 +489,13 @@ def _build_impact_paths(
 
         for neighbor in adjacency.get(current, []):
             new_path = path + [neighbor]
-            paths.append({
-                "path": new_path,
-                "length": len(new_path),
-                "edge_type": edges[0].type if edges else "unknown",
-            })
+            paths.append(
+                {
+                    "path": new_path,
+                    "length": len(new_path),
+                    "edge_type": edges[0].type if edges else "unknown",
+                }
+            )
             dfs(neighbor, new_path, depth + 1)
 
     dfs(start_id, [start_id], 0)

@@ -24,6 +24,7 @@ class ToolSelectionRuntime:
         runtime = self._runtime
         provider_supports_tools = runtime.provider.supports_tools()
         tooling_allowed = provider_supports_tools and runtime._model_supports_tool_calls()
+        user_message_anchor = getattr(runtime, "_current_user_message", None) or context_msg
 
         if not tooling_allowed:
             return None
@@ -43,8 +44,11 @@ class ToolSelectionRuntime:
         conversation_history = (
             [msg.model_dump() for msg in runtime.messages] if runtime.messages else None
         )
+        selection_context = context_msg
+        if user_message_anchor and user_message_anchor != context_msg:
+            selection_context = f"{user_message_anchor}\n\n" f"Current working step: {context_msg}"
         tools = await runtime.tool_selector.select_tools(
-            context_msg,
+            selection_context,
             use_semantic=runtime.use_semantic_selection,
             conversation_history=conversation_history,
             conversation_depth=conversation_depth,
@@ -61,7 +65,7 @@ class ToolSelectionRuntime:
         tools = runtime._tool_planner.filter_tools_by_intent(
             tools,
             current_intent,
-            user_message=context_msg,
+            user_message=user_message_anchor,
         )
         tools = runtime._apply_kv_tool_strategy(tools)
         return runtime._sort_tools_for_kv_stability(tools)

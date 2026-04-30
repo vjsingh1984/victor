@@ -53,6 +53,7 @@ def _get_graph_types() -> Tuple[type, type]:
         Tuple of (GraphNode, GraphEdge) classes
     """
     from victor.storage.graph.protocol import GraphEdge, GraphNode
+
     return GraphNode, GraphEdge
 
 
@@ -888,11 +889,13 @@ class SqliteLanceDBStore:
 
             # Build CONTAINS edge for nested symbols
             if symbol.parent_id and symbol.parent_id != symbol.unified_id:
-                edges.append(GraphEdge(
-                    src=symbol.parent_id,
-                    dst=symbol.unified_id,
-                    type=EdgeType.CONTAINS,
-                ))
+                edges.append(
+                    GraphEdge(
+                        src=symbol.parent_id,
+                        dst=symbol.unified_id,
+                        type=EdgeType.CONTAINS,
+                    )
+                )
 
         # Store nodes and edges
         await self._graph_store.upsert_nodes(nodes)

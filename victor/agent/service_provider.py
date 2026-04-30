@@ -1156,6 +1156,7 @@ class OrchestratorServiceProvider:
         presentation = None
         try:
             from victor.agent.presentation import create_presentation_adapter
+
             presentation = create_presentation_adapter()
         except Exception:
             pass

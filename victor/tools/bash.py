@@ -464,7 +464,18 @@ def _is_dangerous(command: str) -> bool:
         "query",
         "sql",
     ],  # Force inclusion
-    keywords=["bash", "shell", "command", "run", "execute", "terminal", "cli", "sqlite3", "database", "sql"],
+    keywords=[
+        "bash",
+        "shell",
+        "command",
+        "run",
+        "execute",
+        "terminal",
+        "cli",
+        "sqlite3",
+        "database",
+        "sql",
+    ],
 )
 async def shell(
     cmd: str,

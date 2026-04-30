@@ -74,6 +74,7 @@ try:
         RequirementSimilarity,
         RequirementSimilarityCalculator,
     )
+
     _requirement_graph_available = True
 except ImportError:
     _requirement_graph_available = False
@@ -94,6 +95,7 @@ try:
         register_template,
         list_templates,
     )
+
     _query_translation_available = True
 except ImportError:
     _query_translation_available = False

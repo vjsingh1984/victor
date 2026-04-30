@@ -52,6 +52,7 @@ def _get_graph_types() -> tuple[type, type, type]:
     """Lazy import of graph types."""
     from victor.storage.graph.protocol import GraphEdge, GraphNode
     from victor.storage.graph.edge_types import EdgeType
+
     return GraphNode, GraphEdge, EdgeType
 
 
@@ -250,8 +251,7 @@ class CodeContextGraphBuilder:
         all_edges = cfg_edges + cdg_edges + ddg_edges
 
         logger.debug(
-            f"Built CCG for {file_path}: "
-            f"{len(all_nodes)} nodes, {len(all_edges)} edges"
+            f"Built CCG for {file_path}: " f"{len(all_nodes)} nodes, {len(all_edges)} edges"
         )
 
         return all_nodes, all_edges
@@ -284,9 +284,7 @@ class CodeContextGraphBuilder:
         }
         return ext_map.get(file_path.suffix.lower(), "unknown")
 
-    def _parse_source(
-        self, source_code: str, file_path: Path
-    ) -> Optional[Any]:
+    def _parse_source(self, source_code: str, file_path: Path) -> Optional[Any]:
         """Parse source code using Tree-sitter.
 
         Args:
@@ -323,7 +321,9 @@ class CodeContextGraphBuilder:
             lang_module = __import__(module_name)
             lang_func = getattr(lang_module, func_name)
             lang_obj = lang_func()
-            ts_language = ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            ts_language = (
+                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            )
 
             parser = ts.Parser(ts_language)
             tree = parser.parse(bytes(source_code, "utf-8"))
@@ -415,9 +415,7 @@ class CodeContextGraphBuilder:
                         content = source_lines[start_line - 1].strip()
 
                     # Generate unique node ID
-                    node_id = self._generate_statement_id(
-                        file_str, start_line, end_line, node_type
-                    )
+                    node_id = self._generate_statement_id(file_str, start_line, end_line, node_type)
 
                     # Determine visibility
                     visibility = self._determine_visibility(node, content)
@@ -498,8 +496,12 @@ class CodeContextGraphBuilder:
         elif self.language in {"javascript", "typescript"}:
             if node_type in {"if_statement", "else_clause"}:
                 return StatementType.CONDITION
-            if node_type in {"for_statement", "for_in_statement", "while_statement",
-                             "do_statement"}:
+            if node_type in {
+                "for_statement",
+                "for_in_statement",
+                "while_statement",
+                "do_statement",
+            }:
                 return StatementType.LOOP
             if node_type == "try_statement":
                 return StatementType.TRY
@@ -515,8 +517,12 @@ class CodeContextGraphBuilder:
                 return StatementType.CALL
             if node_type == "return_statement":
                 return StatementType.RETURN
-            if node_type in {"function_declaration", "function_expression",
-                             "arrow_function", "method_definition"}:
+            if node_type in {
+                "function_declaration",
+                "function_expression",
+                "arrow_function",
+                "method_definition",
+            }:
                 return StatementType.FUNCTION_DEF
             if node_type == "class_declaration":
                 return StatementType.CLASS_DEF
@@ -675,8 +681,7 @@ class CodeContextGraphBuilder:
             return EdgeType.CFG_TRUE_BRANCH
         elif current.statement_type == StatementType.LOOP.value:
             return EdgeType.CFG_LOOP_ENTRY
-        elif current.statement_type in {StatementType.SWITCH.value,
-                                        StatementType.CASE.value}:
+        elif current.statement_type in {StatementType.SWITCH.value, StatementType.CASE.value}:
             return EdgeType.CFG_CASE
         elif current.statement_type == StatementType.RETURN.value:
             return EdgeType.CFG_RETURN
@@ -717,8 +722,10 @@ class CodeContextGraphBuilder:
 
         # Find condition nodes (if statements, loops)
         condition_nodes = [
-            n for n in nodes
-            if n.statement_type in {
+            n
+            for n in nodes
+            if n.statement_type
+            in {
                 StatementType.CONDITION.value,
                 StatementType.LOOP.value,
                 StatementType.SWITCH.value,
@@ -728,9 +735,7 @@ class CodeContextGraphBuilder:
         # Create CDG edges from conditions to their dependent nodes
         for condition in condition_nodes:
             # Get all nodes dominated by this condition
-            dominated = self._find_dominated_nodes(
-                condition.node_id, successors, nodes
-            )
+            dominated = self._find_dominated_nodes(condition.node_id, successors, nodes)
 
             for dominated_id in dominated:
                 if dominated_id != condition.node_id:
@@ -842,9 +847,7 @@ class CodeContextGraphBuilder:
                 var_name = self._extract_variable_name(node)
                 if var_name:
                     current_scope = scope_stack[-1] if scope_stack else ""
-                    node_id = self._find_node_at_line(
-                        nodes, node.start_point[0] + 1
-                    )
+                    node_id = self._find_node_at_line(nodes, node.start_point[0] + 1)
 
                     var_info = VariableInfo(
                         name=var_name,
@@ -861,9 +864,7 @@ class CodeContextGraphBuilder:
                 key = f"{current_scope}:{var_name}"
                 if key in symbol_table:
                     var_info = symbol_table[key]
-                    use_node_id = self._find_node_at_line(
-                        nodes, node.start_point[0] + 1
-                    )
+                    use_node_id = self._find_node_at_line(nodes, node.start_point[0] + 1)
                     if use_node_id and use_node_id != var_info.defining_node:
                         var_info.use_sites.append(use_node_id)
 
@@ -980,7 +981,9 @@ class CodeContextGraphBuilder:
                 for child in node.children:
                     if hasattr(child, "type") and child.type == "identifier":
                         if hasattr(child, "text"):
-                            return child.text.decode() if isinstance(child.text, bytes) else child.text
+                            return (
+                                child.text.decode() if isinstance(child.text, bytes) else child.text
+                            )
         except Exception:
             pass
         return None
@@ -1026,20 +1029,86 @@ class CodeContextGraphBuilder:
         # Combined keywords set (unique across all languages)
         keywords = {
             # Python
-            "False", "None", "True", "and", "as", "assert", "async",
-            "await", "break", "class", "continue", "def", "del", "elif",
-            "else", "except", "finally", "for", "from", "global", "if",
-            "import", "in", "is", "lambda", "nonlocal", "not", "or",
-            "pass", "raise", "return", "try", "while", "with", "yield",
+            "False",
+            "None",
+            "True",
+            "and",
+            "as",
+            "assert",
+            "async",
+            "await",
+            "break",
+            "class",
+            "continue",
+            "def",
+            "del",
+            "elif",
+            "else",
+            "except",
+            "finally",
+            "for",
+            "from",
+            "global",
+            "if",
+            "import",
+            "in",
+            "is",
+            "lambda",
+            "nonlocal",
+            "not",
+            "or",
+            "pass",
+            "raise",
+            "return",
+            "try",
+            "while",
+            "with",
+            "yield",
             # JavaScript/TypeScript
-            "case", "catch", "const", "debugger", "default", "delete", "do",
-            "enum", "export", "extends", "false", "function", "implements", "instanceof",
-            "interface", "let", "new", "null", "of", "package", "private",
-            "protected", "public", "super", "switch", "static",
-            "this", "throw", "true", "typeof", "var", "void",
+            "case",
+            "catch",
+            "const",
+            "debugger",
+            "default",
+            "delete",
+            "do",
+            "enum",
+            "export",
+            "extends",
+            "false",
+            "function",
+            "implements",
+            "instanceof",
+            "interface",
+            "let",
+            "new",
+            "null",
+            "of",
+            "package",
+            "private",
+            "protected",
+            "public",
+            "super",
+            "switch",
+            "static",
+            "this",
+            "throw",
+            "true",
+            "typeof",
+            "var",
+            "void",
             # Go
-            "chan", "defer", "fallthrough", "func", "go", "goto",
-            "map", "range", "select", "struct", "type",
+            "chan",
+            "defer",
+            "fallthrough",
+            "func",
+            "go",
+            "goto",
+            "map",
+            "range",
+            "select",
+            "struct",
+            "type",
         }
         return name in keywords
 

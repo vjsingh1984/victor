@@ -65,6 +65,8 @@ from victor.workflows.definition import (
     AgentNode,
     ConditionNode,
     ParallelNode,
+    TeamStepWorkflow,
+    TeamNodeWorkflow,
     TransformNode,
     WorkflowDefinition,
     WorkflowBuilder,
@@ -364,6 +366,8 @@ __all__ = [
     "ConditionNode",
     "ParallelNode",
     "TransformNode",
+    "TeamStepWorkflow",
+    "TeamNodeWorkflow",
     # Constraints
     "TaskConstraints",
     "ConstraintsProtocol",

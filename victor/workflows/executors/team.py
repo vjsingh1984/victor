@@ -89,7 +89,7 @@ class TeamStepExecutor:
         except Exception as exc:
             if "_node_results" not in current_state:
                 current_state["_node_results"] = {}
-            current_state["_error"] = f"Team node '{node.id}' failed: {exc}"
+            current_state["_error"] = f"Team step '{node.id}' failed: {exc}"
             current_state["_node_results"][node.id] = GraphNodeResult(
                 node_id=node.id,
                 success=False,

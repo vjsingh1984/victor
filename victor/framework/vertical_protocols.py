@@ -39,7 +39,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, FrozenSet, List, Optional, Protocol, Tuple, runtime_checkable
 
 # =============================================================================
 # File Editing Protocols

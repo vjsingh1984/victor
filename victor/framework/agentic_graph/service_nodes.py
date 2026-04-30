@@ -49,7 +49,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def _unwrap_state(state: Union[AgenticLoopStateModel, CopyOnWriteState, Any]) -> AgenticLoopStateModel:
+def _unwrap_state(
+    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+) -> AgenticLoopStateModel:
     """Unwrap state from CopyOnWriteState if needed."""
     if isinstance(state, CopyOnWriteState):
         unwrapped = state.get_state()
@@ -156,7 +158,7 @@ async def chat_service_node(
             context["last_response"] = response
 
         state = state.model_copy(update={"context": context})
-        logger.info(f"Chat service node: Generated response")
+        logger.info("Chat service node: Generated response")
 
     except Exception as e:
         logger.warning(f"Chat service node failed: {e}")
@@ -304,7 +306,9 @@ async def context_service_node(
             context["context_items"] = []
 
         state = state.model_copy(update={"context": context})
-        logger.info(f"Context service node: Retrieved {len(context.get('context_items', []))} items")
+        logger.info(
+            f"Context service node: Retrieved {len(context.get('context_items', []))} items"
+        )
 
     except Exception as e:
         logger.warning(f"Context service node failed: {e}")
@@ -361,7 +365,9 @@ async def provider_service_node(
         context["current_model"] = provider_info.get("model", "")
 
         state = state.model_copy(update={"context": context})
-        logger.info(f"Provider service node: {provider_info.get('provider')}/{provider_info.get('model')}")
+        logger.info(
+            f"Provider service node: {provider_info.get('provider')}/{provider_info.get('model')}"
+        )
 
     except Exception as e:
         logger.warning(f"Provider service node failed: {e}")

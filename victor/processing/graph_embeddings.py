@@ -42,6 +42,7 @@ def _get_embedding_service() -> Any:
     if _embedding_service is None:
         try:
             from victor.storage.embeddings.service import get_embedding_service
+
             _embedding_service = get_embedding_service()
             logger.debug("GraphAwareEmbedder using EmbeddingService for embeddings")
         except ImportError:
@@ -194,6 +195,7 @@ class GraphAwareEmbedder:
         if service is not None:
             try:
                 import numpy as np
+
                 embedding = await service.embed_text(text, use_cache=True)
                 return embedding.tolist() if isinstance(embedding, np.ndarray) else list(embedding)
             except Exception as e:
@@ -294,6 +296,7 @@ class GraphAwareEmbedder:
 
         # Expand to 384 dimensions
         import hashlib
+
         feature_str = ",".join(map(str, features))
         hash_obj = hashlib.sha256(feature_str.encode())
         hash_bytes = hash_obj.digest()
@@ -329,10 +332,7 @@ class GraphAwareEmbedder:
         # Weighted combination
         combined = []
         for t, s in zip(text_embedding, structural_embedding):
-            val = (
-                t * self.config.semantic_weight +
-                s * self.config.structural_weight
-            )
+            val = t * self.config.semantic_weight + s * self.config.structural_weight
             combined.append(val)
 
         return combined

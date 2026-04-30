@@ -61,7 +61,7 @@ class VerbosityTracker:
         max_lines = max_lines or self._settings.max_response_lines
 
         char_count = len(response)
-        line_count = len([l for l in response.strip().splitlines() if l.strip()])
+        line_count = len([line for line in response.strip().splitlines() if line.strip()])
 
         return char_count > max_chars or line_count > max_lines
 
@@ -75,13 +75,14 @@ class VerbosityTracker:
             Dictionary with verbosity metrics.
         """
         lines = response.strip().splitlines()
-        non_empty_lines = [l for l in lines if l.strip()]
+        non_empty_lines = [line for line in lines if line.strip()]
 
         return {
             "char_count": len(response),
             "line_count": len(lines),
             "non_empty_line_count": len(non_empty_lines),
-            "avg_line_length": sum(len(l) for l in non_empty_lines) / max(len(non_empty_lines), 1),
+            "avg_line_length": sum(len(line) for line in non_empty_lines)
+            / max(len(non_empty_lines), 1),
             "verbosity_ratio_chars": len(response) / self._settings.max_response_chars,
             "verbosity_ratio_lines": len(non_empty_lines) / self._settings.max_response_lines,
         }

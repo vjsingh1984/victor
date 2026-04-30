@@ -288,9 +288,7 @@ class GraphAwarePromptBuilder:
 
         # Boost if contains close nodes (low hop distance)
         if nodes:
-            avg_distance = sum(
-                hop_distances.get(n.node_id, 99) for n in nodes
-            ) / len(nodes)
+            avg_distance = sum(hop_distances.get(n.node_id, 99) for n in nodes) / len(nodes)
             proximity_boost = max(0, 1 - avg_distance / 3)
             return base * 0.7 + proximity_boost * 0.3
 
@@ -450,8 +448,13 @@ class GraphAwarePromptBuilder:
         """
         lines = []
         for section_name, section_text in context.sections.items():
-            if section_name not in {"Functions", "Methods", "Classes",
-                                    "Control Flow", "Data Dependencies"}:
+            if section_name not in {
+                "Functions",
+                "Methods",
+                "Classes",
+                "Control Flow",
+                "Data Dependencies",
+            }:
                 lines.append(section_text)
         return "\n\n".join(lines) if lines else "No related symbols found."
 

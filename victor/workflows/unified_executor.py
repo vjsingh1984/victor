@@ -490,6 +490,7 @@ class CompiledWorkflowExecutor:
         if cache is None and cache_config is not None:
             try:
                 from victor.workflows.cache import WorkflowCache
+
                 self.cache = WorkflowCache(config=cache_config)
             except ImportError:
                 self.cache = None
@@ -536,7 +537,9 @@ class CompiledWorkflowExecutor:
             context.metadata["thread_id"] = thread_id
 
             try:
-                await self._execute_workflow(workflow_or_graph, context, timeout=timeout, thread_id=thread_id)
+                await self._execute_workflow(
+                    workflow_or_graph, context, timeout=timeout, thread_id=thread_id
+                )
                 total_duration = time.time() - start_time
 
                 return WorkflowResult(
@@ -622,7 +625,11 @@ class CompiledWorkflowExecutor:
                     self._save_workflow_checkpoint(
                         state={
                             "last_node": node_id,
-                            "next_node": self._get_next_nodes(node, context)[0] if self._get_next_nodes(node, context) else None,
+                            "next_node": (
+                                self._get_next_nodes(node, context)[0]
+                                if self._get_next_nodes(node, context)
+                                else None
+                            ),
                             "context": dict(context.data),
                         },
                     )
@@ -635,22 +642,26 @@ class CompiledWorkflowExecutor:
                 # Record timeout failure
                 from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
-                context.add_result(NodeResult(
-                    node_id=node_id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error=f"Node execution timed out after {timeout}s",
-                ))
+                context.add_result(
+                    NodeResult(
+                        node_id=node_id,
+                        status=ExecutorNodeStatus.FAILED,
+                        error=f"Node execution timed out after {timeout}s",
+                    )
+                )
                 break
 
             except Exception as e:
                 # Record failure
                 from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
-                context.add_result(NodeResult(
-                    node_id=node_id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error=str(e),
-                ))
+                context.add_result(
+                    NodeResult(
+                        node_id=node_id,
+                        status=ExecutorNodeStatus.FAILED,
+                        error=str(e),
+                    )
+                )
 
                 # Stop on failure unless continue_on_failure is set
                 if not workflow.metadata.get("continue_on_failure", False):
@@ -723,7 +734,11 @@ class CompiledWorkflowExecutor:
             result = NodeResult(
                 node_id=node.id,
                 status=ExecutorNodeStatus.COMPLETED,
-                output=context.data.get(node.output_key) if hasattr(node, "output_key") and node.output_key else None,
+                output=(
+                    context.data.get(node.output_key)
+                    if hasattr(node, "output_key") and node.output_key
+                    else None
+                ),
                 duration_seconds=time.time() - start_time,
             )
 

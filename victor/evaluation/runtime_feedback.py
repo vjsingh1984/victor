@@ -617,13 +617,9 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             "team_worktree_materialized_count": int(
                 summary.get("team_worktree_materialized_count", 0) or 0
             ),
-            "team_worktree_dry_run_count": int(
-                summary.get("team_worktree_dry_run_count", 0) or 0
-            ),
+            "team_worktree_dry_run_count": int(summary.get("team_worktree_dry_run_count", 0) or 0),
             "team_low_risk_task_count": int(summary.get("team_low_risk_task_count", 0) or 0),
-            "team_medium_risk_task_count": int(
-                summary.get("team_medium_risk_task_count", 0) or 0
-            ),
+            "team_medium_risk_task_count": int(summary.get("team_medium_risk_task_count", 0) or 0),
             "team_high_risk_task_count": int(summary.get("team_high_risk_task_count", 0) or 0),
             "team_merge_conflict_task_count": int(
                 summary.get("team_merge_conflict_task_count", 0) or 0
@@ -649,7 +645,9 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
                 summary.get("team_cleanup_error_task_count", 0) or 0
             ),
             "team_cleanup_error_count": int(summary.get("team_cleanup_error_count", 0) or 0),
-            "avg_team_assignments": round(float(summary.get("avg_team_assignments", 0.0) or 0.0), 4),
+            "avg_team_assignments": round(
+                float(summary.get("avg_team_assignments", 0.0) or 0.0), 4
+            ),
             "avg_team_scoped_members": round(
                 float(summary.get("avg_team_scoped_members", 0.0) or 0.0),
                 4,
@@ -1816,8 +1814,7 @@ def _merge_team_worktree_scope_bucket(
     )
     bucket["_coverage_weight"] = round(bucket["_coverage_weight"] + count_weight, 4)
     bucket["team_feedback_coverage"] = round(
-        bucket["team_feedback_coverage"]
-        + (_coerce_non_negative(coverage) * count_weight),
+        bucket["team_feedback_coverage"] + (_coerce_non_negative(coverage) * count_weight),
         4,
     )
     for field_name, field_value in (
@@ -1954,7 +1951,11 @@ def _build_team_worktree_scope_metrics(
                 merge_risk_distribution=dict(metadata.get("team_merge_risk_levels") or {}),
             )
 
-    finalized: dict[str, dict[str, dict[str, Any]]] = {"task_type": {}, "provider": {}, "model_family": {}}
+    finalized: dict[str, dict[str, dict[str, Any]]] = {
+        "task_type": {},
+        "provider": {},
+        "model_family": {},
+    }
     for dimension, entries in scope_metrics.items():
         for label, bucket in entries.items():
             coverage_weight = max(float(bucket.get("_coverage_weight", 0.0) or 0.0), 1e-9)
@@ -2251,12 +2252,8 @@ def _aggregate_feedback_payloads(
             "avg_degradation_intervention_count": weighted_metadata_average(
                 "avg_degradation_intervention_count"
             ),
-            "avg_degradation_confidence": weighted_metadata_average(
-                "avg_degradation_confidence"
-            ),
-            "avg_degradation_drift_score": weighted_metadata_average(
-                "avg_degradation_drift_score"
-            ),
+            "avg_degradation_confidence": weighted_metadata_average("avg_degradation_confidence"),
+            "avg_degradation_drift_score": weighted_metadata_average("avg_degradation_drift_score"),
             "content_degradation_task_count": weighted_metadata_average(
                 "content_degradation_task_count"
             ),
@@ -2280,15 +2277,9 @@ def _aggregate_feedback_payloads(
             "high_adaptation_cost_task_count": weighted_metadata_average(
                 "high_adaptation_cost_task_count"
             ),
-            "degradation_high_cost_rate": weighted_metadata_average(
-                "degradation_high_cost_rate"
-            ),
-            "degradation_confidence_rate": weighted_metadata_average(
-                "degradation_confidence_rate"
-            ),
-            "degradation_stability_score": weighted_metadata_average(
-                "degradation_stability_score"
-            ),
+            "degradation_high_cost_rate": weighted_metadata_average("degradation_high_cost_rate"),
+            "degradation_confidence_rate": weighted_metadata_average("degradation_confidence_rate"),
+            "degradation_stability_score": weighted_metadata_average("degradation_stability_score"),
             "degradation_sources": weighted_distribution("degradation_sources"),
             "degradation_kinds": weighted_distribution("degradation_kinds"),
             "degradation_failure_types": weighted_distribution("degradation_failure_types"),
@@ -2535,9 +2526,7 @@ def _aggregate_topology_feedback_metadata(
         "avg_degradation_time_to_recover_seconds": weighted_metadata_average(
             "avg_degradation_time_to_recover_seconds"
         ),
-        "avg_degradation_cost_variance": weighted_metadata_average(
-            "avg_degradation_cost_variance"
-        ),
+        "avg_degradation_cost_variance": weighted_metadata_average("avg_degradation_cost_variance"),
         "avg_degradation_recovery_time_variance": weighted_metadata_average(
             "avg_degradation_recovery_time_variance"
         ),
@@ -2563,9 +2552,7 @@ def _aggregate_topology_feedback_metadata(
         "degradation_intervention_task_count": weighted_metadata_average(
             "degradation_intervention_task_count"
         ),
-        "degradation_intervention_rate": weighted_metadata_average(
-            "degradation_intervention_rate"
-        ),
+        "degradation_intervention_rate": weighted_metadata_average("degradation_intervention_rate"),
         "high_adaptation_cost_task_count": weighted_metadata_average(
             "high_adaptation_cost_task_count"
         ),
@@ -2593,31 +2580,21 @@ def _aggregate_topology_feedback_metadata(
             "team_merge_conflict_task_count"
         ),
         "team_merge_conflict_count": weighted_metadata_average("team_merge_conflict_count"),
-        "team_merge_overlap_task_count": weighted_metadata_average(
-            "team_merge_overlap_task_count"
-        ),
+        "team_merge_overlap_task_count": weighted_metadata_average("team_merge_overlap_task_count"),
         "team_out_of_scope_write_task_count": weighted_metadata_average(
             "team_out_of_scope_write_task_count"
         ),
-        "team_out_of_scope_write_count": weighted_metadata_average(
-            "team_out_of_scope_write_count"
-        ),
+        "team_out_of_scope_write_count": weighted_metadata_average("team_out_of_scope_write_count"),
         "team_readonly_violation_task_count": weighted_metadata_average(
             "team_readonly_violation_task_count"
         ),
-        "team_readonly_violation_count": weighted_metadata_average(
-            "team_readonly_violation_count"
-        ),
+        "team_readonly_violation_count": weighted_metadata_average("team_readonly_violation_count"),
         "team_cleanup_task_count": weighted_metadata_average("team_cleanup_task_count"),
-        "team_cleanup_error_task_count": weighted_metadata_average(
-            "team_cleanup_error_task_count"
-        ),
+        "team_cleanup_error_task_count": weighted_metadata_average("team_cleanup_error_task_count"),
         "team_cleanup_error_count": weighted_metadata_average("team_cleanup_error_count"),
         "avg_team_assignments": weighted_metadata_average("avg_team_assignments"),
         "avg_team_scoped_members": weighted_metadata_average("avg_team_scoped_members"),
-        "avg_team_members_with_changes": weighted_metadata_average(
-            "avg_team_members_with_changes"
-        ),
+        "avg_team_members_with_changes": weighted_metadata_average("avg_team_members_with_changes"),
         "avg_team_changed_file_count": weighted_metadata_average("avg_team_changed_file_count"),
         "team_materialized_assignment_total": weighted_metadata_average(
             "team_materialized_assignment_total"

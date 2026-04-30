@@ -96,7 +96,10 @@ class ToolPlanner:
             return tools
 
         from victor.tools.core_tool_aliases import canonicalize_core_tool_name
-        from victor.agent.action_authorizer import get_intent_blocked_tools, is_tool_blocked_for_intent
+        from victor.agent.action_authorizer import (
+            get_intent_blocked_tools,
+            is_tool_blocked_for_intent,
+        )
 
         blocked_tools = get_intent_blocked_tools(current_intent)
         if not blocked_tools:

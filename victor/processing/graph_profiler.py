@@ -213,6 +213,7 @@ class GraphProfiler:
         start_memory = 0
         if self._track_memory:
             import tracemalloc
+
             if not tracemalloc.is_tracing():
                 tracemalloc.start()
             start_memory = tracemalloc.get_traced_memory()[0]
@@ -234,6 +235,7 @@ class GraphProfiler:
             # Track memory if enabled
             if self._track_memory:
                 import tracemalloc
+
                 current_memory = tracemalloc.get_traced_memory()[0]
                 metrics.memory_bytes = max(metrics.memory_bytes, current_memory - start_memory)
 

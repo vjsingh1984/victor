@@ -56,7 +56,9 @@ class SessionContextLinker:
 
     def __init__(
         self,
-        session_persistence: Optional[Union["SQLiteSessionPersistence", "ConversationStore"]] = None,
+        session_persistence: Optional[
+            Union["SQLiteSessionPersistence", "ConversationStore"]
+        ] = None,
         conversation_store: Optional["ConversationStore"] = None,
         embedding_service: Optional["EmbeddingService"] = None,
     ):

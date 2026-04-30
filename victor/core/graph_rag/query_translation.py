@@ -264,8 +264,6 @@ class QueryTemplate:
                 params[param_def.name] = param_def.default
 
         # Extract using regex patterns
-        query_lower = query.lower()
-
         # Common extraction patterns
         # Extract function/class/module names
         name_patterns = [
@@ -302,7 +300,12 @@ class QueryTemplate:
                 elif groups[0]:
                     extracted_name = groups[0]
                     # Map to appropriate parameter name
-                    if "node_id" not in params and "function" not in params and "target" not in params and "source" not in params:
+                    if (
+                        "node_id" not in params
+                        and "function" not in params
+                        and "target" not in params
+                        and "source" not in params
+                    ):
                         # Check which parameter this should map to
                         param_names = [p.name for p in self.parameters]
                         if "node_id" in param_names:
@@ -999,15 +1002,14 @@ class LLMBasedTranslator(QueryTranslator):
             return await self._fallback.translate(query, graph_store, context)
 
         # Get graph statistics for context
-        try:
-            stats = await graph_store.stats()
-        except Exception:
-            stats = {}
+        # try:
+        #     stats = await graph_store.stats()
+        # except Exception:
+        #     stats = {}
 
         # Build prompt for LLM
-        prompt = self._build_translation_prompt(query, stats, context)
-
         # TODO: Call LLM for translation
+        # prompt = self._build_translation_prompt(query, stats, context)
         # For now, fall back to template-based
         result = await self._fallback.translate(query, graph_store, context)
         result.metadata["llm_used"] = False
@@ -1104,8 +1106,8 @@ def register_template(template: QueryTemplate) -> None:
 
 
 def list_templates(
-        query_type: Optional[QueryType] = None,
-        enabled_only: bool = True,
+    query_type: Optional[QueryType] = None,
+    enabled_only: bool = True,
 ) -> List[QueryTemplate]:
     """List available query templates.
 

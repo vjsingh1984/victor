@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 # Try to import NetworkX
 try:
     import networkx as nx
+
     _NETWORKX_AVAILABLE = True
 except ImportError:
     _NETWORKX_AVAILABLE = False
@@ -101,12 +102,15 @@ def build_networkx_graph(
 
     # Add nodes
     for node in nodes:
-        G.add_node(node.node_id, **{
-            "name": node.name,
-            "type": node.type,
-            "file": node.file,
-            "line": node.line,
-        })
+        G.add_node(
+            node.node_id,
+            **{
+                "name": node.name,
+                "type": node.type,
+                "file": node.file,
+                "line": node.line,
+            },
+        )
 
     # Add edges
     for edge in edges:
@@ -297,7 +301,7 @@ def extract_subgraph(
                 subgraph.neighbors(center_node),
                 key=lambda n: subgraph.degree(n),
                 reverse=True,
-            )[:max_nodes - 1]:
+            )[: max_nodes - 1]:
                 nodes_to_keep.add(neighbor)
 
             subgraph = subgraph.subgraph(nodes_to_keep)

@@ -225,10 +225,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     f"[red]No prompt candidate found for {section} selector '{selector}' (provider={provider}).[/]"
                 )
                 return
-            label = (
-                f"{section}:{provider}:{candidate.generation}"
-                f" [{candidate.text_hash[:8]}]"
-            )
+            label = f"{section}:{provider}:{candidate.generation}" f" [{candidate.text_hash[:8]}]"
             text = candidate.text
             subtitle = f"Hash: {candidate.text_hash} | Parent: {candidate.parent_hash} | Database: {db_path}"
         ctx.console.print(
@@ -246,9 +243,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
         from_selector = self._option_value(args, "--from") or "baseline"
         to_selector = self._option_value(args, "--to")
         if not to_selector:
-            ctx.console.print(
-                "[red]Missing --to selector for /prompt-optimize --diff.[/]"
-            )
+            ctx.console.print("[red]Missing --to selector for /prompt-optimize --diff.[/]")
             return
 
         left = self._resolve_candidate_or_baseline(learner, section, provider, from_selector)

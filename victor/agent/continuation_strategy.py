@@ -1109,23 +1109,17 @@ class ContinuationStrategy:
         # Short preamble with no tool calls: model started a response but stalled,
         # typically because context compaction erased the pending task state.
         # "Let me verify the files I need to modify:" is 164 chars — a classic symptom.
-        _PREAMBLE_PREFIXES = (
-            "let me ",
-            "i'll ",
-            "i will ",
-            "i need to ",
-            "first, ",
-            "first i ",
-            "to implement",
-            "to complete",
-            "to continue",
-            "next, i",
+        _PREAMBLE_START = re.compile(
+            r"^\s*(?:(?:yes|yeah|yep|sure|ok|okay|alright)[,!.\s]+)?"
+            r"(?:let me\b|i'll\b|i will\b|i need to\b|first,\b|first i\b|"
+            r"to implement\b|to complete\b|to continue\b|next,\s*i\b)",
+            re.IGNORECASE,
         )
         if (
             not is_completion
             and content_length < 400
             and full_content
-            and full_content.lower().lstrip().startswith(_PREAMBLE_PREFIXES)
+            and _PREAMBLE_START.match(full_content)
         ):
             logger.warning(
                 f"Short preamble ({content_length} chars) with no tool calls — "

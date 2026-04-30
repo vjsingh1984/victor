@@ -1353,7 +1353,9 @@ class Settings(BaseSettings):
     # Production data verified (2026-04-29): 140 provider stats with 90.5% success rate
     # Enable via: victor chat --routing-profile balanced
     # Disable via: victor chat --disable-smart-routing or VICTOR_SMART_ROUTING_ENABLED=false
-    smart_routing_enabled: bool = True  # Master switch for smart routing (ON by default with production data)
+    smart_routing_enabled: bool = (
+        True  # Master switch for smart routing (ON by default with production data)
+    )
     smart_routing_profile: str = (
         "balanced"  # Routing profile (balanced, cost-optimized, performance, local-first)
     )

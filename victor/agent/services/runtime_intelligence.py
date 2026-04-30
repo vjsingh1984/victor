@@ -1556,7 +1556,9 @@ class RuntimeIntelligenceService:
         worktree_materialized_count = cls._coerce_feedback_int(
             metadata.get("team_worktree_materialized_count")
         )
-        worktree_dry_run_count = cls._coerce_feedback_int(metadata.get("team_worktree_dry_run_count"))
+        worktree_dry_run_count = cls._coerce_feedback_int(
+            metadata.get("team_worktree_dry_run_count")
+        )
         low_risk_task_count = cls._coerce_feedback_int(metadata.get("team_low_risk_task_count"))
         medium_risk_task_count = cls._coerce_feedback_int(
             metadata.get("team_medium_risk_task_count")
@@ -1569,9 +1571,7 @@ class RuntimeIntelligenceService:
         cleanup_error_task_count = cls._coerce_feedback_int(
             metadata.get("team_cleanup_error_task_count")
         )
-        avg_team_assignments = cls._coerce_non_negative_float(
-            metadata.get("avg_team_assignments")
-        )
+        avg_team_assignments = cls._coerce_non_negative_float(metadata.get("avg_team_assignments"))
         avg_team_scoped_members = cls._coerce_non_negative_float(
             metadata.get("avg_team_scoped_members")
         )

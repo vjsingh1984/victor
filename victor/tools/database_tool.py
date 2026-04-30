@@ -552,7 +552,20 @@ async def _do_disconnect(
         ".db",
         ".sqlite",
     ],
-    keywords=["database", "sql", "query", "connect", "tables", "sqlite", "sqlite3", "postgres", "mysql", "schema", "db", "rows"],
+    keywords=[
+        "database",
+        "sql",
+        "query",
+        "connect",
+        "tables",
+        "sqlite",
+        "sqlite3",
+        "postgres",
+        "mysql",
+        "schema",
+        "db",
+        "rows",
+    ],
 )
 async def database(
     action: str,

@@ -608,7 +608,9 @@ def _resolve_vertical_catalog_source(subject: Any, provider_method: str) -> Opti
         return None
     if _has_declared_attribute(subject, provider_method):
         return subject
-    config = getattr(subject, "config", None) if _has_declared_attribute(subject, "config") else None
+    config = (
+        getattr(subject, "config", None) if _has_declared_attribute(subject, "config") else None
+    )
     if config is not None and _has_declared_attribute(config, provider_method):
         return config
     return None

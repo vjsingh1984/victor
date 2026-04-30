@@ -57,7 +57,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def _unwrap_state(state: Union[AgenticLoopStateModel, CopyOnWriteState, Any]) -> AgenticLoopStateModel:
+def _unwrap_state(
+    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+) -> AgenticLoopStateModel:
     """Unwrap state from CopyOnWriteState if needed.
 
     Args:
@@ -110,6 +112,7 @@ def _create_context_snapshot(
     # If orchestrator provided, delegate to create_snapshot
     if orchestrator is not None:
         from victor.agent.coordinators.state_context import create_snapshot
+
         return create_snapshot(orchestrator)
 
     # Otherwise, create minimal snapshot from state
@@ -274,6 +277,7 @@ async def exploration_node(
             from victor.agent.coordinators.exploration_state_passed import (
                 ExplorationStatePassedCoordinator,
             )
+
             exploration_coordinator = ExplorationStatePassedCoordinator()
         except ImportError:
             logger.warning("ExplorationStatePassedCoordinator not available")
@@ -331,6 +335,7 @@ async def safety_node(
             from victor.agent.coordinators.safety_state_passed import (
                 SafetyStatePassedCoordinator,
             )
+
             safety_coordinator = SafetyStatePassedCoordinator()
         except ImportError:
             logger.warning("SafetyStatePassedCoordinator not available")
@@ -415,6 +420,7 @@ async def system_prompt_node(
                 from victor.agent.coordinators.system_prompt_state_passed import (
                     SystemPromptStatePassedCoordinator,
                 )
+
                 system_prompt_coordinator = SystemPromptStatePassedCoordinator(
                     orchestrator.task_analyzer
                 )

@@ -254,13 +254,15 @@ class GraphEnhancedContextBuilder:
                 for edge in edges:
                     target_node = await self.graph_store.get_node_by_id(edge.dst)
                     if target_node:
-                        data_flows.append({
-                            "source": symbol.name,
-                            "source_file": symbol.file,
-                            "target": target_node.name,
-                            "target_file": target_node.file,
-                            "variable": edge.metadata.get("variable", "unknown"),
-                        })
+                        data_flows.append(
+                            {
+                                "source": symbol.name,
+                                "source_file": symbol.file,
+                                "target": target_node.name,
+                                "target_file": target_node.file,
+                                "variable": edge.metadata.get("variable", "unknown"),
+                            }
+                        )
 
             except Exception as e:
                 logger.warning(f"Error building data flow for {symbol.name}: {e}")
@@ -315,7 +317,7 @@ class GraphEnhancedContextBuilder:
         ]
 
         # Format symbols
-        for symbol in symbols[:self.config.get("max_symbols", 50)]:
+        for symbol in symbols[: self.config.get("max_symbols", 50)]:
             lines.append(f"### {symbol.type}: `{symbol.name}`")
             if symbol.file:
                 location = symbol.file
@@ -334,8 +336,9 @@ class GraphEnhancedContextBuilder:
             lines.append("")
             for symbol_name, deps in dependencies.items():
                 if deps:
-                    lines.append(f"- `{symbol_name}` depends on: " +
-                               ", ".join(f"`{d}`" for d in deps[:5]))
+                    lines.append(
+                        f"- `{symbol_name}` depends on: " + ", ".join(f"`{d}`" for d in deps[:5])
+                    )
             lines.append("")
 
         # Format data flow

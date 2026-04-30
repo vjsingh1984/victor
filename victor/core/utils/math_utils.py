@@ -20,6 +20,8 @@ particularly in evaluation, feedback, and scoring modules.
 
 from __future__ import annotations
 
+from typing import Any
+
 
 def clamp(value: float, lower: float, upper: float) -> float:
     """Bound a numeric score into a closed interval.

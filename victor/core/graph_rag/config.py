@@ -37,9 +37,9 @@ class SubgraphConfig:
     default_radius: int = 2
     max_nodes: int = 100
     ttl_seconds: int = 3600
-    edge_types: Set[str] = field(default_factory=lambda: {
-        "CALLS", "REFERENCES", "CONTAINS", "CFG_SUCCESSOR", "DDG_DEF_USE"
-    })
+    edge_types: Set[str] = field(
+        default_factory=lambda: {"CALLS", "REFERENCES", "CONTAINS", "CFG_SUCCESSOR", "DDG_DEF_USE"}
+    )
 
 
 @dataclass
@@ -67,21 +67,23 @@ class GraphIndexConfig:
     enable_subgraph_cache: bool = True
     chunk_size: int = 50
     max_file_size_bytes: int = 1_000_000  # 1MB
-    exclude_patterns: List[str] = field(default_factory=lambda: [
-        "**/.git/**",
-        "**/node_modules/**",
-        "**/venv/**",
-        "**/.venv/**",
-        "**/__pycache__/**",
-        "**/dist/**",
-        "**/build/**",
-        "**/*.min.js",
-        "**/*.min.css",
-        "**/package-lock.json",
-        "**/yarn.lock",
-        "**/Poetry.lock",
-        "**/*.pyc",
-    ])
+    exclude_patterns: List[str] = field(
+        default_factory=lambda: [
+            "**/.git/**",
+            "**/node_modules/**",
+            "**/venv/**",
+            "**/.venv/**",
+            "**/__pycache__/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/*.min.js",
+            "**/*.min.css",
+            "**/package-lock.json",
+            "**/yarn.lock",
+            "**/Poetry.lock",
+            "**/*.pyc",
+        ]
+    )
     include_patterns: List[str] = field(default_factory=list)
     subgraph_config: SubgraphConfig = field(default_factory=SubgraphConfig)
     embedding_neighborhood_radius: int = 2

@@ -168,7 +168,7 @@ class TeamStep:
         orchestrator: Optional["AgentOrchestrator"],
         graph_state: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Execute the team node (sync wrapper).
+        """Execute the team step (sync wrapper).
 
         Args:
             orchestrator: Agent orchestrator for spawning sub-agents
@@ -198,7 +198,7 @@ class TeamStep:
         orchestrator: Optional["AgentOrchestrator"],
         graph_state: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Execute the team node asynchronously.
+        """Execute the team step asynchronously.
 
         This method:
         1. Creates a team coordinator
@@ -366,6 +366,7 @@ class TeamStep:
         Returns:
             Team result from execution
         """
+
         def _get_explicit_callable(name: str):
             if hasattr(type(coordinator), name) or name in vars(coordinator):
                 candidate = getattr(coordinator, name, None)

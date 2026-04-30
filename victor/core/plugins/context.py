@@ -612,7 +612,7 @@ class HostPluginContext(PluginContext):
                 CCGBuilderProtocol,
                 builder,
                 CapabilityStatus.ENHANCED,
-                metadata={"language": language}
+                metadata={"language": language},
             )
             logger.debug(
                 "Plugin registered CCG builder for language: %s",

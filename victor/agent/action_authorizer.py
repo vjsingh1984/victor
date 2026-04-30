@@ -147,7 +147,7 @@ GENERATION_TOOLS: frozenset[str] = frozenset(
 
 # Signals that indicate the user explicitly wants readonly shell/SQLite inspection.
 READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
-    (r"\b(sqlite|sqlite3)\b", "sqlite"),
+    (r"\b(sqlite|sqlite3|sqllite|sqllite3)\b", "sqlite"),
     (
         r"\b(use|run|query|inspect|review|check|look\s+at)\b.*\b(shell|bash|terminal|sqlite3?)\b",
         "explicit_shell_request",
@@ -157,8 +157,14 @@ READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
         "explicit_shell_request_reverse",
     ),
     # Database-related signals - allow shell for database operations
-    (r"\b(read|query|inspect|check|view|explore)\b.*\b(database|db|table|schema)\b", "database_read"),
-    (r"\b(database|db|table|schema)\b.*\b(read|query|inspect|check|view|list)\b", "database_read_reverse"),
+    (
+        r"\b(read|query|inspect|review|check|view|explore)\b.*\b(database|db|table|schema)\b",
+        "database_read",
+    ),
+    (
+        r"\b(database|db|table|schema)\b.*\b(read|query|inspect|review|check|view|list)\b",
+        "database_read_reverse",
+    ),
     (r"\b(list|show)\s+(all\s+)?(tables|rows|data)\b", "database_list"),
     (r"\b\.tables\b", "sqlite_dot_tables"),
     (r"\bSELECT\b.*\bFROM\b", "sql_query"),

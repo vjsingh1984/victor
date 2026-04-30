@@ -44,7 +44,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _unwrap_state(state: Union[AgenticLoopStateModel, CopyOnWriteState, Any]) -> AgenticLoopStateModel:
+def _unwrap_state(
+    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+) -> AgenticLoopStateModel:
     """Unwrap state from CopyOnWriteState if needed.
 
     Args:
@@ -70,6 +72,7 @@ def _unwrap_state(state: Union[AgenticLoopStateModel, CopyOnWriteState, Any]) ->
     else:
         # Last resort: assume it's already compatible
         return state
+
 
 # =============================================================================
 # PERCEIVE Node
@@ -288,8 +291,6 @@ async def act_node(
         Updated state with action results
     """
     state = _unwrap_state(state)
-    plan = state.plan or {}
-    tool_calls = plan.get("tool_calls", [])
 
     try:
         if turn_executor is not None:
@@ -461,8 +462,7 @@ def _default_evaluation(state: AgenticLoopStateModel) -> Dict[str, Any]:
     # Check for completion signals
     response = action_result.get("response", "")
     if response and any(
-        marker in response.lower()
-        for marker in ["done", "complete", "finished", "successfully"]
+        marker in response.lower() for marker in ["done", "complete", "finished", "successfully"]
     ):
         return {
             "decision": "complete",
@@ -541,6 +541,7 @@ def _create_fallback_perception(query: str) -> Any:
     Returns:
         Mock perception result
     """
+
     # Create a simple mock object
     class FallbackPerception:
         def __init__(self, query: str):

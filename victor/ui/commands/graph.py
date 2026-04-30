@@ -140,7 +140,9 @@ async def _query_async(
 
     # Print results
     console.print(f"\n[green]Query results for:[/green] '{query}'")
-    console.print(f"[dim]Found {len(result.nodes)} symbols in {result.execution_time_ms:.1f}ms[/dim]\n")
+    console.print(
+        f"[dim]Found {len(result.nodes)} symbols in {result.execution_time_ms:.1f}ms[/dim]\n"
+    )
 
     if not result.nodes:
         console.print("[dim]No matching symbols found[/dim]")
@@ -371,7 +373,9 @@ async def _export_async(
         with output_path.open("w") as f:
             json.dump(data, f, indent=2)
 
-        console.print(f"[green]✓ Exported {len(nodes)} nodes and {len(edges)} edges to {output}[/green]")
+        console.print(
+            f"[green]✓ Exported {len(nodes)} nodes and {len(edges)} edges to {output}[/green]"
+        )
 
     elif format == "dot":
         # Export as DOT (GraphViz)
@@ -392,7 +396,9 @@ async def _export_async(
 
             f.write("}\n")
 
-        console.print(f"[green]✓ Exported {len(nodes)} nodes and {len(edges)} edges to {output}[/green]")
+        console.print(
+            f"[green]✓ Exported {len(nodes)} nodes and {len(edges)} edges to {output}[/green]"
+        )
         console.print("[dim]Render with: dot -Tpng graph.dot -o graph.png[/dim]")
 
     else:
@@ -405,6 +411,7 @@ async def _export_async(
 # ============================================================================
 # CLI Commands
 # ============================================================================
+
 
 @graph_app.command("index")
 def graph_index(
@@ -552,7 +559,9 @@ async def _init_context_async(
 def graph_init_context(
     path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
     task: Optional[str] = typer.Option(None, "--task", "-t", help="Task description for relevance"),
-    max_symbols: int = typer.Option(50, "--symbols", "-s", help="Max symbols to include", min=10, max=200),
+    max_symbols: int = typer.Option(
+        50, "--symbols", "-s", help="Max symbols to include", min=10, max=200
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing file"),
 ):
     """Generate graph-enhanced init.md with symbol context."""

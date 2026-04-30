@@ -446,11 +446,11 @@ class GitWorktreeRuntime:
             if isinstance(merge_analysis, dict)
             else list(session.plan.merge_order)
         )
-        merge_risk_level = merge_analysis.get("risk_level") if isinstance(merge_analysis, dict) else None
+        merge_risk_level = (
+            merge_analysis.get("risk_level") if isinstance(merge_analysis, dict) else None
+        )
         executable_without_override = (
-            bool(session.materialized)
-            and not bool(session.dry_run)
-            and merge_risk_level == "low"
+            bool(session.materialized) and not bool(session.dry_run) and merge_risk_level == "low"
         )
         return {
             "materialized": session.materialized,

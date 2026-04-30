@@ -34,10 +34,14 @@ class GraphNode:
     # ===========================================
     # v5: CCG and enhanced graph fields
     # ===========================================
-    ast_kind: str | None = None  # Tree-sitter node kind (e.g., "function_definition", "if_statement")
+    ast_kind: str | None = (
+        None  # Tree-sitter node kind (e.g., "function_definition", "if_statement")
+    )
     scope_id: str | None = None  # Hierarchical scope tracking for nested contexts
     statement_type: str | None = None  # Statement type: assignment, call, return, condition, etc.
-    requirement_id: str | None = None  # Link to requirement node (for requirement-graph integration)
+    requirement_id: str | None = (
+        None  # Link to requirement node (for requirement-graph integration)
+    )
     visibility: str | None = None  # Visibility: public, private, protected, package-private
 
 

@@ -125,13 +125,30 @@ def _normalize_query(query: str) -> str:
 
     # Remove common question words at the start
     prefixes_to_remove = [
-        "how do i ", "how can i ", "how to ", "how do we ",
-        "what is the ", "what are the ", "what ",
-        "where is the ", "where are the ", "where ",
-        "which ", "who ", "when ", "why ",
-        "can you ", "could you ", "would you ",
-        "find ", "search for ", "look for ", "get ",
-        "show me ", "list ", "display ",
+        "how do i ",
+        "how can i ",
+        "how to ",
+        "how do we ",
+        "what is the ",
+        "what are the ",
+        "what ",
+        "where is the ",
+        "where are the ",
+        "where ",
+        "which ",
+        "who ",
+        "when ",
+        "why ",
+        "can you ",
+        "could you ",
+        "would you ",
+        "find ",
+        "search for ",
+        "look for ",
+        "get ",
+        "show me ",
+        "list ",
+        "display ",
     ]
 
     for prefix in prefixes_to_remove:
@@ -270,10 +287,7 @@ class GraphQueryCache:
         ]
 
         # Convert edges to minimal representation
-        edges_data = [
-            {"src": e.src, "dst": e.dst, "type": e.type}
-            for e in result.edges
-        ]
+        edges_data = [{"src": e.src, "dst": e.dst, "type": e.type} for e in result.edges]
 
         return {
             "nodes": nodes_data,
@@ -287,9 +301,7 @@ class GraphQueryCache:
             "cached_at": time.time(),
         }
 
-    def _deserialize_result(
-        self, data: Dict[str, Any]
-    ) -> "RetrievalResult":
+    def _deserialize_result(self, data: Dict[str, Any]) -> "RetrievalResult":
         """Deserialize cached data back to RetrievalResult.
 
         Args:

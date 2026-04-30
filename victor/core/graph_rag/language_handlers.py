@@ -319,6 +319,7 @@ class _VictorCodingPluginAdapter:
         # victor_coding plugins use synchronous detect_calls_edges
         # Run in thread pool to avoid blocking
         import asyncio
+
         return await asyncio.to_thread(
             self._plugin.detect_calls_edges,
             tree,

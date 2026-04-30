@@ -654,7 +654,9 @@ async def generate_victor_md_with_graph(
                 count = 0
                 for symbol_name, deps in result.dependencies_found.items():
                     if deps and count < 10:  # Limit display
-                        sections.append(f"- `{symbol_name}` → " + ", ".join(f"`{d}`" for d in deps[:3]))
+                        sections.append(
+                            f"- `{symbol_name}` → " + ", ".join(f"`{d}`" for d in deps[:3])
+                        )
                         count += 1
                 sections.append("")
 
@@ -666,9 +668,7 @@ async def generate_victor_md_with_graph(
 
         await graph_store.close()
 
-        logger.info(
-            f"Generated graph-enhanced init.md with {len(result.symbols_included)} symbols"
-        )
+        logger.info(f"Generated graph-enhanced init.md with {len(result.symbols_included)} symbols")
 
     except ImportError as e:
         logger.debug(f"Graph dependencies not available: {e}")

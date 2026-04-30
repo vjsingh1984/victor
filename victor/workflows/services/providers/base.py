@@ -462,8 +462,7 @@ class BaseServiceProvider(ABC):
                 # Call Check with empty request (standard health check)
                 request = health_pb2.HealthCheckRequest(service="")
                 response = await asyncio.wait_for(
-                    health_stub.Check(request, timeout=config.timeout),
-                    timeout=config.timeout + 1
+                    health_stub.Check(request, timeout=config.timeout), timeout=config.timeout + 1
                 )
 
                 # Check response status

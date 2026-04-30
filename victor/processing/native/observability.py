@@ -78,6 +78,7 @@ def is_observability_enabled() -> bool:
 
     # Disable in test mode for performance
     import sys
+
     if "pytest" in sys.modules or "unittest" in sys.modules:
         enabled = False
 
@@ -201,9 +202,7 @@ class DispatchMetrics:
 
         if operation not in self._backends:
             self._backends[operation] = {}
-        self._backends[operation][backend] = (
-            self._backends[operation].get(backend, 0) + 1
-        )
+        self._backends[operation][backend] = self._backends[operation].get(backend, 0) + 1
 
     def get_stats(self, operation: str) -> dict[str, Any] | None:
         """Get statistics for a specific operation.
@@ -233,11 +232,7 @@ class DispatchMetrics:
         Returns:
             Dict mapping operation names to their stats
         """
-        return {
-            op: self.get_stats(op)
-            for op in self._counts
-            if self.get_stats(op) is not None
-        }
+        return {op: self.get_stats(op) for op in self._counts if self.get_stats(op) is not None}
 
     def reset(self) -> None:
         """Reset all collected metrics."""

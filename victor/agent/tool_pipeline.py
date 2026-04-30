@@ -1097,9 +1097,10 @@ class ToolPipeline:
             except ValueError:
                 intent = None
 
-        if intent in {ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY} and adjusted.get(
-            "readonly"
-        ) is not True:
+        if (
+            intent in {ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY}
+            and adjusted.get("readonly") is not True
+        ):
             adjusted["readonly"] = True
             changed = True
             logger.info("Pinned shell readonly=True due to %s intent", intent.value)
@@ -1110,9 +1111,7 @@ class ToolPipeline:
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[str, Dict[str, Any], NormalizationStrategy]:
         """Normalize a full tool call, including search-routing adjustments."""
-        normalized_args, strategy = self._normalize_arguments(
-            tool_name, arguments, context=context
-        )
+        normalized_args, strategy = self._normalize_arguments(tool_name, arguments, context=context)
         normalized_args, readonly_changed = self._apply_shell_policy(
             tool_name,
             normalized_args,

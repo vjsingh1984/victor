@@ -597,7 +597,9 @@ def build_registered_coordination_suggestions(
     """Build shared coordination recommendations for registered vertical catalogs."""
     from victor.framework.team_runtime import resolve_registered_coordination_catalogs
 
-    requested_vertical = vertical.strip() if isinstance(vertical, str) and vertical.strip() else None
+    requested_vertical = (
+        vertical.strip() if isinstance(vertical, str) and vertical.strip() else None
+    )
     resolved_mode_configs = mode_configs or DEFAULT_MODE_CONFIGS
     resolved_team_selector = team_selector or HybridTeamSelector(
         RuleBasedTeamSelector(),
@@ -821,7 +823,9 @@ def _should_delegate_to_coordination_surface(coordination: Any) -> bool:
     )
 
 
-def _serialize_team_recommendation(recommendation: Optional[TeamRecommendation]) -> Optional[Dict[str, Any]]:
+def _serialize_team_recommendation(
+    recommendation: Optional[TeamRecommendation],
+) -> Optional[Dict[str, Any]]:
     """Serialize a team recommendation for JSON output."""
     if recommendation is None:
         return None

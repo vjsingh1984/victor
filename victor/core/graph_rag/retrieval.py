@@ -84,8 +84,7 @@ class RetrievalResult:
             "query": self.query,
             "seed_count": len(self.seed_nodes),
             "top_nodes": [
-                {"node_id": n.node_id, "name": n.name, "file": n.file}
-                for n in self.nodes[:5]
+                {"node_id": n.node_id, "name": n.name, "file": n.file} for n in self.nodes[:5]
             ],
             "execution_time_ms": self.execution_time_ms,
         }
@@ -269,10 +268,41 @@ class MultiHopRetriever:
 
         # Filter out common stop words
         stop_words = {
-            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to",
-            "for", "of", "with", "by", "from", "as", "is", "was", "are",
-            "how", "what", "when", "where", "why", "which", "who", "does",
-            "do", "can", "could", "should", "would", "get", "find", "show",
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "by",
+            "from",
+            "as",
+            "is",
+            "was",
+            "are",
+            "how",
+            "what",
+            "when",
+            "where",
+            "why",
+            "which",
+            "who",
+            "does",
+            "do",
+            "can",
+            "could",
+            "should",
+            "would",
+            "get",
+            "find",
+            "show",
         }
 
         keywords = [w for w in words if len(w) > 2 and w not in stop_words]
@@ -334,9 +364,7 @@ class MultiHopRetriever:
 
                     # Use lazy loading if enabled and available (PH4-006)
                     if use_lazy_loading and hasattr(self.graph_store, "iter_neighbors"):
-                        neighbors = await self._get_neighbors_lazy(
-                            node_id, edge_types, config
-                        )
+                        neighbors = await self._get_neighbors_lazy(node_id, edge_types, config)
                     else:
                         neighbors = await self.graph_store.get_neighbors(
                             node_id,
@@ -446,7 +474,7 @@ class MultiHopRetriever:
             return initial_score
 
         # Exponential decay
-        decay_factor = 0.7 ** distance
+        decay_factor = 0.7**distance
         return initial_score * decay_factor
 
     def _rank_nodes(

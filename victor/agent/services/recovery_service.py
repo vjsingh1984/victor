@@ -34,7 +34,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 if TYPE_CHECKING:
-    pass
+    from victor.agent.streaming.context import StreamingChatContext
 
 logger = logging.getLogger(__name__)
 

@@ -679,9 +679,8 @@ class AgenticLoop:
                                 },
                             )
                         )
-                        if (
-                            structured_routing_policy is not None
-                            and hasattr(structured_routing_policy, "planning_context")
+                        if structured_routing_policy is not None and hasattr(
+                            structured_routing_policy, "planning_context"
                         ):
                             resolved_planning_hints = structured_routing_policy.planning_context()
                             if isinstance(resolved_planning_hints, dict):
@@ -1290,9 +1289,8 @@ class AgenticLoop:
             if provider_candidates:
                 routing_context["provider_candidates"] = list(dict.fromkeys(provider_candidates))
         structured_routing_policy = state.get("_structured_routing_policy_obj")
-        if (
-            structured_routing_policy is not None
-            and hasattr(structured_routing_policy, "selector_context")
+        if structured_routing_policy is not None and hasattr(
+            structured_routing_policy, "selector_context"
         ):
             learned_topology_context = structured_routing_policy.selector_context()
             if isinstance(learned_topology_context, dict) and learned_topology_context:
@@ -2559,6 +2557,7 @@ class AgenticLoop:
             from victor.framework.agentic_graph.executor import (
                 AgenticLoopGraphExecutor as _Executor,
             )
+
             _AgenticLoopGraphExecutor = _Executor
 
         try:
@@ -2597,9 +2596,7 @@ class AgenticLoop:
                 total_duration=duration,
                 metadata={
                     "iterations_completed": graph_result.iterations,
-                    "max_iterations_reached": (
-                        graph_result.termination_reason == "max_iterations"
-                    ),
+                    "max_iterations_reached": (graph_result.termination_reason == "max_iterations"),
                     "termination_reason": graph_result.termination_reason,
                     "executor_type": "stategraph",
                 },

@@ -1138,7 +1138,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
         # Check if this signature is permanently blocked
         if proposed_sig in self._progress.permanently_blocked:
             # Log detailed information about the blocked tool call
-            args_summary = ", ".join(f"{k}={repr(v)[:30]}" for k, v in arguments.items() if k not in {"offset", "limit"})
+            args_summary = ", ".join(
+                f"{k}={repr(v)[:30]}" for k, v in arguments.items() if k not in {"offset", "limit"}
+            )
             logger.info(
                 f"[dedup-block] Tool call BLOCKED: {tool_name}({args_summary}) | "
                 f"signature={proposed_sig[:60]}... | "

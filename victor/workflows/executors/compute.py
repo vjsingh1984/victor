@@ -250,7 +250,7 @@ class ComputeNodeExecutor:
         from victor.framework.chain_registry import create_chain
 
         # Parse "chain:vertical:name" or "chain:name"
-        chain_ref = handler_name[len(CHAIN_HANDLER_PREFIX):]
+        chain_ref = handler_name[len(CHAIN_HANDLER_PREFIX) :]
         if ":" in chain_ref:
             vertical, name = chain_ref.split(":", 1)
         else:
@@ -260,8 +260,7 @@ class ComputeNodeExecutor:
         runnable = create_chain(name, vertical=vertical)
         if runnable is None:
             logger.warning(
-                f"Chain '{chain_ref}' not found in registry "
-                f"(vertical={vertical}, name={name})"
+                f"Chain '{chain_ref}' not found in registry " f"(vertical={vertical}, name={name})"
             )
             return None
 
@@ -302,10 +301,7 @@ class ComputeNodeExecutor:
 
             try:
                 # Execute chain with timeout
-                output = await asyncio.wait_for(
-                    runnable.invoke(input_data),
-                    timeout=timeout
-                )
+                output = await asyncio.wait_for(runnable.invoke(input_data), timeout=timeout)
 
                 # Update context with output
                 self._update_context(context, node, output)
@@ -313,28 +309,18 @@ class ComputeNodeExecutor:
                 logger.info(f"Chain '{chain_ref}' completed successfully")
 
                 return NodeResult(
-                    node_id=node.id,
-                    status=ExecutorNodeStatus.COMPLETED,
-                    output=output
+                    node_id=node.id, status=ExecutorNodeStatus.COMPLETED, output=output
                 )
 
             except asyncio.TimeoutError:
                 error = f"Chain '{chain_ref}' timed out after {timeout}s"
                 logger.error(error)
-                return NodeResult(
-                    node_id=node.id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error=error
-                )
+                return NodeResult(node_id=node.id, status=ExecutorNodeStatus.FAILED, error=error)
 
             except Exception as e:
                 error = f"Chain '{chain_ref}' execution failed: {e}"
                 logger.error(error, exc_info=True)
-                return NodeResult(
-                    node_id=node.id,
-                    status=ExecutorNodeStatus.FAILED,
-                    error=error
-                )
+                return NodeResult(node_id=node.id, status=ExecutorNodeStatus.FAILED, error=error)
 
         return chain_handler
 

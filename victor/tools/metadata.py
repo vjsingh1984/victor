@@ -81,7 +81,9 @@ class ToolMetadata:
     # NEW: Task types for classification-aware selection
     task_types: List[str] = field(default_factory=list)  # e.g., ["analysis", "search", "default"]
     # NEW: Signature parameters for loop detection
-    signature_params: List[str] = field(default_factory=list)  # e.g., ["path"] (excludes offset/limit)
+    signature_params: List[str] = field(
+        default_factory=list
+    )  # e.g., ["path"] (excludes offset/limit)
     # NEW: Execution category for parallel execution
     execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
 

@@ -5,4 +5,3 @@ callers to the canonical observability analytics package.
 """
 
 from victor.observability.analytics import *  # noqa: F403
-

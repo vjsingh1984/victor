@@ -493,7 +493,9 @@ class TopologySelector:
             worker_hint = int(context.get("learned_team_max_workers_hint"))
         except (TypeError, ValueError):
             return None
-        return max(self.config.min_parallel_workers, min(self.config.max_parallel_workers, worker_hint))
+        return max(
+            self.config.min_parallel_workers, min(self.config.max_parallel_workers, worker_hint)
+        )
 
     def _team_execution_metadata(
         self,

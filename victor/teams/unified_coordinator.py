@@ -1076,9 +1076,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         finally:
             self._execution_state.reset(token)
 
-    def _adapt_team_members(
-        self, members: List[Any]
-    ) -> List["ITeamMember"]:
+    def _adapt_team_members(self, members: List[Any]) -> List["ITeamMember"]:
         """Adapt ``TeamMember`` dataclasses to ``ITeamMember`` adapters.
 
         Uses ``self._orchestrator`` to build a ``SubAgentOrchestrator`` that
@@ -1118,9 +1116,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
             return executor
 
-        return [
-            TeamMemberAdapter(member=m, executor=_make_executor(m)) for m in members
-        ]
+        return [TeamMemberAdapter(member=m, executor=_make_executor(m)) for m in members]
 
     def _dict_result_to_team_result(
         self,
@@ -1181,9 +1177,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     # StateGraph Integration
     # =========================================================================
 
-    def with_state_graph_config(
-        self, config: StateGraphNodeConfig
-    ) -> "UnifiedTeamCoordinator":
+    def with_state_graph_config(self, config: StateGraphNodeConfig) -> "UnifiedTeamCoordinator":
         """Configure how this coordinator behaves when used as a StateGraph node.
 
         ``__call__`` reads/writes the input/output keys named in ``config``.
@@ -1228,9 +1222,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return state.get(key, default)
 
     @staticmethod
-    def _build_call_context(
-        state: Any, kind: str, *, exclude: set
-    ) -> Dict[str, Any]:
+    def _build_call_context(state: Any, kind: str, *, exclude: set) -> Dict[str, Any]:
         if kind == "pydantic":
             dump = state.model_dump()
             return {k: v for k, v in dump.items() if k not in exclude}
@@ -1349,9 +1341,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             task = self._read_state(state, kind, config.query_key, default="")
 
         # Build context excluding task/query keys.
-        context = self._build_call_context(
-            state, kind, exclude={config.task_key, config.query_key}
-        )
+        context = self._build_call_context(state, kind, exclude={config.task_key, config.query_key})
         strategy_state = state.get_state() if kind == "cow" else state
         if callable(config.formation_strategy):
             try:

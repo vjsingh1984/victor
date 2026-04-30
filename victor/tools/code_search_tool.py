@@ -2074,7 +2074,9 @@ async def _get_or_build_index(
                             current_cache["index_manifest"] = index_manifest
                         logger.info("[code_search] Background rebuild complete for %s", root)
                     except Exception as exc:
-                        logger.warning("[code_search] Background rebuild failed for %s: %s", root, exc)
+                        logger.warning(
+                            "[code_search] Background rebuild failed for %s: %s", root, exc
+                        )
 
                 # Spawn background task
                 asyncio.create_task(_rebuildInBackground())
@@ -3074,10 +3076,9 @@ async def code_search(
             from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
             flag_manager = get_feature_flag_manager()
-            graph_enabled = (
-                flag_manager.is_enabled(FeatureFlag.USE_GRAPH_RAG) and
-                flag_manager.is_enabled(FeatureFlag.USE_MULTI_HOP_RETRIEVAL)
-            )
+            graph_enabled = flag_manager.is_enabled(
+                FeatureFlag.USE_GRAPH_RAG
+            ) and flag_manager.is_enabled(FeatureFlag.USE_MULTI_HOP_RETRIEVAL)
 
             if not graph_enabled:
                 logger.info("Graph search features not enabled, falling back to semantic search")
@@ -3113,7 +3114,8 @@ async def code_search(
                             **backend_metadata,
                             "graph_search": {
                                 "max_hops": max_hops,
-                                "edge_types": graph_edge_types or graph_results.get("edge_types_used", []),
+                                "edge_types": graph_edge_types
+                                or graph_results.get("edge_types_used", []),
                                 "nodes_traversed": graph_results.get("nodes_traversed", 0),
                                 "execution_time_ms": graph_results.get("execution_time_ms", 0),
                             },
@@ -3134,7 +3136,9 @@ async def code_search(
                         )
                     else:
                         # No graph results, fall back to semantic
-                        logger.info("Graph search returned no results, falling back to semantic search")
+                        logger.info(
+                            "Graph search returned no results, falling back to semantic search"
+                        )
                         filters_applied.append("mode_fallback=semantic")
                         fallback_metadata = {
                             "requested_mode": "graph",

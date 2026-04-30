@@ -132,7 +132,11 @@ def _is_drift_event(event: Mapping[str, Any]) -> bool:
         return True
     if bool(event.get("post_degraded")):
         return True
-    reasons = {str(reason).strip().lower() for reason in list(event.get("reasons") or []) if str(reason).strip()}
+    reasons = {
+        str(reason).strip().lower()
+        for reason in list(event.get("reasons") or [])
+        if str(reason).strip()
+    }
     return bool(
         reasons.intersection(
             {
@@ -419,7 +423,9 @@ def aggregate_degradation_feedback(
         4,
     )
     avg_confidence = round(
-        sum(float(summary.get("avg_confidence_at_degradation", 0.0) or 0.0) for summary in summaries)
+        sum(
+            float(summary.get("avg_confidence_at_degradation", 0.0) or 0.0) for summary in summaries
+        )
         / max(1, len(summaries)),
         4,
     )

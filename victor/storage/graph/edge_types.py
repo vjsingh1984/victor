@@ -178,9 +178,7 @@ class EdgeType(str, Enum):
             True if edge type is a CCG edge
         """
         return (
-            cls.is_cfg_edge(edge_type)
-            or cls.is_cdg_edge(edge_type)
-            or cls.is_ddg_edge(edge_type)
+            cls.is_cfg_edge(edge_type) or cls.is_cdg_edge(edge_type) or cls.is_ddg_edge(edge_type)
         )
 
     @classmethod
@@ -251,11 +249,7 @@ class EdgeType(str, Enum):
         Returns:
             Set of CCG edge type strings
         """
-        return (
-            cls.get_cfg_edge_types()
-            | cls.get_cdg_edge_types()
-            | cls.get_ddg_edge_types()
-        )
+        return cls.get_cfg_edge_types() | cls.get_cdg_edge_types() | cls.get_ddg_edge_types()
 
     @classmethod
     def get_legacy_edge_types(cls) -> Set[str]:

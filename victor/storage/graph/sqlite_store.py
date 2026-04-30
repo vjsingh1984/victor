@@ -6,12 +6,13 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Iterable, List, Optional, Set
 
 from victor.core.schema import Tables
 from victor.storage.graph.protocol import (
     GraphEdge,
     GraphNode,
+    GraphQueryResult,
     GraphStoreProtocol,
     GraphTraversalDirection,
 )
@@ -164,13 +165,15 @@ class SqliteGraphStore(GraphStoreProtocol):
             ("parent_id", "TEXT"),
         ]
         # v5 columns (CCG and Graph RAG)
-        new_columns.extend([
-            ("ast_kind", "TEXT"),
-            ("scope_id", "TEXT"),
-            ("statement_type", "TEXT"),
-            ("requirement_id", "TEXT"),
-            ("visibility", "TEXT"),
-        ])
+        new_columns.extend(
+            [
+                ("ast_kind", "TEXT"),
+                ("scope_id", "TEXT"),
+                ("statement_type", "TEXT"),
+                ("requirement_id", "TEXT"),
+                ("visibility", "TEXT"),
+            ]
+        )
         for col_name, col_type in new_columns:
             if col_name not in columns:
                 try:
@@ -624,7 +627,9 @@ class SqliteGraphStore(GraphStoreProtocol):
             clauses.append("file = ?")
             params.append(file)
         where = " AND ".join(clauses) if clauses else "1=1"
-        query = f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE {where} ORDER BY file, line, name"
+        query = (
+            f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE {where} ORDER BY file, line, name"
+        )
 
         async with self._lock:
             conn = self._connect()
@@ -856,7 +861,7 @@ class SqliteGraphStore(GraphStoreProtocol):
             results: Dict[str, List[GraphEdge]] = {}
 
             for i in range(0, len(frontier), batch_size):
-                batch = frontier[i:i + batch_size]
+                batch = frontier[i : i + batch_size]
 
                 # Fetch neighbors for this batch in parallel
                 batch_results = await self.get_neighbors_batch(

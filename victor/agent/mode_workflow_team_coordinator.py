@@ -32,7 +32,10 @@ from victor.framework.coordination_runtime import (
     recommend_workflows_for_catalog,
     resolve_default_workflow_for_mode,
 )
-from victor.protocols.coordination import CoordinationSuggestion, ModeWorkflowTeamCoordinatorProtocol
+from victor.protocols.coordination import (
+    CoordinationSuggestion,
+    ModeWorkflowTeamCoordinatorProtocol,
+)
 
 if TYPE_CHECKING:
     from victor.agent.teams.learner import TeamCompositionLearner

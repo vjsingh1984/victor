@@ -204,22 +204,26 @@ class RequirementSimilarityCalculator:
             if similarity_type in {"textual", "all"}:
                 score = self._textual_similarity(source_req, req)
                 if score >= threshold:
-                    similarities.append(RequirementSimilarity(
-                        requirement_id=requirement_id,
-                        similar_requirement_id=req.node_id,
-                        similarity_score=score,
-                        similarity_type="textual",
-                    ))
+                    similarities.append(
+                        RequirementSimilarity(
+                            requirement_id=requirement_id,
+                            similar_requirement_id=req.node_id,
+                            similarity_score=score,
+                            similarity_type="textual",
+                        )
+                    )
 
             if similarity_type in {"semantic", "all"} and self.use_embeddings:
                 score = await self._semantic_similarity(source_req, req)
                 if score >= threshold:
-                    similarities.append(RequirementSimilarity(
-                        requirement_id=requirement_id,
-                        similar_requirement_id=req.node_id,
-                        similarity_score=score,
-                        similarity_type="semantic",
-                    ))
+                    similarities.append(
+                        RequirementSimilarity(
+                            requirement_id=requirement_id,
+                            similar_requirement_id=req.node_id,
+                            similarity_score=score,
+                            similarity_type="semantic",
+                        )
+                    )
 
         # Sort by score descending
         similarities.sort(key=lambda s: s.similarity_score, reverse=True)
@@ -249,7 +253,7 @@ class RequirementSimilarityCalculator:
         matrix: Dict[Tuple[str, str], float] = {}
 
         for i, req_id_1 in enumerate(requirement_ids):
-            for req_id_2 in requirement_ids[i + 1:]:
+            for req_id_2 in requirement_ids[i + 1 :]:
                 req_1 = await self.graph_store.get_node_by_id(req_id_1)
                 req_2 = await self.graph_store.get_node_by_id(req_id_2)
 
@@ -285,7 +289,7 @@ class RequirementSimilarityCalculator:
         edge_count = 0
 
         for i, req_id_1 in enumerate(req_ids):
-            for req_id_2 in req_ids[i + 1:]:
+            for req_id_2 in req_ids[i + 1 :]:
                 req_1 = await self.graph_store.get_node_by_id(req_id_1)
                 req_2 = await self.graph_store.get_node_by_id(req_id_2)
 
@@ -401,9 +405,34 @@ class RequirementSimilarityCalculator:
 
         # Filter stop words
         stop_words = {
-            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to",
-            "for", "of", "with", "by", "from", "as", "is", "was", "are",
-            "be", "been", "being", "have", "has", "had", "do", "does", "did",
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "by",
+            "from",
+            "as",
+            "is",
+            "was",
+            "are",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
         }
 
         return {w for w in words if len(w) > 2 and w not in stop_words}
@@ -521,9 +550,7 @@ class RequirementGraphBuilder:
             title=title,
             description=description,
             mapped_symbols=[s.symbol_id for s in mapped_symbols],
-            confidence_scores={
-                s.symbol_id: s.confidence for s in mapped_symbols
-            },
+            confidence_scores={s.symbol_id: s.confidence for s in mapped_symbols},
             mapping_method="semantic",
         )
 
@@ -691,11 +718,15 @@ class RequirementGraphBuilder:
                 limit=max_symbols,
             )
             return [
-                type("Symbol", (), {
-                    "symbol_id": n.node_id,
-                    "confidence": 0.8,  # Placeholder for semantic similarity
-                    "node": n,
-                })()
+                type(
+                    "Symbol",
+                    (),
+                    {
+                        "symbol_id": n.node_id,
+                        "confidence": 0.8,  # Placeholder for semantic similarity
+                        "node": n,
+                    },
+                )()
                 for n in nodes
             ]
         except Exception as e:

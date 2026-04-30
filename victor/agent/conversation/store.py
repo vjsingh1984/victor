@@ -119,8 +119,8 @@ class ConversationSession:
 
     # State persistence (for session resume)
     conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine.to_dict()
-    execution_state: Optional[Dict[str, Any]] = None    # ExecutionState.to_dict()
-    session_ledger: Optional[Dict[str, Any]] = None     # SessionLedger.to_dict()
+    execution_state: Optional[Dict[str, Any]] = None  # ExecutionState.to_dict()
+    session_ledger: Optional[Dict[str, Any]] = None  # SessionLedger.to_dict()
     compaction_hierarchy: Optional[Dict[str, Any]] = None  # Message compaction hierarchy
 
     # Preview messages (separated from regular messages for display)
@@ -2731,7 +2731,11 @@ class ConversationStore:
                 preview_msg = ConversationMessage(
                     role=MessageRole(pm.get("role", "user")),
                     content=pm.get("content", ""),
-                    timestamp=datetime.fromisoformat(pm["timestamp"]) if pm.get("timestamp") else datetime.now(),
+                    timestamp=(
+                        datetime.fromisoformat(pm["timestamp"])
+                        if pm.get("timestamp")
+                        else datetime.now()
+                    ),
                     token_count=pm.get("token_count", 0),
                     priority=MessagePriority(pm.get("priority", 50)),
                     tool_name=pm.get("tool_name"),

@@ -175,8 +175,7 @@ class DatabaseConsolidator:
 
             # Step 4: Create consolidation flag
             self._consolidated_flag.write_text(
-                f"consolidated_at={datetime.now().isoformat()}\n"
-                f"schema_version=6\n"
+                f"consolidated_at={datetime.now().isoformat()}\n" f"schema_version=6\n"
             )
 
             logger.info("Database consolidation complete")
@@ -234,29 +233,57 @@ class DatabaseConsolidator:
         # Global tables to migrate
         global_tables = {
             # RL tables
-            "rl_learner", "rl_outcome", "rl_metric", "rl_q_value",
-            "rl_transition", "rl_param", "rl_task_stat",
-            "rl_mode_q", "rl_mode_history", "rl_mode_task",
-            "rl_model_q", "rl_model_task", "rl_model_state",
-            "rl_tool_q", "rl_tool_task", "rl_tool_outcome",
-            "rl_cache_q", "rl_cache_tool", "rl_cache_history",
-            "rl_grounding_param", "rl_grounding_stat", "rl_grounding_history",
-            "rl_semantic_stat", "rl_patience_stat", "rl_prompt_stat",
-            "rl_quality_weight", "rl_quality_history",
-            "rl_provider_stat", "rl_context_pruning",
-            "rl_pattern", "rl_pattern_use",
+            "rl_learner",
+            "rl_outcome",
+            "rl_metric",
+            "rl_q_value",
+            "rl_transition",
+            "rl_param",
+            "rl_task_stat",
+            "rl_mode_q",
+            "rl_mode_history",
+            "rl_mode_task",
+            "rl_model_q",
+            "rl_model_task",
+            "rl_model_state",
+            "rl_tool_q",
+            "rl_tool_task",
+            "rl_tool_outcome",
+            "rl_cache_q",
+            "rl_cache_tool",
+            "rl_cache_history",
+            "rl_grounding_param",
+            "rl_grounding_stat",
+            "rl_grounding_history",
+            "rl_semantic_stat",
+            "rl_patience_stat",
+            "rl_prompt_stat",
+            "rl_quality_weight",
+            "rl_quality_history",
+            "rl_provider_stat",
+            "rl_context_pruning",
+            "rl_pattern",
+            "rl_pattern_use",
             # Agent tables
-            "agent_team_config", "agent_team_run",
-            "agent_workflow_run", "agent_workflow_q",
-            "agent_prompt_style", "agent_prompt_element",
-            "agent_prompt_history", "agent_prompt_candidate",
+            "agent_team_config",
+            "agent_team_run",
+            "agent_workflow_run",
+            "agent_workflow_q",
+            "agent_prompt_style",
+            "agent_prompt_element",
+            "agent_prompt_history",
+            "agent_prompt_candidate",
             "agent_prompt_pareto_instance",
-            "agent_curriculum_stage", "agent_curriculum_metric",
-            "agent_curriculum_history", "agent_policy_snapshot",
+            "agent_curriculum_stage",
+            "agent_curriculum_metric",
+            "agent_curriculum_history",
+            "agent_policy_snapshot",
             # UI tables
-            "ui_session", "ui_failed_call",
+            "ui_session",
+            "ui_failed_call",
             # Profile learning
-            "interaction_history", "profile_metrics",
+            "interaction_history",
+            "profile_metrics",
         }
 
         self._migrate_tables(source_path, target_path, global_tables)
@@ -289,16 +316,24 @@ class DatabaseConsolidator:
         # Project tables to migrate
         project_tables = {
             # Graph tables
-            "graph_node", "graph_edge", "graph_file_mtime",
-            "graph_module_metric", "graph_module_metric_history",
-            "graph_requirement", "graph_subgraph", "graph_subgraph_node",
+            "graph_node",
+            "graph_edge",
+            "graph_file_mtime",
+            "graph_module_metric",
+            "graph_module_metric_history",
+            "graph_requirement",
+            "graph_subgraph",
+            "graph_subgraph_node",
             # Conversation tables
-            "messages", "sessions",
-            "context_sizes", "context_summaries",
+            "messages",
+            "sessions",
+            "context_sizes",
+            "context_summaries",
             # Entity memory
             "entities",
             # Changes
-            "change_groups", "file_changes",
+            "change_groups",
+            "file_changes",
         }
 
         self._migrate_tables(source_path, target_path, project_tables)
@@ -324,7 +359,7 @@ class DatabaseConsolidator:
 
         try:
             # Attach source database
-            target_conn.execute(f"ATTACH DATABASE ? AS source_db", (str(source_path),))
+            target_conn.execute("ATTACH DATABASE ? AS source_db", (str(source_path),))
 
             # Get tables in source that we want to migrate
             cursor = target_conn.execute("""
@@ -339,8 +374,7 @@ class DatabaseConsolidator:
                 try:
                     # Check if table exists in target
                     target_cursor = target_conn.execute(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                        (table,)
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
                     )
                     if target_cursor.fetchone():
                         # Table exists, copy data if target is empty
@@ -361,7 +395,7 @@ class DatabaseConsolidator:
                     else:
                         # Create table and copy data
                         schema_row = target_conn.execute(
-                            f"""
+                            """
                             SELECT sql FROM source_db.sqlite_master
                             WHERE type='table' AND name=?
                         """,
@@ -377,7 +411,7 @@ class DatabaseConsolidator:
 
                             # Copy indexes
                             idx_cursor = target_conn.execute(
-                                f"""
+                                """
                                 SELECT sql FROM source_db.sqlite_master
                                 WHERE type='index' AND tbl_name=? AND sql IS NOT NULL
                             """,
@@ -758,7 +792,9 @@ class DatabaseManager(_DatabaseManagerBase):
 
         # Run migrations if needed
         if current_version < CURRENT_SCHEMA_VERSION:
-            logger.info(f"Migrating database from version {current_version} to {CURRENT_SCHEMA_VERSION}")
+            logger.info(
+                f"Migrating database from version {current_version} to {CURRENT_SCHEMA_VERSION}"
+            )
 
             migration_sqls = get_migration_sql(current_version, CURRENT_SCHEMA_VERSION)
 

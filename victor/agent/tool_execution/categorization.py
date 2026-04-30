@@ -26,6 +26,7 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set
 
 from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
+
 logger = logging.getLogger(__name__)
 
 __all__ = [

@@ -36,9 +36,12 @@ from victor.workflows.executors.registry import (
     get_workflow_node_executor_registry,
     register_workflow_node_executor,
 )
+from victor.workflows.executors.team import TeamNodeExecutor, TeamStepExecutor
 
 __all__ = [
     "NodeExecutorFactory",
+    "TeamStepExecutor",
+    "TeamNodeExecutor",
     "WorkflowNodeExecutorRegistration",
     "WorkflowNodeExecutorRegistry",
     "clear_registered_workflow_node_executors",

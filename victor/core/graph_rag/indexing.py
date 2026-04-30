@@ -57,6 +57,7 @@ logger = logging.getLogger(__name__)
 def _get_graph_types() -> tuple[type, type]:
     """Lazy import of graph types."""
     from victor.storage.graph.protocol import GraphEdge, GraphNode
+
     return GraphNode, GraphEdge
 
 
@@ -230,8 +231,7 @@ class GraphIndexingPipeline:
 
             # Check exclude patterns
             excluded = any(
-                fnmatch.fnmatch(path_str, pattern) or
-                fnmatch.fnmatch(path_str, f"**/{pattern}")
+                fnmatch.fnmatch(path_str, pattern) or fnmatch.fnmatch(path_str, f"**/{pattern}")
                 for pattern in exclude_patterns
             )
             if excluded:
@@ -240,8 +240,7 @@ class GraphIndexingPipeline:
             # Check include patterns (if specified)
             if include_patterns:
                 included = any(
-                    fnmatch.fnmatch(path_str, pattern) or
-                    fnmatch.fnmatch(path_str, f"**/{pattern}")
+                    fnmatch.fnmatch(path_str, pattern) or fnmatch.fnmatch(path_str, f"**/{pattern}")
                     for pattern in include_patterns
                 )
                 if not included:
@@ -308,9 +307,7 @@ class GraphIndexingPipeline:
 
         # Build CCG if enabled
         if self.config.enable_ccg and self._ccg_builder:
-            ccg_nodes, ccg_edges = await self._ccg_builder.build_ccg_for_file(
-                file_path, language
-            )
+            ccg_nodes, ccg_edges = await self._ccg_builder.build_ccg_for_file(file_path, language)
             stats.ccg_nodes_created += len(ccg_nodes)
             stats.ccg_edges_created += len(ccg_edges)
 
@@ -411,22 +408,22 @@ class GraphIndexingPipeline:
             lang_module = __import__(module_name)
             lang_func = getattr(lang_module, func_name)
             lang_obj = lang_func()
-            ts_language = ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            ts_language = (
+                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            )
 
             parser = ts.Parser(ts_language)
             tree = parser.parse(bytes(source_code, "utf-8"))
 
             # Extract function/class definitions
-            nodes.extend(self._extract_definitions(
-                tree.root_node, file_path, language, source_code
-            ))
+            nodes.extend(
+                self._extract_definitions(tree.root_node, file_path, language, source_code)
+            )
 
         except (ImportError, AttributeError, ValueError, Exception) as e:
             # Fall back to simple regex-based extraction
             logger.debug(f"Tree-sitter extraction failed for {language}: {e}, using fallback")
-            nodes.extend(self._extract_symbols_fallback(
-                source_code, file_path, language
-            ))
+            nodes.extend(self._extract_symbols_fallback(source_code, file_path, language))
 
         return nodes
 
@@ -469,9 +466,7 @@ class GraphIndexingPipeline:
                 name = self._extract_name(node)
 
                 # Get signature
-                signature = self._extract_signature(
-                    node, source_lines, start_line, end_line
-                )
+                signature = self._extract_signature(node, source_lines, start_line, end_line)
 
                 # Get docstring
                 docstring = self._extract_docstring(
@@ -480,9 +475,10 @@ class GraphIndexingPipeline:
 
                 # Generate node ID
                 import hashlib
-                node_id = hashlib.sha256(
-                    f"{file_path}:{name}:{start_line}".encode()
-                ).hexdigest()[:16]
+
+                node_id = hashlib.sha256(f"{file_path}:{name}:{start_line}".encode()).hexdigest()[
+                    :16
+                ]
 
                 # Determine visibility
                 visibility = self._determine_visibility(node, name, language)
@@ -505,7 +501,9 @@ class GraphIndexingPipeline:
                 nodes.append(graph_node)
 
                 # DEBUG: Log node creation
-                logger.debug(f"Created node: {name} (type={node_type}, parent_id={parent_id[:8] + '...' if parent_id else None})")
+                logger.debug(
+                    f"Created node: {name} (type={node_type}, parent_id={parent_id[:8] + '...' if parent_id else None})"
+                )
 
                 # Recurse into children (for nested classes/functions)
                 for child in node.children:
@@ -623,6 +621,7 @@ class GraphIndexingPipeline:
         Returns:
             Name string
         """
+
         # Find the first identifier child
         def find_identifier(n: Any) -> str | None:
             if hasattr(n, "type") and n.type == "identifier":
@@ -722,9 +721,7 @@ class GraphIndexingPipeline:
         # Java: check modifiers
         if language == "java":
             for child in getattr(node, "children", []):
-                if hasattr(child, "type") and child.type in {
-                    "modifiers", "modifier", "annotation"
-                }:
+                if hasattr(child, "type") and child.type in {"modifiers", "modifier", "annotation"}:
                     text = getattr(child, "text", b"")
                     if isinstance(text, bytes):
                         text = text.decode()
@@ -767,34 +764,34 @@ class GraphIndexingPipeline:
                 func_match = re.match(func_pattern, line.strip())
                 if func_match:
                     name = func_match.group(2)
-                    node_id = hashlib.sha256(
-                        f"{file_path}:{name}:{i}".encode()
-                    ).hexdigest()[:16]
-                    nodes.append(GraphNode(
-                        node_id=node_id,
-                        type="function",
-                        name=name,
-                        file=str(file_path),
-                        line=i,
-                        lang=language,
-                        ast_kind="function_definition",
-                    ))
+                    node_id = hashlib.sha256(f"{file_path}:{name}:{i}".encode()).hexdigest()[:16]
+                    nodes.append(
+                        GraphNode(
+                            node_id=node_id,
+                            type="function",
+                            name=name,
+                            file=str(file_path),
+                            line=i,
+                            lang=language,
+                            ast_kind="function_definition",
+                        )
+                    )
 
                 class_match = re.match(class_pattern, line.strip())
                 if class_match:
                     name = class_match.group(1)
-                    node_id = hashlib.sha256(
-                        f"{file_path}:{name}:{i}".encode()
-                    ).hexdigest()[:16]
-                    nodes.append(GraphNode(
-                        node_id=node_id,
-                        type="class",
-                        name=name,
-                        file=str(file_path),
-                        line=i,
-                        lang=language,
-                        ast_kind="class_definition",
-                    ))
+                    node_id = hashlib.sha256(f"{file_path}:{name}:{i}".encode()).hexdigest()[:16]
+                    nodes.append(
+                        GraphNode(
+                            node_id=node_id,
+                            type="class",
+                            name=name,
+                            file=str(file_path),
+                            line=i,
+                            lang=language,
+                            ast_kind="class_definition",
+                        )
+                    )
 
         return nodes
 
@@ -820,11 +817,13 @@ class GraphIndexingPipeline:
         # Build CONTAINS edges for parent-child relationships
         for node in nodes:
             if node.parent_id:
-                edges.append(GraphEdge(
-                    src=node.parent_id,
-                    dst=node.node_id,
-                    type=EdgeType.CONTAINS,
-                ))
+                edges.append(
+                    GraphEdge(
+                        src=node.parent_id,
+                        dst=node.node_id,
+                        type=EdgeType.CONTAINS,
+                    )
+                )
 
         # Build CALLS edges by analyzing source code for cross-references
         calls_edges = await self._build_calls_edges(nodes, file_path)
@@ -884,9 +883,9 @@ class GraphIndexingPipeline:
             handler = get_edge_handler(language)
             if handler is not None:
                 logger.debug(f"Using edge handler for language: {language}")
-                edges.extend(await self._build_edges_with_handler(
-                    handler, nodes, file_path, name_to_ids
-                ))
+                edges.extend(
+                    await self._build_edges_with_handler(handler, nodes, file_path, name_to_ids)
+                )
                 return edges
         except ImportError:
             logger.debug("Language handler system not available, using legacy")
@@ -940,7 +939,9 @@ class GraphIndexingPipeline:
             lang_module = __import__(module_name)
             lang_func = getattr(lang_module, func_name)
             lang_obj = lang_func()
-            ts_language = ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            ts_language = (
+                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            )
 
             # Parse source
             source_code = file_path.read_text(encoding="utf-8")
@@ -960,11 +961,13 @@ class GraphIndexingPipeline:
                 for caller_id in caller_ids:
                     for callee_id in callee_ids:
                         if caller_id != callee_id:  # No self-loops
-                            edges.append(GraphEdge(
-                                src=caller_id,
-                                dst=callee_id,
-                                type=EdgeType.CALLS,
-                            ))
+                            edges.append(
+                                GraphEdge(
+                                    src=caller_id,
+                                    dst=callee_id,
+                                    type=EdgeType.CALLS,
+                                )
+                            )
 
             logger.debug(f"Handler detected {len(result.calls)} calls, created {len(edges)} edges")
 
@@ -1026,7 +1029,9 @@ class GraphIndexingPipeline:
             lang_module = __import__(module_name)
             lang_func = getattr(lang_module, func_name)
             lang_obj = lang_func()
-            ts_language = ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            ts_language = (
+                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+            )
 
             # Parse source
             source_code = file_path.read_text(encoding="utf-8")
@@ -1047,11 +1052,13 @@ class GraphIndexingPipeline:
                 for caller_id in caller_ids:
                     for callee_id in callee_ids:
                         if caller_id != callee_id:  # No self-loops
-                            edges.append(GraphEdge(
-                                src=caller_id,
-                                dst=callee_id,
-                                type=EdgeType.CALLS,
-                            ))
+                            edges.append(
+                                GraphEdge(
+                                    src=caller_id,
+                                    dst=callee_id,
+                                    type=EdgeType.CALLS,
+                                )
+                            )
 
         except (ImportError, Exception) as e:
             logger.debug(f"Legacy CALLS edge extraction failed: {e}")
@@ -1240,7 +1247,9 @@ class GraphIndexingPipeline:
                     stats.errors.append(f"Embedding storage failed for {node_id}: {e}")
 
             stats.embeddings_generated = len(all_embeddings)
-            logger.info(f"Generated {len(all_embeddings)} embeddings in {time.time() - start_time:.2f}s")
+            logger.info(
+                f"Generated {len(all_embeddings)} embeddings in {time.time() - start_time:.2f}s"
+            )
 
         except ImportError as e:
             logger.warning(f"Graph embedding components not available: {e}")

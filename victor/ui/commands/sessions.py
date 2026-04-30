@@ -190,8 +190,7 @@ def sessions_show(
                 "provider": session.provider,
                 "profile": session.profile,
                 "messages": [
-                    {"role": msg.role.value, "content": msg.content}
-                    for msg in session.messages
+                    {"role": msg.role.value, "content": msg.content} for msg in session.messages
                 ],
                 "message_count": len(session.messages),
                 "created_at": session.created_at.isoformat(),
@@ -366,19 +365,20 @@ def sessions_export(
         # Export data - convert ConversationSession objects to dicts
         export_data = []
         for session in all_sessions:
-            export_data.append({
-                "session_id": session.session_id,
-                "model": session.model,
-                "provider": session.provider,
-                "profile": session.profile,
-                "messages": [
-                    {"role": msg.role.value, "content": msg.content}
-                    for msg in session.messages
-                ],
-                "message_count": len(session.messages),
-                "created_at": session.created_at.isoformat(),
-                "updated_at": session.last_activity.isoformat(),
-            })
+            export_data.append(
+                {
+                    "session_id": session.session_id,
+                    "model": session.model,
+                    "provider": session.provider,
+                    "profile": session.profile,
+                    "messages": [
+                        {"role": msg.role.value, "content": msg.content} for msg in session.messages
+                    ],
+                    "message_count": len(session.messages),
+                    "created_at": session.created_at.isoformat(),
+                    "updated_at": session.last_activity.isoformat(),
+                }
+            )
 
         # Determine output path
         if not output:

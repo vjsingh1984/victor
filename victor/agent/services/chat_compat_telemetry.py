@@ -47,9 +47,7 @@ def record_deprecated_chat_shim_access(
     key = f"{location}.{name}.{access_type}"
     _telemetry[key] = _telemetry.get(key, 0) + 1
     _telemetry["total"] += 1
-    logger.debug(
-        f"Deprecated chat shim access: {location} accessed {name} via {access_type}"
-    )
+    logger.debug(f"Deprecated chat shim access: {location} accessed {name} via {access_type}")
 
 
 def get_deprecated_chat_shim_telemetry() -> Dict[str, int]:
@@ -88,7 +86,6 @@ def get_deprecated_chat_shim_report() -> Dict[str, Any]:
     components: Dict[str, Dict[str, Any]] = {}
     route_totals: Dict[str, int] = {}
     surfaces: Dict[str, int] = {}
-    deprecated_surfaces: Dict[str, Dict[str, Any]] = {}
 
     for key, count in _telemetry.items():
         if key == "total":
@@ -134,8 +131,7 @@ def get_deprecated_chat_shim_report() -> Dict[str, Any]:
 
     # Build active surfaces list (sorted by count descending, then surface name ascending)
     active_surfaces = [
-        {"surface": k, "count": v}
-        for k, v in sorted(surfaces.items(), key=lambda x: (-x[1], x[0]))
+        {"surface": k, "count": v} for k, v in sorted(surfaces.items(), key=lambda x: (-x[1], x[0]))
     ]
 
     # Build removal candidates (surfaces with low usage)

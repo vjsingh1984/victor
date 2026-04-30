@@ -434,7 +434,9 @@ class StreamingChatHandler:
         ctx.record_tool_blocked()
 
         # Log detailed information about the blocked tool
-        args_summary = ", ".join(f"{k}={repr(v)[:30]}" for k, v in tool_args.items() if k not in {"offset", "limit"})
+        args_summary = ", ".join(
+            f"{k}={repr(v)[:30]}" for k, v in tool_args.items() if k not in {"offset", "limit"}
+        )
         logger.info(
             f"[dedup-block-exec] BLOCKED tool execution: {tool_name}({args_summary}) | "
             f"reason: {block_reason}"
@@ -1107,9 +1109,9 @@ class StreamingChatHandler:
         if result is not None:
             # Show brief metadata-only message instead of full content
             # User can expand with /expand or Ctrl+O to see full output
-            metadata["tool_result"]["result"] = (
-                "Tool completed successfully. Use /expand or Ctrl+O at prompt to see full output."
-            )
+            metadata["tool_result"][
+                "result"
+            ] = "Tool completed successfully. Use /expand or Ctrl+O at prompt to see full output."
         if original_result is not None:
             metadata["tool_result"]["original_result"] = str(original_result)
         return StreamChunk(content="", metadata=metadata)

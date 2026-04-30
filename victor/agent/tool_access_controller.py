@@ -450,7 +450,9 @@ class StageLayer(AccessLayer, ModeAwareMixin):
         if _tool_matches(tool_name, self.CORE_TOOLS | self._preserved_tools):
             return True, f"Tool '{tool_name}' is core/preserved"
 
-        if _core_tool_name(tool_name) == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
+        if _core_tool_name(
+            tool_name
+        ) == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
             getattr(context, "intent", None),
             getattr(context, "user_message", None),
         ):

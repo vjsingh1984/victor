@@ -79,11 +79,11 @@ class OperationProfile:
 class GraphOptimizer:
     """Optimizer for graph operations based on profiling data (PH4-008).
 
-    Analyzes operation profiles and suggests optimizations:
-- Optimal batch sizes for bulk operations
-- When to use parallel vs sequential processing
-- Cache hit/miss patterns
-- Index usage recommendations
+        Analyzes operation profiles and suggests optimizations:
+    - Optimal batch sizes for bulk operations
+    - When to use parallel vs sequential processing
+    - Cache hit/miss patterns
+    - Index usage recommendations
     """
 
     def __init__(self) -> None:
@@ -127,9 +127,7 @@ class GraphOptimizer:
 
         # Batch size optimization
         if node_count > 100:
-            hints.batch_size_hint = self._calculate_optimal_batch_size(
-                avg_time, node_count
-            )
+            hints.batch_size_hint = self._calculate_optimal_batch_size(avg_time, node_count)
 
         return hints
 
@@ -173,12 +171,14 @@ class GraphOptimizer:
         """
         import time
 
-        self._optimization_history.append({
-            "operation": operation_name,
-            "optimization": optimization_type,
-            "details": details,
-            "timestamp": time.time(),
-        })
+        self._optimization_history.append(
+            {
+                "operation": operation_name,
+                "optimization": optimization_type,
+                "details": details,
+                "timestamp": time.time(),
+            }
+        )
 
         # Update profile last optimized time
         if operation_name in self._profiles:
@@ -236,8 +236,7 @@ class GraphOptimizer:
 
         if edge_count > 50000:
             recommendations.append(
-                "Very large edge count - consider compressed storage "
-                "or edge type aggregation"
+                "Very large edge count - consider compressed storage " "or edge type aggregation"
             )
 
         return recommendations
