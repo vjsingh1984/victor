@@ -234,7 +234,7 @@ class TestPromptOptimizationSettings:
         )
 
         s = PromptOptimizationSettings(enabled=True)
-        assert s.get_strategies_for_section("GROUNDING_RULES") == ["gepa"]
+        assert s.get_strategies_for_section("UNLISTED_SECTION") == ["gepa"]
 
     def test_get_strategies_uses_builtin_section_defaults(self):
         from victor.config.prompt_optimization_settings import (
@@ -258,7 +258,7 @@ class TestPromptOptimizationSettings:
             section_strategies={"COMPLETION_GUIDANCE": []},
         )
         assert s.get_strategies_for_section("COMPLETION_GUIDANCE") == []
-        assert s.get_strategies_for_section("GROUNDING_RULES") == ["gepa"]
+        assert s.get_strategies_for_section("GROUNDING_RULES") == ["gepa", "prefpo"]
 
     def test_get_strategies_empty_when_disabled(self):
         from victor.config.prompt_optimization_settings import (
@@ -275,6 +275,7 @@ class TestPromptOptimizationSettings:
 
         s = PromptOptimizationSettings(enabled=True)
         assert s.is_strategy_active("gepa")
+        assert s.is_strategy_active("prefpo")
         assert s.is_strategy_active("miprov2")
         assert s.is_strategy_active("cot_distillation")
         assert not s.is_strategy_active("nonexistent")
