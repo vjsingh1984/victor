@@ -948,7 +948,8 @@ class TestPromptOptimizerLearner:
 
         assert few_shot_names == ["MIPROv2Strategy"]
         assert asi_names == ["GEPAStrategy", "CoTDistillationStrategy"]
-        assert grounding_names == ["GEPAStrategy"]
+        # GROUNDING_RULES uses both GEPA and PrefPO (see BUILTIN_SECTION_STRATEGIES)
+        assert set(grounding_names) == {"GEPAStrategy", "PrefPOStrategy"}
 
     def test_section_strategies_honor_config_overrides(self, db):
         settings = SimpleNamespace(
@@ -974,7 +975,8 @@ class TestPromptOptimizerLearner:
 
         assert grounding_names == ["GEPAStrategy", "CoTDistillationStrategy"]
         assert learner._strategies_for_section("FEW_SHOT_EXAMPLES") == []
-        assert completion_names == ["CoTDistillationStrategy"]
+        # COMPLETION_GUIDANCE uses builtin strategies (GEPA + PrefPO)
+        assert set(completion_names) == {"GEPAStrategy", "PrefPOStrategy"}
 
     def test_section_strategies_support_prefpo_override(self, db):
         settings = SimpleNamespace(

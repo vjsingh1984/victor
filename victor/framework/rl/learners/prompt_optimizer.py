@@ -162,6 +162,7 @@ FAILURE_TO_CAPABILITY: Dict[str, str] = {
     "timeout": "execution_efficiency",
     "shell_error": "execution_efficiency",
     "test_failure": "verification",
+    "verbosity": "conciseness",
     "other": "other",
 }
 
