@@ -4426,19 +4426,17 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
     def _sync_session_service_runtime_state(self) -> None:
         """Keep SessionService bound to the current live runtime state."""
-        if self._session_service is None or not hasattr(
-            self._session_service,
-            "bind_runtime_components",
-        ):
-            return
+        self._get_session_runtime().sync_runtime_state()
 
-        self._session_service.bind_runtime_components(
-            lifecycle_manager=self._lifecycle_manager,
-            memory_manager=self.memory_manager,
-            checkpoint_manager=self._checkpoint_manager,
-            cost_tracker=self._session_cost_tracker,
-            memory_session_id=self._memory_session_id,
-        )
+    def _get_session_runtime(self) -> Any:
+        """Get the canonical service-owned session runtime helper."""
+        runtime = getattr(self, "_session_runtime", None)
+        if runtime is None:
+            from victor.agent.services.session_runtime import SessionRuntime
+
+            runtime = SessionRuntime(self.protocol_adapter)
+            self._session_runtime = runtime
+        return runtime
 
     def _record_prompt_optimization_metadata(self, turn_context: Any) -> None:
         """Persist the active live prompt-optimization identity for the session."""
@@ -4488,8 +4486,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             List of session metadata dictionaries
         """
-        self._sync_session_service_runtime_state()
-        return self._session_service.get_recent_sessions(limit)
+        return self._get_session_runtime().get_recent_sessions(limit)
 
     def recover_session(self, session_id: str) -> bool:
         """Recover a previous conversation session.
@@ -4502,11 +4499,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             True if session was recovered successfully
         """
-        self._sync_session_service_runtime_state()
-        success = self._session_service.recover_session(session_id)
-        if success:
-            self._memory_session_id = session_id
-        return success
+        return self._get_session_runtime().recover_session(session_id)
 
     def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get token-aware context messages from memory manager.
@@ -4519,11 +4512,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             List of messages in provider format.
         """
-        self._sync_session_service_runtime_state()
-        return self._session_service.get_memory_context(
-            max_tokens=max_tokens,
-            messages=self.messages,
-        )
+        return self._get_session_runtime().get_memory_context(max_tokens=max_tokens)
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.
@@ -4533,8 +4522,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             Dictionary with session statistics.
         """
-        self._sync_session_service_runtime_state()
-        return self._session_service.get_session_stats()
+        return self._get_session_runtime().get_session_stats()
 
     async def shutdown(self) -> None:
         """Clean up resources and shutdown gracefully.

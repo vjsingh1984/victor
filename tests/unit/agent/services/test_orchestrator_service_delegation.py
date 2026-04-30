@@ -740,6 +740,21 @@ class TestChatServiceBootstrapLaziness:
         assert first is second
         assert first._runtime is adapter
 
+    def test_get_session_runtime_prefers_cached_helper_and_protocol_adapter(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.session_runtime import SessionRuntime
+
+        obj = object.__new__(AgentOrchestrator)
+        adapter = MagicMock(name="protocol_adapter")
+        obj._protocol_adapter = adapter
+
+        first = obj._get_session_runtime()
+        second = obj._get_session_runtime()
+
+        assert isinstance(first, SessionRuntime)
+        assert first is second
+        assert first._runtime is adapter
+
     @pytest.mark.asyncio
     async def test_run_planning_chat_runtime_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
@@ -912,6 +927,69 @@ class TestChatServiceBootstrapLaziness:
 
         assert result == [{"name": "read", "success": True}]
         helper.execute_tool_calls.assert_awaited_once_with([{"name": "read", "arguments": {}}])
+
+    def test_sync_session_service_runtime_state_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._session_runtime = helper
+
+        AgentOrchestrator._sync_session_service_runtime_state(obj)
+
+        helper.sync_runtime_state.assert_called_once_with()
+
+    def test_get_recent_sessions_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_recent_sessions.return_value = [{"session_id": "session-1"}]
+        obj._session_runtime = helper
+
+        result = AgentOrchestrator.get_recent_sessions(obj, limit=5)
+
+        assert result == [{"session_id": "session-1"}]
+        helper.get_recent_sessions.assert_called_once_with(5)
+
+    def test_recover_session_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.recover_session.return_value = True
+        obj._session_runtime = helper
+
+        result = AgentOrchestrator.recover_session(obj, "session-123")
+
+        assert result is True
+        helper.recover_session.assert_called_once_with("session-123")
+
+    def test_get_memory_context_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_memory_context.return_value = [{"role": "user", "content": "hello"}]
+        obj._session_runtime = helper
+
+        result = AgentOrchestrator.get_memory_context(obj, max_tokens=200)
+
+        assert result == [{"role": "user", "content": "hello"}]
+        helper.get_memory_context.assert_called_once_with(max_tokens=200)
+
+    def test_get_session_stats_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_session_stats.return_value = {"enabled": True}
+        obj._session_runtime = helper
+
+        result = AgentOrchestrator.get_session_stats(obj)
+
+        assert result == {"enabled": True}
+        helper.get_session_stats.assert_called_once_with()
 
     def test_get_task_guidance_runtime_prefers_cached_helper_and_protocol_adapter(self):
         from victor.agent.orchestrator import AgentOrchestrator
