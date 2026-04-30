@@ -654,6 +654,15 @@ class ResponseSanitizer:
             return True
         return bool(re.search(r"\.[A-Za-z0-9]{1,8}$", normalized))
 
+    def _is_malformed_parameter_line(self, line: str) -> bool:
+        normalized = line.strip()
+        if not normalized:
+            return False
+        return bool(
+            re.match(r"^parameter\s*=", normalized, re.IGNORECASE)
+            or re.match(r"^<parameter\b", normalized, re.IGNORECASE)
+        )
+
     def _is_plaintext_tool_command_line(self, line: str) -> bool:
         normalized = " ".join(line.strip().split())
         if not normalized or len(normalized) > 80:
@@ -736,6 +745,10 @@ class ResponseSanitizer:
             # Skip standalone shell-like command lines; these are malformed
             # plain-text tool intents, not useful user-facing content.
             if self._is_plaintext_tool_command_line(stripped):
+                continue
+            # Skip standalone malformed parameter artifact lines that some
+            # models emit instead of structured tool-call arguments.
+            if self._is_malformed_parameter_line(stripped):
                 continue
             cleaned_lines.append(line)
         text = "\n".join(cleaned_lines)
