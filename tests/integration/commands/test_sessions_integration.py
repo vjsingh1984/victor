@@ -303,8 +303,7 @@ class TestChatSessionFlagsIntegration:
         # Create sessions with specific prefixes
         store = ConversationStore()
 
-        # Create a session with a predictable prefix (session IDs are auto-generated)
-        # We'll create sessions and then match by their actual IDs
+        # Create 3 sessions to increase chance of finding a unique prefix
         session_1 = store.create_session(
             model="ollama:qwen2.5-coder:7b",
             provider="ollama",
@@ -320,7 +319,7 @@ class TestChatSessionFlagsIntegration:
         # Small delay to ensure different timestamp
         import time
 
-        time.sleep(0.01)
+        time.sleep(0.05)  # Increased delay
 
         session_2 = store.create_session(
             model="gpt-4",
@@ -334,21 +333,44 @@ class TestChatSessionFlagsIntegration:
         )
         session_id_2 = session_2.session_id
 
-        # Verify both sessions exist
+        time.sleep(0.05)
+
+        session_3 = store.create_session(
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+        )
+        store.add_message(
+            session_3.session_id,
+            MessageRole.USER,
+            "Third task",
+        )
+        session_id_3 = session_3.session_id
+
+        # Verify all sessions exist
         assert store.get_session(session_id_1) is not None
         assert store.get_session(session_id_2) is not None
+        assert store.get_session(session_id_3) is not None
 
         # Find a unique prefix that matches only session_id_1
-        # Start with a longer prefix and make sure it doesn't match session_id_2
-        for prefix_len in range(12, 6, -1):  # Try 12, 11, 10, 9, 8, 7
-            prefix = session_id_1[:prefix_len]
-            if not session_id_2.startswith(prefix):
+        # Check against both session_id_2 and session_id_3
+        prefix = None
+        for prefix_len in range(15, 6, -1):  # Try longer prefixes first
+            candidate_prefix = session_id_1[:prefix_len]
+            if (not session_id_2.startswith(candidate_prefix) and
+                not session_id_3.startswith(candidate_prefix)):
+                prefix = candidate_prefix
                 break  # Found a unique prefix
-        else:
-            # If no unique prefix found, skip this test
-            pytest.skip("Could not find unique prefix for test")
 
-        assert len(prefix) >= 6, "Prefix should be at least 6 characters"
+        if not prefix or len(prefix) < 6:
+            # If no unique prefix found, skip this test
+            pytest.skip(f"Could not find unique prefix for test. session_id_1={session_id_1[:20]}, session_id_2={session_id_2[:20]}, session_id_3={session_id_3[:20]}")
+
+        # Verify that the prefix actually matches session_id_1
+        assert session_id_1.startswith(prefix), f"Prefix {prefix} should match session_id_1 {session_id_1}"
+        # Verify that the prefix doesn't match other sessions
+        assert not session_id_2.startswith(prefix), f"Prefix {prefix} should NOT match session_id_2 {session_id_2}"
+        assert not session_id_3.startswith(prefix), f"Prefix {prefix} should NOT match session_id_3 {session_id_3}"
 
         # Clear sessions matching prefix
         result = runner.invoke(sessions_app, ["clear", prefix, "--yes"])
@@ -356,11 +378,15 @@ class TestChatSessionFlagsIntegration:
         assert "Cleared" in result.stdout
         assert f"matching prefix '{prefix}'" in result.stdout
 
-        # Verify session with matching prefix is deleted
-        assert store.get_session(session_id_1) is None
+        # Create a new store instance to avoid stale cache issues
+        store_after_clear = ConversationStore()
 
-        # Verify other session still exists
-        assert store.get_session(session_id_2) is not None
+        # Verify session with matching prefix is deleted
+        assert store_after_clear.get_session(session_id_1) is None
+
+        # Verify other sessions still exist
+        assert store_after_clear.get_session(session_id_2) is not None
+        assert store_after_clear.get_session(session_id_3) is not None
 
     @pytest.mark.integration
     def test_sessions_clear_prefix_too_short(self, backup_db):
