@@ -103,6 +103,7 @@ class TestCoordinatorIntegration:
         # Manually trigger a transition to ensure cooldown is set
         # (simulating what would happen if heuristic detected a stage change)
         from victor.core.shared_types import ConversationStage
+
         state_machine.state.stage = ConversationStage.EXECUTION
         coordinator._last_transition_time = time.time()
         coordinator._transition_count = 1
@@ -116,13 +117,15 @@ class TestCoordinatorIntegration:
 
         # Should not have transitioned due to cooldown
         assert result2 is None, f"Expected None due to cooldown, got {result2}"
-        assert coordinator._transition_count == first_count, \
-            f"Transition count should not increase: {coordinator._transition_count} != {first_count}"
+        assert (
+            coordinator._transition_count == first_count
+        ), f"Transition count should not increase: {coordinator._transition_count} != {first_count}"
 
         # Verify we're actually in cooldown
         time_since_last = time.time() - coordinator._last_transition_time
-        assert time_since_last < coordinator._cooldown_seconds, \
-            f"Not in cooldown: {time_since_last:.2f}s >= {coordinator._cooldown_seconds}s"
+        assert (
+            time_since_last < coordinator._cooldown_seconds
+        ), f"Not in cooldown: {time_since_last:.2f}s >= {coordinator._cooldown_seconds}s"
 
         # Wait for cooldown to expire
         time.sleep(coordinator._cooldown_seconds + 0.1)
@@ -134,8 +137,9 @@ class TestCoordinatorIntegration:
 
         # Cooldown should have expired (transition may or may not occur depending on heuristic)
         time_since_last = time.time() - coordinator._last_transition_time
-        assert time_since_last >= coordinator._cooldown_seconds, \
-            f"Cooldown should have expired: {time_since_last:.2f}s < {coordinator._cooldown_seconds}s"
+        assert (
+            time_since_last >= coordinator._cooldown_seconds
+        ), f"Cooldown should have expired: {time_since_last:.2f}s < {coordinator._cooldown_seconds}s"
 
     def test_feature_flag_controls_coordinator(self):
         """Test that feature flag controls coordinator creation."""
@@ -277,13 +281,15 @@ class TestCoordinatorWithTurnExecutor:
         sm.record_tool_execution("read", {"path": "other.py"})
         result = coordinator.end_turn()
         assert result is None, f"Expected None due to cooldown, got {result}"
-        assert coordinator._transition_count == count1, \
-            f"Transition count should not increase: {coordinator._transition_count} != {count1}"
+        assert (
+            coordinator._transition_count == count1
+        ), f"Transition count should not increase: {coordinator._transition_count} != {count1}"
 
         # Verify we're in cooldown
         time_since_last = time.time() - coordinator._last_transition_time
-        assert time_since_last < coordinator._cooldown_seconds, \
-            f"Not in cooldown: {time_since_last:.2f}s >= {coordinator._cooldown_seconds}s"
+        assert (
+            time_since_last < coordinator._cooldown_seconds
+        ), f"Not in cooldown: {time_since_last:.2f}s >= {coordinator._cooldown_seconds}s"
 
         # Wait for cooldown to expire
         time.sleep(coordinator._cooldown_seconds + 0.1)
@@ -295,5 +301,6 @@ class TestCoordinatorWithTurnExecutor:
 
         # Cooldown should have expired
         time_since_last = time.time() - coordinator._last_transition_time
-        assert time_since_last >= coordinator._cooldown_seconds, \
-            f"Cooldown should have expired: {time_since_last:.2f}s < {coordinator._cooldown_seconds}s"
+        assert (
+            time_since_last >= coordinator._cooldown_seconds
+        ), f"Cooldown should have expired: {time_since_last:.2f}s < {coordinator._cooldown_seconds}s"

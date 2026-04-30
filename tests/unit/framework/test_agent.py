@@ -138,7 +138,11 @@ def reset_feature_flags_for_agent_tests():
     with the legacy path (Agent → orchestrator.chat()) without needing
     to mock the entire service layer.
     """
-    from victor.core.feature_flags import reset_feature_flag_manager, FeatureFlag, get_feature_flag_manager
+    from victor.core.feature_flags import (
+        reset_feature_flag_manager,
+        FeatureFlag,
+        get_feature_flag_manager,
+    )
 
     reset_feature_flag_manager()
     # Disable service layer to test legacy Agent behavior

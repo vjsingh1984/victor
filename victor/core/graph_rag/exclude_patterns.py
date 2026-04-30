@@ -49,7 +49,6 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/.git/**",
     "**/.svn/**",
     "**/.hg/**",
-
     # Python
     "**/__pycache__/**",
     "**/*.pyc",
@@ -68,7 +67,6 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/.virtualenv/**",
     "**/.env/**",
     "**/pip-wheel-metadata/**",
-
     # Node.js / JavaScript / TypeScript
     "**/node_modules/**",
     "**/jspm_packages/**",
@@ -88,15 +86,12 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/.cache/**",
     "**/parcel-bundle/**",
     "**/.tsbuildinfo",
-
     # Rust
     "**/target/**",
     "**/Cargo.lock",
-
     # Go
     "**/bin/**",
     "**/pkg/**",
-
     # Java / JVM
     "**/target/**",  # Maven
     "**/build/**",  # Gradle
@@ -107,17 +102,14 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/.settings/**",
     "**/.project",
     "**/.classpath",
-
     # Scala
     "**/target/**",  # sbt
     "**/project/**",
     "**/.bloop/**",
-
     # Kotlin
     "**/build/**",  # Gradle
     "**/target/**",  # Maven
     "**/.kotlin/**",
-
     # C/C++
     "**/build/**",
     "**/cmake-build-*/**",
@@ -128,18 +120,15 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/CMakeCache.txt",
     "**/cmake_install.cmake",
     "**/Makefile**",
-
     # Ruby
     "**/vendor/bundle/**",
     "**/.bundle/**",
     "**/tmp/**",
     "**/log/**",
-
     # PHP
     "**/vendor/**",
     "**/storage/**",  # Laravel
     "**/bootstrap/cache/**",
-
     # Swift / Objective-C
     "**/DerivedData/**",
     "**/build/**",
@@ -147,33 +136,26 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/*.xcodeproj/**",
     "**/*.xcworkspace/**",
     "**/.swiftpm/**",
-
     # Dart / Flutter
     "**/build/**",
     "**/.dart_tool/**",
     "**/flutter_build/**",
-
     # Elixir
     "**/_build/**",
     "**/deps/**",
     "**/.elixir_ls/**",
-
     # Erlang
     "**/ebin/**",
     "**/deps/**",
-
     # Haskell
     "**/dist/**",
     "**/dist-newstyle/**",
     "**/.cabal/**",
     "**/.stack-work/**",
-
     # Lua
     "**/.luarocks/**",
-
     # R
     "**/packrat/**",
-
     # General test artifacts
     "**/coverage/**",
     "**/.coverage/**",
@@ -181,7 +163,6 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/test/fixtures/**",
     "**/spec/fixtures/**",
     "**/tests/fixtures/**",
-
     # IDE files
     "**/.idea/**",
     "**/.vscode/**",
@@ -193,16 +174,13 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/Thumbs.db",
     "**/*.sublime-project",
     "**/*.sublime-workspace",
-
     # OS files
     "**/.DS_Store/**",
     "**/._*",
-
     # Documentation builds
     "**/site/**",
     "**/_site/**",
     "**/.doctrees/**",
-
     # Dependency lock files (large, not source code)
     "**/package-lock.json",
     "**/yarn.lock",
@@ -211,26 +189,20 @@ UNIVERSAL_EXCLUDE_PATTERNS = [
     "**/Gemfile.lock",
     "**/composer.lock",
     "**/Cargo.lock",
-
     # Minified assets
     "**/*.min.js",
     "**/*.min.css",
     "**/*.min.html",
-
     # Generated files
     "**/*.generated.*",
     "**/*.gen.*",
     "**/.gencache/**",
-
     # Victor-specific
     "**/.victor/**",
-
     # VS Code extension test fixtures
     "**/.vscode-test/**",
-
     # Docker
     "**/.dockerignore",
-
     # CI/CD
     "**/.github/workflows/*/dist/**",  # Action builds
 ]

@@ -83,14 +83,12 @@ class TestGitignoreParsing:
             root_path = Path(tmpdir)
             gitignore = root_path / ".gitignore"
 
-            gitignore.write_text(
-                """# Comment
+            gitignore.write_text("""# Comment
 node_modules/
 dist/
 *.log
 .env
-"""
-            )
+""")
 
             patterns = parse_gitignore(root_path)
             assert len(patterns) == 4
@@ -105,16 +103,14 @@ dist/
             root_path = Path(tmpdir)
             gitignore = root_path / ".gitignore"
 
-            gitignore.write_text(
-                """
+            gitignore.write_text("""
 # This is a comment
 
 node_modules/
 
 # Another comment
 dist/
-"""
-            )
+""")
 
             patterns = parse_gitignore(root_path)
             assert len(patterns) == 2
@@ -125,11 +121,9 @@ dist/
             root_path = Path(tmpdir)
             gitignore = root_path / ".gitignore"
 
-            gitignore.write_text(
-                """*.log
+            gitignore.write_text("""*.log
 !important.log
-"""
-            )
+""")
 
             patterns = parse_gitignore(root_path)
             assert len(patterns) == 1
@@ -229,9 +223,7 @@ class TestGetExclusionPatterns:
         with tempfile.TemporaryDirectory() as tmpdir:
             root_path = Path(tmpdir)
 
-            patterns = get_exclusion_patterns(
-                root_path, custom_patterns=["**/my_custom_dir/**"]
-            )
+            patterns = get_exclusion_patterns(root_path, custom_patterns=["**/my_custom_dir/**"])
             assert any("my_custom_dir" in p for p in patterns)
 
     def test_get_exclusion_patterns_deduplicates(self):

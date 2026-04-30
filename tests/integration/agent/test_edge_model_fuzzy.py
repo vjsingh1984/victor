@@ -208,7 +208,9 @@ class TestEdgeModelPerformanceWithFuzzy:
         if not manager.is_enabled(FeatureFlag.USE_EDGE_MODEL):
             pytest.skip("Edge model not enabled")
 
-    @pytest.mark.skip(reason="pytest-benchmark fixture not available - requires pytest-benchmark package")
+    @pytest.mark.skip(
+        reason="pytest-benchmark fixture not available - requires pytest-benchmark package"
+    )
     def test_decision_speed_with_fuzzy(self, benchmark):
         """Ensure fuzzy matching doesn't significantly slow edge decisions."""
         from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol

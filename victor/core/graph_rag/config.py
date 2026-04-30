@@ -69,7 +69,9 @@ class GraphIndexConfig:
     enable_subgraph_cache: bool = True
     chunk_size: int = 50
     max_file_size_bytes: int = 1_000_000  # 1MB
-    exclude_patterns: List[str] = field(default_factory=list)  # Initialized via get_exclusion_patterns()
+    exclude_patterns: List[str] = field(
+        default_factory=list
+    )  # Initialized via get_exclusion_patterns()
     include_patterns: List[str] = field(default_factory=list)
     subgraph_config: SubgraphConfig = field(default_factory=SubgraphConfig)
     embedding_neighborhood_radius: int = 2
