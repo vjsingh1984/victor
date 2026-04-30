@@ -113,6 +113,19 @@ class ConversationSession:
     is_moe: bool = False  # Mixture of Experts architecture
     is_reasoning: bool = False  # Explicit reasoning model (R1, o1)
 
+    # Rich session metadata (for slash commands, TUI, resume)
+    title: Optional[str] = None  # Session title (generated or user-provided)
+    tags: List[str] = field(default_factory=list)  # User-assigned tags
+
+    # State persistence (for session resume)
+    conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine.to_dict()
+    execution_state: Optional[Dict[str, Any]] = None    # ExecutionState.to_dict()
+    session_ledger: Optional[Dict[str, Any]] = None     # SessionLedger.to_dict()
+    compaction_hierarchy: Optional[Dict[str, Any]] = None  # Message compaction hierarchy
+
+    # Preview messages (separated from regular messages for display)
+    preview_messages: List[ConversationMessage] = field(default_factory=list)
+
     @property
     def available_tokens(self) -> int:
         """Get available tokens for new messages."""
@@ -142,6 +155,14 @@ class ConversationSession:
             "tool_capable": self.tool_capable,
             "is_moe": self.is_moe,
             "is_reasoning": self.is_reasoning,
+            # Rich session metadata
+            "title": self.title,
+            "tags": self.tags,
+            # State persistence
+            "conversation_state": self.conversation_state,
+            "execution_state": self.execution_state,
+            "session_ledger": self.session_ledger,
+            "compaction_hierarchy": self.compaction_hierarchy,
         }
 
 
@@ -1857,6 +1878,20 @@ class ConversationStore:
             model_size_id = self._get_model_size_id(session.model_size)
             context_size_id = self._get_context_size_id(session.context_size)
 
+            # Build metadata dict with both legacy and new rich fields
+            metadata = {
+                "active_files": session.active_files,
+                "tool_usage_count": session.tool_usage_count,
+                # Rich session metadata
+                "title": session.title,
+                "tags": session.tags,
+                # State persistence
+                "conversation_state": session.conversation_state,
+                "execution_state": session.execution_state,
+                "session_ledger": session.session_ledger,
+                "compaction_hierarchy": session.compaction_hierarchy,
+            }
+
             conn.execute(
                 """
                 INSERT OR REPLACE INTO sessions
@@ -1875,12 +1910,7 @@ class ConversationStore:
                     session.profile,
                     session.max_tokens,
                     session.reserved_tokens,
-                    json_dumps(
-                        {
-                            "active_files": session.active_files,
-                            "tool_usage_count": session.tool_usage_count,
-                        }
-                    ),
+                    json_dumps(metadata),
                     # Normalized FK columns
                     provider_id,
                     model_family_id,
@@ -2381,6 +2411,14 @@ class ConversationStore:
             tool_capable=(bool(row["tool_capable"]) if "tool_capable" in row_keys else False),
             is_moe=bool(row["is_moe"]) if "is_moe" in row_keys else False,
             is_reasoning=(bool(row["is_reasoning"]) if "is_reasoning" in row_keys else False),
+            # Rich session metadata (from metadata column)
+            title=metadata.get("title"),
+            tags=metadata.get("tags", []),
+            # State persistence (from metadata column)
+            conversation_state=metadata.get("conversation_state"),
+            execution_state=metadata.get("execution_state"),
+            session_ledger=metadata.get("session_ledger"),
+            compaction_hierarchy=metadata.get("compaction_hierarchy"),
         )
 
     def _message_from_row(self, row: sqlite3.Row) -> ConversationMessage:
