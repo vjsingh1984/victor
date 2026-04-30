@@ -743,6 +743,50 @@ class ContinuationStrategy:
             max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
         )
 
+        if task_completion_signals:
+            explicit_database_query_requested = task_completion_signals.get(
+                "explicit_database_query_requested", False
+            )
+            database_query_satisfied = task_completion_signals.get(
+                "database_query_satisfied", False
+            )
+            if explicit_database_query_requested and not database_query_satisfied:
+                logger.info(
+                    "Explicit database inspection request not yet satisfied; "
+                    "requiring a real db/shell tool call before completion"
+                )
+                if continuation_prompts >= max_continuation_prompts:
+                    return {
+                        "action": "request_summary",
+                        "message": (
+                            "You still have not directly inspected the database even though the "
+                            "user explicitly asked for it. Make one actual database or readonly "
+                            "shell tool call now if possible; otherwise explain clearly that the "
+                            "direct database inspection step remains unmet and why."
+                        ),
+                        "reason": (
+                            "Explicit database inspection request remained unmet after "
+                            "continuation budget"
+                        ),
+                        "updates": {
+                            "continuation_prompts": continuation_prompts,
+                            "max_prompts_summary_requested": True,
+                        },
+                    }
+
+                updates["continuation_prompts"] = continuation_prompts + 1
+                return {
+                    "action": "prompt_tool_call",
+                    "message": (
+                        "The user explicitly asked you to inspect/query the database directly. "
+                        "Before you finish, make an actual database or readonly shell tool call "
+                        "now, such as listing tables, inspecting schema, or running a SELECT. "
+                        "Do not rely on code inspection alone."
+                    ),
+                    "reason": "Explicit database inspection request not yet satisfied",
+                    "updates": updates,
+                }
+
         # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
         # If model says "let me call search()" but didn't actually call it, try to extract
         # the intended tool call from the text and execute it automatically.

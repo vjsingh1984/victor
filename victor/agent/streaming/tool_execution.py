@@ -78,6 +78,8 @@ from victor.agent.services.protocols.streaming_runtime import (
 )
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.decorators import resolve_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -382,6 +384,10 @@ class ToolExecutionHandler:
         result.tool_results = tool_results
         result.tool_calls_executed = len(tool_calls)
         result.last_tool_name = last_tool_name
+        for tool_call in tool_calls:
+            tool_name = tool_call.get("name", "")
+            canonical_name = canonicalize_core_tool_name(resolve_tool_name(tool_name))
+            stream_ctx.record_executed_tool_name(canonical_name)
 
         # Generate result chunks
         for tool_result in tool_results:

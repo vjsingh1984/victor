@@ -129,6 +129,7 @@ class StreamingChatContext:
     tool_budget: int = 200  # Default tool budget
     tool_calls_used: int = 0
     unique_resources: Set[str] = field(default_factory=set)
+    executed_tool_names: Set[str] = field(default_factory=set)
 
     # Compaction tracking (P0 fix for post-compaction continuation)
     compaction_occurred: bool = False
@@ -296,6 +297,11 @@ class StreamingChatContext:
     def record_tool_execution(self, count: int = 1) -> None:
         """Record tool calls used."""
         self.tool_calls_used += count
+
+    def record_executed_tool_name(self, tool_name: str) -> None:
+        """Track a successfully issued tool name for completion policy checks."""
+        if tool_name:
+            self.executed_tool_names.add(tool_name)
 
     def add_unique_resource(self, resource: str) -> None:
         """Track a unique resource accessed by tools."""

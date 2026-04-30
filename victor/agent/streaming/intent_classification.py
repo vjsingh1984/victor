@@ -363,6 +363,24 @@ class IntentClassificationHandler:
         if stream_ctx and hasattr(stream_ctx, "total_iterations"):
             current_iteration = stream_ctx.total_iterations
 
+        explicit_database_query_requested = False
+        executed_tool_names: Set[str] = set()
+        database_query_satisfied = False
+        original_user_message = ""
+        if stream_ctx:
+            try:
+                from victor.agent.action_authorizer import has_explicit_readonly_shell_request
+
+                original_user_message = getattr(stream_ctx, "user_message", "") or ""
+                explicit_database_query_requested = has_explicit_readonly_shell_request(
+                    original_user_message
+                )
+            except Exception:
+                explicit_database_query_requested = False
+
+            executed_tool_names = set(getattr(stream_ctx, "executed_tool_names", set()) or set())
+            database_query_satisfied = bool(executed_tool_names & {"shell", "db", "database"})
+
         return {
             "required_files": tracking_state.required_files,
             "read_files": tracking_state.read_files_session,
@@ -375,6 +393,10 @@ class IntentClassificationHandler:
             "synthesis_nudge_count": tracking_state.synthesis_nudge_count,
             "cumulative_prompt_interventions": tracking_state.cumulative_prompt_interventions,
             "current_iteration": current_iteration,  # NEW: For algorithmic loop detection
+            "original_user_message": original_user_message,
+            "executed_tool_names": executed_tool_names,
+            "explicit_database_query_requested": explicit_database_query_requested,
+            "database_query_satisfied": database_query_satisfied,
         }
 
     def _determine_action(

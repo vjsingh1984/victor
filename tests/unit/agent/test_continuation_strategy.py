@@ -476,6 +476,40 @@ class TestDetermineContinuationAction:
         assert result["action"] == "prompt_tool_call"
         assert "didn't complete" in result["message"]
 
+    def test_prompt_tool_call_when_explicit_database_request_unmet(self, strategy, base_kwargs):
+        """Explicit direct DB inspection requests should block completion until satisfied."""
+        base_kwargs["task_completion_signals"] = {
+            "explicit_database_query_requested": True,
+            "database_query_satisfied": False,
+            "executed_tool_names": set(),
+            "original_user_message": "review the sqllite db directly",
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] == "prompt_tool_call"
+        assert "database" in result["message"].lower()
+        assert result["updates"]["continuation_prompts"] == 1
+
+    def test_finish_when_explicit_database_request_is_satisfied(self, strategy, base_kwargs):
+        """A real db/shell call should satisfy the direct inspection requirement."""
+        base_kwargs["task_completion_signals"] = {
+            "explicit_database_query_requested": True,
+            "database_query_satisfied": True,
+            "executed_tool_names": {"shell"},
+            "original_user_message": "review the sqllite db directly",
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] == "finish"
+
     def test_finish_default(self, strategy, base_kwargs):
         """Test finishes by default when no conditions met."""
         mock_intent = MagicMock()

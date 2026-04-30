@@ -71,3 +71,28 @@ def test_intent_handler_finishes_early_on_malformed_tool_style_plaintext():
     assert any(chunk.is_final for chunk in result.chunks)
     assert any("malformed tool-style text" in chunk.content.lower() for chunk in result.chunks)
     intent_classifier.classify_intent_sync.assert_not_called()
+
+
+def test_build_task_completion_signals_tracks_explicit_database_requirements():
+    handler = IntentClassificationHandler(
+        intent_classifier=MagicMock(),
+        unified_tracker=MagicMock(),
+        sanitizer=ResponseSanitizer(),
+        chunk_generator=MagicMock(),
+        settings=MagicMock(),
+        provider_name="zai",
+        model="glm-5.1",
+    )
+
+    tracking_state = TrackingState()
+    stream_ctx = StreamingChatContext(
+        user_message="please review the sqllite db directly and inspect the schema"
+    )
+    stream_ctx.executed_tool_names.add("shell")
+
+    signals = handler._build_task_completion_signals(tracking_state, stream_ctx)
+
+    assert signals["explicit_database_query_requested"] is True
+    assert signals["database_query_satisfied"] is True
+    assert signals["original_user_message"] == stream_ctx.user_message
+    assert signals["executed_tool_names"] == {"shell"}
