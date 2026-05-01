@@ -231,7 +231,10 @@ class VictorClient:
             model=model_name,
             session_config=self._config,  # Pass SessionConfig
         )
-        if hasattr(self._agent, "get_orchestrator"):
+        execution_context = getattr(self._agent, "execution_context", None)
+        if execution_context is not None:
+            self._context = execution_context
+        elif hasattr(self._agent, "get_orchestrator"):
             orchestrator = self._agent.get_orchestrator()
             self._context = getattr(orchestrator, "_execution_context", None)
         self._initialized = True

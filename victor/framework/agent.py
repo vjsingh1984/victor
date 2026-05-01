@@ -137,6 +137,7 @@ class Agent:
         self._model = model
         self._vertical = vertical
         self._vertical_config = vertical_config
+        self._context = getattr(orchestrator, "_execution_context", None)
         self._state = State(orchestrator)
         self._state_observers: List[StateObserver] = []
         # LSP capability (language intelligence)
@@ -414,25 +415,37 @@ class Agent:
     # Primary Methods
     # =========================================================================
 
+    @property
+    def execution_context(self) -> Any:
+        """Return the explicit runtime execution context when available."""
+        runtime_context = getattr(self, "_context", None)
+        if runtime_context is not None:
+            return runtime_context
+
+        runtime_context = getattr(self._orchestrator, "_execution_context", None)
+        if runtime_context is not None:
+            self._context = runtime_context
+        return runtime_context
+
     def _resolve_chat_runtime(self) -> Any:
         """Resolve the canonical chat runtime for this agent.
 
         Preference order:
-        1. Orchestrator-bound ChatService
-        2. RuntimeExecutionContext services accessor
+        1. RuntimeExecutionContext services accessor
+        2. Orchestrator-bound ChatService
         3. Container-resolved ChatService
         4. Underlying orchestrator as a compatibility fallback
         """
-        chat_service = getattr(self._orchestrator, "_chat_service", None)
-        if chat_service is not None:
-            return chat_service
-
-        runtime_context = getattr(self, "_context", None)
+        runtime_context = self.execution_context
         services = getattr(runtime_context, "services", None)
         if services is not None:
             chat_service = getattr(services, "chat", None)
             if chat_service is not None:
                 return chat_service
+
+        chat_service = getattr(self._orchestrator, "_chat_service", None)
+        if chat_service is not None:
+            return chat_service
 
         container = getattr(self._orchestrator, "_container", None)
         if container is not None:

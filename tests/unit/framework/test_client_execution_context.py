@@ -33,6 +33,35 @@ async def test_victor_client_ensure_initialized_captures_execution_context() -> 
 
 
 @pytest.mark.asyncio
+async def test_victor_client_ensure_initialized_prefers_agent_execution_context_surface() -> None:
+    config = SessionConfig()
+    client = VictorClient(config, container=object())
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=None))
+
+    class _FakeAgent:
+        def __init__(self, ctx):
+            self.execution_context = ctx
+
+        def get_orchestrator(self):
+            raise AssertionError("execution_context surface should be preferred over orchestrator")
+
+    settings = SimpleNamespace(
+        provider=SimpleNamespace(default_provider="ollama", default_model="test-model")
+    )
+
+    with (
+        patch("victor.config.settings.load_settings", return_value=settings),
+        patch(
+            "victor.framework.agent.Agent.create",
+            new=AsyncMock(return_value=_FakeAgent(execution_context)),
+        ),
+    ):
+        await client._ensure_initialized()
+
+    assert client._context is execution_context
+
+
+@pytest.mark.asyncio
 async def test_victor_client_chat_prefers_execution_context_chat_service() -> None:
     config = SessionConfig.from_cli_flags(tool_budget=4)
     client = VictorClient(config, container=object())
