@@ -263,3 +263,29 @@ def test_graph_watch_status_reports_last_refresh_details(tmp_path):
     assert "last refresh" in output
     assert "changed=2, deleted=1, unchanged=7" in output
     assert "1.25s" in output
+
+
+def test_summarize_graph_watch_health_reports_active_refresh_counts() -> None:
+    """Compact health summaries should include current refresh counts for live surfaces."""
+    summary, state = graph_cmd.summarize_graph_watch_health(
+        {
+            "running": True,
+            "last_refresh": {
+                "changed": 2,
+                "deleted": 1,
+                "unchanged": 7,
+                "errors": 0,
+            },
+        }
+    )
+
+    assert summary == "Graph: ok c2 d1 u7"
+    assert state == "active"
+
+
+def test_summarize_graph_watch_health_reports_stale_or_missing_state() -> None:
+    """Compact health summaries should distinguish stale and disabled graph watch states."""
+    assert graph_cmd.summarize_graph_watch_health(None) == ("Graph: off", "inactive")
+    assert graph_cmd.summarize_graph_watch_health(
+        {"running": False, "stale_pid_file": True}
+    ) == ("Graph: stale", "warning")

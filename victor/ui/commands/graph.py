@@ -711,6 +711,32 @@ def summarize_graph_watch_startup(
     return messages
 
 
+def summarize_graph_watch_health(manifest: Optional[dict[str, Any]]) -> tuple[str, str]:
+    """Return a compact status-bar summary for graph watch health."""
+    if not isinstance(manifest, dict):
+        return "Graph: off", "inactive"
+
+    running = bool(manifest.get("running"))
+    stale_pid_file = bool(manifest.get("stale_pid_file"))
+    last_refresh = manifest.get("last_refresh")
+
+    if stale_pid_file and not running:
+        return "Graph: stale", "warning"
+    if not running:
+        return "Graph: off", "inactive"
+    if not isinstance(last_refresh, dict):
+        return "Graph: starting", "active"
+
+    changed = int(last_refresh.get("changed", 0) or 0)
+    deleted = int(last_refresh.get("deleted", 0) or 0)
+    unchanged = int(last_refresh.get("unchanged", 0) or 0)
+    errors = int(last_refresh.get("errors", 0) or 0)
+
+    if errors > 0:
+        return f"Graph: err {errors} c{changed} d{deleted}", "warning"
+    return f"Graph: ok c{changed} d{deleted} u{unchanged}", "active"
+
+
 def _graph_watch_lock_is_stale(lock_file: Path, stale_after_seconds: float) -> bool:
     """Return True when a graph-watch startup lock is old enough to reap."""
     try:

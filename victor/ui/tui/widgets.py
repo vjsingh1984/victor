@@ -76,6 +76,8 @@ class StatusBar(Static):
         self._state = "idle"  # idle, streaming, error
         self._follow_paused: bool = False
         self._last_unread_count: int = 0
+        self._graph_watch_summary = "Graph: ..."
+        self._graph_watch_state = "inactive"
 
     def compose(self) -> ComposeResult:
         """Compose the status bar widget.
@@ -108,6 +110,13 @@ class StatusBar(Static):
             follow_label.add_class("following")
             yield follow_label
             yield Label("", classes="unread-indicator", id="unread-indicator")
+            graph_watch_label = Label(
+                self._graph_watch_summary,
+                classes="graph-watch-indicator",
+                id="graph-watch-indicator",
+            )
+            graph_watch_label.add_class(self._graph_watch_state)
+            yield graph_watch_label
             yield Label(
                 Text.assemble(
                     ("Ctrl+C", "bold"),
@@ -261,6 +270,24 @@ class StatusBar(Static):
                 label.remove_class("visible")
         except Exception as e:
             logger.debug(f"Failed to update unread indicator: {e}")
+
+    def update_graph_watch(self, summary: str, state: str = "inactive") -> None:
+        """Update the graph-watch indicator.
+
+        No-op when both the summary and state are unchanged.
+        """
+        if summary == self._graph_watch_summary and state == self._graph_watch_state:
+            return
+
+        self._graph_watch_summary = summary
+        self._graph_watch_state = state
+        try:
+            label = self.query_one("#graph-watch-indicator", Label)
+            label.update(summary)
+            label.remove_class("active", "warning", "inactive")
+            label.add_class(state)
+        except Exception as e:
+            logger.debug(f"Failed to update graph watch indicator: {e}")
 
 
 class SubmitTextArea(TextArea):

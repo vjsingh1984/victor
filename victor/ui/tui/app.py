@@ -355,6 +355,21 @@ class VictorTUI(App):
         display: block;
     }
 
+    StatusBar .graph-watch-indicator {
+        width: auto;
+        margin-left: 1;
+        color: $text-muted;
+        text-style: bold;
+    }
+
+    StatusBar .graph-watch-indicator.active {
+        color: $success;
+    }
+
+    StatusBar .graph-watch-indicator.warning {
+        color: $warning;
+    }
+
     StatusBar .provider-info .victor-name {
         color: $primary;
     }
@@ -590,6 +605,7 @@ class VictorTUI(App):
         Binding("ctrl+n", "jump_unread", "Jump Unread", show=False),
         Binding("ctrl+u", "toggle_unread_marker", "Toggle Unread Marker", show=False),
     ]
+    _GRAPH_WATCH_STATUS_REFRESH_SECONDS = 5.0
 
     def __init__(
         self,
@@ -635,6 +651,7 @@ class VictorTUI(App):
         self._session_messages: list[Message] = []
         self._session_restore_task: asyncio.Task | None = None
         self._jump_button_visible: Optional[bool] = None  # None = unknown initial state
+        self._graph_watch_refresh_timer: Any = None
 
     # Async replay thresholds
     _ASYNC_REPLAY_THRESHOLD = 100
@@ -684,6 +701,7 @@ class VictorTUI(App):
         for message in self._startup_messages:
             self._add_system_message(message)
         self._set_status("Idle", "idle")
+        self._start_graph_watch_status_refresh()
         self._update_jump_to_bottom()
 
         # Focus input
@@ -1992,6 +2010,36 @@ Slash Commands:
             self._status_bar.update_status(status, state)
         except Exception as e:
             logger.debug(f"Failed to update status bar: {e}")
+
+    def _start_graph_watch_status_refresh(self) -> None:
+        """Load and periodically refresh graph-watch health in the status bar."""
+        self._refresh_graph_watch_status()
+        try:
+            self._graph_watch_refresh_timer = self.set_interval(
+                self._GRAPH_WATCH_STATUS_REFRESH_SECONDS,
+                self._refresh_graph_watch_status,
+            )
+        except Exception as e:
+            logger.debug(f"Failed to schedule graph watch refresh: {e}")
+
+    def _refresh_graph_watch_status(self) -> None:
+        """Refresh the live graph-watch summary from the project manifest."""
+        if not self._status_bar:
+            return
+
+        try:
+            from victor.config.settings import get_project_paths
+            from victor.ui.commands.graph import (
+                _read_graph_watch_manifest,
+                summarize_graph_watch_health,
+            )
+
+            project_root = get_project_paths(Path.cwd()).project_root
+            manifest = _read_graph_watch_manifest(project_root)
+            summary, state = summarize_graph_watch_health(manifest)
+            self._status_bar.update_graph_watch(summary, state=state)
+        except Exception as e:
+            logger.debug(f"Failed to refresh graph watch status: {e}")
 
     def _update_jump_to_bottom(self) -> None:
         if not self._jump_button or not self._conversation_log:

@@ -669,6 +669,31 @@ def test_status_bar_update_unread_is_noop_when_count_unchanged() -> None:
     query_one.assert_not_called()
 
 
+def test_status_bar_updates_graph_watch_indicator() -> None:
+    """Status bar should reflect the latest graph-watch health summary."""
+    bar = StatusBar()
+    label = MagicMock()
+
+    with patch.object(StatusBar, "query_one", return_value=label):
+        bar.update_graph_watch("Graph: ok c2 d1 u7", state="active")
+
+    label.update.assert_called_once_with("Graph: ok c2 d1 u7")
+    label.remove_class.assert_called_once_with("active", "warning", "inactive")
+    label.add_class.assert_called_once_with("active")
+
+
+def test_status_bar_update_graph_watch_is_noop_when_unchanged() -> None:
+    """Graph-watch indicator updates should be skipped when unchanged."""
+    bar = StatusBar()
+    bar._graph_watch_summary = "Graph: ok c2 d1 u7"
+    bar._graph_watch_state = "active"
+
+    with patch.object(StatusBar, "query_one") as query_one:
+        bar.update_graph_watch("Graph: ok c2 d1 u7", state="active")
+
+    query_one.assert_not_called()
+
+
 def test_status_bar_shortcuts_reflect_follow_action_state() -> None:
     """Shortcut hints should show pause/resume follow based on current state."""
     bar = StatusBar()

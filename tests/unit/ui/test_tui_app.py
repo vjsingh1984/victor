@@ -2,6 +2,7 @@
 
 import asyncio
 from contextlib import nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
@@ -1180,6 +1181,7 @@ def test_on_mount_renders_startup_messages() -> None:
     status_bar = MagicMock()
     jump_button = MagicMock()
     app._set_status = MagicMock()
+    app._start_graph_watch_status_refresh = MagicMock()
     app._update_jump_to_bottom = MagicMock()
 
     def _query_one(selector, *_args):
@@ -1203,7 +1205,46 @@ def test_on_mount_renders_startup_messages() -> None:
         call("Profile fallback active"),
         call("Resumed session: Demo"),
     ]
+    app._start_graph_watch_status_refresh.assert_called_once_with()
     input_widget.focus_input.assert_called_once()
+
+
+def test_start_graph_watch_status_refresh_updates_and_schedules() -> None:
+    """Graph-watch refresh startup should prime the indicator and schedule polling."""
+    app = VictorTUI()
+    app._refresh_graph_watch_status = MagicMock()
+    app.set_interval = MagicMock(return_value="timer")
+
+    app._start_graph_watch_status_refresh()
+
+    app._refresh_graph_watch_status.assert_called_once_with()
+    app.set_interval.assert_called_once_with(
+        app._GRAPH_WATCH_STATUS_REFRESH_SECONDS,
+        app._refresh_graph_watch_status,
+    )
+    assert app._graph_watch_refresh_timer == "timer"
+
+
+def test_refresh_graph_watch_status_updates_status_bar_from_manifest() -> None:
+    """Graph-watch refresh should push compact health info into the status bar."""
+    app = VictorTUI()
+    app._status_bar = MagicMock()
+    manifest = {"running": True, "last_refresh": {"changed": 2, "deleted": 1, "unchanged": 7}}
+
+    with (
+        patch(
+            "victor.config.settings.get_project_paths",
+            return_value=SimpleNamespace(project_root=Path("/repo")),
+        ),
+        patch("victor.ui.commands.graph._read_graph_watch_manifest", return_value=manifest),
+        patch(
+            "victor.ui.commands.graph.summarize_graph_watch_health",
+            return_value=("Graph: ok c2 d1 u7", "active"),
+        ),
+    ):
+        app._refresh_graph_watch_status()
+
+    app._status_bar.update_graph_watch.assert_called_once_with("Graph: ok c2 d1 u7", state="active")
 
 
 def test_update_jump_button_label_with_unread_count() -> None:
