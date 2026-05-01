@@ -283,7 +283,11 @@ def _ensure_graph_watch_for_chat(*, enabled: bool) -> list[str]:
     paths.ensure_project_dirs()
 
     try:
-        from victor.ui.commands.graph import ensure_graph_watch_daemon
+        from victor.ui.commands.graph import (
+            _read_graph_watch_manifest,
+            ensure_graph_watch_daemon,
+            summarize_graph_watch_startup,
+        )
 
         state = ensure_graph_watch_daemon(
             paths.project_root,
@@ -293,12 +297,8 @@ def _ensure_graph_watch_for_chat(*, enabled: bool) -> list[str]:
     except Exception as exc:
         return [f"Warning: failed to ensure graph watch daemon: {exc}"]
 
-    messages: list[str] = []
-    if state.stale_pid_removed:
-        messages.append("Recovered stale graph watch state before chat startup.")
-    if state.started and state.pid is not None:
-        messages.append(f"Graph watch daemon started for this project (PID {state.pid}).")
-    return messages
+    manifest = _read_graph_watch_manifest(paths.project_root)
+    return summarize_graph_watch_startup(paths.project_root, state, manifest=manifest)
 
 
 def _summarize_smart_routing(

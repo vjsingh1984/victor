@@ -677,6 +677,40 @@ def _record_graph_watch_refresh(project_root: Path, stats: Any) -> Path:
     )
 
 
+def summarize_graph_watch_startup(
+    project_root: Path,
+    state: GraphWatchDaemonState,
+    *,
+    manifest: Optional[dict[str, Any]] = None,
+) -> list[str]:
+    """Return concise startup messages describing project graph watch state."""
+    root_path = project_root.resolve()
+    active_manifest = manifest if manifest is not None else _read_graph_watch_manifest(root_path)
+    messages: list[str] = []
+
+    if state.stale_pid_removed:
+        messages.append("Recovered stale graph watch state before chat startup.")
+
+    if state.running and state.pid is not None:
+        if state.started:
+            messages.append(f"Graph watch daemon started for this project (PID {state.pid}).")
+        else:
+            messages.append(f"Graph watch daemon active for this project (PID {state.pid}).")
+
+    if active_manifest and isinstance(active_manifest.get("last_refresh"), dict):
+        last_refresh = active_manifest["last_refresh"]
+        messages.append(
+            "Last refresh: "
+            f"changed={last_refresh.get('changed', 0)}, "
+            f"deleted={last_refresh.get('deleted', 0)}, "
+            f"unchanged={last_refresh.get('unchanged', 0)}, "
+            f"errors={last_refresh.get('errors', 0)}, "
+            f"duration={float(last_refresh.get('duration_seconds', 0.0)):.2f}s."
+        )
+
+    return messages
+
+
 def _graph_watch_lock_is_stale(lock_file: Path, stale_after_seconds: float) -> bool:
     """Return True when a graph-watch startup lock is old enough to reap."""
     try:

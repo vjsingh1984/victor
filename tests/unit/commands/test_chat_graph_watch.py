@@ -32,12 +32,22 @@ def test_chat_graph_watch_ensures_project_singleton_by_default(tmp_path):
         pid_file=project_root / ".victor" / "graph-watch.pid",
         running=True,
         pid=321,
-        started=True,
+        started=False,
     )
+    manifest = {
+        "last_refresh": {
+            "changed": 2,
+            "deleted": 1,
+            "unchanged": 7,
+            "errors": 0,
+            "duration_seconds": 1.25,
+        }
+    }
 
     with (
         patch.object(chat_cmd, "get_project_paths", return_value=paths),
         patch("victor.ui.commands.graph.ensure_graph_watch_daemon", return_value=state) as mock_ensure,
+        patch("victor.ui.commands.graph._read_graph_watch_manifest", return_value=manifest),
     ):
         messages = chat_cmd._ensure_graph_watch_for_chat(enabled=True)
 
@@ -47,7 +57,36 @@ def test_chat_graph_watch_ensures_project_singleton_by_default(tmp_path):
         enable_ccg=True,
         build_now=True,
     )
-    assert any("graph watch" in message.lower() for message in messages)
+    assert any("active for this project (pid 321)" in message.lower() for message in messages)
+    assert any("changed=2, deleted=1, unchanged=7" in message.lower() for message in messages)
+    assert any("1.25s" in message.lower() for message in messages)
+
+
+def test_chat_graph_watch_reports_new_daemon_start_without_refresh_stats(tmp_path):
+    """Interactive chat should report a fresh graph watcher start even before refresh telemetry exists."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+
+    paths = SimpleNamespace(
+        project_root=project_root,
+        ensure_project_dirs=MagicMock(),
+    )
+    state = graph_cmd.GraphWatchDaemonState(
+        pid_file=project_root / ".victor" / "graph-watch.pid",
+        running=True,
+        pid=654,
+        started=True,
+    )
+
+    with (
+        patch.object(chat_cmd, "get_project_paths", return_value=paths),
+        patch("victor.ui.commands.graph.ensure_graph_watch_daemon", return_value=state),
+        patch("victor.ui.commands.graph._read_graph_watch_manifest", return_value=None),
+    ):
+        messages = chat_cmd._ensure_graph_watch_for_chat(enabled=True)
+
+    assert any("started for this project (pid 654)" in message.lower() for message in messages)
+    assert not any("last refresh" in message.lower() for message in messages)
 
 
 def test_chat_graph_watch_can_be_disabled(tmp_path):
