@@ -312,7 +312,7 @@ class TestProtocolRegistration:
 
         reset_global_registry()
         registry = get_global_registry()
-        stats = registry.load_from_entry_points()
+        registry.load_from_entry_points()
 
         # Should have discovered the tool provider
         assert len(registry.get_tool_providers()) >= 1
@@ -341,6 +341,7 @@ class TestProtocolRegistration:
                 (),
                 {
                     "name": "mock-safety",
+                    "group": "victor.sdk.protocols",
                     "load": mock_load,
                     "dist": type("MockDist", (), {"version": "1.0.0"}),
                     "value": "mock-package",
@@ -350,14 +351,7 @@ class TestProtocolRegistration:
 
         import importlib.metadata
 
-        original_entry_points = importlib.metadata.entry_points
-
-        def mock_entry_points(*args, **kwargs):
-            if "group" in kwargs and kwargs["group"] == "victor.sdk.protocols":
-                return mock_eps
-            return original_entry_points(*args, **kwargs)
-
-        monkeypatch.setattr(importlib.metadata, "entry_points", mock_entry_points)
+        monkeypatch.setattr(importlib.metadata, "entry_points", lambda *a, **kw: mock_eps)
 
         reset_global_registry()
         registry = get_global_registry()
@@ -425,6 +419,7 @@ class TestProtocolRegistration:
                 (),
                 {
                     "name": "plugin-registered",
+                    "group": "victor.plugins",
                     "load": lambda self=None: _Plugin(),
                     "dist": type("MockDist", (), {"version": "1.0.0"}),
                     "value": "victor_plugin:plugin",
@@ -434,14 +429,7 @@ class TestProtocolRegistration:
 
         import importlib.metadata
 
-        original_entry_points = importlib.metadata.entry_points
-
-        def mock_entry_points(*args, **kwargs):
-            if kwargs.get("group") == "victor.plugins":
-                return mock_eps
-            return original_entry_points(*args, **kwargs)
-
-        monkeypatch.setattr(importlib.metadata, "entry_points", mock_entry_points)
+        monkeypatch.setattr(importlib.metadata, "entry_points", lambda *a, **kw: mock_eps)
 
         registry = ProtocolRegistry()
         stats = registry.load_from_entry_points(reload=True)

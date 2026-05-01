@@ -13,26 +13,26 @@ async def software_development_team(task: str):
     # Create specialized agents
     product_owner = Agent.create(
         system_prompt="You are a Product Owner focused on user value and requirements.",
-        temperature=0.5
+        temperature=0.5,
     )
 
     architect = Agent.create(
         system_prompt="You are a Software Architect focused on system design and best practices.",
         vertical="coding",
-        temperature=0.4
+        temperature=0.4,
     )
 
     developer = Agent.create(
         system_prompt="You are a Senior Developer focused on clean, maintainable code.",
         vertical="coding",
         tools=["read", "write", "edit"],
-        temperature=0.3
+        temperature=0.3,
     )
 
     qa_engineer = Agent.create(
         system_prompt="You are a QA Engineer focused on testing and quality assurance.",
         vertical="coding",
-        temperature=0.3
+        temperature=0.3,
     )
 
     # Step 1: Product Owner defines requirements
@@ -67,8 +67,7 @@ async def software_development_team(task: str):
 
     # Step 3: Developer implements
     print("3. Developer implementing...")
-    implementation = await developer.run(
-        f"""Write implementation code based on:
+    implementation = await developer.run(f"""Write implementation code based on:
         Requirements: {requirements.content}
         Architecture: {design.content}
 
@@ -76,15 +75,13 @@ async def software_development_team(task: str):
         - Clean, well-documented code
         - Error handling
         - Type hints
-        - Examples"""
-    )
+        - Examples""")
 
     print(f"Implementation:\n{implementation.content[:500]}...\n")
 
     # Step 4: QA Engineer reviews
     print("4. QA Engineer reviewing...")
-    review = await qa_engineer.run(
-        f"""Review this implementation for quality:
+    review = await qa_engineer.run(f"""Review this implementation for quality:
         {implementation.content}
 
         Check:
@@ -92,8 +89,7 @@ async def software_development_team(task: str):
         - Edge cases
         - Error handling
         - Test coverage needs
-        - Security issues"""
-    )
+        - Security issues""")
 
     print(f"QA Review:\n{review.content}\n")
 
@@ -102,7 +98,7 @@ async def software_development_team(task: str):
         "requirements": requirements.content,
         "design": design.content,
         "implementation": implementation.content,
-        "review": review.content
+        "review": review.content,
     }
 
     return summary
@@ -114,19 +110,19 @@ async def research_consensus(topic: str):
     technical_researcher = Agent.create(
         system_prompt="You research from a technical/engineering perspective.",
         tools=["web_search"],
-        temperature=0.4
+        temperature=0.4,
     )
 
     business_researcher = Agent.create(
         system_prompt="You research from a business/market perspective.",
         tools=["web_search"],
-        temperature=0.4
+        temperature=0.4,
     )
 
     academic_researcher = Agent.create(
         system_prompt="You research from an academic/scientific perspective.",
         tools=["web_search"],
-        temperature=0.4
+        temperature=0.4,
     )
 
     # Parallel research
@@ -135,7 +131,7 @@ async def research_consensus(topic: str):
     tasks = [
         technical_researcher.run(f"Technical research on: {topic}"),
         business_researcher.run(f"Business research on: {topic}"),
-        academic_researcher.run(f"Academic research on: {topic}")
+        academic_researcher.run(f"Academic research on: {topic}"),
     ]
 
     results = await asyncio.gather(*tasks)

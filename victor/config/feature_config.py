@@ -27,8 +27,8 @@ Example:
     from victor.config.feature_config import load_feature_flags_from_settings
 
     flags = load_feature_flags_from_settings(settings)
-    if flags.get("use_new_chat_service", False):
-        # Use new chat service
+    if flags.get("use_semantic_response_cache", False):
+        # Use semantic response cache
         pass
 """
 
@@ -47,17 +47,43 @@ logger = logging.getLogger(__name__)
 
 # Feature flag defaults for development/testing
 DEFAULT_FEATURE_FLAGS = {
-    # Phase 3 - Service Implementation (all disabled by default)
-    "use_new_chat_service": False,
-    "use_new_tool_service": False,
-    "use_new_context_service": False,
-    "use_new_provider_service": False,
-    "use_new_recovery_service": False,
-    "use_new_session_service": False,
-    # Phase 4 - Vertical Composition (disabled by default)
+    # Core architecture flags (disabled by default)
     "use_composition_over_inheritance": False,
-    # Phase 5 - Tool Registration Strategy (disabled by default)
     "use_strategy_based_tool_registration": False,
+    "use_llm_decision_service": False,
+    "use_edge_model": False,
+    # Fuzzy matching (enabled by default for better UX)
+    "use_fuzzy_matching": True,
+    # Optimization flags (opt-in, disabled by default)
+    "use_semantic_response_cache": False,
+    "use_context_temperature": False,
+    "use_confidence_monitor": False,
+    "tool_strategy_v2": False,
+    # Smart routing (disabled by default)
+    "use_smart_routing": False,
+    # Learning from execution (enabled by default)
+    "use_learning_from_execution": True,
+    # Agentic rollout flags (opt-in, disabled by default)
+    "use_agentic_bench_gates": False,
+    "use_calibrated_completion": False,
+    "use_agentic_retrieval_repair": False,
+    "use_utility_retrieval": False,
+    "use_prompt_completeness_guard": False,
+    "use_prompt_dictionary_compression": False,
+    "use_prime_memory_evolution": False,
+    "use_external_agentic_benchmarks": False,
+    # Rich formatting (disabled by default)
+    "use_rich_formatting": False,
+    # Graph-based enhancements (disabled by default)
+    "use_graph_rag": False,
+    "use_ccg": False,
+    "use_graph_query_tool": False,
+    "use_multi_hop_retrieval": False,
+    "use_graph_enhanced_context": False,
+    # Architecture consolidation (opt-in for safety)
+    "use_stategraph_agentic_loop": False,
+    # Stage transition coordination (opt-in for gradual rollout)
+    "use_stage_transition_coordinator": False,
 }
 
 
@@ -67,7 +93,7 @@ def load_feature_flags_from_settings(
     """Load feature flags from settings and environment variables.
 
     This function loads feature flags from multiple sources:
-    1. Environment variables (VICTOR_USE_NEW_CHAT_SERVICE, etc.)
+    1. Environment variables (VICTOR_USE_EDGE_MODEL, etc.)
     2. Settings object (if provided)
     3. Default values
 
@@ -113,8 +139,8 @@ def load_feature_flags_from_yaml(
 
     Example YAML format:
         features:
-            use_new_chat_service: true
-            use_new_tool_service: false
+            use_semantic_response_cache: true
+            use_smart_routing: false
             use_composition_over_inheritance: true
     """
     if config_path is None:

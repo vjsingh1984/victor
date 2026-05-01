@@ -24,13 +24,75 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import time
 import uuid
 
+# =============================================================================
+# Enums for A/B Testing
+# =============================================================================
 
-class AllocationStrategy(Enum):
+
+class AllocationStrategy(str, Enum):
     """Traffic allocation strategies."""
 
     RANDOM = "random"
     STICKY = "sticky"
     ROUND_ROBIN = "round_robin"
+
+
+class ExperimentRecommendation(str, Enum):
+    """Recommendation for A/B test experiment.
+
+    Determines what action to take based on test results:
+    - DEPLOY_WINNER: Clear winner found, deploy to production
+    - CONTINUE: Need more data, continue collecting
+    - INCONCLUSIVE: No clear winner, inconclusive results
+    """
+
+    DEPLOY_WINNER = "deploy_winner"  # Clear winner, deploy
+    CONTINUE = "continue"  # Need more data
+    INCONCLUSIVE = "inconclusive"  # No clear winner
+
+
+class AggregationMethod(str, Enum):
+    """Method for aggregating metric values.
+
+    Determines how to aggregate multiple measurements:
+    - MEAN: Arithmetic mean (average)
+    - MEDIAN: Median value (middle)
+    - P95: 95th percentile
+    - SUM: Sum of all values
+    """
+
+    MEAN = "mean"  # Arithmetic mean
+    MEDIAN = "median"  # Median value
+    P95 = "p95"  # 95th percentile
+    SUM = "sum"  # Sum of values
+
+
+class WorkflowType(str, Enum):
+    """Type of workflow definition.
+
+    Determines how workflows are defined:
+    - YAML: YAML workflow definition
+    - STATEGRAPH: StateGraph programmatic definition
+    - DEFINITION: Workflow definition format
+    """
+
+    YAML = "yaml"  # YAML workflow definition
+    STATEGRAPH = "stategraph"  # StateGraph programmatic definition
+    DEFINITION = "definition"  # Workflow definition format
+
+
+class VariantStatus(str, Enum):
+    """Status of experiment variant.
+
+    Runtime status of variants:
+    - RUNNING: Currently executing
+    - PAUSED: Temporarily paused
+    - FAILED: Failed with error
+    """
+
+    RUNNING = "running"  # Currently executing
+    PAUSED = "paused"  # Temporarily paused
+    FAILED = "failed"  # Failed with error
 
 
 @dataclass
@@ -54,7 +116,7 @@ class ExperimentVariant:
     description: str = ""
 
     # Workflow configuration
-    workflow_type: Literal["yaml", "stategraph", "definition"] = "yaml"
+    workflow_type: WorkflowType = WorkflowType.YAML
     workflow_config: Dict[str, Any] = field(default_factory=dict)
 
     # Parameter overrides (optional)
@@ -108,7 +170,7 @@ class ExperimentMetric:
     relative_improvement: Optional[float] = None
 
     # Statistical settings
-    aggregation_method: Literal["mean", "median", "p95", "sum"] = "mean"
+    aggregation_method: AggregationMethod = AggregationMethod.MEAN
 
 
 @dataclass
@@ -206,7 +268,7 @@ class ExperimentStatus:
 
     # Variant status
     variant_samples: Dict[str, int] = field(default_factory=dict)
-    variant_status: Dict[str, Literal["running", "paused", "failed"]] = field(default_factory=dict)
+    variant_status: Dict[str, VariantStatus] = field(default_factory=dict)
 
 
 @dataclass
@@ -278,7 +340,7 @@ class ExperimentResult:
     variant_results: Dict[str, VariantResult] = field(default_factory=dict)
 
     # Recommendations
-    recommendation: Literal["deploy_winner", "continue", "inconclusive"] = "inconclusive"
+    recommendation: ExperimentRecommendation = ExperimentRecommendation.INCONCLUSIVE
     reasoning: str = ""
 
     # Metadata

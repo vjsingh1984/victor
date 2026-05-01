@@ -27,10 +27,19 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Set, Tuple, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
-    from victor.core.tool_dependency_base import ToolDependencyConfig
+    from victor_sdk.verticals.tool_dependencies import ToolDependencyConfig
 
 
 @dataclass

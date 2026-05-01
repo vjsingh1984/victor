@@ -160,7 +160,10 @@ class FileEditor:
         old_content = path_obj.read_text()
 
         operation = EditOperation(
-            type=OperationType.MODIFY, path=path, old_content=old_content, new_content=new_content
+            type=OperationType.MODIFY,
+            path=path,
+            old_content=old_content,
+            new_content=new_content,
         )
 
         self.current_transaction.operations.append(operation)
@@ -273,7 +276,11 @@ class FileEditor:
         new_lines = (op.new_content or "").splitlines(keepends=True)
 
         diff = difflib.unified_diff(
-            old_lines, new_lines, fromfile=f"a/{op.path}", tofile=f"b/{op.path}", n=context_lines
+            old_lines,
+            new_lines,
+            fromfile=f"a/{op.path}",
+            tofile=f"b/{op.path}",
+            n=context_lines,
         )
 
         diff_text = "".join(diff)

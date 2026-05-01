@@ -70,11 +70,13 @@ Victor achieves **100% task success rate** across multiple providers:
 
 | Persona | Start here | Typical goals |
 |---------|------------|---------------|
-| **New user** | [Getting Started](docs/getting-started/) | Install, first run, local vs cloud |
-| **Daily user** | [User Guide](docs/user-guide/) | Commands, modes, profiles, workflows |
+| **New user** | [Getting Started](docs/users/getting-started/) | Install, first run, local vs cloud |
+| **Daily user** | [User Guides](docs/users/guides/) | Commands, modes, profiles, workflows |
 | **Operator** | [Operations](docs/operations/) | Deployment, monitoring, security |
-| **Contributor** | [Development](docs/development/) | Setup, testing, architecture, extending |
+| **Contributor** | [Developer Docs](docs/developers/) | Setup, testing, architecture, extending |
 | **Architect** | [Architecture](ARCHITECTURE.md) | System overview, core components |
+
+**📚 Documentation**: [View all docs](docs/) | [FAQ](docs/users/reference/faq.md) | [Troubleshooting](docs/users/reference/troubleshooting.md)
 
 ## Quick start
 

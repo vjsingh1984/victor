@@ -513,7 +513,11 @@ class DepsManager:
 
         if pkg_manager in (PackageManager.PIP, PackageManager.POETRY):
             version = self._get_pypi_version(package)
-        elif pkg_manager in (PackageManager.NPM, PackageManager.YARN, PackageManager.PNPM):
+        elif pkg_manager in (
+            PackageManager.NPM,
+            PackageManager.YARN,
+            PackageManager.PNPM,
+        ):
             version = self._get_npm_version(package)
 
         if version:

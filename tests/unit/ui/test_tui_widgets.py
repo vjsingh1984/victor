@@ -288,6 +288,66 @@ def test_tool_call_widget_emits_follow_up_selection_message() -> None:
     event.stop.assert_called_once_with()
 
 
+def test_tool_call_widget_recomposes_when_follow_ups_added_on_update() -> None:
+    """Follow-up buttons added after completion should trigger a recompose."""
+    widget = ToolCallWidget("code_search", status="pending")
+    widget.refresh = MagicMock()
+
+    widget.update_status(
+        "success",
+        elapsed=0.5,
+        follow_up_suggestions=[
+            {
+                "command": 'graph(mode="trace", node="main", depth=3)',
+                "description": "Trace execution starting from main.",
+            }
+        ],
+    )
+
+    widget.refresh.assert_called_once_with(recompose=True)
+    assert widget.follow_up_suggestions == [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+
+
+def test_tool_call_widget_skips_recompose_when_follow_ups_unchanged() -> None:
+    """Repeated status updates should avoid recompose when follow-ups did not change."""
+    follow_ups = [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+    widget = ToolCallWidget("code_search", status="success", follow_up_suggestions=follow_ups)
+    widget.refresh = MagicMock()
+
+    widget.update_status(
+        "success",
+        elapsed=0.7,
+        follow_up_suggestions=follow_ups,
+    )
+
+    widget.refresh.assert_not_called()
+
+
+def test_tool_call_widget_updates_output_preview_without_recompose() -> None:
+    """Output preview updates should not require a widget recompose."""
+    widget = ToolCallWidget("read", status="pending")
+    widget.refresh = MagicMock()
+
+    widget.update_status(
+        "success",
+        elapsed=0.2,
+        output_preview="line1\nline2\nline3\nline4",
+    )
+
+    assert widget._output_preview == "line1\nline2\nline3\n..."
+    widget.refresh.assert_not_called()
+
+
 def test_update_scroll_processes_after_resize_guard_window() -> None:
     """Once resize guard expires, follow state updates should resume normally."""
     log = EnhancedConversationLog()
@@ -605,6 +665,31 @@ def test_status_bar_update_unread_is_noop_when_count_unchanged() -> None:
 
     with patch.object(StatusBar, "query_one") as query_one:
         bar.update_unread(0)
+
+    query_one.assert_not_called()
+
+
+def test_status_bar_updates_graph_watch_indicator() -> None:
+    """Status bar should reflect the latest graph-watch health summary."""
+    bar = StatusBar()
+    label = MagicMock()
+
+    with patch.object(StatusBar, "query_one", return_value=label):
+        bar.update_graph_watch("Graph: ok c2 d1 u7", state="active")
+
+    label.update.assert_called_once_with("Graph: ok c2 d1 u7")
+    label.remove_class.assert_called_once_with("active", "warning", "inactive")
+    label.add_class.assert_called_once_with("active")
+
+
+def test_status_bar_update_graph_watch_is_noop_when_unchanged() -> None:
+    """Graph-watch indicator updates should be skipped when unchanged."""
+    bar = StatusBar()
+    bar._graph_watch_summary = "Graph: ok c2 d1 u7"
+    bar._graph_watch_state = "active"
+
+    with patch.object(StatusBar, "query_one") as query_one:
+        bar.update_graph_watch("Graph: ok c2 d1 u7", state="active")
 
     query_one.assert_not_called()
 

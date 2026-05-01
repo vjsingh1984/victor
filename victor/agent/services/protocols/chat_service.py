@@ -20,7 +20,15 @@ of processing user messages and generating responses.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterator, Dict, Optional, Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Dict,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from victor.providers.base import CompletionResponse, StreamChunk
@@ -28,12 +36,11 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class ChatServiceProtocol(Protocol):
-    """Protocol for chat operations service.
+    """[CANONICAL] Protocol for chat operations service.
 
-    Handles the core chat flow including:
-    - Processing user messages through the agentic loop
-    - Streaming responses for real-time feedback
-    - Managing conversation state and resets
+    This protocol represents the target architecture for chat operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on chat-related operations.
@@ -109,6 +116,33 @@ class ChatServiceProtocol(Protocol):
         """
         ...
 
+    async def chat_with_planning(
+        self,
+        user_message: str,
+        use_planning: Optional[bool] = None,
+    ) -> "CompletionResponse":
+        """Process a chat message with optional planning support.
+
+        Args:
+            user_message: The user's input message
+            use_planning: Force planning on/off. None means auto-detect.
+
+        Returns:
+            CompletionResponse with the generated response content
+        """
+        ...
+
+    async def handle_context_and_iteration_limits(
+        self,
+        user_message: str,
+        max_total_iterations: int,
+        max_context: int,
+        total_iterations: int,
+        last_quality_score: float,
+    ) -> tuple[bool, Optional["StreamChunk"]]:
+        """Handle context overflow and iteration hard limits during streaming."""
+        ...
+
     def reset_conversation(self) -> None:
         """Reset the conversation history and state.
 
@@ -119,6 +153,30 @@ class ChatServiceProtocol(Protocol):
         - Starting fresh conversations
         - Testing and development
         - Clearing state after errors
+        """
+        ...
+
+    @staticmethod
+    def persist_message(
+        role: str,
+        content: str,
+        memory_manager: Optional[Any] = None,
+        memory_session_id: Optional[str] = None,
+        usage_logger: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Persist a message to memory and log usage events.
+
+        Handles async-aware thread pool offloading for SQLite I/O
+        and logs user_prompt/assistant_response events.
+
+        Args:
+            role: Message role (user, assistant, system)
+            content: Message content
+            memory_manager: Optional memory manager for persistence
+            memory_session_id: Optional session ID for memory
+            usage_logger: Optional logger for usage events
+            metadata: Optional message metadata for persistence
         """
         ...
 

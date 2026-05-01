@@ -37,7 +37,7 @@ def check_capability(
             capability_name,
         )
 
-    from victor.framework.capability_registry import get_method_for_capability
+    from victor.core.capability_registry import get_method_for_capability
 
     method_name = get_method_for_capability(capability_name)
     ensure_protocol_fallback_allowed(
@@ -69,7 +69,7 @@ def invoke_capability(
             capability_name,
         )
 
-    from victor.framework.capability_registry import get_method_for_capability
+    from victor.core.capability_registry import get_method_for_capability
 
     method_name = get_method_for_capability(capability_name)
     ensure_protocol_fallback_allowed(

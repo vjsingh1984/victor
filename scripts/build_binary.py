@@ -258,24 +258,20 @@ def create_launcher_script(binary_path: Path) -> None:
 
     # Unix launcher
     launcher_unix = dist_dir / "victor-serve"
-    launcher_unix.write_text(
-        f"""#!/bin/bash
+    launcher_unix.write_text(f"""#!/bin/bash
 # Victor Server Launcher
 DIR="$(cd "$(dirname "$0")" && pwd)"
 exec "$DIR/{binary_path.name}" serve "$@"
-"""
-    )
+""")
     launcher_unix.chmod(0o755)
 
     # Windows launcher
     launcher_win = dist_dir / "victor-serve.bat"
-    launcher_win.write_text(
-        f"""@echo off
+    launcher_win.write_text(f"""@echo off
 REM Victor Server Launcher
 set DIR=%~dp0
 "%DIR%{binary_path.name}" serve %*
-"""
-    )
+""")
 
     print("Created launcher scripts:")
     print(f"  - {launcher_unix}")
@@ -292,9 +288,13 @@ def main():
     parser.add_argument(
         "--clean", action="store_true", help="Clean build artifacts before building"
     )
-    parser.add_argument("--debug", action="store_true", help="Include debug information")
     parser.add_argument(
-        "--output", default="victor-server", help="Output binary name (default: victor-server)"
+        "--debug", action="store_true", help="Include debug information"
+    )
+    parser.add_argument(
+        "--output",
+        default="victor-server",
+        help="Output binary name (default: victor-server)",
     )
 
     args = parser.parse_args()
@@ -322,7 +322,9 @@ def main():
         print()
 
     # Build
-    binary_path = build_binary(onefile=args.onefile, debug=args.debug, output_name=args.output)
+    binary_path = build_binary(
+        onefile=args.onefile, debug=args.debug, output_name=args.output
+    )
 
     if binary_path:
         create_launcher_script(binary_path)

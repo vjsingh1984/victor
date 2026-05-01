@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for PlanningCoordinator integration with ChatCoordinator."""
+"""Unit tests for PlanningCoordinator and chat service/coordinator integration."""
 
 import pytest
 
-from victor.agent.coordinators.planning_coordinator import (
+from victor.agent.services.planning_runtime import (
     PlanningCoordinator,
     PlanningConfig,
     PlanningMode,
@@ -219,18 +219,26 @@ class TestPlanningCoordinator:
 
 
 class TestPlanningCoordinatorIntegration:
-    """Integration tests for PlanningCoordinator with ChatCoordinator."""
+    """Integration tests for PlanningCoordinator with chat entry points."""
 
-    def test_planning_coordinator_protocol(self):
-        """Test that coordinator can be used with ChatCoordinator."""
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+    def test_legacy_coordinator_module_reexports_service_runtime(self):
+        """Legacy planning coordinator import path should re-export the service runtime."""
+        from victor.agent.services.planning_runtime import (
+            PlanningCoordinator as legacy_planning_coordinator,
+        )
+        from victor.agent.services.planning_runtime import (
+            PlanningCoordinator as service_planning_coordinator,
+        )
 
-        # This test verifies the integration structure
-        # Actual execution would require full orchestrator setup
-        assert hasattr(ChatCoordinator, "__init__")
-        assert hasattr(ChatCoordinator, "chat")
-        assert hasattr(ChatCoordinator, "_should_use_planning")
-        assert hasattr(ChatCoordinator, "_chat_with_planning")
+        assert legacy_planning_coordinator is service_planning_coordinator
+
+    def test_planning_entrypoints_exist(self):
+        """Planning should be canonical on ChatService."""
+        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.protocols import ChatServiceProtocol
+
+        assert hasattr(ChatServiceProtocol, "chat_with_planning")
+        assert hasattr(ChatService, "chat_with_planning")
 
     def test_config_settings_exist(self):
         """Test that planning settings exist in config."""
@@ -238,12 +246,13 @@ class TestPlanningCoordinatorIntegration:
 
         settings = Settings()
 
-        # Check that planning settings are available
-        assert hasattr(settings, "enable_planning")
-        assert hasattr(settings, "planning_min_complexity")
-        assert hasattr(settings, "planning_show_plan")
+        # Check that planning settings are available in nested group
+        assert hasattr(settings, "agent")
+        assert hasattr(settings.agent, "enable_planning")
+        assert hasattr(settings.agent, "planning_min_complexity")
+        assert hasattr(settings.agent, "planning_show_plan")
 
         # Check defaults
-        assert settings.enable_planning is False
-        assert settings.planning_min_complexity == "moderate"
-        assert settings.planning_show_plan is True
+        assert settings.agent.enable_planning is False
+        assert settings.agent.planning_min_complexity == "moderate"
+        assert settings.agent.planning_show_plan is True

@@ -39,7 +39,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, FrozenSet, List, Optional, Protocol, Tuple, runtime_checkable
 
 # =============================================================================
 # File Editing Protocols
@@ -604,6 +604,15 @@ class EmbeddingsProtocol(Protocol):
         vector = await embeddings.embed_text("Hello world")
     """
 
+    @property
+    def semantic(self) -> bool:
+        """Whether this provider produces semantically meaningful vectors.
+
+        Hash-based fallbacks return False. ML model-based providers return True.
+        Consumers should check this before relying on similarity scores.
+        """
+        ...
+
     async def embed_text(
         self,
         text: str,
@@ -852,6 +861,65 @@ class SymbolStoreFactoryProtocol(Protocol):
 
 
 # =============================================================================
+# Graph Building Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class CCGBuilderProtocol(Protocol):
+    """Protocol for language-specific CCG (Code Context Graph) builders.
+
+    External packages (victor-coding) can implement this to provide
+    enhanced CCG construction for specific languages. The core provides
+    a basic implementation; external packages can override with enhanced
+    versions that have deeper language-specific analysis.
+
+    Example implementation in victor-coding:
+
+        class PythonCCGBuilder:
+            def __init__(self, graph_store):
+                self.graph_store = graph_store
+
+            async def build_ccg_for_file(self, file_path, language=None):
+                # Enhanced Python-specific CCG construction
+                # - Better control flow analysis
+                # - Type-aware DDG
+                # - Decorator handling
+                ...
+
+            def supports_language(self, language):
+                return language == "python"
+    """
+
+    async def build_ccg_for_file(
+        self,
+        file_path: Path,
+        language: str | None = None,
+    ) -> Tuple[List[Any], List[Any]]:
+        """Build CCG for a file.
+
+        Args:
+            file_path: Path to source file
+            language: Optional language override (auto-detected if None)
+
+        Returns:
+            Tuple of (nodes, edges) representing the CCG
+        """
+        ...
+
+    def supports_language(self, language: str) -> bool:
+        """Check if this builder supports the given language.
+
+        Args:
+            language: Language identifier (e.g., "python", "javascript")
+
+        Returns:
+            True if this builder can handle the language
+        """
+        ...
+
+
+# =============================================================================
 # Language Registry Protocols
 # =============================================================================
 
@@ -905,6 +973,38 @@ class TaskTypeHintProtocol(Protocol):
 
     def get_hint(self, task_type: str) -> str:
         """Get a prompt hint for the given task type. Returns empty string if none."""
+        ...
+
+
+# =============================================================================
+# Task Classifier Phrase Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class TaskClassifierPhraseProtocol(Protocol):
+    """Protocol for contributing additional classifier phrases per task type.
+
+    Verticals can register enhanced implementations to extend the semantic
+    task classifier with domain-specific phrases. The classifier merges
+    these phrases with its built-in phrase lists during initialization.
+
+    Example implementation in a vertical::
+
+        class MedicalClassifierPhrases:
+            def get_classifier_phrases(self) -> Dict[str, List[str]]:
+                return {
+                    "analyze": ["diagnose symptoms", "review lab results"],
+                    "search": ["find clinical trials", "search medical literature"],
+                }
+    """
+
+    def get_classifier_phrases(self) -> Dict[str, List[str]]:
+        """Return additional phrases keyed by TaskType value string.
+
+        Returns:
+            Dict mapping TaskType.value strings to lists of classifier phrases.
+        """
         ...
 
 
@@ -1022,6 +1122,8 @@ __all__ = [
     # Codebase indexing protocols
     "CodebaseIndexFactoryProtocol",
     "SymbolStoreFactoryProtocol",
+    # Graph building protocols
+    "CCGBuilderProtocol",
     # Language registry protocols
     "LanguageRegistryProtocol",
     "DocCommentPatternProtocol",

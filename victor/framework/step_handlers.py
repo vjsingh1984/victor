@@ -145,7 +145,9 @@ from victor.framework.capability_runtime import (
     check_capability as _check_capability,
     invoke_capability as _invoke_capability,
 )
-from victor.framework.capability_config_helpers import resolve_capability_config_scope_key
+from victor.framework.capability_config_helpers import (
+    resolve_capability_config_scope_key,
+)
 from victor.framework.framework_integration_registry_service import (
     resolve_framework_integration_registry_service,
 )
@@ -294,6 +296,8 @@ class BaseStepHandler(ABC):
     parallel_safe: bool = False
     depends_on: tuple[str, ...] = ()
     side_effects: bool = True
+    # Per-capability version contracts (Phase 2 architecture hardening)
+    capability_contracts: tuple = ()
 
     @property
     @abstractmethod
@@ -406,6 +410,7 @@ class ToolStepHandler(BaseStepHandler):
     parallel_safe = True
     depends_on = ()
     side_effects = False
+    capability_contracts = (("tools", 2, ">=0.7.0"),)
 
     @property
     def name(self) -> str:
@@ -433,10 +438,11 @@ class ToolStepHandler(BaseStepHandler):
         result.tools_applied = canonical_tools
 
         # Call vertical's register_tools hook for custom tool registration
-        try:
-            vertical.register_tools(orchestrator)
-        except Exception as e:
-            logger.debug(f"register_tools() hook for {vertical.name}: {e}")
+        if hasattr(vertical, "register_tools"):
+            try:
+                vertical.register_tools(orchestrator)
+            except Exception as e:
+                logger.debug(f"register_tools() hook for {vertical.name}: {e}")
 
         # Use capability-based approach
         if _check_capability(orchestrator, "enabled_tools"):
@@ -799,6 +805,86 @@ class ConfigStepHandler(BaseStepHandler):
 
 
 # =============================================================================
+# Compatibility Step Handler — Version Gating (Contract Hardening)
+# =============================================================================
+
+
+class CompatibilityStepHandler(BaseStepHandler):
+    """Handler for vertical compatibility validation.
+
+    Runs FIRST in the pipeline (order=1) to fail fast if a vertical is
+    incompatible with the running framework version. Uses the existing
+    VerticalCompatibilityGate which checks:
+    - min_framework_version (PEP 440 specifier)
+    - API version range (min/max supported)
+    - Capability negotiation (required vs available)
+    - Version matrix (known compatible/broken combinations)
+
+    On incompatibility: raises VerticalCompatibilityError with actionable message.
+    On warnings: records in result.warnings but does not block.
+    """
+
+    parallel_safe = True
+    depends_on = ()
+    side_effects = False
+
+    @property
+    def name(self) -> str:
+        return "compatibility"
+
+    @property
+    def order(self) -> int:
+        return 1  # Runs before ALL other handlers
+
+    def _do_apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Validate vertical compatibility before any other step runs."""
+        try:
+            from victor.core.verticals.compatibility_gate import (
+                VerticalCompatibilityGate,
+                VerticalCompatibilityError,
+            )
+            from victor.core.verticals.manifest_contract import (
+                get_or_create_vertical_manifest,
+            )
+        except ImportError:
+            return
+
+        try:
+            manifest = get_or_create_vertical_manifest(vertical)
+        except (ImportError, AttributeError, NotImplementedError):
+            # No manifest available — skip validation (graceful degradation)
+            logger.debug("No manifest for %s, skipping compatibility check", vertical)
+            return
+
+        gate = VerticalCompatibilityGate()
+        report = gate.assess_manifest(manifest)
+
+        # Store report for downstream handlers
+        context.set_capability_config("compatibility_report", report.to_dict())
+
+        # Record warnings
+        for warning in report.warnings:
+            result.add_warning(f"Compatibility: {warning}")
+
+        # Fail fast on incompatibility
+        if not report.compatible:
+            raise VerticalCompatibilityError(report)
+
+        logger.debug(
+            "Vertical %s v%s compatible with framework v%s",
+            report.vertical_name,
+            report.vertical_version,
+            report.framework_version,
+        )
+
+
+# =============================================================================
 # Capability Config Step Handler (SOLID: Centralized Config Storage)
 # =============================================================================
 
@@ -860,7 +946,8 @@ class CapabilityConfigStepHandler(BaseStepHandler):
         # Fallback: try importing from capabilities module
         try:
             module = __import__(
-                f"victor.{vertical.name}.capabilities", fromlist=["get_capability_configs"]
+                f"victor.{vertical.name}.capabilities",
+                fromlist=["get_capability_configs"],
             )
             if hasattr(module, "get_capability_configs"):
                 return module.get_capability_configs()
@@ -876,7 +963,9 @@ class CapabilityConfigStepHandler(BaseStepHandler):
     ) -> None:
         """Persist capability configs in framework service when available."""
         try:
-            from victor.framework.capability_config_service import CapabilityConfigService
+            from victor.framework.capability_config_service import (
+                CapabilityConfigService,
+            )
         except ImportError:
             return
 
@@ -1292,6 +1381,29 @@ class FrameworkStepHandler(BaseStepHandler):
         if team_specs is None and hasattr(vertical, "get_team_specs"):
             team_specs = vertical.get_team_specs()
 
+        # Manifest-driven fallback: if vertical declares TEAMS in manifest
+        # but doesn't provide specs via protocol, build from declarations.
+        if not team_specs:
+            try:
+                from victor.core.verticals.manifest_contract import (
+                    get_or_create_vertical_manifest,
+                )
+                from victor_sdk.verticals.manifest import ExtensionType
+
+                manifest = get_or_create_vertical_manifest(vertical)
+                if manifest and ExtensionType.TEAMS in manifest.provides:
+                    # Try get_team_declarations() for declarative specs
+                    if hasattr(vertical, "get_team_declarations"):
+                        declarations = vertical.get_team_declarations()
+                        if declarations:
+                            team_specs = declarations
+                            logger.info(
+                                "Loaded %d team specs from manifest declarations",
+                                len(team_specs),
+                            )
+            except Exception as e:
+                logger.debug("Manifest team spec loading skipped: %s", e)
+
         if not team_specs:
             return
 
@@ -1632,6 +1744,75 @@ class FrameworkStepHandler(BaseStepHandler):
             logger.debug(f"Applied {handler_count} handlers from vertical")
         except Exception as e:
             result.add_warning(f"Could not register handlers: {e}")
+
+
+# =============================================================================
+# MCP Step Handler — Vertical MCP Dependency Declaration
+# =============================================================================
+
+
+class McpStepHandler(BaseStepHandler):
+    """Handler for MCP server configuration from vertical declarations.
+
+    Detects if a vertical implements the McpProvider protocol (from victor-sdk)
+    and applies its MCP server configurations to the VerticalContext. The
+    MCPConnector reads these configs during server discovery to auto-provision
+    MCP servers declared by the active vertical.
+
+    Design: Strategy Pattern via protocol detection (isinstance check on
+    runtime_checkable McpProvider). Zero coupling to specific verticals.
+    """
+
+    parallel_safe = True
+    depends_on = ("tools",)
+    side_effects = False
+
+    @property
+    def name(self) -> str:
+        return "mcp"
+
+    @property
+    def order(self) -> int:
+        return 12  # After tools (10), before tiered_config (15)
+
+    def _do_apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply MCP configuration if vertical implements McpProvider."""
+        try:
+            from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
+        except ImportError:
+            return
+
+        if not isinstance(vertical, McpProvider):
+            return
+
+        mcp_servers = vertical.get_mcp_servers()
+        if not mcp_servers:
+            return
+
+        context.set_capability_config("mcp_servers", mcp_servers)
+
+        tool_filters = vertical.get_mcp_tool_filters()
+        if tool_filters:
+            context.set_capability_config("mcp_tool_filters", tool_filters)
+
+        if isinstance(vertical, McpToolProvider):
+            tool_overrides = vertical.get_mcp_tool_overrides()
+            if tool_overrides:
+                context.set_capability_config("mcp_tool_overrides", tool_overrides)
+
+        server_names = ", ".join(mcp_servers.keys())
+        result.add_info(f"MCP servers declared: {server_names}")
+        logger.info(
+            "McpStepHandler: vertical declares %d MCP server(s): %s",
+            len(mcp_servers),
+            server_names,
+        )
 
 
 # =============================================================================
@@ -2042,7 +2223,9 @@ class ExtensionsStepHandler(BaseStepHandler):
 
             try:
                 # Use the shared loader-based activation path for consistency with bootstrap.
-                from victor.core.verticals.vertical_loader import activate_vertical_services
+                from victor.core.verticals.vertical_loader import (
+                    activate_vertical_services,
+                )
 
                 activation = activate_vertical_services(container, settings, vertical_name)
 
@@ -2255,8 +2438,10 @@ class StepHandlerRegistry:
         """
         return cls(
             handlers=[
+                CompatibilityStepHandler(),  # Version gating (fail fast)
                 CapabilityConfigStepHandler(),  # SOLID: Centralized config storage
                 ToolStepHandler(),
+                McpStepHandler(),  # MCP server declarations from vertical
                 TieredConfigStepHandler(),  # Phase 1: Gap fix
                 PromptStepHandler(),
                 ConfigStepHandler(),
@@ -2269,11 +2454,51 @@ class StepHandlerRegistry:
     def add_handler(self, handler: StepHandlerProtocol) -> None:
         """Add a handler to the registry.
 
+        Validates capability_contracts on the handler and logs warnings
+        for any contracts that appear unsatisfiable (e.g., impossibly high
+        version requirements). Contract validation is advisory — handlers
+        are always registered to avoid breaking existing pipelines.
+
         Args:
             handler: Step handler to add
         """
+        self._validate_contracts(handler)
         self.handlers.append(handler)
         self._sort_handlers()
+
+    @staticmethod
+    def _validate_contracts(handler: StepHandlerProtocol) -> None:
+        """Validate capability contracts declared by a handler.
+
+        Logs warnings for contracts that are likely unsatisfiable.
+        Does not block registration — advisory only.
+        """
+        contracts = getattr(handler, "capability_contracts", ())
+        if not contracts:
+            return
+
+        for contract in contracts:
+            if not isinstance(contract, tuple) or len(contract) < 2:
+                logger.warning(
+                    "Handler '%s' has malformed contract: %r",
+                    handler.name,
+                    contract,
+                )
+                continue
+
+            cap_name = contract[0]
+            cap_version = contract[1]
+
+            # Warn on impossibly high version numbers
+            if isinstance(cap_version, int) and cap_version > 100:
+                logger.warning(
+                    "Handler '%s' declares contract ('%s', version=%d) "
+                    "which exceeds any known capability version. "
+                    "This contract may be unsatisfiable.",
+                    handler.name,
+                    cap_name,
+                    cap_version,
+                )
 
     def remove_handler(self, name: str) -> bool:
         """Remove a handler by name.

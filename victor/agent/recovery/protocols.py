@@ -98,6 +98,33 @@ class StrategyRecoveryAction(Enum):
 RecoveryAction = StrategyRecoveryAction
 
 
+class RatioLevel(str, Enum):
+    """Discretized ratio bucket for recovery state."""
+
+    LOW = "low"  # < 0.25
+    MID_LOW = "mid_low"  # 0.25-0.5
+    MID_HIGH = "mid_high"  # 0.5-0.75
+    HIGH = "high"  # > 0.75
+
+
+class QualityLevel(str, Enum):
+    """Discretized quality score bucket."""
+
+    POOR = "poor"  # < 0.4
+    FAIR = "fair"  # 0.4-0.6
+    GOOD = "good"  # 0.6-0.8
+    EXCELLENT = "excellent"  # > 0.8
+
+
+class TemperatureLevel(str, Enum):
+    """Discretized temperature bucket for recovery."""
+
+    LOW = "low"  # < 0.3
+    MEDIUM = "medium"  # 0.3-0.6
+    HIGH = "high"  # 0.6-0.9
+    VERY_HIGH = "very_high"  # > 0.9
+
+
 @dataclass(frozen=True)
 class RecoveryContext:
     """Immutable context for recovery decisions.
@@ -152,41 +179,41 @@ class RecoveryContext:
         key = (
             f"{self.failure_type.name}:"
             f"{self.provider_name}:{self.model_name}:"
-            f"{budget_ratio}:{iter_ratio}:{time_ratio}:"
-            f"{quality_bucket}:{temp_bucket}:"
+            f"{budget_ratio.value}:{iter_ratio.value}:{time_ratio.value}:"
+            f"{quality_bucket.value}:{temp_bucket.value}:"
             f"{self.task_type}:{self.consecutive_failures}"
         )
         return key
 
-    def _discretize_ratio(self, ratio: float) -> str:
+    def _discretize_ratio(self, ratio: float) -> RatioLevel:
         if ratio < 0.25:
-            return "low"
+            return RatioLevel.LOW
         elif ratio < 0.5:
-            return "mid_low"
+            return RatioLevel.MID_LOW
         elif ratio < 0.75:
-            return "mid_high"
+            return RatioLevel.MID_HIGH
         else:
-            return "high"
+            return RatioLevel.HIGH
 
-    def _discretize_quality(self, score: float) -> str:
+    def _discretize_quality(self, score: float) -> QualityLevel:
         if score < 0.4:
-            return "poor"
+            return QualityLevel.POOR
         elif score < 0.6:
-            return "fair"
+            return QualityLevel.FAIR
         elif score < 0.8:
-            return "good"
+            return QualityLevel.GOOD
         else:
-            return "excellent"
+            return QualityLevel.EXCELLENT
 
-    def _discretize_temperature(self, temp: float) -> str:
+    def _discretize_temperature(self, temp: float) -> TemperatureLevel:
         if temp < 0.3:
-            return "low"
+            return TemperatureLevel.LOW
         elif temp < 0.6:
-            return "medium"
+            return TemperatureLevel.MEDIUM
         elif temp < 0.9:
-            return "high"
+            return TemperatureLevel.HIGH
         else:
-            return "very_high"
+            return TemperatureLevel.VERY_HIGH
 
 
 @dataclass

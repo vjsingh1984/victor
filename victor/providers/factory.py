@@ -63,7 +63,7 @@ from victor.providers.concurrency import (
     RequestPriority,
     get_provider_config,
 )
-from victor.analytics.streaming_metrics import (
+from victor.observability.analytics.streaming_metrics import (
     StreamingMetricsCollector,
     MetricsStreamWrapper,
 )
@@ -665,6 +665,112 @@ class ManagedProviderFactory:
         """
         primary_config.fallback_providers = fallback_configs
         return await cls.create_from_config(primary_config)
+
+    @classmethod
+    async def create_with_smart_routing(
+        cls,
+        provider_name: Optional[str],  # Suggestion only
+        model: str,
+        routing_profile: str = "balanced",
+        custom_fallback_chain: Optional[List[str]] = None,
+        performance_window_size: int = 100,
+        learning_enabled: bool = True,
+        resource_awareness_enabled: bool = True,
+        **kwargs: Any,
+    ) -> Any:  # Returns SmartRoutingProvider
+        """Create provider with smart routing enabled.
+
+        Creates multiple providers from the routing profile and wraps them
+        in a SmartRoutingProvider that intelligently selects the best provider
+        for each request based on health, resources, cost, latency, and performance.
+
+        Args:
+            provider_name: Suggested primary provider (can be overridden by routing)
+            model: Model identifier
+            routing_profile: Profile name from routing_profiles.yaml
+                (balanced, cost-optimized, performance, local-first)
+            custom_fallback_chain: Custom fallback chain (overrides profile)
+            performance_window_size: Number of requests for learning
+            learning_enabled: Enable adaptive learning from performance
+            resource_awareness_enabled: Enable GPU/API quota detection
+            **kwargs: Additional provider arguments
+
+        Returns:
+            SmartRoutingProvider instance
+
+        Example:
+            # Create smart routing provider
+            provider = await ManagedProviderFactory.create_with_smart_routing(
+                provider_name="ollama",  # Suggestion
+                model="qwen3-coder:30b",
+                routing_profile="balanced",
+            )
+
+            # Use like any other provider
+            response = await provider.chat(messages, model=model)
+        """
+        from victor.providers.smart_router import SmartRoutingProvider
+        from victor.providers.routing_config import (
+            SmartRoutingConfig,
+            load_routing_profiles,
+        )
+
+        # Load routing profile
+        profiles = load_routing_profiles()
+        profile = profiles.get(routing_profile)
+        if not profile:
+            logger.warning(f"Profile '{routing_profile}' not found, using 'balanced'")
+            profile = profiles.get("balanced")
+
+        # Get fallback chain (custom or from profile)
+        if custom_fallback_chain:
+            provider_names = custom_fallback_chain
+        else:
+            provider_names = profile.get_fallback_chain("default")
+
+        # If provider_name suggested, prepend it if not already in chain
+        if provider_name and provider_name.lower() not in [p.lower() for p in provider_names]:
+            provider_names.insert(0, provider_name)
+
+        # Create all providers in the chain
+        providers = []
+        for provider_name_str in provider_names:
+            try:
+                provider = await cls.create(
+                    provider_name=provider_name_str,
+                    model=model,
+                    **kwargs,
+                )
+                providers.append(provider._active_provider)  # Use ResilientProvider
+            except Exception as e:
+                logger.warning(f"Failed to create provider '{provider_name_str}': {e}")
+                continue
+
+        if not providers:
+            raise Exception(f"No providers could be created from chain: {provider_names}")
+
+        # Create smart routing config
+        config = SmartRoutingConfig(
+            enabled=True,
+            profile_name=routing_profile,
+            custom_fallback_chain=custom_fallback_chain,
+            performance_window_size=performance_window_size,
+            learning_enabled=learning_enabled,
+            resource_awareness_enabled=resource_awareness_enabled,
+        )
+
+        # Wrap in SmartRoutingProvider
+        smart_provider = SmartRoutingProvider(
+            providers=[p._base_provider for p in providers],  # Pass base providers
+            config=config,
+        )
+
+        logger.info(
+            f"Created SmartRoutingProvider with {len(providers)} providers, "
+            f"profile='{routing_profile}'"
+        )
+
+        return smart_provider
 
 
 # Convenience function for quick provider creation

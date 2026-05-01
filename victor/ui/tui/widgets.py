@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import sqlite3
 import time
 from typing import TYPE_CHECKING, Callable, List, Optional
 
@@ -34,40 +33,21 @@ from textual.binding import Binding
 if TYPE_CHECKING:
     pass
 
+from victor.ui.history_utils import load_input_history_from_db
+
 
 def _get_input_history_from_db(limit: int = 100) -> List[str]:
     """Load user message history from conversation database.
 
-    Returns recent unique user messages from the project's conversation.db.
+    Returns recent unique user messages from the project's consolidated database.
+    Uses project.db (consolidated database) which includes conversation history.
     Filters out tool outputs and system-like messages.
     """
     try:
         from victor.config.settings import get_project_paths
 
-        db_path = get_project_paths().conversation_db
-        if not db_path.exists():
-            return []
-
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.execute(
-                """
-                SELECT DISTINCT content
-                FROM messages
-                WHERE role = 'user'
-                  AND content IS NOT NULL
-                  AND content != ''
-                  AND LENGTH(content) < 4000  # Skip very long messages
-                  AND content NOT LIKE '<TOOL_OUTPUT%'  # Filter tool outputs
-                  AND content NOT LIKE '<%'  # Filter XML-like tags
-                  AND content NOT LIKE '{%'  # Filter JSON blobs
-                ORDER BY timestamp ASC
-                LIMIT ?
-                """,
-                (limit,),
-            )
-            # Already in chronological order (oldest first) from ORDER BY timestamp ASC
-            messages = [row[0] for row in cursor.fetchall()]
-            return messages
+        db_path = get_project_paths().project_db
+        return load_input_history_from_db(db_path, limit=limit)
     except Exception as e:
         # DB not available - this is expected in some configurations
         logger.debug(f"Failed to load recent messages from database: {e}")
@@ -96,8 +76,22 @@ class StatusBar(Static):
         self._state = "idle"  # idle, streaming, error
         self._follow_paused: bool = False
         self._last_unread_count: int = 0
+        self._graph_watch_summary = "Graph: ..."
+        self._graph_watch_state = "inactive"
 
     def compose(self) -> ComposeResult:
+        """Compose the status bar widget.
+
+        Returns:
+            ComposeResult: The child widgets for the status bar.
+
+        Layout:
+            - Provider info (e.g., "Victor | anthropic / claude-3-5-sonnet-20241022")
+            - Status indicator (idle, streaming, error)
+            - Follow indicator (shows when auto-following is active)
+            - Unread indicator (shows unread message count)
+            - Keyboard shortcuts (Ctrl+C exit, Enter send)
+        """
         with Horizontal(classes="status-content"):
             yield Label(
                 Text.assemble(
@@ -116,6 +110,13 @@ class StatusBar(Static):
             follow_label.add_class("following")
             yield follow_label
             yield Label("", classes="unread-indicator", id="unread-indicator")
+            graph_watch_label = Label(
+                self._graph_watch_summary,
+                classes="graph-watch-indicator",
+                id="graph-watch-indicator",
+            )
+            graph_watch_label.add_class(self._graph_watch_state)
+            yield graph_watch_label
             yield Label(
                 Text.assemble(
                     ("Ctrl+C", "bold"),
@@ -270,6 +271,24 @@ class StatusBar(Static):
         except Exception as e:
             logger.debug(f"Failed to update unread indicator: {e}")
 
+    def update_graph_watch(self, summary: str, state: str = "inactive") -> None:
+        """Update the graph-watch indicator.
+
+        No-op when both the summary and state are unchanged.
+        """
+        if summary == self._graph_watch_summary and state == self._graph_watch_state:
+            return
+
+        self._graph_watch_summary = summary
+        self._graph_watch_state = state
+        try:
+            label = self.query_one("#graph-watch-indicator", Label)
+            label.update(summary)
+            label.remove_class("active", "warning", "inactive")
+            label.add_class(state)
+        except Exception as e:
+            logger.debug(f"Failed to update graph watch indicator: {e}")
+
 
 class SubmitTextArea(TextArea):
     """Custom TextArea that submits on Enter and allows Shift+Enter for newlines.
@@ -393,6 +412,19 @@ class InputWidget(Static):
         self._history_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
+        """Compose the input widget.
+
+        Creates a text input area with a prompt indicator and hint label.
+        Supports Up/Down arrow navigation through conversation history.
+
+        Returns:
+            ComposeResult: The child widgets for the input area.
+
+        Layout:
+            - Prompt indicator (❯): Visual prompt marker
+            - SubmitTextArea: Multi-line text input with submit on Ctrl+Enter/Ctrl+J
+            - Hint label: Shows keyboard shortcuts and status messages
+        """
         with Vertical():
             with Horizontal(classes="input-row"):
                 yield Label("❯", classes="prompt-indicator")
@@ -598,6 +630,13 @@ class ToolCallWidget(Static):
         height: auto;
     }
 
+    ToolCallWidget .tool-output-preview {
+        margin-top: 1;
+        color: $text-muted;
+        max-height: 4;
+        overflow: hidden;
+    }
+
     ToolCallWidget .follow-up-button {
         width: auto;
         min-width: 18;
@@ -619,6 +658,7 @@ class ToolCallWidget(Static):
         status: str = "pending",
         elapsed: float | None = None,
         follow_up_suggestions: list[dict] | None = None,
+        output_preview: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -627,6 +667,7 @@ class ToolCallWidget(Static):
         self.status = status
         self.elapsed = elapsed
         self.follow_up_suggestions = self._normalize_follow_up_suggestions(follow_up_suggestions)
+        self._output_preview = self._normalize_output_preview(output_preview)
         self.add_class(status)
 
     @staticmethod
@@ -656,7 +697,31 @@ class ToolCallWidget(Static):
             return label[:29] + "..."
         return label
 
+    @staticmethod
+    def _normalize_output_preview(output_preview: str | None) -> str:
+        """Build a compact multi-line preview for tool output."""
+        if not isinstance(output_preview, str) or not output_preview.strip():
+            return ""
+        lines = output_preview.splitlines() or [output_preview]
+        preview_lines = lines[:3]
+        normalized = "\n".join(line[:120] for line in preview_lines)
+        if len(lines) > 3 or len(output_preview) > len(normalized):
+            normalized += "\n..."
+        return normalized
+
     def compose(self) -> ComposeResult:
+        """Compose the tool call widget.
+
+        Displays:
+            - Status icon (pending: ..., success: ✓, error: ✗)
+            - Tool name
+            - Arguments preview (first argument, truncated if too long)
+            - Elapsed time
+            - Follow-up suggestions (if available)
+
+        Returns:
+            ComposeResult: The child widgets for the tool call display.
+        """
         status_icon = {
             "pending": "...",
             "success": "✓",
@@ -683,7 +748,9 @@ class ToolCallWidget(Static):
                 (elapsed_str, "dim"),
             ),
             classes="tool-header",
+            id="tool-header-label",
         )
+        yield Static(self._output_preview, classes="tool-output-preview", id="tool-output-preview")
         if self.follow_up_suggestions:
             with Horizontal(classes="tool-follow-ups"):
                 for idx, suggestion in enumerate(self.follow_up_suggestions[:2]):
@@ -699,17 +766,62 @@ class ToolCallWidget(Static):
         status: str,
         elapsed: float | None = None,
         follow_up_suggestions: list[dict] | None = None,
+        output_preview: str | None = None,
     ) -> None:
         """Update tool call status."""
         self.remove_class(self.status)
         self.status = status
         self.elapsed = elapsed
+        follow_ups_changed = False
         if follow_up_suggestions is not None:
-            self.follow_up_suggestions = self._normalize_follow_up_suggestions(
-                follow_up_suggestions
-            )
+            normalized_follow_ups = self._normalize_follow_up_suggestions(follow_up_suggestions)
+            follow_ups_changed = normalized_follow_ups != self.follow_up_suggestions
+            self.follow_up_suggestions = normalized_follow_ups
+        preview_changed = False
+        if output_preview is not None:
+            normalized_preview = self._normalize_output_preview(output_preview)
+            preview_changed = normalized_preview != self._output_preview
+            self._output_preview = normalized_preview
         self.add_class(status)
-        self.refresh(recompose=True)
+        # Targeted header update instead of expensive refresh(recompose=True)
+        try:
+            header = self.query_one("#tool-header-label", Label)
+            status_icon = {
+                "pending": "...",
+                "success": "✓",
+                "error": "✗",
+            }.get(status, "?")
+            elapsed_str = f" ({self.elapsed:.1f}s)" if self.elapsed else ""
+            args_preview = ""
+            if self.arguments:
+                first_key = next(iter(self.arguments.keys()), None)
+                if first_key:
+                    first_val = str(self.arguments[first_key])[:30]
+                    if len(str(self.arguments[first_key])) > 30:
+                        first_val += "..."
+                    args_preview = f"({first_key}={first_val})"
+            header.update(
+                Text.assemble(
+                    (status_icon, "bold"),
+                    " ",
+                    (self.tool_name, "cyan"),
+                    (args_preview, "dim"),
+                    (elapsed_str, "dim"),
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Failed to update tool header label: {e}")
+        if preview_changed:
+            try:
+                preview = self.query_one("#tool-output-preview", Static)
+                preview.update(self._output_preview)
+            except Exception as e:
+                logger.debug(f"Failed to update tool output preview: {e}")
+        if follow_ups_changed:
+            try:
+                self.refresh(recompose=True)
+            except Exception as e:
+                logger.debug(f"Failed to recompose tool follow-ups: {e}")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle follow-up suggestion buttons."""
@@ -742,6 +854,17 @@ class ThinkingWidget(Static):
         self.content = content
 
     def compose(self) -> ComposeResult:
+        """Compose the thinking widget.
+
+        Displays the model's extended thinking/reasoning process in a styled panel.
+
+        Returns:
+            ComposeResult: The child widgets for the thinking display.
+
+        Layout:
+            - Header label: "Thinking..." in bold magenta
+            - Content Static: Shows the thinking/reasoning text content
+        """
         with Vertical():
             yield Label(
                 Text("Thinking...", style="bold magenta"),
@@ -809,6 +932,17 @@ class CodeBlock(Static):
         self.show_line_numbers = show_line_numbers
 
     def compose(self) -> ComposeResult:
+        """Compose the code block widget.
+
+        Displays syntax-highlighted code with a copy button and language label.
+
+        Returns:
+            ComposeResult: The child widgets for the code block display.
+
+        Layout:
+            - Header row: Language label (e.g., [python]) and Copy button
+            - Static Syntax widget: Syntax-highlighted code with Monokai theme
+        """
         with Horizontal(classes="code-header-row"):
             yield Label(f"[{self.language}]", classes="code-header")
             yield Button("Copy", classes="copy-button", variant="default")
@@ -1056,6 +1190,20 @@ class ToolProgressPanel(Static):
         self._output_preview = ""
 
     def compose(self) -> ComposeResult:
+        """Compose the tool progress panel.
+
+        Displays real-time tool execution progress with status, progress bar,
+        and optional cancel button.
+
+        Returns:
+            ComposeResult: The child widgets for the progress panel.
+
+        Layout:
+            - Header row: Tool name with icon, status icon (⏳/✓/✗), elapsed time
+            - ProgressBar: Visual progress indicator (0-100%)
+            - Output preview: Shows recent tool output (max 4 lines)
+            - Cancel button: Only shown if on_cancel callback provided
+        """
         args_preview = self._format_args_preview()
 
         with Vertical():
@@ -1192,6 +1340,10 @@ class EnhancedConversationLog(VerticalScroll):
     _PROGRAMMATIC_GUARD_SECONDS = 0.15
     # Duration (seconds) of the guard window after a resize event.
     _RESIZE_GUARD_SECONDS = 0.3
+    # Minimum interval between scroll_end calls during streaming (200ms).
+    _SCROLL_THROTTLE_SECONDS = 0.2
+    # Max widgets before trimming old messages (virtual scrolling).
+    MAX_VISIBLE_MESSAGES = 100
 
     def __init__(self, show_unread_separator: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -1209,6 +1361,8 @@ class EnhancedConversationLog(VerticalScroll):
         # Programmatic scroll guard timestamps
         self._ignore_scroll_update_until: float = 0.0
         self._ignore_resize_scroll_update_until: float = 0.0
+        # Streaming scroll throttle
+        self._last_scroll_end_time: float = 0.0
 
     # -- public properties ---------------------------------------------------
 
@@ -1253,6 +1407,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
+        self._trim_old_messages()
         # User messages always re-enable follow (unless sticky-paused)
         if not self._follow_paused:
             self._auto_scroll = True
@@ -1270,6 +1425,7 @@ class EnhancedConversationLog(VerticalScroll):
         if not self._auto_scroll:
             self._increment_unread(msg_id)
         self.mount(msg)
+        self._trim_old_messages()
         self._maybe_scroll_end()
 
     def add_system_message(self, content: str) -> None:
@@ -1326,6 +1482,20 @@ class EnhancedConversationLog(VerticalScroll):
         self._message_count += 1
         self.mount(msg)
 
+    def add_history_code_block(
+        self,
+        code: str,
+        language: str = "python",
+    ) -> None:
+        """Add a replayed code block without scroll or unread side effects."""
+        block = CodeBlock(
+            code=code,
+            language=language,
+            id=f"code-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(block)
+
     # -- streaming -----------------------------------------------------------
 
     def start_streaming(self) -> StreamingMessageBlock:
@@ -1367,7 +1537,7 @@ class EnhancedConversationLog(VerticalScroll):
         if self._streaming_message:
             self._streaming_message.finish_streaming()
             self._streaming_message = None
-        self._maybe_scroll_end()
+        self._maybe_scroll_end(bypass_throttle=True)
 
     # -- tool / code helpers -------------------------------------------------
 
@@ -1541,15 +1711,38 @@ class EnhancedConversationLog(VerticalScroll):
 
     # -- internal helpers ----------------------------------------------------
 
-    def _maybe_scroll_end(self, force: bool = False) -> None:
+    def _maybe_scroll_end(self, force: bool = False, bypass_throttle: bool = False) -> None:
         """Conditionally scroll to end.
 
-        Sets a short guard window to suppress transient UpdateScroll events
-        triggered by our own programmatic scroll.
+        ``force=True``: scroll regardless of _auto_scroll (anchors new messages).
+        ``bypass_throttle=True``: skip the rate-limit but still respect _auto_scroll.
+        Both ``force`` and ``bypass_throttle`` are combined with OR for throttle bypass.
+        Sets a short guard window to suppress transient UpdateScroll events.
         """
-        if force or self._auto_scroll:
-            self.scroll_end(animate=False)
-            self._ignore_scroll_update_until = time.monotonic() + self._PROGRAMMATIC_GUARD_SECONDS
+        if not (force or self._auto_scroll):
+            return
+        now = time.monotonic()
+        skip_throttle = force or bypass_throttle
+        if not skip_throttle and (now - self._last_scroll_end_time) < self._SCROLL_THROTTLE_SECONDS:
+            return
+        self._last_scroll_end_time = now
+        self.scroll_end(animate=False)
+        self._ignore_scroll_update_until = now + self._PROGRAMMATIC_GUARD_SECONDS
+
+    def _trim_old_messages(self) -> None:
+        """Remove oldest message widgets when the DOM grows too large.
+
+        Keeps at most MAX_VISIBLE_MESSAGES children mounted to prevent
+        unbounded widget tree growth across long conversations.
+        """
+        children = [c for c in self.children if not isinstance(c, type(self._unread_separator))]
+        excess = len(children) - self.MAX_VISIBLE_MESSAGES
+        if excess > 0:
+            for child in children[:excess]:
+                try:
+                    child.remove()
+                except Exception:
+                    pass
 
     def _is_at_bottom(self) -> bool:
         try:

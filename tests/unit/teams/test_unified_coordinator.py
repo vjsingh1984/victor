@@ -14,7 +14,9 @@
 
 """Tests for UnifiedTeamCoordinator."""
 
-from typing import Any, Dict, Optional
+import asyncio
+from types import SimpleNamespace
+from typing import Any, Dict, Optional, TypedDict
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -27,7 +29,7 @@ from victor.teams import (
     UnifiedTeamCoordinator,
     create_coordinator,
 )
-from victor.teams.protocols import ITeamMember
+from victor.protocols.team import ITeamMember
 
 
 class MockTeamMember:
@@ -53,6 +55,36 @@ class MockTeamMember:
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         self._messages.append(message)
         return None
+
+
+class StructuredMember(MockTeamMember):
+    """Mock member that returns structured execution metadata."""
+
+    def __init__(
+        self,
+        member_id: str,
+        output: str = "Done",
+        *,
+        changed_files: Optional[list[str]] = None,
+        success: bool = True,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(member_id, output=output)
+        self._changed_files = list(changed_files or [])
+        self._success = success
+        self._metadata = dict(metadata or {})
+        self.seen_contexts: list[Dict[str, Any]] = []
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        self.seen_contexts.append(dict(context))
+        return {
+            "success": self._success,
+            "output": self._output,
+            "changed_files": list(self._changed_files),
+            "metadata": dict(self._metadata),
+            "tool_calls_used": 2,
+            "discoveries": [f"handled:{self._id}"],
+        }
 
 
 class FailingMember(MockTeamMember):
@@ -123,6 +155,20 @@ class TestFormations:
         assert result["formation"] == "parallel"
 
     @pytest.mark.asyncio
+    async def test_formation_hint_overrides_default_for_single_execution(self):
+        """Per-call formation hints should override the coordinator default."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Result1"))
+        coordinator.add_member(MockTeamMember("m2", "Result2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+        result = await coordinator.execute_task("Test task", {"formation_hint": "parallel"})
+
+        assert result["success"] is True
+        assert result["formation"] == "parallel"
+        assert coordinator.formation == TeamFormation.SEQUENTIAL
+
+    @pytest.mark.asyncio
     async def test_hierarchical_execution(self):
         """Hierarchical formation should have manager plan and synthesize."""
         coordinator = UnifiedTeamCoordinator(enable_observability=False)
@@ -153,6 +199,21 @@ class TestFormations:
         assert result["success"] is True
         assert result["final_output"] == "Stage2Output"  # Last stage output
         assert result["formation"] == "pipeline"
+
+    @pytest.mark.asyncio
+    async def test_max_workers_limits_execution_members(self):
+        """Per-call max_workers should limit the participating members."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Result1"))
+        coordinator.add_member(MockTeamMember("m2", "Result2"))
+        coordinator.add_member(MockTeamMember("m3", "Result3"))
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task("Test task", {"max_workers": 2})
+
+        assert result["success"] is True
+        assert result["formation"] == "parallel"
+        assert len(result["member_results"]) == 2
 
     @pytest.mark.asyncio
     async def test_consensus_execution(self):
@@ -208,6 +269,203 @@ class TestErrorHandling:
         assert result["success"] is False
         assert result["member_results"]["m1"].success is True
         assert result["member_results"]["m2"].success is False
+
+    @pytest.mark.asyncio
+    async def test_structured_member_outputs_feed_worktree_plan_and_merge_analysis(self):
+        """Structured member outputs should drive isolation metadata and merge analysis."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        planner = StructuredMember("planner", "Planned", changed_files=["src/auth/service.py"])
+        tester = StructuredMember("tester", "Tested", changed_files=["tests/auth/test_service.py"])
+        coordinator.add_member(planner)
+        coordinator.add_member(tester)
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_task(
+            "Implement auth flow",
+            {
+                "team_name": "feature_team",
+                "worktree_isolation": True,
+                "repo_root": "/repo/project",
+                "member_write_scopes": {
+                    "planner": ["src/auth"],
+                    "tester": ["tests/auth"],
+                },
+                "shared_readonly_paths": ["docs"],
+            },
+        )
+
+        assert result["success"] is True
+        assert result["merge_risk_level"] == "low"
+        assert result["worktree_plan"]["team_name"] == "feature_team"
+        assert planner.seen_contexts[0]["isolation_mode"] == "worktree"
+        assert planner.seen_contexts[0]["workspace_root"].endswith("feature_team-planner")
+        assert result["member_results"]["planner"].metadata["worktree_assignment"]["member_id"] == (
+            "planner"
+        )
+        assert result["merge_analysis"]["member_changed_files"]["tester"] == [
+            "tests/auth/test_service.py"
+        ]
+
+    @pytest.mark.asyncio
+    async def test_structured_failure_payload_marks_member_failed(self):
+        """Structured failure payloads should be preserved without raising."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(
+            StructuredMember(
+                "m1",
+                output="",
+                success=False,
+                metadata={"failure_stage": "merge"},
+            )
+        )
+
+        result = await coordinator.execute_task("Test", {})
+
+        assert result["success"] is False
+        assert result["member_results"]["m1"].success is False
+        assert result["member_results"]["m1"].metadata["failure_stage"] == "merge"
+
+    @pytest.mark.asyncio
+    async def test_materialized_worktree_runtime_enriches_results_and_cleans_up(self):
+        """Explicit worktree materialization should add session and merge orchestration metadata."""
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.materialized = True
+                self.dry_run = False
+                self.plan = MagicMock(merge_order=("m1",))
+                self.assignments = [
+                    SimpleNamespace(
+                        member_id="m1",
+                        branch_name="victor/feature/m1-1",
+                        worktree_path="/tmp/feature-m1",
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-m1",
+                            "materialized_worktree": True,
+                        },
+                        to_dict=lambda: {
+                            "member_id": "m1",
+                            "branch_name": "victor/feature/m1-1",
+                            "worktree_path": "/tmp/feature-m1",
+                            "materialized": True,
+                        },
+                    )
+                ]
+
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    "materialized": True,
+                    "dry_run": False,
+                    "assignments": [self.assignments[0].to_dict()],
+                }
+
+            def assignment_for(self, member_id: str):
+                return self.assignments[0] if member_id == "m1" else None
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(return_value=FakeSession()),
+            collect_changed_files=MagicMock(return_value=("src/auth/service.py",)),
+            build_merge_orchestration=MagicMock(
+                return_value={"recommended_merge_order": ["m1"], "materialized": True}
+            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        member = StructuredMember("m1", "Done", changed_files=[])
+        coordinator.add_member(member)
+
+        result = await coordinator.execute_task(
+            "Implement feature",
+            {
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+                "materialize_worktrees": True,
+            },
+        )
+
+        assert result["success"] is True
+        fake_runtime.materialize.assert_called_once()
+        fake_runtime.collect_changed_files.assert_called_once()
+        fake_runtime.cleanup.assert_called_once()
+        assert result["worktree_session"]["materialized"] is True
+        assert result["merge_orchestration"]["materialized"] is True
+        assert result["member_results"]["m1"].metadata["changed_files"] == ["src/auth/service.py"]
+        assert result["worktree_cleanup"]["removed"] == ["/tmp/feature-m1"]
+
+    @pytest.mark.asyncio
+    async def test_auto_merge_worktrees_executes_guarded_merge_plan(self):
+        """Auto-merge should invoke the runtime merge executor when explicitly enabled."""
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.materialized = True
+                self.dry_run = False
+                self.plan = MagicMock(merge_order=("m1",))
+                self.assignments = [
+                    SimpleNamespace(
+                        member_id="m1",
+                        branch_name="victor/feature/m1-1",
+                        worktree_path="/tmp/feature-m1",
+                        to_context_overrides=lambda: {
+                            "isolation_mode": "worktree",
+                            "workspace_root": "/tmp/feature-m1",
+                            "materialized_worktree": True,
+                        },
+                        to_dict=lambda: {
+                            "member_id": "m1",
+                            "branch_name": "victor/feature/m1-1",
+                            "worktree_path": "/tmp/feature-m1",
+                            "materialized": True,
+                        },
+                    )
+                ]
+
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    "materialized": True,
+                    "dry_run": False,
+                    "assignments": [self.assignments[0].to_dict()],
+                }
+
+            def assignment_for(self, member_id: str):
+                return self.assignments[0] if member_id == "m1" else None
+
+        fake_runtime = SimpleNamespace(
+            materialize=MagicMock(return_value=FakeSession()),
+            collect_changed_files=MagicMock(return_value=("src/auth/service.py",)),
+            build_merge_orchestration=MagicMock(
+                return_value={"recommended_merge_order": ["m1"], "materialized": True}
+            ),
+            execute_merge_orchestration=MagicMock(
+                return_value={"status": "success", "executed": True, "merged_members": ["m1"]}
+            ),
+            cleanup=MagicMock(return_value={"removed": ["/tmp/feature-m1"], "errors": []}),
+        )
+        coordinator = UnifiedTeamCoordinator(
+            enable_observability=False,
+            worktree_runtime=fake_runtime,
+        )
+        member = StructuredMember("m1", "Done", changed_files=[])
+        coordinator.add_member(member)
+
+        result = await coordinator.execute_task(
+            "Implement feature",
+            {
+                "team_name": "feature_team",
+                "repo_root": "/repo/project",
+                "worktree_isolation": True,
+                "materialize_worktrees": True,
+                "auto_merge_worktrees": True,
+            },
+        )
+
+        fake_runtime.execute_merge_orchestration.assert_called_once()
+        assert result["merge_execution"]["status"] == "success"
 
 
 class TestBroadcast:
@@ -315,6 +573,620 @@ class TestClearAndReset:
         coordinator = UnifiedTeamCoordinator()
         result = coordinator.clear()
         assert result is coordinator
+
+
+class TestStateGraphNodeIntegration:
+    """Tests for UnifiedTeamCoordinator usage as a StateGraph node (`__call__`).
+
+    The coordinator implements ``async __call__(state) -> state`` so it can be
+    passed directly to ``StateGraph.add_node``. This class covers the dict-state
+    contract:
+
+    - Reads task from ``state['task']`` (or falls back to ``state['query']``).
+    - Builds context excluding the task/query keys.
+    - Returns a new dict (does NOT mutate the caller's input).
+    - On success: writes ``result`` and ``team_output``.
+    - On failure: writes ``error`` and ``team_output``.
+    """
+
+    @pytest.mark.asyncio
+    async def test_success_writes_result_and_team_output(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "First"))
+        coordinator.add_member(MockTeamMember("m2", "Second"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+        out = await coordinator({"task": "demo"})
+
+        assert "result" in out
+        assert "team_output" in out
+        assert out["team_output"]["success"] is True
+        assert "error" not in out
+
+    @pytest.mark.asyncio
+    async def test_failure_writes_error_and_team_output(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        # No members → execute_task returns success=False
+        out = await coordinator({"task": "demo"})
+
+        assert "error" in out
+        assert "team_output" in out
+        assert out["team_output"]["success"] is False
+        assert "result" not in out
+
+    @pytest.mark.asyncio
+    async def test_uses_task_key(self):
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+
+        await coordinator({"task": "build the thing"})
+
+        assert captured == ["build the thing"]
+
+    @pytest.mark.asyncio
+    async def test_query_key_fallback(self):
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+
+        await coordinator({"query": "find auth code"})
+
+        assert captured == ["find auth code"]
+
+    @pytest.mark.asyncio
+    async def test_context_excludes_task_and_query_keys(self):
+        captured_contexts: list[Dict[str, Any]] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured_contexts.append(dict(context))
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+
+        await coordinator({"task": "T", "query": "Q", "scope": "auth", "max_workers": 3})
+
+        assert captured_contexts, "member.execute_task was not invoked"
+        ctx = captured_contexts[0]
+        assert "task" not in ctx
+        assert "query" not in ctx
+        assert ctx["scope"] == "auth"
+        assert ctx["max_workers"] == 3
+
+    @pytest.mark.asyncio
+    async def test_no_members_returns_error_state(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        out = await coordinator({"task": "anything"})
+
+        assert "error" in out
+        assert out["team_output"]["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_does_not_mutate_caller_state(self):
+        """The caller's dict must not be mutated; __call__ returns a new dict."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "ok"))
+
+        original = {"task": "build", "scope": "auth"}
+        snapshot = dict(original)
+
+        out = await coordinator(original)
+
+        assert original == snapshot, "input dict was mutated"
+        assert out is not original
+        assert out["task"] == "build"  # input keys preserved in output
+        assert out["scope"] == "auth"
+
+
+class TestStateGraphNodeConfig:
+    """Tests for ``StateGraphNodeConfig`` and the ``with_state_graph_config``
+    fluent setter.
+
+    Configuration is the seam that keeps the StateGraph node usable across
+    different graph schemas without forcing every consumer to rename their
+    state keys to match an internal convention.
+    """
+
+    def test_default_config_preserves_keys(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        config = StateGraphNodeConfig()
+        assert config.task_key == "task"
+        assert config.query_key == "query"
+        assert config.result_key == "result"
+        assert config.output_key == "team_output"
+        assert config.error_key == "error"
+        assert config.formation_strategy is None
+
+    def test_with_state_graph_config_returns_self_for_chaining(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        result = coordinator.with_state_graph_config(StateGraphNodeConfig())
+        assert result is coordinator
+
+    @pytest.mark.asyncio
+    async def test_custom_keys_honored_on_input(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(task_key="instruction", query_key="prompt")
+        )
+
+        await coordinator({"instruction": "do work", "prompt": "ignored"})
+        assert captured == ["do work"]
+
+    @pytest.mark.asyncio
+    async def test_custom_keys_honored_on_output(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(
+                result_key="final",
+                output_key="team_run",
+                error_key="failure",
+            )
+        )
+
+        out = await coordinator({"task": "run"})
+
+        assert out["final"] == "Done"
+        assert "team_run" in out
+        # Default keys MUST NOT be written when overrides are configured.
+        assert "result" not in out
+        assert "team_output" not in out
+
+    @pytest.mark.asyncio
+    async def test_custom_error_key_used_on_failure(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        # No members → guaranteed failure
+        coordinator.with_state_graph_config(StateGraphNodeConfig(error_key="failure"))
+
+        out = await coordinator({"task": "run"})
+
+        assert "failure" in out
+        assert "error" not in out
+
+
+class TestExecuteTeamConfig:
+    """Tests for ``execute_team_config(config, members=...)`` and the
+    ``_execute_with`` parameterized core.
+
+    ``execute_team_config`` exists so callers (notably ``TeamStep`` in
+    ``victor.framework.workflows.nodes``) can hand a ``TeamConfig`` to the
+    coordinator without first having to mutate ``self._formation`` or
+    ``self._members``. It must be safe to call concurrently on a shared
+    coordinator.
+    """
+
+    @staticmethod
+    def _make_config(members, formation=TeamFormation.SEQUENTIAL):
+        from victor.teams.types import TeamConfig, TeamMember
+        from victor.core.shared_types import SubAgentRole
+
+        # TeamConfig.members type is List[TeamMember]; for these tests we
+        # pass MockTeamMember instances via the ``members`` override
+        # parameter on execute_team_config, so config.members can be empty
+        # placeholders or real TeamMembers.
+        placeholder_members = [
+            TeamMember(id=m.id, role=SubAgentRole.RESEARCHER, name=m.id, goal="test")
+            for m in members
+        ]
+        return TeamConfig(
+            name="TestTeam",
+            goal="Test goal",
+            members=placeholder_members,
+            formation=formation,
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_team_result(self):
+        from victor.teams.types import TeamResult
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        members = [MockTeamMember("m1", "Done")]
+        config = self._make_config(members)
+
+        result = await coordinator.execute_team_config(config, members=members)
+
+        assert isinstance(result, TeamResult)
+        assert result.success is True
+        assert result.formation == TeamFormation.SEQUENTIAL
+        assert "m1" in result.member_results
+
+    @pytest.mark.asyncio
+    async def test_uses_config_formation(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        # Set a different default formation; config should override it
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        members = [MockTeamMember("m1"), MockTeamMember("m2")]
+        config = self._make_config(members, formation=TeamFormation.PARALLEL)
+
+        result = await coordinator.execute_team_config(config, members=members)
+
+        assert result.formation == TeamFormation.PARALLEL
+        # And self._formation must NOT have been changed
+        assert coordinator.formation == TeamFormation.SEQUENTIAL
+
+    @pytest.mark.asyncio
+    async def test_does_not_mutate_self_state(self):
+        """Crucial: execute_team_config must never alter self._members or
+        self._formation, otherwise concurrent graph runs corrupt each other."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("baseline"))
+        coordinator.set_formation(TeamFormation.HIERARCHICAL)
+
+        baseline_members = list(coordinator.members)
+        baseline_formation = coordinator.formation
+
+        members = [MockTeamMember("m1"), MockTeamMember("m2")]
+        config = self._make_config(members, formation=TeamFormation.PARALLEL)
+        await coordinator.execute_team_config(config, members=members)
+
+        assert list(coordinator.members) == baseline_members
+        assert coordinator.formation == baseline_formation
+
+    @pytest.mark.asyncio
+    async def test_concurrent_calls_are_isolated(self):
+        """Two simultaneous execute_team_config calls must each see their
+        own formation/members — no cross-contamination."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+
+        members_a = [MockTeamMember("a1"), MockTeamMember("a2")]
+        members_b = [MockTeamMember("b1"), MockTeamMember("b2")]
+        config_a = self._make_config(members_a, formation=TeamFormation.PARALLEL)
+        config_b = self._make_config(members_b, formation=TeamFormation.SEQUENTIAL)
+
+        result_a, result_b = await asyncio.gather(
+            coordinator.execute_team_config(config_a, members=members_a),
+            coordinator.execute_team_config(config_b, members=members_b),
+        )
+
+        assert result_a.formation == TeamFormation.PARALLEL
+        assert result_b.formation == TeamFormation.SEQUENTIAL
+        assert set(result_a.member_results.keys()) == {"a1", "a2"}
+        assert set(result_b.member_results.keys()) == {"b1", "b2"}
+
+    @pytest.mark.asyncio
+    async def test_raises_without_members_or_orchestrator(self):
+        """If config.members can't be adapted (no orchestrator) and no
+        ``members=`` override is provided, the error must be explicit."""
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        members = [MockTeamMember("m1")]
+        config = self._make_config(members)
+
+        with pytest.raises(ValueError, match=r"orchestrator"):
+            # Pass no members override, force the adapter path
+            await coordinator.execute_team_config(config)
+
+    @pytest.mark.asyncio
+    async def test_team_step_adapter_calls_execute_team_config(self):
+        """``TeamStep._execute_team`` calls ``coordinator.execute_team_config``
+        at workflows/nodes.py:392. Before this refactor, that method did not
+        exist. This test exercises that exact code path against a stub
+        coordinator and asserts the call routes cleanly.
+        """
+        from victor.framework.workflows.nodes import TeamStep, TeamStepConfig
+        from victor.teams.types import TeamMember, TeamResult, MemberResult
+        from victor.core.shared_types import SubAgentRole
+
+        # Build a UnifiedTeamCoordinator and stub execute_team_config so we
+        # don't need a real orchestrator to validate the path.
+        recorded: Dict[str, Any] = {}
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+
+        async def _stub_execute_team_config(config, members=None):  # pragma: no cover - thin stub
+            recorded["called"] = True
+            recorded["config_name"] = config.name
+            recorded["formation"] = config.formation
+            return TeamResult(
+                success=True,
+                final_output="stub-output",
+                member_results={
+                    m.id: MemberResult(member_id=m.id, success=True, output="ok")
+                    for m in config.members
+                },
+                formation=config.formation,
+            )
+
+        # Monkey-patch onto this instance only.
+        coordinator.execute_team_config = _stub_execute_team_config  # type: ignore[assignment]
+
+        # Replace the create_coordinator factory so TeamStep picks up our stub.
+        import victor.framework.workflows.nodes as nodes_mod
+
+        original_create = nodes_mod.__dict__.get("create_coordinator")
+
+        def _stub_create_coordinator(**kwargs):  # noqa: ARG001
+            return coordinator
+
+        # TeamStep imports create_coordinator inside execute_async — patch the
+        # ``victor.teams`` module re-export so the late import sees our stub.
+        import victor.teams as teams_mod
+
+        original_teams_create = teams_mod.create_coordinator
+        teams_mod.create_coordinator = _stub_create_coordinator  # type: ignore[assignment]
+        try:
+            node = TeamStep(
+                id="t1",
+                name="TestTeam",
+                goal="Goal",
+                team_formation=TeamFormation.PARALLEL,
+                members=[
+                    TeamMember(
+                        id="m1",
+                        role=SubAgentRole.RESEARCHER,
+                        name="m1",
+                        goal="test",
+                    )
+                ],
+                config=TeamStepConfig(timeout_seconds=None),
+            )
+            graph_state = {"task": "execute"}
+            out = await node.execute_async(orchestrator=None, graph_state=graph_state)
+        finally:
+            teams_mod.create_coordinator = original_teams_create  # type: ignore[assignment]
+            if original_create is not None:
+                nodes_mod.__dict__["create_coordinator"] = original_create
+
+        assert recorded.get("called") is True, "execute_team_config not invoked"
+        assert recorded["config_name"] == "TestTeam"
+        assert recorded["formation"] == TeamFormation.PARALLEL
+        # Result merged into graph state under TeamStepConfig.output_key
+        assert "team_result" in out
+
+
+class TestPydanticAndCopyOnWriteState:
+    """Tests that ``__call__`` cleanly handles non-dict state types.
+
+    StateGraph (`victor/framework/graph.py`) accepts dict, ``CopyOnWriteState``
+    wrapper, and arbitrary Pydantic ``BaseModel`` schemas. The coordinator
+    must work in all three without forcing the caller's hand.
+    """
+
+    @pytest.mark.asyncio
+    async def test_call_with_pydantic_extra_allow_state(self):
+        """A BaseModel with ``extra='allow'`` must accept the result/output
+        keys via model_copy and return a model of the same type."""
+        from pydantic import BaseModel, ConfigDict
+
+        class FlexibleState(BaseModel):
+            model_config = ConfigDict(extra="allow")
+            task: str = ""
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+
+        state = FlexibleState(task="run analysis")
+        out = await coordinator(state)
+
+        assert isinstance(out, FlexibleState), "Pydantic input must yield Pydantic output"
+        assert getattr(out, "result", None) == "Done"
+        assert getattr(out, "team_output", None) is not None
+        assert out.task == "run analysis"  # original field preserved
+
+    @pytest.mark.asyncio
+    async def test_call_with_strict_pydantic_raises_clear_error(self):
+        """A strict (extra='forbid') BaseModel with no result/output fields
+        must raise a clear error naming the missing key."""
+        from pydantic import BaseModel, ConfigDict
+
+        class StrictState(BaseModel):
+            model_config = ConfigDict(extra="forbid")
+            task: str = ""
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+
+        with pytest.raises(ValueError, match=r"(result|team_output|extra='allow')"):
+            await coordinator(StrictState(task="x"))
+
+    @pytest.mark.asyncio
+    async def test_call_with_copy_on_write_state(self):
+        """When the StateGraph executor wraps state in CopyOnWriteState the
+        coordinator must still find the task and write the results so that
+        the wrapper sees the mutation."""
+        from victor.framework.graph import CopyOnWriteState
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Done"))
+
+        cow = CopyOnWriteState({"task": "build", "scope": "auth"})
+        out = await coordinator(cow)
+
+        # Output is the same wrapper, mutated via __setitem__.
+        assert isinstance(out, CopyOnWriteState)
+        assert out["result"] == "Done"
+        assert out["team_output"]["success"] is True
+        assert out["scope"] == "auth"  # passthrough preserved
+
+    @pytest.mark.asyncio
+    async def test_call_with_agentic_loop_state_model_uses_query_field(self):
+        """``AgenticLoopStateModel`` has a ``query`` field but no ``task``
+        field. Default config falls back to query — and writing to the
+        coordinator's default ``result_key`` requires extra='allow'."""
+        from victor.framework.agentic_graph.state import AgenticLoopStateModel
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        captured: list[str] = []
+
+        class CapturingMember(MockTeamMember):
+            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+                captured.append(task)
+                return "ok"
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(CapturingMember("m1"))
+        # Map outputs into the model's existing ``context`` dict field so the
+        # strict schema doesn't reject them.
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(
+                result_key="context",
+                output_key="evaluation",
+                error_key="evaluation",
+            )
+        )
+
+        state = AgenticLoopStateModel(query="explore the repo")
+        out = await coordinator(state)
+
+        assert captured == ["explore the repo"]
+        assert isinstance(out, AgenticLoopStateModel)
+
+
+class TestFormationStrategy:
+    """Tests for the optional ``formation_strategy`` slot on
+    ``StateGraphNodeConfig``.
+
+    The strategy turns ``select_formation`` (an existing utility in
+    ``victor/framework/agentic_graph/team_selector.py``) into a real
+    production seam — its result is injected into the per-call context as
+    ``formation_hint``, which the existing ``_resolve_effective_formation``
+    consumes. Crucially this does NOT mutate ``self._formation``, so two
+    concurrent ``__call__`` invocations can still pick different formations
+    without corrupting each other.
+    """
+
+    @pytest.mark.asyncio
+    async def test_no_strategy_uses_self_formation(self):
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.PARALLEL)
+
+        out = await coordinator({"task": "x"})
+
+        assert out["team_output"]["formation"] == "parallel"
+
+    @pytest.mark.asyncio
+    async def test_strategy_overrides_default_via_hint(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(formation_strategy=lambda _state: TeamFormation.PARALLEL)
+        )
+
+        out = await coordinator({"task": "x"})
+
+        assert out["team_output"]["formation"] == "parallel"
+        # Self-formation must NOT be mutated.
+        assert coordinator.formation == TeamFormation.SEQUENTIAL
+
+    @pytest.mark.asyncio
+    async def test_select_formation_works_as_strategy(self):
+        """The shipped ``select_formation`` utility is plug-and-play: pass it
+        as the ``formation_strategy`` and it picks based on dict context."""
+        from victor.framework.agentic_graph.team_selector import select_formation
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(formation_strategy=select_formation)
+        )
+
+        # task_type="research" is a select_formation override → PARALLEL
+        out = await coordinator({"task": "x", "context": {"task_type": "research", "team_size": 2}})
+
+        assert out["team_output"]["formation"] == "parallel"
+
+    @pytest.mark.asyncio
+    async def test_async_strategy_is_rejected(self):
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        async def async_strategy(_state):
+            return TeamFormation.PARALLEL
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.with_state_graph_config(StateGraphNodeConfig(formation_strategy=async_strategy))
+
+        with pytest.raises(TypeError, match="synchronously"):
+            await coordinator({"task": "x"})
+
+    @pytest.mark.asyncio
+    async def test_strategy_works_with_copy_on_write_state(self):
+        from victor.framework.agentic_graph.team_selector import select_formation
+        from victor.framework.graph import CopyOnWriteState
+        from victor.teams.unified_coordinator import StateGraphNodeConfig
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1"))
+        coordinator.add_member(MockTeamMember("m2"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+        coordinator.with_state_graph_config(
+            StateGraphNodeConfig(formation_strategy=select_formation)
+        )
+
+        out = await coordinator(
+            CopyOnWriteState({"task": "x", "context": {"task_type": "research", "team_size": 2}})
+        )
+
+        assert out["team_output"]["formation"] == "parallel"
+
+
+class TestEndToEndStateGraphIntegration:
+    """End-to-end coverage for using the coordinator directly as a graph node."""
+
+    @pytest.mark.asyncio
+    async def test_state_graph_invokes_coordinator_node(self):
+        from victor.framework.graph import END, StateGraph
+
+        class TeamState(TypedDict, total=False):
+            task: str
+            result: str
+            team_output: Dict[str, Any]
+
+        coordinator = UnifiedTeamCoordinator(enable_observability=False)
+        coordinator.add_member(MockTeamMember("m1", "Research complete"))
+        coordinator.set_formation(TeamFormation.SEQUENTIAL)
+
+        graph = StateGraph(TeamState)
+        graph.add_node("research_team", coordinator)
+        graph.add_edge("research_team", END)
+        graph.set_entry_point("research_team")
+
+        compiled = graph.compile()
+        result = await compiled.invoke({"task": "Inspect the auth flow"})
+        final_state = result.state
+
+        assert final_state["result"] == "Research complete"
+        assert final_state["team_output"]["success"] is True
+        assert final_state["team_output"]["formation"] == "sequential"
 
 
 if __name__ == "__main__":

@@ -1045,6 +1045,9 @@ class ObservabilityBus:
             []
         )  # (exporter, handler) awaiting subscription
 
+        # Track background tasks for proper cleanup (prevents pytest hangs)
+        self._background_tasks: Set[asyncio.Task] = set()
+
     @property
     def backend(self) -> IEventBackend:
         """Get underlying backend."""
@@ -1241,6 +1244,25 @@ class ObservabilityBus:
             )
         )
 
+    def emit_lifecycle_event(
+        self,
+        event_name: str,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Emit a lifecycle event (fire-and-forget).
+
+        Convenience method for graph/workflow lifecycle events
+        (graph_started, node_start, node_end, graph_completed).
+        """
+        from victor.core.events.emit_helper import emit_event_sync
+
+        emit_event_sync(
+            self,
+            f"lifecycle.{event_name}",
+            data or {},
+            source="observability",
+        )
+
     def emit_metric(
         self,
         metric_name: str,
@@ -1260,7 +1282,8 @@ class ObservabilityBus:
         """
         import asyncio
 
-        asyncio.create_task(
+        # Create and track the background task for proper cleanup
+        task = asyncio.create_task(
             self.emit(
                 topic=f"metric.{metric_name}",
                 data={
@@ -1272,6 +1295,20 @@ class ObservabilityBus:
                 source="observability",
             )
         )
+        # Track task for cleanup (prevents pytest hangs)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def cleanup_background_tasks(self) -> None:
+        """Clean up all pending background tasks.
+
+        Waits for all fire-and-forget tasks to complete.
+        Call this before shutting down the bus to prevent task leaks.
+        """
+        if self._background_tasks:
+            # Wait for all tasks with timeout to prevent hanging
+            await asyncio.wait(self._background_tasks, timeout=5.0)
+            self._background_tasks.clear()
 
 
 class AgentMessageBus:
@@ -1508,7 +1545,9 @@ def get_observability_bus() -> ObservabilityBus:
                     settings, "event_emit_sync_metrics_interval_seconds", 60.0
                 ),
                 topic=getattr(
-                    settings, "event_emit_sync_metrics_topic", "core.events.emit_sync.metrics"
+                    settings,
+                    "event_emit_sync_metrics_topic",
+                    "core.events.emit_sync.metrics",
                 ),
                 reset_after_emit=getattr(
                     settings, "event_emit_sync_metrics_reset_after_emit", False

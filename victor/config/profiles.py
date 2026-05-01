@@ -87,7 +87,7 @@ BASIC_PROFILE = ProfileTemplate(
     settings={
         # Use Ollama by default (local, free)
         "default_provider": "ollama",
-        "default_model": "qwen2.5-coder:7b",
+        "default_model": "qwen3.5:27b-q4_K_M",  # Fast MoE model with good knowledge
         "default_temperature": 0.7,
         "default_max_tokens": 4096,
         # Conservative tool budget
@@ -275,6 +275,49 @@ RESEARCH_PROFILE = ProfileTemplate(
     },
 )
 
+BENCHMARK_PROFILE = ProfileTemplate(
+    name="benchmark",
+    display_name="Benchmark Testbed",
+    description=(
+        "Cloud API testbed for running benchmarks (SWE-bench, HumanEval, MBPP). "
+        "Uses OAuth authentication to avoid direct API costs. "
+        "High tool budget and generous timeouts for evaluation runs."
+    ),
+    level=ProfileLevel.EXPERT,
+    settings={
+        "default_provider": "openai",
+        "default_model": "gpt-5.4-mini",
+        "default_temperature": 0.3,  # Low temp for deterministic benchmark runs
+        "default_max_tokens": 16384,
+        # High tool budget for benchmark tasks
+        "fallback_max_tools": 20,
+        # All optimizations
+        "framework_preload_enabled": True,
+        "http_connection_pool_enabled": True,
+        "tool_selection_cache_enabled": True,
+        "tool_deduplication_enabled": True,
+        # Expert tool selection (cloud tier)
+        "tool_selection": {
+            "model_size_tier": "cloud",
+            "base_threshold": 0.65,
+            "base_max_tools": 20,
+            "adaptive": True,
+        },
+        # Generous thresholds for benchmark evaluation
+        "loop_repeat_threshold": 4,
+        "max_continuation_prompts": 3,
+        "max_tool_calls_per_turn": 15,
+        "timeout": 300,
+        "session_idle_timeout": 7200,
+    },
+    provider_settings={
+        "openai": {
+            "auth_mode": "oauth",
+            "description": "GPT-5.4 Mini via OAuth (ChatGPT subscription, no API costs)",
+        },
+    },
+)
+
 # All available profiles
 PROFILES: Dict[str, ProfileTemplate] = {
     "basic": BASIC_PROFILE,
@@ -282,6 +325,7 @@ PROFILES: Dict[str, ProfileTemplate] = {
     "expert": EXPERT_PROFILE,
     "coding": CODING_PROFILE,
     "research": RESEARCH_PROFILE,
+    "benchmark": BENCHMARK_PROFILE,
 }
 
 
@@ -499,6 +543,16 @@ def _detect_model_for_provider(provider: str) -> str:
     return model_defaults.get(provider, "qwen2.5-coder:7b")
 
 
+def _resolve_profile_config_dir(config_dir: Optional[Path] = None) -> Path:
+    """Resolve the profile config directory through centralized Victor paths."""
+    if config_dir is not None:
+        return config_dir
+
+    from victor.config.settings import get_project_paths
+
+    return get_project_paths().global_victor_dir
+
+
 # =============================================================================
 # Profile Installation
 # =============================================================================
@@ -521,8 +575,7 @@ def install_profile(
     Returns:
         Path to the generated profiles.yaml file
     """
-    if config_dir is None:
-        config_dir = Path.home() / ".victor"
+    config_dir = _resolve_profile_config_dir(config_dir)
 
     # Ensure directory exists
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -550,8 +603,7 @@ def get_current_profile(config_dir: Optional[Path] = None) -> Optional[str]:
     Returns:
         Profile name if detected, None otherwise
     """
-    if config_dir is None:
-        config_dir = Path.home() / ".victor"
+    config_dir = _resolve_profile_config_dir(config_dir)
 
     profiles_path = config_dir / "profiles.yaml"
     if not profiles_path.exists():
@@ -570,13 +622,129 @@ def get_current_profile(config_dir: Optional[Path] = None) -> Optional[str]:
         max_tools = settings.get("fallback_max_tools", 0)
         preload = settings.get("framework_preload_enabled", False)
 
+        provider = settings.get("default_provider", "")
+
         if max_tools == 5 and preload:
             return "basic"
         elif max_tools == 10 and preload:
             return "advanced"
+        elif max_tools == 20 and preload and provider == "openai":
+            return "benchmark"
         elif max_tools == 20 and preload:
             return "expert"
 
         return "unknown"
     except Exception:
         return None
+
+
+# =============================================================================
+# Profile Manager - Single source of truth for profile operations
+# =============================================================================
+
+
+class ProfileManager:
+    """Manager for configuration profile operations.
+
+    Provides a centralized interface for loading and saving profiles,
+    eliminating duplication between CLI commands and framework code.
+    """
+
+    def __init__(self, config_dir: Optional[Path] = None) -> None:
+        """Initialize the profile manager.
+
+        Args:
+            config_dir: Optional config directory (defaults to ~/.victor)
+        """
+        self._config_dir = _resolve_profile_config_dir(config_dir)
+        self._profiles_path = self._config_dir / "profiles.yaml"
+
+    @property
+    def profiles_path(self) -> Path:
+        """Get the path to the profiles.yaml file."""
+        return self._profiles_path
+
+    def load_profiles(self) -> Dict[str, Any]:
+        """Load profiles from the profiles.yaml file.
+
+        Returns:
+            Dictionary containing profiles data, or empty dict if file doesn't exist or is invalid
+        """
+        if not self._profiles_path.exists():
+            return {"profiles": {}}
+
+        try:
+            import yaml
+
+            with open(self._profiles_path) as f:
+                return yaml.safe_load(f) or {"profiles": {}}
+        except (yaml.YAMLError, IOError, OSError):
+            return {"profiles": {}}
+
+    def save_profiles(self, data: Dict[str, Any]) -> None:
+        """Save profiles to the profiles.yaml file.
+
+        Args:
+            data: Dictionary containing profiles data
+
+        Raises:
+            IOError: If file cannot be written
+        """
+        import yaml
+
+        self._config_dir.mkdir(parents=True, exist_ok=True)
+        with open(self._profiles_path, "w") as f:
+            yaml.safe_dump(data, f, default_flow_style=False)
+
+    def get_current_profile_name(self) -> Optional[str]:
+        """Detect the current profile from profiles.yaml.
+
+        Returns:
+            Profile name if detected, None otherwise
+        """
+        if not self._profiles_path.exists():
+            return None
+
+        try:
+            import yaml
+
+            with open(self._profiles_path) as f:
+                data = yaml.safe_load(f)
+
+            # Try to identify profile from settings
+            settings = data.get("settings", {})
+
+            # Check for characteristic settings
+            max_tools = settings.get("fallback_max_tools", 0)
+            preload = settings.get("framework_preload_enabled", False)
+
+            provider = settings.get("default_provider", "")
+
+            if max_tools == 5 and preload:
+                return "basic"
+            elif max_tools == 10 and preload:
+                return "advanced"
+            elif max_tools == 20 and preload and provider == "openai":
+                return "benchmark"
+            elif max_tools == 20 and preload:
+                return "expert"
+
+            return "unknown"
+        except Exception:
+            return None
+
+    def has_profiles_file(self) -> bool:
+        """Check if the profiles.yaml file exists."""
+        return self._profiles_path.exists()
+
+    @classmethod
+    def for_config_dir(cls, config_dir: Optional[Path] = None) -> "ProfileManager":
+        """Create a ProfileManager for a specific config directory.
+
+        Args:
+            config_dir: Optional config directory path
+
+        Returns:
+            ProfileManager instance
+        """
+        return cls(config_dir=config_dir)

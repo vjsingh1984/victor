@@ -4,7 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.query_classifier import QueryClassification, QueryClassifier, QueryType
+from victor.agent.query_classifier import (
+    QueryClassification,
+    QueryClassifier,
+    QueryType,
+)
 from victor.framework.task.protocols import TaskClassification, TaskComplexity
 
 
@@ -30,6 +34,11 @@ def classifier_with_mock_service():
 class TestQueryTypeClassification:
     def test_quick_question_classification(self, classifier):
         result = classifier.classify("What is the auth module?")
+        assert result.query_type == QueryType.QUICK_QUESTION
+        assert result.should_plan is False
+
+    def test_exact_response_prompt_is_quick_question(self, classifier):
+        result = classifier.classify("Reply with exactly READY")
         assert result.query_type == QueryType.QUICK_QUESTION
         assert result.should_plan is False
 

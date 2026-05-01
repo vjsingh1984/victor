@@ -24,6 +24,7 @@ __all__ = [
     "ChunkGeneratorProtocol",
     "StreamingHandlerProtocol",
     "StreamingMetricsCollectorProtocol",
+    "StreamingConfidenceMonitorProtocol",
 ]
 
 
@@ -542,3 +543,32 @@ class StreamingMetricsCollectorProtocol(Protocol):
     def reset(self) -> None:
         """Reset metrics for new session."""
         ...
+
+
+@runtime_checkable
+class StreamingConfidenceMonitorProtocol(Protocol):
+    """Protocol for streaming confidence monitor.
+
+    Detects when the LLM has committed to an answer and signals early stop.
+    Based on ATCC (arXiv 2603.13906) — adaptive generation termination.
+    """
+
+    def record(self, content: str, completion_tokens: int = 0) -> None:
+        """Update internal state from a chunk or turn output."""
+        ...
+
+    def should_stop(self) -> bool:
+        """Return True if generation should stop now."""
+        ...
+
+    def reset(self) -> None:
+        """Reset state for a new turn."""
+        ...
+
+    async def wrap_stream(self, stream: AsyncIterator[Any]) -> AsyncIterator[Any]:
+        """Wrap an async stream, stopping early when confident."""
+        ...
+
+
+# Alias: some modules reference StreamingCoordinatorProtocol
+StreamingCoordinatorProtocol = StreamingControllerProtocol

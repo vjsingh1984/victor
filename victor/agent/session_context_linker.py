@@ -22,12 +22,13 @@ and compaction history restoration.
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
     from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
@@ -49,16 +50,61 @@ class SessionContextLinker:
     Builds rich resume context from persisted session data including
     ledger, execution state, and compaction history. Optionally supports
     cross-session semantic search via embedding service.
+
+    Supports both SQLiteSessionPersistence (deprecated) and ConversationStore (canonical).
     """
 
     def __init__(
         self,
-        session_persistence: "SQLiteSessionPersistence",
+        session_persistence: Optional[
+            Union["SQLiteSessionPersistence", "ConversationStore"]
+        ] = None,
         conversation_store: Optional["ConversationStore"] = None,
         embedding_service: Optional["EmbeddingService"] = None,
     ):
-        self._persistence = session_persistence
-        self._conversation_store = conversation_store
+        self._conversation_store: Optional["ConversationStore"] = None
+
+        # Normalize to single persistence parameter
+        # If session_persistence is ConversationStore, use it directly
+        # If session_persistence is SQLiteSessionPersistence, use it with deprecation warning
+        # If conversation_store is provided, use it (new canonical path)
+
+        if conversation_store is not None:
+            # New canonical path
+            self._persistence = conversation_store
+            self._persistence_type = "ConversationStore"
+            self._conversation_store = conversation_store
+        elif session_persistence is not None:
+            # Check type
+            if isinstance(session_persistence, str):
+                # Type check failed - might be a string representation
+                self._persistence = session_persistence
+                self._persistence_type = "unknown"
+            elif hasattr(session_persistence, "__class__"):
+                class_name = session_persistence.__class__.__name__
+                if class_name == "ConversationStore":
+                    self._persistence = session_persistence
+                    self._persistence_type = "ConversationStore"
+                    self._conversation_store = session_persistence
+                elif class_name == "SQLiteSessionPersistence":
+                    self._persistence = session_persistence
+                    self._persistence_type = "SQLiteSessionPersistence"
+                    warnings.warn(
+                        "SQLiteSessionPersistence is deprecated and will be removed in v0.10.0. "
+                        "Use ConversationStore instead. "
+                        "Pass ConversationStore as conversation_store parameter.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                else:
+                    self._persistence = session_persistence
+                    self._persistence_type = class_name
+            else:
+                self._persistence = session_persistence
+                self._persistence_type = "unknown"
+        else:
+            raise ValueError("Either session_persistence or conversation_store must be provided")
+
         self._embedding_service = embedding_service
 
     def build_resume_context(self, session_id: str) -> SessionResumeContext:
@@ -71,7 +117,13 @@ class SessionContextLinker:
             SessionResumeContext with restored state and summary
         """
         try:
-            session_data = self._persistence.load_session(session_id)
+            # Handle both persistence types
+            if self._persistence_type == "ConversationStore":
+                # Use ConversationStore.load_session()
+                session_data = self._persistence.load_session(session_id)
+            else:
+                # Use SQLiteSessionPersistence.load_session()
+                session_data = self._persistence.load_session(session_id)
         except Exception as e:
             logger.warning(f"Failed to load session {session_id}: {e}")
             return SessionResumeContext(resume_summary="[Session data unavailable]")
@@ -106,7 +158,9 @@ class SessionContextLinker:
         hierarchy_data = session_data.get("compaction_hierarchy")
         if hierarchy_data:
             try:
-                from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
+                from victor.agent.compaction_hierarchy import (
+                    HierarchicalCompactionManager,
+                )
 
                 hm = HierarchicalCompactionManager.from_dict(hierarchy_data)
                 active_ctx = hm.get_active_context()
@@ -119,6 +173,8 @@ class SessionContextLinker:
         summary_parts = ["[Resumed session"]
 
         metadata = session_data.get("metadata", {})
+        if metadata.get("title"):
+            summary_parts.append(f"\"{metadata['title']}\"")
         if metadata.get("updated_at"):
             summary_parts.append(f"last active: {metadata['updated_at']}")
 
@@ -144,6 +200,33 @@ class SessionContextLinker:
             tool_calls = getattr(execution_state, "tool_calls_used", 0)
             if tool_calls:
                 summary_parts.append(f"{tool_calls} tool calls used")
+
+        preview_messages = session_data.get("conversation", {}).get("preview_messages", [])
+        if isinstance(preview_messages, list) and preview_messages:
+            preview_paths: List[str] = []
+            seen_paths: set[str] = set()
+            for preview in preview_messages:
+                if not isinstance(preview, dict):
+                    continue
+                metadata = preview.get("metadata", {})
+                if not isinstance(metadata, dict):
+                    continue
+                preview_path = metadata.get("preview_path")
+                if not isinstance(preview_path, str) or not preview_path:
+                    continue
+                if preview_path in seen_paths:
+                    continue
+                seen_paths.add(preview_path)
+                preview_paths.append(preview_path)
+
+            if preview_paths:
+                listed_paths = ", ".join(preview_paths[:3])
+                extra_count = max(0, len(preview_paths) - 3)
+                if extra_count:
+                    listed_paths = f"{listed_paths} (+{extra_count} more)"
+                summary_parts.append(f"previews: {listed_paths}")
+            else:
+                summary_parts.append(f"{len(preview_messages)} previews available")
 
         resume_summary = ". ".join(summary_parts) + ".]"
 

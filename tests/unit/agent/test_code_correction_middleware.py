@@ -50,7 +50,8 @@ class TestCodeCorrectionConfig:
         # Should include common code execution tools
         assert "code_executor" in config.code_tools
         assert "execute_code" in config.code_tools
-        assert "write_file" in config.code_tools
+        assert "write" in config.code_tools
+        assert "edit" in config.code_tools
         assert "file_editor" in config.code_tools
 
     def test_default_code_argument_names(self):
@@ -99,9 +100,17 @@ class TestCodeCorrectionMiddleware:
         """Test that code_executor tool should be validated."""
         assert middleware.should_validate("code_executor") is True
 
-    def test_should_validate_write_file(self, middleware):
-        """Test that write_file tool should be validated."""
+    def test_should_validate_write_tool(self, middleware):
+        """Test that canonical write tool should be validated."""
+        assert middleware.should_validate("write") is True
+
+    def test_should_validate_write_file_alias(self, middleware):
+        """Legacy write alias should still be validated."""
         assert middleware.should_validate("write_file") is True
+
+    def test_should_validate_edit_file_alias(self, middleware):
+        """Legacy edit alias should still be validated."""
+        assert middleware.should_validate("edit_file") is True
 
     def test_should_not_validate_read_file(self, middleware):
         """Test that read_file tool should not be validated."""

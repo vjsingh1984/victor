@@ -23,6 +23,7 @@ Usage:
     victor dashboard --no-live          # Disable live event streaming
 """
 
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -320,7 +321,8 @@ def dashboard_status() -> None:
         console.print("[red]Error: Could not import ObservabilityBus[/]")
         raise typer.Exit(1)
 
-    bus = get_observability_bus()
+    # Verify the bus is accessible
+    _ = get_observability_bus()
 
     console.print("\n[bold]ObservabilityBus Status[/]\n")
     console.print("  Status: Running")

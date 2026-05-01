@@ -16,20 +16,12 @@
 
 Supports multiple backends via factory pattern (OCP - Open/Closed Principle):
 - sqlite+lancedb: Default, local storage (SQLite graph + LanceDB vectors)
-- postgres+pgvector: Cloud-ready single store
-- lancedb: Single LanceDB for both vectors and metadata
-- duckdb+lancedb: Analytical graph queries
+- proximadb: Planned single-engine backend
 
 Usage:
     # Default backend
     store = create_symbol_store(repo_root=Path("."))
 
-    # Specific backend
-    store = create_symbol_store(
-        repo_root=Path("."),
-        backend="postgres+pgvector",
-        connection_string="postgresql://...",
-    )
 """
 
 from pathlib import Path
@@ -49,11 +41,8 @@ def create_symbol_store(
         repo_root: Root directory of the repository. If None, uses cwd().
         backend: Storage backend to use:
             - "sqlite+lancedb": Default, SQLite graph + LanceDB vectors (local/air-gapped)
-            - "postgres+pgvector": PostgreSQL with pgvector extension (cloud-ready)
-            - "lancedb": Single LanceDB store for vectors + metadata
-            - "duckdb+lancedb": DuckDB for graph + LanceDB for vectors (analytical)
+            - "proximadb": Planned single-engine backend (not yet available)
         **kwargs: Backend-specific configuration:
-            - connection_string: For postgres backends
             - embedding_model: Override embedding model (default: sentence-transformers)
             - persist_directory: Override storage location
             - table_name: Override table names
@@ -65,12 +54,6 @@ def create_symbol_store(
         # Local development (air-gapped compatible)
         store = create_symbol_store(repo_root=Path("."))
 
-        # Cloud deployment with PostgreSQL
-        store = create_symbol_store(
-            repo_root=Path("."),
-            backend="postgres+pgvector",
-            connection_string="postgresql://user:pass@host/db",
-        )
     """
     if repo_root is None:
         repo_root = Path.cwd()
@@ -80,31 +63,17 @@ def create_symbol_store(
 
         return SqliteLanceDBStore(repo_root, **kwargs)
 
-    elif backend == "postgres+pgvector":
-        # Future implementation
+    elif backend == "proximadb":
+        # Future: ProximaDB provides vector + relational in a single engine
         raise NotImplementedError(
-            "postgres+pgvector backend not yet implemented. "
-            "Use 'sqlite+lancedb' for local development."
-        )
-
-    elif backend == "lancedb":
-        # Future implementation: LanceDB for both vectors and structured data
-        raise NotImplementedError(
-            "lancedb-only backend not yet implemented. "
-            "Use 'sqlite+lancedb' for local development."
-        )
-
-    elif backend == "duckdb+lancedb":
-        # Future implementation: DuckDB for analytical queries
-        raise NotImplementedError(
-            "duckdb+lancedb backend not yet implemented. "
-            "Use 'sqlite+lancedb' for local development."
+            "proximadb backend planned but not yet available. "
+            "Use 'sqlite+lancedb' (the default and recommended backend)."
         )
 
     else:
         raise ValueError(
             f"Unknown backend: {backend}. "
-            f"Supported: sqlite+lancedb, postgres+pgvector, lancedb, duckdb+lancedb"
+            f"Supported: sqlite+lancedb (default), proximadb (planned)"
         )
 
 

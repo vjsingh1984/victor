@@ -191,7 +191,11 @@ class TestHybridToolSelector:
 
     @pytest.mark.asyncio
     async def test_select_tools_blends_results(
-        self, hybrid_selector, mock_semantic_selector, mock_keyword_selector, tool_definitions
+        self,
+        hybrid_selector,
+        mock_semantic_selector,
+        mock_keyword_selector,
+        tool_definitions,
     ):
         """Test that select_tools blends semantic and keyword results."""
         # Semantic returns first 3 tools
@@ -465,7 +469,11 @@ class TestHybridToolSelectorRLIntegration:
 
     @patch("victor.framework.rl.coordinator.get_rl_coordinator")
     def test_apply_rl_boost_exploration_mode(
-        self, mock_get_coordinator, mock_semantic_selector, mock_keyword_selector, tool_definitions
+        self,
+        mock_get_coordinator,
+        mock_semantic_selector,
+        mock_keyword_selector,
+        tool_definitions,
     ):
         """Test _apply_rl_boost in exploration mode shuffles top 3."""
         mock_learner = MagicMock()
@@ -501,7 +509,11 @@ class TestHybridToolSelectorRLIntegration:
 
     @patch("victor.framework.rl.coordinator.get_rl_coordinator")
     def test_apply_rl_boost_exploitation_mode(
-        self, mock_get_coordinator, mock_semantic_selector, mock_keyword_selector, tool_definitions
+        self,
+        mock_get_coordinator,
+        mock_semantic_selector,
+        mock_keyword_selector,
+        tool_definitions,
     ):
         """Test _apply_rl_boost in exploitation mode uses Q-values."""
         mock_learner = MagicMock()
@@ -552,7 +564,11 @@ class TestHybridToolSelectorRLIntegration:
             config=config,
         )
 
-        context = {"task_type": "action", "task_completed": True, "grounding_score": 0.8}
+        context = {
+            "task_type": "action",
+            "task_completed": True,
+            "grounding_score": 0.8,
+        }
 
         selector._record_rl_outcome("read_file", True, context)
 

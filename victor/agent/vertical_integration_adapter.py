@@ -48,10 +48,10 @@ Victor has TWO distinct vertical integration mechanisms that serve different pur
 
    Example::
        from victor.framework.vertical_integration import VerticalIntegrationPipeline
-       from victor_coding import CodingAssistant
 
+       # Vertical classes are discovered via victor.plugins entry points
        pipeline = VerticalIntegrationPipeline()
-       result = pipeline.apply(orchestrator, CodingAssistant)
+       result = pipeline.apply(orchestrator, vertical_class)
        # Applies: tools, prompts, middleware, safety patterns, workflows, etc.
 
 2. **Runtime Integration (VerticalIntegrationAdapter)**:
@@ -92,27 +92,19 @@ Usage Examples
 Basic runtime middleware application::
 
     from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
-try:
-        from victor_coding.middleware import CodeReviewMiddleware
-except ImportError:
-    # External vertical package may not be installed
-    pass
+    # Middleware classes come from external vertical packages (e.g., victor-coding)
+    # discovered via victor.plugins entry points
 
-    # Create adapter with orchestrator reference
     adapter = VerticalIntegrationAdapter(orchestrator)
 
     # Apply middleware during runtime
-    middleware = [CodeReviewMiddleware()]
-    adapter.apply_middleware(middleware)
+    adapter.apply_middleware(middleware_list)
 
 Runtime safety pattern application::
 
     from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
-try:
-        from victor_coding.safety import DangerousOperationPattern
-except ImportError:
-    # External vertical package may not be installed
-    pass
+    # Safety patterns come from external vertical packages
+    # discovered via victor.plugins entry points
 
     adapter = VerticalIntegrationAdapter(orchestrator)
 
@@ -155,7 +147,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from victor.framework.capability_registry import get_method_for_capability
+from victor.core.capability_registry import get_method_for_capability
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator

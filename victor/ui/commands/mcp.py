@@ -10,7 +10,7 @@ from rich.console import Console
 
 from victor.core.async_utils import run_sync
 from victor.integrations.mcp.server import MCPServer
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 from victor.ui.commands.utils import setup_logging
 
 mcp_app = typer.Typer(name="mcp", help="Run Victor as an MCP server.")
@@ -75,7 +75,10 @@ async def _run_mcp_server() -> None:
                         registry.register(obj)
                         registered_tools_count += 1
             except Exception as e:
-                print(f"Warning: Failed to load tools from {module_name}: {e}", file=sys.stderr)
+                print(
+                    f"Warning: Failed to load tools from {module_name}: {e}",
+                    file=sys.stderr,
+                )
 
     server = MCPServer(
         name="Victor MCP Server",
@@ -83,5 +86,8 @@ async def _run_mcp_server() -> None:
         tool_registry=registry,
     )
 
-    print(f"Victor MCP Server starting with {registered_tools_count} tools", file=sys.stderr)
+    print(
+        f"Victor MCP Server starting with {registered_tools_count} tools",
+        file=sys.stderr,
+    )
     await server.start_stdio_server()

@@ -1,0 +1,324 @@
+# Legacy Shim And Canonical API Migration Plan
+
+Date: 2026-04-25
+
+## Goal
+
+Reduce internal dependence on deprecated or compatibility-only APIs while
+preserving public compatibility shims where they still serve external callers.
+
+The target state is:
+- internal runtime code depends only on canonical service/state-passed/SDK APIs
+- compatibility modules remain thin public adapters with minimal internal usage
+- legacy field names remain accepted at configuration boundaries, but runtime
+  code reads canonical nested configuration
+
+## Audit Table
+
+| Surface | Current role | Canonical API / module | Active internal usage | Priority | Action |
+|---|---|---|---|---|---|
+| Flat `Settings.use_semantic_tool_selection` | Legacy flat field mapped into nested config | `settings.tool_selection.use_semantic_tool_selection` | Runtime reads in `victor/agent/service_provider.py`, `victor/agent/factory/tool_builders.py`, `victor/agent/factory/coordination_builders.py` | P0 | Migrate internal reads to canonical nested access while leaving legacy input mapping at config boundary |
+| `victor.core.tool_dependency_base` | SDK promotion shim | `victor_sdk.verticals.tool_dependencies` | Internal imports in `victor/core/tool_dependency_loader.py`, `victor/core/tool_types.py`, `victor/core/entry_points/tool_dependency_provider.py` | P0 | Migrate internal imports to SDK-owned canonical types; keep shim for public imports |
+| `victor.tools` package-root re-exports | Deprecated convenience surface | Specific submodules like `victor.tools.registry`, `victor.tools.base` | Minor internal import in `victor/agent/response_processor.py` | P1 | Move internal imports to concrete tool modules |
+| `victor.agent.provider_coordinator` | Deprecated root-level provider compatibility wrapper | `victor.agent.services.provider_service.ProviderService` plus provider runtime/service wiring | Active production imports in `victor/agent/orchestrator.py`, `victor/agent/runtime/provider_runtime.py`; unit tests still target wrapper directly | P0 | Remove internal dependence on the wrapper and collapse provider switching onto canonical service/runtime seams |
+| `victor.agent.coordinators.provider_coordinator` | Deprecated coordinator-path provider wrapper | `ProviderService` / provider runtime | Compatibility surface with real logic, but not the canonical runtime path | P1 | After root provider wrapper migration, shrink or replace with a thin public shim |
+| `victor.agent.provider_switch_coordinator` | Legacy provider-switch orchestration surface | Provider runtime/service-owned switching boundary | Still used in `victor/agent/factory/runtime_builders.py`, `victor/agent/orchestrator_factory.py`, `victor/agent/provider/__init__.py`, `victor/agent/post_switch_hooks.py` | P0 | Introduce a canonical service-owned switch boundary, then migrate runtime/factory imports off the coordinator module |
+| `victor.agent.coordinators.recovery_controller` | Deprecated recovery controller | `victor.agent.services.recovery_service.RecoveryService` | Compatibility surface with lightweight real logic | P1 | Keep as external shim only; remove any remaining internal dependence on controller semantics |
+| `victor.agent.coordinators` package exports | Deprecated coordinator compatibility package | `victor.agent.services.*`, `victor.agent.services.protocols.chat_runtime`, state-passed coordinators, `OrchestrationFacade.chat_stream_runtime` | Mostly tests/examples/docs; no meaningful production import dependence found | P1 | Leave public shim, migrate remaining non-test examples/docs and any future internal imports |
+| `victor.agent.coordinators.chat_protocols` | Deprecated chat protocol shim | `victor.agent.services.protocols.chat_runtime` | Tests/compat only | P1 | Leave shim; no production callers should import it |
+| Service-owned `*_compat.py` shims | Deprecated coordinator/sync adapter layer | `ChatService`, `ToolService`, `SessionService`, `PromptRuntimeProtocol`, `StateRuntimeProtocol`, `ServiceStreamingRuntime` | Still surfaced through orchestrator properties and facades | P1 | Reduce internal dependence on compat accessors; keep shim layer thin |
+| Orchestrator/facade compatibility properties | Deprecated shim accessors for old coordinator surfaces | Direct DI/service/runtime access | Active in `victor/agent/orchestrator_properties.py`, `victor/agent/orchestrator.py`, `victor/agent/facades/orchestration_facade.py`, `victor/agent/runtime/bootstrapper.py` | P1 | Move internal callers to direct service/runtime seams; retain properties only for external compatibility |
+| Legacy `_stream_chat_runtime` hook | Old fallback hook for older integrations | `ChatService.stream_chat` / `ServiceStreamingRuntime.stream_chat` | Only fallback path in `victor/agent/services/chat_compat.py` and orchestrator hook | P2 | Keep isolated as terminal fallback; do not allow new internal callers |
+| `victor.workflows.executor` | Deprecated DAG executor module | `victor.workflows.unified_executor`, `victor.workflows.context`, `victor_sdk.workflows` runtime types | Heavy internal import usage across workflow runtime, framework, benchmark, and CLI modules | P0 | Multi-step migration: first move shared runtime types/helpers, then executor consumers |
+| `victor.workflows.graph_compiler` | Legacy compiler surface | `victor.workflows.compiler.boundary`, `victor.workflows.unified_compiler` | Heavy internal import usage | P0 | Migrate call sites through compiler boundary/unified compiler; keep graph compiler as backend adapter only |
+| `victor.workflows.yaml_to_graph_compiler` | Legacy compiler adapter surface | Compiler boundary / unified compiler entrypoints | Medium internal import usage | P1 | Move callers to boundary/unified surfaces after compiler API normalization |
+| `victor.core.types` | Backward-compatible type re-export | `victor.core.vertical_types` | Low internal usage | P2 | Migrate any internal imports; keep public re-export |
+| `victor.teams.protocols` | Re-export shim | `victor.protocols.team` | Tests/docs only | P2 | Leave shim for compatibility, avoid new internal imports |
+| `victor.verticals.contrib.*` fallback namespace | Legacy plugin/import fallback | Standalone packages plus canonical entry points via import resolver | Fallback logic remains active in resolver/loader code | P1 | Keep fallback for external compatibility; avoid new direct imports and narrow loader ownership |
+| `create_default_validated_session_truth_service(...)` | Older evaluation service factory alias | `victor.evaluation.services.create_validated_session_truth_service(...)` | Production code already migrated; tests still cover compatibility | Done | Keep alias only as compatibility coverage surface |
+
+## Phase Plan
+
+### Phase 1
+- Migrate flat semantic-selection setting reads to canonical nested config.
+- Migrate internal `victor.core.tool_dependency_base` imports to SDK-owned types.
+- Remove remaining internal `victor.tools` package-root re-export usage.
+
+### Phase 2
+- Reduce internal dependence on coordinator compatibility exports and
+  orchestrator compatibility properties.
+- Keep `*_compat.py` modules public, but ensure runtime code reaches services
+  and state-passed boundaries directly.
+- Collapse the provider migration seam in the right order:
+  1. migrate internal orchestrator switching off the coordinator fallback and
+     onto `ProviderService` only
+  2. migrate internal imports off `victor.agent.provider_coordinator`
+  3. introduce a canonical provider-switch boundary to replace direct
+     `provider_switch_coordinator` construction
+  4. only then retire the coordinator-path provider shims
+
+### Phase 3
+- Migrate workflow runtime imports off `victor.workflows.executor` legacy types.
+- Move compiler consumers to boundary/unified compiler APIs.
+
+### Phase 4
+- Clean up low-volume re-export shims (`victor.core.types`,
+  `victor.teams.protocols`) and review remaining public-only shims for
+  retirement milestones.
+
+## TDD Strategy
+
+For each batch:
+1. Add focused tests that fail if runtime code reaches through the shim or
+   legacy flat field.
+2. Migrate internal call sites to the canonical module/API.
+3. Run targeted regression for the touched seam.
+4. Run a broader surrounding regression suite before commit.
+
+## Current Batch
+
+Phase 1 is complete. Phase 2.1, Phase 2.2, Phase 2.3, Phase 2.4, Phase 2.5, Phase 2.6, Phase 2.7, and Phase 2.8 are now complete:
+- internal provider switching is service-first in `AgentOrchestrator`
+- provider-switch hook contracts now live in a canonical provider contract
+  module instead of being sourced from the legacy switch coordinator
+- `ProviderSwitchCoordinator` behavior now lives in the canonical provider
+  package, with the root module reduced to a public compatibility shim
+- `ProviderCoordinator` behavior now lives in the canonical provider package
+  module, with the root module reduced to a public compatibility shim and
+  internal runtime imports moved to the canonical module path
+- `victor.agent.coordinators.provider_coordinator` is now a thin
+  compatibility adapter over the canonical provider coordinator rather than a
+  second behavior owner
+- simple `AgentOrchestrator` compatibility properties now resolve from direct
+  canonical backing attributes instead of facades, so facades are no longer
+  behavior owners for those runtime accessors
+- lazy sync/streaming/unified deprecated chat coordinator wiring is now bound
+  directly from bootstrapper to compatibility constructors, removing the last
+  internal-only wrapper methods from `AgentOrchestrator` for those shims
+- lazy deprecated chat/tool/session coordinator access in bootstrapper now
+  binds directly to the backing compatibility slots, removing the remaining
+  internal wrapper methods from `AgentOrchestrator` for those shims
+- secondary compatibility facades (`provider`, `session`, `metrics`,
+  `resilience`, `workflow`) now bootstrap lazily via `LazyRuntimeProxy`,
+  reducing eager runtime compatibility construction while keeping the public
+  facade attributes available
+- `OrchestrationFacade` now also bootstraps lazily via `LazyRuntimeProxy`,
+  so state-passed compatibility surfaces and deprecated coordinator getters
+  are materialized only on demand instead of during orchestrator startup
+- `ChatFacade` and `ToolFacade` now also bootstrap lazily via
+  `LazyRuntimeProxy`, so every orchestrator facade is now a compatibility-only
+  object that materializes on demand rather than at orchestrator startup
+- internal runtime code no longer depends on any facade as a behavior owner;
+  facades are now reduced to thin compatibility groupings over canonical
+  service/runtime/state-passed seams
+- Phase 2.9 provider facade compatibility derivation:
+  - `ProviderFacade` now derives deprecated `provider_coordinator` and
+    `provider_switch_coordinator` compatibility accessors from
+    `provider_runtime` by default instead of requiring bootstrapper to wire the
+    deprecated slots directly
+  - bootstrapper now passes only canonical provider runtime inputs into
+    `ProviderFacade`, reducing another internal dependency on coordinator
+    compatibility fields while preserving the public properties
+- Phase 2.10 provider health-monitoring canonicalization:
+  - `AgentOrchestrator.start_health_monitoring()` and
+    `AgentOrchestrator.stop_health_monitoring()` now depend on
+    `ProviderService` only and return `False` when the canonical service is
+    unavailable instead of silently succeeding through deprecated coordinator
+    fallback
+  - `AgentOrchestrator.get_current_provider_info()` now sources rate-limit
+    stats from `ProviderService` only, removing the remaining coordinator
+    fallback branch from that canonical method
+- Phase 2.11 legacy chat provider protocol alignment:
+  - the deprecated chat runtime protocol now exposes `_provider_service`
+    instead of `_provider_coordinator`, matching the actual rate-limit retry
+    helper implementation
+  - `OrchestratorProtocolAdapter` now surfaces the canonical provider service
+    for the chat shim path, and the deprecated chat coordinator tests/mocks no
+    longer depend on a legacy provider coordinator field
+- Phase 2.12 provider compatibility-slot derivation:
+  - `AgentOrchestrator._provider_coordinator` and
+    `AgentOrchestrator._provider_switch_coordinator` are now deprecated
+    compatibility properties derived from `provider_runtime` instead of
+    concrete orchestrator attributes
+  - `_initialize_provider_runtime()` no longer stores duplicate coordinator
+    compatibility state on the orchestrator instance; explicit overrides now
+    go through `_deprecated_provider_coordinator` and
+    `_deprecated_provider_switch_coordinator`
+  - provider compatibility tests now seed the explicit deprecated backing
+    slots directly, keeping the deprecation path intentional and reducing
+    warning noise in regression runs
+- Phase 2.13 provider runtime construction extraction:
+  - `victor.agent.runtime.provider_runtime` now constructs the deprecated
+    provider coordinator and provider switch coordinator directly from the
+    canonical provider package instead of routing through generic
+    `RuntimeBuilder` helper methods
+  - `AgentOrchestrator._initialize_provider_runtime()` no longer passes the
+    generic factory into provider runtime construction
+  - the provider shim boundary tests now assert that `RuntimeBuilder` no
+    longer owns provider coordinator construction helpers for the active
+    runtime path
+- Phase 2.14 root provider shim guardrails:
+  - repo-wide AST guardrails now ensure `victor.agent.provider_coordinator`
+    and `victor.agent.provider_switch_coordinator` stay compatibility-only
+    import surfaces outside their dedicated shim tests
+  - this locks in the current state where internal runtime and test code
+    depends on canonical provider package modules instead of re-entering the
+    root shim modules
+- Phase 2.15 explicit root provider shim warnings:
+  - `victor.agent.provider_coordinator` and
+    `victor.agent.provider_switch_coordinator` now emit explicit
+    `DeprecationWarning`s on import while preserving symbol re-exports
+  - the dedicated shim tests now reload those modules under warning capture,
+    so the deprecation behavior is covered intentionally instead of surfacing
+    as incidental collection-time noise
+
+- Phase 3.1 compute handler registry extraction:
+  - `victor.workflows.compute_registry` is now the canonical module for
+    `ComputeHandler`, `register_compute_handler`, `get_compute_handler`,
+    `list_compute_handlers`; executor.py re-exports from it with a shared
+    `_compute_handlers` dict
+  - NodeResult/ExecutorNodeStatus imported directly from victor_sdk.workflows
+    in all benchmark callers
+  - Boundary tests enforce canonical paths for all migrated consumers
+
+- Phase 3.2 workflow context/result/temporal canonicalization:
+  - `victor.workflows.context` is now the canonical module for
+    `WorkflowContext`, `WorkflowResult`, and `TemporalContext`
+  - executor.py re-exports those types for compatibility but no longer defines
+    them, and `TemporalContext.get_date_range()` behavior is preserved in the
+    canonical module
+  - internal callers that previously imported those types directly from
+    executor.py now import them from `victor.workflows.context`
+  - workflow package exports now source those types from the canonical module
+  - boundary and workflow regression tests enforce the canonical import paths
+
+- Phase 3.3 workflow graph-compiler caller migration:
+  - `victor.framework.coordinators.graph_coordinator` now compiles
+    `WorkflowGraph` and `WorkflowDefinition` execution through the canonical
+    `UnifiedWorkflowCompiler` path instead of importing legacy
+    `victor.workflows.graph_compiler` execution-time entrypoints directly
+  - `GraphTurnExecutor` now caches canonical unified compiler instances keyed
+    by node-runner usage, preserving the `use_node_runners` execution contract
+    without reviving direct legacy compiler ownership
+  - `victor.framework.workflow_engine` no longer carries dead legacy
+    `WorkflowGraphCompiler` / `WorkflowDefinitionCompiler` state and type
+    imports; the workflow engine now treats `UnifiedWorkflowCompiler` as the
+    only compiler boundary it owns directly
+
+- Phase 3.4 workflow executor canonical boundary migration:
+  - `victor.workflows.unified_executor.StateGraphExecutor` now compiles
+    `WorkflowDefinition` execution through `NativeWorkflowGraphCompiler` from
+    `victor.workflows.compiler.boundary` instead of routing through
+    `victor.workflows.yaml_to_graph_compiler`
+  - executor-local compiler caching is preserved for the default path, while
+    per-call custom checkpointers now flow through a temporary canonical
+    boundary compiler instead of mutating a legacy compiler config object
+  - runtime behavior for iteration/timeout overlays and HITL interruption is
+    preserved by overlaying executor config onto the definition before
+    canonical compilation
+
+- Phase 3.5 workflow UI compile-only canonicalization:
+  - `victor.ui.commands.workflow` validation and dry-run paths now compile
+    already-loaded `WorkflowDefinition` objects through a small canonical
+    `UnifiedWorkflowCompiler` helper instead of instantiating
+    `YAMLToStateGraphCompiler` directly
+  - focused command tests now assert those CLI compile-only paths use the
+    canonical helper and fail cleanly on canonical compilation errors
+
+- Phase 3.6 chat workflow-mode compile-only canonicalization:
+  - `victor.ui.commands.chat.run_workflow_mode` now validates already-loaded
+    `WorkflowDefinition` objects through a canonical `UnifiedWorkflowCompiler`
+    helper instead of instantiating `YAMLToStateGraphCompiler` directly
+  - focused async chat workflow-mode tests now pin the canonical helper path
+    and failure behavior for validation-only runs
+
+- Phase 3.7 workflow graph-DSL boundary normalization:
+  - `victor.workflows.compiler.boundary` now owns a dedicated
+    `LegacyWorkflowDslCompiler` adapter for `WorkflowGraph` DSL compilation
+    through the legacy backend, so internal canonical callers no longer
+    construct `WorkflowGraphCompiler` directly
+  - `victor.workflows.unified_compiler.UnifiedWorkflowCompiler` now resolves
+    graph-DSL compilation through that boundary adapter instead of importing
+    `victor.workflows.graph_compiler` directly
+  - focused compiler boundary and unified compiler tests now pin the adapter
+    seam so future internal callers cannot regress back to direct legacy
+    backend ownership
+
+- Phase 3.8 workflow executor type-seam normalization:
+  - `victor.workflows.protocols` now owns dedicated runtime executor protocol
+    types for workflow-definition execution and single-node execution
+    (`IWorkflowRuntimeExecutor`, `IWorkflowNodeRuntimeExecutor`)
+  - `victor.workflows.batch_executor` and `victor.workflows.adapters` now
+    depend on those workflow-owned protocols instead of importing the legacy
+    `victor.workflows.executor.WorkflowExecutor` class for typing only
+  - boundary tests now pin those two modules away from the legacy executor
+    module import path
+
+- Phase 3.9 centralized legacy executor construction:
+  - `victor.workflows.runtime_executor_factory` now owns the remaining shared
+    construction seam for compatibility `WorkflowExecutor` and
+    `StreamingWorkflowExecutor` instances
+  - `victor.framework.coordinators.yaml_coordinator` and
+    `victor.framework.workflow_engine` now delegate legacy executor creation
+    through that shared factory instead of importing the legacy executor
+    modules directly
+  - focused boundary tests now pin both framework owners to the shared factory
+    seam so future migrations only need to swap one construction module
+
+- Phase 3.10 streaming executor composition:
+  - `victor.workflows.streaming_executor.StreamingWorkflowExecutor` no longer
+    subclasses the legacy DAG executor directly; it now composes a delegated
+    compatibility runtime created through the shared runtime-executor factory
+  - backward-compatible `execute()` behavior and `sub_agents` access are
+    preserved through thin delegation, while inherited helper calls are routed
+    through the wrapped runtime explicitly
+  - boundary and unit tests now pin both the absence of direct inheritance and
+    the constructor's use of the shared runtime-executor factory
+
+- Phase 3.11 workflow utility canonical imports:
+  - `victor.workflows.handlers` now depends on canonical SDK result types and
+    `WorkflowContext` from `context.py` instead of importing those through the
+    legacy executor convenience surface
+  - `victor.workflows.cache` now references canonical `NodeResult` typing from
+    `victor_sdk.workflows`, and `victor.workflows.executors.compute` plus
+    `victor.workflows.node_runners` now resolve compute handlers from
+    `victor.workflows.compute_registry`
+  - boundary tests now pin those workflow utility modules away from the legacy
+    executor convenience imports
+
+- Phase 4.1 canonical team protocol import cleanup:
+  - internal tests now import `ITeamMember` from `victor.protocols.team`
+    instead of the compatibility shim in `victor.teams.protocols`
+  - architecture boundary tests now scan the `tests/` tree as well, so new
+    test code cannot regress back to the deprecated team protocol shim
+  - the team consolidation guide now points its canonical import example at
+    `victor.protocols.team`
+
+- Phase 4.2 core type shim guardrails:
+  - architecture tests now verify `victor.core.types` remains a pure
+    re-export of `victor.core.vertical_types`
+  - production and test trees are now scanned for direct imports from
+    `victor.core.types`, so the compatibility shim stays public-only instead
+    of quietly re-entering internal code paths
+
+- Phase 4.3 executor test-only cleanup:
+  - `victor/tests/workflows/test_isolation.py` no longer imports
+    `WorkflowExecutor` just to assert isolation defaults; the checks now
+    depend directly on `IsolationMapper`, which is the real subject under test
+
+- Phase 4.4 handler test canonical SDK imports:
+  - `tests/unit/workflows/handlers/test_error_boundary.py` now imports
+    `NodeResult` and `ExecutorNodeStatus` directly from `victor_sdk.workflows`
+    instead of the legacy executor re-export surface, keeping compatibility
+    coverage isolated to the explicit interop tests
+
+Next resume point:
+- The workflow/executor migration track is in a clean stop state; remaining
+  `victor.workflows.executor` imports are intentional compatibility/public-test
+  surface (`victor/workflows/__init__.py`, integration coverage, and the
+  legacy executor module itself).
+- The next active compatibility seam is provider runtime exposure through
+  public docs and eventual retirement policy only. The runtime and internal
+  import migration work for root provider shims is complete; any further work
+  here is a deprecation-policy decision rather than an active canonicalization
+  gap.

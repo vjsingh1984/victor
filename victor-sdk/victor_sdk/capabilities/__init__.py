@@ -20,6 +20,27 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Set
 
+from victor_sdk.capabilities.runtime import (
+    BaseCapabilityProvider,
+    CapabilityLoaderPortProtocol,
+    CapabilityConfigMergePolicy,
+    CapabilityConfigScopePortProtocol,
+    CapabilityConfigService,
+    CapabilityEntry,
+    CapabilityMetadata,
+    CapabilityType,
+    DEFAULT_CAPABILITY_CONFIG_SCOPE_KEY,
+    OrchestratorCapability,
+    build_capability_loader,
+    capability,
+    load_capability_config,
+    register_capability_entries,
+    resolve_capability_config_scope_key,
+    resolve_capability_config_service,
+    store_capability_config,
+    update_capability_config_section,
+)
+
 
 class FileOperationType(Enum):
     """Types of generic file operations exposed by a vertical."""
@@ -39,8 +60,26 @@ class FileOperation:
     required: bool = True
 
 
+@dataclass(frozen=True)
+class PromptContribution:
+    """Serializable prompt contribution contract."""
+
+    name: str
+    task_type: str
+    hint: str
+    tool_budget: int = 15
+    priority: int = 50
+    system_section: str = ""
+
+
 class FileOperationsCapability:
-    """Declarative file-operation capability contract."""
+    """Declarative file-operation capability contract.
+
+    Note: Contains light helper methods (get_tools, get_tool_list) that only
+    depend on SDK data types (FileOperation). Acceptable in zero-dep SDK
+    since no framework imports are needed. Framework extends this class
+    in victor.framework.capabilities.file_operations for runtime features.
+    """
 
     DEFAULT_OPERATIONS: ClassVar[List[FileOperation]] = [
         FileOperation(FileOperationType.READ, "read", required=True),
@@ -56,29 +95,20 @@ class FileOperationsCapability:
 
     def get_tools(self) -> Set[str]:
         """Return the required tool names for this capability."""
-
         return {op.tool_name for op in self.operations if op.required}
 
     def get_tool_list(self) -> List[str]:
         """Return the required tool names in declaration order."""
-
         return [op.tool_name for op in self.operations if op.required]
 
 
-@dataclass(frozen=True)
-class PromptContribution:
-    """Serializable prompt contribution contract."""
-
-    name: str
-    task_type: str
-    hint: str
-    tool_budget: int = 15
-    priority: int = 50
-    system_section: str = ""
-
-
 class PromptContributionCapability:
-    """Declarative prompt contribution capability contract."""
+    """Declarative prompt contribution capability contract.
+
+    Note: Contains light helper (get_task_hints) using only SDK data types.
+    Framework extends this in victor.framework.capabilities.prompt_contributions
+    for runtime features.
+    """
 
     COMMON_HINTS: ClassVar[List[PromptContribution]] = [
         PromptContribution(
@@ -111,7 +141,6 @@ class PromptContributionCapability:
 
     def get_task_hints(self) -> Dict[str, Dict[str, Any]]:
         """Return prompt hints in a pure-serializable form."""
-
         hints: Dict[str, Dict[str, Any]] = {}
         for contribution in self.contributions:
             hints[contribution.task_type] = {
@@ -122,9 +151,27 @@ class PromptContributionCapability:
 
 
 __all__ = [
+    "BaseCapabilityProvider",
+    "CapabilityConfigMergePolicy",
+    "CapabilityConfigScopePortProtocol",
+    "CapabilityConfigService",
+    "CapabilityEntry",
+    "CapabilityLoaderPortProtocol",
+    "CapabilityMetadata",
+    "CapabilityType",
+    "DEFAULT_CAPABILITY_CONFIG_SCOPE_KEY",
     "FileOperation",
     "FileOperationsCapability",
     "FileOperationType",
+    "OrchestratorCapability",
     "PromptContribution",
     "PromptContributionCapability",
+    "build_capability_loader",
+    "capability",
+    "load_capability_config",
+    "register_capability_entries",
+    "resolve_capability_config_scope_key",
+    "resolve_capability_config_service",
+    "store_capability_config",
+    "update_capability_config_section",
 ]

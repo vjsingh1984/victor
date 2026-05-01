@@ -86,7 +86,462 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
-class DatabaseManager:
+# =============================================================================
+# DATABASE CONSOLIDATION
+# =============================================================================
+
+
+class DatabaseConsolidator:
+    """Handle database consolidation migration to canonical two-database structure.
+
+    Target Architecture:
+        ~/.victor/victor.db - Global database (user-wide data)
+            - Settings, API keys, profiles
+            - RL learning (rl_outcomes, rl_q_values, etc.)
+            - Team composition stats
+            - Cross-vertical patterns
+            - TUI session persistence
+
+        ./.victor/project.db - Project database (project-specific data)
+            - Graph nodes/edges
+            - Conversations and messages
+            - Project sessions
+            - Entity memory
+            - Mode learning
+            - Change tracking
+
+    Migration Strategy:
+        1. Backup existing databases with .bak.<timestamp> suffix
+        2. Migrate data to canonical databases
+        3. Validate integrity
+        4. Update metadata
+    """
+
+    def __init__(self, victor_dir: Optional[Path] = None):
+        """Initialize consolidator.
+
+        Args:
+            victor_dir: Path to ~/.victor directory
+        """
+        if victor_dir is None:
+            victor_dir = Path.home() / ".victor"
+        self.victor_dir = victor_dir
+        self._consolidated_flag = victor_dir / ".consolidated_v6"
+
+    def needs_consolidation(self) -> bool:
+        """Check if database consolidation is needed.
+
+        Returns:
+            True if consolidation has not been completed
+        """
+        # Check if consolidation flag exists
+        if self._consolidated_flag.exists():
+            return False
+
+        # Check if there are any legacy databases to migrate
+        legacy_dbs = [
+            self.victor_dir / "conversation.db",
+            self.victor_dir / "profile_learning.db",
+            self.victor_dir / "project.db",  # Old mixed database
+        ]
+
+        for db_path in legacy_dbs:
+            if db_path.exists() and db_path.stat().st_size > 0:
+                return True
+
+        return False
+
+    def consolidate(self) -> None:
+        """Consolidate databases to canonical two-database structure.
+
+        Raises:
+            Exception: If consolidation fails
+        """
+        if not self.needs_consolidation():
+            logger.debug("Database consolidation already completed")
+            return
+
+        logger.info("Starting database consolidation...")
+
+        try:
+            # Step 1: Backup existing databases
+            self._backup_legacy_databases()
+
+            # Step 2: Migrate global data to ~/.victor/victor.db
+            self._migrate_global_database()
+
+            # Step 3: Migrate project data to ./.victor/project.db
+            self._migrate_project_databases()
+
+            # Step 4: Create consolidation flag
+            self._consolidated_flag.write_text(
+                f"consolidated_at={datetime.now().isoformat()}\n" f"schema_version=6\n"
+            )
+
+            logger.info("Database consolidation complete")
+
+        except Exception as e:
+            logger.error(f"Database consolidation failed: {e}")
+            raise
+
+    def _backup_legacy_databases(self) -> None:
+        """Backup legacy databases with .bak.<timestamp> suffix."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        legacy_dbs = [
+            self.victor_dir / "conversation.db",
+            self.victor_dir / "profile_learning.db",
+            self.victor_dir / "project.db",
+            self.victor_dir / "graph" / "graph.db",
+        ]
+
+        for db_path in legacy_dbs:
+            if db_path.exists() and db_path.stat().st_size > 0:
+                backup_path = Path(f"{db_path}.bak.{timestamp}")
+                shutil.copy2(db_path, backup_path)
+                logger.info(f"Backed up {db_path.name} to {backup_path.name}")
+
+    def _migrate_global_database(self) -> None:
+        """Migrate global user data to ~/.victor/victor.db."""
+        target_path = self.victor_dir / "victor.db"
+
+        # Source databases with global data
+        sources = [
+            self.victor_dir / "conversation.db",
+            self.victor_dir / "profile_learning.db",
+            self.victor_dir / "project.db",  # Old mixed database
+        ]
+
+        for source_path in sources:
+            if source_path.exists() and source_path.stat().st_size > 0:
+                self._migrate_global_tables(source_path, target_path)
+
+    def _migrate_global_tables(
+        self,
+        source_path: Path,
+        target_path: Path,
+    ) -> None:
+        """Migrate global tables from source to target database.
+
+        Global tables (user-wide data):
+        - rl_* (reinforcement learning)
+        - agent_* (agent learning, teams)
+        - ui_* (UI sessions, preferences)
+        - interaction_history (profile learning)
+        - profile_metrics (profile learning)
+        """
+        # Global tables to migrate
+        global_tables = {
+            # RL tables
+            "rl_learner",
+            "rl_outcome",
+            "rl_metric",
+            "rl_q_value",
+            "rl_transition",
+            "rl_param",
+            "rl_task_stat",
+            "rl_mode_q",
+            "rl_mode_history",
+            "rl_mode_task",
+            "rl_model_q",
+            "rl_model_task",
+            "rl_model_state",
+            "rl_tool_q",
+            "rl_tool_task",
+            "rl_tool_outcome",
+            "rl_cache_q",
+            "rl_cache_tool",
+            "rl_cache_history",
+            "rl_grounding_param",
+            "rl_grounding_stat",
+            "rl_grounding_history",
+            "rl_semantic_stat",
+            "rl_patience_stat",
+            "rl_prompt_stat",
+            "rl_quality_weight",
+            "rl_quality_history",
+            "rl_provider_stat",
+            "rl_context_pruning",
+            "rl_pattern",
+            "rl_pattern_use",
+            # Agent tables
+            "agent_team_config",
+            "agent_team_run",
+            "agent_workflow_run",
+            "agent_workflow_q",
+            "agent_prompt_style",
+            "agent_prompt_element",
+            "agent_prompt_history",
+            "agent_prompt_candidate",
+            "agent_prompt_pareto_instance",
+            "agent_curriculum_stage",
+            "agent_curriculum_metric",
+            "agent_curriculum_history",
+            "agent_policy_snapshot",
+            # UI tables
+            "ui_session",
+            "ui_failed_call",
+            # Profile learning
+            "interaction_history",
+            "profile_metrics",
+        }
+
+        self._migrate_tables(source_path, target_path, global_tables)
+
+    def _migrate_project_databases(self) -> None:
+        """Migrate project data to ./.victor/project.db."""
+        # For each project directory with a legacy database
+        project_dir = Path.cwd() / ".victor"
+
+        # Check for standalone graph.db in project
+        graph_db = project_dir / "graph.db"
+        if graph_db.exists() and graph_db.stat().st_size > 0:
+            target_path = project_dir / "project.db"
+            self._migrate_project_tables(graph_db, target_path)
+
+    def _migrate_project_tables(
+        self,
+        source_path: Path,
+        target_path: Path,
+    ) -> None:
+        """Migrate project tables from source to target database.
+
+        Project tables (project-specific data):
+        - graph_* (graph nodes, edges, file mtime)
+        - messages, sessions (conversations)
+        - context_sizes, context_summaries
+        - entities (entity memory)
+        - change_groups, file_changes (change tracking)
+        """
+        # Project tables to migrate
+        project_tables = {
+            # Graph tables
+            "graph_node",
+            "graph_edge",
+            "graph_file_mtime",
+            "graph_module_metric",
+            "graph_module_metric_history",
+            "graph_requirement",
+            "graph_subgraph",
+            "graph_subgraph_node",
+            # Conversation tables
+            "messages",
+            "sessions",
+            "context_sizes",
+            "context_summaries",
+            # Entity memory
+            "entities",
+            # Changes
+            "change_groups",
+            "file_changes",
+        }
+
+        self._migrate_tables(source_path, target_path, project_tables)
+
+    def _migrate_tables(
+        self,
+        source_path: Path,
+        target_path: Path,
+        table_names: set,
+    ) -> None:
+        """Migrate tables from source to target database.
+
+        Args:
+            source_path: Path to source database
+            target_path: Path to target database
+            table_names: Set of table names to migrate
+        """
+        import sqlite3
+
+        # Connect to both databases
+        source_conn = sqlite3.connect(str(source_path))
+        target_conn = sqlite3.connect(str(target_path))
+
+        try:
+            # Attach source database
+            target_conn.execute("ATTACH DATABASE ? AS source_db", (str(source_path),))
+
+            # Get tables in source that we want to migrate
+            cursor = target_conn.execute("""
+                SELECT name FROM source_db.sqlite_master
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+            """)
+            source_tables = {row[0] for row in cursor.fetchall()}
+
+            # Migrate matching tables
+            migrated = 0
+            for table in table_names & source_tables:
+                try:
+                    # Check if table exists in target
+                    target_cursor = target_conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+                    )
+                    if target_cursor.fetchone():
+                        # Table exists, copy data if target is empty
+                        source_count = target_conn.execute(
+                            f"SELECT COUNT(*) FROM source_db.{table}"
+                        ).fetchone()[0]
+                        target_count = target_conn.execute(
+                            f"SELECT COUNT(*) FROM {table}"
+                        ).fetchone()[0]
+
+                        if source_count > 0 and target_count == 0:
+                            target_conn.execute(f"""
+                                INSERT INTO {table}
+                                SELECT * FROM source_db.{table}
+                            """)
+                            logger.debug(f"Copied {source_count} rows from {table}")
+                            migrated += 1
+                    else:
+                        # Create table and copy data
+                        schema_row = target_conn.execute(
+                            """
+                            SELECT sql FROM source_db.sqlite_master
+                            WHERE type='table' AND name=?
+                        """,
+                            (table,),
+                        ).fetchone()
+
+                        if schema_row and schema_row[0]:
+                            target_conn.execute(schema_row[0])
+                            target_conn.execute(f"""
+                                INSERT INTO {table}
+                                SELECT * FROM source_db.{table}
+                            """)
+
+                            # Copy indexes
+                            idx_cursor = target_conn.execute(
+                                """
+                                SELECT sql FROM source_db.sqlite_master
+                                WHERE type='index' AND tbl_name=? AND sql IS NOT NULL
+                            """,
+                                (table,),
+                            )
+                            for idx_row in idx_cursor:
+                                try:
+                                    target_conn.execute(idx_row[0])
+                                except sqlite3.OperationalError:
+                                    pass  # Index may already exist
+
+                            migrated += 1
+                            logger.debug(f"Migrated table: {table}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to migrate {table}: {e}")
+
+            target_conn.commit()
+
+            if migrated > 0:
+                logger.info(f"Migrated {migrated} tables from {source_path.name}")
+
+        finally:
+            target_conn.execute("DETACH DATABASE source_db")
+            source_conn.close()
+            target_conn.close()
+
+
+def _normalize_project_database_paths(project_path: Optional[Path]) -> tuple[Path, Path, Path]:
+    """Normalize project DB input to project root, state dir, and db file."""
+    if project_path is None:
+        resolved = Path.cwd().resolve()
+    else:
+        resolved = Path(project_path).resolve()
+
+    if resolved.suffix == ".db":
+        project_dir = resolved.parent
+        db_path = resolved
+    elif resolved.name == ".victor":
+        project_dir = resolved
+        db_path = project_dir / "project.db"
+    else:
+        project_dir = resolved / ".victor"
+        db_path = project_dir / "project.db"
+
+    project_root = project_dir.parent
+    return project_root, project_dir, db_path
+
+
+class _DatabaseManagerBase:
+    """Base class for database managers with shared connection logic.
+
+    Provides common functionality for managing SQLite database connections:
+    - Thread-local connection storage
+    - Raw connection retrieval with lazy initialization
+    - Connection cleanup
+
+    This base class is inherited by both DatabaseManager and ProjectDatabaseManager
+    to avoid code duplication.
+    """
+
+    def __init__(self):
+        """Initialize thread-local storage for database connection."""
+        import threading
+
+        self._local = threading.local()
+
+    def _get_raw_connection(self) -> sqlite3.Connection:
+        """Get raw SQLite connection (thread-local).
+
+        Creates a new connection if one doesn't exist for the current thread.
+        All connections use Row factory for convenient column access.
+
+        Returns:
+            Thread-local SQLite connection with Row factory
+
+        ENHANCEMENT: Added retry logic for concurrent access during init.
+        """
+        if not hasattr(self._local, "conn") or self._local.conn is None:
+            import time
+
+            max_retries = 3
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    self._local.conn = sqlite3.connect(
+                        str(self.db_path),
+                        check_same_thread=False,
+                        timeout=30.0,  # 30 second timeout for SQLite locks
+                    )
+                    self._local.conn.row_factory = sqlite3.Row
+                    break  # Success
+                except sqlite3.OperationalError as e:
+                    last_error = e
+                    if "locked" in str(e).lower() and attempt < max_retries - 1:
+                        # Brief wait before retry (exponential backoff)
+                        wait_time = 0.1 * (2**attempt)
+                        logger.debug(
+                            "Database locked (attempt %d/%d), retrying in %.2fs",
+                            attempt + 1,
+                            max_retries,
+                            wait_time,
+                        )
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        # Re-raise if not a lock error or out of retries
+                        raise
+
+            # Should not reach here, but handle it
+            if not hasattr(self._local, "conn") or self._local.conn is None:
+                raise sqlite3.OperationalError(
+                    f"Failed to open database after {max_retries} attempts: {last_error}"
+                )
+
+        return self._local.conn
+
+    def close(self) -> None:
+        """Close the database connection.
+
+        Closes the thread-local connection if it exists and clears the reference.
+        Safe to call multiple times.
+        """
+        if hasattr(self._local, "conn") and self._local.conn:
+            self._local.conn.close()
+            self._local.conn = None
+
+
+class DatabaseManager(_DatabaseManagerBase):
     """Unified database manager for Victor.
 
     Provides a single SQLite database for all components, with:
@@ -132,6 +587,9 @@ class DatabaseManager:
         if self._initialized:
             return
 
+        # Initialize base class (sets up self._local)
+        super().__init__()
+
         self._victor_dir = Path.home() / ".victor"
         self._victor_dir.mkdir(parents=True, exist_ok=True)
 
@@ -139,7 +597,6 @@ class DatabaseManager:
             db_path = self._victor_dir / "victor.db"
 
         self.db_path = db_path
-        self._local = threading.local()
         self._migration_lock = threading.Lock()
         self._migrated = False
 
@@ -153,6 +610,12 @@ class DatabaseManager:
         """Ensure database exists and is up to date."""
         from victor.core.schema import Tables, Schema
 
+        # Run database consolidation if needed
+        consolidator = DatabaseConsolidator(self._victor_dir)
+        if consolidator.needs_consolidation():
+            logger.info("Running database consolidation...")
+            consolidator.consolidate()
+
         # Create database if needed
         conn = self._get_raw_connection()
 
@@ -165,19 +628,11 @@ class DatabaseManager:
         conn.execute(Schema.SYS_METADATA)
         conn.commit()
 
-        # Run migrations if needed
-        self._run_migrations(conn)
+        # Run schema version migrations if needed
+        self._run_schema_version_migrations(conn)
 
-    def _get_raw_connection(self) -> sqlite3.Connection:
-        """Get raw SQLite connection (thread-local)."""
-        if not hasattr(self._local, "conn") or self._local.conn is None:
-            self._local.conn = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-                timeout=30.0,
-            )
-            self._local.conn.row_factory = sqlite3.Row
-        return self._local.conn
+        # Run legacy migrations if needed
+        self._run_migrations(conn)
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection.
@@ -305,6 +760,61 @@ class DatabaseManager:
         """
         rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row[0] for row in rows]
+
+    def _run_schema_version_migrations(self, conn: sqlite3.Connection) -> None:
+        """Run schema version migrations.
+
+        Args:
+            conn: Database connection
+        """
+        from victor.core.schema import Tables, CURRENT_SCHEMA_VERSION, get_migration_sql
+
+        # Get current schema version
+        cursor = conn.execute(
+            f"SELECT value FROM {Tables.SYS_METADATA} WHERE key = 'schema_version'"
+        )
+        row = cursor.fetchone()
+
+        if row:
+            current_version = int(row[0])
+        else:
+            # First time initialization - set version to CURRENT
+            conn.execute(
+                f"""
+                INSERT INTO {Tables.SYS_METADATA} (key, value, updated_at)
+                VALUES ('schema_version', ?, datetime('now'))
+                """,
+                (str(CURRENT_SCHEMA_VERSION),),
+            )
+            conn.commit()
+            logger.info(f"Database initialized at schema version {CURRENT_SCHEMA_VERSION}")
+            return
+
+        # Run migrations if needed
+        if current_version < CURRENT_SCHEMA_VERSION:
+            logger.info(
+                f"Migrating database from version {current_version} to {CURRENT_SCHEMA_VERSION}"
+            )
+
+            migration_sqls = get_migration_sql(current_version, CURRENT_SCHEMA_VERSION)
+
+            for sql in migration_sqls:
+                try:
+                    conn.execute(sql)
+                except Exception as e:
+                    logger.warning(f"Migration SQL failed (may be idempotent): {e}")
+
+            # Update schema version
+            conn.execute(
+                f"""
+                UPDATE {Tables.SYS_METADATA}
+                SET value = ?, updated_at = datetime('now')
+                WHERE key = 'schema_version'
+                """,
+                (str(CURRENT_SCHEMA_VERSION),),
+            )
+            conn.commit()
+            logger.info(f"Database migrated to schema version {CURRENT_SCHEMA_VERSION}")
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
         """Run database migrations from legacy databases."""
@@ -490,17 +1000,191 @@ class DatabaseManager:
 
         return stats
 
+    # Table groups for bulk operations
+    TABLE_GROUPS = {
+        "rl": ["rl_outcome", "rl_metric"],
+        "agent": ["agent_prompt_history", "agent_workflow_run", "agent_team_run"],
+    }
+
+    # Column name mapping: table → date column used for time-based pruning
+    # Tables use different names: created_at, timestamp, executed_at
+    _DATE_COLUMNS = {
+        "rl_outcome": "created_at",
+        "rl_metric": "created_at",
+        "agent_prompt_history": "timestamp",
+        "agent_workflow_run": "executed_at",
+        "agent_team_run": "created_at",
+        "rl_cache_history": "created_at",
+        "rl_grounding_history": "created_at",
+        "rl_tool_outcome": "created_at",
+    }
+
+    def _get_date_column(self, table: str) -> str:
+        """Get the date column name for a table, with auto-detection fallback."""
+        if table in self._DATE_COLUMNS:
+            return self._DATE_COLUMNS[table]
+        # Auto-detect
+        conn = self.get_connection()
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info([{table}])").fetchall()}
+        for candidate in ("created_at", "timestamp", "executed_at", "updated_at"):
+            if candidate in cols:
+                return candidate
+        raise ValueError(f"No date column found in '{table}' (columns: {cols})")
+
+    def get_tables_for_group(self, group: str) -> list:
+        """Get table names for a logical group. 'all' returns all prunable tables."""
+        if group == "all":
+            tables = []
+            for g in self.TABLE_GROUPS.values():
+                tables.extend(g)
+            return tables
+        return list(self.TABLE_GROUPS.get(group, []))
+
+    def prune_table(
+        self,
+        table: str,
+        *,
+        older_than_days: int | None = None,
+        keep_last: int | None = None,
+    ) -> int:
+        """Delete old rows from a table.
+
+        Args:
+            table: Table name (must be in a known group for safety)
+            older_than_days: Delete rows older than N days (uses created_at)
+            keep_last: Keep only the most recent N rows
+
+        Returns:
+            Number of rows deleted
+        """
+        # Safety: only allow pruning known tables
+        all_prunable = self.get_tables_for_group("all")
+        if table not in all_prunable:
+            raise ValueError(f"Table '{table}' not in prunable tables: {all_prunable}")
+
+        conn = self.get_connection()
+
+        if older_than_days is not None:
+            from datetime import datetime, timedelta, timezone
+
+            date_col = self._get_date_column(table)
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
+            cursor = conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (cutoff,))
+            conn.commit()
+            deleted = cursor.rowcount
+            logger.info(
+                "Pruned %d rows from %s (older than %d days)", deleted, table, older_than_days
+            )
+            return deleted
+
+        if keep_last is not None:
+            cursor = conn.execute(
+                f"DELETE FROM [{table}] WHERE id NOT IN "
+                f"(SELECT id FROM [{table}] ORDER BY id DESC LIMIT ?)",
+                (keep_last,),
+            )
+            conn.commit()
+            deleted = cursor.rowcount
+            logger.info("Pruned %d rows from %s (kept last %d)", deleted, table, keep_last)
+            return deleted
+
+        return 0
+
+    def archive_table(self, table: str, before_date: str, output_path: "Path") -> int:
+        """Export rows before a date to gzip JSONL, then delete them.
+
+        Args:
+            table: Table name
+            before_date: ISO date string (YYYY-MM-DD)
+            output_path: Path for the .jsonl.gz archive file
+
+        Returns:
+            Number of rows archived
+        """
+        import gzip
+        import json
+
+        all_prunable = self.get_tables_for_group("all")
+        if table not in all_prunable:
+            raise ValueError(f"Table '{table}' not prunable")
+
+        conn = self.get_connection()
+        date_col = self._get_date_column(table)
+        cursor = conn.execute(f"SELECT * FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+
+        if not rows:
+            return 0
+
+        # Write to gzip JSONL
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(output_path, "wt", encoding="utf-8") as f:
+            for row in rows:
+                record = dict(zip(columns, row))
+                f.write(json.dumps(record, default=str) + "\n")
+
+        # Delete archived rows
+        conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
+        conn.commit()
+
+        logger.info("Archived %d rows from %s to %s", len(rows), table, output_path)
+        return len(rows)
+
+    def get_table_stats(self) -> list:
+        """Get per-table statistics for all tables with data.
+
+        Returns:
+            List of dicts with table, rows, min_date, max_date, est_size_kb
+        """
+        conn = self.get_connection()
+        tables = [
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        ]
+
+        stats = []
+        for table in sorted(tables):
+            try:
+                count = conn.execute(f"SELECT count(*) FROM [{table}]").fetchone()[0]
+                if count == 0:
+                    continue
+
+                # Try to get date range (check multiple column names)
+                min_date = max_date = None
+                try:
+                    date_col = self._get_date_column(table)
+                    row = conn.execute(
+                        f"SELECT MIN([{date_col}]), MAX([{date_col}]) FROM [{table}]"
+                    ).fetchone()
+                    min_date, max_date = row[0], row[1]
+                except Exception:
+                    pass
+
+                # Estimate size from sample
+                sample = conn.execute(f"SELECT * FROM [{table}] LIMIT 5").fetchall()
+                avg_row = sum(len(str(r)) for r in sample) / max(len(sample), 1)
+                est_kb = int(count * avg_row / 1024)
+
+                stats.append(
+                    {
+                        "table": table,
+                        "rows": count,
+                        "min_date": str(min_date)[:10] if min_date else None,
+                        "max_date": str(max_date)[:10] if max_date else None,
+                        "est_size_kb": est_kb,
+                    }
+                )
+            except Exception:
+                continue
+
+        return stats
+
     def vacuum(self) -> None:
         """Vacuum the database to reclaim space."""
         conn = self.get_connection()
         conn.execute("VACUUM")
         logger.info("Database vacuumed")
-
-    def close(self) -> None:
-        """Close the database connection."""
-        if hasattr(self._local, "conn") and self._local.conn:
-            self._local.conn.close()
-            self._local.conn = None
 
     # =========================================================================
     # Async API (wraps sync methods via thread pool)
@@ -704,7 +1388,7 @@ class DatabaseManager:
         await self.flush_writes_async()
 
 
-class ProjectDatabaseManager:
+class ProjectDatabaseManager(_DatabaseManagerBase):
     """Project-level database manager for repo-specific data.
 
     Manages project-scoped data in .victor/project.db:
@@ -763,14 +1447,15 @@ class ProjectDatabaseManager:
         Args:
             project_path: Path to project root. If None, uses current directory.
         """
-        if project_path is None:
-            project_path = Path.cwd()
+        project_root, project_dir, db_path = _normalize_project_database_paths(project_path)
 
-        self.project_dir = project_path / ".victor"
+        # Initialize base class (sets up self._local)
+        super().__init__()
+
+        self.project_root = project_root
+        self.project_dir = project_dir
         self.project_dir.mkdir(parents=True, exist_ok=True)
-
-        self.db_path = self.project_dir / "project.db"
-        self._local = threading.local()
+        self.db_path = db_path
         self._migration_lock = threading.Lock()
         self._migrated = False
 
@@ -811,17 +1496,6 @@ class ProjectDatabaseManager:
 
         # Run migrations if needed
         self._run_migrations(conn)
-
-    def _get_raw_connection(self) -> sqlite3.Connection:
-        """Get raw SQLite connection (thread-local)."""
-        if not hasattr(self._local, "conn") or self._local.conn is None:
-            self._local.conn = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-                timeout=30.0,
-            )
-            self._local.conn.row_factory = sqlite3.Row
-        return self._local.conn
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection."""
@@ -999,12 +1673,6 @@ class ProjectDatabaseManager:
 
         return stats
 
-    def close(self) -> None:
-        """Close the database connection."""
-        if hasattr(self._local, "conn") and self._local.conn:
-            self._local.conn.close()
-            self._local.conn = None
-
 
 # Module-level singleton accessors
 _database: Optional[DatabaseManager] = None
@@ -1036,10 +1704,8 @@ def get_project_database(project_path: Optional[Path] = None) -> ProjectDatabase
         ProjectDatabaseManager instance for the project
     """
     global _project_databases
-    if project_path is None:
-        project_path = Path.cwd()
-
-    project_key = str(project_path.resolve())
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
+    project_key = str(db_path)
     if project_key not in _project_databases:
         _project_databases[project_key] = ProjectDatabaseManager(project_path)
     return _project_databases[project_key]
@@ -1057,10 +1723,8 @@ def reset_database() -> None:
 def reset_project_database(project_path: Optional[Path] = None) -> None:
     """Reset project database instance (for testing)."""
     global _project_databases
-    if project_path is None:
-        project_path = Path.cwd()
-
-    project_key = str(project_path.resolve())
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
+    project_key = str(db_path)
     if project_key in _project_databases:
         _project_databases[project_key].close()
         del _project_databases[project_key]

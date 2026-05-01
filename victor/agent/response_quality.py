@@ -518,7 +518,10 @@ class ResponseQualityScorer:
 
         # Check for action indicators in response
         has_steps = bool(
-            re.search(r"(?:^|\n)\s*(?:\d+[.):]|Step\s+\d+|First|Second|Then|Finally)", response)
+            re.search(
+                r"(?:^|\n)\s*(?:\d+[.):]|Step\s+\d+|First|Second|Then|Finally)",
+                response,
+            )
         )
         if has_steps:
             score += 0.2
@@ -537,7 +540,10 @@ class ResponseQualityScorer:
 
         # Check for file paths
         has_file_refs = bool(
-            re.search(r"(?:in|edit|modify|create)\s+[`\"']?[\w./]+\.(?:py|js|ts|json)", response)
+            re.search(
+                r"(?:in|edit|modify|create)\s+[`\"']?[\w./]+\.(?:py|js|ts|json)",
+                response,
+            )
         )
         if has_file_refs:
             score += 0.05

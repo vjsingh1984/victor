@@ -10,14 +10,9 @@ from victor import Agent
 
 async def analyze_code_quality(file_path: str):
     """Analyze code quality and provide feedback."""
-    agent = Agent.create(
-        vertical="coding",
-        tools=["read", "grep"],
-        temperature=0.3
-    )
+    agent = Agent.create(vertical="coding", tools=["read", "grep"], temperature=0.3)
 
-    result = await agent.run(
-        f"""Analyze the code in {file_path}.
+    result = await agent.run(f"""Analyze the code in {file_path}.
 
         Focus on:
         1. Code quality and readability
@@ -26,19 +21,14 @@ async def analyze_code_quality(file_path: str):
         4. Performance concerns
         5. Best practices violations
 
-        Provide specific, actionable feedback with line numbers where applicable."""
-    )
+        Provide specific, actionable feedback with line numbers where applicable.""")
 
     return result.content
 
 
 async def suggest_improvements(file_path: str):
     """Suggest specific code improvements."""
-    agent = Agent.create(
-        vertical="coding",
-        tools=["read"],
-        temperature=0.5
-    )
+    agent = Agent.create(vertical="coding", tools=["read"], temperature=0.5)
 
     result = await agent.run(
         f"""Review the code in {file_path} and suggest improvements.
@@ -66,7 +56,7 @@ async def main():
     quality_report = await analyze_code_quality(file_to_analyze)
     print(quality_report)
 
-    print("\n" + "="*60 + "\n")
+    print("\n" + "=" * 60 + "\n")
 
     # Suggest improvements
     print("Suggesting improvements...")

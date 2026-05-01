@@ -165,7 +165,10 @@ def _extract_api_info(tree: ast.AST, module_name: str) -> Dict[str, Any]:
             methods = []
             for item in node.body:
                 if isinstance(item, ast.FunctionDef):
-                    if not item.name.startswith("_") or item.name in ("__init__", "__str__"):
+                    if not item.name.startswith("_") or item.name in (
+                        "__init__",
+                        "__str__",
+                    ):
                         methods.append(
                             {
                                 "name": item.name,
@@ -626,8 +629,20 @@ def _analyze_non_python_file(
     priority=Priority.MEDIUM,  # Task-specific documentation generation
     access_mode=AccessMode.WRITE,  # Writes documentation files
     danger_level=DangerLevel.LOW,  # File changes are additive and undoable
-    keywords=["docs", "documentation", "docstring", "api", "readme", "type hints", "generate"],
-    mandatory_keywords=["generate docs", "add documentation", "document code"],  # Force inclusion
+    keywords=[
+        "docs",
+        "documentation",
+        "docstring",
+        "api",
+        "readme",
+        "type hints",
+        "generate",
+    ],
+    mandatory_keywords=[
+        "generate docs",
+        "add documentation",
+        "document code",
+    ],  # Force inclusion
     task_types=["documentation", "generation"],  # Classification-aware selection
     stages=["planning", "analysis", "completion"],  # Conversation stages where relevant
 )
@@ -732,7 +747,12 @@ async def docs(
                 elif isinstance(node, ast.ClassDef):
                     if not ast.get_docstring(node):
                         items_to_document.append(
-                            {"type": "class", "name": node.name, "node": node, "line": node.lineno}
+                            {
+                                "type": "class",
+                                "name": node.name,
+                                "node": node,
+                                "line": node.lineno,
+                            }
                         )
 
             if items_to_document:
@@ -948,7 +968,9 @@ async def docs_coverage(
         if _extractor is None and _extractor_error is None:
             try:
                 from victor.core.capability_registry import CapabilityRegistry
-                from victor.framework.vertical_protocols import TreeSitterExtractorProtocol
+                from victor.framework.vertical_protocols import (
+                    TreeSitterExtractorProtocol,
+                )
 
                 provider = CapabilityRegistry.get_instance().get(TreeSitterExtractorProtocol)
                 if provider is not None and CapabilityRegistry.get_instance().is_enhanced(

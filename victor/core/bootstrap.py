@@ -48,13 +48,46 @@ from victor.core.container import (
 
 logger = logging.getLogger(__name__)
 
-_VERTICAL_PACKAGE_HINTS: Dict[str, str] = {
-    "coding": "victor-coding",
-    "research": "victor-research",
-    "devops": "victor-devops",
-    "investment": "victor-invest",
-}
+# Vertical package hints loaded dynamically from entry points.
+# No hardcoded vertical names in core — verticals advertise
+# themselves via victor.vertical_hints entry points.
+_DEFAULT_VERTICAL_PACKAGE_HINTS: Dict[str, str] = {}
 _REPORTED_MISSING_VERTICALS: Set[str] = set()
+
+
+def _load_vertical_package_hints() -> Dict[str, str]:
+    """Load vertical package hints from entry points with hardcoded fallbacks.
+
+    Scans ``victor.vertical_hints`` entry points so that external vertical
+    packages can advertise their pip-installable name without modifying
+    this module.  Falls back to ``_DEFAULT_VERTICAL_PACKAGE_HINTS`` for
+    any vertical not covered by an entry point.
+
+    Each entry point should have ``name=<vertical>`` and its loaded value
+    should be the pip package name (a plain string).
+    """
+    hints = dict(_DEFAULT_VERTICAL_PACKAGE_HINTS)
+    try:
+        from importlib.metadata import entry_points
+
+        eps = entry_points()
+        # Python 3.12+ returns a SelectableGroups, older returns dict
+        group_eps = (
+            eps.select(group="victor.vertical_hints")
+            if hasattr(eps, "select")
+            else eps.get("victor.vertical_hints", [])
+        )  # noqa: E501
+        for ep in group_eps:
+            try:
+                value = ep.load()
+                if isinstance(value, str):
+                    hints[ep.name] = value
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return hints
+
 
 T = TypeVar("T")
 
@@ -275,9 +308,33 @@ def _phase_capabilities(container, settings, context):
     _report_capability_health(context.get("active_vertical"), container)
 
 
-def _phase_coding(container, settings, context):
-    """Phase: Language plugins, indexing (optional)."""
-    _register_coding_services(container, settings)
+def _phase_vertical_services(container, settings, context):
+    """Phase: Vertical-specific bootstrap services via entry points.
+
+    Scans ``victor.bootstrap_services`` entry points so external
+    verticals can register bootstrap hooks without modifying this
+    module.  No hardcoded vertical calls — all verticals participate
+    equally through entry points.
+    """
+    # Discover bootstrap service hooks from entry points
+    try:
+        from importlib.metadata import entry_points as _ep
+
+        eps = _ep()
+        group_eps = (
+            eps.select(group="victor.bootstrap_services")
+            if hasattr(eps, "select")
+            else eps.get("victor.bootstrap_services", [])
+        )
+        for ep in group_eps:
+            try:
+                hook = ep.load()
+                hook(container, settings, context)
+                logger.debug("Loaded bootstrap service entry point: %s", ep.name)
+            except Exception as exc:
+                logger.debug("Skipped bootstrap service %s: %s", ep.name, exc)
+    except Exception as exc:
+        logger.debug("Bootstrap service entry point discovery failed: %s", exc)
 
 
 def _phase_signature(container, settings, context):
@@ -290,9 +347,9 @@ def _phase_orchestrator(container, settings, context):
     _register_orchestrator_services(container, settings)
 
 
-def _phase_solid(container, settings, context):
-    """Phase: SOLID-refactored services (feature-flag gated)."""
-    _register_solid_refactored_services(container, settings)
+def _phase_agent_services(container, settings, context):
+    """Phase: canonical agent-service bootstrap."""
+    _register_agent_services(container, settings)
 
 
 def _phase_workflow(container, settings, context):
@@ -351,10 +408,20 @@ _BOOTSTRAP_PHASES = [
         depends_on=("core", "events", "analytics", "embedding"),
     ),
     BootstrapPhase("capabilities", _phase_capabilities, depends_on=("plugins",)),
-    BootstrapPhase("coding", _phase_coding, depends_on=("capabilities",), optional=True),
+    BootstrapPhase(
+        "vertical_services",
+        _phase_vertical_services,
+        depends_on=("capabilities",),
+        optional=True,
+    ),
     BootstrapPhase("signature", _phase_signature, depends_on=("settings",)),
     BootstrapPhase("orchestrator", _phase_orchestrator, depends_on=("capabilities",)),
-    BootstrapPhase("solid", _phase_solid, depends_on=("orchestrator",), optional=True),
+    BootstrapPhase(
+        "agent_services",
+        _phase_agent_services,
+        depends_on=("orchestrator",),
+        optional=True,
+    ),
     BootstrapPhase("workflow", _phase_workflow, depends_on=("settings",)),
     BootstrapPhase("compiler_plugins", _phase_compiler_plugins, depends_on=("settings",)),
     BootstrapPhase("extensions", _phase_extensions, depends_on=("events",)),
@@ -547,9 +614,29 @@ def _register_analytics_services(container: ServiceContainer, settings: Settings
 
     # Enhanced usage logger
     paths = get_project_paths()
+
+    # Check for test mode and redirect telemetry to test-specific location
+    # This prevents MagicMock events from test suites from polluting global usage.jsonl
+    import os
+
+    if (
+        os.getenv("PYTEST_XDIST_WORKER")
+        or os.getenv("TEST_MODE")
+        or os.getenv("PYTEST_CURRENT_TEST")
+    ):
+        # Running under pytest - use test-specific log file
+        import tempfile
+
+        test_log_dir = Path(tempfile.gettempdir()) / "victor_test_telemetry"
+        test_log_dir.mkdir(exist_ok=True)
+        usage_log_file = test_log_dir / "test_usage.jsonl"
+    else:
+        # Normal operation - use global logs directory
+        usage_log_file = paths.global_logs_dir / "usage.jsonl"
+
     container.register(
         UsageLoggerProtocol,
-        lambda c: _create_usage_logger(paths.global_logs_dir / "usage.jsonl", settings),
+        lambda c: _create_usage_logger(usage_log_file, settings),
         ServiceLifetime.SINGLETON,
     )
 
@@ -563,7 +650,7 @@ def _register_embedding_services(container: ServiceContainer, settings: Settings
     """
     from victor.storage.embeddings.service import EmbeddingService
 
-    model_name = settings.unified_embedding_model
+    model_name = settings.embedding.unified_embedding_model
 
     container.register(
         EmbeddingServiceProtocol,
@@ -596,6 +683,7 @@ def bootstrap_capabilities() -> None:
         IgnorePatternsProtocol,
         LanguageRegistryProtocol,
         SymbolStoreFactoryProtocol,
+        TaskClassifierPhraseProtocol,
         TaskTypeHintProtocol,
         TreeSitterExtractorProtocol,
         TreeSitterParserProtocol,
@@ -623,6 +711,18 @@ def bootstrap_capabilities() -> None:
     registry.register(IgnorePatternsProtocol, BasicIgnorePatterns(), CapabilityStatus.STUB)
     registry.register(LanguageRegistryProtocol, NullLanguageRegistry(), CapabilityStatus.STUB)
     registry.register(TaskTypeHintProtocol, NullTaskTypeHinter(), CapabilityStatus.STUB)
+
+    class _NullClassifierPhraseContributor:
+        """Returns no additional phrases when no vertical enhances this."""
+
+        def get_classifier_phrases(self) -> dict:
+            return {}
+
+    registry.register(
+        TaskClassifierPhraseProtocol,
+        _NullClassifierPhraseContributor(),
+        CapabilityStatus.STUB,
+    )
 
     from victor.contrib.editing.diff_editor import DiffEditor
 
@@ -659,9 +759,61 @@ def bootstrap_capabilities() -> None:
     except Exception as e:
         logger.debug(f"Entry point discovery failed: {e}")
 
-    # 3. Auto-detect installed vertical packages that provide enhanced capabilities
+    # 3. Discover enhanced capabilities from plugin verticals.
+    #    Plugins (victor.plugins entry points) register verticals that declare
+    #    capabilities via get_capability_registrations(). This path ensures
+    #    tools like graph/search that run outside AgentFactory still get
+    #    the enhanced CodebaseIndex factory from victor-coding.
+    _discover_plugin_capabilities(registry)
+
+    # 4. Auto-detect installed vertical packages that provide enhanced capabilities
     #    but haven't registered via entry points (e.g., victor-coding's CodebaseIndex).
     _auto_detect_enhanced_capabilities(registry)
+
+
+# CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+# Capability registration ultimately runs inside plugin.register(HostPluginContext),
+# so this entry-point is the *single* side-effecting registration path. Do not
+# add a parallel entry-point scan here — PluginRegistry owns discovery.
+def _discover_plugin_capabilities(registry: Any) -> None:
+    """Discover enhanced capabilities from installed plugin verticals.
+
+    Triggers full plugin registration if not already done, which causes:
+    plugin.register(context) → context.register_vertical(VerticalClass)
+    → _auto_register_vertical_capabilities() → CapabilityRegistry.register(ENHANCED)
+
+    This replaces the hardcoded _PLUGIN_VERTICAL_MAP with dynamic discovery.
+
+    The check uses CapabilityRegistry state (not PluginRegistry.context) to
+    decide whether to re-run discovery.  This handles the case where the
+    CapabilityRegistry singleton was reset (e.g., by test fixtures) while
+    the ServiceContainer singleton still has Settings registered, causing
+    ensure_bootstrapped() to take the early-return path.
+    """
+    try:
+        from victor.core.capability_registry import CapabilityRegistry as CapReg
+        from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+
+        cap_registry = CapReg.get_instance()
+
+        # If enhanced capabilities already registered, nothing to do.
+        if cap_registry.is_enhanced(CodebaseIndexFactoryProtocol):
+            return
+
+        from victor.core.plugins.registry import PluginRegistry
+
+        plugin_registry = PluginRegistry.get_instance()
+        # Force full registration — capabilities are missing even if
+        # the plugin context was set by a previous (now stale) bootstrap.
+        plugin_registry.register_all()
+        # Verify registration succeeded
+        if not cap_registry.is_enhanced(CodebaseIndexFactoryProtocol):
+            logger.warning(
+                "Plugin capability discovery completed but CodebaseIndex "
+                "still not enhanced — check victor-coding plugin registration"
+            )
+    except Exception as e:
+        logger.warning("Plugin capability discovery failed: %s", e, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -674,18 +826,11 @@ def bootstrap_capabilities() -> None:
 #
 # To add a new auto-detected capability, append an entry here — no new
 # function needed.
-_AUTO_DETECT_SPECS: list[dict[str, Any]] = [
-    {
-        "protocol_attr": "CodebaseIndexFactoryProtocol",
-        "factory": "victor.core.search.indexer:detect_enhanced_index_factory",
-        "label": "CodebaseIndexFactory",
-    },
-    {
-        "protocol_attr": "EditorProtocol",
-        "import_path": "victor_coding.editing.editor:FileEditor",
-        "label": "FileEditor",
-    },
-]
+# DEPRECATED: Capabilities are now registered via the plugin system.
+# Plugins call context.register_capability() or declare them via
+# get_capability_registrations() on their VerticalBase subclass.
+# See HostPluginContext.register_vertical() for the bridge logic.
+_AUTO_DETECT_SPECS: list[dict[str, Any]] = []
 
 
 def _auto_detect_enhanced_capabilities(registry: Any) -> None:
@@ -737,11 +882,14 @@ def _auto_detect_enhanced_capabilities(registry: Any) -> None:
                 logger.debug(f"{label} auto-detection skipped: {e}")
 
 
-def _register_coding_services(container: ServiceContainer, settings: Settings) -> None:
-    """Register coding services (language plugins, indexing).
+def _register_language_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register language plugin services (discovery, indexing).
 
     This ensures language plugins are discovered at startup, not mid-conversation.
-    Uses the capability registry — no direct victor_coding imports.
+    Uses the capability registry — no direct vertical imports.
+
+    Note: Currently unused by bootstrap phases. Available for vertical-triggered
+    language plugin discovery via ``victor.bootstrap_services`` entry points.
     """
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import LanguageRegistryProtocol
@@ -770,8 +918,10 @@ def _register_signature_store(container: ServiceContainer, settings: Settings) -
 
 def _create_usage_logger(log_file: Path, settings: Settings) -> Any:
     """Create usage logger with enhanced features if available."""
+    sampling_filter = _create_sampling_filter(settings)
+
     try:
-        from victor.analytics.enhanced_logger import EnhancedUsageLogger
+        from victor.observability.analytics.enhanced_logger import EnhancedUsageLogger
 
         return EnhancedUsageLogger(
             log_file=log_file,
@@ -781,13 +931,34 @@ def _create_usage_logger(log_file: Path, settings: Settings) -> Any:
             max_log_size=10 * 1024 * 1024,  # 10MB
             backup_count=5,
             compress_rotated=True,
+            sampling_filter=sampling_filter,
         )
     except Exception as e:
         logger.warning(f"Failed to create enhanced logger: {e}")
         # Fall back to basic logger
-        from victor.analytics.logger import UsageLogger
+        from victor.observability.analytics.logger import UsageLogger
 
-        return UsageLogger(log_file, enabled=True)
+        return UsageLogger(log_file, enabled=True, sampling_filter=sampling_filter)
+
+
+def _create_sampling_filter(settings: Settings) -> Any:
+    """Create semantic sampling filter if enabled in settings."""
+    if not getattr(settings, "usage_sampling_enabled", True):
+        return None
+    try:
+        from victor.observability.analytics.sampling_filter import (
+            SamplingPolicy,
+            SemanticSamplingFilter,
+        )
+
+        policy = SamplingPolicy(
+            sample_rate=getattr(settings, "usage_content_sample_rate", 10),
+            dedup_window_seconds=getattr(settings, "usage_dedup_window_seconds", 5.0),
+        )
+        return SemanticSamplingFilter(policy)
+    except Exception as e:
+        logger.debug("Sampling filter unavailable: %s", e)
+        return None
 
 
 def _create_signature_store() -> Any:
@@ -839,23 +1010,13 @@ def _register_orchestrator_services(container: ServiceContainer, settings: Setti
         logger.warning(f"Failed to register orchestrator services: {e}")
 
 
-def _register_solid_refactored_services(container: ServiceContainer, settings: Settings) -> None:
-    """Register SOLID-refactored service architecture (Phase 6).
+def _register_agent_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register the canonical agent-service layer.
 
-    This function bootstraps the new service-oriented architecture when
-    feature flags are enabled. It provides a graceful migration path by:
-
-    1. Checking feature flags before bootstrapping new services
-    2. Only registering services that have their flags enabled
-    3. Maintaining backward compatibility when flags are disabled
-
-    Services registered (when flags enabled):
-    - ChatServiceProtocol: Chat flow coordination
-    - ToolServiceProtocol: Tool operations
-    - ContextServiceProtocol: Context management
-    - ProviderServiceProtocol: Provider management
-    - RecoveryServiceProtocol: Error recovery
-    - SessionServiceProtocol: Session lifecycle
+    The service layer is part of the default runtime shape. Bootstrap occurs
+    whenever the required conversation and streaming collaborators are
+    available; only optional decision-service registration remains feature-flag
+    controlled inside :mod:`victor.core.bootstrap_services`.
 
     Args:
         container: DI container to register services in
@@ -871,8 +1032,6 @@ def _register_solid_refactored_services(container: ServiceContainer, settings: S
         conversation_controller = container.get_optional(ConversationControllerProtocol)
         streaming_coordinator = container.get_optional(StreamingCoordinatorProtocol)
 
-        # Only bootstrap new services if feature flags are enabled
-        # AND we have the required dependencies
         if conversation_controller is not None and streaming_coordinator is not None:
             from victor.core.bootstrap_services import bootstrap_new_services
 
@@ -881,13 +1040,12 @@ def _register_solid_refactored_services(container: ServiceContainer, settings: S
                 conversation_controller=conversation_controller,
                 streaming_coordinator=streaming_coordinator,
             )
-            logger.debug("Bootstrapped SOLID-refactored services (feature flag controlled)")
+            logger.debug("Bootstrapped canonical agent services")
         else:
-            logger.debug("Skipping SOLID-refactored services bootstrap (missing dependencies)")
+            logger.debug("Skipping canonical agent-service bootstrap (missing dependencies)")
     except Exception as e:
-        # Don't fail bootstrap if new services can't be registered
-        # The orchestrator will fall back to existing implementation
-        logger.debug(f"Failed to bootstrap SOLID-refactored services: {e}")
+        # Don't fail bootstrap if canonical services can't be registered.
+        logger.debug("Failed to bootstrap canonical agent services: %s", e)
 
 
 def _register_workflow_services(container: ServiceContainer, settings: Settings) -> None:
@@ -909,7 +1067,9 @@ def _register_workflow_services(container: ServiceContainer, settings: Settings)
         settings: Application settings
     """
     try:
-        from victor.workflows.services.workflow_service_provider import configure_workflow_services
+        from victor.workflows.services.workflow_service_provider import (
+            configure_workflow_services,
+        )
 
         configure_workflow_services(container, settings)
         logger.debug("Registered workflow services")
@@ -927,9 +1087,12 @@ def _register_workflow_compiler_plugins(
 
     Part of Plugin Architecture - registers built-in compiler plugins.
     This enables:
-    - URI-based compiler creation (create_compiler("yaml://"))
-    - Third-party plugin registration via entry points
-    - Gradual migration from legacy to SOLID architecture
+    - Third-party plugin registration via WorkflowCompilerRegistry
+    - Entry-point-based plugin discovery
+
+    Note: UnifiedWorkflowCompiler is the canonical compiler API for framework
+    use (caching, multi-source, execution). The plugin registry extends it
+    with third-party compiler backends (e.g., S3, security-specific).
 
     Plugins registered:
     - YamlCompilerPlugin: YAML workflow compilation
@@ -988,7 +1151,9 @@ def _report_capability_health(
     available = set(VerticalRegistry.list_names())
     try:
         loader = get_vertical_loader()
-        available.update(loader.discover_verticals().keys())
+        # Use discover_vertical_names (reads entry point metadata only)
+        # instead of discover_verticals (imports + validates each class).
+        available.update(loader.discover_vertical_names())
     except Exception as exc:
         logger.debug(f"Vertical discovery failed during health check: {exc}")
 
@@ -996,7 +1161,7 @@ def _report_capability_health(
         return
 
     _REPORTED_MISSING_VERTICALS.add(normalized)
-    package_hint = _VERTICAL_PACKAGE_HINTS.get(normalized)
+    package_hint = _load_vertical_package_hints().get(normalized)
     if package_hint:
         remedy = (
             f"Install the '{package_hint}' package (e.g., `pip install {package_hint}`) "
@@ -1156,7 +1321,11 @@ def ensure_bootstrapped(
 
     # Check if already bootstrapped (Settings registered)
     if container.is_registered(Settings):
-        # Container already bootstrapped, but check if we need to switch verticals
+        # Container already bootstrapped — still run plugin discovery so capabilities
+        # from installed verticals (e.g. CodebaseIndex for graph tool) are registered
+        # even when no --vertical flag is passed.
+        _discover_plugin_capabilities(None)
+        # Check if we need to switch verticals
         if vertical is not None:
             _ensure_vertical_activated(container, settings or container.get(Settings), vertical)
         return container

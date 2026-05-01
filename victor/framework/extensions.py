@@ -110,9 +110,15 @@ __all__ = [
     "VerticalConfig",  # noqa: F822
     "VerticalExtensions",  # noqa: F822
     # Tool dependency types
+    "BaseToolDependencyProvider",  # noqa: F822
     "ToolDependencyConfig",  # noqa: F822
     "ToolDependency",  # noqa: F822
+    "YAMLToolDependencyProvider",  # noqa: F822
+    "load_tool_dependency_yaml",  # noqa: F822
     "create_vertical_tool_dependency_provider",  # noqa: F822
+    "TieredToolConfig",  # noqa: F822
+    "TaskTypeHint",  # noqa: F822
+    "ToolDependencyLoader",  # noqa: F822
     # Safety pattern types
     "SafetyExtensionProtocol",  # noqa: F822
     "SafetyPattern",  # noqa: F822
@@ -133,18 +139,18 @@ def __getattr__(name: str):
     """Lazy imports to avoid circular dependencies and unnecessary loading."""
     _LAZY_IMPORTS = {
         # Safety
-        "SafetyCoordinator": "victor.agent.coordinators.safety_coordinator",
-        "SafetyAction": "victor.agent.coordinators.safety_coordinator",
-        "SafetyCategory": "victor.agent.coordinators.safety_coordinator",
-        "SafetyRule": "victor.agent.coordinators.safety_coordinator",
+        "SafetyCoordinator": "victor_sdk.safety",
+        "SafetyAction": "victor_sdk.safety",
+        "SafetyCategory": "victor_sdk.safety",
+        "SafetyRule": "victor_sdk.safety",
         # Conversation
-        "ConversationCoordinator": "victor.agent.coordinators.conversation_coordinator",
-        "ConversationStats": "victor.agent.coordinators.conversation_coordinator",
-        "ConversationTurn": "victor.agent.coordinators.conversation_coordinator",
-        "TurnType": "victor.agent.coordinators.conversation_coordinator",
+        "ConversationCoordinator": "victor_sdk.conversation",
+        "ConversationStats": "victor_sdk.conversation",
+        "ConversationTurn": "victor_sdk.conversation",
+        "TurnType": "victor_sdk.conversation",
         # Workflow execution
         "WorkflowExecutor": "victor.workflows.executor",
-        "WorkflowContext": "victor.workflows.executor",
+        "WorkflowContext": "victor.workflows.context",
         "NodeResult": "victor.workflows.executor",
         "ExecutorNodeStatus": "victor.workflows.executor",
         "register_compute_handler": "victor.workflows.executor",
@@ -208,9 +214,15 @@ def __getattr__(name: str):
         "VerticalConfig": "victor_sdk",
         "VerticalExtensions": "victor_sdk",
         # Tool dependency types
+        "BaseToolDependencyProvider": "victor.core.tool_dependency_base",
         "ToolDependencyConfig": "victor.core.tool_dependency_base",
         "ToolDependency": "victor.core.tool_types",
+        "YAMLToolDependencyProvider": "victor.core.tool_dependency_loader",
+        "load_tool_dependency_yaml": "victor.core.tool_dependency_loader",
         "create_vertical_tool_dependency_provider": "victor.core.tool_dependency_loader",
+        "TieredToolConfig": "victor.core.verticals.protocols",
+        "TaskTypeHint": "victor.core.vertical_types",
+        "ToolDependencyLoader": "victor.core.tool_dependency_loader",
         # Safety pattern types
         "SafetyExtensionProtocol": "victor.core.verticals.protocols",
         "SafetyPattern": "victor.core.verticals.protocols",

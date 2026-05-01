@@ -131,6 +131,7 @@ import time
 import warnings
 import weakref
 from dataclasses import dataclass, field
+from enum import Enum
 
 from victor.framework.integration_registry import IntegrationPlanRegistry
 from pathlib import Path
@@ -195,7 +196,6 @@ def _warn_legacy_extension_registry_api(api_name: str) -> None:
         "See victor.framework.step_handlers.ExtensionsStepHandler.extension_registry. "
         "This will be removed in v1.0."
     )
-    warnings.warn(message, DeprecationWarning, stacklevel=3)
     logger.warning(message)
 
 
@@ -218,7 +218,8 @@ class ExtensionHandlerInfo:
     name: str
     attr_name: str
     handler: Callable[
-        ["VerticalIntegrationPipeline", Any, Any, VerticalContext, "IntegrationResult"], None
+        ["VerticalIntegrationPipeline", Any, Any, VerticalContext, "IntegrationResult"],
+        None,
     ]
     order: int = 100
 
@@ -463,8 +464,27 @@ class ExtensionLoadErrorInfo:
         }
 
 
-# Type alias for validation status
-ValidationStatus = Literal["success", "partial", "failed"]
+# =============================================================================
+# Enums for Vertical Integration
+# =============================================================================
+
+
+class ValidationStatus(str, Enum):
+    """Validation status for vertical capabilities.
+
+    Indicates the validation result:
+    - SUCCESS: All capabilities validated successfully
+    - PARTIAL: Some capabilities validated, others failed
+    - FAILED: All capabilities failed validation
+    """
+
+    SUCCESS = "success"  # All capabilities validated
+    PARTIAL = "partial"  # Some capabilities validated
+    FAILED = "failed"  # All capabilities failed
+
+
+# Backward compatibility
+_ValidationStatusLiteral = Literal["success", "partial", "failed"]
 
 
 @dataclass
@@ -842,7 +862,7 @@ class VerticalIntegrationPipeline:
         cache_ttl: int = 3600,
         max_cache_entries: int = 256,
         cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-        parallel_enabled: bool = False,
+        parallel_enabled: bool = True,
     ):
         """Initialize the pipeline.
 
@@ -2420,7 +2440,7 @@ def create_integration_pipeline(
     cache_ttl: int = 3600,
     max_cache_entries: int = 256,
     cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-    enable_parallel: bool = False,
+    enable_parallel: bool = True,
 ) -> VerticalIntegrationPipeline:
     """Create a vertical integration pipeline with feature flags (Phase 2).
 
@@ -2463,7 +2483,7 @@ def create_integration_pipeline_with_handlers(
     cache_ttl: int = 3600,
     max_cache_entries: int = 256,
     cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-    enable_parallel: bool = False,
+    enable_parallel: bool = True,
 ) -> VerticalIntegrationPipeline:
     """Create a pipeline with custom step handlers.
 

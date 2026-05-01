@@ -29,25 +29,25 @@ Example:
     manager = get_feature_flag_manager()
 
     # Check if a feature is enabled
-    if manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-        # Use new chat service
+    if manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
+        # Use smart routing
         pass
     else:
-        # Use legacy implementation
+        # Use default provider
         pass
 
     # Enable a feature at runtime
-    manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+    manager.enable(FeatureFlag.USE_SMART_ROUTING)
 
 Environment Variables:
-    VICTOR_USE_NEW_CHAT_SERVICE=true
-    VICTOR_USE_NEW_TOOL_SERVICE=false
+    VICTOR_USE_SMART_ROUTING=true
+    VICTOR_USE_EDGE_MODEL=false
     VICTOR_USE_COMPOSITION_OVER_INHERITANCE=true
 
 YAML Configuration (~/.victor/features.yaml):
     features:
-        use_new_chat_service: true
-        use_new_tool_service: false
+        use_smart_routing: true
+        use_edge_model: false
         use_composition_over_inheritance: true
 """
 
@@ -67,35 +67,16 @@ logger = logging.getLogger(__name__)
 
 
 class FeatureFlag(Enum):
-    """Feature flags for gradual rollout of SOLID refactoring.
+    """Feature flags for gradual rollout of new features.
 
-    Phase 1 - Foundation:
-        USE_NEW_CHAT_SERVICE: Use extracted ChatService instead of orchestrator methods
-        USE_NEW_TOOL_SERVICE: Use extracted ToolService instead of orchestrator methods
-        USE_NEW_CONTEXT_SERVICE: Use extracted ContextService for context management
-        USE_NEW_PROVIDER_SERVICE: Use extracted ProviderService for provider management
-        USE_NEW_RECOVERY_SERVICE: Use extracted RecoveryService for error recovery
-        USE_NEW_SESSION_SERVICE: Use extracted SessionService for session management
-
-    Phase 4 - Vertical Composition:
-        USE_COMPOSITION_OVER_INHERITANCE: Use composition-based verticals instead of inheritance
-
-    Phase 5 - Tool Registration:
-        USE_STRATEGY_BASED_TOOL_REGISTRATION: Use strategy pattern for tool registration
+    Active flags guard real behavior in the codebase. Removed flags that
+    no longer guard behavior (Phase 3 service layer flags removed in W3 cleanup).
 
     Usage:
-        Set via environment variable: VICTOR_USE_NEW_CHAT_SERVICE=true
-        Set via YAML config: features.use_new_chat_service: true
-        Enable at runtime: manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        Set via environment variable: VICTOR_USE_SMART_ROUTING=true
+        Set via YAML config: features.use_smart_routing: true
+        Enable at runtime: manager.enable(FeatureFlag.USE_SMART_ROUTING)
     """
-
-    # Phase 3 - Service Implementation
-    USE_NEW_CHAT_SERVICE = "use_new_chat_service"
-    USE_NEW_TOOL_SERVICE = "use_new_tool_service"
-    USE_NEW_CONTEXT_SERVICE = "use_new_context_service"
-    USE_NEW_PROVIDER_SERVICE = "use_new_provider_service"
-    USE_NEW_RECOVERY_SERVICE = "use_new_recovery_service"
-    USE_NEW_SESSION_SERVICE = "use_new_session_service"
 
     # Phase 4 - Vertical Composition
     USE_COMPOSITION_OVER_INHERITANCE = "use_composition_over_inheritance"
@@ -103,20 +84,86 @@ class FeatureFlag(Enum):
     # Phase 5 - Tool Registration
     USE_STRATEGY_BASED_TOOL_REGISTRATION = "use_strategy_based_tool_registration"
 
-    # Phase 6 - Service Layer (Strangler Fig)
-    USE_SERVICE_LAYER = "use_service_layer"
-
     # Phase 7 - LLM Decision Service
     USE_LLM_DECISION_SERVICE = "use_llm_decision_service"
 
     # Phase 8 - Edge Model for micro-decisions
     USE_EDGE_MODEL = "use_edge_model"
 
+    # Phase 14 - Fuzzy Matching for robust classification
+    # Enables Levenshtein-based fuzzy matching across all classification systems
+    # to handle typos and spelling variations while maintaining high precision.
+    # Default: True (enabled by default for better UX)
+    USE_FUZZY_MATCHING = "use_fuzzy_matching"
+
+    # Optimization flags (default: False — opt-in only)
+    USE_SEMANTIC_RESPONSE_CACHE = "use_semantic_response_cache"
+    USE_CONTEXT_TEMPERATURE = "use_context_temperature"
+    USE_CONFIDENCE_MONITOR = "use_confidence_monitor"
+
+    # Phase 11 - Smart Model Routing (automatic local→cloud fallback)
+    USE_SMART_ROUTING = "use_smart_routing"
+
+    # Priority 4 - Learning from Execution (meta-learning, user feedback, explainability)
+    # Default: enabled. Roll back with VICTOR_USE_LEARNING_FROM_EXECUTION=false.
+    USE_LEARNING_FROM_EXECUTION = "use_learning_from_execution"
+
+    # Tool Broadcasting Optimization (context-aware, economy-first)
+    TOOL_STRATEGY_V2 = "tool_strategy_v2"
+
+    # Phase 13 - Agentic rollout controls (default: False — opt-in only)
+    USE_AGENTIC_BENCH_GATES = "use_agentic_bench_gates"
+    USE_CALIBRATED_COMPLETION = "use_calibrated_completion"
+    USE_AGENTIC_RETRIEVAL_REPAIR = "use_agentic_retrieval_repair"
+    USE_UTILITY_RETRIEVAL = "use_utility_retrieval"
+    USE_PROMPT_COMPLETENESS_GUARD = "use_prompt_completeness_guard"
+    USE_PROMPT_DICTIONARY_COMPRESSION = "use_prompt_dictionary_compression"
+    USE_PRIME_MEMORY_EVOLUTION = "use_prime_memory_evolution"
+    USE_EXTERNAL_AGENTIC_BENCHMARKS = "use_external_agentic_benchmarks"
+
+    # Phase 9 - Prompt Optimization (controlled via settings.prompt_optimization)
+    # USE_PROMPT_OPTIMIZER → settings.prompt_optimization.enabled
+    # USE_GEPA_V2          → settings.prompt_optimization.gepa.enabled
+    # USE_GEPA_TRACE_ENRICHMENT → settings.prompt_optimization.gepa.capture_reasoning
+
+    # Phase 12 - Rich Formatting (unified formatter system with preview integration)
+    # USE_RICH_FORMATTING → settings.rich_formatting_enabled (master switch)
+    # This flag controls the entire Rich formatter system including:
+    # - Tool output formatting with Rich markup
+    # - Preview strategy integration
+    # - Performance guards and error handling
+    USE_RICH_FORMATTING = "use_rich_formatting"
+
+    # Phase 14 - Graph-Based Enhancements (unified graph schema, CCG, Graph RAG)
+    # These flags enable the new graph-based code intelligence features
+    USE_GRAPH_RAG = "use_graph_rag"
+    USE_CCG = "use_ccg"
+    USE_GRAPH_QUERY_TOOL = "use_graph_query_tool"
+    USE_MULTI_HOP_RETRIEVAL = "use_multi_hop_retrieval"
+    USE_GRAPH_ENHANCED_CONTEXT = "use_graph_enhanced_context"
+
+    # Phase 15 - Architecture Consolidation (Framework Primitives)
+    # USE_STATEGRAPH_AGENTIC_LOOP gates the StateGraph executor inside
+    # AgenticLoop.run() (see victor/framework/agentic_loop.py:593). The other
+    # Phase-15 placeholders (USE_FRAMEWORK_TEAMS, USE_FRAMEWORK_COORDINATORS,
+    # USE_CONTEXT_SERVICE_INJECTION) were removed — they were defined but
+    # never read by production code. Coordinator/team consolidation now ships
+    # unconditionally; teams use UnifiedTeamCoordinator directly.
+    USE_STATEGRAPH_AGENTIC_LOOP = "use_stategraph_agentic_loop"
+
+    # Phase 16 - Stage Transition Coordination (Streaming Path Optimization)
+    # USE_STAGE_TRANSITION_COORDINATOR enables batching of tool executions
+    # and Phase 1 optimizations (cooldown, high confidence skip) in the
+    # streaming path. Fixes the issue where the legacy streaming runtime bypasses
+    # Phase 1 optimizations and causes stage thrashing.
+    # Default: False (opt-in for gradual rollout)
+    USE_STAGE_TRANSITION_COORDINATOR = "use_stage_transition_coordinator"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
         Returns:
-            Environment variable name (e.g., VICTOR_USE_NEW_CHAT_SERVICE)
+            Environment variable name (e.g., VICTOR_USE_SMART_ROUTING)
         """
         return f"VICTOR_{self.value.upper()}"
 
@@ -124,9 +171,36 @@ class FeatureFlag(Enum):
         """Get the YAML configuration key for this flag.
 
         Returns:
-            YAML key (e.g., use_new_chat_service)
+            YAML key (e.g., use_edge_model)
         """
         return self.value
+
+    def is_opt_in_by_default(self) -> bool:
+        """Whether the flag should stay disabled unless explicitly enabled."""
+        return self in {
+            FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE,
+            FeatureFlag.USE_CONTEXT_TEMPERATURE,
+            FeatureFlag.USE_CONFIDENCE_MONITOR,
+            FeatureFlag.TOOL_STRATEGY_V2,
+            FeatureFlag.USE_AGENTIC_BENCH_GATES,
+            FeatureFlag.USE_CALIBRATED_COMPLETION,
+            FeatureFlag.USE_AGENTIC_RETRIEVAL_REPAIR,
+            FeatureFlag.USE_UTILITY_RETRIEVAL,
+            FeatureFlag.USE_PROMPT_COMPLETENESS_GUARD,
+            FeatureFlag.USE_PROMPT_DICTIONARY_COMPRESSION,
+            FeatureFlag.USE_PRIME_MEMORY_EVOLUTION,
+            FeatureFlag.USE_EXTERNAL_AGENTIC_BENCHMARKS,
+            # Phase 15: Architecture Consolidation (opt-in for safety)
+            FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP,
+            # Phase 16: Stage Transition Coordination (opt-in for gradual rollout)
+            FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR,
+        }
+
+    def get_default_enabled(self, fallback: bool) -> bool:
+        """Return the effective default state for this flag."""
+        if self.is_opt_in_by_default():
+            return False
+        return fallback
 
 
 @dataclass
@@ -161,11 +235,11 @@ class FeatureFlagManager:
         manager = FeatureFlagManager()
 
         # Check if a feature is enabled
-        if manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-            use_new_service()
+        if manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
+            use_smart_routing()
 
         # Enable a feature at runtime
-        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.enable(FeatureFlag.USE_SMART_ROUTING)
 
         # Get all enabled flags
         enabled_flags = manager.get_enabled_flags()
@@ -213,7 +287,7 @@ class FeatureFlagManager:
                 return self._flags[flag]
 
             # Return default
-            return self._config.default_enabled
+            return flag.get_default_enabled(self._config.default_enabled)
 
     def enable(self, flag: FeatureFlag) -> None:
         """Enable a feature flag at runtime.
@@ -302,8 +376,8 @@ class FeatureFlagManager:
 
         Expected YAML format:
             features:
-                use_new_chat_service: true
-                use_new_tool_service: false
+                use_edge_model: true
+                use_llm_decision_service: false
                 use_composition_over_inheritance: true
         """
         try:

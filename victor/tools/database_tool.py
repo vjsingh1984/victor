@@ -31,10 +31,12 @@ Features:
 """
 
 import sqlite3
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.formatters import format_database_results
 
 if TYPE_CHECKING:
     from victor.tools.cache_manager import CacheNamespace
@@ -45,6 +47,45 @@ _DEFAULT_MAX_ROWS: int = 100
 
 # Legacy session-level connection cache (use _get_connection_pool() for DI support)
 _connections: Dict[str, Any] = {}
+
+
+@dataclass
+class DatabaseConnection:
+    """Database connection configuration.
+
+    Consolidates all connection parameters into a single object.
+    Reduces parameter count from 6 to 1 for database operations.
+    """
+
+    db_type: str = "sqlite"
+    database: Optional[str] = None
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for internal use."""
+        return {
+            "db_type": self.db_type,
+            "database": self.database,
+            "host": self.host,
+            "port": self.port,
+            "username": self.username,
+            "password": self.password,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DatabaseConnection":
+        """Create from dictionary for backward compatibility."""
+        return cls(
+            db_type=data.get("db_type", "sqlite"),
+            database=data.get("database"),
+            host=data.get("host"),
+            port=data.get("port"),
+            username=data.get("username"),
+            password=data.get("password"),
+        )
 
 
 def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -201,7 +242,10 @@ async def _connect_sqlserver(
             "message": "Connected to SQL Server database",
         }
     except ImportError:
-        return {"success": False, "error": "SQL Server support requires: pip install pyodbc"}
+        return {
+            "success": False,
+            "error": "SQL Server support requires: pip install pyodbc",
+        }
     except Exception as e:
         return {"success": False, "error": f"SQL Server connection failed: {str(e)}"}
 
@@ -242,7 +286,12 @@ async def _do_connect(
         )
     elif db_type == "sqlserver":
         return await _connect_sqlserver(
-            {"database": database, "host": host, "username": username, "password": password},
+            {
+                "database": database,
+                "host": host,
+                "username": username,
+                "password": password,
+            },
             connection_pool,
         )
     else:
@@ -307,6 +356,14 @@ async def _do_query(
                 "rows": results,
                 "count": len(results),
                 "limited": len(rows) == query_limit,
+                "formatted_output": format_database_results(
+                    {
+                        "columns": columns,
+                        "rows": results,
+                        "count": len(results),
+                    }
+                ).content,
+                "contains_markup": True,
             }
         else:
             # Non-SELECT query (INSERT, UPDATE, DELETE)
@@ -408,9 +465,17 @@ async def _do_describe(
             ]
 
         else:
-            return {"success": False, "error": "Describe not implemented for this database type"}
+            return {
+                "success": False,
+                "error": "Describe not implemented for this database type",
+            }
 
-        return {"success": True, "table": table, "columns": columns, "count": len(columns)}
+        return {
+            "success": True,
+            "table": table,
+            "columns": columns,
+            "count": len(columns),
+        }
 
     except Exception as e:
         return {"success": False, "error": f"Failed to describe table: {str(e)}"}
@@ -457,7 +522,10 @@ async def _do_disconnect(
         conn.close()
         del pool[connection_id]
 
-        return {"success": True, "message": f"Disconnected from database: {connection_id}"}
+        return {
+            "success": True,
+            "message": f"Disconnected from database: {connection_id}",
+        }
 
     except Exception as e:
         return {"success": False, "error": f"Disconnect failed: {str(e)}"}
@@ -468,25 +536,53 @@ async def _do_disconnect(
     priority=Priority.MEDIUM,  # Task-specific database operations
     access_mode=AccessMode.MIXED,  # Reads and can modify database
     danger_level=DangerLevel.MEDIUM,  # Database modifications have impact
-    keywords=["database", "sql", "query", "connect", "tables", "sqlite", "postgres"],
+    mandatory_keywords=[
+        "database",
+        "sqlite",
+        "sqlite3",
+        "sql",
+        "query",
+        "tables",
+        "schema",
+        ".tables",
+        "SELECT",
+        "postgres",
+        "mysql",
+        "database file",
+        ".db",
+        ".sqlite",
+    ],
+    keywords=[
+        "database",
+        "sql",
+        "query",
+        "connect",
+        "tables",
+        "sqlite",
+        "sqlite3",
+        "postgres",
+        "mysql",
+        "schema",
+        "db",
+        "rows",
+    ],
 )
 async def database(
     action: str,
-    database: Optional[str] = None,
-    db_type: str = "sqlite",
-    host: Optional[str] = None,
-    port: Optional[int] = None,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
+    connection: Optional[DatabaseConnection] = None,
     connection_id: Optional[str] = None,
     sql: Optional[str] = None,
     table: Optional[str] = None,
     limit: Optional[int] = None,
-    allow_modifications: Optional[bool] = None,
+    allow_modifications: bool = False,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Unified database tool for SQL operations. Supports SQLite, PostgreSQL, MySQL, SQL Server.
+    Execute SQL queries and manage database schemas.
+
+    For SQLite database files (.db, .sqlite), you can either:
+    1. Use this tool: database(action="connect", connection=DatabaseConnection(db_type="sqlite", database="path/to/file.db"))
+    2. Use shell: shell(cmd='sqlite3 file.db ".tables"') for quick inspection
 
     Actions:
     - connect: Connect to a database
@@ -498,12 +594,7 @@ async def database(
 
     Args:
         action: Operation to perform - 'connect', 'query', 'tables', 'describe', 'schema', 'disconnect'.
-        database: Database name or path (required for connect).
-        db_type: Database type - 'sqlite', 'postgresql', 'mysql', 'sqlserver' (default: 'sqlite').
-        host: Database host for remote databases (default: 'localhost').
-        port: Database port (defaults vary by db_type).
-        username: Database username for authenticated connections.
-        password: Database password for authenticated connections.
+        connection: DatabaseConnection object with db_type, database, host, port, username, password.
         connection_id: Connection ID from previous connect (required for query/tables/describe/schema/disconnect).
         sql: SQL query to execute (required for query action).
         table: Table name (required for describe action).
@@ -520,20 +611,24 @@ async def database(
         - For schema: tables with their columns
         - error: Error message if failed
 
-    Example:
-        # Connect to PostgreSQL
-        database(action="connect", database="mydb", db_type="postgresql",
-                host="localhost", username="user", password="pass")
+    Examples:
+        # SQLite - Connect
+        database(action="connect", connection=DatabaseConnection(db_type="sqlite", database="data.db"))
 
-        # Query with returned connection_id
-        database(action="query", connection_id="postgresql_123",
-                sql="SELECT * FROM users LIMIT 10")
+        # SQLite - List tables
+        database(action="tables", connection_id="sqlite_12345")
 
-        # List tables
-        database(action="tables", connection_id="postgresql_123")
+        # SQLite - Query
+        database(action="query", connection_id="sqlite_12345", sql="SELECT * FROM users LIMIT 10")
 
-        # Describe table
-        database(action="describe", connection_id="postgresql_123", table="users")
+        # PostgreSQL - Connect
+        database(action="connect", connection=DatabaseConnection(
+            db_type="postgresql", database="mydb", host="localhost", username="user", password="pass"
+        ))
+
+        # Quick shell alternative for SQLite:
+        # shell(cmd='sqlite3 file.db ".tables"')
+        # shell(cmd='sqlite3 file.db "SELECT * FROM users LIMIT 10"')
     """
     action_lower = action.lower().strip()
 
@@ -541,37 +636,63 @@ async def database(
     pool = _get_connection_pool(_exec_ctx)
 
     if action_lower == "connect":
-        if not database:
-            return {"success": False, "error": "Missing required parameter: database"}
-        return await _do_connect(database, db_type, host, port, username, password, pool)
+        if connection is None:
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection (DatabaseConnection object)",
+            }
+        return await _do_connect(
+            connection.database,
+            connection.db_type,
+            connection.host,
+            connection.port,
+            connection.username,
+            connection.password,
+            pool,
+        )
 
     elif action_lower == "query":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         if not sql:
             return {"success": False, "error": "Missing required parameter: sql"}
         return await _do_query(connection_id, sql, limit, allow_modifications, pool)
 
     elif action_lower == "tables":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         return await _do_tables(connection_id, pool)
 
     elif action_lower == "describe":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         if not table:
             return {"success": False, "error": "Missing required parameter: table"}
         return await _do_describe(connection_id, table, pool)
 
     elif action_lower == "schema":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         return await _do_schema(connection_id, pool)
 
     elif action_lower == "disconnect":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         return await _do_disconnect(connection_id, pool)
 
     else:

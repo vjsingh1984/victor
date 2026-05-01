@@ -97,10 +97,18 @@ class TestIsWriteTool:
 
     def test_write_tools_set(self):
         """Test WRITE_TOOLS contains expected tools."""
-        assert "write_file" in WRITE_TOOLS
+        assert "write" in WRITE_TOOLS
         assert "shell" in WRITE_TOOLS
         assert "edit" in WRITE_TOOLS
         assert "git_commit" in WRITE_TOOLS
+
+    def test_recognizes_execute_bash_alias(self):
+        """Legacy execute_bash alias should still resolve as a write tool."""
+        assert is_write_tool("execute_bash") is True
+
+    def test_recognizes_notebook_edit_as_write_tool(self):
+        """Notebook edits should be treated as write operations consistently."""
+        assert is_write_tool("notebook_edit") is True
 
 
 # =============================================================================

@@ -32,6 +32,7 @@ from victor.integrations.api.fastapi_server import (
     _new_chat_request_id,
 )
 from victor.observability.request_correlation import request_correlation_id
+from victor.runtime.chat_runtime import resolve_chat_runtime
 
 if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
@@ -52,8 +53,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         request_id = _new_chat_request_id()
         response.headers["X-Victor-Request-Id"] = request_id
         orchestrator = await server._get_orchestrator()
+        chat_runtime = resolve_chat_runtime(orchestrator)
         with request_correlation_id(request_id):
-            chat_result = await orchestrator.chat(request.messages[-1].content)
+            chat_result = await chat_runtime.chat(request.messages[-1].content)
 
         content = getattr(chat_result, "content", None) or ""
         tool_calls = getattr(chat_result, "tool_calls", None) or []
@@ -71,10 +73,11 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         async def event_generator() -> AsyncIterator[str]:
             try:
                 orchestrator = await server._get_orchestrator()
+                chat_runtime = resolve_chat_runtime(orchestrator)
                 yield f'data: {json.dumps({"type": "request", "request_id": request_id})}\n\n'
 
                 with request_correlation_id(request_id):
-                    async for chunk in orchestrator.stream_chat(request.messages[-1].content):
+                    async for chunk in chat_runtime.stream_chat(request.messages[-1].content):
                         if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
                             content = getattr(chunk, "content", "")
                             tool_calls = getattr(chunk, "tool_calls", None)

@@ -5,7 +5,7 @@ These protocols define how verticals provide capability configurations.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Callable
+from typing import Protocol, runtime_checkable, Dict, Any, List, Optional
 
 from victor_sdk.core.types import CapabilityRequirementLike
 

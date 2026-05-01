@@ -63,7 +63,7 @@ class TestToolNamesConstants:
     def test_shell_tools(self):
         """Verify shell/command execution tool names."""
         assert ToolNames.SHELL == "shell"
-        assert ToolNames.SHELL_READONLY == "shell_readonly"
+        assert not hasattr(ToolNames, "SHELL_READONLY")
         assert ToolNames.SANDBOX == "sandbox"
         assert ToolNames.SANDBOX_UPLOAD == "sandbox_upload"
 
@@ -202,6 +202,7 @@ class TestToolAliases:
         assert TOOL_ALIASES["read_file"] == "read"
         assert TOOL_ALIASES["write_file"] == "write"
         assert TOOL_ALIASES["edit_files"] == "edit"
+        assert TOOL_ALIASES["edit_file"] == "edit"
         assert TOOL_ALIASES["list_directory"] == "ls"
         assert TOOL_ALIASES["plan_files"] == "plan"
         assert TOOL_ALIASES["get_project_overview"] == "overview"
@@ -209,6 +210,7 @@ class TestToolAliases:
     def test_shell_aliases(self):
         """Verify shell execution aliases."""
         assert TOOL_ALIASES["execute_bash"] == "shell"
+        assert "shell_readonly" not in TOOL_ALIASES
         assert TOOL_ALIASES["run"] == "shell"
         assert TOOL_ALIASES["bash"] == "shell"
         assert TOOL_ALIASES["execute"] == "shell"
@@ -218,7 +220,8 @@ class TestToolAliases:
 
     def test_search_aliases(self):
         """Verify search tool aliases."""
-        assert TOOL_ALIASES["code_search"] == "grep"
+        assert TOOL_ALIASES["code_search"] == "code_search"
+        assert TOOL_ALIASES["search"] == "code_search"
         assert TOOL_ALIASES["semantic_code_search"] == "code_search"
         assert TOOL_ALIASES["web_summarize"] == "summarize"
 
@@ -238,7 +241,14 @@ class TestToolAliases:
 
     def test_git_aliases(self):
         """Verify git operation aliases all map to 'git'."""
-        git_aliases = ["git_status", "git_diff", "git_log", "git_commit", "git_branch", "git_stage"]
+        git_aliases = [
+            "git_status",
+            "git_diff",
+            "git_log",
+            "git_commit",
+            "git_branch",
+            "git_stage",
+        ]
         for alias in git_aliases:
             assert TOOL_ALIASES[alias] == "git"
 
@@ -313,8 +323,10 @@ class TestGetCanonicalName:
     def test_alias_returns_canonical(self):
         """Aliases return their canonical form."""
         assert get_canonical_name("execute_bash") == "shell"
+        assert get_canonical_name("shell_readonly") == "shell_readonly"
         assert get_canonical_name("read_file") == "read"
         assert get_canonical_name("edit_files") == "edit"
+        assert get_canonical_name("edit_file") == "edit"
         assert get_canonical_name("run_tests") == "test"
 
     def test_canonical_returns_itself(self):
@@ -348,6 +360,7 @@ class TestGetAliases:
         """Returns aliases for canonical names with aliases."""
         aliases = get_aliases("shell")
         assert "execute_bash" in aliases
+        assert "shell_readonly" not in aliases
         assert "bash" in aliases
         assert "run" in aliases
 
@@ -378,6 +391,7 @@ class TestIsValidToolName:
         assert is_valid_tool_name("read_file") is True
         assert is_valid_tool_name("edit_files") is True
         assert is_valid_tool_name("git_status") is True
+        assert is_valid_tool_name("shell_readonly") is False
 
     def test_unknown_names_invalid(self):
         """Unknown names are invalid."""
@@ -417,6 +431,7 @@ class TestGetAllCanonicalNames:
         """Does not contain alias names."""
         names = get_all_canonical_names()
         assert "execute_bash" not in names
+        assert "shell_readonly" not in names
         assert "read_file" not in names
         assert "edit_files" not in names
 
@@ -440,6 +455,7 @@ class TestGetNameMapping:
         """Aliases map to their canonical names."""
         mapping = get_name_mapping()
         assert mapping["execute_bash"] == "shell"
+        assert "shell_readonly" not in mapping
         assert mapping["read_file"] == "read"
         assert mapping["edit_files"] == "edit"
 

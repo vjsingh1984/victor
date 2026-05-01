@@ -193,7 +193,12 @@ class TestApplyPatchToContent:
                 old_count=3,
                 new_start=1,
                 new_count=3,
-                lines=[" line1", "-line2", "+line2_modified", " line3"],  # line1 doesn't match
+                lines=[
+                    " line1",
+                    "-line2",
+                    "+line2_modified",
+                    " line3",
+                ],  # line1 doesn't match
             )
         ]
 

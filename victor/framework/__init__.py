@@ -19,6 +19,11 @@ Quick Start:
     result = await agent.run("Write a hello world function")
     print(result.content)
 
+Advanced Config:
+    from victor.framework import Agent, UnifiedAgentConfig
+
+    agent = await Agent.create(config=UnifiedAgentConfig.high_budget())
+
 Streaming:
     async for event in agent.stream("Refactor this code"):
         if event.type == EventType.CONTENT:
@@ -44,9 +49,11 @@ State Observation:
 
 Escape Hatch:
     # Access full AgentOrchestrator for advanced use cases
-    orchestrator = agent.get_orchestrator()
+orchestrator = agent.get_orchestrator()
     # Now you have access to all 27+ internal components
 """
+
+import warnings
 
 # === CORE: Always imported (the 5 concepts + errors + protocols) ===
 from victor.framework._api import *  # noqa: F401,F403
@@ -199,8 +206,18 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "RLOutcome",
         "RLRecommendation",
         "RLStats",
+        "analyze_prompt_rollout_experiment",
+        "analyze_prompt_rollout_experiment_async",
+        "apply_prompt_rollout_recommendation",
+        "apply_prompt_rollout_recommendation_async",
+        "process_prompt_candidate_evaluation_suite",
+        "process_prompt_candidate_evaluation_suite_async",
+        "PromptCandidateSuiteWorkflowResult",
+        "create_prompt_rollout_experiment",
+        "create_prompt_rollout_experiment_async",
         "create_outcome",
         "get_rl_coordinator",
+        "get_rl_coordinator_async",
         "record_tool_success",
     ],
     "victor.framework.team_registry": [
@@ -371,6 +388,13 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "create_devops_prompt_builder",
         "create_research_prompt_builder",
     ],
+    "victor.framework.prompt_document": [
+        "PromptBlock",
+        "PromptDocument",
+        "PromptDocumentProcessor",
+        "PromptDeduplicationProcessor",
+        "PromptPriorityTrimProcessor",
+    ],
     "victor.framework.prompt_sections": [
         "GROUNDING_RULES_EXTENDED",
         "GROUNDING_RULES_MINIMAL",
@@ -450,6 +474,41 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "create_file_error",
         "wrap_error",
         "format_exception_for_user",
+    ],
+    "victor.framework.perception_integration": [
+        "Perception",
+        "PerceptionIntegration",
+        "Requirement",
+        "RequirementType",
+        "SimilarExperience",
+        "perceive",
+    ],
+    "victor.framework.evaluation_nodes": [
+        "EvaluationCheckpoint",
+        "EvaluationDecision",
+        "EvaluationNode",
+        "EvaluationResult",
+        "add_evaluation",
+        "composite_evaluator",
+        "convergence_evaluator",
+        "create_agentic_loop_graph",
+        "error_count_evaluator",
+        "progress_tracking_evaluator",
+        "simple_score_evaluator",
+    ],
+    "victor.framework.fulfillment": [
+        "FulfillmentConfig",
+        "FulfillmentDetector",
+        "FulfillmentResult",
+        "FulfillmentStatus",
+        "FulfillmentStrategy",
+        "TaskType",
+    ],
+    "victor.framework.agentic_loop": [
+        "AgenticLoop",
+        "LoopIteration",
+        "LoopResult",
+        "LoopStage",
     ],
 }
 
@@ -531,6 +590,18 @@ _ALIASED_IMPORTS: dict[str, tuple[str, str]] = {
     # agent_components also defines it (first-wins in _NAME_TO_MODULE)
 }
 
+_DEPRECATED_COMPAT_EXPORTS: dict[str, tuple[str, str, str]] = {
+    "FrameworkShim": (
+        "victor.framework.shim",
+        "FrameworkShim",
+        "victor.framework.FrameworkShim is deprecated. "
+        "Use Agent.create() from the Framework API instead. "
+        "This warning-backed compatibility export remains supported through "
+        "v1.0.0 (2027-06-30). "
+        "See docs/architecture/migration.md for migration guidance.",
+    ),
+}
+
 # Build reverse lookup: name -> module path
 _NAME_TO_MODULE: dict[str, str] = {}
 for _mod, _names in _LAZY_IMPORTS.items():
@@ -540,6 +611,16 @@ for _mod, _names in _LAZY_IMPORTS.items():
 
 
 def __getattr__(name: str):
+    if name in _DEPRECATED_COMPAT_EXPORTS:
+        import importlib
+
+        mod_path, real_name, message = _DEPRECATED_COMPAT_EXPORTS[name]
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        mod = importlib.import_module(mod_path)
+        value = getattr(mod, real_name)
+        globals()[name] = value
+        return value
+
     # Check aliased imports first
     if name in _ALIASED_IMPORTS:
         import importlib

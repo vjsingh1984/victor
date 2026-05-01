@@ -65,11 +65,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
-from contextlib import asynccontextmanager
 
+from victor.config.settings import get_project_paths
 from victor.workflows.hitl import (
     HITLFallback,
     HITLNodeType,
@@ -87,6 +89,11 @@ logger = logging.getLogger(__name__)
 def _utc_now() -> datetime:
     """Return current UTC time (timezone-aware)."""
     return datetime.now(timezone.utc)
+
+
+def get_default_hitl_db_path() -> Path:
+    """Resolve the default persistent HITL database path."""
+    return get_project_paths().global_victor_dir / "hitl.db"
 
 
 # ============================================================================
@@ -212,7 +219,7 @@ class HITLStore:
         now = _utc_now()
         pending = []
         for stored in self._requests.values():
-            if stored.status == "pending":
+            if stored.status == HITLStatus.PENDING.value:
                 # Check if expired
                 if stored.expires_at and now > stored.expires_at:
                     stored.status = "expired"
@@ -310,8 +317,8 @@ class HITLStore:
         except asyncio.TimeoutError:
             # Mark as timed out
             async with self._lock:
-                if stored.status == "pending":
-                    stored.status = "timeout"
+                if stored.status == HITLStatus.PENDING.value:
+                    stored.status = HITLStatus.TIMEOUT.value
             return None
 
     async def subscribe(
@@ -370,7 +377,7 @@ class HITLStore:
         async with self._lock:
             for request_id, stored in self._requests.items():
                 if stored.expires_at and now > stored.expires_at:
-                    if stored.status == "pending":
+                    if stored.status == HITLStatus.PENDING.value:
                         stored.status = "expired"
                         event = self._events.get(request_id)
                         if event:
@@ -429,12 +436,10 @@ class SQLiteHITLStore:
             db_path: Path to SQLite database (default: ~/.victor/hitl.db)
             table_name: Table name for HITL requests
         """
-        from pathlib import Path
-
         if db_path is None:
-            victor_dir = Path.home() / ".victor"
-            victor_dir.mkdir(parents=True, exist_ok=True)
-            db_path = str(victor_dir / "hitl.db")
+            default_db_path = get_default_hitl_db_path()
+            default_db_path.parent.mkdir(parents=True, exist_ok=True)
+            db_path = str(default_db_path)
 
         self.db_path = db_path
         self.table_name = table_name
@@ -534,7 +539,7 @@ class SQLiteHITLStore:
             status=row["status"],
             response=response,
             created_at=datetime.fromisoformat(row["created_at"]),
-            expires_at=datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None,
+            expires_at=(datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None),
         )
 
     async def store_request(

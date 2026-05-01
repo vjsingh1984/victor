@@ -11,6 +11,36 @@ Core runtime code lives in `victor/`. The main boundaries worth knowing are:
 - `docs/`: MkDocs source. `site/` is generated output and should not be hand-edited unless the task is specifically about generated artifacts.
 - `ui/`, `web/ui/`, and `vscode-victor/`: separate frontend projects with their own `package.json` and lockfiles.
 
+## Database Architecture
+
+Victor uses a canonical two-database architecture (schema version 6):
+
+**Global Database** (`~/.victor/victor.db`) — User-wide data:
+- Settings, API keys, profiles
+- RL learning (rl_outcomes, rl_q_values, tool/model preferences)
+- Team composition stats
+- Cross-project patterns
+- TUI session persistence
+
+**Project Database** (`./.victor/project.db`) — Project-specific data:
+- Graph nodes/edges (symbols, references, definitions)
+- Conversations and messages
+- Project sessions, cache, entity memory
+- Change tracking
+
+**Access Pattern:**
+```python
+from victor.core.database import get_database, get_project_database
+
+global_db = get_database()  # ~/.victor/victor.db
+project_db = get_project_database()  # ./.victor/project.db
+```
+
+**Migration:**
+- Consolidation runs automatically on first access
+- Legacy databases backed up with `.bak.<timestamp>` suffix
+- Always use `get_database()` and `get_project_database()` accessors
+
 ## Generated Files & Repo Hygiene
 Prefer editing source, not generated output:
 - Do not hand-edit `site/`, `htmlcov/`, `dist/`, `build/`, `ui/dist/`, `.pytest_cache/`, `.mypy_cache/`, or `.ruff_cache/` unless the task explicitly targets generated artifacts.
@@ -71,11 +101,47 @@ When changing native-extension behavior, verify both the Rust side and the Pytho
 Use the smallest layer that fits the change:
 - Put framework-wide abstractions in `victor/framework/` only when they are truly reusable.
 - Keep domain-specific behavior in verticals, tools, providers, or integrations instead of expanding core APIs.
+- Reuse existing framework-level capabilities wherever feasible. When CLI, chat, API, or integration behavior needs to change, prefer extending or upgrading the underlying `victor/framework/` capability first, then wire the surface layer to consume and test that shared path instead of adding local ad hoc logic.
+- Treat this as a design mandate for user-facing orchestration work: interface layers should primarily compose, configure, and expose framework behavior. If a surface needs special handling, make the framework abstraction capable of supporting it cleanly before adding surface-specific branching.
 - Update docs when user-facing commands, config, providers, workflows, or public APIs change.
+- Before adding new logic, first verify whether similar behavior already exists in the repo and prefer enhancing or reusing it instead of duplicating it.
+- If the existing implementation is close but not sufficient, refactor toward the smallest clear abstraction that improves reuse, maintainability, and scalability without widening scope unnecessarily.
+- When refactoring is required, favor well-bounded class and protocol design, explicit ownership, and composition-oriented patterns that keep the solution extensible for future features.
 
 Large framework-level changes usually need more than code:
 - Changes to `victor/framework/` public APIs, protocol definitions, workflow DSL structure, or major architecture patterns likely need a FEP and docs updates.
 - For version changes, update `VERSION` and use `python scripts/sync_version.py` so root and `victor-sdk/` stay aligned.
+
+## Team Architecture Reminder
+
+**IMPORTANT**: Teams are formations, not separate graphs.
+
+- **StateGraph** is the execution engine (always)
+- **Teams/Formations** are coordination patterns for multiple agents (logical layer)
+- **"Multi-agent"** means a StateGraph where some nodes are team formations
+- **DO NOT** create separate "multi-agent graph" abstractions
+- **DO** use UnifiedTeamCoordinator directly as a StateGraph node
+
+Correct usage:
+```python
+from victor.framework import StateGraph
+from victor.teams import UnifiedTeamCoordinator, TeamFormation
+
+coordinator = UnifiedTeamCoordinator(orchestrator)
+coordinator.set_formation(TeamFormation.PARALLEL)
+coordinator.add_member(agent1).add_member(agent2)
+
+graph = StateGraph(AgentState)
+graph.add_node("research_team", coordinator)  # Direct usage!
+```
+
+Wrong (don't do this):
+```python
+# Don't create wrapper nodes for each formation
+# Don't create separate "multi-agent graph" types
+```
+
+This architectural principle was established after Phase 4 consolidation revealed that wrapper layers (team_nodes.py, multi_agent_graph.py) added unnecessary indirection without value.
 
 ## Commit & Pull Request Guidelines
 Follow Conventional Commits such as `feat: add workflow retry guard` or `fix: handle empty tool result`. Keep commits scoped. Reference issues with `Fixes #123` when appropriate.

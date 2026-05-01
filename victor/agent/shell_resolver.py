@@ -2,7 +2,7 @@
 
 Extracted from AgentOrchestrator to reduce orchestrator LOC.
 Handles resolution of LLM-hallucinated shell tool names (run, bash, execute)
-to the appropriate enabled shell variant (shell, shell_readonly).
+to the canonical shell tool.
 """
 
 from __future__ import annotations
@@ -14,12 +14,19 @@ from victor.tools.alias_resolver import get_alias_resolver
 from victor.tools.tool_names import ToolNames
 
 if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
 # Shell-related aliases that should resolve intelligently
-SHELL_ALIASES = {"run", "bash", "execute", "cmd", "execute_bash", "shell_readonly", "shell"}
+SHELL_ALIASES = {
+    "run",
+    "bash",
+    "execute",
+    "cmd",
+    "execute_bash",
+    "shell",
+}
 
 
 def resolve_shell_variant(
@@ -27,11 +34,10 @@ def resolve_shell_variant(
     tools: "ToolRegistry",
     mode_controller: Optional[object] = None,
 ) -> str:
-    """Resolve shell aliases to the appropriate enabled shell variant.
+    """Resolve shell aliases to the canonical shell tool.
 
     LLMs often hallucinate shell tool names like 'run', 'bash', 'execute'.
-    These map to 'shell' canonically, but in INITIAL stage only 'shell_readonly'
-    may be enabled. This resolves to whichever shell variant is available.
+    These map to 'shell' canonically.
 
     Args:
         tool_name: Original tool name (may be alias like 'run')
@@ -39,7 +45,7 @@ def resolve_shell_variant(
         mode_controller: Mode controller for checking BUILD mode
 
     Returns:
-        The appropriate enabled shell tool name, or original if not a shell alias
+        The canonical shell tool name, or original if not a shell alias
     """
     if tool_name not in SHELL_ALIASES:
         return tool_name
@@ -72,10 +78,6 @@ def _shell_alias_resolver(
         logger.debug(f"Resolved '{tool_name}' to 'shell' (shell enabled)")
         return ToolNames.SHELL
 
-    if tools.is_tool_enabled(ToolNames.SHELL_READONLY):
-        logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
-        return ToolNames.SHELL_READONLY
-
     canonical = get_canonical_name(tool_name)
-    logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
+    logger.debug(f"Shell tool not enabled for '{tool_name}', using canonical '{canonical}'")
     return canonical

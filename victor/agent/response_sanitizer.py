@@ -33,7 +33,14 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
+
+# Import native dispatch functions for ~3x speedup when available
+from victor.processing.native.tool_extraction import (
+    sanitize_response_fast,
+    is_garbage_content_fast,
+    strip_markup_fast,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -359,8 +366,64 @@ class StreamingContentFilter:
         return result
 
 
+class _NativeFilterWrapper:
+    """Python wrapper around the native Rust StreamingFilter.
+
+    The Rust extension exposes ``process_chunk`` / ``should_abort`` /
+    ``get_state`` but lacks ``is_thinking``, ``abort_reason``, and
+    ``flush`` — all used by ``handler.py``.  This thin wrapper fills those
+    gaps so callers see a uniform interface regardless of which backend is
+    active.
+    """
+
+    def __init__(self, inner: Any, max_thinking_content: int) -> None:
+        self._inner = inner
+        self._max_thinking_content = max_thinking_content
+        self._should_abort = False
+        self._abort_reason: Optional[str] = None
+
+    def process_chunk(self, text: str) -> StreamingChunkResult:
+        result = self._inner.process_chunk(text)
+        if (
+            not self._should_abort
+            and self._inner.get_thinking_length() > self._max_thinking_content
+        ):
+            self._should_abort = True
+            self._abort_reason = (
+                f"Thinking content exceeded {self._max_thinking_content} chars. "
+                "Model may be stuck in a reasoning loop."
+            )
+
+        if self._should_abort and (
+            result.is_thinking or result.entering_thinking or result.exiting_thinking
+        ):
+            return StreamingChunkResult(
+                content="",
+                is_thinking=result.is_thinking,
+                state_changed=result.state_changed,
+                entering_thinking=result.entering_thinking,
+                exiting_thinking=result.exiting_thinking,
+            )
+        return result
+
+    def should_abort(self) -> bool:
+        return self._should_abort or self._inner.should_abort()
+
+    @property
+    def abort_reason(self) -> Optional[str]:
+        return self._abort_reason or self._inner.get_abort_reason()
+
+    @property
+    def is_thinking(self) -> bool:
+        return self._inner.get_state() != "normal"
+
+    def flush(self) -> StreamingChunkResult:
+        # Native filter has no buffering — flush is a no-op.
+        return StreamingChunkResult(content="", is_thinking=self.is_thinking)
+
+
 def create_streaming_filter(
-    suppress_thinking: bool = False, max_thinking_content: int = 50000
+    suppress_thinking: bool = False, max_thinking_content: Optional[int] = None
 ) -> "StreamingContentFilter":
     """Factory function to create the best available streaming filter.
 
@@ -369,13 +432,23 @@ def create_streaming_filter(
 
     Args:
         suppress_thinking: If True, suppress thinking content entirely
-        max_thinking_content: Max chars before aborting (default 50000)
+        max_thinking_content: Max chars before aborting. When omitted, use the
+            current ``StreamingContentFilter.MAX_THINKING_CONTENT`` value so test
+            patches and runtime overrides apply consistently to both backends.
 
     Returns:
         StreamingContentFilter (native or Python implementation)
     """
+    effective_max_thinking_content = (
+        StreamingContentFilter.MAX_THINKING_CONTENT
+        if max_thinking_content is None
+        else max_thinking_content
+    )
     if _NATIVE_AVAILABLE:
-        return _native.StreamingFilter(suppress_thinking, max_thinking_content)
+        return _NativeFilterWrapper(
+            _native.StreamingFilter(suppress_thinking, effective_max_thinking_content),
+            effective_max_thinking_content,
+        )
     return StreamingContentFilter(suppress_thinking)
 
 
@@ -437,11 +510,11 @@ class ResponseSanitizer:
         r"Do NOT surround the function call.*",
         r"All parameters are required unless.*",
         r"The agent is not allowed to directly access.*",
-        r"Begin by calling list_directory.*",
-        r"execute_bash\(command=.*\)",
+        r"Begin by calling ls.*",
+        r"shell\(cmd=.*\)",
         r"No files read yet\. Avoid file-specific claims.*",
-        r'list_directory\(path="[^"]*"\)',
-        r'read_file\(path="[^"]*"\)',
+        r'ls\(path="[^"]*"\)',
+        r'read\(path="[^"]*"\)',
     ]
 
     # Patterns indicating garbage/malformed output
@@ -478,6 +551,27 @@ class ResponseSanitizer:
         r"</think>",  # Orphaned Qwen3 thinking close tag
         r"<think>",  # Orphaned Qwen3 thinking open tag
     ]
+
+    # Standalone shell-like command lines emitted as plain text instead of tool calls.
+    # These commonly appear when smaller/local models try to "suggest" commands
+    # rather than using the tool-calling interface.
+    PLAIN_COMMAND_WORDS = frozenset(
+        {"ls", "rg", "grep", "find", "cat", "sed", "head", "tail", "pwd", "read"}
+    )
+    PATHLIKE_HINT_WORDS = frozenset(
+        {
+            "rust",
+            "victor",
+            "tests",
+            "docs",
+            "scripts",
+            "src",
+            "site",
+            "ui",
+            "web",
+            ".victor",
+        }
+    )
 
     # Patterns for invalid/hallucinated tool names
     INVALID_TOOL_PATTERNS: List[str] = [
@@ -535,6 +629,8 @@ class ResponseSanitizer:
     def strip_markup(self, text: str) -> str:
         """Remove simple XML/HTML-like tags to salvage plain text.
 
+        Uses native Rust implementation when available for ~3x speedup.
+
         Args:
             text: Text potentially containing markup
 
@@ -543,11 +639,80 @@ class ResponseSanitizer:
         """
         if not text:
             return text
-        cleaned = re.sub(r"<[^>]+>", " ", text)
-        return " ".join(cleaned.split())
+        return strip_markup_fast(text)
+
+    def _looks_like_path_fragment(self, token: str) -> bool:
+        normalized = token.strip().strip("`'\"")
+        if not normalized:
+            return False
+        lowered = normalized.lower()
+        if lowered in self.PATHLIKE_HINT_WORDS:
+            return True
+        if normalized.startswith((".", "/", "~")):
+            return True
+        if "/" in normalized or "\\" in normalized:
+            return True
+        return bool(re.search(r"\.[A-Za-z0-9]{1,8}$", normalized))
+
+    def _is_malformed_parameter_line(self, line: str) -> bool:
+        normalized = line.strip()
+        if not normalized:
+            return False
+        return bool(
+            re.match(r"^parameter\s*=", normalized, re.IGNORECASE)
+            or re.match(r"^<parameter\b", normalized, re.IGNORECASE)
+        )
+
+    def _is_plaintext_tool_command_line(self, line: str) -> bool:
+        normalized = " ".join(line.strip().split())
+        if not normalized or len(normalized) > 80:
+            return False
+        if any(ch in normalized for ch in "(){}[]=:,"):
+            return False
+
+        tokens = normalized.split()
+        if len(tokens) > 3:
+            return False
+
+        command = None
+        arguments: List[str] = []
+        if tokens[0].lower() in self.PLAIN_COMMAND_WORDS:
+            command = tokens[0].lower()
+            arguments = tokens[1:]
+        elif tokens[-1].lower() in self.PLAIN_COMMAND_WORDS:
+            command = tokens[-1].lower()
+            arguments = tokens[:-1]
+        else:
+            return False
+
+        if command == "pwd" and not arguments:
+            return True
+        if not arguments:
+            return False
+        return all(self._looks_like_path_fragment(token) for token in arguments)
+
+    def extract_plaintext_tool_command_lines(self, text: str | None) -> List[str]:
+        if not text:
+            return []
+        return [
+            line.strip() for line in text.splitlines() if self._is_plaintext_tool_command_line(line)
+        ]
+
+    def has_tool_format_confusion(self, text: str | None) -> bool:
+        if not text:
+            return False
+        malformed_lines = self.extract_plaintext_tool_command_lines(text)
+        if not malformed_lines:
+            return False
+        sanitized = self.sanitize(text)
+        removed_ratio = 1.0 - (len(sanitized) / max(len(text), 1))
+        return len(malformed_lines) >= 2 or removed_ratio >= 0.35
 
     def sanitize(self, text: str) -> str:
         """Sanitize model response by removing malformed patterns.
+
+        Uses native Rust implementation for common patterns (~3x speedup),
+        then applies additional ResponseSanitizer-specific filtering.
 
         Handles common issues from local models:
         - Repeated </function> or </parameter> tags
@@ -566,38 +731,24 @@ class ResponseSanitizer:
 
         original_len = len(text)
 
-        # Remove repeated closing tags (</function>, </parameter>, etc.)
-        # These indicate the model is confused about tool calling format
-        text = re.sub(r"(</\w+>\s*){3,}", "", text)
+        # Fast path: use native dispatch for common sanitization patterns
+        # This handles: repeated closing tags, orphaned XML-like tags,
+        # thinking tokens, training data leakage, JSON tool calls, etc.
+        text = sanitize_response_fast(text)
 
-        # Remove orphaned XML-like tags
-        text = re.sub(r"</?function[^>]*>", "", text)
-        text = re.sub(r"</?parameter[^>]*>", "", text)
-        text = re.sub(r"</?tool[^>]*>", "", text)
-        text = re.sub(r"</?IMPORTANT[^>]*>", "", text)
-
-        # Remove thinking tokens from reasoning models (DeepSeek, Qwen3)
-        # Uses native implementation when available for 2-3x speedup
-        text = strip_thinking_tokens_fast(text)
-
-        # Remove training data leakage patterns
-        for pattern in self.LEAKAGE_PATTERNS:
-            text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
-
-        # Remove JSON-like tool call attempts embedded in text
-        # Pattern: {"name": "tool_name", ...}
-        text = re.sub(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}', "", text)
-
-        # Remove lines that are just tool call syntax
+        # Additional line-by-line filtering for plaintext tool command lines
+        # (beyond what the native dispatch handles)
         lines = text.split("\n")
         cleaned_lines = []
         for line in lines:
             stripped = line.strip()
-            # Skip lines that look like raw tool call attempts
-            if stripped.startswith('{"name":') or stripped.startswith("</"):
+            # Skip standalone shell-like command lines; these are malformed
+            # plain-text tool intents, not useful user-facing content.
+            if self._is_plaintext_tool_command_line(stripped):
                 continue
-            # Skip lines that are just parameter= syntax
-            if re.match(r"^(parameter=|<parameter)", stripped):
+            # Skip standalone malformed parameter artifact lines that some
+            # models emit instead of structured tool-call arguments.
+            if self._is_malformed_parameter_line(stripped):
                 continue
             cleaned_lines.append(line)
         text = "\n".join(cleaned_lines)
@@ -619,6 +770,9 @@ class ResponseSanitizer:
     def is_garbage_content(self, content: str) -> bool:
         """Detect if content is garbage/malformed output from local models.
 
+        Uses native Rust implementation for common patterns (~3x speedup),
+        then checks additional ResponseSanitizer-specific patterns.
+
         Args:
             content: Content chunk to check
 
@@ -628,7 +782,26 @@ class ResponseSanitizer:
         if not content:
             return False
 
-        for pattern in self.GARBAGE_PATTERNS:
+        # Fast path: use native dispatch for common garbage patterns
+        if is_garbage_content_fast(content):
+            return True
+
+        # Additional patterns specific to ResponseSanitizer beyond native dispatch
+        additional_patterns = [
+            r"^\s*<important>",  # Instruction leakage (lowercase)
+            r"</important>",  # Instruction leakage closing tag
+            r"^\s*ALWAYS include",  # Instruction leakage
+            r"^\s*- Do NOT",  # List-style instruction leakage
+            r"^\s*- Use lowercase",  # Formatting instruction leakage
+            r"^\s*- The parameters",  # Parameter instruction leakage
+            r"the XML tag",  # Format instruction leakage
+            r"backticks.*markdown",  # Format instruction leakage
+            r"JSON parsing",  # Technical instruction leakage
+            r"file system structure",  # Security instruction leakage
+            r"\[END_TOOL_REQUEST\]",  # LMStudio default format leakage
+        ]
+
+        for pattern in additional_patterns:
             if re.search(pattern, content, re.IGNORECASE | re.MULTILINE):
                 return True
 

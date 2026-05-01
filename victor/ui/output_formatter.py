@@ -39,6 +39,21 @@ import json
 import re
 import sys
 import time
+from rich.markup import escape as _markup_escape
+
+
+def _colorize_diff_line(line: str) -> str:
+    """Return Rich markup for a unified-diff line (colors + and - lines)."""
+    escaped = _markup_escape(line)
+    if line.startswith("+"):
+        return f"[green]{escaped}[/]"
+    if line.startswith("-"):
+        return f"[red]{escaped}[/]"
+    if line.startswith("@@"):
+        return f"[cyan]{escaped}[/]"
+    return f"[dim]{escaped}[/]"
+
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, TextIO, Tuple
@@ -49,6 +64,14 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from victor.ui.rendering.markdown import render_markdown_with_hooks
+from victor.ui.rendering.utils import (
+    format_duration,
+    format_tool_args,
+    format_tool_display_name,
+    render_status_message,
+    render_tool_preview,
+)
+from victor.ui.rendering.tool_preview import renderer as _tool_preview_renderer
 
 
 class OutputMode(Enum):
@@ -100,6 +123,8 @@ class OutputFormatter:
         self._stream_buffer: str = ""
         # Tool timing tracking for compact output
         self._pending_tool: Optional[Tuple[str, Dict[str, Any], float]] = None
+        # Tool result storage for expansion
+        self._last_tool_result: Optional[Dict[str, Any]] = None
 
     @property
     def mode(self) -> OutputMode:
@@ -118,12 +143,28 @@ class OutputFormatter:
             return
 
         if self.config.mode == OutputMode.RICH:
-            self._console.print(f"[dim]{message}[/]")
+            render_status_message(self._console, message)
         elif self.config.mode == OutputMode.PLAIN:
             print(f"# {message}", file=self.config.stderr)
             # Flush stderr immediately to ensure status appears before next content
             self.config.stderr.flush()
         # JSON modes: skip status messages
+
+    def info(self, message: str) -> None:
+        """Output an informational message.
+
+        Info messages are displayed in all non-JSON modes and not suppressed in quiet mode.
+
+        Args:
+            message: Info message to display
+        """
+        if self.config.mode == OutputMode.RICH:
+            self._console.print(f"[cyan]{message}[/]")
+        elif self.config.mode == OutputMode.PLAIN:
+            print(message, file=self.config.stderr)
+            # Flush stderr immediately to ensure info appears before next content
+            self.config.stderr.flush()
+        # JSON modes: skip info messages
 
     def error(self, message: str, details: Optional[str] = None) -> None:
         """Output an error message.
@@ -162,25 +203,7 @@ class OutputFormatter:
         Returns:
             Formatted args string like "path='/file.py', limit=100"
         """
-        parts = []
-        total_len = 0
-        for k, v in arguments.items():
-            if isinstance(v, str):
-                # Truncate long strings - allow up to 60 chars for strings
-                display = v if len(v) <= 60 else v[:57] + "..."
-                part = f"{k}='{display}'"
-            elif isinstance(v, (int, float, bool)):
-                part = f"{k}={v}"
-            elif v is None:
-                continue  # Skip None values
-            else:
-                part = f"{k}=..."
-            if total_len + len(part) > max_width and parts:
-                parts.append("...")
-                break
-            parts.append(part)
-            total_len += len(part) + 2  # +2 for ", "
-        return ", ".join(parts)
+        return format_tool_args(arguments, max_width=max_width)
 
     def tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Indicate tool execution has started.
@@ -217,21 +240,33 @@ class OutputFormatter:
         result: Optional[str] = None,
         error: Optional[str] = None,
         follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
+        # New parameters for preview
+        original_result: Optional[str] = None,
+        preview_lines: int = 3,
+        was_pruned: bool = False,
+        show_preview: bool = True,
     ) -> None:
-        """Record tool execution result and output compact single-line format.
+        """Record tool execution result and output compact single-line format with preview.
 
         Args:
             tool_name: Name of the tool
             success: Whether tool succeeded
             result: Tool result (if success)
             error: Error message (if failed)
+            original_result: Unmodified tool output (before pruning)
+            preview_lines: Number of lines to show in preview
+            was_pruned: Whether output was pruned before sending to LLM
+            show_preview: Whether to show preview (controlled by settings)
         """
+        preview_result = result or original_result
+        full_result = original_result or result
+
         tool_record = {
             "tool": tool_name,
             "success": success,
         }
-        if result:
-            tool_record["result"] = result[:500]  # Truncate for JSON
+        if preview_result:
+            tool_record["result"] = preview_result[:500]  # Truncate for JSON
         if error:
             tool_record["error"] = error
         if follow_up_suggestions:
@@ -243,14 +278,16 @@ class OutputFormatter:
 
         self._tool_calls.append(tool_record)
 
-        # Calculate duration from pending tool
+        # Calculate duration from pending tool; retain arguments for preview
+        duration: Optional[float] = None
         duration_str = ""
         args_str = ""
+        _tool_arguments: Dict[str, Any] = {}
         if self._pending_tool and self._pending_tool[0] == tool_name:
-            _, arguments, start_time = self._pending_tool
+            _, _tool_arguments, start_time = self._pending_tool
             duration = time.time() - start_time
             duration_str = f"({duration:.1f}s)"
-            args_str = self._format_args(arguments)
+            args_str = self._format_args(_tool_arguments)
             self._pending_tool = None
 
         if not self.config.show_tools:
@@ -267,18 +304,80 @@ class OutputFormatter:
                 file=self.config.stdout,
             )
         elif self.config.mode == OutputMode.RICH:
-            # Compact single-line format: ✓ tool_name(args) (X.XXs)
-            # Use full 90 chars width, 6 chars for elapsed time at end
-            if success:
-                status_icon = "[green]✓[/]"
-            else:
-                status_icon = "[red]✗[/]"
-            # Format: ✓ name(args) (X.XXs) - target ~90 chars
-            base = f"{tool_name}({args_str})" if args_str else tool_name
-            # Elapsed time format: (X.XXs) = 8 chars
-            time_display = f"({duration_str.strip('()')})" if duration_str else ""
-            error_display = f" [red]{error[:30]}[/]" if error else ""
-            self._console.print(f"{status_icon} [bold]{base}[/] {time_display}{error_display}")
+            status_icon = "[green]✓[/]" if success else "[red]✗[/]"
+            display_name = format_tool_display_name(tool_name)
+            status_line = f"{status_icon} [bold]{display_name}[/]"
+            if args_str:
+                status_line += f" [dim]{args_str}[/]"
+            if duration_str:
+                status_line += f" [dim]• {format_duration(duration)}[/]"
+            if error:
+                status_line += f" [red]{error[:80]}[/]"
+            self._console.print(status_line)
+
+            # Show per-tool preview using the strategy renderer.
+            # Note: condition does NOT require original_result — some strategies
+            # (e.g. DiffPreviewStrategy) generate output purely from arguments.
+            if show_preview and success:
+                try:
+                    from victor.config.tool_settings import get_tool_settings
+
+                    hotkey = get_tool_settings().tool_output_expand_hotkey
+                except Exception:
+                    hotkey = "^O"
+
+                preview = _tool_preview_renderer.render(
+                    tool_name, _tool_arguments, preview_result or "", max_lines=preview_lines
+                )
+                if preview.header or preview.lines:
+                    if preview.header:
+                        self._console.print(f"[dim]│ {_markup_escape(preview.header)}[/]")
+                    if preview.lines:
+                        if preview.syntax_hint == "diff":
+                            render_tool_preview(
+                                self._console,
+                                "\n".join(_colorize_diff_line(line) for line in preview.lines),
+                                total_lines=preview.total_line_count,
+                                preview_lines=preview_lines,
+                                hotkey=hotkey,
+                            )
+                        else:
+                            render_tool_preview(
+                                self._console,
+                                "\n".join(_markup_escape(line) for line in preview.lines),
+                                total_lines=preview.total_line_count,
+                                preview_lines=preview_lines,
+                                hotkey=hotkey,
+                            )
+
+            # Show pruning transparency if enabled
+            if was_pruned and self.config.show_tools:
+                try:
+                    from victor.config.tool_settings import get_tool_settings
+
+                    tool_settings = get_tool_settings()
+                    if tool_settings.tool_output_show_transparency:
+                        self._console.print(
+                            "[dim yellow]! Preview truncated (full output sent to model)[/]"
+                        )
+                except Exception:
+                    # Fallback if settings not available
+                    self._console.print(
+                        "[dim yellow]! Preview truncated (full output sent to model)[/]"
+                    )
+
+            # Store full result for potential expansion
+            self._last_tool_result = {
+                "tool_name": tool_name,
+                "arguments": _tool_arguments,
+                "success": success,
+                "result": full_result,
+                "pruned_result": preview_result,
+                "was_pruned": was_pruned,
+                "error": error,
+                "follow_up_suggestions": follow_up_suggestions,
+            }
+
             if success and follow_up_suggestions:
                 for suggestion in follow_up_suggestions[:2]:
                     if not isinstance(suggestion, dict):
@@ -289,7 +388,8 @@ class OutputFormatter:
         elif self.config.mode == OutputMode.PLAIN:
             # Compact single-line format: ✓ tool_name(args) (X.XXs)
             status_icon = "✓" if success else "✗"
-            base = f"{tool_name}({args_str})" if args_str else tool_name
+            display_name = format_tool_display_name(tool_name)
+            base = f"{display_name}({args_str})" if args_str else display_name
             time_display = f" ({duration_str.strip('()')})" if duration_str else ""
             error_display = f" {error[:40]}" if error else ""
             print(
@@ -305,6 +405,87 @@ class OutputFormatter:
                         print(f"  next: {command}", file=self.config.stderr)
             # Flush stderr immediately to ensure tool output appears before next content
             self.config.stderr.flush()
+
+    def _generate_preview(self, text: str, num_lines: int = 3) -> str:
+        """Generate a preview of the first few lines of output.
+
+        Args:
+            text: Full tool output
+            num_lines: Number of lines to include in preview
+
+        Returns:
+            Preview string with first N lines
+        """
+        if not text:
+            return ""
+        lines = text.split("\n")
+        preview = "\n".join(lines[:num_lines])
+        if len(lines) > num_lines:
+            preview += "..."
+        # Truncate long lines
+        max_line_length = 120
+        preview = "\n".join(
+            line[:max_line_length] + "..." if len(line) > max_line_length else line
+            for line in preview.split("\n")
+        )
+        return preview
+
+    def expand_last_tool_output(self) -> None:
+        """Expand the last tool output to show full content.
+
+        Displays the full tool output in a Rich panel with syntax highlighting.
+        """
+        if not hasattr(self, "_last_tool_result") or not self._last_tool_result:
+            self._console.print("[dim]No tool output to expand[/]")
+            return
+
+        data = self._last_tool_result
+        if not data["success"]:
+            return
+
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        content = data["result"]
+        tool_name = data["tool_name"]
+        display_name = format_tool_display_name(tool_name)
+
+        # Try syntax highlighting for code-like content
+        if self.config.mode == OutputMode.RICH:
+            try:
+                # Extract file extension from tool name if possible
+                ext = tool_name.split("_")[-1] if "_" in tool_name else "txt"
+                # Map common tool names to extensions
+                ext_map = {
+                    "read": "py",
+                    "grep": "txt",
+                    "code_search": "py",
+                    "cat": "txt",
+                }
+                ext = ext_map.get(tool_name, ext)
+
+                syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
+                self._console.print(
+                    Panel(
+                        syntax,
+                        title=f"[bold]{display_name}[/] - Full Output",
+                        border_style="blue",
+                    )
+                )
+            except Exception:
+                # Fallback to plain panel
+                self._console.print(
+                    Panel(
+                        content,
+                        title=f"[bold]{display_name}[/] - Full Output",
+                        border_style="blue",
+                    )
+                )
+        else:
+            # Plain mode
+            print(f"\n--- Full Output: {display_name} ---")
+            print(content)
+            print("--- End of Output ---\n")
 
     def thinking(self, content: str) -> None:
         """Output thinking/reasoning content.

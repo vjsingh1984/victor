@@ -54,7 +54,11 @@ _SECRET_PATTERNS = [
     ("google_api_key", r"AIza[0-9A-Za-z_-]{35}", "high"),
     ("stripe_key", r"(?:sk|pk)_(?:live|test)_[a-zA-Z0-9]{24,}", "high"),
     ("jwt_token", r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "medium"),
-    ("private_key", r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", "critical"),
+    (
+        "private_key",
+        r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
+        "critical",
+    ),
 ]
 
 

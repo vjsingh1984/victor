@@ -15,13 +15,24 @@
 """Base provider interface for LLM providers."""
 
 import logging
+import ssl
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
+from victor.core.circuit_breaker import CircuitBreakerError
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerRegistry,
@@ -92,6 +103,24 @@ class StreamingProvider(Protocol):
 
 
 @runtime_checkable
+class VisionProvider(Protocol):
+    """Protocol for providers that support multimodal (image) input.
+
+    Providers implementing this protocol can receive messages with
+    `images` populated and include image content in API requests.
+
+    Type checking:
+        if is_vision_provider(provider):
+            msg = Message(role="user", content="What's in this image?", images=[data_uri])
+            response = await provider.chat([msg], model=model)
+    """
+
+    def supports_vision(self) -> bool:
+        """Whether the provider supports image input in messages."""
+        ...
+
+
+@runtime_checkable
 class ToolCallingProvider(Protocol):
     """Protocol for providers that support tool/function calling.
 
@@ -127,6 +156,13 @@ class ToolCallingProvider(Protocol):
 
 
 # Helper functions for type checking
+def is_vision_provider(provider: Any) -> bool:
+    """Check if a provider supports multimodal (image) input."""
+    if hasattr(provider, "supports_vision"):
+        return provider.supports_vision()
+    return False
+
+
 def is_streaming_provider(provider: Any) -> bool:
     """Check if a provider supports streaming.
 
@@ -161,6 +197,34 @@ def is_tool_calling_provider(provider: Any) -> bool:
     return False
 
 
+def is_caching_provider(provider: Any) -> bool:
+    """Check if a provider supports API-level prompt caching (billing discounts).
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider offers cached token billing discounts
+    """
+    if hasattr(provider, "supports_prompt_caching"):
+        return provider.supports_prompt_caching()
+    return False
+
+
+def has_kv_prefix_caching(provider: Any) -> bool:
+    """Check if a provider benefits from stable prompt prefixes (KV cache reuse).
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider reuses KV cache for matching prefixes
+    """
+    if hasattr(provider, "supports_kv_prefix_caching"):
+        return provider.supports_kv_prefix_caching()
+    return False
+
+
 class Message(BaseModel):
     """Standard message format across all providers."""
 
@@ -173,6 +237,10 @@ class Message(BaseModel):
     tool_call_id: Optional[str] = Field(
         default=None, description="ID of the tool call being responded to"
     )
+    images: Optional[List[str]] = Field(
+        default=None,
+        description="Image data URIs (data:image/png;base64,...) for multimodal user messages",
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert message to dictionary representation."""
@@ -180,11 +248,18 @@ class Message(BaseModel):
 
 
 class ToolDefinition(BaseModel):
-    """Standard tool definition format."""
+    """Standard tool definition format.
+
+    The optional schema_level tracks which verbosity tier was used to
+    generate the description and parameters. It is excluded from
+    serialization (never sent to providers) — used only for internal
+    cache-aware ordering.
+    """
 
     name: str = Field(..., description="Tool name")
     description: str = Field(..., description="What the tool does")
     parameters: Dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
+    schema_level: Optional[str] = Field(default=None, exclude=True)
 
 
 class CompletionResponse(BaseModel):
@@ -312,11 +387,161 @@ class BaseProvider(ABC):
         """
         return False
 
+    def supports_prompt_caching(self) -> bool:
+        """Check if provider supports API-level prompt prefix caching.
+
+        API-level prompt caching means the provider offers a **billing discount**
+        (50-90%) on cached input tokens. For these providers, sending the full
+        tool set (48 tools) every call is optimal because cached tokens are
+        nearly free after the first call.
+
+        This is distinct from KV prefix caching (see supports_kv_prefix_caching),
+        which is a latency optimization at the inference engine level.
+
+        Providers WITHOUT API-level caching (Ollama, LMStudio, llama.cpp, MLX,
+        vLLM) should use per-turn semantic tool selection (5-12 tools) to
+        minimize token overhead.
+
+        Default implementation returns False.
+
+        Returns:
+            True if provider has API-level cached token discounts
+        """
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Check if provider supports KV prefix caching for latency savings.
+
+        KV prefix caching means the inference engine reuses computed key-value
+        state when consecutive requests share the same prompt prefix. This
+        reduces time-to-first-token (TTFT) but does NOT reduce cost — every
+        token still incurs compute on the first call.
+
+        When True, the framework should keep the system prompt + tool definitions
+        stable across turns within a session so the KV cache can be reused.
+
+        Both local engines (Ollama, vLLM, llama.cpp) and cloud APIs (Anthropic,
+        OpenAI) support this. Default is False.
+
+        Returns:
+            True if provider benefits from stable prompt prefixes
+        """
+        return False
+
+    DEFAULT_CONTEXT_WINDOW: int = 8_192
+    """Conservative default context window when model is unknown.
+
+    Triggers semantic_select_capped strategy in the tool broadcaster, which
+    is safe for any model. Override per-provider with a model lookup table.
+    """
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        """Return effective context window in tokens for the given model.
+
+        Used by the tool broadcasting strategy picker to decide whether all
+        tools fit in the cacheable prefix or whether per-turn semantic
+        selection is required.
+
+        Default implementation returns DEFAULT_CONTEXT_WINDOW. Providers
+        should override with a per-model lookup table.
+
+        Args:
+            model: Model identifier. If None, uses provider's current model.
+
+        Returns:
+            Context window in tokens. Never returns 0 or negative.
+        """
+        return self.DEFAULT_CONTEXT_WINDOW
+
+    def get_tool_output_format(self) -> Any:
+        """Get preferred tool output format for this provider.
+
+        This method enables provider-specific customization of tool output
+        formatting, following the Strategy pattern. Default implementation
+        returns plain JSON format (token-efficient for cloud providers).
+
+        Providers can override to specify XML, TOON, or custom formats:
+        - Cloud providers (OpenAI, xAI, etc.): Use default plain JSON
+        - Local providers (Ollama, vLLM, llama.cpp): Override to XML format
+        - Experimental: Override to TOON for structured data
+
+        Returns:
+            ToolOutputFormat specification (from victor.agent.format_strategies)
+
+        Example:
+            from victor.agent.format_strategies import ToolOutputFormat, XML_FORMAT
+
+            class OllamaProvider(BaseProvider):
+                def get_tool_output_format(self):
+                    # Local models trained on XML format
+                    return XML_FORMAT
+        """
+        from victor.agent.format_strategies import ToolOutputFormat
+
+        return ToolOutputFormat(style="plain")
+
     def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
         """Get circuit breaker statistics for monitoring."""
         if self._circuit_breaker:
             return self._circuit_breaker.get_stats()
         return None
+
+    def _iter_exception_chain(self, error: Exception) -> List[Exception]:
+        """Yield the wrapped exception chain without looping forever."""
+        chain: List[Exception] = []
+        seen: set[int] = set()
+        current: Optional[BaseException] = error
+
+        while isinstance(current, Exception) and id(current) not in seen:
+            chain.append(current)
+            seen.add(id(current))
+            current = (
+                getattr(current, "__cause__", None)
+                or getattr(current, "__context__", None)
+                or getattr(current, "cause", None)
+            )
+
+        return chain
+
+    def _is_connection_error_like(self, error: Exception) -> bool:
+        """Check whether an exception looks like a transient transport failure."""
+        connection_exception_names = {
+            "APIConnectionError",
+            "ConnectError",
+            "ConnectTimeout",
+            "ReadError",
+            "ReadTimeout",
+            "RemoteProtocolError",
+            "TransportError",
+            "WriteError",
+        }
+        connection_tokens = (
+            "bad record mac",
+            "broken pipe",
+            "connection aborted",
+            "connection error",
+            "connection refused",
+            "connection reset",
+            "remote protocol error",
+            "server disconnected",
+            "ssl",
+            "tls",
+        )
+
+        for candidate in self._iter_exception_chain(error):
+            if isinstance(candidate, (ConnectionError, ssl.SSLError)):
+                return True
+
+            if any(
+                parent.__name__ in connection_exception_names for parent in type(candidate).__mro__
+            ):
+                return True
+
+            candidate_str = str(candidate).lower()
+            if any(token in candidate_str for token in connection_tokens):
+                return True
+
+        return False
 
     def classify_error(self, error: Exception) -> ProviderError:
         """Classify a raw exception into the appropriate ProviderError subtype.
@@ -336,6 +561,15 @@ class BaseProvider(ABC):
         # Tier 0: Already classified
         if isinstance(error, ProviderError):
             return error
+
+        if isinstance(error, CircuitBreakerError):
+            return ProviderRateLimitError(
+                message=f"Provider temporarily unavailable: {error}",
+                provider=self.name,
+                retry_after=error.retry_after,
+                status_code=429,
+                raw_error=error,
+            )
 
         wrapped_error = (
             getattr(error, "last_error", None)
@@ -371,11 +605,34 @@ class BaseProvider(ABC):
                     raw_error=error,
                 )
 
+        if self._is_connection_error_like(error):
+            # Log detailed connection error information for debugging
+            error_type = type(error).__name__
+            error_msg = str(error)
+            logger.error(
+                "Provider connection error: provider=%s error_type=%s error_msg=%s",
+                self.name,
+                error_type,
+                error_msg,
+            )
+            return ProviderConnectionError(
+                message=f"Connection failed: {error}",
+                provider=self.name,
+                raw_error=error,
+            )
+
         # Tier 2: String-based classification (deprecated — providers should use
         # proper exception types or HTTP status codes instead)
         if any(
             t in error_str
-            for t in ("auth", "unauthorized", "invalid key", "invalid api", "api_key", "401")
+            for t in (
+                "auth",
+                "unauthorized",
+                "invalid key",
+                "invalid api",
+                "api_key",
+                "401",
+            )
         ):
             logger.warning(
                 "String-based error classification triggered for auth error "
@@ -545,8 +802,8 @@ class BaseProvider(ABC):
     async def count_tokens(self, text: str) -> int:
         """Estimate token count for given text.
 
-        Uses tiktoken if available for exact counting, otherwise falls back
-        to character-based estimation.
+        Uses the fast native token counter when available and falls back
+        to word-based estimation.
 
         Args:
             text: Text to count tokens for
@@ -554,9 +811,110 @@ class BaseProvider(ABC):
         Returns:
             Estimated token count
         """
-        from victor.processing.native import count_tokens
+        from victor.processing.native.tokenizer import count_tokens_fast
 
-        return count_tokens(text)
+        return count_tokens_fast(text)
+
+    def context_window(self, model: str) -> int:
+        """Get context window size for a given model.
+
+        Provides context window limits for common models to enable
+        context-budgeted tool selection strategies. Returns safe default
+        for unknown models.
+
+        Args:
+            model: Model identifier (e.g., "claude-sonnet-4-20250514", "qwen2.5-coder:7b")
+
+        Returns:
+            Context window in tokens. Returns safe default (8192) for unknown models.
+
+        Examples:
+            >>> provider = AnthropicProvider(api_key="...")
+            >>> cw = provider.context_window("claude-sonnet-4-20250514")
+            >>> assert cw == 200000
+        """
+        # Known models lookup table
+        # Source: Model documentation as of 2025-04
+        CONTEXT_WINDOWS = {
+            # Anthropic
+            "claude-sonnet-4-20250514": 200000,
+            "claude-3.5-sonnet-20240620": 200000,
+            "claude-3-5-sonnet-20241022": 200000,
+            "claude-3-opus-20240229": 200000,
+            "claude-3-haiku-20240307": 200000,
+            # OpenAI
+            "gpt-4o": 128000,
+            "gpt-4o-mini": 128000,
+            "gpt-4-turbo": 128000,
+            "gpt-4": 8192,
+            "gpt-3.5-turbo": 16385,
+            # Google Gemini
+            "gemini-2.0-flash-exp": 1000000,
+            "gemini-1.5-pro": 280000,
+            "gemini-1.5-flash": 280000,
+            "gemini-pro": 280000,
+            # DeepSeek
+            "deepseek-coder": 128000,
+            "deepseek-chat": 128000,
+            "deepseek-coder-v2": 128000,
+            # Meta Llama (via various providers)
+            "llama-3.1-405b-instruct": 128000,
+            "llama-3.1-70b-instruct": 128000,
+            "llama-3.1-8b-instruct": 128000,
+            "llama-3-1-405b-instruct": 128000,
+            "llama-3-1-70b-instruct": 128000,
+            # Qwen (via Ollama, vLLM, etc.)
+            "qwen2.5-coder:7b": 32768,
+            "qwen2.5-coder:14b": 32768,
+            "qwen2.5-72b-instruct": 128000,
+            "qwen2.5-7b-instruct": 128000,
+            "qwen2.5-14b": 128000,
+            # Edge models (small models for fast micro-decisions)
+            "qwen3.5:2b": 8192,
+            "qwen2.5:0.5b": 8192,
+            "qwen2.5:1.5b": 8192,
+            "qwen2.5:3b": 8192,
+            "phi-2:2.7b": 8192,
+            "phi-2.7b": 8192,
+            "phi:2.7b": 8192,
+            "gemma:2b": 8192,
+            "gemma2:2b": 8192,
+            "tinyllama:1.1b": 8192,
+            "tinyllama:1.1b-chat": 8192,
+            # CodeLlama
+            "codellama:13b": 16384,
+            "codellama:34b": 16384,
+            "codellama:7b": 16384,
+            # Mistral
+            "mistral:7b": 32768,
+            "mixtral:8x7b": 32768,
+            "mixtral:8x22b": 65536,
+            # Common Ollama models
+            "phi:2.7b-chat": 128000,
+            "gemma:7b": 8192,
+        }
+
+        # Try direct lookup
+        if model in CONTEXT_WINDOWS:
+            return CONTEXT_WINDOWS[model]
+
+        # Try pattern matching (e.g., "qwen2.5-*" or "llama-3*")
+        for pattern, cw in CONTEXT_WINDOWS.items():
+            if "*" in pattern:
+                prefix = pattern[:-1]
+                if model.startswith(prefix):
+                    logger.debug(
+                        f"Model {model} matched pattern {pattern}, using context window {cw}"
+                    )
+                    return cw
+
+        # Safe default for unknown models
+        # Use 8192 (8K) as conservative default that fits even smallest models
+        logger.warning(
+            f"Unknown model {model}, using default context window of 8192 tokens. "
+            f"Consider adding context_window mapping for this model."
+        )
+        return 8192
 
     @abstractmethod
     async def close(self) -> None:
@@ -623,7 +981,13 @@ class BaseProvider(ABC):
             )
 
             self._retry_strategy = ProviderRetryStrategy(
-                ProviderRetryConfig(max_retries=self.max_retries)
+                ProviderRetryConfig(
+                    max_retries=self.max_retries,
+                    # BaseProvider wraps the call in a circuit breaker before retry.
+                    # Open circuits should fail fast instead of sleeping through
+                    # the recovery timeout and re-entering as half-open.
+                    retryable_exceptions=(ConnectionError, TimeoutError),
+                )
             )
 
         return await self._retry_strategy.execute(_call)

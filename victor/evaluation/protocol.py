@@ -18,24 +18,42 @@ Defines data structures for running evaluations against
 benchmarks like SWE-bench, HumanEval, MBPP, etc.
 """
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from victor.evaluation.topology_feedback import aggregate_topology_feedback
+from victor.evaluation.planning_feedback import aggregate_planning_feedback
+from victor.evaluation.degradation_feedback import aggregate_degradation_feedback
+from victor.evaluation.team_feedback import aggregate_team_feedback
+
 
 @dataclass
 class TokenUsage:
     """Token usage metrics for evaluation tracking.
 
-    A minimal interface for token data needed by evaluations (ISP compliance).
+    Normalized across providers:
+    - DeepSeek: prompt_cache_hit_tokens, prompt_cache_miss_tokens
+    - OpenAI/xAI: prompt_tokens_details.cached_tokens, reasoning_tokens
+    - Anthropic: cache_creation_input_tokens, cache_read_input_tokens
+    - xAI: cost_in_usd_ticks (direct cost)
+
     Supports addition for aggregation across turns.
     """
 
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    # Cache tracking (normalized across providers)
+    cached_tokens: int = 0
+    cache_miss_tokens: int = 0
+    # Reasoning/thinking tokens (xAI, OpenAI o-series)
+    reasoning_tokens: int = 0
+    # Direct cost tracking (xAI provides this)
+    cost_usd_micros: int = 0  # Cost in millionths of USD (0 = not available)
 
     def __add__(self, other: "TokenUsage") -> "TokenUsage":
         """Add two TokenUsage instances for aggregation."""
@@ -43,6 +61,10 @@ class TokenUsage:
             input_tokens=self.input_tokens + other.input_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
             total_tokens=self.total_tokens + other.total_tokens,
+            cached_tokens=self.cached_tokens + other.cached_tokens,
+            cache_miss_tokens=self.cache_miss_tokens + other.cache_miss_tokens,
+            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
+            cost_usd_micros=self.cost_usd_micros + other.cost_usd_micros,
         )
 
     def __iadd__(self, other: "TokenUsage") -> "TokenUsage":
@@ -50,7 +72,40 @@ class TokenUsage:
         self.input_tokens += other.input_tokens
         self.output_tokens += other.output_tokens
         self.total_tokens += other.total_tokens
+        self.cached_tokens += other.cached_tokens
+        self.cache_miss_tokens += other.cache_miss_tokens
+        self.reasoning_tokens += other.reasoning_tokens
+        self.cost_usd_micros += other.cost_usd_micros
         return self
+
+    @staticmethod
+    def from_provider_usage(usage: dict, raw_usage: dict = None) -> "TokenUsage":
+        """Create TokenUsage from provider-specific usage dict.
+
+        Normalizes across DeepSeek, OpenAI, xAI, and Anthropic formats.
+        """
+        raw = raw_usage or {}
+        prompt_details = raw.get("prompt_tokens_details", {}) or {}
+        completion_details = raw.get("completion_tokens_details", {}) or {}
+
+        return TokenUsage(
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+            total_tokens=usage.get("total_tokens", 0),
+            # Cache: OpenAI/xAI use prompt_tokens_details.cached_tokens
+            # DeepSeek uses prompt_cache_hit_tokens
+            # Anthropic uses cache_read_input_tokens
+            cached_tokens=(
+                prompt_details.get("cached_tokens", 0)
+                or raw.get("prompt_cache_hit_tokens", 0)
+                or raw.get("cache_read_input_tokens", 0)
+            ),
+            cache_miss_tokens=raw.get("prompt_cache_miss_tokens", 0),
+            # Reasoning: xAI/OpenAI o-series
+            reasoning_tokens=completion_details.get("reasoning_tokens", 0),
+            # Direct cost: xAI provides cost_in_usd_ticks
+            cost_usd_micros=raw.get("cost_in_usd_ticks", 0),
+        )
 
 
 class BenchmarkType(Enum):
@@ -62,6 +117,10 @@ class BenchmarkType(Enum):
     LIVE_CODE_BENCH = "live_code_bench"  # Live coding evaluation
     BIG_CODE_BENCH = "big_code_bench"  # Large-scale code tasks
     AIDER_POLYGLOT = "aider_polyglot"  # Multi-language tasks
+    DR3_EVAL = "dr3_eval"  # Deep-research report evaluation
+    CLAW_BENCH = "claw_bench"  # GUI/web computer-use evaluation
+    GUIDE = "guide"  # Grounded multimodal UI agent evaluation
+    VLAA_GUI = "vlaa_gui"  # Vision-language action benchmark for GUI tasks
     CUSTOM = "custom"  # User-defined benchmark
 
 
@@ -75,6 +134,114 @@ class TaskStatus(Enum):
     ERROR = "error"
     TIMEOUT = "timeout"
     SKIPPED = "skipped"
+
+
+class BenchmarkFailureCategory(Enum):
+    """Normalized failure categories for benchmark reporting."""
+
+    PATCH_APPLICATION = "patch_application"
+    TEST_FAILURE = "test_failure"
+    TOOL_USAGE = "tool_usage"
+    TASK_COMPLETION = "task_completion"
+    TIMEOUT = "timeout"
+    EXECUTION_ERROR = "execution_error"
+    ENVIRONMENT_ERROR = "environment_error"
+    UNSUPPORTED_CLAIM = "unsupported_claim"
+    UNKNOWN = "unknown"
+
+
+class FailureStage(Enum):
+    """Hierarchical failure stage aligned to agentic benchmark workflows."""
+
+    PERCEPTION = "perception"
+    ACTION = "action"
+    GROUNDING = "grounding"
+    VALIDATION = "validation"
+    EXECUTION = "execution"
+    ENVIRONMENT = "environment"
+    COMPLETION = "completion"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class FailureDiagnosis:
+    """Structured failure diagnosis preserving stage and subtype detail."""
+
+    stage: FailureStage
+    category: BenchmarkFailureCategory
+    subtype: str = "generic"
+    retryable: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def path(self) -> str:
+        """Stable taxonomy path for reporting and aggregation."""
+        return f"{self.stage.value}.{self.category.value}.{self.subtype}"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a report-friendly dictionary."""
+        return {
+            "stage": self.stage.value,
+            "category": self.category.value,
+            "subtype": self.subtype,
+            "path": self.path,
+            "retryable": self.retryable,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "FailureDiagnosis":
+        """Reconstruct a structured diagnosis from serialized data."""
+        return cls(
+            stage=FailureStage(payload["stage"]),
+            category=BenchmarkFailureCategory(payload["category"]),
+            subtype=str(payload.get("subtype") or "generic"),
+            retryable=bool(payload.get("retryable", False)),
+            metadata=dict(payload.get("metadata") or {}),
+        )
+
+
+class ConfidenceBucket(Enum):
+    """Bucketized confidence for truth-aligned reporting."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+@dataclass(frozen=True)
+class ConfidenceAssessment:
+    """Derived task confidence and uncertainty summary."""
+
+    confidence_score: float
+    uncertainty: float
+    evidence_score: float
+    bucket: ConfidenceBucket
+    truth_aligned: bool
+    signals: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to report-friendly output."""
+        return {
+            "confidence_score": self.confidence_score,
+            "uncertainty": self.uncertainty,
+            "evidence_score": self.evidence_score,
+            "bucket": self.bucket.value,
+            "truth_aligned": self.truth_aligned,
+            "signals": dict(self.signals),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "ConfidenceAssessment":
+        """Reconstruct a confidence assessment from serialized data."""
+        return cls(
+            confidence_score=float(payload.get("confidence_score", 0.0)),
+            uncertainty=float(payload.get("uncertainty", 1.0)),
+            evidence_score=float(payload.get("evidence_score", 0.0)),
+            bucket=ConfidenceBucket(payload.get("bucket", ConfidenceBucket.LOW.value)),
+            truth_aligned=bool(payload.get("truth_aligned", False)),
+            signals=dict(payload.get("signals") or {}),
+        )
 
 
 class EvaluationMetric(Enum):
@@ -104,6 +271,7 @@ class BenchmarkTask:
     prompt: str = ""
     context_code: str = ""
     test_code: str = ""
+    seed_files: dict[str, str] = field(default_factory=dict)
 
     # Repository info (for SWE-bench)
     repo: Optional[str] = None
@@ -125,6 +293,11 @@ class BenchmarkTask:
     # Valid values: "simple", "medium", "complex", "generation", "action", "analysis"
     # If None, framework infers complexity from task description
     complexity_override: Optional[str] = None
+
+    # Task type hint - if set, _infer_task_type() uses this instead of keyword inference.
+    # Valid values match FrameworkTaskType names: "edit", "create", "search", "analyze",
+    # "execute", "chat", "explore".  If None, keyword-based inference is used.
+    task_type_hint: Optional[str] = None
 
 
 @dataclass
@@ -196,8 +369,13 @@ class TaskResult:
     tokens_used: int = 0
     tokens_input: int = 0  # Input tokens (prompt)
     tokens_output: int = 0  # Output tokens (completion)
+    cached_tokens: int = 0  # Prompt cache hits
+    reasoning_tokens: int = 0  # Hidden reasoning/thinking tokens
+    cost_usd_micros: int = 0  # Direct API cost (xAI)
     tool_calls: int = 0
     turns: int = 0
+    code_search_calls: int = 0
+    graph_calls: int = 0
 
     # Code quality metrics
     code_quality: Optional[CodeQualityMetrics] = None
@@ -213,6 +391,11 @@ class TaskResult:
     # Error info
     error_message: str = ""
     traceback: str = ""
+    failure_category: Optional[BenchmarkFailureCategory] = None
+    failure_details: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    failure_diagnosis: Optional[FailureDiagnosis] = None
+    confidence_assessment: Optional[ConfidenceAssessment] = None
 
     # Detailed output
     stdout: str = ""
@@ -245,6 +428,48 @@ class TaskResult:
         # Score based on success per 1K tokens
         return (self.completion_score * 1000) / self.tokens_used
 
+    @property
+    def code_intelligence_calls(self) -> int:
+        """Combined `code_search` and `graph` calls."""
+        return self.code_search_calls + self.graph_calls
+
+    @property
+    def used_code_search(self) -> bool:
+        """Whether the task used `code_search` at least once."""
+        return self.code_search_calls > 0
+
+    @property
+    def used_graph(self) -> bool:
+        """Whether the task used `graph` at least once."""
+        return self.graph_calls > 0
+
+    @property
+    def used_code_intelligence(self) -> bool:
+        """Whether the task used either `code_search` or `graph`."""
+        return self.code_intelligence_calls > 0
+
+    def get_failure_diagnosis(self) -> Optional[FailureDiagnosis]:
+        """Return a structured failure diagnosis, deriving one when needed."""
+        if self.failure_diagnosis is not None:
+            return self.failure_diagnosis
+        if self.failure_category is None:
+            return None
+        return derive_failure_diagnosis(self)
+
+    @property
+    def failure_taxonomy_path(self) -> Optional[str]:
+        """Stable hierarchical taxonomy path for this task failure."""
+        diagnosis = self.get_failure_diagnosis()
+        if diagnosis is None:
+            return None
+        return diagnosis.path
+
+    def get_confidence_assessment(self) -> ConfidenceAssessment:
+        """Return truth-aligned confidence and uncertainty for this task."""
+        if self.confidence_assessment is not None:
+            return self.confidence_assessment
+        return derive_confidence_assessment(self)
+
     def calculate_completion_score(self) -> float:
         """Calculate partial completion score based on tests and quality."""
         score = 0.0
@@ -268,10 +493,19 @@ class TaskResult:
 
 @dataclass
 class EvaluationConfig:
-    """Configuration for an evaluation run."""
+    """Configuration for an evaluation run.
+
+    The optional prompt-optimization fields let benchmark artifacts identify the
+    exact prompt candidate and section under evaluation. That keeps offline
+    evaluation output reusable by frontier seeding instead of relying solely on
+    runtime traces.
+    """
 
     benchmark: BenchmarkType
     model: str
+    provider: Optional[str] = None
+    prompt_candidate_hash: Optional[str] = None
+    prompt_section_name: Optional[str] = None
     max_tasks: Optional[int] = None
     timeout_per_task: int = 300
     max_retries: int = 1
@@ -292,11 +526,28 @@ class EvaluationConfig:
     use_docker: bool = True
     docker_image: str = "python:3.11"
     workspace_dir: Optional[Path] = None
+    dataset_metadata: dict[str, Any] = field(default_factory=dict)
 
     # Self-correction settings (generic iterative refinement)
     enable_self_correction: bool = False
     self_correction_max_iterations: int = 3
     auto_fix_imports: bool = True
+
+    def to_artifact_config(self) -> dict[str, Any]:
+        """Serialize stable evaluation identity for saved benchmark artifacts."""
+        return {
+            "benchmark": self.benchmark.value,
+            "model": self.model,
+            "provider": self.provider,
+            "prompt_candidate_hash": self.prompt_candidate_hash,
+            "section_name": self.prompt_section_name,
+            "prompt_section_name": self.prompt_section_name,
+            "max_tasks": self.max_tasks,
+            "timeout_per_task": self.timeout_per_task,
+            "max_turns": self.max_turns,
+            "parallel_tasks": self.parallel_tasks,
+            "dataset_metadata": dict(self.dataset_metadata),
+        }
 
 
 @dataclass
@@ -360,6 +611,31 @@ class EvaluationResult:
         """Total tool calls made."""
         return sum(r.tool_calls for r in self.task_results)
 
+    @property
+    def total_code_search_calls(self) -> int:
+        """Total `code_search` calls across all tasks."""
+        return sum(r.code_search_calls for r in self.task_results)
+
+    @property
+    def total_graph_calls(self) -> int:
+        """Total `graph` calls across all tasks."""
+        return sum(r.graph_calls for r in self.task_results)
+
+    @property
+    def tasks_using_code_search(self) -> int:
+        """Number of tasks that used `code_search`."""
+        return sum(1 for r in self.task_results if r.used_code_search)
+
+    @property
+    def tasks_using_graph(self) -> int:
+        """Number of tasks that used `graph`."""
+        return sum(1 for r in self.task_results if r.used_graph)
+
+    @property
+    def tasks_using_code_intelligence(self) -> int:
+        """Number of tasks that used `code_search` or `graph`."""
+        return sum(1 for r in self.task_results if r.used_code_intelligence)
+
     def get_by_status(self, status: TaskStatus) -> list[TaskResult]:
         """Get results by status."""
         return [r for r in self.task_results if r.status == status]
@@ -370,8 +646,46 @@ class EvaluationResult:
         return self.task_results
 
     def get_metrics(self) -> dict[str, Any]:
-        """Get summary metrics."""
-        return {
+        """Get summary metrics including extended token tracking."""
+        cached = sum(r.cached_tokens for r in self.task_results)
+        reasoning = sum(r.reasoning_tokens for r in self.task_results)
+        cost_micros = sum(r.cost_usd_micros for r in self.task_results)
+        code_search_calls = self.total_code_search_calls
+        graph_calls = self.total_graph_calls
+        code_intelligence_tasks = self.tasks_using_code_intelligence
+        failure_categories = Counter()
+        failure_stages = Counter()
+        failure_taxonomy = Counter()
+        confidence_buckets = Counter()
+        confidence_scores: list[float] = []
+        uncertainty_scores: list[float] = []
+        truth_aligned_tasks = 0
+        overconfident_failures = 0
+        underconfident_passes = 0
+        for task_result in self.task_results:
+            if task_result.failure_category is not None:
+                failure_categories[task_result.failure_category.value] += 1
+            diagnosis = task_result.get_failure_diagnosis()
+            if diagnosis is not None:
+                failure_stages[diagnosis.stage.value] += 1
+                failure_taxonomy[diagnosis.path] += 1
+            confidence = task_result.get_confidence_assessment()
+            confidence_buckets[confidence.bucket.value] += 1
+            confidence_scores.append(confidence.confidence_score)
+            uncertainty_scores.append(confidence.uncertainty)
+            if confidence.truth_aligned:
+                truth_aligned_tasks += 1
+            if (
+                task_result.status != TaskStatus.PASSED
+                and confidence.bucket == ConfidenceBucket.HIGH
+            ):
+                overconfident_failures += 1
+            if (
+                task_result.status == TaskStatus.PASSED
+                and confidence.bucket == ConfidenceBucket.LOW
+            ):
+                underconfident_passes += 1
+        metrics = {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
             "failed": self.failed_tasks,
@@ -381,9 +695,251 @@ class EvaluationResult:
             "duration_seconds": self.duration_seconds,
             "total_tokens": self.total_tokens,
             "total_tool_calls": self.total_tool_calls,
+            "total_code_search_calls": code_search_calls,
+            "total_graph_calls": graph_calls,
+            "total_code_intelligence_calls": code_search_calls + graph_calls,
+            "tasks_using_code_search": self.tasks_using_code_search,
+            "tasks_using_graph": self.tasks_using_graph,
+            "tasks_using_code_intelligence": code_intelligence_tasks,
+            "code_intelligence_task_coverage": code_intelligence_tasks / max(1, self.total_tasks),
             "avg_tokens_per_task": self.total_tokens / max(1, self.total_tasks),
             "avg_duration_per_task": self.duration_seconds / max(1, self.total_tasks),
+            # Extended token metrics
+            "cached_tokens": cached,
+            "reasoning_tokens": reasoning,
+            "cost_usd_micros": cost_micros,
+            "failure_categories": dict(failure_categories),
+            "failure_stages": dict(failure_stages),
+            "failure_taxonomy": dict(failure_taxonomy),
+            "avg_confidence_score": sum(confidence_scores) / max(1, len(confidence_scores)),
+            "avg_uncertainty": sum(uncertainty_scores) / max(1, len(uncertainty_scores)),
+            "confidence_buckets": dict(confidence_buckets),
+            "truth_alignment_rate": truth_aligned_tasks / max(1, self.total_tasks),
+            "overconfidence_rate": overconfident_failures / max(1, self.total_tasks),
+            "underconfidence_rate": underconfident_passes / max(1, self.total_tasks),
         }
+        metrics.update(aggregate_planning_feedback(self.task_results, total_tasks=self.total_tasks))
+        metrics.update(aggregate_topology_feedback(self.task_results, total_tasks=self.total_tasks))
+        metrics.update(
+            aggregate_degradation_feedback(self.task_results, total_tasks=self.total_tasks)
+        )
+        metrics.update(aggregate_team_feedback(self.task_results, total_tasks=self.total_tasks))
+        return metrics
+
+
+def derive_failure_diagnosis(result: TaskResult) -> FailureDiagnosis:
+    """Infer a structured failure diagnosis from a task result."""
+    if result.failure_category is None:
+        raise ValueError("Cannot derive failure diagnosis without a failure category")
+
+    details = dict(result.failure_details)
+    error_message = result.error_message.lower()
+
+    def subset(*keys: str) -> dict[str, Any]:
+        return {key: details[key] for key in keys if key in details and details[key]}
+
+    if result.failure_category == BenchmarkFailureCategory.TOOL_USAGE:
+        if details.get("forbidden_action_hits"):
+            return FailureDiagnosis(
+                stage=FailureStage.ACTION,
+                category=result.failure_category,
+                subtype="forbidden_action",
+                retryable=False,
+                metadata=subset("forbidden_action_hits"),
+            )
+        return FailureDiagnosis(
+            stage=FailureStage.ACTION,
+            category=result.failure_category,
+            subtype="tool_policy_violation",
+            retryable=True,
+            metadata=dict(details),
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.TASK_COMPLETION:
+        if details.get("missing_actions"):
+            return FailureDiagnosis(
+                stage=FailureStage.ACTION,
+                category=result.failure_category,
+                subtype="missing_required_actions",
+                retryable=True,
+                metadata=subset("missing_actions"),
+            )
+        if details.get("missing_claims") or details.get("missing_citations"):
+            return FailureDiagnosis(
+                stage=FailureStage.GROUNDING,
+                category=result.failure_category,
+                subtype="missing_required_evidence",
+                retryable=True,
+                metadata=subset("missing_claims", "missing_citations"),
+            )
+        if details.get("missing_answer_phrases"):
+            return FailureDiagnosis(
+                stage=FailureStage.COMPLETION,
+                category=result.failure_category,
+                subtype="missing_answer_coverage",
+                retryable=True,
+                metadata=subset("missing_answer_phrases"),
+            )
+        if "no generated report" in error_message or "no generated output" in error_message:
+            return FailureDiagnosis(
+                stage=FailureStage.COMPLETION,
+                category=result.failure_category,
+                subtype="empty_output",
+                retryable=True,
+                metadata={},
+            )
+        return FailureDiagnosis(
+            stage=FailureStage.COMPLETION,
+            category=result.failure_category,
+            subtype="incomplete_task",
+            retryable=True,
+            metadata=dict(details),
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.UNSUPPORTED_CLAIM:
+        if details.get("forbidden_claim_hits"):
+            return FailureDiagnosis(
+                stage=FailureStage.GROUNDING,
+                category=result.failure_category,
+                subtype="forbidden_claim",
+                retryable=True,
+                metadata=subset("forbidden_claim_hits"),
+            )
+        return FailureDiagnosis(
+            stage=FailureStage.GROUNDING,
+            category=result.failure_category,
+            subtype="unsupported_claim",
+            retryable=True,
+            metadata=dict(details),
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.PATCH_APPLICATION:
+        return FailureDiagnosis(
+            stage=FailureStage.EXECUTION,
+            category=result.failure_category,
+            subtype="patch_did_not_apply",
+            retryable=True,
+            metadata={},
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.TEST_FAILURE:
+        subtype = "partial_test_failure" if result.tests_passed > 0 else "all_tests_failed"
+        return FailureDiagnosis(
+            stage=FailureStage.VALIDATION,
+            category=result.failure_category,
+            subtype=subtype,
+            retryable=True,
+            metadata={
+                "tests_passed": result.tests_passed,
+                "tests_failed": result.tests_failed,
+                "tests_total": result.tests_total,
+            },
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.TIMEOUT:
+        subtype = "test_timeout" if "test" in error_message else "task_timeout"
+        return FailureDiagnosis(
+            stage=FailureStage.EXECUTION,
+            category=result.failure_category,
+            subtype=subtype,
+            retryable=True,
+            metadata={},
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.EXECUTION_ERROR:
+        return FailureDiagnosis(
+            stage=FailureStage.EXECUTION,
+            category=result.failure_category,
+            subtype="runtime_exception",
+            retryable=True,
+            metadata={},
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.ENVIRONMENT_ERROR:
+        subtype = "test_runner_error" if "test runner" in error_message else "environment_setup"
+        return FailureDiagnosis(
+            stage=FailureStage.ENVIRONMENT,
+            category=result.failure_category,
+            subtype=subtype,
+            retryable=True,
+            metadata={},
+        )
+
+    return FailureDiagnosis(
+        stage=FailureStage.UNKNOWN,
+        category=result.failure_category,
+        subtype="unknown",
+        retryable=False,
+        metadata=dict(details),
+    )
+
+
+def derive_confidence_assessment(result: TaskResult) -> ConfidenceAssessment:
+    """Infer truth-aligned confidence from task evidence and failure state."""
+    evidence_signals: list[float] = []
+
+    if result.tests_total > 0:
+        evidence_signals.append(result.tests_passed / max(1, result.tests_total))
+
+    for key in (
+        "claim_coverage",
+        "citation_coverage",
+        "action_coverage",
+        "answer_coverage",
+    ):
+        value = result.failure_details.get(key)
+        if isinstance(value, (int, float)):
+            evidence_signals.append(float(value))
+
+    if result.completion_score > 0:
+        evidence_signals.append(float(result.completion_score))
+
+    evidence_score = sum(evidence_signals) / max(1, len(evidence_signals))
+
+    if result.status == TaskStatus.PASSED:
+        confidence_score = min(0.99, 0.6 + (0.4 * evidence_score))
+    else:
+        failure_factor = {
+            BenchmarkFailureCategory.UNSUPPORTED_CLAIM: 0.2,
+            BenchmarkFailureCategory.TOOL_USAGE: 0.25,
+            BenchmarkFailureCategory.TASK_COMPLETION: 0.35,
+            BenchmarkFailureCategory.TEST_FAILURE: 0.45,
+            BenchmarkFailureCategory.PATCH_APPLICATION: 0.3,
+            BenchmarkFailureCategory.TIMEOUT: 0.25,
+            BenchmarkFailureCategory.EXECUTION_ERROR: 0.15,
+            BenchmarkFailureCategory.ENVIRONMENT_ERROR: 0.1,
+            BenchmarkFailureCategory.UNKNOWN: 0.2,
+        }.get(result.failure_category, 0.2)
+        confidence_score = min(0.49, evidence_score * failure_factor)
+
+    uncertainty = max(0.0, 1.0 - confidence_score)
+    if confidence_score >= 0.67:
+        bucket = ConfidenceBucket.HIGH
+    elif confidence_score >= 0.34:
+        bucket = ConfidenceBucket.MEDIUM
+    else:
+        bucket = ConfidenceBucket.LOW
+
+    truth_aligned = (result.status == TaskStatus.PASSED and bucket != ConfidenceBucket.LOW) or (
+        result.status != TaskStatus.PASSED and bucket != ConfidenceBucket.HIGH
+    )
+
+    return ConfidenceAssessment(
+        confidence_score=round(confidence_score, 4),
+        uncertainty=round(uncertainty, 4),
+        evidence_score=round(evidence_score, 4),
+        bucket=bucket,
+        truth_aligned=truth_aligned,
+        signals={
+            "status": result.status.value,
+            "failure_category": (
+                result.failure_category.value if result.failure_category is not None else None
+            ),
+            "completion_score": result.completion_score,
+            "tests_passed": result.tests_passed,
+            "tests_total": result.tests_total,
+        },
+    )
 
 
 @dataclass
@@ -397,8 +953,30 @@ class BenchmarkMetadata:
     languages: list[str]
     categories: list[str]
     description: str = ""
+    source_name: str = ""
     source_url: str = ""
     paper_url: str = ""
+    aliases: tuple[str, ...] = ()
+    evaluation_mode: str = "code"
+    runner_status: str = "implemented"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize benchmark metadata for reporting."""
+        return {
+            "name": self.name,
+            "type": self.type.value,
+            "version": self.version,
+            "total_tasks": self.total_tasks,
+            "languages": list(self.languages),
+            "categories": list(self.categories),
+            "description": self.description,
+            "source_name": self.source_name,
+            "source_url": self.source_url,
+            "paper_url": self.paper_url,
+            "aliases": list(self.aliases),
+            "evaluation_mode": self.evaluation_mode,
+            "runner_status": self.runner_status,
+        }
 
 
 @dataclass
@@ -414,3 +992,179 @@ class LeaderboardEntry:
     avg_tokens: float
     avg_duration: float
     config: dict = field(default_factory=dict)
+
+
+BENCHMARK_CATALOG: tuple[BenchmarkMetadata, ...] = (
+    BenchmarkMetadata(
+        name="swe-bench",
+        type=BenchmarkType.SWE_BENCH,
+        version="1.0",
+        total_tasks=2300,
+        languages=["python"],
+        categories=["software-engineering", "agentic"],
+        description="Real-world GitHub issue resolution benchmark.",
+        source_name="Princeton NLP",
+        aliases=("swe_bench",),
+        evaluation_mode="agentic",
+    ),
+    BenchmarkMetadata(
+        name="swe-bench-lite",
+        type=BenchmarkType.SWE_BENCH,
+        version="1.0",
+        total_tasks=300,
+        languages=["python"],
+        categories=["software-engineering", "agentic"],
+        description="Curated subset of SWE-bench for faster evaluation.",
+        source_name="Princeton NLP",
+        aliases=("swe_bench_lite",),
+        evaluation_mode="agentic",
+    ),
+    BenchmarkMetadata(
+        name="humaneval",
+        type=BenchmarkType.HUMAN_EVAL,
+        version="1.0",
+        total_tasks=164,
+        languages=["python"],
+        categories=["code-generation"],
+        description="Code generation from docstrings.",
+        source_name="OpenAI",
+        aliases=("human-eval", "human_eval"),
+        evaluation_mode="code-generation",
+    ),
+    BenchmarkMetadata(
+        name="mbpp",
+        type=BenchmarkType.MBPP,
+        version="1.0",
+        total_tasks=974,
+        languages=["python"],
+        categories=["code-generation"],
+        description="Mostly Basic Python Problems.",
+        source_name="Google Research",
+        evaluation_mode="code-generation",
+    ),
+    BenchmarkMetadata(
+        name="mbpp-test",
+        type=BenchmarkType.MBPP,
+        version="1.0",
+        total_tasks=500,
+        languages=["python"],
+        categories=["code-generation"],
+        description="MBPP test split.",
+        source_name="Google Research",
+        aliases=("mbpp_test",),
+        evaluation_mode="code-generation",
+    ),
+    BenchmarkMetadata(
+        name="dr3-eval",
+        type=BenchmarkType.DR3_EVAL,
+        version="1.0",
+        total_tasks=0,
+        languages=["report"],
+        categories=["agentic", "deep-research", "reporting"],
+        description="Deep-research report benchmark with claim and citation checks.",
+        source_name="DR3-Eval",
+        aliases=("dr3_eval", "dr3"),
+        evaluation_mode="deep-research",
+    ),
+    BenchmarkMetadata(
+        name="clawbench",
+        type=BenchmarkType.CLAW_BENCH,
+        version="1.0",
+        total_tasks=0,
+        languages=["gui", "web"],
+        categories=["agentic", "perception", "computer-use"],
+        description="External GUI benchmark for computer-use agent evaluation.",
+        source_name="Research",
+        aliases=("claw-bench", "claw_bench"),
+        evaluation_mode="agentic-perception",
+        runner_status="implemented",
+    ),
+    BenchmarkMetadata(
+        name="guide",
+        type=BenchmarkType.GUIDE,
+        version="1.0",
+        total_tasks=0,
+        languages=["gui", "web"],
+        categories=["agentic", "perception", "grounding"],
+        description="External grounded UI agent benchmark coverage.",
+        source_name="Research",
+        evaluation_mode="agentic-perception",
+        runner_status="implemented",
+    ),
+    BenchmarkMetadata(
+        name="vlaa-gui",
+        type=BenchmarkType.VLAA_GUI,
+        version="1.0",
+        total_tasks=0,
+        languages=["gui"],
+        categories=["agentic", "perception", "gui-actions"],
+        description="External GUI action benchmark for vision-language agents.",
+        source_name="Research",
+        aliases=("vlaa_gui",),
+        evaluation_mode="agentic-perception",
+        runner_status="implemented",
+    ),
+)
+
+_BENCHMARK_NAME_INDEX = {
+    alias: metadata
+    for metadata in BENCHMARK_CATALOG
+    for alias in (metadata.name, *metadata.aliases)
+}
+
+EXTERNAL_AGENTIC_BENCHMARK_TYPES = frozenset(
+    {
+        BenchmarkType.CLAW_BENCH,
+        BenchmarkType.GUIDE,
+        BenchmarkType.VLAA_GUI,
+    }
+)
+
+BROWSER_TASK_BENCHMARK_TYPES = EXTERNAL_AGENTIC_BENCHMARK_TYPES
+LOCAL_MANIFEST_BENCHMARK_TYPES = frozenset(
+    {
+        BenchmarkType.DR3_EVAL,
+        *BROWSER_TASK_BENCHMARK_TYPES,
+    }
+)
+
+
+def normalize_benchmark_name(name: str) -> str:
+    """Normalize benchmark names for CLI and metadata lookup."""
+    return name.strip().lower().replace("_", "-")
+
+
+def get_benchmark_catalog() -> tuple[BenchmarkMetadata, ...]:
+    """Return benchmark metadata in CLI display order."""
+    return BENCHMARK_CATALOG
+
+
+def get_benchmark_metadata(benchmark: BenchmarkType | str) -> Optional[BenchmarkMetadata]:
+    """Resolve benchmark metadata from enum type or CLI name."""
+    if isinstance(benchmark, BenchmarkType):
+        return next((item for item in BENCHMARK_CATALOG if item.type == benchmark), None)
+    return _BENCHMARK_NAME_INDEX.get(normalize_benchmark_name(benchmark))
+
+
+def is_external_agentic_benchmark(benchmark: BenchmarkType | str) -> bool:
+    """Return True when the benchmark is an external perception-heavy agentic task."""
+    metadata = get_benchmark_metadata(benchmark)
+    if metadata is None:
+        return False
+    return metadata.type in EXTERNAL_AGENTIC_BENCHMARK_TYPES
+
+
+def is_browser_task_benchmark(benchmark: BenchmarkType | str) -> bool:
+    """Return True for browser/web-task benchmarks with action-trace evaluation."""
+    metadata = get_benchmark_metadata(benchmark)
+    if metadata is None:
+        return False
+    return metadata.type in BROWSER_TASK_BENCHMARK_TYPES
+
+
+def requires_local_manifest_benchmark(benchmark: BenchmarkType | str) -> bool:
+    """Return True when a benchmark runner requires a local dataset manifest."""
+    metadata = get_benchmark_metadata(benchmark)
+    if metadata is None:
+        return False
+    return metadata.type in LOCAL_MANIFEST_BENCHMARK_TYPES

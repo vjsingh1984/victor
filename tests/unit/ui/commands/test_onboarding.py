@@ -15,6 +15,7 @@
 """Tests for interactive onboarding wizard."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -29,6 +30,18 @@ class TestOnboardingWizard:
         wizard = OnboardingWizard()
         assert wizard.config_dir == Path.home() / ".victor"
         assert wizard.state["step"] == 0
+
+    def test_init_uses_global_victor_dir(self, tmp_path):
+        """Wizard should resolve config dir through centralized Victor paths."""
+        global_dir = tmp_path / ".victor"
+
+        with patch(
+            "victor.ui.commands.onboarding.get_project_paths",
+            return_value=SimpleNamespace(global_victor_dir=global_dir),
+        ):
+            wizard = OnboardingWizard()
+
+        assert wizard.config_dir == global_dir
 
     def test_init_with_custom_console(self):
         """Wizard can accept custom console."""
@@ -111,7 +124,7 @@ class TestProviderConfiguration:
         """Getting default model works."""
         wizard = OnboardingWizard()
 
-        assert "qwen2.5-coder" in wizard._get_default_model("ollama")
+        assert "qwen3.5" in wizard._get_default_model("ollama")
         assert "claude" in wizard._get_default_model("anthropic").lower()
         assert "gpt" in wizard._get_default_model("openai").lower()
 
@@ -254,7 +267,8 @@ class TestRunOnboarding:
         mock_run.assert_called_once()
 
     @patch(
-        "victor.ui.commands.onboarding.OnboardingWizard.run", side_effect=Exception("Test error")
+        "victor.ui.commands.onboarding.OnboardingWizard.run",
+        side_effect=Exception("Test error"),
     )
     def test_run_onboarding_handles_exception(self, mock_run):
         """run_onboarding handles exceptions."""
@@ -265,7 +279,10 @@ class TestRunOnboarding:
         assert exit_code == 1
         mock_run.assert_called_once()
 
-    @patch("victor.ui.commands.onboarding.OnboardingWizard", side_effect=Exception("Init error"))
+    @patch(
+        "victor.ui.commands.onboarding.OnboardingWizard",
+        side_effect=Exception("Init error"),
+    )
     def test_run_onboarding_handles_wizard_init_exception(self, mock_wizard):
         """run_onboarding handles wizard initialization exceptions."""
         from victor.ui.commands.onboarding import run_onboarding

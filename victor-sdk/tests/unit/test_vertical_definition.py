@@ -41,9 +41,7 @@ def test_vertical_definition_to_dict_and_to_config_round_trip() -> None:
         ],
         system_prompt="You are a coding assistant.",
         prompt_metadata={
-            "templates": {
-                "analysis": "Analyze the repository."
-            },
+            "templates": {"analysis": "Analyze the repository."},
             "task_type_hints": {
                 "analysis": {
                     "hint": "Start with reading the relevant files.",
@@ -170,7 +168,9 @@ def test_sdk_vertical_base_exposes_get_definition() -> None:
     assert config.extensions["tool_requirements"][0].tool_name == "read"
     assert config.extensions["capability_requirements"][0].capability_id == CapabilityIds.FILE_OPS
     assert config.extensions["prompt_metadata"]["templates"][0]["task_type"] == "analysis"
-    assert config.extensions["workflow_metadata"]["provider_hints"]["preferred_providers"] == ["anthropic"]
+    assert config.extensions["workflow_metadata"]["provider_hints"]["preferred_providers"] == [
+        "anthropic"
+    ]
 
 
 def test_sdk_vertical_base_allows_explicit_tool_requirements() -> None:

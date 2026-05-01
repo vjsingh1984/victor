@@ -69,8 +69,15 @@ class CapabilityResolution:
         return payload
 
 
-class RuntimeCapabilityRegistry:
-    """Registry of runtime bindings for SDK capability identifiers."""
+class SdkCapabilityNegotiator:
+    """Registry of runtime bindings for SDK capability identifiers.
+
+    Negotiates SDK capability requirements against runtime satisfactions.
+    Maps SDK capability IDs (e.g., CapabilityIds.CODEBASE_INDEXING) to
+    orchestrator capabilities, required tools, and provider protocols.
+
+    Note: Previously named RuntimeCapabilityRegistry - renamed for clarity.
+    """
 
     def __init__(self) -> None:
         self._bindings: Dict[str, RuntimeCapabilityBinding] = {}
@@ -308,7 +315,11 @@ def get_runtime_capability_registry(*, reset: bool = False) -> RuntimeCapability
             RuntimeCapabilityBinding(
                 capability_id=CapabilityIds.PROMPT_CONTRIBUTIONS,
                 description="Prompt contribution support is provided by framework prompt capabilities.",
-                orchestrator_capabilities=("task_type_hints", "prompt_section", "prompt_builder"),
+                orchestrator_capabilities=(
+                    "task_type_hints",
+                    "prompt_section",
+                    "prompt_builder",
+                ),
                 builtin_provider_imports=(
                     "victor.framework.capabilities.prompt_contributions:PromptContributionCapability",
                 ),
@@ -374,7 +385,10 @@ def get_runtime_capability_registry(*, reset: bool = False) -> RuntimeCapability
             RuntimeCapabilityBinding(
                 capability_id=CapabilityIds.SAFETY_RULES,
                 description="Safety rules are provided by the framework safety rules capability provider.",
-                orchestrator_capabilities=("vertical_safety_patterns", "safety_patterns"),
+                orchestrator_capabilities=(
+                    "vertical_safety_patterns",
+                    "safety_patterns",
+                ),
                 builtin_provider_imports=(
                     "victor.framework.capabilities.safety_rules:SafetyRulesCapabilityProvider",
                 ),
@@ -426,7 +440,7 @@ def resolve_capability_requirements(
     *,
     orchestrator: Any = None,
     available_tools: Optional[Iterable[str]] = None,
-    registry: Optional[RuntimeCapabilityRegistry] = None,
+    registry: Optional["SdkCapabilityNegotiator"] = None,
 ) -> List[CapabilityResolution]:
     """Resolve SDK capability requirements against the runtime."""
 
@@ -438,10 +452,19 @@ def resolve_capability_requirements(
     )
 
 
+# =============================================================================
+# Backward compatibility aliases
+# =============================================================================
+
+# Alias for backward compatibility - was renamed for clarity
+RuntimeCapabilityRegistry = SdkCapabilityNegotiator
+
+
 __all__ = [
     "CapabilityResolution",
     "RuntimeCapabilityBinding",
-    "RuntimeCapabilityRegistry",
+    "SdkCapabilityNegotiator",
+    "RuntimeCapabilityRegistry",  # Backward compat alias
     "get_runtime_capability_registry",
     "resolve_capability_requirement",
     "resolve_capability_requirements",

@@ -39,17 +39,7 @@ from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 def _to_runtime_stage(stage_name: str, stage: Any) -> StageDefinition:
     """Convert an SDK/declarative stage into the core runtime shape."""
 
-    normalized = normalize_stage_definition(stage_name, stage)
-    return StageDefinition(
-        name=normalized.name,
-        description=normalized.description,
-        required_tools=list(normalized.required_tools),
-        optional_tools=list(normalized.optional_tools),
-        allow_custom_tools=normalized.allow_custom_tools,
-        keywords=list(normalized.keywords),
-        next_stages=set(normalized.next_stages),
-        min_confidence=float(normalized.min_confidence),
-    )
+    return normalize_stage_definition(stage_name, stage)
 
 
 def _to_runtime_stages(stages: Dict[str, Any]) -> Dict[str, StageDefinition]:

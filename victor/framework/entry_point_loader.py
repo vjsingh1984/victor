@@ -47,17 +47,12 @@ import threading
 import warnings
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from importlib.metadata import entry_points
-
 from victor.framework.config import SafetyEnforcer
 
 # Import unified registry for single-pass scanning
 from victor.framework.entry_point_registry import (
-    EntryPointGroup,
-    UnifiedEntryPointRegistry,
     get_entry_point,
-    get_entry_point_group,
-    scan_all_entry_points,
+    get_entry_point_objects,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,7 +136,9 @@ def normalize_vertical_name(name: str) -> str:
     return _get_normalize_fn()(name)
 
 
-def _normalize_vertical_names(vertical_names: Optional[List[str]]) -> Optional[set[str]]:
+def _normalize_vertical_names(
+    vertical_names: Optional[List[str]],
+) -> Optional[set[str]]:
     """Normalize an optional list of vertical names for matching."""
     if vertical_names is None:
         return None
@@ -181,17 +178,8 @@ def _cached_entry_points(group: str) -> tuple:
     Returns:
         Tuple of entry point objects
     """
-    logger.debug(f"_cached_entry_points('{group}') called - using unified registry")
-
-    # Use unified registry
-    registry = UnifiedEntryPointRegistry.get_instance()
-    group_obj = registry.get_group(group)
-
-    if not group_obj:
-        return ()
-
-    # Convert to tuple format for backward compatibility
-    return tuple(ep for ep, _ in group_obj.entry_points.values())
+    logger.debug(f"_cached_entry_points('{group}') called - using shared entry-point discovery")
+    return get_entry_point_objects(group)
 
 
 def clear_entry_point_loader_cache() -> None:
@@ -206,8 +194,9 @@ def clear_entry_point_loader_cache() -> None:
 
     # Also clear the unified registry
     try:
-        registry = UnifiedEntryPointRegistry.get_instance()
-        registry.invalidate()
+        from victor.framework.entry_point_registry import get_entry_point_registry
+
+        get_entry_point_registry().invalidate()
         logger.debug("Cleared unified entry point registry")
     except Exception as e:
         logger.warning(f"Failed to clear unified entry point registry: {e}")
@@ -257,23 +246,14 @@ def load_runtime_extension_from_entry_points(
     _increment_group_loader_stat(group, "calls")
     normalized_vertical = normalize_vertical_name(vertical)
 
-    # Use unified registry for better performance
-    registry = UnifiedEntryPointRegistry.get_instance()
-
-    # Ensure entry points are scanned (lazy initialization)
     try:
-        registry.scan_all()
+        loaded_ep = get_entry_point(group, normalized_vertical)
     except Exception as e:
         _increment_group_loader_stat(group, "failures")
         logger.debug(
-            "Failed to scan entry-point groups for vertical '%s': %s",
-            vertical,
-            e,
+            "Failed to resolve entry point group '%s' for vertical '%s': %s", group, vertical, e
         )
         return None
-
-    # Get the specific entry point using unified registry
-    loaded_ep = registry.get(group, normalized_vertical)
 
     if loaded_ep is not None:
         # Resolve loaded entry point target if needed
@@ -394,7 +374,9 @@ def load_tool_dependency_provider_from_entry_points(
 
     # Compatibility fallback for extracted verticals (core + external packages).
     try:
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
         from victor.core.tool_types import EmptyToolDependencyProvider
 
         provider = create_vertical_tool_dependency_provider(normalized_vertical)
@@ -600,7 +582,6 @@ def list_installed_verticals() -> List[str]:
             "'victor.verticals'. Migrate these packages to 'victor.plugins'. "
             f"Observed legacy entries: {', '.join(sorted(legacy_verticals))}"
         )
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
         logger.warning(message)
         _WARNED_LEGACY_VERTICAL_LISTINGS = True
 

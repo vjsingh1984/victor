@@ -30,6 +30,10 @@ curl http://localhost:8080/api/v1/chat \
   }'
 ```
 
+```bash
+curl "http://localhost:8080/api/v1/capabilities/recommend?task_type=feature&complexity=high&mode=build"
+```
+
 [Full HTTP API Documentation →](http-api.md)
 
 ### MCP Server

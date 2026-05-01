@@ -57,6 +57,9 @@ class StreamRenderer(Protocol):
         arguments: dict[str, Any],
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
+        was_pruned: bool = False,
+        original_result: Any = None,
+        result: Any = None,
     ) -> None:
         """Handle tool execution result event."""
         ...
@@ -87,6 +90,10 @@ class StreamRenderer(Protocol):
 
     def on_thinking_end(self) -> None:
         """Handle transition out of thinking state."""
+        ...
+
+    def had_tool_calls(self) -> bool:
+        """Return True if at least one tool call was processed this turn."""
         ...
 
     def finalize(self) -> str:

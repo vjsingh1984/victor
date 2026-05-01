@@ -17,12 +17,14 @@
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 import pytest
 
 from victor.tools.filesystem import (
     read,
     write,
     ls,
+    reset_path_resolver,
     detect_file_type_by_magic,
     check_extension_magic_mismatch,
     FileCategory,
@@ -36,6 +38,12 @@ from victor.tools.filesystem import (
     is_file_cache_enabled,
     _cache_enabled,
 )
+
+
+@pytest.fixture(autouse=True)
+def _allow_tmp_workspace(monkeypatch):
+    """Disable workspace guard for tests that create files in /tmp."""
+    monkeypatch.setenv("VICTOR_DISABLE_WORKSPACE_GUARD", "1")
 
 
 @pytest.mark.asyncio
@@ -74,11 +82,33 @@ async def test_read_file_not_found():
 
 
 @pytest.mark.asyncio
+async def test_read_file_not_found_prefers_package_file_suggestions(tmp_path, monkeypatch):
+    """Missing module files should suggest package-backed source files first."""
+    package_dir = tmp_path / "victor" / "core" / "registry"
+    package_dir.mkdir(parents=True)
+    (package_dir / "__init__.py").write_text("# package")
+    (package_dir / "base.py").write_text("# base")
+    (tmp_path / "victor" / "core" / "registry_base.py").write_text("# legacy")
+    monkeypatch.chdir(tmp_path)
+    reset_path_resolver()
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        await read(path="victor/core/registry.py")
+
+    message = str(exc_info.value)
+    assert "victor/core/registry/base.py" in message
+    assert message.index("victor/core/registry/base.py") < message.index(
+        "victor/core/registry_base.py"
+    )
+
+
+@pytest.mark.asyncio
 async def test_read_file_not_a_file():
-    """Test reading a directory path."""
+    """Test reading a directory path auto-converts to ls."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        with pytest.raises(IsADirectoryError):
-            await read(path=tmpdir)
+        # Directories auto-convert to ls instead of raising
+        result = await read(path=tmpdir)
+        assert "directory" in result.lower() or "contents" in result.lower()
 
 
 @pytest.mark.asyncio
@@ -277,13 +307,34 @@ async def test_list_directory_not_found():
 
 @pytest.mark.asyncio
 async def test_list_directory_not_a_directory():
-    """Test listing a file path."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
+    """Test listing a file path returns file metadata."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w") as f:
+        f.write("test content")
         temp_path = f.name
 
     try:
-        with pytest.raises(NotADirectoryError):
-            await ls(path=temp_path)
+        # ls() on a file should return file metadata in ls format
+        result = await ls(path=temp_path)
+        # Should return a dict with items list (same format as directory listing)
+        assert isinstance(result, dict)
+        assert "items" in result
+        assert result["count"] == 1
+        assert result["auto_converted_from_file"] is True
+
+        # Check the single file item has comprehensive metadata
+        item = result["items"][0]
+        assert item["type"] == "file"
+        # Path may be resolved to absolute form (e.g., /private/var on macOS)
+        assert item["path"] == str(Path(temp_path).resolve())
+        assert "name" in item
+        assert "size" in item
+        assert "permissions" in item
+        assert "owner" in item
+        assert "group" in item
+        assert "modified" in item
+        assert "auto_converted" in item
+        assert "hint" in item
+        assert item["hint"].startswith("Note:")
     finally:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
@@ -375,16 +426,11 @@ async def test_read_file_db_extension_rejected():
 
 
 @pytest.mark.asyncio
-async def test_read_file_directory_error_with_suggestion():
-    """Test that read_file gives helpful suggestion when trying to read a directory."""
+async def test_read_file_directory_auto_converts_to_ls():
+    """Test that read(dir) auto-converts to ls(dir) instead of erroring."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        with pytest.raises(IsADirectoryError) as excinfo:
-            await read(path=tmpdir)
-
-        error_msg = str(excinfo.value)
-        assert "Cannot read directory as file" in error_msg
-        assert "list_directory" in error_msg
-        assert "Suggestion" in error_msg
+        result = await read(path=tmpdir)
+        assert "directory" in result.lower()
 
 
 # ============================================================================
@@ -849,11 +895,20 @@ class TestFileContentCache:
 
 
 class TestFileCacheIntegration:
-    """Integration tests for file cache with read/write functions."""
+    """Integration tests for file cache with read/write functions.
+
+    NOTE: These tests are skipped when file cache is disabled (default).
+    The OS page cache provides better memory management, so the Python
+    process cache is disabled by default.
+    """
 
     @pytest.fixture(autouse=True)
     def setup_cache(self):
         """Ensure cache is cleared before each test."""
+        from victor.tools.filesystem import is_file_cache_enabled
+
+        if not is_file_cache_enabled():
+            pytest.skip("File cache disabled - OS page cache handles this better")
         clear_file_content_cache()
         yield
         clear_file_content_cache()

@@ -46,21 +46,93 @@ Example:
 """
 
 from victor.agent.services.protocols.chat_service import ChatServiceProtocol
+from victor.agent.services.protocols.chat_runtime import (
+    ChatCompatRuntimeProtocol,
+    ChatContextProtocol,
+    ChatOrchestratorProtocol,
+    ExecutionMode,
+    PlanningContextProtocol,
+    ProviderContextProtocol,
+    ToolContextProtocol,
+)
 from victor.agent.services.protocols.context_service import ContextServiceProtocol
 from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+from victor.agent.services.protocols.infrastructure_runtime import (
+    IntentClassifierProtocol,
+    ReminderManagerProtocol,
+    ResponseSanitizerProtocol,
+    StreamingConfidenceMonitorProtocol,
+    StreamingHandlerProtocol,
+    StreamingMetricsCollectorProtocol,
+)
 from victor.agent.services.protocols.provider_service import ProviderServiceProtocol
 from victor.agent.services.protocols.recovery_service import RecoveryServiceProtocol
+from victor.agent.services.protocols.runtime_support import (
+    ChunkRuntimeProtocol,
+    CoordinationAdvisorRuntimeProtocol,
+    PromptRuntimeProtocol,
+    RLLearningRuntimeProtocol,
+    StateRuntimeProtocol,
+    StreamingRecoveryRuntimeProtocol,
+    TaskRuntimeProtocol,
+    ToolPlanningRuntimeProtocol,
+)
 from victor.agent.services.protocols.session_service import SessionServiceProtocol
 from victor.agent.services.protocols.session_ledger import SessionLedgerProtocol
+from victor.agent.services.protocols.streaming_runtime import (
+    StreamingChunkRuntimeProtocol,
+    StreamingConversationStateProtocol,
+    StreamingExecutionRuntimeProtocol,
+    StreamingIntentClassifierRuntimeProtocol,
+    StreamingMessageAdderProtocol,
+    StreamingProviderRuntimeProtocol,
+    StreamingReminderRuntimeProtocol,
+    StreamingRLRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+    StreamingTrackerRuntimeProtocol,
+    ToolExecutionRecoveryRuntimeProtocol,
+)
 from victor.agent.services.protocols.tool_service import ToolServiceProtocol
 
 __all__ = [
     "ChatServiceProtocol",
+    "ChunkRuntimeProtocol",
+    "ChatCompatRuntimeProtocol",
+    "ChatContextProtocol",
+    "ChatOrchestratorProtocol",
+    "CoordinationAdvisorRuntimeProtocol",
     "ContextServiceProtocol",
+    "ExecutionMode",
+    "IntentClassifierProtocol",
     "LLMDecisionServiceProtocol",
+    "PlanningContextProtocol",
+    "PromptRuntimeProtocol",
     "ProviderServiceProtocol",
+    "ProviderContextProtocol",
+    "RLLearningRuntimeProtocol",
+    "ReminderManagerProtocol",
     "RecoveryServiceProtocol",
+    "ResponseSanitizerProtocol",
     "SessionLedgerProtocol",
     "SessionServiceProtocol",
+    "StreamingChunkRuntimeProtocol",
+    "StreamingConfidenceMonitorProtocol",
+    "StreamingConversationStateProtocol",
+    "StreamingExecutionRuntimeProtocol",
+    "StreamingHandlerProtocol",
+    "StreamingIntentClassifierRuntimeProtocol",
+    "StreamingMessageAdderProtocol",
+    "StreamingMetricsCollectorProtocol",
+    "StreamingProviderRuntimeProtocol",
+    "StreamingReminderRuntimeProtocol",
+    "StreamingRLRuntimeProtocol",
+    "StateRuntimeProtocol",
+    "StreamingSanitizerRuntimeProtocol",
+    "StreamingRecoveryRuntimeProtocol",
+    "StreamingTrackerRuntimeProtocol",
+    "TaskRuntimeProtocol",
+    "ToolExecutionRecoveryRuntimeProtocol",
+    "ToolContextProtocol",
+    "ToolPlanningRuntimeProtocol",
     "ToolServiceProtocol",
 ]

@@ -84,41 +84,10 @@ class VerticalConfigRegistry:
         VerticalConfigRegistry.register_provider_hints("my_vertical", {...})
     """
 
-    # Provider hints templates
+    # Provider hints — only the "default" fallback lives in core.
+    # Vertical-specific hints are registered dynamically by external vertical
+    # packages via register_vertical_config() during VictorPlugin.register().
     _provider_hints: Dict[str, Dict[str, Any]] = {
-        "coding": {
-            "preferred_providers": ["anthropic", "openai"],
-            "preferred_models": [
-                "claude-sonnet-4-20250514",
-                "gpt-4-turbo",
-                "claude-3-5-sonnet-20241022",
-            ],
-            "min_context_window": 100000,
-            "requires_tool_calling": True,
-            "prefers_extended_thinking": True,
-        },
-        "research": {
-            "preferred_providers": ["anthropic", "openai", "google"],
-            "min_context_window": 100000,
-            "features": ["web_search", "large_context"],
-        },
-        "devops": {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 100000,
-            "features": ["tool_calling", "large_context"],
-            "requires_tool_calling": True,
-        },
-        "data_analysis": {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 128000,
-            "features": ["tool_calling", "large_context", "code_execution"],
-        },
-        "rag": {
-            "preferred_providers": ["anthropic", "openai", "google"],
-            "min_context_window": 8000,
-            "features": ["tool_calling"],
-            "temperature": 0.3,
-        },
         "default": {
             "preferred_providers": ["anthropic", "openai"],
             "min_context_window": 100000,
@@ -126,48 +95,9 @@ class VerticalConfigRegistry:
         },
     }
 
-    # Evaluation criteria templates
+    # Evaluation criteria — only the "default" fallback lives in core.
+    # Vertical-specific criteria are registered by external packages.
     _evaluation_criteria: Dict[str, List[str]] = {
-        "coding": [
-            "Code correctness and functionality",
-            "Test coverage and validation",
-            "Code quality and maintainability",
-            "Security best practices",
-            "Performance considerations",
-        ],
-        "research": [
-            "accuracy",
-            "source_quality",
-            "comprehensiveness",
-            "clarity",
-            "attribution",
-            "objectivity",
-            "timeliness",
-        ],
-        "devops": [
-            "configuration_correctness",
-            "security_best_practices",
-            "idempotency",
-            "documentation_completeness",
-            "resource_efficiency",
-            "disaster_recovery",
-            "monitoring_coverage",
-        ],
-        "data_analysis": [
-            "statistical_correctness",
-            "visualization_quality",
-            "insight_clarity",
-            "reproducibility",
-            "data_privacy",
-            "methodology_transparency",
-        ],
-        "rag": [
-            "Answer is grounded in retrieved documents",
-            "Sources are properly cited",
-            "No hallucination of facts not in documents",
-            "Relevant documents were retrieved",
-            "Answer is coherent and well-structured",
-        ],
         "default": [
             "Task completion accuracy",
             "Tool usage efficiency",
@@ -176,9 +106,37 @@ class VerticalConfigRegistry:
         ],
     }
 
+    # Dynamic registry for vertical-provided configs (OCP extension point)
+    _registered_provider_hints: Dict[str, Dict[str, Any]] = {}
+    _registered_eval_criteria: Dict[str, List[str]] = {}
+
+    @classmethod
+    def register_vertical_config(
+        cls,
+        vertical: str,
+        provider_hints: Optional[Dict[str, Any]] = None,
+        evaluation_criteria: Optional[List[str]] = None,
+    ) -> None:
+        """Register configuration for a vertical dynamically.
+
+        Enables new verticals to provide their own provider hints and
+        evaluation criteria without modifying core code.
+
+        Args:
+            vertical: Vertical name
+            provider_hints: LLM provider selection hints
+            evaluation_criteria: Quality evaluation criteria
+        """
+        if provider_hints is not None:
+            cls._registered_provider_hints[vertical] = provider_hints
+        if evaluation_criteria is not None:
+            cls._registered_eval_criteria[vertical] = evaluation_criteria
+
     @classmethod
     def get_provider_hints(cls, vertical_name: str) -> Dict[str, Any]:
         """Get provider hints for a vertical.
+
+        Checks dynamic registry first, then falls back to built-in defaults.
 
         Args:
             vertical_name: Name of vertical (e.g., "coding", "research")
@@ -186,8 +144,11 @@ class VerticalConfigRegistry:
         Returns:
             Provider hints dictionary (copy to prevent mutation)
         """
+        # Check dynamic registry first
+        if vertical_name in cls._registered_provider_hints:
+            return cls._registered_provider_hints[vertical_name].copy()
+        # Fall back to built-in defaults
         if vertical_name not in cls._provider_hints:
-            # Fallback to default
             return cls._provider_hints["default"].copy()
         return cls._provider_hints[vertical_name].copy()
 
@@ -195,14 +156,19 @@ class VerticalConfigRegistry:
     def get_evaluation_criteria(cls, vertical_name: str) -> List[str]:
         """Get evaluation criteria for a vertical.
 
+        Checks dynamic registry first, then falls back to built-in defaults.
+
         Args:
             vertical_name: Name of vertical (e.g., "coding", "research")
 
         Returns:
             List of evaluation criteria (copy to prevent mutation)
         """
+        # Check dynamic registry first
+        if vertical_name in cls._registered_eval_criteria:
+            return cls._registered_eval_criteria[vertical_name].copy()
+        # Fall back to built-in defaults
         if vertical_name not in cls._evaluation_criteria:
-            # Fallback to default
             return cls._evaluation_criteria["default"].copy()
         return cls._evaluation_criteria[vertical_name].copy()
 

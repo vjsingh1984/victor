@@ -14,7 +14,7 @@
 
 """Registry consolidation module providing a unified base for all registry implementations."""
 
-from victor.core.registry.base import BaseRegistry
+from victor.core.registry.base import BaseRegistry, ItemRegistry, SingletonRegistry
 from victor.core.registry.protocols import IRegistry
 
-__all__ = ["BaseRegistry", "IRegistry"]
+__all__ = ["BaseRegistry", "IRegistry", "SingletonRegistry", "ItemRegistry"]

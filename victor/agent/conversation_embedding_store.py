@@ -125,7 +125,8 @@ class ConversationEmbeddingStore:
 
         Args:
             embedding_service: Shared EmbeddingService for generating embeddings
-            sqlite_db_path: Path to SQLite conversation.db (for lazy embedding)
+            sqlite_db_path: Path to SQLite database for lazy embedding
+                          (Note: This is a separate embeddings database, NOT project.db or victor.db)
             lancedb_path: Path to LanceDB directory. Defaults to {project}/.victor/embeddings/conversations/
         """
         if not LANCEDB_AVAILABLE:
@@ -162,7 +163,7 @@ class ConversationEmbeddingStore:
             if self._lancedb_path is None:
                 self._lancedb_path = paths.embeddings_dir / "conversations"
             if self._sqlite_db_path is None:
-                self._sqlite_db_path = paths.conversation_db
+                self._sqlite_db_path = paths.project_db
 
         # Ensure directory exists
         self._lancedb_path.mkdir(parents=True, exist_ok=True)
@@ -581,7 +582,7 @@ class ConversationEmbeddingStore:
             "mode": "lazy",
             "total_embeddings": count,
             "max_embeddings": self.MAX_EMBEDDINGS,
-            "usage_pct": (count / self.MAX_EMBEDDINGS * 100) if self.MAX_EMBEDDINGS > 0 else 0,
+            "usage_pct": ((count / self.MAX_EMBEDDINGS * 100) if self.MAX_EMBEDDINGS > 0 else 0),
             "embedding_dimension": self.dimension,
             "embedding_model": self._embedding_service.model_name,
             "lancedb_path": str(self._lancedb_path),

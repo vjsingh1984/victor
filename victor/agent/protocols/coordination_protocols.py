@@ -15,10 +15,11 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage
+    from victor.agent.conversation.state_machine import ConversationStage
 
 
 __all__ = [
+    "CoordinationAdvisorRuntimeProtocol",
     "ToolPlannerProtocol",
     "TaskCoordinatorProtocol",
     "ToolCoordinatorProtocol",
@@ -26,6 +27,36 @@ __all__ = [
     "PromptCoordinatorProtocol",
     "UnifiedMemoryCoordinatorProtocol",
 ]
+
+
+@runtime_checkable
+class CoordinationAdvisorRuntimeProtocol(Protocol):
+    """Protocol for service-owned coordination recommendation runtime access."""
+
+    def suggest_for_task(
+        self,
+        *,
+        task_type: str,
+        complexity: str,
+        mode: str = "build",
+        runtime_subject: Optional[Any] = None,
+        coordination_advisor: Optional[Any] = None,
+        vertical_context: Optional[Any] = None,
+    ) -> Any:
+        """Build coordination suggestions using shared framework logic."""
+        ...
+
+    def serialize_suggestion(
+        self,
+        suggestion: Any,
+        *,
+        vertical: Optional[str] = None,
+        available_teams: Optional[tuple[str, ...]] = None,
+        available_workflows: Optional[tuple[str, ...]] = None,
+        default_workflow: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Serialize coordination suggestions for transport or state output."""
+        ...
 
 
 @runtime_checkable
@@ -66,13 +97,17 @@ class ToolPlannerProtocol(Protocol):
         ...
 
     def filter_tools_by_intent(
-        self, tools: List[Any], current_intent: Optional[Any] = None
+        self,
+        tools: List[Any],
+        current_intent: Optional[Any] = None,
+        user_message: Optional[str] = None,
     ) -> List[Any]:
         """Filter tools based on detected user intent.
 
         Args:
             tools: List of tool definitions
             current_intent: The detected user intent (if None, no filtering)
+            user_message: Current user message for explicit tool-request disambiguation
 
         Returns:
             Filtered list of tools
@@ -162,10 +197,10 @@ class TaskCoordinatorProtocol(Protocol):
 
 @runtime_checkable
 class ToolCoordinatorProtocol(Protocol):
-    """Protocol for tool coordination operations.
+    """[DEPRECATED] Compatibility protocol for legacy tool coordination.
 
-    Coordinates tool selection, budgeting, and execution through a unified
-    interface. Consolidates tool-related operations from AgentOrchestrator.
+    This protocol remains importable for backward compatibility, but the
+    canonical runtime path should depend on ToolService instead.
     """
 
     async def select_tools(self, context: Any) -> List[Any]:

@@ -82,7 +82,9 @@ async def demo_database_tool():
 
         # Query data
         print("\n4️⃣ Querying data...")
-        result = await database(action="query", connection_id=conn_id, sql="SELECT * FROM users")
+        result = await database(
+            action="query", connection_id=conn_id, sql="SELECT * FROM users"
+        )
         if result.get("success"):
             print(f"Rows: {result.get('rows', [])}")
         else:

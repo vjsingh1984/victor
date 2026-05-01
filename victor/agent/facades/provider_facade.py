@@ -20,6 +20,10 @@ and rate coordination components behind a single interface.
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
 The orchestrator delegates property access through this facade.
+
+Deprecated coordinator properties are retained as compatibility accessors,
+but canonical runtime code should source those handles from
+``provider_runtime`` rather than wiring them independently.
 """
 
 from __future__ import annotations
@@ -46,8 +50,10 @@ class ProviderFacade:
         - thinking: Extended thinking mode flag
         - provider_manager: ProviderManager for lifecycle management
         - provider_runtime: Provider runtime boundary components
-        - provider_coordinator: Provider coordination service
-        - provider_switch_coordinator: Provider switching coordinator
+        - provider_coordinator: Deprecated compatibility accessor derived from
+          provider_runtime when not supplied explicitly
+        - provider_switch_coordinator: Deprecated compatibility accessor
+          derived from provider_runtime when not supplied explicitly
     """
 
     def __init__(
@@ -81,6 +87,13 @@ class ProviderFacade:
             model,
             thinking,
         )
+
+    def _get_runtime_component(self, component_name: str) -> Optional[Any]:
+        """Resolve a compatibility component from provider runtime if available."""
+        runtime = self._provider_runtime
+        if runtime is None:
+            return None
+        return getattr(runtime, component_name, None)
 
     # ------------------------------------------------------------------
     # Properties (satisfy ProviderFacadeProtocol)
@@ -159,9 +172,13 @@ class ProviderFacade:
     @property
     def provider_coordinator(self) -> Optional[Any]:
         """Provider coordination service."""
-        return self._provider_coordinator
+        if self._provider_coordinator is not None:
+            return self._provider_coordinator
+        return self._get_runtime_component("provider_coordinator")
 
     @property
     def provider_switch_coordinator(self) -> Optional[Any]:
         """Provider switching coordinator."""
-        return self._provider_switch_coordinator
+        if self._provider_switch_coordinator is not None:
+            return self._provider_switch_coordinator
+        return self._get_runtime_component("provider_switch_coordinator")

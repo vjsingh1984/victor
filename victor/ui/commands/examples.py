@@ -429,7 +429,7 @@ def copy_example(
         # Copy the file
         shutil.copy2(source_path, dest_path)
 
-        console.print(f"[green]Copied successfully![/]")
+        console.print("[green]Copied successfully![/]")
         console.print(f"  [dim]Source:[/] {source_path}")
         console.print(f"  [dim]Destination:[/] {dest_path}")
         console.print(f"\n[dim]Description:[/] {description}")

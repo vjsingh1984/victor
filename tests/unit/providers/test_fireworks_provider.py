@@ -146,7 +146,10 @@ class TestFireworksProviderRequestPayload:
             ToolDefinition(
                 name="code_search",
                 description="Search for code patterns",
-                parameters={"type": "object", "properties": {"query": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                },
             )
         ]
 
@@ -271,12 +274,18 @@ class TestFireworksProviderResponseParsing:
                             {
                                 "id": "call_1",
                                 "type": "function",
-                                "function": {"name": "read_file", "arguments": '{"path": "a.py"}'},
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": '{"path": "a.py"}',
+                                },
                             },
                             {
                                 "id": "call_2",
                                 "type": "function",
-                                "function": {"name": "read_file", "arguments": '{"path": "b.py"}'},
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": '{"path": "b.py"}',
+                                },
                             },
                         ],
                     },

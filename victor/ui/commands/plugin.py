@@ -31,15 +31,17 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import Optional
 
+from victor.core.async_utils import run_sync
+
 import typer
 from rich.console import Console
 from rich.table import Table
+
+from victor.ui.json_utils import create_json_option, print_json_data
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +62,7 @@ def list_plugins(
         None, "--type", "-t", help="Filter by type: vertical, external, plugin"
     ),
     enabled_only: bool = typer.Option(False, "--enabled", help="Show only enabled plugins"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all plugins (verticals, external plugins, and entry-point plugins)."""
     from victor.core.plugins.registry import PluginRegistry
@@ -78,7 +80,7 @@ def list_plugins(
         entries = [e for e in entries if e["enabled"]]
 
     if json_output:
-        console.print_json(json.dumps(entries, indent=2))
+        print_json_data({"plugins": entries, "count": len(entries)})
         return
 
     if not entries:
@@ -121,7 +123,7 @@ def install_plugin(
     console.print(f"[cyan]Installing plugin from {source}...[/]")
 
     try:
-        plugin = asyncio.run(manager.install_plugin(source, source_type))
+        plugin = run_sync(manager.install_plugin(source, source_type))
     except ManifestValidationError as e:
         console.print("[red]Manifest validation failed:[/]")
         for error in e.errors:
@@ -210,7 +212,7 @@ def disable_plugin(
 @plugin_app.command("info")
 def plugin_info(
     plugin_id: str = typer.Argument(help="Plugin ID to inspect"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show detailed information about a plugin."""
     manager = _get_manager()
@@ -234,7 +236,11 @@ def plugin_info(
             "root_path": str(plugin.root_path),
             "permissions": manifest.permissions,
             "tools": [
-                {"name": t.name, "description": t.description, "permission": t.required_permission}
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "permission": t.required_permission,
+                }
                 for t in manifest.tools
             ],
             "commands": [{"name": c.name, "description": c.description} for c in manifest.commands],
@@ -243,7 +249,7 @@ def plugin_info(
                 "post_tool_use": manifest.hooks.post_tool_use,
             },
         }
-        console.print_json(json.dumps(data, indent=2))
+        print_json_data(data)
         return
 
     console.print(f"[bold]{manifest.name}[/] v{manifest.version}")
@@ -304,3 +310,61 @@ def search_plugins(
         )
 
     console.print(table)
+
+
+@plugin_app.command("init")
+def init_plugin(
+    name: str = typer.Argument(
+        ...,
+        help="Name of the new plugin (e.g., 'security', 'analytics')",
+    ),
+    description: str = typer.Option(
+        None,
+        "--description",
+        "-d",
+        help="Description of the plugin's purpose",
+    ),
+    service_provider: bool = typer.Option(
+        False,
+        "--service-provider",
+        "-s",
+        help="Include service_provider.py for DI container registration",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Overwrite existing files if plugin already exists",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-n",
+        help="Show what would be created without actually creating files",
+    ),
+) -> None:
+    """Scaffold a new plugin from templates.
+
+    Creates a plugin directory with an SDK-first definition layer:
+    - __init__.py - Package initialization and assistant export
+    - assistant.py - Main plugin definition authored against victor-sdk
+    - safety.py - Optional runtime-side safety notes placeholder
+    - prompts.py - Optional serializable prompt metadata helper
+    - mode_config.py - Optional runtime-side mode metadata placeholder
+    - service_provider.py - DI container registration (optional)
+
+    Examples:
+        victor plugin init security --description "Security analysis assistant"
+        victor plugin init analytics -d "Data analytics" --service-provider
+        victor plugin init ml --dry-run
+    """
+    from victor.ui.commands.scaffold import scaffold_plugin
+
+    scaffold_plugin(
+        name=name,
+        description=description,
+        service_provider=service_provider,
+        force=force,
+        dry_run=dry_run,
+        label="plugin",
+    )

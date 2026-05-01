@@ -32,9 +32,7 @@ async def text_summarization(text: str, max_words: int = 50):
     from victor import Agent
 
     agent = Agent.create(temperature=0.3)
-    result = await agent.run(
-        f"Summarize this in {max_words} words or less:\n\n{text}"
-    )
+    result = await agent.run(f"Summarize this in {max_words} words or less:\n\n{text}")
     return result
 
 
@@ -43,9 +41,7 @@ async def text_translation(text: str, target_language: str = "Spanish"):
     from victor import Agent
 
     agent = Agent.create(temperature=0.2)
-    result = await agent.run(
-        f"Translate this to {target_language}:\n\n{text}"
-    )
+    result = await agent.run(f"Translate this to {target_language}:\n\n{text}")
     return result
 
 
@@ -55,8 +51,7 @@ async def creative_writing(topic: str = "a futuristic city"):
 
     agent = Agent.create(temperature=0.9)
     result = await agent.run(
-        f"Write a creative short story about {topic}. "
-        "Make it vivid and imaginative."
+        f"Write a creative short story about {topic}. " "Make it vivid and imaginative."
     )
     return result
 
@@ -284,11 +279,11 @@ async def main():
     for recipe_func, recipe_name in recipes:
         print(f"\n{'='*60}")
         print(f"Recipe: {recipe_name}")
-        print('='*60)
+        print("=" * 60)
 
         try:
             result = await recipe_func()
-            if hasattr(result, 'content'):
+            if hasattr(result, "content"):
                 print(result.content[:200] + "...")
             else:
                 print(result)
@@ -298,4 +293,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

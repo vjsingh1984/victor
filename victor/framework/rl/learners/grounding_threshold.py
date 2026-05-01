@@ -66,7 +66,14 @@ class GroundingThresholdLearner(BaseLearner):
     DEFAULT_THRESHOLD = 0.70
 
     # Response types for state categorization
-    RESPONSE_TYPES = ["code_generation", "explanation", "analysis", "edit", "search", "general"]
+    RESPONSE_TYPES = [
+        "code_generation",
+        "explanation",
+        "analysis",
+        "edit",
+        "search",
+        "general",
+    ]
 
     # Minimum observations before confident recommendation
     MIN_SAMPLES_FOR_CONFIDENCE = 10
@@ -473,7 +480,10 @@ class GroundingThresholdLearner(BaseLearner):
             Tuple of (threshold, confidence)
         """
         rec = self.get_recommendation(provider, "", response_type)
-        return (rec.value if rec else self.DEFAULT_THRESHOLD, rec.confidence if rec else 0.3)
+        return (
+            rec.value if rec else self.DEFAULT_THRESHOLD,
+            rec.confidence if rec else 0.3,
+        )
 
     def get_provider_error_rates(self, provider: str) -> Dict[str, float]:
         """Get error rates for a provider.

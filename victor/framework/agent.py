@@ -20,17 +20,34 @@ Example:
 
 from __future__ import annotations
 
+import inspect
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    Union,
+)
 
 logger = logging.getLogger(__name__)
 
-from victor.framework.config import AgentConfig
-from victor.framework.errors import AgentError, CancellationError, ProviderError
+from victor.agent.config import (
+    FrameworkCompatibleAgentConfig,
+    UnifiedAgentConfig,
+    normalize_agent_config,
+)
+from victor.core.errors import AgentError, CancellationError, ProviderError
 from victor.framework.events import AgentExecutionEvent, EventType
+from victor.framework.message_execution import execute_message, stream_message_events
 from victor.framework.state import State, StateObserver
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
+from victor.runtime.context import resolve_execution_context
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -40,6 +57,7 @@ if TYPE_CHECKING:
     from victor.observability.integration import ObservabilityIntegration
     from victor.core.events import ObservabilityBus
     from victor.core.verticals.base import VerticalBase, VerticalConfig
+    from victor.framework.session_config import SessionConfig
 
 
 class Agent:
@@ -97,12 +115,31 @@ class Agent:
             model: Model name for reference
             vertical: Optional vertical class used to create this agent
             vertical_config: Optional vertical configuration applied
+
+        Raises:
+            ValueError: If orchestrator is not a valid AgentOrchestrator instance
         """
+        # Validate that orchestrator is a proper AgentOrchestrator instance
+        # This prevents misuse where someone tries to call Agent(...) directly
+        orchestrator_type_name = type(orchestrator).__name__
+        if orchestrator_type_name != "AgentOrchestrator":
+            raise ValueError(
+                f"Agent.__init__() requires an AgentOrchestrator instance, "
+                f"but got {type(orchestrator).__module__}.{orchestrator_type_name}. "
+                f"Use Agent.create() instead of calling Agent() directly.\n\n"
+                f"Correct usage:\n"
+                f"  agent = await Agent.create(provider='anthropic', model='claude-3-5-sonnet-20241022')\n"
+                f"  agent = await Agent.create()  # Uses default provider/model\n"
+                f"  agent = Agent.from_orchestrator(orchestrator)  # If you have an orchestrator\n\n"
+                f"See victor/framework/agent.py for more details."
+            )
+
         self._orchestrator = orchestrator
         self._provider = provider
         self._model = model
         self._vertical = vertical
         self._vertical_config = vertical_config
+        self._context = resolve_execution_context(orchestrator)
         self._state = State(orchestrator)
         self._state_observers: List[StateObserver] = []
         # LSP capability (language intelligence)
@@ -111,7 +148,7 @@ class Agent:
     @classmethod
     async def create(
         cls,
-        provider: str = "anthropic",
+        provider: Optional[str] = None,
         model: Optional[str] = None,
         *,
         temperature: float = 0.7,
@@ -121,10 +158,11 @@ class Agent:
         airgapped: bool = False,
         profile: Optional[str] = None,
         workspace: Optional[str] = None,
-        config: Optional[AgentConfig] = None,
+        config: Optional[FrameworkCompatibleAgentConfig] = None,
         vertical: Optional[Type["VerticalBase"]] = None,
         enable_observability: bool = True,
         session_id: Optional[str] = None,
+        session_config: Optional["SessionConfig"] = None,
     ) -> "Agent":
         """Create a new Agent instance.
 
@@ -132,8 +170,9 @@ class Agent:
         you only need to specify the provider.
 
         Args:
-            provider: LLM provider name (anthropic, openai, ollama, google, etc.)
-            model: Model identifier. If None, uses provider default.
+            provider: Optional LLM provider name (anthropic, openai, ollama, google, etc.).
+                If omitted, uses the active profile/default settings.
+            model: Model identifier. If None, uses provider/profile default.
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
             tools: Tool configuration - ToolSet, list of category names, or None
@@ -141,13 +180,16 @@ class Agent:
             airgapped: Disable network-dependent tools
             profile: Profile name from ~/.victor/profiles.yaml
             workspace: Working directory for file operations
-            config: Advanced configuration (overrides other options)
+            config: Advanced configuration. Accepts AgentConfig (deprecated) or
+                UnifiedAgentConfig (preferred). Overrides individual options.
             vertical: Optional vertical class or name (e.g., 'coding', 'research').
                 When provided, the vertical's configuration (tools, system_prompt,
                 stages) is automatically applied.
             enable_observability: Auto-initialize ObservabilityIntegration for
                 unified event handling. Defaults to True.
             session_id: Optional session ID for event correlation.
+            session_config: Optional SessionConfig with CLI/runtime overrides.
+                This is the PREFERRED way to pass CLI flags - immutable and traceable.
 
         Returns:
             Configured Agent instance
@@ -166,70 +208,81 @@ class Agent:
             # With tools
             agent = await Agent.create(tools=ToolSet.coding())
 
+            # With SessionConfig (preferred for CLI/runtime overrides)
+            from victor.framework.session_config import SessionConfig
+            config = SessionConfig.from_cli_flags(tool_budget=50, enable_smart_routing=True)
+            agent = await Agent.create(session_config=config)
+
             # With vertical (domain-specific assistant)
-            # Note: External vertical packages must be installed separately
-            # pip install victor-coding  # or victor-ai[coding]
             agent = await Agent.create(vertical="coding")
-
-            # With observability events
-            agent = await Agent.create(session_id="my-session")
-            agent.subscribe_to_events("TOOL", lambda e: print(f"Tool: {e.name}"))
-
-            # Advanced
-            agent = await Agent.create(
-                config=AgentConfig(tool_budget=100, enable_semantic_search=True)
-            )
         """
-        from victor.framework._internal import create_orchestrator_from_options
+        from victor.config.settings import Settings, load_settings
+        from victor.framework.agent_factory import AgentFactory, InitializationError
+        from victor.framework.session_config import SessionConfig
 
-        # Extract configuration from vertical if provided
-        # Note: Full vertical integration (middleware, safety, prompts, modes, deps)
-        # is now handled by VerticalIntegrationPipeline in create_orchestrator_from_options
+        # Load settings (or use config overrides)
+        settings = load_settings()
+        if workspace:
+            settings.working_directory = workspace
+
+        config = normalize_agent_config(config)
+
+        # Overlay config settings after normalizing legacy AgentConfig inputs.
+        if config is not None:
+            for key, value in config.to_settings_dict().items():
+                if hasattr(settings, key):
+                    setattr(settings, key, value)
+
+        # Apply SessionConfig overrides (preferred over direct settings mutation)
+        profile_overrides: Dict[str, Any] = {}
+        if session_config is not None:
+            session_config.apply_to_settings(settings)
+            profile = session_config.agent_profile or profile
+            provider_override = getattr(session_config, "provider_override", None)
+            if provider_override is not None:
+                provider = provider_override.provider or provider
+                model = provider_override.model or model
+                profile_overrides = provider_override.to_profile_overrides()
+
+        # Extract vertical config for backward compat return value
         vertical_config: Optional["VerticalConfig"] = None
-        system_prompt: Optional[str] = None
-
         if vertical:
             vertical_config = vertical.get_config()
-            # Vertical tools override explicit tools if not provided
-            # Note: Pipeline also handles this, but we do it here for tools kwarg compat
-            if tools is None:
-                tools = vertical_config.tools
-            # Get vertical's system prompt for backward compatibility
-            # Note: Pipeline also handles this, but explicit param takes priority
-            system_prompt = vertical_config.system_prompt
-            # Apply provider hints from vertical
-            if vertical_config.provider_hints.get("preferred_providers"):
-                prefs = vertical_config.provider_hints["preferred_providers"]
-                if provider == "anthropic" and "anthropic" not in prefs and prefs:
-                    # Use first preferred provider if default isn't preferred
-                    pass  # Keep user's choice, hints are just hints
 
         try:
-            # Create orchestrator with full vertical integration via pipeline
-            # This achieves parity with CLI (FrameworkShim) path
-            orchestrator = await create_orchestrator_from_options(
+            # Unified creation via AgentFactory — same path as CLI/API
+            factory = AgentFactory(
+                settings=settings,
+                profile=profile or "default",
                 provider=provider,
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                tools=tools,
+                vertical=vertical,
                 thinking=thinking,
-                airgapped=airgapped,
-                profile=profile,
-                workspace=workspace,
-                config=config,
-                system_prompt=system_prompt,
-                enable_observability=enable_observability,
                 session_id=session_id,
-                vertical=vertical,  # Pass vertical for unified pipeline integration
+                enable_observability=enable_observability,
+                profile_overrides=profile_overrides,
             )
+            orchestrator = await factory.create()
+            resolved_provider = (
+                provider
+                or getattr(orchestrator, "provider_name", None)
+                or getattr(getattr(orchestrator, "provider", None), "name", None)
+                or "unknown"
+            )
+            resolved_model = model or getattr(orchestrator, "model", None)
             return cls(
                 orchestrator,
-                provider=provider,
-                model=model,
+                provider=resolved_provider,
+                model=resolved_model,
                 vertical=vertical,
                 vertical_config=vertical_config,
             )
+        except InitializationError as e:
+            if e.stage == "credentials":
+                raise ProviderError(str(e), provider=provider) from e
+            raise AgentError(str(e)) from e
         except Exception as e:
             if "provider" in str(e).lower() or "api" in str(e).lower():
                 raise ProviderError(str(e), provider=provider) from e
@@ -266,7 +319,7 @@ class Agent:
         max_iterations: int = 50,
         timeout_seconds: int = 600,
         shared_context: Optional[Dict[str, Any]] = None,
-        config: Optional[AgentConfig] = None,
+        config: Optional[FrameworkCompatibleAgentConfig] = None,
     ) -> "AgentTeam":
         """Create a multi-agent team.
 
@@ -364,6 +417,33 @@ class Agent:
     # Primary Methods
     # =========================================================================
 
+    @property
+    def execution_context(self) -> Any:
+        """Return the explicit runtime execution context when available."""
+        runtime_context = getattr(self, "_context", None)
+        if runtime_context is not None:
+            return runtime_context
+
+        runtime_context = resolve_execution_context(self._orchestrator)
+        if runtime_context is not None:
+            self._context = runtime_context
+        return runtime_context
+
+    def _notify_state_observers_if_changed(self, previous_stage: Any) -> Any:
+        """Notify observers when the observable stage changes."""
+        new_stage = self._state.stage
+        if new_stage == previous_stage:
+            return previous_stage
+
+        old_state = State(self._orchestrator)
+        old_state._orchestrator = self._orchestrator
+        for observer in self._state_observers:
+            try:
+                observer(old_state, self._state)
+            except Exception:
+                logger.warning("State observer error", exc_info=True)
+        return new_stage
+
     async def run(
         self,
         prompt: str,
@@ -392,46 +472,12 @@ class Agent:
                 context={"file": "auth.py", "error": "IndexError"}
             )
         """
-        from victor.framework._internal import format_context_message
-        from victor.providers.base import CompletionResponse
-
-        # Apply context to prompt for one-shot runs.
-        if context:
-            context_message = format_context_message(context)
-            if context_message:
-                prompt = f"{context_message}\n\n{prompt}"
-
-        try:
-            response: CompletionResponse = await self._orchestrator.chat(prompt)
-            return TaskResult(
-                content=response.content or "",
-                tool_calls=response.tool_calls or [],
-                success=True,
-                error=None,
-                metadata={
-                    "stage": self._state.stage.value,
-                    "model": response.model,
-                    "usage": response.usage,
-                    "stop_reason": response.stop_reason,
-                },
-            )
-
-        except CancellationError:
-            return TaskResult(
-                content="",
-                tool_calls=[],
-                success=False,
-                error="Operation cancelled",
-                metadata={"stage": self._state.stage.value},
-            )
-        except Exception as e:
-            return TaskResult(
-                content="",
-                tool_calls=[],
-                success=False,
-                error=str(e),
-                metadata={"stage": self._state.stage.value},
-            )
+        return await execute_message(
+            orchestrator=self._orchestrator,
+            execution_context=self.execution_context,
+            user_message=prompt,
+            context=context,
+        )
 
     async def stream(
         self,
@@ -462,31 +508,16 @@ class Agent:
                 elif event.type == EventType.CONTENT:
                     print(event.content, end="", flush=True)
         """
-        from victor.framework._internal import format_context_message, stream_with_events
-
-        # Apply context to conversation if provided
-        if context:
-            context_message = format_context_message(context)
-            if context_message:
-                # Prepend context to the prompt
-                prompt = f"{context_message}\n\n{prompt}"
-
         # Track state for observers
         old_stage = self._state.stage
 
-        async for event in stream_with_events(self._orchestrator, prompt):
-            # Check for state changes and notify observers
-            new_stage = self._state.stage
-            if new_stage != old_stage:
-                old_state = State(self._orchestrator)
-                old_state._orchestrator = self._orchestrator
-                for observer in self._state_observers:
-                    try:
-                        observer(old_state, self._state)
-                    except Exception:
-                        logger.warning("State observer error", exc_info=True)
-                old_stage = new_stage
-
+        async for event in stream_message_events(
+            orchestrator=self._orchestrator,
+            execution_context=self.execution_context,
+            user_message=prompt,
+            context=context,
+        ):
+            old_stage = self._notify_state_observers_if_changed(old_stage)
             yield event
 
     def chat(self, prompt: str) -> "ChatSession":
@@ -507,6 +538,85 @@ class Agent:
             response = await session.send("Now extract the validation logic")
         """
         return ChatSession(self, prompt)
+
+    def create_session(
+        self,
+        initial_prompt: Optional[str] = None,
+        **kwargs: Any,
+    ) -> "AgentSession":
+        """Create the canonical multi-turn session implementation.
+
+        Args:
+            initial_prompt: Optional initial prompt for the first turn.
+            **kwargs: Additional ``AgentSession`` constructor options.
+
+        Returns:
+            AgentSession with shared runtime/state behavior.
+        """
+        from victor.framework.agent_components import AgentSession
+
+        return AgentSession(self, initial_prompt, **kwargs)
+
+    async def run_oneshot(
+        self,
+        prompt: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> TaskResult:
+        """Execute a single-turn task without maintaining conversation state.
+
+        This is a convenience method that wraps run() for one-shot tasks
+        where you don't need to maintain conversation context across calls.
+
+        Args:
+            prompt: What the agent should do
+            context: Optional context dict (files, variables, etc.)
+
+        Returns:
+            TaskResult with content, tool_calls, and metadata
+
+        Example:
+            # Single API call to get a response
+            result = await agent.run_oneshot("Explain quantum computing")
+            print(result.content)
+
+            # With context
+            result = await agent.run_oneshot(
+                "What's wrong with this code?",
+                context={"file": "auth.py", "error": "NullReferenceException"}
+            )
+        """
+        return await self.run(prompt, context=context)
+
+    async def run_interactive(
+        self,
+        initial_prompt: str,
+    ) -> "ChatSession":
+        """Start an interactive multi-turn conversation session.
+
+        This is a convenience method that creates a ChatSession with an
+        initial prompt, allowing you to send multiple messages while
+        maintaining conversation context.
+
+        Args:
+            initial_prompt: The first message to start the conversation
+
+        Returns:
+            ChatSession for multi-turn conversation
+
+        Example:
+            session = await agent.run_interactive("Help me refactor this code")
+
+            # Continue the conversation
+            response1 = await session.send("What should we extract first?")
+            response2 = await session.send("Now apply that change")
+
+            # Or stream responses
+            async for event in session.stream("Show me the full diff"):
+                if event.type == EventType.CONTENT:
+                    print(event.content, end="")
+        """
+        return self.chat(initial_prompt)
 
     # =========================================================================
     # State and Observation
@@ -572,6 +682,23 @@ class Agent:
         self._state_observers.append(callback)
 
         def unsubscribe() -> None:
+            """Unsubscribe the previously registered callback from event notifications.
+
+            This function removes the callback from the event notification system.
+            After calling unsubscribe(), the callback will no longer receive events.
+
+            Example:
+                >>> def my_handler(event):
+                ...     print(f"Event: {event.type}")
+                >>>
+                >>> unsubscribe = agent.subscribe_to_events("TOOL", my_handler)
+                >>> # Later, stop receiving events:
+                >>> unsubscribe()
+
+            Note:
+                If the callback is not registered, this function does nothing (no error raised).
+                Safe to call multiple times.
+            """
             if callback in self._state_observers:
                 self._state_observers.remove(callback)
 
@@ -631,6 +758,73 @@ class Agent:
             metrics = orchestrator.streaming_controller.get_session_history()
         """
         return self._orchestrator
+
+    # =========================================================================
+    # Runtime Configuration (CLI/Runtime Override Support)
+    # =========================================================================
+
+    def set_tool_budget(self, budget: int, *, user_override: bool = False) -> None:
+        """Set the maximum number of tool calls allowed.
+
+        Args:
+            budget: Maximum tool calls allowed
+            user_override: Whether this is a user-specified override (takes precedence)
+
+        Example:
+            agent = await Agent.create()
+            agent.set_tool_budget(50)
+        """
+        if hasattr(self._orchestrator, "unified_tracker"):
+            self._orchestrator.unified_tracker.set_tool_budget(budget, user_override=user_override)
+
+    def set_max_iterations(self, max_iterations: int, *, user_override: bool = False) -> None:
+        """Set the maximum number of agentic loop iterations.
+
+        Args:
+            max_iterations: Maximum iterations allowed
+            user_override: Whether this is a user-specified override (takes precedence)
+
+        Example:
+            agent = await Agent.create()
+            agent.set_max_iterations(20)
+        """
+        if hasattr(self._orchestrator, "unified_tracker"):
+            self._orchestrator.unified_tracker.set_max_iterations(
+                max_iterations, user_override=user_override
+            )
+
+    def supports_streaming(self) -> bool:
+        """Check if the current provider supports streaming responses.
+
+        Returns:
+            True if streaming is supported, False otherwise
+
+        Example:
+            agent = await Agent.create()
+            if agent.supports_streaming():
+                async for event in agent.stream("Hello"):
+                    print(event.content)
+        """
+        if hasattr(self._orchestrator, "provider"):
+            return getattr(self._orchestrator.provider, "supports_streaming", lambda: True)()
+        return True
+
+    def start_embedding_preload(self) -> None:
+        """Warm embedding-dependent runtime state when supported.
+
+        This is primarily used by chat surfaces to front-load semantic search
+        initialization without exposing orchestrator internals directly.
+        """
+        if hasattr(self._orchestrator, "start_embedding_preload"):
+            self._orchestrator.start_embedding_preload()
+
+    def get_session_metrics(self) -> Dict[str, Any]:
+        """Return session-level runtime metrics when available."""
+        if hasattr(self._orchestrator, "get_session_metrics"):
+            metrics = self._orchestrator.get_session_metrics()
+            if isinstance(metrics, dict):
+                return metrics
+        return {}
 
     # =========================================================================
     # Observability
@@ -724,7 +918,9 @@ class Agent:
         if not event_bus:
             return None
 
-        from victor.observability.event_registry import resolve_subscription_topic_pattern
+        from victor.observability.event_registry import (
+            resolve_subscription_topic_pattern,
+        )
 
         topic_pattern = resolve_subscription_topic_pattern(category)
 
@@ -829,52 +1025,60 @@ class Agent:
                 context={"error_log": "TimeoutError at auth.py:45"}
             )
         """
-        from victor.framework.teams import AgentTeam
+        from victor.framework.team_runtime import resolve_vertical_team_catalog, run_named_team
 
         # Check if vertical is configured
         if not self._vertical:
             raise AgentError("No vertical configured. Create agent with vertical= parameter.")
 
-        # Get team specs using ISP-compliant provider pattern (LSP fix)
-        if not hasattr(self._vertical, "get_team_spec_provider"):
+        team_catalog = resolve_vertical_team_catalog(self._vertical)
+        if not team_catalog.supported:
             raise AgentError(f"Vertical '{self._vertical.name}' does not support teams.")
-
-        team_provider = self._vertical.get_team_spec_provider()
-        if not team_provider or not hasattr(team_provider, "get_team_specs"):
+        if not team_catalog.provider_available:
             raise AgentError(f"Vertical '{self._vertical.name}' does not provide team specs.")
-
-        team_specs = team_provider.get_team_specs()
-        if not team_specs:
+        if not team_catalog.has_team_specs:
             raise AgentError(f"Vertical '{self._vertical.name}' has no team specs defined.")
 
-        # Get the team specification
-        team_spec = team_specs.get(team_name)
+        team_spec = team_catalog.get(team_name)
         if not team_spec:
-            available = list(team_specs.keys())
+            available = team_catalog.list_names()
             raise AgentError(f"Team '{team_name}' not found. " f"Available: {', '.join(available)}")
 
-        # Create and run team
-        team = await AgentTeam.create(
-            orchestrator=self._orchestrator,
-            name=team_spec.name,
+        team_execution = await run_named_team(
+            self._orchestrator,
+            team_name=team_name,
             goal=goal,
-            members=team_spec.members,
-            formation=team_spec.formation,
-            total_tool_budget=team_spec.total_tool_budget,
-            max_iterations=team_spec.max_iterations,
+            context=context,
             timeout_seconds=timeout_seconds,
-            shared_context=context,
         )
+        if team_execution is None:
+            raise AgentError(f"Team '{team_name}' could not be resolved for execution.")
+        resolved_team, result = team_execution
 
-        # Execute team and collect result
-        result = await team.run()
-
-        return {
-            "success": result.success if hasattr(result, "success") else True,
-            "final_output": result.final_output if hasattr(result, "final_output") else str(result),
-            "team_name": team_spec.name,
-            "goal": goal,
-        }
+        payload: Dict[str, Any] = {}
+        to_dict = getattr(result, "to_dict", None)
+        if callable(to_dict):
+            serialized = to_dict()
+            if isinstance(serialized, dict):
+                payload = dict(serialized)
+        if not payload:
+            payload = {
+                "success": bool(getattr(result, "success", True)),
+                "final_output": (
+                    getattr(result, "final_output", None)
+                    if getattr(result, "final_output", None) is not None
+                    else str(result)
+                ),
+            }
+        payload.update(
+            {
+                "team_name": resolved_team.team_name,
+                "team_display_name": resolved_team.display_name,
+                "goal": goal,
+                "recommendation_source": resolved_team.recommendation_source,
+            }
+        )
+        return payload
 
     def get_available_workflows(self) -> List[str]:
         """Get list of available workflow names from the vertical.
@@ -886,14 +1090,12 @@ class Agent:
             workflows = agent.get_available_workflows()
             print(workflows)  # ['feature_implementation', 'bug_fix', 'code_review']
         """
-        if not self._vertical:
-            return []
+        from victor.framework.team_runtime import resolve_vertical_workflow_catalog
 
-        workflow_provider = self._vertical.get_workflow_provider()
-        if not workflow_provider:
+        workflow_catalog = resolve_vertical_workflow_catalog(self._vertical)
+        if not workflow_catalog.supported or not workflow_catalog.provider_available:
             return []
-
-        return workflow_provider.get_workflow_names()
+        return workflow_catalog.list_names()
 
     def get_available_teams(self) -> List[str]:
         """Get list of available team names from the vertical.
@@ -905,22 +1107,78 @@ class Agent:
             teams = agent.get_available_teams()
             print(teams)  # ['feature_team', 'bug_fix_team', 'review_team']
         """
-        if not self._vertical:
-            return []
+        from victor.framework.team_runtime import resolve_vertical_team_catalog
 
-        # All verticals use ISP-compliant provider pattern
-        if not hasattr(self._vertical, "get_team_spec_provider"):
+        team_catalog = resolve_vertical_team_catalog(self._vertical)
+        if not team_catalog.supported or not team_catalog.provider_available:
             return []
+        return team_catalog.list_names()
 
-        team_provider = self._vertical.get_team_spec_provider()
-        if not team_provider or not hasattr(team_provider, "get_team_specs"):
-            return []
+    def get_coordination_suggestion(
+        self,
+        task_type: str,
+        complexity: str,
+        *,
+        mode: Optional[str] = None,
+    ) -> Any:
+        """Get shared framework coordination recommendations for a task.
 
-        team_specs = team_provider.get_team_specs()
-        if not team_specs:
-            return []
+        Args:
+            task_type: Classified task type
+            complexity: Complexity level string
+            mode: Optional mode override. Defaults to the runtime's current mode.
 
-        return list(team_specs.keys())
+        Returns:
+            CoordinationSuggestion with team and workflow recommendations.
+        """
+        from victor.framework.coordination_runtime import get_runtime_coordination_suggestion
+
+        return get_runtime_coordination_suggestion(
+            runtime_subject=self._orchestrator,
+            task_type=task_type,
+            complexity=complexity,
+            mode=mode,
+        )
+
+    async def get_coordination_transitions(
+        self,
+        task_type: str,
+        complexity: Optional[str] = None,
+        *,
+        mode: Optional[str] = None,
+    ) -> Any:
+        """Get state-passed coordination transitions for a task.
+
+        This is the framework-facing state-passed companion to
+        ``get_coordination_suggestion()``. It returns the raw coordinator result
+        so callers can inspect transitions, confidence, and metadata without
+        mutating orchestrator state directly.
+        """
+        from victor.agent.coordinators.state_context import create_snapshot
+
+        orchestration_facade = getattr(self._orchestrator, "orchestration_facade", None)
+        if orchestration_facade is None:
+            orchestration_facade = getattr(self._orchestrator, "_orchestration_facade", None)
+
+        coordination_state_passed = (
+            getattr(orchestration_facade, "coordination_state_passed", None)
+            if orchestration_facade is not None
+            else None
+        )
+        if coordination_state_passed is None:
+            raise AgentError("Coordination state-passed surface is not available")
+
+        mode_controller = getattr(self._orchestrator, "mode_controller", None)
+        current_mode = getattr(mode_controller, "current_mode", None)
+        resolved_mode = mode or getattr(current_mode, "value", None) or "build"
+
+        snapshot = create_snapshot(self._orchestrator)
+        return await coordination_state_passed.suggest(
+            snapshot,
+            task_type=task_type,
+            complexity=complexity,
+            mode=resolved_mode,
+        )
 
     # =========================================================================
     # Lifecycle
@@ -931,11 +1189,60 @@ class Agent:
         self._orchestrator.reset_conversation()
         self._state.reset()
 
+    async def warm_up(self) -> None:
+        """Prime the KV cache for faster first responses.
+
+        For local providers (Ollama, LMStudio) with KV prefix caching, the first
+        API call is always cold. This sends a minimal 1-token request to prime
+        the KV cache with the system prompt, making subsequent calls faster.
+
+        No-op for cloud providers or when KV optimization is disabled.
+        """
+        if hasattr(self._orchestrator, "warm_up_kv_cache"):
+            await self._orchestrator.warm_up_kv_cache()
+
+    async def graceful_shutdown(self) -> Dict[str, bool]:
+        """Perform graceful shutdown of all agent components.
+
+        Delegates to orchestrator's graceful_shutdown method if available.
+        Flushes analytics, stops health monitoring, and cleans up resources.
+        Call this before application exit for a clean shutdown.
+
+        Returns:
+            Dictionary with shutdown status for each component.
+            Returns empty dict if orchestrator doesn't support graceful_shutdown.
+        """
+        if self._orchestrator is None:
+            return {}
+
+        if hasattr(self._orchestrator, "graceful_shutdown"):
+            return await self._orchestrator.graceful_shutdown()
+
+        # Fallback to regular close if graceful_shutdown not available
+        await self.close()
+        return {}
+
+    async def shutdown(self) -> None:
+        """Shutdown the agent and clean up resources.
+
+        This is an alias for close() for compatibility with code that
+        expects a shutdown method.
+        """
+        await self.close()
+
     async def close(self) -> None:
         """Clean up resources."""
         # Clean up orchestrator
+        cleanup = None
         if hasattr(self._orchestrator, "close"):
-            await self._orchestrator.close()
+            cleanup = self._orchestrator.close
+        elif hasattr(self._orchestrator, "shutdown"):
+            cleanup = self._orchestrator.shutdown
+
+        if cleanup is not None:
+            result = cleanup()
+            if inspect.isawaitable(result):
+                await result
         self._orchestrator = None  # Prevent __del__ warning after proper close
 
     async def __aenter__(self) -> "Agent":
@@ -992,10 +1299,7 @@ class ChatSession:
             agent: Agent instance
             initial_prompt: First message in the conversation
         """
-        # Delegate to AgentSession for actual implementation
-        from victor.framework.agent_components import AgentSession
-
-        self._delegate = AgentSession(agent, initial_prompt)
+        self._delegate = agent.create_session(initial_prompt)
 
     async def send(self, message: str) -> TaskResult:
         """Send a message in the conversation.

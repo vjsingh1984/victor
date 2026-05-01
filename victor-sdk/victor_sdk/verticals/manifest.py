@@ -125,11 +125,7 @@ class ExtensionManifest:
 
     def get_extension_dependencies(self) -> Set[str]:
         """Get the set of required extension dependencies (excluding optional)."""
-        return {
-            dep.extension_name
-            for dep in self.extension_dependencies
-            if not dep.optional
-        }
+        return {dep.extension_name for dep in self.extension_dependencies if not dep.optional}
 
     def has_extension_dependency(self, extension_name: str) -> bool:
         """Check if this vertical depends on a specific extension."""
@@ -156,15 +152,3 @@ class ExtensionManifest:
                 f"Vertical '{self.name}' has conflicting feature requirements: "
                 f"features in both requires and excludes: {overlap}"
             )
-
-    def is_provider(self, ext_type: ExtensionType) -> bool:
-        """Check if this manifest declares the given extension type."""
-        return ext_type in self.provides
-
-    def has_requirement(self, ext_type: ExtensionType) -> bool:
-        """Check if this manifest requires the given extension type."""
-        return ext_type in self.requires
-
-    def unmet_requirements(self, available: Set[ExtensionType]) -> Set[ExtensionType]:
-        """Return required extension types not present in ``available``."""
-        return self.requires - available

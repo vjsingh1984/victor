@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,6 +87,20 @@ class OperationalModeConfig:
     # Whether edits are allowed in sandbox even if disallowed_tools has edit
     allow_sandbox_edits: bool = False
 
+    def __post_init__(self) -> None:
+        """Normalize tool names to the canonical runtime surface."""
+        self.allowed_tools = {
+            canonicalize_core_tool_name(tool) for tool in self.allowed_tools if tool
+        }
+        self.disallowed_tools = {
+            canonicalize_core_tool_name(tool) for tool in self.disallowed_tools if tool
+        }
+        self.tool_priorities = {
+            canonicalize_core_tool_name(tool): priority
+            for tool, priority in self.tool_priorities.items()
+            if tool
+        }
+
 
 # Default mode configurations
 MODE_CONFIGS: Dict[AgentMode, OperationalModeConfig] = {
@@ -104,7 +120,7 @@ ACTION-FIRST PRINCIPLE:
 
 IMPLEMENTATION WORKFLOW:
 1. Read the target file ONCE to understand current state
-2. IMMEDIATELY use edit_files() or write_file() to make changes
+2. IMMEDIATELY use edit() or write() to make changes
 3. Run tests if applicable
 4. Commit your changes
 
@@ -114,18 +130,17 @@ ANTI-PATTERNS TO AVOID:
 - Planning to edit without actually calling the edit tool
 - Exploration loops without taking action
 
-When the user asks you to edit a file, your NEXT tool call should be edit_files() or write_file().
+When the user asks you to edit a file, your NEXT tool call should be edit() or write().
 """,
         require_write_confirmation=False,
         verbose_planning=False,
         max_files_per_operation=0,  # No limit
         tool_priorities={
             "edit": 1.5,  # Boost edit tool priority in BUILD mode (canonical name)
-            "edit_files": 1.5,  # Alias for edit
-            "write_file": 1.5,  # Boost write tool priority
-            "bash": 1.2,
+            "write": 1.5,  # Boost write tool priority
+            "shell": 1.2,
             "git_status": 1.0,
-            "read_file": 0.9,  # Slightly lower read priority to encourage action
+            "read": 0.9,  # Slightly lower read priority to encourage action
         },
         exploration_multiplier=5.0,  # 5x exploration for reading before writing (was 2x)
     ),
@@ -135,8 +150,8 @@ When the user asks you to edit a file, your NEXT tool call should be edit_files(
         allow_all_tools=False,
         allowed_tools={
             # Read-only and analysis tools
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "code_search",
             "semantic_code_search",
             "glob",
@@ -149,8 +164,8 @@ When the user asks you to edit a file, your NEXT tool call should be edit_files(
             # Planning-specific
             "plan_files",
             # Sandbox editing (limited to .victor/sandbox/)
-            "write_file",
-            "edit_files",
+            "write",
+            "edit",
         },
         disallowed_tools={
             # No direct bash/shell or git modifications
@@ -187,7 +202,7 @@ WORKFLOW:
         tool_priorities={
             "code_search": 1.3,
             "semantic_code_search": 1.3,
-            "read_file": 1.2,
+            "read": 1.2,
             "dependency_graph": 1.2,
             "plan_files": 1.5,
         },
@@ -201,8 +216,8 @@ WORKFLOW:
         allow_all_tools=False,
         allowed_tools={
             # Read-only tools only
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "code_search",
             "semantic_code_search",
             "glob",
@@ -216,11 +231,10 @@ WORKFLOW:
             "web_search",
             "web_fetch",
             # Sandbox notes (limited to .victor/sandbox/)
-            "write_file",
+            "write",
         },
         disallowed_tools={
-            "edit_files",  # No editing main codebase
-            "bash",
+            "edit",  # No editing main codebase
             "shell",  # Also shell tool (same as bash)
             "git_commit",
             "git_push",
@@ -249,10 +263,10 @@ WORKFLOW:
         verbose_planning=False,
         max_files_per_operation=3,  # Limited notes in sandbox
         tool_priorities={
-            "read_file": 1.3,
+            "read": 1.3,
             "code_search": 1.2,
             "semantic_code_search": 1.2,
-            "list_directory": 1.1,
+            "ls": 1.1,
         },
         exploration_multiplier=20.0,  # 20x exploration in explore mode (effectively unlimited like Claude Code)
         sandbox_dir=".victor/sandbox",
@@ -384,9 +398,10 @@ class AgentModeController:
             True if the tool is allowed
         """
         config = self.config
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
 
         # Check disallowed list first (takes precedence)
-        if tool_name in config.disallowed_tools:
+        if canonical_tool_name in config.disallowed_tools:
             return False
 
         # If allow_all_tools, it's allowed unless disallowed
@@ -394,7 +409,7 @@ class AgentModeController:
             return True
 
         # Otherwise, check allowed list
-        return tool_name in config.allowed_tools
+        return canonical_tool_name in config.allowed_tools
 
     def get_tool_priority(self, tool_name: str) -> float:
         """Get priority adjustment for a tool in current mode.
@@ -405,7 +420,8 @@ class AgentModeController:
         Returns:
             Priority multiplier (1.0 = no adjustment)
         """
-        return self.config.tool_priorities.get(tool_name, 1.0)
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
+        return self.config.tool_priorities.get(canonical_tool_name, 1.0)
 
     def get_system_prompt_addition(self) -> str:
         """Get additional system prompt text for current mode.

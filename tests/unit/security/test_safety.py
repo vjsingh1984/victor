@@ -137,6 +137,13 @@ class TestSafetyChecker:
         assert level == OperationalRiskLevel.HIGH
         assert any("system" in d.lower() for d in details)
 
+    def test_is_write_tool_recognizes_canonical_names(self):
+        """Canonical runtime tool names should be treated as write tools."""
+        checker = SafetyChecker()
+        assert checker.is_write_tool("write") is True
+        assert checker.is_write_tool("edit") is True
+        assert checker.is_write_tool("shell") is True
+
     @pytest.mark.asyncio
     async def test_check_and_confirm_safe_operation(self):
         """Safe operations should auto-approve without callback."""
@@ -164,6 +171,29 @@ class TestSafetyChecker:
         )
         should_proceed, reason = await checker.check_and_confirm(
             "execute_bash", {"command": "rm -rf /tmp/test"}
+        )
+        assert confirmed is True
+        assert should_proceed is True
+
+    @pytest.mark.asyncio
+    async def test_check_and_confirm_canonical_shell_uses_cmd(self):
+        """Canonical shell tool should read the cmd argument."""
+        confirmed = False
+
+        async def mock_callback(request):
+            nonlocal confirmed
+            confirmed = True
+            assert request.tool_name == "shell"
+            assert request.arguments["cmd"] == "rm -rf /tmp/test"
+            assert request.risk_level == OperationalRiskLevel.HIGH
+            return True
+
+        checker = SafetyChecker(
+            confirmation_callback=mock_callback,
+            require_confirmation_threshold=OperationalRiskLevel.HIGH,
+        )
+        should_proceed, reason = await checker.check_and_confirm(
+            "shell", {"cmd": "rm -rf /tmp/test"}
         )
         assert confirmed is True
         assert should_proceed is True

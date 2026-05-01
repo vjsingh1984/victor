@@ -265,7 +265,8 @@ class PostgresLocalProvider(LocalProcessProvider):
 
         except FileNotFoundError:
             raise ServiceStartError(
-                config.name, "PostgreSQL not found. Install with: brew install postgresql"
+                config.name,
+                "PostgreSQL not found. Install with: brew install postgresql",
             )
 
     async def _init_db(self) -> None:

@@ -41,7 +41,6 @@ from typing import Any, Dict, List
 from victor.tools.base import BaseTool, CostTier, ToolResult
 from victor.tools.plugin import ToolPlugin
 
-
 # =============================================================================
 # Example Tool Implementation
 # =============================================================================
@@ -349,7 +348,9 @@ async def demo_plugin_usage():
     context: Dict[str, Any] = {}
 
     # Execute weather tool
-    weather_result = await registry.execute("get_weather", context, city="London", units="celsius")
+    weather_result = await registry.execute(
+        "get_weather", context, city="London", units="celsius"
+    )
     print("\nWeather for London:")
     print(f"  Success: {weather_result.success}")
     if weather_result.success:
@@ -358,7 +359,11 @@ async def demo_plugin_usage():
 
     # Execute temperature converter
     temp_result = await registry.execute(
-        "convert_temperature", context, value=100, from_unit="celsius", to_unit="fahrenheit"
+        "convert_temperature",
+        context,
+        value=100,
+        from_unit="celsius",
+        to_unit="fahrenheit",
     )
     print("\nTemperature Conversion:")
     print(f"  Success: {temp_result.success}")
@@ -414,8 +419,7 @@ async def demo_mcp_registry():
 
 
 if __name__ == "__main__":
-    print(
-        """
+    print("""
 ╔══════════════════════════════════════════════════════════════╗
 ║                 Victor Plugin System Example                  ║
 ╠══════════════════════════════════════════════════════════════╣
@@ -426,8 +430,7 @@ if __name__ == "__main__":
 ║  4. Tool execution through the registry                       ║
 ║  5. MCP Registry for managing external MCP servers            ║
 ╚══════════════════════════════════════════════════════════════╝
-"""
-    )
+""")
 
     asyncio.run(demo_plugin_usage())
     asyncio.run(demo_mcp_registry())

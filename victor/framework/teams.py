@@ -65,8 +65,6 @@ from typing import (
     Union,
 )
 
-from victor.core.shared_types import SubAgentRole
-from victor.agent.teams.coordinator import TeamCoordinator
 from victor.teams.types import (
     MemoryConfig,
     TeamConfig,
@@ -79,6 +77,8 @@ from victor.teams import (
 )
 
 if TYPE_CHECKING:
+    from victor.agent.teams.coordinator import TeamCoordinator
+    from victor.core.shared_types import SubAgentRole
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.framework.agent import Agent
 
@@ -118,6 +118,34 @@ class TeamEventType(str, Enum):
 
     HANDOFF = "handoff"
     """Work was handed off between members."""
+
+
+# Register domain event mapping with canonical EventType taxonomy
+def _register_team_event_taxonomy() -> None:
+    try:
+        from victor.core.events.taxonomy import EventTaxonomyRegistry
+        from victor.framework.events import EventType
+
+        EventTaxonomyRegistry.register_domain(
+            "team",
+            TeamEventType,
+            {
+                TeamEventType.TEAM_START: EventType.STREAM_START,
+                TeamEventType.TEAM_COMPLETE: EventType.STREAM_END,
+                TeamEventType.TEAM_ERROR: EventType.ERROR,
+                TeamEventType.MEMBER_START: EventType.PROGRESS,
+                TeamEventType.MEMBER_PROGRESS: EventType.PROGRESS,
+                TeamEventType.MEMBER_COMPLETE: EventType.MILESTONE,
+                TeamEventType.MEMBER_ERROR: EventType.ERROR,
+                TeamEventType.MESSAGE_SENT: EventType.CONTENT,
+                TeamEventType.HANDOFF: EventType.STAGE_CHANGE,
+            },
+        )
+    except ImportError:
+        pass
+
+
+_register_team_event_taxonomy()
 
 
 @dataclass
@@ -182,22 +210,22 @@ class TeamEvent:
         }
 
 
-# Role name to SubAgentRole mapping
-ROLE_MAPPING: Dict[str, SubAgentRole] = {
-    "researcher": SubAgentRole.RESEARCHER,
-    "research": SubAgentRole.RESEARCHER,
-    "planner": SubAgentRole.PLANNER,
-    "plan": SubAgentRole.PLANNER,
-    "executor": SubAgentRole.EXECUTOR,
-    "execute": SubAgentRole.EXECUTOR,
-    "impl": SubAgentRole.EXECUTOR,
-    "implementer": SubAgentRole.EXECUTOR,
-    "reviewer": SubAgentRole.REVIEWER,
-    "review": SubAgentRole.REVIEWER,
-    "critic": SubAgentRole.REVIEWER,
-    "writer": SubAgentRole.EXECUTOR,
-    "analyzer": SubAgentRole.RESEARCHER,
-    "verifier": SubAgentRole.REVIEWER,
+# Role name to SubAgentRole name mapping (string-based to avoid eager import)
+ROLE_MAPPING: Dict[str, str] = {
+    "researcher": "RESEARCHER",
+    "research": "RESEARCHER",
+    "planner": "PLANNER",
+    "plan": "PLANNER",
+    "executor": "EXECUTOR",
+    "execute": "EXECUTOR",
+    "impl": "EXECUTOR",
+    "implementer": "EXECUTOR",
+    "reviewer": "REVIEWER",
+    "review": "REVIEWER",
+    "critic": "REVIEWER",
+    "writer": "EXECUTOR",
+    "analyzer": "RESEARCHER",
+    "verifier": "REVIEWER",
 }
 
 
@@ -284,13 +312,12 @@ class TeamMemberSpec:
         Returns:
             TeamMember instance with memory coordinator attached if memory is enabled
         """
-        # Resolve role
+        from victor.core.shared_types import SubAgentRole
+
+        # Resolve role via string mapping → enum
         role_lower = self.role.lower()
-        if role_lower in ROLE_MAPPING:
-            sub_role = ROLE_MAPPING[role_lower]
-        else:
-            # Default to executor for unknown roles
-            sub_role = SubAgentRole.EXECUTOR
+        role_name = ROLE_MAPPING.get(role_lower, "EXECUTOR")
+        sub_role = getattr(SubAgentRole, role_name, SubAgentRole.EXECUTOR)
 
         # Generate name if not provided
         name = self.name or f"{self.role.title()} Agent"
@@ -434,11 +461,13 @@ class AgentTeam:
                 ],
             )
         """
+        normalized_formation = TeamFormation(getattr(formation, "value", formation))
+
         # Convert specs to TeamMembers
         team_members = [spec.to_team_member(index=i) for i, spec in enumerate(members)]
 
         # For hierarchical, ensure we have a manager
-        if formation == TeamFormation.HIERARCHICAL:
+        if normalized_formation == TeamFormation.HIERARCHICAL:
             has_manager = any(m.is_manager for m in team_members)
             if not has_manager and team_members:
                 # Make the first member the manager
@@ -457,14 +486,16 @@ class AgentTeam:
             name=name,
             goal=goal,
             members=team_members,
-            formation=formation,
+            formation=normalized_formation,
             total_tool_budget=total_tool_budget,
             max_iterations=max_iterations,
             timeout_seconds=timeout_seconds,
             shared_context=shared_context or {},
         )
 
-        # Create coordinator
+        # Create coordinator (lazy import to avoid framework → agent chain)
+        from victor.agent.teams.coordinator import TeamCoordinator
+
         coordinator = TeamCoordinator(orchestrator)
 
         return cls(coordinator, config)
@@ -693,7 +724,7 @@ class AgentTeam:
         """
         member = self._config.get_member(member_id)
         event = TeamEvent(
-            type=TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR,
+            type=(TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR),
             team_name=self.name,
             member_id=member_id,
             member_name=member.name if member else member_id,
@@ -751,7 +782,7 @@ class AgentTeam:
         """
         member = self._config.get_member(member_id)
         event = TeamEvent(
-            type=TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR,
+            type=(TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR),
             team_name=self.name,
             member_id=member_id,
             member_name=member.name if member else member_id,
@@ -847,7 +878,7 @@ def member_complete_event(
 ) -> TeamEvent:
     """Create a member complete event."""
     return TeamEvent(
-        type=TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR,
+        type=(TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR),
         team_name=team_name,
         member_id=member_id,
         member_name=member_name,

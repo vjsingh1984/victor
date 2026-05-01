@@ -97,7 +97,10 @@ def _load_builtin_category_tools() -> dict:
     Returns:
         Dict mapping ToolCategory enum -> set of tool names
     """
-    from victor.config.tool_categories import load_tool_categories, get_fallback_categories
+    from victor.config.tool_categories import (
+        load_tool_categories,
+        get_fallback_categories,
+    )
 
     # Try loading from YAML
     yaml_categories = load_tool_categories()

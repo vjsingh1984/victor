@@ -70,10 +70,7 @@ FORBIDDEN_PREFIXES = frozenset(
 # Known violations to track migration progress (baseline).
 # All external verticals have been migrated to use victor.framework.extensions,
 # victor.framework.processing, and victor.framework.lsp re-export modules.
-KNOWN_VIOLATIONS: Dict[str, Set[str]] = {
-    # victor_invest uses victor.workflows.executor directly; migration deferred
-    "victor_invest": {"victor.workflows.executor"},
-}
+KNOWN_VIOLATIONS: Dict[str, Set[str]] = {}
 
 
 def _find_package_root(package_name: str) -> Path | None:
@@ -316,6 +313,13 @@ def test_framework_extensions_module_exports():
         "TeamSpecProviderProtocol",
         "EnrichmentStrategyProtocol",
         "MiddlewareProtocol",
+        # Tool dependency infrastructure
+        "BaseToolDependencyProvider",
+        "YAMLToolDependencyProvider",
+        "load_tool_dependency_yaml",
+        "ToolDependencyLoader",
+        "TieredToolConfig",
+        "TaskTypeHint",
     }
 
     assert set(extensions.__all__) == expected_exports, (
@@ -338,7 +342,12 @@ def test_framework_extensions_lazy_import():
 def test_framework_extensions_uses_sdk_vertical_contracts():
     """Public extension-layer vertical symbols should resolve to SDK contracts."""
     from victor.framework import extensions
-    from victor_sdk import StageDefinition, VerticalBase, VerticalConfig, VerticalExtensions
+    from victor_sdk import (
+        StageDefinition,
+        VerticalBase,
+        VerticalConfig,
+        VerticalExtensions,
+    )
     from victor_sdk import register_vertical
 
     assert extensions.register_vertical is register_vertical

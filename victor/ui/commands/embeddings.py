@@ -7,11 +7,12 @@ from rich.console import Console
 from rich.prompt import Confirm
 
 from victor.core.async_utils import run_sync
-from victor.storage.cache.embedding_cache_manager import CacheType, EmbeddingCacheManager
-
-embeddings_app = typer.Typer(
-    name="embeddings", help="Manage Victor embeddings for troubleshooting."
+from victor.storage.cache.embedding_cache_manager import (
+    CacheType,
+    EmbeddingCacheManager,
 )
+
+embeddings_app = typer.Typer(name="embedding", help="Manage Victor embeddings for troubleshooting.")
 console = Console()
 
 
@@ -202,7 +203,7 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
 
 
 def _build_tool_registry():
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
     registry = ToolRegistry()
     tools_dir = Path(__file__).resolve().parents[2] / "tools"

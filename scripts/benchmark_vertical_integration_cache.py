@@ -91,7 +91,9 @@ class _BenchmarkHandler:
             details={"call_index": self.calls},
         )
 
-    async def apply_async(self, orchestrator, vertical, context, result, strict_mode=False) -> None:
+    async def apply_async(
+        self, orchestrator, vertical, context, result, strict_mode=False
+    ) -> None:
         del vertical, strict_mode
         set_context = getattr(orchestrator, "set_vertical_context", None)
         if callable(set_context):
@@ -206,11 +208,15 @@ def _build_pipeline(
         return None
 
     pipeline._emit_vertical_applied_event_async = _noop_emit_async
-    side_effect_handler_names = [handler.name for handler in handlers if handler.side_effects]
+    side_effect_handler_names = [
+        handler.name for handler in handlers if handler.side_effects
+    ]
     return pipeline, side_effect_handler_names
 
 
-def _run_sync(iterations: int, side_effect_delay_seconds: float, pure_delay_seconds: float) -> _BenchResult:
+def _run_sync(
+    iterations: int, side_effect_delay_seconds: float, pure_delay_seconds: float
+) -> _BenchResult:
     # Warm full-replay benchmark: cache hit path on fresh orchestrators (no no-op plan state).
     full_pipeline, _ = _build_pipeline(
         side_effect_delay_seconds=side_effect_delay_seconds,
@@ -266,7 +272,9 @@ async def _run_async(
         side_effect_delay_seconds=side_effect_delay_seconds,
         pure_delay_seconds=pure_delay_seconds,
     )
-    await full_pipeline.apply_async(_BenchmarkOrchestrator(), _BenchmarkVertical)  # prime cache
+    await full_pipeline.apply_async(
+        _BenchmarkOrchestrator(), _BenchmarkVertical
+    )  # prime cache
     warm_full_replay_ms: List[float] = []
     for _ in range(iterations):
         orchestrator = _BenchmarkOrchestrator()
@@ -289,7 +297,9 @@ async def _run_async(
     total_slots = 0
     for _ in range(iterations):
         t0 = time.perf_counter()
-        result = await delta_pipeline.apply_async(shared_orchestrator, _BenchmarkVertical)
+        result = await delta_pipeline.apply_async(
+            shared_orchestrator, _BenchmarkVertical
+        )
         warm_delta_ms.append(_ms(time.perf_counter() - t0))
         for name in side_effect_handler_names:
             total_slots += 1
@@ -331,7 +341,9 @@ async def _main_async(args) -> Dict[str, Any]:
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Benchmark vertical integration warm-cache paths.")
+    parser = argparse.ArgumentParser(
+        description="Benchmark vertical integration warm-cache paths."
+    )
     parser.add_argument(
         "--iterations",
         type=int,

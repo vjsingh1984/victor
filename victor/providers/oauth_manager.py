@@ -53,6 +53,8 @@ REFRESH_GRACE_MINUTES = 5
 OAUTH_CLIENT_ID_ENV_VARS = {
     "openai": "VICTOR_OPENAI_OAUTH_CLIENT_ID",
     "qwen": "VICTOR_QWEN_OAUTH_CLIENT_ID",
+    "google": "VICTOR_GOOGLE_OAUTH_CLIENT_ID",
+    "github-copilot": "VICTOR_GITHUB_COPILOT_OAUTH_CLIENT_ID",
 }
 
 # OAuth client ID keychain service names
@@ -113,6 +115,8 @@ def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
 # See: https://github.com/openai/codex (codex-rs/core/src/auth.rs)
 _PUBLIC_OAUTH_CLIENT_IDS: Dict[str, str] = {
     "openai": "app_EMoamEEZ73f0CkXaXp7hrann",
+    # Google public client for installed apps (same as Gemini CLI)
+    "google": ("681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j" ".apps.googleusercontent.com"),
 }
 
 
@@ -176,6 +180,15 @@ class OAuthProviderConfig:
     scopes: List[str] = field(default_factory=lambda: ["openid", "profile", "email"])
     token_endpoint: str = "/oauth/token"
     redirect_port: int = 8400
+    # Config-driven overrides for providers with non-standard OAuth endpoints
+    client_secret: Optional[str] = None  # Public secret (e.g. Google installed apps)
+    authorize_path: Optional[str] = None  # e.g. "/o/oauth2/v2/auth" for Google
+    token_url: Optional[str] = None  # Full token URL when host differs from issuer
+    callback_path: str = "/callback"  # Redirect callback path
+    extra_auth_params: Optional[Dict[str, str]] = None  # e.g. {"access_type": "offline"}
+    # Device code flow (GitHub Copilot, headless environments)
+    use_device_flow: bool = False
+    device_code_url: Optional[str] = None
 
     def get_client_id(self) -> str:
         """Get the OAuth client_id for this provider.
@@ -192,19 +205,25 @@ class OAuthProviderConfig:
 
     def to_sso_config(self) -> SSOConfig:
         """Convert to SSOConfig for use with SSOAuthenticator."""
-        # OpenAI uses /auth/callback (matching Codex CLI), others use /callback
+        # OpenAI uses /auth/callback (matching Codex CLI), others use their callback_path
         if self.sso_provider == SSOProvider.OPENAI_CODEX:
             redirect_uri = f"http://localhost:{self.redirect_port}/auth/callback"
         else:
-            redirect_uri = f"http://localhost:{self.redirect_port}/callback"
+            redirect_uri = f"http://localhost:{self.redirect_port}{self.callback_path}"
 
         return SSOConfig(
             provider=self.sso_provider,
             issuer_url=self.issuer_url,
             client_id=self.get_client_id(),
+            client_secret=self.client_secret,
             scopes=self.scopes,
             redirect_uri=redirect_uri,
-            use_pkce=True,
+            use_pkce=not self.use_device_flow,
+            authorize_path=self.authorize_path,
+            token_url=self.token_url,
+            extra_auth_params=self.extra_auth_params,
+            use_device_flow=self.use_device_flow,
+            device_code_url=self.device_code_url,
         )
 
 
@@ -234,6 +253,32 @@ OAUTH_PROVIDERS: Dict[str, OAuthProviderConfig] = {
         issuer_url="https://chat.qwen.ai",
         scopes=["openid", "profile", "email", "offline_access"],
         token_endpoint="/oauth/token",
+    ),
+    "google": OAuthProviderConfig(
+        provider_name="google",
+        sso_provider=SSOProvider.GOOGLE_GEMINI,
+        issuer_url="https://accounts.google.com",
+        scopes=[
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+        ],
+        token_url="https://oauth2.googleapis.com/token",
+        authorize_path="/o/oauth2/v2/auth",
+        # Public client secret (standard for Google installed apps, same as Gemini CLI)
+        client_secret="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",
+        callback_path="/oauth2callback",
+        redirect_port=8401,
+        extra_auth_params={"access_type": "offline"},
+    ),
+    "github-copilot": OAuthProviderConfig(
+        provider_name="github-copilot",
+        sso_provider=SSOProvider.GITHUB_COPILOT,
+        issuer_url="https://github.com",
+        scopes=["copilot"],
+        use_device_flow=True,
+        device_code_url="https://github.com/login/device/code",
+        token_url="https://github.com/login/oauth/access_token",
     ),
 }
 

@@ -59,7 +59,12 @@ async def test_aws_provider_start_msk_uses_to_thread() -> None:
 async def test_aws_provider_start_sqs_uses_to_thread_for_create_queue() -> None:
     sqs = MagicMock()
     sqs.get_queue_url.side_effect = aws_module.ClientError(
-        {"Error": {"Code": "AWS.SimpleQueueService.NonExistentQueue", "Message": "missing"}},
+        {
+            "Error": {
+                "Code": "AWS.SimpleQueueService.NonExistentQueue",
+                "Message": "missing",
+            }
+        },
         "GetQueueUrl",
     )
     sqs.create_queue.return_value = {"QueueUrl": "https://sqs.us-east-1.amazonaws.com/123/test"}

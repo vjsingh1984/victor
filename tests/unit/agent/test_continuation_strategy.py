@@ -17,9 +17,18 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from victor.agent.continuation_strategy import ContinuationStrategy
+from victor.agent.continuation_strategy import ContinuationActionType, ContinuationStrategy
+from victor.agent.decisions.schemas import (
+    ContinuationAction,
+    ContinuationDecision,
+    DecisionType,
+)
+from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.storage.embeddings.intent_classifier import IntentType
-from victor.storage.embeddings.question_classifier import QuestionType, QuestionClassificationResult
+from victor.storage.embeddings.question_classifier import (
+    QuestionType,
+    QuestionClassificationResult,
+)
 
 # =============================================================================
 # DETECT MENTIONED TOOLS TESTS
@@ -273,7 +282,7 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "finish"
+        assert result["action"] is ContinuationActionType.FINISH
         assert "already requested" in result["reason"]
 
     def test_request_summary_on_stuck_loop(self, strategy, base_kwargs):
@@ -283,8 +292,41 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "request_summary"
+        assert result["action"] is ContinuationActionType.REQUEST_SUMMARY
         assert "STUCK_LOOP" in result["reason"]
+
+    def test_runtime_intelligence_guides_low_confidence_continuation(
+        self, mock_settings, base_kwargs
+    ):
+        """Low-confidence continuation decisions should use runtime intelligence."""
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.CONTINUATION_ACTION,
+            result=ContinuationDecision(
+                action=ContinuationAction.REQUEST_SUMMARY,
+                reason="Need a concise handoff",
+            ),
+            source="llm",
+            confidence=0.8,
+        )
+        strategy = ContinuationStrategy(
+            event_bus=MagicMock(),
+            runtime_intelligence=runtime_intelligence,
+        )
+        mock_intent = MagicMock()
+        mock_intent.intent = "other"
+        base_kwargs["continuation_prompts"] = 3
+        mock_settings.max_continuation_prompts_default = 6
+
+        with patch("victor.agent.decisions.chain.should_use_llm", return_value=True):
+            result = strategy.determine_continuation_action(
+                intent_result=mock_intent,
+                **base_kwargs,
+            )
+
+        assert result["action"] is ContinuationActionType.REQUEST_SUMMARY
+        assert result["reason"] == "LLM: Need a concise handoff"
+        runtime_intelligence.decide_sync.assert_called_once()
 
     def test_force_tool_execution_on_hallucinated_calls(self, strategy, base_kwargs):
         """Test forces tool execution when tools mentioned but not called."""
@@ -295,8 +337,23 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "force_tool_execution"
+        assert result["action"] is ContinuationActionType.FORCE_TOOL_EXECUTION
         assert "Hallucinated" in result["reason"]
+
+    def test_force_tool_execution_message_avoids_pseudo_call_examples(self, strategy, base_kwargs):
+        """Recovery guidance should ask for real tool calls, not text pseudo-calls."""
+        base_kwargs["mentioned_tools"] = ["read", "search"]
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.CONTINUATION
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.FORCE_TOOL_EXECUTION
+        assert "plain text" in result["message"].lower()
+        assert "write(path=" not in result["message"]
+        assert "edit(path=" not in result["message"]
+        assert "shell(command=" not in result["message"]
 
     def test_return_to_user_for_asking_input_one_shot(self, strategy, base_kwargs):
         """Test returns to user when asking input in one-shot mode."""
@@ -307,7 +364,88 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "return_to_user"
+        assert result["action"] is ContinuationActionType.RETURN_TO_USER
+
+    def test_finishes_direct_qa_response_in_one_shot_mode(self, strategy, base_kwargs):
+        """One-shot direct-answer turns should not be pushed into continuation loops."""
+        base_kwargs["one_shot_mode"] = True
+        base_kwargs["content_length"] = 5
+        base_kwargs["full_content"] = "READY"
+        base_kwargs["task_completion_signals"] = {
+            "direct_response_requested": True,
+            "required_files": set(),
+            "explicit_database_query_requested": False,
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.FINISH
+        assert "direct-response" in result["reason"].lower()
+
+    def test_finishes_direct_response_in_interactive_mode(self, strategy, base_kwargs):
+        """Interactive direct-response turns should also terminate immediately."""
+        base_kwargs["one_shot_mode"] = False
+        base_kwargs["content_length"] = 5
+        base_kwargs["full_content"] = "READY"
+        base_kwargs["task_completion_signals"] = {
+            "direct_response_requested": True,
+            "required_files": set(),
+            "explicit_database_query_requested": False,
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.FINISH
+        assert "direct-response" in result["reason"].lower()
+
+    def test_direct_response_finish_preempts_stuck_loop_recovery(self, strategy, base_kwargs):
+        """Direct-response turns should finish before stuck-loop recovery fires."""
+        base_kwargs["content_length"] = 120
+        base_kwargs["full_content"] = (
+            "The user is asking me to reply with exactly READY, so the answer is READY"
+        )
+        base_kwargs["task_completion_signals"] = {
+            "direct_response_requested": True,
+            "required_files": set(),
+            "explicit_database_query_requested": False,
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.STUCK_LOOP
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.FINISH
+        assert "direct-response" in result["reason"].lower()
+
+    def test_direct_response_finish_preempts_hallucinated_tool_recovery(
+        self, strategy, base_kwargs
+    ):
+        """Direct-response turns should finish before generic tool-recovery prompts."""
+        base_kwargs["content_length"] = 120
+        base_kwargs["full_content"] = (
+            "This is a simple acknowledgement request that does not require tool calls. READY"
+        )
+        base_kwargs["mentioned_tools"] = ["search"]
+        base_kwargs["task_completion_signals"] = {
+            "direct_response_requested": True,
+            "required_files": set(),
+            "explicit_database_query_requested": False,
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.FINISH
+        assert "direct-response" in result["reason"].lower()
 
     def test_continue_asking_input_auto_respond(self, strategy, base_kwargs):
         """Test auto-responds to asking input intent when question is rhetorical."""
@@ -322,13 +460,14 @@ class TestDetermineContinuationAction:
             matched_pattern="Should I proceed?",
         )
         with patch(
-            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+            "victor.agent.continuation_strategy.classify_question",
+            return_value=mock_result,
         ):
             result = strategy.determine_continuation_action(
                 intent_result=mock_intent, **base_kwargs
             )
 
-        assert result["action"] == "continue_asking_input"
+        assert result["action"] is ContinuationActionType.CONTINUE_ASKING_INPUT
         assert "asking_input_prompts" in result["updates"]
 
     def test_return_to_user_max_asking_input(self, strategy, base_kwargs):
@@ -347,13 +486,14 @@ class TestDetermineContinuationAction:
             matched_pattern="Should I proceed?",
         )
         with patch(
-            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+            "victor.agent.continuation_strategy.classify_question",
+            return_value=mock_result,
         ):
             result = strategy.determine_continuation_action(
                 intent_result=mock_intent, **base_kwargs
             )
 
-        assert result["action"] == "return_to_user"
+        assert result["action"] is ContinuationActionType.RETURN_TO_USER
 
     def test_finish_on_completion_intent(self, strategy, base_kwargs):
         """Test finishes on completion intent."""
@@ -362,7 +502,7 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "finish"
+        assert result["action"] is ContinuationActionType.FINISH
         assert "completion" in result["reason"].lower()
 
     def test_prompt_tool_call_for_analysis_task(self, strategy, base_kwargs):
@@ -374,7 +514,7 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "prompt_tool_call"
+        assert result["action"] is ContinuationActionType.PROMPT_TOOL_CALL
         assert "analysis" in result["message"].lower()
 
     def test_prompt_tool_call_for_action_task(self, strategy, base_kwargs):
@@ -386,7 +526,7 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "prompt_tool_call"
+        assert result["action"] is ContinuationActionType.PROMPT_TOOL_CALL
         assert "implementation" in result["message"].lower()
 
     def test_request_summary_max_continuation_prompts(self, strategy, base_kwargs):
@@ -399,8 +539,57 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "request_summary"
+        assert result["action"] is ContinuationActionType.REQUEST_SUMMARY
         assert result["updates"].get("max_prompts_summary_requested") is True
+
+    def test_prompt_tool_call_for_yes_let_me_short_preamble(self, strategy, base_kwargs):
+        """Interjections before 'let me' should still trigger continuation."""
+        base_kwargs["content_length"] = 83
+        base_kwargs["full_content"] = (
+            "Yes! Let me find and query the SQLite databases directly. Let me locate them first:"
+        )
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.PROMPT_TOOL_CALL
+        assert "didn't complete" in result["message"]
+
+    def test_prompt_tool_call_when_explicit_database_request_unmet(self, strategy, base_kwargs):
+        """Explicit direct DB inspection requests should block completion until satisfied."""
+        base_kwargs["task_completion_signals"] = {
+            "explicit_database_query_requested": True,
+            "database_query_satisfied": False,
+            "executed_tool_names": set(),
+            "original_user_message": "review the sqllite db directly",
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.PROMPT_TOOL_CALL
+        assert "database" in result["message"].lower()
+        assert result["updates"]["continuation_prompts"] == 1
+
+    def test_finish_when_explicit_database_request_is_satisfied(self, strategy, base_kwargs):
+        """A real db/shell call should satisfy the direct inspection requirement."""
+        base_kwargs["task_completion_signals"] = {
+            "explicit_database_query_requested": True,
+            "database_query_satisfied": True,
+            "executed_tool_names": {"shell"},
+            "original_user_message": "review the sqllite db directly",
+        }
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.NEUTRAL
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] is ContinuationActionType.FINISH
 
     def test_finish_default(self, strategy, base_kwargs):
         """Test finishes by default when no conditions met."""
@@ -410,7 +599,7 @@ class TestDetermineContinuationAction:
 
         result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
 
-        assert result["action"] == "finish"
+        assert result["action"] is ContinuationActionType.FINISH
 
 
 class TestRLCoordinator:

@@ -16,7 +16,9 @@ class HandlerProvider(Protocol):
     external systems.
     """
 
-    def get_input_handlers(self) -> Dict[str, Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]]:
+    def get_input_handlers(
+        self,
+    ) -> Dict[str, Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]]:
         """Return input transformation handlers.
 
         Returns:
@@ -24,7 +26,9 @@ class HandlerProvider(Protocol):
         """
         ...
 
-    def get_output_handlers(self) -> Dict[str, Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]]:
+    def get_output_handlers(
+        self,
+    ) -> Dict[str, Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]]:
         """Return output transformation handlers.
 
         Returns:
@@ -32,7 +36,9 @@ class HandlerProvider(Protocol):
         """
         ...
 
-    def get_handler_chain(self) -> List[Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]]:
+    def get_handler_chain(
+        self,
+    ) -> List[Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]]:
         """Return ordered chain of handlers to apply.
 
         Returns:

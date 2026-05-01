@@ -436,7 +436,9 @@ def _measure_discovery_probe(
         "warm_mean_ms": float(payload["warm_mean_ms"]),
         "warm_p95_ms": float(payload["warm_p95_ms"]),
         "discovered_count": int(payload["discovered_count"]),
-        "discovered_vertical_names": [str(v) for v in payload["discovered_vertical_names"]],
+        "discovered_vertical_names": [
+            str(v) for v in payload["discovered_vertical_names"]
+        ],
         "call_total": int(payload["call_total"]),
         "cache_hit_total": int(payload["cache_hit_total"]),
         "scan_total": int(payload["scan_total"]),
@@ -489,31 +491,48 @@ def _collect_thresholds(args: argparse.Namespace) -> Dict[str, float]:
 
     if hasattr(args, "max_import_cold_ms") and args.max_import_cold_ms is not None:
         thresholds["import_victor.cold_ms"] = args.max_import_cold_ms
-    if hasattr(args, "max_import_warm_mean_ms") and args.max_import_warm_mean_ms is not None:
+    if (
+        hasattr(args, "max_import_warm_mean_ms")
+        and args.max_import_warm_mean_ms is not None
+    ):
         thresholds["import_victor.warm_mean_ms"] = args.max_import_warm_mean_ms
-    if hasattr(args, "max_agent_create_cold_ms") and args.max_agent_create_cold_ms is not None:
+    if (
+        hasattr(args, "max_agent_create_cold_ms")
+        and args.max_agent_create_cold_ms is not None
+    ):
         thresholds["agent_create.cold_ms"] = args.max_agent_create_cold_ms
     if (
         hasattr(args, "max_agent_create_warm_mean_ms")
         and args.max_agent_create_warm_mean_ms is not None
     ):
         thresholds["agent_create.warm_mean_ms"] = args.max_agent_create_warm_mean_ms
-    if hasattr(args, "max_activation_cold_ms") and args.max_activation_cold_ms is not None:
+    if (
+        hasattr(args, "max_activation_cold_ms")
+        and args.max_activation_cold_ms is not None
+    ):
         thresholds["activation_probe.cold_ms"] = args.max_activation_cold_ms
     if (
         hasattr(args, "max_activation_warm_mean_ms")
         and args.max_activation_warm_mean_ms is not None
     ):
         thresholds["activation_probe.warm_mean_ms"] = args.max_activation_warm_mean_ms
-    if hasattr(args, "max_discovery_cold_ms") and args.max_discovery_cold_ms is not None:
+    if (
+        hasattr(args, "max_discovery_cold_ms")
+        and args.max_discovery_cold_ms is not None
+    ):
         thresholds["discovery_probe.cold_ms"] = args.max_discovery_cold_ms
-    if hasattr(args, "max_discovery_warm_mean_ms") and args.max_discovery_warm_mean_ms is not None:
+    if (
+        hasattr(args, "max_discovery_warm_mean_ms")
+        and args.max_discovery_warm_mean_ms is not None
+    ):
         thresholds["discovery_probe.warm_mean_ms"] = args.max_discovery_warm_mean_ms
 
     return thresholds
 
 
-def _evaluate_threshold_failures(report: Dict[str, Any], thresholds: Dict[str, float]) -> List[str]:
+def _evaluate_threshold_failures(
+    report: Dict[str, Any], thresholds: Dict[str, float]
+) -> List[str]:
     """Evaluate report against thresholds and return list of failure messages."""
     failures: List[str] = []
 
@@ -551,13 +570,18 @@ def _collect_minimums(args: argparse.Namespace) -> Dict[str, float]:
         and args.min_discovery_vertical_count is not None
     ):
         minimums["discovery_probe.discovered_count"] = args.min_discovery_vertical_count
-    if hasattr(args, "min_discovery_cache_hits") and args.min_discovery_cache_hits is not None:
+    if (
+        hasattr(args, "min_discovery_cache_hits")
+        and args.min_discovery_cache_hits is not None
+    ):
         minimums["discovery_probe.cache_hit_total"] = args.min_discovery_cache_hits
 
     return minimums
 
 
-def _evaluate_minimum_failures(report: Dict[str, Any], minimums: Dict[str, float]) -> List[str]:
+def _evaluate_minimum_failures(
+    report: Dict[str, Any], minimums: Dict[str, float]
+) -> List[str]:
     """Evaluate report against minimums and return list of failure messages."""
     failures: List[str] = []
 
@@ -580,12 +604,16 @@ def _collect_flag_expectations(args: argparse.Namespace) -> Dict[str, bool]:
         hasattr(args, "require_generic_result_cache_enabled")
         and args.require_generic_result_cache_enabled
     ):
-        expectations["activation_probe.runtime_flags.generic_result_cache_enabled"] = True
+        expectations["activation_probe.runtime_flags.generic_result_cache_enabled"] = (
+            True
+        )
     if (
         hasattr(args, "require_http_connection_pool_enabled")
         and args.require_http_connection_pool_enabled
     ):
-        expectations["activation_probe.runtime_flags.http_connection_pool_enabled"] = True
+        expectations["activation_probe.runtime_flags.http_connection_pool_enabled"] = (
+            True
+        )
     if (
         hasattr(args, "require_framework_preload_enabled")
         and args.require_framework_preload_enabled
@@ -596,7 +624,10 @@ def _collect_flag_expectations(args: argparse.Namespace) -> Dict[str, bool]:
         and args.require_coordination_runtime_lazy
     ):
         expectations["activation_probe.runtime_flags.coordination_runtime_lazy"] = True
-    if hasattr(args, "require_interaction_runtime_lazy") and args.require_interaction_runtime_lazy:
+    if (
+        hasattr(args, "require_interaction_runtime_lazy")
+        and args.require_interaction_runtime_lazy
+    ):
         expectations["activation_probe.runtime_flags.interaction_runtime_lazy"] = True
 
     return expectations
@@ -828,7 +859,9 @@ def main() -> int:
 
     # Collect and evaluate thresholds
     thresholds = _collect_thresholds(args)
-    threshold_failures = _evaluate_threshold_failures(report, thresholds) if thresholds else []
+    threshold_failures = (
+        _evaluate_threshold_failures(report, thresholds) if thresholds else []
+    )
 
     # Collect and evaluate minimums
     minimums = _collect_minimums(args)
@@ -837,7 +870,9 @@ def main() -> int:
     # Collect and evaluate flag expectations
     flag_expectations = _collect_flag_expectations(args)
     flag_failures = (
-        _evaluate_flag_expectation_failures(report, flag_expectations) if flag_expectations else []
+        _evaluate_flag_expectation_failures(report, flag_expectations)
+        if flag_expectations
+        else []
     )
 
     # Combine all failures

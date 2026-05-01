@@ -33,14 +33,44 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Literal
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.context import WorkflowContext
+    from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Enums for Type-Safe Return Values
+# =============================================================================
+
+
+class SolutionQuality(str, Enum):
+    """Quality assessment of a benchmark solution."""
+
+    HIGH_QUALITY = "high_quality"  # Solution passes all quality thresholds
+    NEEDS_IMPROVEMENT = "needs_improvement"  # Solution passes but has quality issues
+    FAILED = "failed"  # Solution does not meet minimum requirements
+
+
+class CoverageStatus(str, Enum):
+    """Test coverage assessment for a solution."""
+
+    SUFFICIENT = "sufficient"  # Coverage meets all requirements
+    NEEDS_MORE_TESTS = "needs_more_tests"  # Coverage below thresholds
+
+
+class ComplexityLevel(str, Enum):
+    """Complexity assessment of a problem/solution."""
+
+    SIMPLE = "simple"  # Low complexity, straightforward solution
+    MEDIUM = "medium"  # Moderate complexity, some challenges
+    COMPLEX = "complex"  # High complexity, requires careful approach
 
 
 # =============================================================================
@@ -48,7 +78,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def solution_quality_check(ctx: Dict[str, Any]) -> str:
+def solution_quality_check(ctx: Dict[str, Any]) -> SolutionQuality:
     """Check solution quality based on multiple factors.
 
     Evaluates test pass rate, code quality metrics, and solution completeness.
@@ -61,7 +91,7 @@ def solution_quality_check(ctx: Dict[str, Any]) -> str:
             - pass_threshold (float): Minimum pass rate required (default 0.8)
 
     Returns:
-        "high_quality", "needs_improvement", or "failed"
+        SolutionQuality enum value: HIGH_QUALITY, NEEDS_IMPROVEMENT, or FAILED
     """
     test_results = ctx.get("test_results", {})
     code_quality = ctx.get("code_quality", {})
@@ -76,10 +106,10 @@ def solution_quality_check(ctx: Dict[str, Any]) -> str:
     # Check for critical failures
     if test_results.get("error"):
         logger.warning(f"Solution failed: {test_results.get('error')}")
-        return "failed"
+        return SolutionQuality.FAILED
 
     if pass_rate < 0.3:
-        return "failed"
+        return SolutionQuality.FAILED
 
     # Quality factors
     lint_score = code_quality.get("lint_score", 1.0)
@@ -88,16 +118,16 @@ def solution_quality_check(ctx: Dict[str, Any]) -> str:
     # High quality: good pass rate, clean code, complete solution
     if pass_rate >= pass_threshold and lint_score >= 0.9 and completeness >= 0.9:
         if complexity_ok:
-            return "high_quality"
+            return SolutionQuality.HIGH_QUALITY
 
     # Needs improvement: passing but could be better
     if pass_rate >= 0.5 or completeness >= 0.5:
-        return "needs_improvement"
+        return SolutionQuality.NEEDS_IMPROVEMENT
 
-    return "failed"
+    return SolutionQuality.FAILED
 
 
-def test_coverage_check(ctx: Dict[str, Any]) -> str:
+def test_coverage_check(ctx: Dict[str, Any]) -> CoverageStatus:
     """Check if test coverage is sufficient for the solution.
 
     Evaluates line coverage, branch coverage, and edge case handling.
@@ -110,7 +140,7 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
             - edge_cases_covered (list): List of covered edge cases
 
     Returns:
-        "sufficient" or "needs_more_tests"
+        CoverageStatus enum value: SUFFICIENT or NEEDS_MORE_TESTS
     """
     coverage_report = ctx.get("coverage_report", {})
     min_line = ctx.get("min_line_coverage", 0.7)
@@ -124,12 +154,12 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
     # Check line coverage
     if line_coverage < min_line:
         logger.info(f"Line coverage {line_coverage:.1%} below threshold {min_line:.1%}")
-        return "needs_more_tests"
+        return CoverageStatus.NEEDS_MORE_TESTS
 
     # Check branch coverage
     if branch_coverage < min_branch:
         logger.info(f"Branch coverage {branch_coverage:.1%} below threshold {min_branch:.1%}")
-        return "needs_more_tests"
+        return CoverageStatus.NEEDS_MORE_TESTS
 
     # Check edge case coverage
     if required_edge_cases:
@@ -139,12 +169,12 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
 
         if len(missing) > len(required_set) * 0.3:  # Allow 30% missing
             logger.info(f"Missing edge cases: {missing}")
-            return "needs_more_tests"
+            return CoverageStatus.NEEDS_MORE_TESTS
 
-    return "sufficient"
+    return CoverageStatus.SUFFICIENT
 
 
-def complexity_check(ctx: Dict[str, Any]) -> str:
+def complexity_check(ctx: Dict[str, Any]) -> ComplexityLevel:
     """Assess problem complexity to adjust strategy.
 
     Evaluates code size, cyclomatic complexity, and problem domain.
@@ -157,7 +187,7 @@ def complexity_check(ctx: Dict[str, Any]) -> str:
             - domain (str): Problem domain (e.g., "algorithm", "system")
 
     Returns:
-        "simple", "medium", or "complex"
+        ComplexityLevel enum value: SIMPLE, MEDIUM, or COMPLEX
     """
     problem = ctx.get("problem", {})
     code_metrics = ctx.get("code_metrics", {})
@@ -167,33 +197,74 @@ def complexity_check(ctx: Dict[str, Any]) -> str:
     # Check explicit difficulty if provided
     difficulty = problem.get("difficulty", "").lower()
     if difficulty in ["easy", "trivial"]:
-        return "simple"
+        return ComplexityLevel.SIMPLE
     if difficulty in ["hard", "expert", "advanced"]:
-        return "complex"
+        return ComplexityLevel.COMPLEX
 
     # Check code complexity metrics
     cyclomatic = code_metrics.get("cyclomatic_complexity", 0)
     if cyclomatic > 20:
-        return "complex"
+        return ComplexityLevel.COMPLEX
     if cyclomatic > 10:
-        return "medium"
+        return ComplexityLevel.MEDIUM
 
     # Check estimated size
     if estimated_loc > 500:
-        return "complex"
+        return ComplexityLevel.COMPLEX
     if estimated_loc > 100:
-        return "medium"
+        return ComplexityLevel.MEDIUM
 
     # Check domain complexity
     complex_domains = ["distributed", "concurrent", "ml", "compiler", "database"]
     if domain.lower() in complex_domains:
-        return "complex"
+        return ComplexityLevel.COMPLEX
 
     medium_domains = ["algorithm", "system", "network"]
     if domain.lower() in medium_domains:
-        return "medium"
+        return ComplexityLevel.MEDIUM
 
-    return "simple"
+    return ComplexityLevel.SIMPLE
+
+
+class TestExecutionStatus(str, Enum):
+    """Test execution outcome status."""
+
+    ALL_PASS = "all_pass"  # All tests passed
+    PARTIAL_PASS = "partial_pass"  # Some tests passed
+    ALL_FAIL = "all_fail"  # All tests failed
+    ERROR = "error"  # Test execution error
+
+
+class FixingDecision(str, Enum):
+    """Decision on whether to continue fixing."""
+
+    CONTINUE_FIXING = "continue_fixing"  # Continue attempting fixes
+    ESCALATE = "escalate"  # Escalate to human intervention
+    SUBMIT_BEST_EFFORT = "submit_best_effort"  # Submit current best solution
+
+
+class VerificationStatus(str, Enum):
+    """Solution verification status."""
+
+    VERIFIED = "verified"  # Solution fully verified
+    PARTIAL = "partial"  # Partially verified
+    FAILED = "failed"  # Verification failed
+
+
+class EscalationDecision(str, Enum):
+    """Human-in-the-loop escalation decision."""
+
+    CONTINUE = "continue"  # Continue with automation
+    SUBMIT = "submit"  # Submit current solution
+    ABORT = "abort"  # Abort the task
+
+
+class PasskProgress(str, Enum):
+    """Pass@k generation progress status."""
+
+    SUFFICIENT = "sufficient"  # Generated sufficient solutions
+    NEED_MORE = "need_more"  # Need more solutions
+    MAX_REACHED = "max_reached"  # Reached max iterations
 
 
 # =============================================================================
@@ -333,7 +404,7 @@ def merge_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "combined_output": combined_output,
         "success": all_success and not errors,
         "errors": errors,
-        "execution_order": execution_order if preserve_order else sorted(execution_order),
+        "execution_order": (execution_order if preserve_order else sorted(execution_order)),
         "tool_count": len(tool_results),
     }
 
@@ -442,7 +513,7 @@ class RunTestsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -563,7 +634,7 @@ class ValidatePatchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -669,7 +740,7 @@ class ValidatePatchHandler:
 # =============================================================================
 
 
-def test_execution_status(ctx: Dict[str, Any]) -> str:
+def test_execution_status(ctx: Dict[str, Any]) -> TestExecutionStatus:
     """Determine test execution outcome.
 
     Args:
@@ -679,14 +750,14 @@ def test_execution_status(ctx: Dict[str, Any]) -> str:
             - error_message (str): Any error message
 
     Returns:
-        "all_pass", "partial_pass", "all_fail", or "error"
+        TestExecutionStatus enum value
     """
     exit_code = ctx.get("exit_code", 0)
     error_message = ctx.get("error_message", "")
     test_results = ctx.get("test_results", {})
 
     if error_message or exit_code < 0:
-        return "error"
+        return TestExecutionStatus.ERROR
 
     passed = test_results.get("passed", 0)
     failed = test_results.get("failed", 0)
@@ -694,18 +765,18 @@ def test_execution_status(ctx: Dict[str, Any]) -> str:
 
     if total == 0:
         # No tests found - treat as error
-        return "error"
+        return TestExecutionStatus.ERROR
 
     if failed == 0 and passed > 0:
-        return "all_pass"
+        return TestExecutionStatus.ALL_PASS
 
     if passed > 0:
-        return "partial_pass"
+        return TestExecutionStatus.PARTIAL_PASS
 
-    return "all_fail"
+    return TestExecutionStatus.ALL_FAIL
 
 
-def should_continue_fixing(ctx: Dict[str, Any]) -> str:
+def should_continue_fixing(ctx: Dict[str, Any]) -> FixingDecision:
     """Determine if agent should continue attempting fixes.
 
     Multi-factor decision based on iteration count, error patterns, and progress.
@@ -718,7 +789,7 @@ def should_continue_fixing(ctx: Dict[str, Any]) -> str:
             - pass_rate (float): Current test pass rate
 
     Returns:
-        "continue_fixing", "escalate", or "submit_best_effort"
+        FixingDecision enum value
     """
     iterations = ctx.get("fix_iterations", 0)
     max_iter = ctx.get("max_iterations", 5)
@@ -728,21 +799,21 @@ def should_continue_fixing(ctx: Dict[str, Any]) -> str:
     # Max iterations reached
     if iterations >= max_iter:
         logger.info(f"Max fix iterations ({max_iter}) reached, submitting best effort")
-        return "submit_best_effort"
+        return FixingDecision.SUBMIT_BEST_EFFORT
 
     # High pass rate achieved
     if pass_rate >= 0.95:
-        return "submit_best_effort"
+        return FixingDecision.SUBMIT_BEST_EFFORT
 
     # Still making progress
     if progress_made and iterations < max_iter:
-        return "continue_fixing"
+        return FixingDecision.CONTINUE_FIXING
 
     # No progress after several attempts
     if iterations >= 3 and not progress_made:
-        return "escalate"
+        return FixingDecision.ESCALATE
 
-    return "continue_fixing"
+    return FixingDecision.CONTINUE_FIXING
 
 
 def code_complexity_check(ctx: Dict[str, Any]) -> str:
@@ -762,7 +833,7 @@ def code_complexity_check(ctx: Dict[str, Any]) -> str:
     return result
 
 
-def verification_status(ctx: Dict[str, Any]) -> str:
+def verification_status(ctx: Dict[str, Any]) -> VerificationStatus:
     """Check verification results for solution.
 
     Args:
@@ -772,25 +843,25 @@ def verification_status(ctx: Dict[str, Any]) -> str:
             - lint_clean (bool): Linting passes
 
     Returns:
-        "verified", "partial", or "failed"
+        VerificationStatus enum value
     """
     syntax_valid = ctx.get("syntax_valid", False)
     tests_pass = ctx.get("tests_pass", False)
     lint_clean = ctx.get("lint_clean", True)
 
     if not syntax_valid:
-        return "failed"
+        return VerificationStatus.FAILED
 
     if tests_pass and lint_clean:
-        return "verified"
+        return VerificationStatus.VERIFIED
 
     if tests_pass or syntax_valid:
-        return "partial"
+        return VerificationStatus.PARTIAL
 
-    return "failed"
+    return VerificationStatus.FAILED
 
 
-def escalation_decision(ctx: Dict[str, Any]) -> str:
+def escalation_decision(ctx: Dict[str, Any]) -> EscalationDecision:
     """Handle escalation decision from HITL node.
 
     Args:
@@ -798,22 +869,22 @@ def escalation_decision(ctx: Dict[str, Any]) -> str:
             - hitl_response (str): User response from HITL
 
     Returns:
-        "continue", "submit", or "abort"
+        EscalationDecision enum value
     """
     response = ctx.get("hitl_response", "").lower().strip()
 
     if "continue" in response or response == "1":
-        return "continue"
+        return EscalationDecision.CONTINUE
     if "submit" in response or response == "2":
-        return "submit"
+        return EscalationDecision.SUBMIT
     if "abort" in response or response == "3":
-        return "abort"
+        return EscalationDecision.ABORT
 
     # Default to submit on timeout/fallback
-    return "submit"
+    return EscalationDecision.SUBMIT
 
 
-def passk_progress_check(ctx: Dict[str, Any]) -> str:
+def passk_progress_check(ctx: Dict[str, Any]) -> PasskProgress:
     """Check pass@k generation progress.
 
     Determines if enough solutions have been generated or if more are needed.
@@ -827,7 +898,7 @@ def passk_progress_check(ctx: Dict[str, Any]) -> str:
             - passed_solutions (int): Number of solutions that pass tests
 
     Returns:
-        "sufficient", "need_more", or "max_reached"
+        PasskProgress enum value
     """
     solutions = ctx.get("valid_solutions", [])
     target_k = ctx.get("target_k", 10)
@@ -840,18 +911,18 @@ def passk_progress_check(ctx: Dict[str, Any]) -> str:
     # Max iterations reached
     if iterations >= max_iter:
         logger.info(f"Max generation iterations ({max_iter}) reached")
-        return "max_reached"
+        return PasskProgress.MAX_REACHED
 
     # Have enough passing solutions for high confidence
     if passed >= target_k * 0.5:
-        return "sufficient"
+        return PasskProgress.SUFFICIENT
 
     # Have target number of solutions
     if solution_count >= target_k:
-        return "sufficient"
+        return PasskProgress.SUFFICIENT
 
     # Need more solutions
-    return "need_more"
+    return PasskProgress.NEED_MORE
 
 
 # =============================================================================
@@ -991,7 +1062,7 @@ HANDLERS = {
 
 def register_handlers() -> None:
     """Register Benchmark handlers with the workflow executor."""
-    from victor.workflows.executor import register_compute_handler
+    from victor.workflows.compute_registry import register_compute_handler
 
     for name, handler in HANDLERS.items():
         register_compute_handler(name, handler)
@@ -999,6 +1070,10 @@ def register_handlers() -> None:
 
 
 __all__ = [
+    # Enums
+    "SolutionQuality",
+    "CoverageStatus",
+    "ComplexityLevel",
     # Conditions
     "solution_quality_check",
     "test_coverage_check",

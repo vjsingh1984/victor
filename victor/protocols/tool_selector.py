@@ -52,7 +52,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 
 class ToolSelectionStrategy(Enum):

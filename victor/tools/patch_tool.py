@@ -327,9 +327,15 @@ async def patch(
     # Route to create diff operation
     if op == "create":
         if not file_path:
-            return {"success": False, "error": "file_path required for 'create' operation"}
+            return {
+                "success": False,
+                "error": "file_path required for 'create' operation",
+            }
         if not new_content:
-            return {"success": False, "error": "new_content required for 'create' operation"}
+            return {
+                "success": False,
+                "error": "new_content required for 'create' operation",
+            }
         return await _create_diff(file_path, new_content, context_lines)
 
     # Apply patch operation (default)
@@ -340,7 +346,10 @@ async def patch(
         }
 
     if not patch_content:
-        return {"success": False, "error": "patch_content required for 'apply' operation"}
+        return {
+            "success": False,
+            "error": "patch_content required for 'apply' operation",
+        }
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 
     # Parse the patch

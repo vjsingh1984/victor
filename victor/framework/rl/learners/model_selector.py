@@ -121,6 +121,10 @@ class ModelSelectorLearner(BaseLearner):
         # Load state from database
         self._load_state()
 
+        # Priority 4 Phase 2: per-decision-type confidence threshold tracking
+        self._threshold_observations: Dict[str, list] = {}
+        self.load_threshold_observations()
+
     def _ensure_tables(self) -> None:
         """Create tables for model selector stats."""
         cursor = self.db.cursor()
@@ -530,3 +534,126 @@ class ModelSelectorLearner(BaseLearner):
             Current selection strategy enum
         """
         return self.strategy
+
+    # ------------------------------------------------------------------
+    # Priority 4 Phase 2: Learned confidence thresholds for HybridDecisionService
+    # ------------------------------------------------------------------
+
+    def learn_confidence_threshold(
+        self, decision_type: str, heuristic_confidence: float, used_llm: bool, success: bool
+    ) -> None:
+        """Record a single decision observation to refine per-type thresholds.
+
+        Tracks which confidence levels led to correct routing (heuristic vs LLM)
+        so get_optimal_threshold() can return data-driven thresholds instead of
+        static ones.
+
+        Args:
+            decision_type: Decision category (e.g. "task_type", "tool_necessity")
+            heuristic_confidence: Confidence score the heuristic produced (0–1)
+            used_llm: Whether the LLM path was actually taken
+            success: Whether the decision outcome was successful
+        """
+        if not hasattr(self, "_threshold_observations"):
+            self._threshold_observations: Dict[str, list] = {}
+
+        if decision_type not in self._threshold_observations:
+            self._threshold_observations[decision_type] = []
+
+        self._threshold_observations[decision_type].append(
+            {
+                "confidence": heuristic_confidence,
+                "used_llm": used_llm,
+                "success": success,
+            }
+        )
+
+        # Keep last 200 observations per type to bound memory
+        self._threshold_observations[decision_type] = self._threshold_observations[decision_type][
+            -200:
+        ]
+
+        self._persist_threshold(decision_type)
+
+    def get_optimal_threshold(self, decision_type: str) -> Optional[float]:
+        """Return the learned optimal confidence threshold for a decision type.
+
+        Finds the threshold that maximises accuracy: heuristic correct when
+        confidence ≥ threshold, LLM correct when confidence < threshold.
+
+        Args:
+            decision_type: Decision category to query
+
+        Returns:
+            Optimal threshold float, or None if insufficient data (<10 observations)
+        """
+        if not hasattr(self, "_threshold_observations"):
+            return None
+
+        observations = self._threshold_observations.get(decision_type, [])
+        if len(observations) < 10:
+            return None
+
+        # Grid search over candidate thresholds
+        best_threshold = 0.5
+        best_accuracy = 0.0
+
+        for candidate in [i / 20 for i in range(1, 20)]:  # 0.05 to 0.95
+            correct = 0
+            for obs in observations:
+                heuristic_correct = obs["confidence"] >= candidate and obs["success"]
+                llm_correct = obs["confidence"] < candidate and obs["success"]
+                if heuristic_correct or llm_correct:
+                    correct += 1
+
+            accuracy = correct / len(observations)
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_threshold = candidate
+
+        return best_threshold
+
+    def _persist_threshold(self, decision_type: str) -> None:
+        """Persist threshold observations to DB for cross-session continuity."""
+        import json
+
+        observations = getattr(self, "_threshold_observations", {}).get(decision_type, [])
+        if not observations:
+            return
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS rl_model_threshold (
+                    decision_type TEXT PRIMARY KEY,
+                    observations TEXT NOT NULL,
+                    last_updated TEXT NOT NULL
+                )
+            """)
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO rl_model_threshold
+                (decision_type, observations, last_updated)
+                VALUES (?, ?, datetime('now'))
+                """,
+                (decision_type, json.dumps(observations[-50:])),
+            )
+            self.db.commit()
+        except Exception as e:
+            logger.debug("model_selector: threshold persist failed: %s", e)
+
+    def load_threshold_observations(self) -> None:
+        """Load persisted threshold observations from DB on startup."""
+        import json
+
+        if not hasattr(self, "_threshold_observations"):
+            self._threshold_observations = {}
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("SELECT decision_type, observations FROM rl_model_threshold")
+            for row in cursor.fetchall():
+                row_dict = dict(row)
+                self._threshold_observations[row_dict["decision_type"]] = json.loads(
+                    row_dict["observations"]
+                )
+        except Exception as e:
+            logger.debug("model_selector: threshold load skipped: %s", e)

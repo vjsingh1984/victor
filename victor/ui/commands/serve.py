@@ -6,6 +6,7 @@ from rich.panel import Panel
 
 from victor.core.async_utils import run_sync
 from victor.ui.commands.utils import setup_logging
+from victor.workflows.hitl_api import get_default_hitl_db_path
 
 serve_app = typer.Typer(
     name="serve",
@@ -237,9 +238,7 @@ def serve_hitl(
 
     storage_info = ""
     if persistent:
-        from pathlib import Path
-
-        effective_db = db_path or str(Path.home() / ".victor" / "hitl.db")
+        effective_db = db_path or str(get_default_hitl_db_path())
         storage_info = f"\n[bold]Storage:[/] [green]SQLite[/] ({effective_db})"
     else:
         storage_info = "\n[bold]Storage:[/] [dim]In-memory[/]"

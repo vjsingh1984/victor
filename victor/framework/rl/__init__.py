@@ -49,7 +49,13 @@ Key Components:
 - LearnerType: Enum of available learner types
 
 Usage:
-    from victor.framework.rl import RLManager, LearnerType, get_rl_coordinator
+    from victor.framework.rl import (
+        RLManager,
+        LearnerType,
+        create_prompt_rollout_experiment,
+        get_rl_coordinator,
+        get_rl_coordinator_async,
+    )
 
     # Option 1: Use high-level RLManager
     rl = RLManager()
@@ -73,13 +79,24 @@ Usage:
         outcome=RLOutcome(...),
         vertical="coding",
     )
+
+    # Option 3: Start a prompt rollout for an approved candidate
+    experiment_id = create_prompt_rollout_experiment(
+        section_name="GROUNDING_RULES",
+        provider="anthropic",
+        treatment_hash="candidate_hash",
+        traffic_split=0.1,
+        min_samples_per_variant=50,
+    )
+
+    # Option 4: Async callers can access the singleton without blocking
+    async_coordinator = await get_rl_coordinator_async()
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -90,59 +107,57 @@ from typing import (
 )
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
-from victor.framework.rl.coordinator import RLCoordinator, get_rl_coordinator
+from victor.framework.rl.coordinator import (
+    PromptCandidateSuiteWorkflowResult,
+    RLCoordinator,
+    get_rl_coordinator,
+    get_rl_coordinator_async,
+)
+from victor.framework.rl.option_framework import OptionRegistry
+from victor.framework.rl.config import (
+    BaseRLConfig,
+    DEFAULT_ACTIVE_LEARNERS,
+    DEFAULT_PATIENCE_MAP,
+    LearnerType,
+)
+from victor.framework.rl.credit_assignment import (
+    ActionMetadata,
+    BaseCreditAssigner,
+    CreditAssignmentConfig,
+    CreditAssignmentIntegration,
+    CreditAssignmentProvider,
+    CreditGranularity,
+    CreditMethodology,
+    CreditSignal,
+    CriticalActionIdentifier,
+    StateGraphCreditMixin,
+    TrajectorySegment,
+    compute_credit_metrics,
+    visualize_credit_assignment,
+)
+from victor.framework.rl.credit_graph_integration import (
+    CreditTracer,
+    CreditAwareGraph,
+    CompiledCreditAwareGraph,
+    Transition,
+    ExecutionTrace,
+    create_credit_aware_workflow,
+)
+from victor.framework.rl.credit_visualization import (
+    CreditVisualizationBuilder,
+    ExportConfig,
+    CreditAssignmentExporter,
+    CreditAssignmentReport,
+    export_credit_report,
+    create_interactive_report,
+)
+from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
     from victor.framework.agent import Agent
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
-
-
-class LearnerType(str, Enum):
-    """Available learner types in the RL system.
-
-    Each learner optimizes a different aspect of agent behavior.
-    """
-
-    # Tool-related learners
-    TOOL_SELECTOR = "tool_selector"
-    """Optimizes tool selection based on task context."""
-
-    CACHE_EVICTION = "cache_eviction"
-    """Learns optimal cache eviction strategies."""
-
-    # Continuation learners
-    CONTINUATION_PATIENCE = "continuation_patience"
-    """Adjusts patience for model continuation attempts."""
-
-    CONTINUATION_PROMPTS = "continuation_prompts"
-    """Optimizes continuation prompt templates."""
-
-    # Quality learners
-    GROUNDING_THRESHOLD = "grounding_threshold"
-    """Adjusts grounding verification thresholds."""
-
-    SEMANTIC_THRESHOLD = "semantic_threshold"
-    """Optimizes semantic similarity thresholds."""
-
-    QUALITY_WEIGHTS = "quality_weights"
-    """Learns quality assessment weights."""
-
-    # Model/mode learners
-    MODEL_SELECTOR = "model_selector"
-    """Recommends optimal model for task type."""
-
-    MODE_TRANSITION = "mode_transition"
-    """Learns optimal mode transitions."""
-
-    # Prompt learners
-    PROMPT_TEMPLATE = "prompt_template"
-    """Optimizes prompt template selection."""
-
-
-# Import config after LearnerType to avoid circular import
-from victor.framework.rl.config import BaseRLConfig, DEFAULT_ACTIVE_LEARNERS, DEFAULT_PATIENCE_MAP
 
 
 @dataclass
@@ -279,7 +294,7 @@ class RLManager:
         task_type: str = "general",
         quality_score: float = 1.0,
         metadata: Optional[Dict[str, Any]] = None,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record a successful outcome.
 
@@ -315,7 +330,7 @@ class RLManager:
         quality_score: float = 0.0,
         error: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record a failed outcome.
 
@@ -387,7 +402,7 @@ class RLManager:
         task_type: str,
         *,
         available_tools: Optional[List[str]] = None,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> Optional[List[str]]:
         """Get recommended tools for a task type.
 
@@ -437,6 +452,162 @@ class RLManager:
         if rec and isinstance(rec.value, (int, float)):
             return int(rec.value)
         return None
+
+    def create_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Create and start a prompt rollout experiment via the coordinator."""
+        return self._coordinator.create_prompt_rollout_experiment(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+
+    async def create_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Async version of create_prompt_rollout_experiment."""
+        return await self._coordinator.create_prompt_rollout_experiment_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+
+    def analyze_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze the rollout experiment for a prompt candidate."""
+        return self._coordinator.analyze_prompt_rollout_experiment(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+
+    async def analyze_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of analyze_prompt_rollout_experiment."""
+        return await self._coordinator.analyze_prompt_rollout_experiment_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+
+    def apply_prompt_rollout_recommendation(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Apply the recommended rollout/rollback action for a prompt candidate."""
+        return self._coordinator.apply_prompt_rollout_recommendation(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            dry_run=dry_run,
+        )
+
+    async def apply_prompt_rollout_recommendation_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of apply_prompt_rollout_recommendation."""
+        return await self._coordinator.apply_prompt_rollout_recommendation_async(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            dry_run=dry_run,
+        )
+
+    def process_prompt_candidate_evaluation_suite(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Process a prompt-candidate suite through sync and rollout stages."""
+        return self._coordinator.process_prompt_candidate_evaluation_suite(
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
+        )
+
+    async def process_prompt_candidate_evaluation_suite_async(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Async version of process_prompt_candidate_evaluation_suite."""
+        return await self._coordinator.process_prompt_candidate_evaluation_suite_async(
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
+        )
 
     # =========================================================================
     # Statistics
@@ -530,7 +701,7 @@ def create_outcome(
     task_type: str = "general",
     quality_score: Optional[float] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    vertical: str = "coding",
+    vertical: str = DEFAULT_VERTICAL,
 ) -> RLOutcome:
     """Create an RLOutcome.
 
@@ -569,7 +740,7 @@ def record_tool_success(
     provider: str = "unknown",
     model: str = "unknown",
     duration_ms: Optional[float] = None,
-    vertical: str = "coding",
+    vertical: str = DEFAULT_VERTICAL,
 ) -> None:
     """Record a successful tool execution.
 
@@ -603,6 +774,170 @@ def record_tool_success(
     )
 
 
+def create_prompt_rollout_experiment(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str] = None,
+    traffic_split: float = 0.1,
+    min_samples_per_variant: int = 50,
+) -> Optional[str]:
+    """Create a prompt rollout experiment via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.create_prompt_rollout_experiment(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        control_hash=control_hash,
+        traffic_split=traffic_split,
+        min_samples_per_variant=min_samples_per_variant,
+    )
+
+
+async def create_prompt_rollout_experiment_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    control_hash: Optional[str] = None,
+    traffic_split: float = 0.1,
+    min_samples_per_variant: int = 50,
+) -> Optional[str]:
+    """Async prompt rollout experiment helper via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.create_prompt_rollout_experiment_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        control_hash=control_hash,
+        traffic_split=traffic_split,
+        min_samples_per_variant=min_samples_per_variant,
+    )
+
+
+def analyze_prompt_rollout_experiment(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+) -> Optional[Dict[str, Any]]:
+    """Analyze a prompt rollout experiment via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.analyze_prompt_rollout_experiment(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+    )
+
+
+async def analyze_prompt_rollout_experiment_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+) -> Optional[Dict[str, Any]]:
+    """Async prompt rollout analysis helper via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.analyze_prompt_rollout_experiment_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+    )
+
+
+def apply_prompt_rollout_recommendation(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    dry_run: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Apply the recommended prompt rollout decision via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.apply_prompt_rollout_recommendation(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        dry_run=dry_run,
+    )
+
+
+async def apply_prompt_rollout_recommendation_async(
+    *,
+    section_name: str,
+    provider: str,
+    treatment_hash: str,
+    dry_run: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Async prompt rollout decision helper via the global RL coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.apply_prompt_rollout_recommendation_async(
+        section_name=section_name,
+        provider=provider,
+        treatment_hash=treatment_hash,
+        dry_run=dry_run,
+    )
+
+
+def process_prompt_candidate_evaluation_suite(
+    suite: Any,
+    *,
+    min_pass_rate: float = 0.5,
+    promote_best: bool = False,
+    create_rollout: bool = False,
+    rollout_control_hash: Optional[str] = None,
+    rollout_traffic_split: float = 0.1,
+    rollout_min_samples_per_variant: int = 100,
+    analyze_rollout: bool = False,
+    apply_rollout_decision: bool = False,
+    rollout_decision_dry_run: bool = False,
+) -> PromptCandidateSuiteWorkflowResult:
+    """Process a prompt-candidate suite via the global RL coordinator."""
+    coordinator = get_rl_coordinator()
+    return coordinator.process_prompt_candidate_evaluation_suite(
+        suite,
+        min_pass_rate=min_pass_rate,
+        promote_best=promote_best,
+        create_rollout=create_rollout,
+        rollout_control_hash=rollout_control_hash,
+        rollout_traffic_split=rollout_traffic_split,
+        rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+        analyze_rollout=analyze_rollout,
+        apply_rollout_decision=apply_rollout_decision,
+        rollout_decision_dry_run=rollout_decision_dry_run,
+    )
+
+
+async def process_prompt_candidate_evaluation_suite_async(
+    suite: Any,
+    *,
+    min_pass_rate: float = 0.5,
+    promote_best: bool = False,
+    create_rollout: bool = False,
+    rollout_control_hash: Optional[str] = None,
+    rollout_traffic_split: float = 0.1,
+    rollout_min_samples_per_variant: int = 100,
+    analyze_rollout: bool = False,
+    apply_rollout_decision: bool = False,
+    rollout_decision_dry_run: bool = False,
+) -> PromptCandidateSuiteWorkflowResult:
+    """Async prompt-candidate suite processing helper via the global coordinator."""
+    coordinator = await get_rl_coordinator_async()
+    return await coordinator.process_prompt_candidate_evaluation_suite_async(
+        suite,
+        min_pass_rate=min_pass_rate,
+        promote_best=promote_best,
+        create_rollout=create_rollout,
+        rollout_control_hash=rollout_control_hash,
+        rollout_traffic_split=rollout_traffic_split,
+        rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+        analyze_rollout=analyze_rollout,
+        apply_rollout_decision=apply_rollout_decision,
+        rollout_decision_dry_run=rollout_decision_dry_run,
+    )
+
+
 __all__ = [
     # Manager
     "RLManager",
@@ -616,6 +951,7 @@ __all__ = [
     "RLCoordinator",
     "BaseLearner",
     "get_rl_coordinator",
+    "get_rl_coordinator_async",
     # Configuration
     "BaseRLConfig",
     "DEFAULT_PATIENCE_MAP",
@@ -623,4 +959,43 @@ __all__ = [
     # Convenience functions
     "create_outcome",
     "record_tool_success",
+    "create_prompt_rollout_experiment",
+    "create_prompt_rollout_experiment_async",
+    "analyze_prompt_rollout_experiment",
+    "analyze_prompt_rollout_experiment_async",
+    "apply_prompt_rollout_recommendation",
+    "apply_prompt_rollout_recommendation_async",
+    "process_prompt_candidate_evaluation_suite",
+    "process_prompt_candidate_evaluation_suite_async",
+    "PromptCandidateSuiteWorkflowResult",
+    # Credit Assignment (arXiv:2604.09459)
+    "CreditGranularity",
+    "CreditMethodology",
+    "ActionMetadata",
+    "CreditSignal",
+    "TrajectorySegment",
+    "CreditAssignmentConfig",
+    "CreditAssignmentProvider",
+    "BaseCreditAssigner",
+    "CreditAssignmentIntegration",
+    "CriticalActionIdentifier",
+    "StateGraphCreditMixin",
+    "compute_credit_metrics",
+    "visualize_credit_assignment",
+    # Credit Assignment Integration
+    "CreditTracer",
+    "CreditAwareGraph",
+    "CompiledCreditAwareGraph",
+    "Transition",
+    "ExecutionTrace",
+    "create_credit_aware_workflow",
+    # Option Framework (hierarchical RL)
+    "OptionRegistry",
+    # Visualization & Export
+    "CreditVisualizationBuilder",
+    "ExportConfig",
+    "CreditAssignmentExporter",
+    "CreditAssignmentReport",
+    "export_credit_report",
+    "create_interactive_report",
 ]

@@ -106,6 +106,12 @@ def test_metrics_keyword_tool_selection_with_mocked_registry():
     matcher and the tool registry to ensure the "metrics" tool appears in the
     final selection.
     """
+    # Reset container to avoid ServiceAlreadyRegisteredError when running
+    # after other tests that create AgentOrchestrator instances.
+    from victor.core.container import reset_container
+
+    reset_container()
+
     mock_metrics_tool = MagicMock()
     mock_metrics_tool.name = "metrics"
     mock_metrics_tool.description = "Metrics tool"

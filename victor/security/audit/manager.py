@@ -491,7 +491,7 @@ class AuditManager:
             "events_by_type": report.events_by_type,
             "events_by_severity": report.events_by_severity,
             "violations": len(report.violations),
-            "compliance_status": "compliant" if not report.violations else "non_compliant",
+            "compliance_status": ("compliant" if not report.violations else "non_compliant"),
         }
 
     async def apply_retention_policy(self) -> dict[str, Any]:

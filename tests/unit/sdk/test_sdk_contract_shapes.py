@@ -112,7 +112,11 @@ class TestVerticalExtensionsContract:
     def test_has_convenience_methods(self):
         from victor_sdk.verticals.extensions import VerticalExtensions
 
-        for method in ("get_all_task_hints", "get_all_safety_patterns", "get_all_mode_configs"):
+        for method in (
+            "get_all_task_hints",
+            "get_all_safety_patterns",
+            "get_all_mode_configs",
+        ):
             assert hasattr(VerticalExtensions, method), f"Missing method: {method}"
 
     def test_pending_factories_property(self):
@@ -209,12 +213,17 @@ class TestVerticalProtocolsContract:
 
     def test_root_sdk_exports_extension_dependency(self):
         from victor_sdk import ExtensionDependency
-        from victor_sdk.verticals.registration import ExtensionDependency as RegistrationDependency
+        from victor_sdk.verticals.registration import (
+            ExtensionDependency as RegistrationDependency,
+        )
 
         assert ExtensionDependency is RegistrationDependency
 
     def test_framework_vertical_base_shim_reexports_sdk_registration_contract(self):
-        from victor.framework.vertical_base import ExtensionDependency, register_vertical
+        from victor.framework.vertical_base import (
+            ExtensionDependency,
+            register_vertical,
+        )
         from victor_sdk import ExtensionDependency as SdkExtensionDependency
         from victor_sdk import register_vertical as sdk_register_vertical
 

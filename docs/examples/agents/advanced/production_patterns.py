@@ -22,7 +22,7 @@ class ProductionAgent:
         provider: str = "openai",
         model: str = "gpt-4",
         max_retries: int = 3,
-        timeout: int = 30
+        timeout: int = 30,
     ):
         self.provider = provider
         self.model = model
@@ -33,23 +33,17 @@ class ProductionAgent:
             "total_calls": 0,
             "successful_calls": 0,
             "failed_calls": 0,
-            "total_tokens": 0
+            "total_tokens": 0,
         }
 
     async def initialize(self):
         """Initialize the agent."""
         self.agent = Agent.create(
-            provider=self.provider,
-            model=self.model,
-            enable_observability=True
+            provider=self.provider, model=self.model, enable_observability=True
         )
         logger.info(f"Agent initialized: {self.provider}/{self.model}")
 
-    async def run_with_retry(
-        self,
-        prompt: str,
-        temperature: float = 0.7
-    ) -> str:
+    async def run_with_retry(self, prompt: str, temperature: float = 0.7) -> str:
         """Run agent with automatic retry on failure."""
         if not self.agent:
             await self.initialize()
@@ -61,8 +55,7 @@ class ProductionAgent:
             try:
                 logger.info(f"Attempt {attempt + 1}/{self.max_retries}")
                 result = await asyncio.wait_for(
-                    self.agent.run(prompt),
-                    timeout=self.timeout
+                    self.agent.run(prompt), timeout=self.timeout
                 )
 
                 self.metrics["successful_calls"] += 1
@@ -136,6 +129,7 @@ class AgentPool:
 
     async def process_batch(self, prompts: list[str]) -> list[str]:
         """Process multiple prompts concurrently."""
+
         async def process_with_agent(agent: ProductionAgent, prompt: str):
             async with self.semaphore:
                 return await agent.run_with_retry(prompt)
@@ -167,11 +161,7 @@ class AgentPool:
 class CircuitBreaker:
     """Circuit breaker for failing agents."""
 
-    def __init__(
-        self,
-        failure_threshold: int = 5,
-        timeout: int = 60
-    ):
+    def __init__(self, failure_threshold: int = 5, timeout: int = 60):
         self.failure_threshold = failure_threshold
         self.timeout = timeout
         self.failures = 0
@@ -249,7 +239,7 @@ async def main():
         "What is JavaScript?",
         "What is Rust?",
         "What is Go?",
-        "What is Java?"
+        "What is Java?",
     ]
 
     try:

@@ -22,10 +22,13 @@ This tool provides:
 5. Context injection for LLM
 """
 
-import re
+import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+import re
+import time
 from threading import RLock
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -40,6 +43,191 @@ _DEFAULT_MAX_CONTENT_LENGTH = 5000
 
 _GENERIC_WEB_CACHE: Optional[GenericResultCache] = None
 _GENERIC_WEB_CACHE_LOCK = RLock()
+
+
+class RateLimiter:
+    """Rate limiter with exponential backoff for HTTP requests.
+
+    Tracks request timestamps per host and enforces rate limits.
+    Implements exponential backoff retry on 429 (Too Many Requests) errors.
+
+    Configuration:
+        - requests_per_minute: Maximum requests per minute per host (default: 10)
+        - max_retries: Maximum retry attempts (default: 5)
+        - initial_delay: Initial backoff delay in seconds (default: 1.0)
+        - max_delay: Maximum backoff delay in seconds (default: 60.0)
+        - backoff_multiplier: Multiplier for exponential backoff (default: 2.0)
+    """
+
+    def __init__(
+        self,
+        requests_per_minute: int = 10,
+        max_retries: int = 5,
+        initial_delay: float = 1.0,
+        max_delay: float = 60.0,
+        backoff_multiplier: float = 2.0,
+    ):
+        """Initialize rate limiter.
+
+        Args:
+            requests_per_minute: Maximum requests per minute per host
+            max_retries: Maximum retry attempts on rate limit errors
+            initial_delay: Initial backoff delay in seconds
+            max_delay: Maximum backoff delay in seconds
+            backoff_multiplier: Multiplier for exponential backoff
+        """
+        self.requests_per_minute = requests_per_minute
+        self.max_retries = max_retries
+        self.initial_delay = initial_delay
+        self.max_delay = max_delay
+        self.backoff_multiplier = backoff_multiplier
+        self.min_interval = 60.0 / requests_per_minute
+
+        # Track request timestamps per host
+        self._request_times: Dict[str, List[float]] = {}
+        self._lock = RLock()
+
+        # Track retry counts per request
+        self._retry_counts: Dict[str, int] = {}
+
+        # Logger instance
+        self._logger = logging.getLogger(__name__)
+
+    def _get_host(self, url: str) -> str:
+        """Extract host from URL.
+
+        Args:
+            url: URL to extract host from
+
+        Returns:
+            Host name (e.g., "html.duckduckgo.com")
+        """
+        parsed = urlparse(url)
+        return parsed.netloc or url
+
+    async def acquire(self, url: str) -> None:
+        """Acquire permission to make a request.
+
+        Blocks if rate limit would be exceeded. Implements token bucket algorithm.
+
+        Args:
+            url: Target URL
+        """
+        host = self._get_host(url)
+        now = time.time()
+
+        with self._lock:
+            # Clean old requests outside the 1-minute window
+            if host in self._request_times:
+                cutoff = now - 60.0
+                self._request_times[host] = [ts for ts in self._request_times[host] if ts > cutoff]
+
+            # Check if we can make a request now
+            if self._request_times.get(host, []):
+                last_request = self._request_times[host][-1]
+                elapsed = now - last_request
+
+                if elapsed < self.min_interval:
+                    # Need to wait
+                    wait_time = self.min_interval - elapsed
+                    self._logger.debug(
+                        f"[RateLimiter] Rate limit: waiting "
+                        f"{wait_time:.2f}s before request to {host}"
+                    )
+                    await asyncio.sleep(wait_time)
+
+            # Record this request
+            self._request_times.setdefault(host, []).append(time.time())
+
+    def on_rate_limit_error(self, url: str, attempt: int) -> float:
+        """Calculate backoff delay for rate limit error.
+
+        Args:
+            url: Target URL
+            attempt: Retry attempt number (0-indexed)
+
+        Returns:
+            Delay in seconds before next retry
+        """
+        # Exponential backoff: initial_delay * (backoff_multiplier ^ attempt)
+        delay = min(
+            self.initial_delay * (self.backoff_multiplier**attempt),
+            self.max_delay,
+        )
+
+        self._logger.warning(
+            f"[RateLimiter] Rate limit error on attempt {attempt + 1} "
+            f"to {self._get_host(url)}, backing off {delay:.2f}s"
+        )
+
+        return delay
+
+    def should_retry(self, url: str, attempt: int) -> bool:
+        """Check if we should retry a failed request.
+
+        Args:
+            url: Target URL
+            attempt: Current retry attempt
+
+        Returns:
+            True if should retry
+        """
+        return attempt < self.max_retries
+
+    def reset(self, url: Optional[str] = None) -> None:
+        """Reset rate limiter state.
+
+        Args:
+            url: If provided, only reset for this host. Otherwise reset all.
+        """
+        with self._lock:
+            if url:
+                host = self._get_host(url)
+                self._request_times.pop(host, None)
+                self._retry_counts.pop(host, None)
+            else:
+                self._request_times.clear()
+                self._retry_counts.clear()
+
+
+# Global rate limiter instance
+_RATE_LIMITER: Optional[RateLimiter] = None
+_RATE_LIMITER_LOCK = RLock()
+
+
+def _get_rate_limiter(
+    requests_per_minute: int = 10,
+    max_retries: int = 5,
+    initial_delay: float = 1.0,
+    max_delay: float = 60.0,
+    backoff_multiplier: float = 2.0,
+) -> RateLimiter:
+    """Get or create global rate limiter instance.
+
+    Args:
+        requests_per_minute: Maximum requests per minute per host
+        max_retries: Maximum retry attempts
+        initial_delay: Initial backoff delay in seconds
+        max_delay: Maximum backoff delay in seconds
+        backoff_multiplier: Multiplier for exponential backoff
+
+    Returns:
+        RateLimiter instance
+    """
+    global _RATE_LIMITER
+
+    if _RATE_LIMITER is None:
+        with _RATE_LIMITER_LOCK:
+            if _RATE_LIMITER is None:
+                _RATE_LIMITER = RateLimiter(
+                    requests_per_minute=requests_per_minute,
+                    max_retries=max_retries,
+                    initial_delay=initial_delay,
+                    max_delay=max_delay,
+                    backoff_multiplier=backoff_multiplier,
+                )
+
+    return _RATE_LIMITER
 
 
 def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -82,6 +270,20 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                 "http_connection_pool_total_timeout",
                 60,
             ),
+            "rate_limiter_enabled": getattr(config, "rate_limiter_enabled", True),
+            "rate_limiter_requests_per_minute": getattr(
+                config,
+                "rate_limiter_requests_per_minute",
+                10,
+            ),
+            "rate_limiter_max_retries": getattr(config, "rate_limiter_max_retries", 5),
+            "rate_limiter_initial_delay": getattr(config, "rate_limiter_initial_delay", 1.0),
+            "rate_limiter_max_delay": getattr(config, "rate_limiter_max_delay", 60.0),
+            "rate_limiter_backoff_multiplier": getattr(
+                config,
+                "rate_limiter_backoff_multiplier",
+                2.0,
+            ),
         }
     return {
         "provider": None,
@@ -96,6 +298,12 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         "http_connection_pool_max_connections_per_host": 10,
         "http_connection_pool_connection_timeout": 30,
         "http_connection_pool_total_timeout": 60,
+        "rate_limiter_enabled": True,
+        "rate_limiter_requests_per_minute": 10,
+        "rate_limiter_max_retries": 2,  # Reduced from 5 to fail faster on timeout
+        "rate_limiter_initial_delay": 0.5,  # Reduced from 1.0 for faster retries
+        "rate_limiter_max_delay": 10.0,  # Reduced from 60.0 to fail faster
+        "rate_limiter_backoff_multiplier": 2.0,
     }
 
 
@@ -118,59 +326,151 @@ async def _request_text(
     follow_redirects: bool = True,
     web_config: Optional[Dict[str, Any]] = None,
 ) -> tuple[int, str]:
-    """Perform HTTP request, optionally using pooled connections."""
+    """Perform HTTP request with rate limiting and retry logic.
+
+    Implements:
+    1. Rate limiting using token bucket algorithm
+    2. Exponential backoff on 429 (rate limit) errors
+    3. Configurable retry attempts and delays
+    4. HTTP connection pooling (if enabled)
+
+    Args:
+        method: HTTP method (GET, POST, etc.)
+        url: Target URL
+        headers: Request headers
+        data: Request data (for POST)
+        timeout_seconds: Request timeout
+        follow_redirects: Whether to follow redirects
+        web_config: Configuration dictionary from _get_web_config
+
+    Returns:
+        Tuple of (status_code, response_text)
+
+    Raises:
+        httpx.HTTPError: On non-retryable errors or max retries exceeded
+    """
     config = web_config or {}
     use_http_pool = bool(config.get("http_connection_pool_enabled", False))
+    use_rate_limiter = bool(config.get("rate_limiter_enabled", True))
     logger = logging.getLogger(__name__)
 
-    if use_http_pool:
-        try:
-            from victor.tools.http_pool import (
-                AIOHTTP_AVAILABLE,
-                ConnectionPoolConfig,
-                get_http_pool,
-            )
+    # Get rate limiter if enabled
+    rate_limiter = None
+    if use_rate_limiter:
+        rate_limiter = _get_rate_limiter(
+            requests_per_minute=int(config.get("rate_limiter_requests_per_minute", 10)),
+            max_retries=int(config.get("rate_limiter_max_retries", 5)),
+            initial_delay=float(config.get("rate_limiter_initial_delay", 1.0)),
+            max_delay=float(config.get("rate_limiter_max_delay", 60.0)),
+            backoff_multiplier=float(config.get("rate_limiter_backoff_multiplier", 2.0)),
+        )
 
-            if AIOHTTP_AVAILABLE:
-                pool = await get_http_pool(
-                    ConnectionPoolConfig(
-                        max_connections=int(
-                            config.get("http_connection_pool_max_connections", 100)
-                        ),
-                        max_connections_per_host=int(
-                            config.get("http_connection_pool_max_connections_per_host", 10)
-                        ),
-                        connection_timeout=int(
-                            config.get("http_connection_pool_connection_timeout", 30)
-                        ),
-                        total_timeout=int(config.get("http_connection_pool_total_timeout", 60)),
+    # Retry loop for rate limit errors
+    attempt = 0
+
+    while True:
+        # Acquire rate limiter permission before making request
+        if rate_limiter:
+            await rate_limiter.acquire(url)
+
+        # Make the request
+        try:
+            if use_http_pool:
+                try:
+                    from victor.tools.http_pool import (
+                        AIOHTTP_AVAILABLE,
+                        ConnectionPoolConfig,
+                        get_http_pool,
                     )
-                )
-                response = await pool.request(
+
+                    if AIOHTTP_AVAILABLE:
+                        pool = await get_http_pool(
+                            ConnectionPoolConfig(
+                                max_connections=int(
+                                    config.get("http_connection_pool_max_connections", 100)
+                                ),
+                                max_connections_per_host=int(
+                                    config.get("http_connection_pool_max_connections_per_host", 10)
+                                ),
+                                connection_timeout=int(
+                                    config.get("http_connection_pool_connection_timeout", 30)
+                                ),
+                                total_timeout=int(
+                                    config.get("http_connection_pool_total_timeout", 60)
+                                ),
+                            )
+                        )
+                        response = await pool.request(
+                            method,
+                            url,
+                            headers=headers,
+                            data=data,
+                            allow_redirects=follow_redirects,
+                            timeout=timeout_seconds,
+                        )
+                        try:
+                            payload = await response.text()
+                            status = int(response.status)
+
+                            # Check for rate limit error (429)
+                            if (
+                                status == 429
+                                and rate_limiter
+                                and rate_limiter.should_retry(url, attempt)
+                            ):
+                                delay = rate_limiter.on_rate_limit_error(url, attempt)
+                                await asyncio.sleep(delay)
+                                attempt += 1
+                                continue
+
+                            return status, payload
+                        finally:
+                            response.release()
+                except Exception as e:
+                    logger.debug("HTTP pool request failed, falling back to httpx: %s", e)
+
+            # Fallback to httpx
+            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+                response = await client.request(
                     method,
                     url,
-                    headers=headers,
                     data=data,
-                    allow_redirects=follow_redirects,
-                    timeout=timeout_seconds,
+                    headers=headers,
+                    follow_redirects=follow_redirects,
                 )
-                try:
-                    payload = await response.text()
-                    return int(response.status), payload
-                finally:
-                    response.release()
-        except Exception as e:
-            logger.debug("HTTP pool request failed, falling back to httpx: %s", e)
+                status = int(response.status_code)
+                payload = response.text
 
-    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-        response = await client.request(
-            method,
-            url,
-            data=data,
-            headers=headers,
-            follow_redirects=follow_redirects,
-        )
-        return int(response.status_code), response.text
+                # Check for rate limit error (429)
+                if status == 429 and rate_limiter and rate_limiter.should_retry(url, attempt):
+                    delay = rate_limiter.on_rate_limit_error(url, attempt)
+                    await asyncio.sleep(delay)
+                    attempt += 1
+                    continue
+
+                return status, payload
+
+        except httpx.TimeoutException as e:
+            # Don't retry timeouts - they're transient but we don't want to wait forever
+            logger.warning(f"[web_search] Timeout on {url}: {e}")
+            raise
+
+        except httpx.HTTPError as e:
+            # Check if it's a rate limit error (some servers return 429 as HTTPError)
+            if "429" in str(e) and rate_limiter and rate_limiter.should_retry(url, attempt):
+                delay = rate_limiter.on_rate_limit_error(url, attempt)
+                await asyncio.sleep(delay)
+                attempt += 1
+                continue
+
+            # Don't retry other HTTP errors
+            logger.error(f"[web_search] HTTP error on {url}: {e}")
+            raise
+
+        except Exception as e:
+            # Unexpected error - don't retry
+            logger.error(f"[web_search] Unexpected error on {url}: {e}")
+            raise
 
 
 def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
@@ -278,9 +578,12 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     access_mode=AccessMode.NETWORK,  # Makes external HTTP requests
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["query"],  # Different queries indicate progress, not loops
+    signature_params=["query"],  # Different queries indicate progress, not loops
     stages=["planning", "initial"],  # Conversation stages where relevant
-    task_types=["research", "analysis"],  # Task types for classification-aware selection
+    task_types=[
+        "research",
+        "analysis",
+    ],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
     keywords=[
         "search",
@@ -386,7 +689,7 @@ async def web_search(
             data=data,
             headers={"User-Agent": _USER_AGENT},
             follow_redirects=True,
-            timeout_seconds=15.0,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
             web_config=config,
         )
 
@@ -406,14 +709,22 @@ async def web_search(
             logger.info(f"[web_search] top URLs: {sample_urls}")
 
         if not results:
-            result_payload = {"success": True, "results": "No results found", "result_count": 0}
+            result_payload = {
+                "success": True,
+                "results": "No results found",
+                "result_count": 0,
+            }
             if cache is not None:
                 cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
             return result_payload
 
         # Format results
         output = _format_results(query, results)
-        result_payload = {"success": True, "results": output, "result_count": len(results)}
+        result_payload = {
+            "success": True,
+            "results": output,
+            "result_count": len(results),
+        }
         if cache is not None:
             cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
         return result_payload
@@ -431,9 +742,12 @@ async def web_search(
     access_mode=AccessMode.NETWORK,  # Makes external HTTP requests
     danger_level=DangerLevel.SAFE,  # No local side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["url"],  # Different URLs indicate progress, not loops
+    signature_params=["url"],  # Different URLs indicate progress, not loops
     stages=["planning", "initial"],  # Conversation stages where relevant
-    task_types=["research", "analysis"],  # Task types for classification-aware selection
+    task_types=[
+        "research",
+        "analysis",
+    ],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
     keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
     aliases=["fetch"],  # Backward compatibility alias
@@ -466,7 +780,7 @@ async def web_fetch(url: str, _exec_ctx: Optional[Dict[str, Any]] = None) -> Dic
             url,
             headers={"User-Agent": _USER_AGENT},
             follow_redirects=True,
-            timeout_seconds=15.0,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
             web_config=config,
         )
         if status_code != 200:
@@ -577,7 +891,7 @@ async def _summarize_search(
             data=data,
             headers={"User-Agent": _USER_AGENT},
             follow_redirects=True,
-            timeout_seconds=15.0,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
             web_config=config,
         )
         if status_code != 200:
@@ -666,7 +980,11 @@ Format the response clearly with sections."""
                 f"[web_summarize] summarization model='{model}', summary_len={len(summary)}"
             )
 
-            return {"success": True, "summary": summary, "original_results": results_text}
+            return {
+                "success": True,
+                "summary": summary,
+                "original_results": results_text,
+            }
 
         except Exception as e:
             # Fallback to just search results

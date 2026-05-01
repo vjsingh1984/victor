@@ -512,7 +512,10 @@ Template summary.
             output_path = Path(tmpdir) / "fep-XXXX-test.md"
 
             with patch("victor.ui.commands.fep._get_feps_dir", return_value=feps_dir):
-                with patch("victor.ui.commands.fep._get_template_path", return_value=template_path):
+                with patch(
+                    "victor.ui.commands.fep._get_template_path",
+                    return_value=template_path,
+                ):
                     result = runner.invoke(
                         fep_app,
                         [
@@ -551,7 +554,10 @@ Template summary.
             template_path.write_text("# Template")
 
             with patch("victor.ui.commands.fep._get_feps_dir", return_value=feps_dir):
-                with patch("victor.ui.commands.fep._get_template_path", return_value=template_path):
+                with patch(
+                    "victor.ui.commands.fep._get_template_path",
+                    return_value=template_path,
+                ):
                     with patch("subprocess.run", side_effect=FileNotFoundError):
                         result = runner.invoke(
                             fep_app,

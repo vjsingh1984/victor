@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
 
@@ -88,6 +88,8 @@ class TruncationStrategy(Enum):
     TRUNCATE_TOOL_RESULTS = "truncate_tool_results"
     # Summarize tool results instead of full content
     SUMMARIZE_TOOL_RESULTS = "summarize_tool_results"
+    # Replace repeated long payloads with compact dictionary references
+    DICTIONARY_COMPRESS = "dictionary_compress"
     # Reduce tool count by removing least relevant
     REDUCE_TOOLS = "reduce_tools"
     # Fail with informative error
@@ -141,6 +143,8 @@ class TruncationResult:
     tools_removed: int = 0
     bytes_saved: int = 0
     warning: Optional[str] = None
+    compression_applied: bool = False
+    compression_entries: int = 0
 
 
 class PayloadLimiter(Protocol):
@@ -194,6 +198,10 @@ class ProviderPayloadLimiter:
     # Additional options
     include_json_overhead: bool = True  # Account for JSON encoding overhead
     safety_margin: float = 0.95  # Only use 95% of limit for safety
+    enable_dictionary_compression: Optional[bool] = None
+    dictionary_min_match_chars: int = 160
+    dictionary_preview_chars: int = 120
+    dictionary_min_repeated_lines: int = 4
 
     def __post_init__(self) -> None:
         """Initialize limit from defaults if not provided."""
@@ -202,6 +210,15 @@ class ProviderPayloadLimiter:
                 self.provider_name.lower(),
                 10 * 1024 * 1024,  # Default 10MB if unknown
             )
+        if self.enable_dictionary_compression is None:
+            try:
+                from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+                self.enable_dictionary_compression = get_feature_flag_manager().is_enabled(
+                    FeatureFlag.USE_PROMPT_DICTIONARY_COMPRESSION
+                )
+            except Exception:
+                self.enable_dictionary_compression = False
 
     @property
     def effective_limit(self) -> int:
@@ -343,6 +360,7 @@ class ProviderPayloadLimiter:
         """
         strategy = strategy or self.default_strategy
         estimate = self.estimate_size(messages, tools, **kwargs)
+        original_total_bytes = estimate.total_bytes
 
         if not estimate.exceeds_limit:
             return TruncationResult(
@@ -361,18 +379,45 @@ class ProviderPayloadLimiter:
                 warning=f"Payload exceeds limit: {estimate.total_bytes:,} > {estimate.limit_bytes:,} bytes",
             )
 
+        compression_applied = False
+        compression_entries = 0
+        if self.enable_dictionary_compression:
+            compressed_messages, compression_entries = self._apply_dictionary_compression(messages)
+            if compression_entries > 0:
+                compressed_estimate = self.estimate_size(compressed_messages, tools, **kwargs)
+                if compressed_estimate.total_bytes < estimate.total_bytes:
+                    messages = compressed_messages
+                    estimate = compressed_estimate
+                    compression_applied = True
+
+                if compression_applied and not estimate.exceeds_limit:
+                    return TruncationResult(
+                        messages=messages,
+                        tools=tools,
+                        truncated=True,
+                        strategy_used=TruncationStrategy.DICTIONARY_COMPRESS,
+                        bytes_saved=original_total_bytes - estimate.total_bytes,
+                        compression_applied=True,
+                        compression_entries=compression_entries,
+                    )
+
         # Apply truncation strategy
         if strategy == TruncationStrategy.TRUNCATE_OLDEST:
-            return self._truncate_oldest(messages, tools, estimate, **kwargs)
+            result = self._truncate_oldest(messages, tools, estimate, **kwargs)
         elif strategy == TruncationStrategy.TRUNCATE_TOOL_RESULTS:
-            return self._truncate_tool_results(messages, tools, estimate, **kwargs)
+            result = self._truncate_tool_results(messages, tools, estimate, **kwargs)
         elif strategy == TruncationStrategy.SUMMARIZE_TOOL_RESULTS:
-            return self._summarize_tool_results(messages, tools, estimate, **kwargs)
+            result = self._summarize_tool_results(messages, tools, estimate, **kwargs)
         elif strategy == TruncationStrategy.REDUCE_TOOLS:
-            return self._reduce_tools(messages, tools, estimate, **kwargs)
+            result = self._reduce_tools(messages, tools, estimate, **kwargs)
+        else:
+            result = self._truncate_oldest(messages, tools, estimate, **kwargs)
 
-        # Fallback to oldest
-        return self._truncate_oldest(messages, tools, estimate, **kwargs)
+        result.compression_applied = compression_applied
+        result.compression_entries = compression_entries if compression_applied else 0
+        final_estimate = self.estimate_size(result.messages, result.tools, **kwargs)
+        result.bytes_saved = max(0, original_total_bytes - final_estimate.total_bytes)
+        return result
 
     def _truncate_oldest(
         self,
@@ -529,6 +574,87 @@ class ProviderPayloadLimiter:
             tools_removed=tools_removed,
             bytes_saved=bytes_saved,
         )
+
+    def _apply_dictionary_compression(
+        self,
+        messages: List["Message"],
+    ) -> Tuple[List["Message"], int]:
+        """Replace repeated long tool payloads with compact references."""
+        from victor.providers.base import Message as BaseMessage
+
+        compressed_messages: List["Message"] = []
+        seen_tool_payloads: Dict[str, str] = {}
+        compression_entries = 0
+
+        for msg in messages:
+            role = getattr(msg, "role", "")
+            content = getattr(msg, "content", "")
+            new_content, local_changes = self._compress_repeated_lines(content)
+
+            if role == "tool" and len(new_content) >= self.dictionary_min_match_chars:
+                ref_id = seen_tool_payloads.get(new_content)
+                if ref_id is None:
+                    ref_id = f"tool_result_{len(seen_tool_payloads) + 1}"
+                    seen_tool_payloads[new_content] = ref_id
+                else:
+                    preview = (
+                        new_content[: self.dictionary_preview_chars].replace("\n", " ").strip()
+                    )
+                    new_content = (
+                        f"[dictionary-ref:{ref_id}] Repeated tool result omitted; "
+                        f"identical content already appeared earlier. Preview: {preview}"
+                    )
+                    local_changes += 1
+
+            if local_changes > 0:
+                compression_entries += 1
+                compressed_messages.append(
+                    BaseMessage(
+                        role=role or "user",
+                        content=new_content,
+                        name=getattr(msg, "name", None),
+                        tool_calls=getattr(msg, "tool_calls", None),
+                        tool_call_id=getattr(msg, "tool_call_id", None),
+                        images=getattr(msg, "images", None),
+                    )
+                )
+            else:
+                compressed_messages.append(msg)
+
+        return compressed_messages, compression_entries
+
+    def _compress_repeated_lines(self, content: str) -> Tuple[str, int]:
+        """Collapse long runs of identical lines inside a single payload."""
+        if not content:
+            return content, 0
+
+        lines = content.splitlines()
+        if len(lines) < self.dictionary_min_repeated_lines:
+            return content, 0
+
+        rewritten: List[str] = []
+        changes = 0
+        index = 0
+
+        while index < len(lines):
+            line = lines[index]
+            next_index = index + 1
+            while next_index < len(lines) and lines[next_index] == line:
+                next_index += 1
+
+            run_length = next_index - index
+            if run_length >= self.dictionary_min_repeated_lines and line.strip():
+                rewritten.append(line)
+                rewritten.append(f"[repeated x{run_length - 1} additional identical lines omitted]")
+                changes += 1
+            else:
+                rewritten.extend(lines[index:next_index])
+
+            index = next_index
+
+        if changes == 0:
+            return content, 0
+        return "\n".join(rewritten), changes
 
     def _message_to_dict(self, msg: "Message") -> Dict[str, Any]:
         """Convert message to dict for size estimation."""

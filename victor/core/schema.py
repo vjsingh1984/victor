@@ -112,6 +112,9 @@ class Tables:
     RL_QUALITY_WEIGHT = "rl_quality_weight"  # Quality weights
     RL_QUALITY_HISTORY = "rl_quality_history"  # Quality weight history
 
+    # Provider routing stats (smart routing performance tracker)
+    RL_PROVIDER_STAT = "rl_provider_stat"  # Per-request provider telemetry (latency, success)
+
     # Context pruning (token optimization)
     RL_CONTEXT_PRUNING = "rl_context_pruning"  # Context pruning Q-values
 
@@ -135,6 +138,8 @@ class Tables:
     AGENT_PROMPT_STYLE = "agent_prompt_style"  # Prompt style definitions
     AGENT_PROMPT_ELEMENT = "agent_prompt_element"  # Prompt components
     AGENT_PROMPT_HISTORY = "agent_prompt_history"  # Prompt history
+    AGENT_PROMPT_CANDIDATE = "agent_prompt_candidate"  # GEPA-evolved prompt candidates
+    AGENT_PROMPT_PARETO_INSTANCE = "agent_prompt_pareto_instance"  # GEPA v2 Pareto instances
 
     # Curriculum & Policy
     AGENT_CURRICULUM_STAGE = "agent_curriculum_stage"  # Learning curriculum
@@ -163,6 +168,11 @@ class Tables:
     # Module-level metrics (WS-1: graph analysis)
     GRAPH_MODULE_METRIC = "graph_module_metric"  # Module coupling/cohesion/hotspot metrics
     GRAPH_MODULE_METRIC_HISTORY = "graph_module_metric_history"  # Historical metric snapshots
+
+    # CCG and Graph RAG (Phase 14: Graph-Based Enhancements)
+    GRAPH_REQUIREMENT = "graph_requirement"  # Requirement nodes (GraphCodeAgent pattern)
+    GRAPH_SUBGRAPH = "graph_subgraph"  # Cached subgraphs for multi-hop retrieval
+    GRAPH_SUBGRAPH_NODE = "graph_subgraph_node"  # Junction table: subgraph -> nodes
 
     # ===========================================
     # UI DOMAIN (ui_)
@@ -217,6 +227,8 @@ class LearnerID:
     CROSS_VERTICAL = "cross_vertical"
     WORKFLOW_EXECUTION = "workflow_execution"
     TEAM_COMPOSITION = "team_composition"
+    PROMPT_OPTIMIZER = "prompt_optimizer"
+    PROVIDER_ROUTING = "provider_routing"
 
     @classmethod
     def all(cls) -> List[str]:
@@ -235,6 +247,7 @@ class LearnerID:
             cls.CROSS_VERTICAL,
             cls.WORKFLOW_EXECUTION,
             cls.TEAM_COMPOSITION,
+            cls.PROMPT_OPTIMIZER,
         ]
 
 
@@ -285,7 +298,8 @@ class Schema:
             provider TEXT,
             model TEXT,
             task_type TEXT,
-            vertical TEXT DEFAULT 'coding',
+            vertical TEXT DEFAULT '',
+            repo_id TEXT DEFAULT NULL,
             success INTEGER,
             quality_score REAL,
             metadata TEXT,
@@ -361,6 +375,26 @@ class Schema:
             updated_at TEXT DEFAULT (datetime('now')),
             UNIQUE(learner_id, task_type, stat_key)
         )
+    """
+
+    RL_PROVIDER_STAT = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.RL_PROVIDER_STAT} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            task_type TEXT DEFAULT 'default',
+            success INTEGER NOT NULL,
+            latency_ms REAL NOT NULL,
+            error_type TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    RL_PROVIDER_STAT_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_rl_pstat_provider
+            ON {Tables.RL_PROVIDER_STAT}(provider, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_rl_pstat_model
+            ON {Tables.RL_PROVIDER_STAT}(provider, model, created_at DESC);
     """
 
     RL_PATTERN = f"""
@@ -460,6 +494,51 @@ class Schema:
             success_rate REAL DEFAULT 0.5,
             usage_count INTEGER DEFAULT 0,
             updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    AGENT_PROMPT_CANDIDATE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_CANDIDATE} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            section_name TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'default',
+            text_hash TEXT NOT NULL,
+            text TEXT NOT NULL,
+            generation INTEGER DEFAULT 0,
+            parent_hash TEXT,
+            completion_score REAL DEFAULT 0.0,
+            token_efficiency REAL DEFAULT 0.0,
+            tool_effectiveness REAL DEFAULT 0.0,
+            alpha REAL DEFAULT 1.0,
+            beta REAL DEFAULT 1.0,
+            sample_count INTEGER DEFAULT 0,
+            instance_scores TEXT DEFAULT '{{}}',
+            coverage_count INTEGER DEFAULT 0,
+            is_on_frontier INTEGER DEFAULT 1,
+            char_length INTEGER DEFAULT 0,
+            benchmark_score REAL DEFAULT 0.0,
+            benchmark_runs INTEGER DEFAULT 0,
+            benchmark_passed INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 0,
+            strategy_name TEXT DEFAULT 'gepa',
+            strategy_chain TEXT DEFAULT 'gepa',
+            requires_benchmark INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(section_name, provider, text_hash)
+        )
+    """
+
+    AGENT_PROMPT_PARETO_INSTANCE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_PARETO_INSTANCE} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            section_name TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'default',
+            instance_id TEXT NOT NULL,
+            best_candidate_hash TEXT,
+            best_score REAL DEFAULT 0.0,
+            sample_count INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(section_name, provider, instance_id)
         )
     """
 
@@ -642,31 +721,93 @@ class Schema:
             ON {Tables.GRAPH_MODULE_METRIC}(tdd_priority DESC);
     """
 
+    # Requirement nodes (GraphCodeAgent pattern)
+    GRAPH_REQUIREMENT = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_REQUIREMENT} (
+            requirement_id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            source TEXT,
+            title TEXT NOT NULL,
+            description TEXT,
+            priority REAL DEFAULT 0.5,
+            status TEXT DEFAULT 'open',
+            metadata TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (requirement_id) REFERENCES {Tables.GRAPH_NODE}(node_id)
+        )
+    """
+
+    # Cached subgraphs for multi-hop retrieval
+    GRAPH_SUBGRAPH = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_SUBGRAPH} (
+            subgraph_id TEXT PRIMARY KEY,
+            anchor_node_id TEXT NOT NULL,
+            radius INTEGER NOT NULL,
+            edge_types TEXT,
+            node_count INTEGER,
+            computed_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (anchor_node_id) REFERENCES {Tables.GRAPH_NODE}(node_id)
+        )
+    """
+
+    # Junction table: subgraph -> nodes (many-to-many)
+    GRAPH_SUBGRAPH_NODE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_SUBGRAPH_NODE} (
+            subgraph_id TEXT NOT NULL,
+            node_id TEXT NOT NULL,
+            hop_distance INTEGER,
+            PRIMARY KEY (subgraph_id, node_id),
+            FOREIGN KEY (subgraph_id) REFERENCES {Tables.GRAPH_SUBGRAPH}(subgraph_id) ON DELETE CASCADE,
+            FOREIGN KEY (node_id) REFERENCES {Tables.GRAPH_NODE}(node_id) ON DELETE CASCADE
+        )
+    """
+
+    # Indexes for new CCG tables
+    GRAPH_RAG_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_graph_requirement_type
+            ON {Tables.GRAPH_REQUIREMENT}(type);
+        CREATE INDEX IF NOT EXISTS idx_graph_requirement_status
+            ON {Tables.GRAPH_REQUIREMENT}(status);
+        CREATE INDEX IF NOT EXISTS idx_graph_requirement_priority
+            ON {Tables.GRAPH_REQUIREMENT}(priority DESC);
+        CREATE INDEX IF NOT EXISTS idx_graph_subgraph_anchor
+            ON {Tables.GRAPH_SUBGRAPH}(anchor_node_id);
+        CREATE INDEX IF NOT EXISTS idx_graph_subgraph_node
+            ON {Tables.GRAPH_SUBGRAPH_NODE}(node_id);
+        CREATE INDEX IF NOT EXISTS idx_graph_subgraph_node_distance
+            ON {Tables.GRAPH_SUBGRAPH_NODE}(hop_distance);
+    """
+
     # ===========================================
     # CONVERSATION TABLES (project-level)
     # ===========================================
 
     CONV_MESSAGE = """
         CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             role TEXT NOT NULL,
-            content TEXT,
-            tool_calls TEXT,
-            created_at TEXT DEFAULT (datetime('now'))
+            content TEXT NOT NULL,
+            timestamp TIMESTAMP NOT NULL,
+            token_count INTEGER NOT NULL,
+            priority INTEGER NOT NULL,
+            tool_name TEXT,
+            tool_call_id TEXT,
+            metadata TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                ON DELETE CASCADE
         )
     """
 
     CONV_SESSION = """
         CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY,
-            name TEXT,
+            session_id TEXT PRIMARY KEY,
+            created_at TIMESTAMP NOT NULL,
+            last_activity TIMESTAMP NOT NULL,
+            project_path TEXT,
             provider TEXT,
             model TEXT,
-            profile TEXT,
-            data TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT
+            profile TEXT
         )
     """
 
@@ -676,7 +817,7 @@ class Schema:
             session_id TEXT,
             token_count INTEGER,
             message_count INTEGER,
-            created_at TEXT DEFAULT (datetime('now'))
+            timestamp TIMESTAMP DEFAULT (datetime('now'))
         )
     """
 
@@ -685,15 +826,19 @@ class Schema:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT,
             summary TEXT,
-            created_at TEXT DEFAULT (datetime('now'))
+            timestamp TIMESTAMP DEFAULT (datetime('now'))
         )
     """
 
     CONV_INDEXES = """
         CREATE INDEX IF NOT EXISTS idx_messages_session
-            ON messages(session_id, created_at);
-        CREATE INDEX IF NOT EXISTS idx_context_sizes_session
-            ON context_sizes(session_id);
+            ON messages(session_id, timestamp);
+        CREATE INDEX IF NOT EXISTS idx_messages_timestamp
+            ON messages(timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_sessions_project
+            ON sessions(project_path);
+        CREATE INDEX IF NOT EXISTS idx_sessions_activity
+            ON sessions(last_activity DESC);
     """
 
     # ===========================================
@@ -856,23 +1001,28 @@ class Schema:
     CHANGES_GROUP = """
         CREATE TABLE IF NOT EXISTS change_groups (
             id TEXT PRIMARY KEY,
+            session_id TEXT,
+            timestamp REAL,
             description TEXT,
-            commit_hash TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            finalized_at TEXT
+            tool_name TEXT,
+            undone INTEGER DEFAULT 0,
+            data TEXT
         )
     """
 
     CHANGES_FILE = """
         CREATE TABLE IF NOT EXISTS file_changes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_id TEXT NOT NULL,
-            file_path TEXT NOT NULL,
-            change_type TEXT NOT NULL,
-            old_content TEXT,
+            id TEXT PRIMARY KEY,
+            group_id TEXT,
+            change_type TEXT,
+            file_path TEXT,
+            timestamp REAL,
+            tool_name TEXT,
+            original_content TEXT,
             new_content TEXT,
-            diff TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
+            original_path TEXT,
+            checksum_before TEXT,
+            checksum_after TEXT,
             FOREIGN KEY (group_id) REFERENCES change_groups(id)
         )
     """
@@ -907,6 +1057,8 @@ class Schema:
             cls.AGENT_WORKFLOW_RUN,
             cls.AGENT_PROMPT_STYLE,
             cls.AGENT_PROMPT_ELEMENT,
+            cls.AGENT_PROMPT_CANDIDATE,
+            cls.AGENT_PROMPT_PARETO_INSTANCE,
             cls.AGENT_CURRICULUM_STAGE,
             cls.AGENT_CURRICULUM_METRIC,
             cls.AGENT_POLICY_SNAPSHOT,
@@ -928,7 +1080,11 @@ class Schema:
 
     @classmethod
     def get_project_schemas(cls) -> List[str]:
-        """Get schema definitions for project-level tables (graph, etc.)."""
+        """Get schema definitions for project-level tables (graph, etc.).
+
+        Note: Conversation tables (messages, sessions, context_sizes, context_summaries)
+        are managed by ConversationStore, not by ProjectDatabaseManager.
+        """
         return [
             # Graph
             cls.GRAPH_NODE,
@@ -936,11 +1092,6 @@ class Schema:
             cls.GRAPH_FILE_MTIME,
             cls.GRAPH_MODULE_METRIC,
             cls.GRAPH_MODULE_METRIC_HISTORY,
-            # Conversation
-            cls.CONV_MESSAGE,
-            cls.CONV_SESSION,
-            cls.CONV_CONTEXT_SIZE,
-            cls.CONV_CONTEXT_SUMMARY,
             # Mode learning
             cls.MODE_Q_VALUE,
             cls.MODE_TASK_STAT,
@@ -955,11 +1106,13 @@ class Schema:
 
     @classmethod
     def get_project_indexes(cls) -> List[str]:
-        """Get index definitions for project-level tables."""
+        """Get index definitions for project-level tables.
+
+        Note: Conversation indexes are managed by ConversationStore.
+        """
         return [
             cls.GRAPH_INDEXES,
             cls.GRAPH_MODULE_METRIC_INDEXES,
-            cls.CONV_INDEXES,
             cls.MODE_INDEXES,
             cls.PROFILE_INDEXES,
             cls.CHANGES_INDEXES,
@@ -967,7 +1120,10 @@ class Schema:
 
 
 # Schema version for migrations
-CURRENT_SCHEMA_VERSION = 3
+# Version 6: Database consolidation - single canonical databases
+#   - Global: ~/.victor/victor.db (user-wide data)
+#   - Project: ./.victor/project.db (project-specific data)
+CURRENT_SCHEMA_VERSION = 6
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1014,6 +1170,50 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             Schema.GRAPH_MODULE_METRIC,
             Schema.GRAPH_MODULE_METRIC_HISTORY,
             Schema.GRAPH_MODULE_METRIC_INDEXES,
+        ],
+        # Version 3 -> 4: Priority 4 - Add session_id column to rl_outcome for user feedback linking
+        4: [
+            # Add session_id column for conversation linking
+            f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN session_id TEXT",
+            # Add indexes for performance
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_repo ON {Tables.RL_OUTCOME}(repo_id, created_at)",
+        ],
+        # Version 4 -> 5: Phase 14 - Graph-Based Enhancements (CCG + Graph RAG)
+        5: [
+            # Add CCG columns to graph_node
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN ast_kind TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN scope_id TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN statement_type TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN requirement_id TEXT",
+            f"ALTER TABLE {Tables.GRAPH_NODE} ADD COLUMN visibility TEXT",
+            # Create indexes for new query patterns
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_statement_type ON {Tables.GRAPH_NODE}(statement_type)",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_requirement ON {Tables.GRAPH_NODE}(requirement_id)",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_visibility ON {Tables.GRAPH_NODE}(visibility)",
+            # Partial indexes for CCG edges (performance)
+            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_cfg ON {Tables.GRAPH_EDGE}(src, type) WHERE type LIKE 'CFG_%'",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_cdg ON {Tables.GRAPH_EDGE}(src, type) WHERE type LIKE 'CDG_%'",
+            f"CREATE INDEX IF NOT EXISTS idx_graph_edge_ddg ON {Tables.GRAPH_EDGE}(src, type) WHERE type LIKE 'DDG_%'",
+            # Create new tables for requirement tracking and subgraph caching
+            Schema.GRAPH_REQUIREMENT,
+            Schema.GRAPH_SUBGRAPH,
+            Schema.GRAPH_SUBGRAPH_NODE,
+            Schema.GRAPH_RAG_INDEXES,
+        ],
+        # Version 5 -> 6: Database Consolidation - Single Canonical Databases
+        # This migration marks the consolidation where:
+        # - Global database: ~/.victor/victor.db (user-wide: settings, API keys, RL learning)
+        # - Project database: ./.victor/project.db (project-specific: graph, conversations, sessions)
+        # Legacy databases are migrated to their canonical locations
+        6: [
+            # Add consolidation metadata to track completion
+            f"INSERT OR REPLACE INTO {Tables.SYS_METADATA} (key, value, updated_at) VALUES ('consolidated_version', '6', datetime('now'))",
+            # Create additional indexes for performance
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_vertical ON {Tables.RL_OUTCOME}(vertical, created_at)",
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
+            # Ensure graph node FTS is up to date
+            f"CREATE INDEX IF NOT EXISTS idx_graph_node_file_line ON {Tables.GRAPH_NODE}(file, line)",
         ],
     }
 

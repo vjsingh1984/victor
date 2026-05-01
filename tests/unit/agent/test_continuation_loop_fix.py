@@ -27,6 +27,7 @@ Test categories:
 - Best-effort finalize on grounding failure
 """
 
+import os
 import pytest
 import time
 from unittest.mock import MagicMock, patch, AsyncMock
@@ -465,6 +466,90 @@ class TestFileReadDedup:
         assert file_path in pipeline._read_file_timestamps
         assert before <= pipeline._read_file_timestamps[file_path] <= after
 
+    def test_read_allowed_after_file_changes(self, tmp_path):
+        """A reread should be allowed when the file changed on disk."""
+        from victor.agent.tool_pipeline import ToolPipeline
+
+        mock_registry = MagicMock()
+        mock_executor = MagicMock()
+
+        pipeline = ToolPipeline(
+            tool_registry=mock_registry,
+            tool_executor=mock_executor,
+        )
+
+        file_path = tmp_path / "module.py"
+        file_path.write_text("print('before')\n")
+        read_key = str(file_path)
+
+        pipeline.record_file_read(read_key)
+        assert pipeline._is_duplicate_read(read_key, max_age_seconds=300)
+
+        file_stat = file_path.stat()
+        file_path.write_text("print('after')\n")
+        os.utime(
+            file_path,
+            ns=(file_stat.st_atime_ns, max(file_stat.st_mtime_ns + 1_000_000, time.time_ns())),
+        )
+
+        assert not pipeline._is_duplicate_read(read_key, max_age_seconds=300)
+
+    @pytest.mark.asyncio
+    async def test_execute_read_after_file_change_not_skipped(self, tmp_path):
+        """Pipeline should re-execute a read after the file changed."""
+        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
+        from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
+        from victor.agent.tool_executor import ToolExecutionResult
+
+        mock_registry = MagicMock()
+        mock_registry.is_tool_enabled.return_value = True
+
+        mock_executor = MagicMock()
+        mock_executor.execute = AsyncMock(
+            side_effect=[
+                ToolExecutionResult(
+                    tool_name="read",
+                    success=True,
+                    result="before",
+                    error=None,
+                ),
+                ToolExecutionResult(
+                    tool_name="read",
+                    success=True,
+                    result="after",
+                    error=None,
+                ),
+            ]
+        )
+
+        pipeline = ToolPipeline(
+            tool_registry=mock_registry,
+            tool_executor=mock_executor,
+            config=ToolPipelineConfig(enable_idempotent_caching=False),
+            deduplication_tracker=ToolDeduplicationTracker(),
+        )
+
+        file_path = tmp_path / "module.py"
+        file_path.write_text("print('before')\n")
+        tool_calls = [{"name": "read", "arguments": {"path": str(file_path)}}]
+
+        first = await pipeline.execute_tool_calls(tool_calls, {})
+        assert first.results[0].success is True
+        assert first.results[0].skipped is False
+
+        file_stat = file_path.stat()
+        file_path.write_text("print('after')\n")
+        os.utime(
+            file_path,
+            ns=(file_stat.st_atime_ns, max(file_stat.st_mtime_ns + 1_000_000, time.time_ns())),
+        )
+
+        second = await pipeline.execute_tool_calls(tool_calls, {})
+        assert second.results[0].success is True
+        assert second.results[0].skipped is False
+        assert second.results[0].result == "after"
+        assert mock_executor.execute.call_count == 2
+
 
 class TestBestEffortFinalize:
     """Tests for best-effort finalize on grounding failure."""
@@ -472,9 +557,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_finalize_after_max_grounding_retries(self):
         """Should finalize with best-effort response after max grounding failures."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        pipeline = IntelligentAgentPipeline(
+        pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
             profile_name="test",
@@ -511,9 +596,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_retry_on_first_grounding_failure(self):
         """Should allow retry on first grounding failure."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        pipeline = IntelligentAgentPipeline(
+        pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
             profile_name="test",
@@ -547,9 +632,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_reset_counter_on_success(self):
         """Should reset grounding failure counter on success."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        pipeline = IntelligentAgentPipeline(
+        pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
             profile_name="test",

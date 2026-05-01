@@ -235,6 +235,20 @@ class VertexAIProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Vertex AI (Gemini) supports context caching (75-90% discount)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Vertex AI reuses KV cache for matching prompt prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import VERTEX, VERTEX_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(VERTEX, target, VERTEX_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],
@@ -345,7 +359,7 @@ class VertexAIProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                            tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                             stop_reason="stop",
                             is_final=True,
                         )

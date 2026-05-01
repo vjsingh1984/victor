@@ -280,6 +280,20 @@ class BedrockProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """AWS Bedrock explicit caching for Claude/Nova (90% read, 1.25x write, 5m TTL)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Bedrock reuses KV cache for matching prompt prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import ANTHROPIC, ANTHROPIC_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(ANTHROPIC, target, ANTHROPIC_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],
@@ -305,19 +319,43 @@ class BedrockProvider(BaseProvider):
                 # Determine model family for request format
                 if model.startswith("anthropic."):
                     response = await self._chat_anthropic(
-                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                        client,
+                        messages,
+                        model,
+                        temperature,
+                        max_tokens,
+                        tools,
+                        **kwargs,
                     )
                 elif model.startswith("meta."):
                     response = await self._chat_meta(
-                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                        client,
+                        messages,
+                        model,
+                        temperature,
+                        max_tokens,
+                        tools,
+                        **kwargs,
                     )
                 elif model.startswith("mistral."):
                     response = await self._chat_mistral(
-                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                        client,
+                        messages,
+                        model,
+                        temperature,
+                        max_tokens,
+                        tools,
+                        **kwargs,
                     )
                 else:
                     response = await self._chat_converse(
-                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                        client,
+                        messages,
+                        model,
+                        temperature,
+                        max_tokens,
+                        tools,
+                        **kwargs,
                     )
 
                 # Log success with usage info
@@ -586,7 +624,7 @@ class BedrockProvider(BaseProvider):
                 elif "messageStop" in event:
                     yield StreamChunk(
                         content="",
-                        tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                        tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                         stop_reason=event["messageStop"].get("stopReason", "stop").lower(),
                         is_final=True,
                     )

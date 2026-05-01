@@ -16,7 +16,7 @@ async def main():
     # Run the workflow with input
     result = await agent.run_workflow(
         "simple_workflow.yaml",
-        input={"user_input": "I need help with Python programming"}
+        input={"user_input": "I need help with Python programming"},
     )
 
     print(f"Workflow result:\n{result.content}")

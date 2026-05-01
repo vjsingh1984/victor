@@ -22,6 +22,7 @@ from victor.agent.services.protocols.decision_service import (
     LLMDecisionServiceProtocol,
 )
 from victor.core.async_utils import run_sync as real_run_sync
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 
 @dataclass
@@ -65,7 +66,11 @@ class TestHeuristicFastPath:
 
         result = await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "done", "deliverable_count": 1, "signal_count": 1},
+            context={
+                "response_tail": "done",
+                "deliverable_count": 1,
+                "signal_count": 1,
+            },
             heuristic_result="high",
             heuristic_confidence=0.9,
         )
@@ -110,7 +115,11 @@ class TestLLMCall:
 
         result = await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "some text", "deliverable_count": 1, "signal_count": 0},
+            context={
+                "response_tail": "some text",
+                "deliverable_count": 1,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.3,
         )
 
@@ -340,6 +349,21 @@ class TestMetrics:
         service = LLMDecisionService(provider=None, model="test")
         assert service.is_healthy() is False
 
+    def test_exports_runtime_evaluation_feedback_from_config_threshold(self):
+        provider = _make_provider({})
+        service = LLMDecisionService(
+            provider=provider,
+            model="test",
+            config=LLMDecisionServiceConfig(confidence_threshold=0.72),
+        )
+
+        feedback = service.get_runtime_evaluation_feedback()
+
+        assert isinstance(feedback, RuntimeEvaluationFeedback)
+        assert feedback.completion_threshold == pytest.approx(0.72)
+        assert feedback.enhanced_progress_threshold == pytest.approx(0.57)
+        assert feedback.minimum_supported_evidence_score == pytest.approx(0.77)
+
 
 class TestSyncDecide:
     """Test synchronous decide wrapper."""
@@ -353,7 +377,11 @@ class TestSyncDecide:
             # We're inside an event loop — decide_sync uses run_sync_in_thread
             result = service.decide_sync(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_result="loop_fallback",
                 heuristic_confidence=0.3,
             )
@@ -368,7 +396,11 @@ class TestSyncDecide:
         service = LLMDecisionService(provider=provider, model="test")
 
         # Run an async decide to populate cache
-        context = {"response_tail": "cache_test", "deliverable_count": 0, "signal_count": 0}
+        context = {
+            "response_tail": "cache_test",
+            "deliverable_count": 0,
+            "signal_count": 0,
+        }
         asyncio.run(
             service.decide(
                 DecisionType.TASK_COMPLETION,
@@ -395,7 +427,11 @@ class TestSyncDecide:
 
         result = service.decide_sync(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "done", "deliverable_count": 1, "signal_count": 1},
+            context={
+                "response_tail": "done",
+                "deliverable_count": 1,
+                "signal_count": 1,
+            },
             heuristic_confidence=0.1,
         )
         # decide_sync uses run_sync_in_thread to bridge async-in-sync

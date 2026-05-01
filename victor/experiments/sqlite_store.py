@@ -203,8 +203,8 @@ class SQLiteStorage:
                     experiment.group_id,
                     experiment.workflow_name,
                     experiment.vertical,
-                    experiment.started_at.isoformat() if experiment.started_at else None,
-                    experiment.completed_at.isoformat() if experiment.completed_at else None,
+                    (experiment.started_at.isoformat() if experiment.started_at else None),
+                    (experiment.completed_at.isoformat() if experiment.completed_at else None),
                 ),
             )
             conn.commit()
@@ -564,7 +564,7 @@ class SQLiteStorage:
             group_id=row["group_id"],
             workflow_name=row["workflow_name"],
             vertical=row["vertical"] or "coding",
-            started_at=datetime.fromisoformat(row["started_at"]) if row["started_at"] else None,
+            started_at=(datetime.fromisoformat(row["started_at"]) if row["started_at"] else None),
             completed_at=(
                 datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None
             ),
@@ -581,7 +581,7 @@ class SQLiteStorage:
             completed_at=(
                 datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None
             ),
-            metrics_summary=json.loads(row["metrics_summary"]) if row["metrics_summary"] else {},
+            metrics_summary=(json.loads(row["metrics_summary"]) if row["metrics_summary"] else {}),
             parameters=json.loads(row["parameters"]) if row["parameters"] else {},
             error_message=row["error_message"],
             python_version=row["python_version"] or "",

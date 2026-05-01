@@ -17,8 +17,10 @@
 Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 """
 
-import pytest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Suppress deprecation warnings for complexity_classifier shim during migration
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -36,6 +38,15 @@ from victor.agent.orchestrator_factory import (
     RecoveryComponents,
     WorkflowOptimizationComponents,
 )
+from victor.agent.coordinators.exploration_state_passed import (
+    ExplorationStatePassedCoordinator,
+)
+from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
+from victor.agent.coordinators.system_prompt_state_passed import (
+    SystemPromptStatePassedCoordinator,
+)
+from victor.agent.services import ServiceStreamingRuntime
+from victor.agent.services.exploration_runtime import ExplorationCoordinator
 
 
 @pytest.fixture
@@ -167,13 +178,15 @@ class TestCreateSanitizer:
         assert isinstance(sanitizer, ResponseSanitizer)
 
     def test_create_sanitizer_uses_di_if_available(self, factory, mock_container):
-        """create_sanitizer uses DI container (always)."""
+        """create_sanitizer checks DI container via get_optional then falls back."""
         from victor.agent.protocols import ResponseSanitizerProtocol
 
         sanitizer = factory.create_sanitizer()
 
-        # Verify DI container was used
-        mock_container.get.assert_called_with(ResponseSanitizerProtocol)
+        # create_sanitizer uses get_optional (soft lookup) so the factory
+        # can fall back to a direct constructor when the protocol isn't
+        # registered (e.g. test environments).
+        mock_container.get_optional.assert_called_with(ResponseSanitizerProtocol)
 
 
 class TestCreateProjectContext:
@@ -194,6 +207,34 @@ class TestCreateProjectContext:
 
         # Verify DI container was used
         mock_container.get.assert_called_with(ProjectContextProtocol)
+
+
+class TestCreateStreamingChatAdapter:
+    """Tests for create_streaming_chat_adapter method."""
+
+    def test_create_streaming_chat_adapter_returns_adapter(self, factory):
+        """create_streaming_chat_adapter returns the canonical chat-stream adapter."""
+        runtime_owner = MagicMock()
+
+        adapter = factory.create_streaming_chat_adapter(runtime_owner)
+
+        assert isinstance(adapter, ServiceStreamingRuntime)
+        assert adapter._orchestrator is runtime_owner
+
+
+class TestCreateStreamingChatExecutor:
+    """Tests for create_streaming_chat_executor method."""
+
+    def test_create_streaming_chat_executor_returns_executor(self, factory):
+        """create_streaming_chat_executor returns the canonical executor."""
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
+
+        runtime_owner = MagicMock()
+
+        executor = factory.create_streaming_chat_executor(runtime_owner)
+
+        assert isinstance(executor, StreamingChatExecutor)
+        assert executor._runtime_owner is runtime_owner
 
 
 class TestCreateComplexityClassifier:
@@ -262,7 +303,7 @@ class TestCreateStreamingMetricsCollector:
 
     def test_create_streaming_metrics_collector_when_enabled(self, factory, mock_settings):
         """create_streaming_metrics_collector returns collector when enabled."""
-        from victor.analytics.streaming_metrics import StreamingMetricsCollector
+        from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 
         mock_settings.streaming_metrics_enabled = True
 
@@ -323,6 +364,128 @@ class TestCreateRecoveryHandler:
         # Handler is always returned from DI container (may be null implementation)
         # In production, this would be _NullRecoveryHandler when disabled
         assert handler is not None
+
+
+class TestCanonicalCoordinatorBuilders:
+    """Tests for canonical coordination helper surfaces on OrchestratorFactory."""
+
+    def test_create_coordination_advisor_runtime_prefers_service_protocol(
+        self, factory, mock_container
+    ):
+        from victor.agent.services.protocols import CoordinationAdvisorRuntimeProtocol
+
+        runtime = MagicMock(name="coordination_advisor_runtime")
+        mock_container.get = MagicMock(return_value=runtime)
+
+        result = factory.create_coordination_advisor_runtime()
+
+        assert result is runtime
+        mock_container.get.assert_called_once_with(CoordinationAdvisorRuntimeProtocol)
+
+    def test_create_coordination_advisor_returns_framework_advisor(self, factory):
+        vertical_context = MagicMock(name="vertical_context")
+        advisor = MagicMock(name="coordination_advisor")
+
+        with patch(
+            "victor.framework.coordination_runtime.create_vertical_coordination_advisor",
+            return_value=advisor,
+        ) as mock_create:
+            result = factory.create_coordination_advisor(vertical_context)
+
+        assert result is advisor
+        mock_create.assert_called_once_with(
+            vertical_context=vertical_context,
+            team_learner=None,
+            selection_strategy=getattr(factory.settings, "team_selection_strategy", "hybrid"),
+        )
+
+    def test_create_mode_workflow_team_coordinator_wraps_coordination_advisor(self, factory):
+        vertical_context = MagicMock(name="vertical_context")
+        advisor = MagicMock(name="coordination_advisor")
+        wrapper = MagicMock(name="mode_workflow_team_coordinator")
+
+        with (
+            patch.object(
+                factory,
+                "create_coordination_advisor",
+                return_value=advisor,
+            ) as mock_create,
+            patch(
+                "victor.agent.mode_workflow_team_coordinator.ModeWorkflowTeamCoordinator",
+                return_value=wrapper,
+            ) as mock_wrapper,
+        ):
+            with pytest.warns(
+                DeprecationWarning,
+                match=(
+                    "OrchestratorFactory.create_mode_workflow_team_coordinator"
+                    "\\(\\.\\.\\.\\) is deprecated"
+                ),
+            ):
+                result = factory.create_mode_workflow_team_coordinator(vertical_context)
+
+        assert result is wrapper
+        mock_create.assert_called_once_with(vertical_context)
+        mock_wrapper.assert_called_once_with(advisor=advisor)
+
+    def test_create_exploration_coordinator_returns_runtime(self, factory):
+        coordinator = factory.create_exploration_coordinator()
+
+        assert isinstance(coordinator, ExplorationCoordinator)
+
+    def test_create_exploration_state_passed_coordinator_uses_settings_root(
+        self, factory, mock_settings
+    ):
+        mock_settings.working_directory = "/tmp/factory-project"
+
+        coordinator = factory.create_exploration_state_passed_coordinator()
+
+        assert isinstance(coordinator, ExplorationStatePassedCoordinator)
+        assert coordinator._project_root == Path("/tmp/factory-project")
+
+    def test_create_system_prompt_coordinator_binds_task_analyzer(self, factory, mock_container):
+        from victor.agent.protocols import TaskAnalyzerProtocol
+
+        analyzer = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            analyzer if protocol is TaskAnalyzerProtocol else None
+        )
+
+        coordinator = factory.create_system_prompt_coordinator()
+
+        assert coordinator._task_analyzer is analyzer
+
+    def test_create_prompt_runtime_support_binds_task_analyzer(self, factory, mock_container):
+        from victor.agent.protocols import TaskAnalyzerProtocol
+
+        analyzer = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            analyzer if protocol is TaskAnalyzerProtocol else None
+        )
+
+        runtime = factory.create_prompt_runtime_support()
+
+        assert runtime._task_analyzer is analyzer
+
+    def test_create_system_prompt_state_passed_coordinator_binds_task_analyzer(
+        self, factory, mock_container
+    ):
+        from victor.agent.protocols import TaskAnalyzerProtocol
+
+        analyzer = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            analyzer if protocol is TaskAnalyzerProtocol else None
+        )
+
+        coordinator = factory.create_system_prompt_state_passed_coordinator()
+
+        assert isinstance(coordinator, SystemPromptStatePassedCoordinator)
+        assert coordinator._task_analyzer is analyzer
+
+    def test_create_safety_state_passed_coordinator_returns_wrapper(self, factory):
+        coordinator = factory.create_safety_state_passed_coordinator()
+
+        assert isinstance(coordinator, SafetyStatePassedCoordinator)
 
 
 class TestCreateObservability:
@@ -476,6 +639,22 @@ class TestCreateToolCache:
 
         assert cache is None
 
+    def test_create_tool_cache_returns_none_when_initialization_fails(self, factory, mock_settings):
+        """create_tool_cache degrades gracefully when disk cache init fails."""
+        mock_settings.tool_cache_enabled = True
+        mock_settings.tool_cache_ttl = 600
+        mock_settings.tool_cache_allowlist = []
+
+        with patch("victor.config.settings.get_project_paths") as mock_paths:
+            mock_paths.return_value.global_cache_dir = "/tmp/cache"
+            with patch(
+                "victor.storage.cache.tool_cache.ToolCache",
+                side_effect=OSError("cache init failed"),
+            ):
+                cache = factory.create_tool_cache()
+
+        assert cache is None
+
 
 class TestCreateMemoryComponents:
     """Tests for create_memory_components method."""
@@ -489,11 +668,11 @@ class TestCreateMemoryComponents:
         with patch("victor.config.settings.get_project_paths") as mock_paths:
             mock_project = MagicMock()
             mock_project.project_victor_dir = MagicMock()
-            mock_project.conversation_db = "/tmp/test.db"
+            mock_project.project_db = "/tmp/test.db"
             mock_project.project_root = "/tmp/project"
             mock_paths.return_value = mock_project
 
-            with patch("victor.agent.conversation_memory.ConversationStore") as mock_store_cls:
+            with patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls:
                 mock_store = MagicMock()
                 mock_session = MagicMock()
                 mock_session.session_id = "test-session-id"
@@ -563,6 +742,22 @@ class TestWorkflowOptimizationComponents:
 
         assert isinstance(detector, TaskCompletionDetector)
 
+    def test_create_task_completion_detector_uses_runtime_intelligence(
+        self, factory, mock_container
+    ):
+        """Task completion detector should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
+        )
+
+        detector = factory.create_task_completion_detector()
+
+        assert detector._runtime_intelligence is not None
+        assert detector._runtime_intelligence._decision_service is decision_service
+
     def test_create_read_cache(self, factory, mock_settings):
         """create_read_cache returns ReadResultCache with settings."""
         mock_settings.read_cache_ttl = 120.0
@@ -626,6 +821,82 @@ class TestWorkflowOptimizationComponents:
         assert isinstance(detector, ThinkingPatternDetector)
         assert detector._repetition_threshold == 4
         assert detector._similarity_threshold == 0.7
+
+    def test_create_thinking_detector_uses_runtime_intelligence(
+        self, factory, mock_settings, mock_container
+    ):
+        """Thinking detector should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        mock_settings.thinking_repetition_threshold = 4
+        mock_settings.thinking_similarity_threshold = 0.7
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
+        )
+
+        detector = factory.create_thinking_detector()
+
+        assert detector._runtime_intelligence is not None
+        assert detector._runtime_intelligence._decision_service is decision_service
+
+    def test_create_context_compactor_uses_runtime_intelligence(
+        self, factory, mock_container, mock_settings
+    ):
+        """Context compactor should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        mock_settings.context_proactive_threshold = 0.9
+        mock_settings.context_min_messages_after_compact = 8
+        mock_settings.max_tool_output_chars = 8192
+        mock_settings.max_tool_output_lines = 200
+        mock_settings.context_proactive_compaction = True
+        mock_settings.tool_result_truncation = True
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
+        )
+
+        controller = MagicMock()
+        compactor = factory.create_context_compactor(controller)
+
+        assert compactor._runtime_intelligence is not None
+        assert compactor._runtime_intelligence._decision_service is decision_service
+
+    def test_create_tool_selector_uses_runtime_intelligence(
+        self, factory, mock_container, mock_settings
+    ):
+        """Tool selector should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        mock_settings.fallback_max_tools = 8
+        mock_settings.tools = MagicMock(
+            max_tool_schema_tokens=0,
+            schema_promotion_threshold=0.8,
+            max_mcp_tools_per_turn=12,
+        )
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            decision_service if protocol is LLMDecisionServiceProtocol else None
+        )
+        tools = MagicMock()
+        tools.list_tools.return_value = []
+        conversation_state = MagicMock()
+        unified_tracker = MagicMock()
+
+        selector = factory.create_tool_selector(
+            tools=tools,
+            semantic_selector=None,
+            conversation_state=conversation_state,
+            unified_tracker=unified_tracker,
+            model="claude-opus-4",
+            provider_name="anthropic",
+            tool_selection={},
+            on_selection_recorded=None,
+        )
+
+        assert selector._runtime_intelligence is not None
+        assert selector._runtime_intelligence._decision_service is decision_service
 
     def test_create_resource_manager(self, factory):
         """create_resource_manager returns singleton ResourceManager."""

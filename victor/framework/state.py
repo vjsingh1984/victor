@@ -9,7 +9,7 @@ Phase 7.2 Refactoring:
 - Eliminates most hasattr/getattr duck-typing
 
 Stage Unification (Post-Phase 9):
-- Stage is now an alias to ConversationStage from conversation_state.py
+- Stage is now an alias to ConversationStage from conversation.state_machine
 - ConversationStage is the canonical source for conversation stages
 - This eliminates duplicate enum definitions
 
@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Union
 from victor.core.shared_types import ConversationStage
 
 if TYPE_CHECKING:
-    from victor.framework.protocols import OrchestratorProtocol
+    from victor.framework.protocols import FrameworkOrchestratorProtocol as OrchestratorProtocol
 
 
 # Stage is an alias to ConversationStage for framework API compatibility
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 Stage = ConversationStage
 """Conversation stage in the agent's workflow.
 
-This is an alias to `victor.agent.conversation_state.ConversationStage`.
+This is an alias to `victor.agent.conversation.state_machine.ConversationStage`.
 
 Stages represent different phases of how the agent
 approaches a task. They are detected automatically

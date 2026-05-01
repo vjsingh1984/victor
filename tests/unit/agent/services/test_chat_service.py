@@ -15,11 +15,13 @@
 """Tests for ChatService implementation."""
 
 import asyncio
+import inspect
 from unittest import mock
 
 import pytest
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+from victor.providers.base import CompletionResponse, StreamChunk
 
 # =============================================================================
 # Mock Dependencies
@@ -63,9 +65,16 @@ class MockToolService:
     def __init__(self):
         self.healthy = True
         self.tools_executed = []
+        self.turn_resets = 0
 
     def is_healthy(self):
         return self.healthy
+
+    def start_new_turn(self):
+        self.turn_resets += 1
+
+    def reset_tool_budget(self):
+        self.turn_resets += 1
 
     async def execute_tool(self, tool_name, arguments):
         from victor.tools.base import ToolResult
@@ -253,56 +262,6 @@ class TestChatServiceHealth(BaseChatServiceTest):
         assert service.is_healthy() is False
 
 
-class TestChatServiceChat(BaseChatServiceTest):
-    """Tests for ChatService.chat method."""
-
-    @pytest.mark.asyncio
-    async def test_chat_basic(self):
-        """Test basic chat functionality."""
-        service = self._create_test_service()
-
-        response = await service.chat("Hello, world!")
-
-        assert response.content == "Mock response"
-        assert response.stop_reason == "stop"
-
-    @pytest.mark.asyncio
-    async def test_chat_with_context_overflow(self):
-        """Test chat with context overflow triggers compaction."""
-        service = self._create_test_service()
-        service._context.overflow = True
-
-        response = await service.chat("Test")
-
-        assert response.content == "Mock response"
-        # Compaction should have been triggered
-
-    @pytest.mark.asyncio
-    async def test_chat_streaming_mode(self):
-        """Test chat in streaming mode."""
-        service = self._create_test_service()
-
-        response = await service.chat("Test", stream=True)
-
-        assert response.content == "Mock chunk"  # Aggregated from stream
-
-
-class TestChatServiceStreamChat(BaseChatServiceTest):
-    """Tests for ChatService.stream_chat method."""
-
-    @pytest.mark.asyncio
-    async def test_stream_chat(self):
-        """Test streaming chat."""
-        service = self._create_test_service()
-
-        chunks = []
-        async for chunk in service.stream_chat("Test"):
-            chunks.append(chunk)
-
-        assert len(chunks) == 1
-        assert chunks[0].content == "Mock chunk"
-
-
 class TestChatServiceReset(BaseChatServiceTest):
     """Tests for ChatService.reset_conversation method."""
 
@@ -319,48 +278,261 @@ class TestChatServiceReset(BaseChatServiceTest):
         assert service._conversation.reset_count == 1
 
 
-class TestChatServiceAgenticLoop(BaseChatServiceTest):
-    """Tests for the agentic loop logic."""
+class TestChatServiceDictBasedContext(BaseChatServiceTest):
+    """Bound runtimes should support dict-based ContextServiceProtocol writes."""
 
     @pytest.mark.asyncio
-    async def test_agentic_loop_with_completion(self):
-        """Test agentic loop completes normally."""
+    async def test_chat_records_user_and_assistant_messages_in_dict_based_context(self):
         service = self._create_test_service()
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
 
-        response = await service.chat("Complete this")
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                service._context.add_message({"role": "user", "content": user_message})
+                service._context.add_message({"role": "assistant", "content": response.content})
+                return response
 
-        assert response is not None
-        assert response.stop_reason == "stop"
+        service.bind_runtime_components(turn_executor=_TurnExecutor())
+
+        result = await service.chat("hello")
+
+        assert result is response
+        assert [message["role"] for message in service._context.messages] == ["user", "assistant"]
+        assert [message["content"] for message in service._context.messages] == ["hello", "done"]
+
+    def test_add_tool_result_supports_dict_based_context_protocol(self):
+        service = self._create_test_service()
+        result = mock.MagicMock(output="tool output", error=None)
+
+        service._add_tool_result_to_context(
+            "read",
+            result,
+            tool_call_id="call-1",
+            formatted_content="formatted output",
+        )
+
+        tool_message = service._context.messages[-1]
+        assert tool_message["role"] == "tool"
+        assert tool_message["content"] == "formatted output"
+        assert tool_message["tool_call_id"] == "call-1"
+        assert tool_message["name"] == "read"
+
+
+class TestChatServiceControllerBackedContext(BaseChatServiceTest):
+    """Bound runtimes should share conversation state with controller-backed context."""
+
+    def _create_controller_backed_service(self):
+        from victor.agent.conversation.controller import ConversationController
+        from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
+        config = ChatServiceConfig()
+        provider = MockProviderService()
+        tools = MockToolService()
+        controller = ConversationController()
+        context = ContextServiceAdapter(controller)
+        recovery = MockRecoveryService()
+        streaming = MockStreamingCoordinator()
+
+        service = ChatService(
+            config=config,
+            provider_service=provider,
+            tool_service=tools,
+            context_service=context,
+            recovery_service=recovery,
+            conversation_controller=controller,
+            streaming_coordinator=streaming,
+        )
+        return service, controller
 
     @pytest.mark.asyncio
-    async def test_agentic_loop_with_max_iterations(self):
-        """Test agentic loop respects max iterations."""
-        config = ChatServiceConfig(max_iterations=2)
-        service = self._create_test_service(config=config)
+    async def test_chat_records_user_and_assistant_messages_in_controller_backed_context(self):
+        service, controller = self._create_controller_backed_service()
+        response = CompletionResponse(content="done", role="assistant", stop_reason="stop")
 
-        response = await service.chat("Test")
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                controller.add_message("user", user_message)
+                controller.add_message("assistant", response.content)
+                return response
 
-        # Should complete without hitting iteration limit
-        assert response is not None
+        service.bind_runtime_components(turn_executor=_TurnExecutor())
+
+        result = await service.chat("hello")
+
+        assert result is response
+        assert [message.role for message in controller.messages] == ["user", "assistant"]
+        assert [message.content for message in controller.messages] == ["hello", "done"]
+
+    def test_add_tool_result_supports_controller_backed_context_adapter(self):
+        service, controller = self._create_controller_backed_service()
+        result = mock.MagicMock(output="tool output", error=None)
+
+        service._add_tool_result_to_context(
+            "read",
+            result,
+            tool_call_id="call-1",
+            formatted_content="formatted output",
+        )
+
+        tool_message = controller.messages[-1]
+        assert tool_message.role == "tool"
+        assert tool_message.content == "formatted output"
+        assert tool_message.tool_call_id == "call-1"
+        assert tool_message.name == "read"
+
+    def test_reset_conversation_preserves_system_prompt_without_double_reset(self):
+        service, controller = self._create_controller_backed_service()
+        controller.set_system_prompt("system prompt")
+        controller.ensure_system_message()
+        controller.add_message("user", "hello")
+        controller.reset = mock.MagicMock(wraps=controller.reset)
+
+        service.reset_conversation()
+
+        assert controller.reset.call_count == 1
+        assert [message.role for message in controller.messages] == ["system"]
+        assert [message.content for message in controller.messages] == ["system prompt"]
+
+    @pytest.mark.asyncio
+    async def test_chat_replenishes_tool_budget_per_prompt_and_preserves_usage_stats(self):
+        from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+        from victor.tools.base import ToolResult
+
+        tool_executor = mock.Mock()
+        tool_executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        tool_service = ToolService(
+            config=ToolServiceConfig(default_tool_budget=1, enable_caching=False),
+            tool_selector=mock.Mock(),
+            tool_executor=tool_executor,
+            tool_registrar=mock.Mock(),
+        )
+
+        service = ChatService(
+            config=ChatServiceConfig(),
+            provider_service=MockProviderService(),
+            tool_service=tool_service,
+            context_service=MockContextService(),
+            recovery_service=MockRecoveryService(),
+            conversation_controller=MockConversationController(),
+            streaming_coordinator=MockStreamingCoordinator(),
+        )
+
+        class _TurnExecutor:
+            async def execute_agentic_loop(self, user_message):
+                await tool_service.execute_tool("read", {"prompt": user_message})
+                return CompletionResponse(
+                    content=f"done:{user_message}",
+                    role="assistant",
+                    stop_reason="stop",
+                )
+
+        service.bind_runtime_components(turn_executor=_TurnExecutor())
+
+        first = await service.chat("first prompt")
+        second = await service.chat("second prompt")
+
+        assert first.content == "done:first prompt"
+        assert second.content == "done:second prompt"
+        assert tool_service.budget_used == 1
+        assert tool_service.get_tool_usage_stats()["total_calls"] == 2
+        assert tool_executor.execute.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_replenishes_tool_budget_per_prompt_and_preserves_usage_stats(self):
+        from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+        from victor.tools.base import ToolResult
+
+        tool_executor = mock.Mock()
+        tool_executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        tool_service = ToolService(
+            config=ToolServiceConfig(default_tool_budget=1, enable_caching=False),
+            tool_selector=mock.Mock(),
+            tool_executor=tool_executor,
+            tool_registrar=mock.Mock(),
+        )
+
+        service = ChatService(
+            config=ChatServiceConfig(),
+            provider_service=MockProviderService(),
+            tool_service=tool_service,
+            context_service=MockContextService(),
+            recovery_service=MockRecoveryService(),
+            conversation_controller=MockConversationController(),
+            streaming_coordinator=MockStreamingCoordinator(),
+        )
+
+        async def _stream_handler(user_message, **kwargs):
+            await tool_service.execute_tool("read", {"prompt": user_message})
+            yield StreamChunk(content=f"done:{user_message}", is_final=True)
+
+        service.bind_runtime_components(stream_chat_handler=_stream_handler)
+
+        first = [chunk async for chunk in service.stream_chat("first prompt")]
+        second = [chunk async for chunk in service.stream_chat("second prompt")]
+
+        assert [chunk.content for chunk in first] == ["done:first prompt"]
+        assert [chunk.content for chunk in second] == ["done:second prompt"]
+        assert tool_service.budget_used == 1
+        assert tool_service.get_tool_usage_stats()["total_calls"] == 2
+        assert tool_executor.execute.await_count == 2
+
+    def test_chat_service_declares_single_keyword_based_context_helpers(self):
+        source = inspect.getsource(ChatService)
+
+        assert source.count("def _add_user_message_to_context(") == 1
+        assert source.count("def _add_assistant_message_to_context(") == 1
+        assert "self._context.add_message(msg)" not in source
+
+
+class TestStreamingExecutorIntegration:
+    """Tests verifying the canonical streaming executor owns loop behavior."""
+
+    def test_pipeline_accepts_perception(self):
+        """StreamingChatExecutor constructor accepts perception parameter."""
+        from unittest.mock import MagicMock
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
+
+        mock_coord = MagicMock()
+        mock_perception = MagicMock()
+        pipeline = StreamingChatExecutor(mock_coord, perception=mock_perception)
+        assert pipeline._perception is mock_perception
+
+    def test_pipeline_accepts_fulfillment(self):
+        """StreamingChatExecutor constructor accepts fulfillment parameter."""
+        from unittest.mock import MagicMock
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
+
+        mock_coord = MagicMock()
+        mock_fulfillment = MagicMock()
+        pipeline = StreamingChatExecutor(mock_coord, fulfillment=mock_fulfillment)
+        assert pipeline._fulfillment is mock_fulfillment
+
+    def test_pipeline_has_progress_tracking(self):
+        """StreamingChatExecutor tracks progress scores."""
+        from unittest.mock import MagicMock
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
+
+        pipeline = StreamingChatExecutor(MagicMock())
+        assert hasattr(pipeline, "_progress_scores")
+        assert pipeline._progress_scores == []
+
+    def test_factory_passes_components(self):
+        """create_streaming_chat_executor passes perception and fulfillment."""
+        from unittest.mock import MagicMock
+        from victor.agent.services.chat_stream_executor import create_streaming_chat_executor
+
+        mock_perception = MagicMock()
+        mock_fulfillment = MagicMock()
+        pipeline = create_streaming_chat_executor(
+            MagicMock(), perception=mock_perception, fulfillment=mock_fulfillment
+        )
+        assert pipeline._perception is mock_perception
+        assert pipeline._fulfillment is mock_fulfillment
 
 
 # =============================================================================
 # Test Helpers
 # =============================================================================
-
-
-def test_chat_service_integration_with_feature_flags():
-    """Test that ChatService works with feature flags."""
-    from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
-
-    # Enable new chat service flag
-    manager = get_feature_flag_manager()
-    manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-
-    # Flag should be enabled
-    assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
-
-
 class TestToolService:
     """Tests for ToolService implementation."""
 

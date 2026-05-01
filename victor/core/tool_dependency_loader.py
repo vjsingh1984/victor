@@ -63,8 +63,7 @@ from importlib.metadata import entry_points
 import yaml
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
-
-from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor_sdk.verticals.tool_dependencies import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_dependency_schema import ToolDependencySpec
 from victor.core.tool_types import ToolDependency
 from victor.core.verticals.config_registry import (
@@ -77,21 +76,27 @@ logger = logging.getLogger(__name__)
 
 def import_module_with_fallback(module_path: str):
     """Lazy proxy to avoid importing vertical package graph at module import time."""
-    from victor.core.verticals.import_resolver import import_module_with_fallback as _resolver
+    from victor.core.verticals.import_resolver import (
+        import_module_with_fallback as _resolver,
+    )
 
     return _resolver(module_path)
 
 
 def module_import_candidates(module_path: str):
     """Lazy proxy for compatibility candidate expansion."""
-    from victor.core.verticals.import_resolver import module_import_candidates as _resolver
+    from victor.core.verticals.import_resolver import (
+        module_import_candidates as _resolver,
+    )
 
     return _resolver(module_path)
 
 
 def normalize_vertical_name(vertical_name: str) -> str:
     """Lazy proxy for shared vertical-name normalization."""
-    from victor.core.verticals.import_resolver import normalize_vertical_name as _resolver
+    from victor.core.verticals.import_resolver import (
+        normalize_vertical_name as _resolver,
+    )
 
     return _resolver(vertical_name)
 
@@ -711,7 +716,9 @@ def get_tool_dependency_resolution_stats() -> Dict[str, int]:
     return stats
 
 
-def reset_tool_dependency_resolution_stats(clear_entry_point_cache: bool = False) -> None:
+def reset_tool_dependency_resolution_stats(
+    clear_entry_point_cache: bool = False,
+) -> None:
     """Reset resolution telemetry counters and optionally clear EP cache."""
     with _TOOL_DEPENDENCY_STATS_LOCK:
         for key in _TOOL_DEPENDENCY_RESOLUTION_STATS:
@@ -751,6 +758,28 @@ def clear_vertical_tool_dependency_provider_cache() -> int:
         with _TOOL_DEPENDENCY_STATS_LOCK:
             _TOOL_DEPENDENCY_RESOLUTION_STATS["provider_cache_entries_cleared"] += count
     return count
+
+
+# CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+def register_vertical_tool_dependency_provider(
+    vertical: str,
+    provider: "BaseToolDependencyProvider",
+) -> None:
+    """Register a tool dependency provider programmatically.
+
+    Used by :class:`HostPluginContext.register_tool_dependency` so a plugin's
+    ``register(context)`` call can wire a dependency provider without the
+    sidecar ``victor.tool_dependencies`` entry-point group.
+
+    Args:
+        vertical: Vertical name (normalized internally).
+        provider: Provider instance implementing ``BaseToolDependencyProvider``.
+    """
+    vertical_name = normalize_vertical_name(vertical)
+    with _vertical_provider_cache_lock:
+        # Seed both canonicalization variants so downstream callers hit cache.
+        for canonicalize in (True, False):
+            _vertical_provider_cache[(vertical_name, canonicalize)] = provider
 
 
 def create_vertical_tool_dependency_provider(
@@ -821,7 +850,10 @@ def create_vertical_tool_dependency_provider(
             _increment_resolution_stat("entry_point_resolutions")
             with _vertical_provider_cache_lock:
                 _vertical_provider_cache[cache_key] = provider
-            logger.debug("Loaded tool dependency provider for '%s' from entry point", vertical_name)
+            logger.debug(
+                "Loaded tool dependency provider for '%s' from entry point",
+                vertical_name,
+            )
             return provider
         except Exception as e:
             _increment_resolution_stat("entry_point_load_failures")

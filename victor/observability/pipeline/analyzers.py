@@ -81,7 +81,16 @@ def detect_step_type(step_name: str, commands: str | list[str] | None = None) ->
     # Security patterns
     if any(
         kw in combined
-        for kw in ["security", "scan", "trivy", "snyk", "bandit", "safety", "audit", "cve"]
+        for kw in [
+            "security",
+            "scan",
+            "trivy",
+            "snyk",
+            "bandit",
+            "safety",
+            "audit",
+            "cve",
+        ]
     ):
         return StepType.SECURITY
 
@@ -747,7 +756,9 @@ COVERAGE_ANALYZERS: dict[str, CoverageAnalyzerProtocol] = {
 }
 
 
-def get_pipeline_analyzer(platform: PipelinePlatform) -> PipelineAnalyzerProtocol | None:
+def get_pipeline_analyzer(
+    platform: PipelinePlatform,
+) -> PipelineAnalyzerProtocol | None:
     """Get an analyzer for a specific CI/CD platform.
 
     Args:

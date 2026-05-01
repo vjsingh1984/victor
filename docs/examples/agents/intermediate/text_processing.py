@@ -7,17 +7,14 @@ from victor import Agent
 async def summarize_text(text: str, max_length: int = 100):
     """Summarize text to max length."""
     agent = Agent.create(temperature=0.3)
-    result = await agent.run(
-        f"Summarize this in {max_length} words or less:\n\n{text}"
-    )
+    result = await agent.run(f"Summarize this in {max_length} words or less:\n\n{text}")
     return result.content
 
 
 async def extract_entities(text: str):
     """Extract named entities from text."""
     agent = Agent.create(temperature=0.2)
-    result = await agent.run(
-        f"""Extract named entities from this text:
+    result = await agent.run(f"""Extract named entities from this text:
         {text}
 
         Identify:
@@ -25,32 +22,27 @@ async def extract_entities(text: str):
         - Organizations
         - Locations
         - Dates
-        - Numbers"""
-    )
+        - Numbers""")
     return result.content
 
 
 async def sentiment_analysis(text: str):
     """Analyze sentiment of text."""
     agent = Agent.create(temperature=0.2)
-    result = await agent.run(
-        f"""Analyze the sentiment of this text:
+    result = await agent.run(f"""Analyze the sentiment of this text:
         "{text}"
 
         Provide:
         1. Overall sentiment (positive/negative/neutral)
         2. Confidence score (0-1)
-        3. Key phrases that indicate sentiment"""
-    )
+        3. Key phrases that indicate sentiment""")
     return result.content
 
 
 async def translate_text(text: str, target_language: str = "Spanish"):
     """Translate text to target language."""
     agent = Agent.create(temperature=0.3)
-    result = await agent.run(
-        f"Translate this to {target_language}:\n\n{text}"
-    )
+    result = await agent.run(f"Translate this to {target_language}:\n\n{text}")
     return result.content
 
 

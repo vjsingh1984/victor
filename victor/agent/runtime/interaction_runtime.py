@@ -8,63 +8,76 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
-from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
+from victor.runtime.context import ResolvedRuntimeServices
 
 
 @dataclass(frozen=True)
 class InteractionRuntimeComponents:
     """Interaction runtime handles exposed to the orchestrator facade."""
 
-    chat_coordinator: LazyRuntimeProxy[Any]
-    tool_coordinator: LazyRuntimeProxy[Any]
-    session_coordinator: LazyRuntimeProxy[Any]
+    chat_service: Any
+    tool_service: Any
+    session_service: Any
+    context_service: Any
+    recovery_service: Any
 
 
 def create_interaction_runtime_components(
     *,
-    orchestrator: Any,
+    enabled_tools: Optional[Any],
     factory: Any,
     tool_pipeline: Any,
     tool_registry: Any,
+    tool_executor: Any,
+    tool_cache: Any,
+    tool_budget: int,
     tool_selector: Any,
     tool_access_controller: Any,
     mode_controller: Any,
+    argument_normalizer: Any,
     session_state_manager: Any,
     lifecycle_manager: Any,
     memory_manager: Any,
+    memory_session_id: Optional[str],
     checkpoint_manager: Any,
     cost_tracker: Any,
+    conversation_controller: Any,
+    streaming_coordinator: Any,
+    runtime_services: Optional[ResolvedRuntimeServices] = None,
 ) -> InteractionRuntimeComponents:
-    """Create lazy interaction/runtime coordinator components."""
+    """Create service-first interaction/runtime components for orchestrator wiring."""
+    from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+    from victor.agent.services.recovery_service import RecoveryService
+    from victor.agent.services.session_service import SessionService
+    from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+    resolved_services = runtime_services or ResolvedRuntimeServices()
 
-    def _build_chat_coordinator() -> Any:
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
-
-        coordinator = ChatCoordinator(orchestrator)
-        if hasattr(factory, "create_streaming_chat_pipeline"):
-            pipeline = factory.create_streaming_chat_pipeline(coordinator)
-            coordinator.set_streaming_pipeline(pipeline)
-        return coordinator
-
-    def _build_tool_coordinator() -> Any:
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
-
-        coordinator = ToolCoordinator(
-            tool_pipeline=tool_pipeline,
-            tool_registry=tool_registry,
+    resolved_tool_service = resolved_services.tool
+    if resolved_tool_service is None:
+        resolved_tool_service = ToolService(
+            config=ToolServiceConfig(default_tool_budget=tool_budget),
             tool_selector=tool_selector,
-            tool_access_controller=tool_access_controller,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registry,
         )
-        coordinator.set_mode_controller(mode_controller)
-        coordinator.set_orchestrator_reference(orchestrator)
-        return coordinator
 
-    def _build_session_coordinator() -> Any:
-        from victor.agent.coordinators.session_coordinator import create_session_coordinator
+    if hasattr(resolved_tool_service, "bind_runtime_components"):
+        resolved_tool_service.bind_runtime_components(
+            tool_registry=tool_registry,
+            tool_pipeline=tool_pipeline,
+            tool_cache=tool_cache,
+            mode_controller=mode_controller,
+            argument_normalizer=argument_normalizer,
+        )
 
-        return create_session_coordinator(
+    if enabled_tools and hasattr(resolved_tool_service, "set_enabled_tools"):
+        resolved_tool_service.set_enabled_tools(enabled_tools)
+
+    resolved_session_service = resolved_services.session
+    if resolved_session_service is None:
+        resolved_session_service = SessionService(
             session_state_manager=session_state_manager,
             lifecycle_manager=lifecycle_manager,
             memory_manager=memory_manager,
@@ -72,17 +85,46 @@ def create_interaction_runtime_components(
             cost_tracker=cost_tracker,
         )
 
+    if hasattr(resolved_session_service, "bind_runtime_components"):
+        resolved_session_service.bind_runtime_components(
+            lifecycle_manager=lifecycle_manager,
+            memory_manager=memory_manager,
+            checkpoint_manager=checkpoint_manager,
+            cost_tracker=cost_tracker,
+            memory_session_id=memory_session_id,
+        )
+
+    resolved_context_service = resolved_services.context
+    if resolved_context_service is None:
+        from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
+        resolved_context_service = ContextServiceAdapter(
+            conversation_controller=conversation_controller,
+        )
+
+    resolved_recovery_service = resolved_services.recovery
+    if resolved_recovery_service is None:
+        resolved_recovery_service = RecoveryService()
+
+    resolved_chat_service = resolved_services.chat
+    if resolved_chat_service is None:
+        resolved_chat_service = ChatService(
+            config=ChatServiceConfig(
+                max_iterations=200,
+                stream_chunk_size=100,
+            ),
+            provider_service=resolved_services.provider,
+            tool_service=resolved_tool_service,
+            context_service=resolved_context_service,
+            recovery_service=resolved_recovery_service,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
+        )
+
     return InteractionRuntimeComponents(
-        chat_coordinator=LazyRuntimeProxy(
-            factory=_build_chat_coordinator,
-            name="chat_coordinator",
-        ),
-        tool_coordinator=LazyRuntimeProxy(
-            factory=_build_tool_coordinator,
-            name="tool_coordinator",
-        ),
-        session_coordinator=LazyRuntimeProxy(
-            factory=_build_session_coordinator,
-            name="session_coordinator",
-        ),
+        chat_service=resolved_chat_service,
+        tool_service=resolved_tool_service,
+        session_service=resolved_session_service,
+        context_service=resolved_context_service,
+        recovery_service=resolved_recovery_service,
     )

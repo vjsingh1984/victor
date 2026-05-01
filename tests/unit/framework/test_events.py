@@ -38,6 +38,11 @@ class TestCustomEventType:
         assert d["metadata"]["custom_type"] == "my.event"
         assert d["content"] == "data"
 
+    def test_event_type_alias_matches_enum_value(self):
+        """event_type should expose the canonical string value of the enum."""
+        event = AgentExecutionEvent(type=EventType.CONTENT, content="hello")
+        assert event.event_type == "content"
+
     def test_custom_event_with_extra_metadata(self):
         """User metadata should be preserved alongside custom_type."""
         event = custom_event(

@@ -51,7 +51,8 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type, Union
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ConstraintsProtocol
@@ -373,8 +374,28 @@ def register_builtin_providers() -> None:
     logger.debug("Registered built-in sandbox providers")
 
 
-# Type alias for sandbox types
-SandboxType = Literal["none", "process", "docker"]
+# =============================================================================
+# Enums for Workflow Isolation
+# =============================================================================
+
+
+class SandboxType(str, Enum):
+    """Sandbox type for workflow execution.
+
+    Isolation levels for workflow node execution:
+    - NONE: Direct inline execution (fastest, least isolation)
+    - PROCESS: Subprocess with resource limits via rlimit
+    - DOCKER: Full container isolation (safest, slower startup)
+    """
+
+    NONE = "none"  # Direct inline execution
+    PROCESS = "process"  # Subprocess with resource limits
+    DOCKER = "docker"  # Full container isolation
+
+
+# Backward compatibility
+_SandboxTypeLiteral = Literal["none", "process", "docker"]
+
 
 # Deployment target hierarchy:
 # - Local: execution on the same machine
@@ -389,25 +410,75 @@ SandboxType = Literal["none", "process", "docker"]
 #   - airflow: Airflow DAG trigger (orchestration API)
 #   - api: Generic REST API endpoint
 
-ExecutionLocality = Literal["local", "remote"]
 
-LocalTarget = Literal[
-    "inline",  # Direct process execution (fastest)
-    "subprocess",  # OS subprocess with rlimit
-    "docker",  # Local Docker container
-    "kubernetes",  # Local K8s (minikube, kind)
-]
+class ExecutionLocality(str, Enum):
+    """Execution locality for workflow nodes.
 
-RemoteTarget = Literal[
-    "docker",  # Remote Docker daemon
-    "kubernetes",  # Generic remote K8s
-    "eks",  # AWS EKS
-    "aks",  # Azure AKS
-    "gke",  # Google GKE
-    "ecs",  # AWS ECS Fargate
-    "airflow",  # Airflow DAG trigger
-    "api",  # Generic REST API
-]
+    Determines whether execution happens locally or on remote infrastructure.
+    """
+
+    LOCAL = "local"  # Execute on local machine
+    REMOTE = "remote"  # Execute on remote infrastructure
+
+
+# Backward compatibility
+_ExecutionLocalityLiteral = Literal["local", "remote"]
+
+
+class LocalTarget(str, Enum):
+    """Local execution target type.
+
+    Determines how to execute workflows locally:
+    - inline: Direct process execution (fastest)
+    - subprocess: OS subprocess with rlimit
+    - docker: Local Docker container
+    - kubernetes: Local K8s (minikube, kind)
+    """
+
+    INLINE = "inline"  # Direct process execution (fastest)
+    SUBPROCESS = "subprocess"  # OS subprocess with rlimit
+    DOCKER = "docker"  # Local Docker container
+    KUBERNETES = "kubernetes"  # Local K8s (minikube, kind)
+
+
+class RemoteTarget(str, Enum):
+    """Remote execution target type.
+
+    Determines which remote infrastructure to use:
+    - docker: Remote Docker daemon
+    - kubernetes: Generic remote K8s
+    - eks: AWS EKS
+    - aks: Azure AKS
+    - gke: Google GKE
+    - ecs: AWS ECS Fargate
+    - airflow: Airflow DAG trigger
+    - api: Generic REST API
+    """
+
+    DOCKER = "docker"  # Remote Docker daemon
+    KUBERNETES = "kubernetes"  # Generic remote K8s
+    EKS = "eks"  # AWS EKS
+    AKS = "aks"  # Azure AKS
+    GKE = "gke"  # Google GKE
+    ECS = "ecs"  # AWS ECS Fargate
+    AIRFLOW = "airflow"  # Airflow DAG trigger
+    API = "api"  # Generic REST API
+
+
+class NetworkProtocol(str, Enum):
+    """Network protocol for connecting to execution targets.
+
+    Determines how to communicate with remote infrastructure:
+    - LOCAL: No network connection needed (inline, subprocess)
+    - DOCKER: Docker daemon socket/API
+    - K8S: Kubernetes API server
+    - HTTP: Generic HTTP/HTTPS REST API
+    """
+
+    LOCAL = "local"  # No network connection
+    DOCKER = "docker"  # Docker daemon socket/API
+    K8S = "k8s"  # Kubernetes API server
+    HTTP = "http"  # Generic HTTP/HTTPS REST API
 
 
 @dataclass
@@ -472,11 +543,11 @@ class ConnectionConfig:
 
     Example:
         # Local Docker
-        config = ConnectionConfig(protocol="docker", endpoint="unix:///var/run/docker.sock")
+        config = ConnectionConfig(protocol=NetworkProtocol.DOCKER, endpoint="unix:///var/run/docker.sock")
 
         # Remote EKS
         config = ConnectionConfig(
-            protocol="k8s",
+            protocol=NetworkProtocol.K8S,
             auth_method="iam",
             region="us-west-2",
         )
@@ -554,16 +625,16 @@ class DeploymentConfig:
 
     Example (Local Docker):
         config = DeploymentConfig(
-            locality="local",
-            target="docker",
+            locality=ExecutionLocality.LOCAL,
+            target=LocalTarget.DOCKER,
         )
 
     Example (Remote EKS):
         config = DeploymentConfig(
-            locality="remote",
-            target="eks",
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.EKS,
             connection=ConnectionConfig(
-                protocol="k8s",
+                protocol=NetworkProtocol.K8S,
                 auth_method="iam",
                 region="us-west-2",
             ),
@@ -574,8 +645,8 @@ class DeploymentConfig:
 
     Example (Airflow handoff):
         config = DeploymentConfig(
-            locality="remote",
-            target="airflow",
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.AIRFLOW,
             connection=ConnectionConfig(
                 protocol="http",
                 endpoint="https://airflow.company.com/api/v1",
@@ -584,8 +655,8 @@ class DeploymentConfig:
         )
     """
 
-    locality: ExecutionLocality = "local"
-    target: str = "inline"  # LocalTarget or RemoteTarget
+    locality: ExecutionLocality = ExecutionLocality.LOCAL
+    target: Union[LocalTarget, RemoteTarget] = LocalTarget.INLINE  # type: ignore[assignment]
     connection: Optional[ConnectionConfig] = None
     cluster_name: Optional[str] = None
     namespace: Optional[str] = "default"
@@ -651,17 +722,17 @@ class DeploymentConfig:
     @classmethod
     def local_inline(cls) -> "DeploymentConfig":
         """Create config for direct inline execution."""
-        return cls(locality="local", target="inline")
+        return cls(locality=ExecutionLocality.LOCAL, target=LocalTarget.INLINE)
 
     @classmethod
     def local_subprocess(cls) -> "DeploymentConfig":
         """Create config for sandboxed subprocess execution."""
-        return cls(locality="local", target="subprocess")
+        return cls(locality=ExecutionLocality.LOCAL, target=LocalTarget.SUBPROCESS)
 
     @classmethod
     def local_docker(cls, image: Optional[str] = None) -> "DeploymentConfig":
         """Create config for local Docker execution."""
-        return cls(locality="local", target="docker")
+        return cls(locality=ExecutionLocality.LOCAL, target=LocalTarget.DOCKER)
 
     @classmethod
     def remote_eks(
@@ -673,9 +744,11 @@ class DeploymentConfig:
     ) -> "DeploymentConfig":
         """Create config for AWS EKS execution."""
         return cls(
-            locality="remote",
-            target="eks",
-            connection=ConnectionConfig(protocol="k8s", auth_method="iam", region=region),
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.EKS,
+            connection=ConnectionConfig(
+                protocol=NetworkProtocol.K8S, auth_method="iam", region=region
+            ),
             cluster_name=cluster_name,
             namespace=namespace,
             gpu_required=gpu,
@@ -690,10 +763,10 @@ class DeploymentConfig:
     ) -> "DeploymentConfig":
         """Create config for Airflow DAG trigger."""
         return cls(
-            locality="remote",
-            target="airflow",
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.AIRFLOW,
             connection=ConnectionConfig(
-                protocol="http",
+                protocol=NetworkProtocol.HTTP,
                 endpoint=endpoint,
                 auth_method=auth_method,
             ),
@@ -933,6 +1006,9 @@ class IsolationMapper:
 
         # AirgappedConstraints: Maximum isolation without network
         if isinstance(constraints, AirgappedConstraints):
+            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+            set_active_write_policy(WritePathPolicy.read_only())
             sandbox_type = "none"  # No external dependencies
             network_allowed = False
             filesystem_readonly = True
@@ -940,6 +1016,9 @@ class IsolationMapper:
 
         # ComputeOnlyConstraints: Process isolation, no LLM
         elif isinstance(constraints, ComputeOnlyConstraints):
+            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+            set_active_write_policy(WritePathPolicy.read_only())
             if sandbox_type == "none":
                 sandbox_type = "process"  # Upgrade to process isolation
             network_allowed = constraints.network_allowed
@@ -947,6 +1026,9 @@ class IsolationMapper:
 
         # FullAccessConstraints: Docker if available
         elif isinstance(constraints, FullAccessConstraints):
+            from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+            set_active_write_policy(WritePathPolicy.full_access())
             sandbox_type = "docker"
             network_allowed = True
             filesystem_readonly = False
@@ -962,8 +1044,20 @@ class IsolationMapper:
             if hasattr(constraints, "network_allowed"):
                 network_allowed = constraints.network_allowed
 
-            # Check write setting for filesystem
-            if hasattr(constraints, "write_allowed"):
+            # Path-tiered write policy takes precedence over binary write_allowed
+            write_path_policy = getattr(constraints, "write_path_policy", None)
+            if write_path_policy is not None:
+                from victor.tools.write_path_policy import set_active_write_policy
+
+                set_active_write_policy(write_path_policy)
+                filesystem_readonly = False  # per-path enforcement governs
+            elif hasattr(constraints, "write_allowed"):
+                from victor.tools.write_path_policy import WritePathPolicy, set_active_write_policy
+
+                if constraints.write_allowed:
+                    set_active_write_policy(WritePathPolicy.full_access())
+                else:
+                    set_active_write_policy(WritePathPolicy.read_only())
                 filesystem_readonly = not constraints.write_allowed
 
             # Update timeout from constraints

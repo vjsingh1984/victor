@@ -28,6 +28,7 @@ For embedding models:
 - OpenAI: pip install openai (requires API key)
 """
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -48,6 +49,16 @@ from victor.storage.vector_stores.models import (
     EmbeddingModelConfig,
     create_embedding_model,
 )
+
+logger = logging.getLogger(__name__)
+
+_SEARCH_METADATA_EXCLUDE_KEYS = {
+    "vector",
+    "content",
+    "file_path",
+    "symbol_name",
+    "line_number",
+}
 
 
 class LanceDBProvider(BaseEmbeddingProvider):
@@ -111,30 +122,23 @@ class LanceDBProvider(BaseEmbeddingProvider):
         self.embedding_model = create_embedding_model(embedding_config)
         await self.embedding_model.initialize()
 
-        print("🔧 Initializing LanceDB provider")
-        print("📦 Vector Store: LanceDB")
-        print(f"🤖 Embedding Model: {model_name} ({model_type})")
-
         # Setup LanceDB
         persist_dir = self.config.persist_directory
         if persist_dir:
             persist_dir = Path(persist_dir).expanduser()
             persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Using persistent storage: {persist_dir}")
         else:
             # LanceDB requires a directory, use centralized path
             from victor.config.settings import get_project_paths
 
             persist_dir = get_project_paths().global_embeddings_dir / "lancedb"
             persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Using default storage: {persist_dir}")
 
         # Connect to LanceDB
         self.db = lancedb.connect(str(persist_dir))
 
         # Get or create table
         table_name = self.config.extra_config.get("table_name", "embeddings")
-        print(f"📚 Table: {table_name}")
 
         # Check if table exists
         from victor.storage.vector_stores._lancedb_compat import get_table_names
@@ -143,13 +147,12 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if table_name not in existing_tables:
             # Create empty table with schema
             # We'll add data later when indexing
-            print(f"📝 Creating new table: {table_name}")
+            logger.info(f"Creating new LanceDB table: {table_name}")
         else:
             self.table = self.db.open_table(table_name)
-            print(f"📖 Opened existing table: {table_name}")
+            logger.debug(f"Opened existing LanceDB table: {table_name}")
 
         self._initialized = True
-        print("✅ LanceDB provider initialized!")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.
@@ -295,7 +298,11 @@ class LanceDBProvider(BaseEmbeddingProvider):
                     content=result.get("content", ""),
                     score=score,
                     line_number=result.get("line_number"),
-                    metadata={k: v for k, v in result.items() if not k.startswith("_")},
+                    metadata={
+                        k: v
+                        for k, v in result.items()
+                        if not k.startswith("_") and k not in _SEARCH_METADATA_EXCLUDE_KEYS
+                    },
                 )
             )
 
@@ -387,7 +394,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model_name": self.config.embedding_model_name,
-            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
+            "dimension": (self.embedding_model.get_dimension() if self.embedding_model else 4096),
             "distance_metric": self.config.distance_metric,
             "table_name": self.config.extra_config.get("table_name", "embeddings"),
             "persist_directory": self.config.persist_directory,

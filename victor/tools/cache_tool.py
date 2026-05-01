@@ -28,7 +28,9 @@ from victor.storage.cache.tiered_cache import TieredCache
 logger = logging.getLogger(__name__)
 
 
-def _get_cache_manager(context: Optional[Dict[str, Any]] = None) -> Optional[TieredCache]:
+def _get_cache_manager(
+    context: Optional[Dict[str, Any]] = None,
+) -> Optional[TieredCache]:
     """Get cache manager from execution context.
 
     Args:
@@ -174,7 +176,7 @@ async def cache(
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Unified cache management tool for Victor's tiered caching system.
+    Manage Victor caches: inspect, clear, and optimize cached data.
 
     Actions:
     - stats: Get cache statistics and performance metrics

@@ -52,6 +52,7 @@ from victor.integrations.api.change_tracker_ops import (
     undo_last_change,
 )
 from victor.integrations.api.middleware import APIMiddlewareStack
+from victor.runtime.chat_runtime import resolve_chat_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -262,9 +263,10 @@ class VictorAPIServer:
 
             # Get or create orchestrator
             orchestrator = await self._get_orchestrator()
+            chat_runtime = resolve_chat_runtime(orchestrator)
 
             # Process chat
-            response = await orchestrator.chat(messages[-1].get("content", ""))
+            response = await chat_runtime.chat(messages[-1].get("content", ""))
 
             # CompletionResponse is a Pydantic model; access attributes
             content = getattr(response, "content", None) or ""
@@ -299,9 +301,10 @@ class VictorAPIServer:
                 return response
 
             orchestrator = await self._get_orchestrator()
+            chat_runtime = resolve_chat_runtime(orchestrator)
 
             # Stream response
-            async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
+            async for chunk in chat_runtime.stream_chat(messages[-1].get("content", "")):
                 # Support both dict and StreamChunk objects
                 if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
                     content = getattr(chunk, "content", "")
@@ -317,7 +320,10 @@ class VictorAPIServer:
                     if chunk.get("type") == "content":
                         event = {"type": "content", "content": chunk.get("content", "")}
                     elif chunk.get("type") == "tool_call":
-                        event = {"type": "tool_call", "tool_call": chunk.get("tool_call", {})}
+                        event = {
+                            "type": "tool_call",
+                            "tool_call": chunk.get("tool_call", {}),
+                        }
                     else:
                         event = chunk
 
@@ -597,7 +603,7 @@ class VictorAPIServer:
     async def _list_tools(self, request: Request) -> Response:
         """List available tools with their metadata."""
         try:
-            from victor.tools.base import CostTier, ToolRegistry
+            from victor.tools.registry import CostTier, ToolRegistry
 
             # ToolRegistry is not a singleton; instantiate to list registered tools
             registry = ToolRegistry()
@@ -620,7 +626,7 @@ class VictorAPIServer:
                         "description": tool.description or "",
                         "category": category,
                         "cost_tier": cost_tier,
-                        "parameters": tool.parameters if hasattr(tool, "parameters") else {},
+                        "parameters": (tool.parameters if hasattr(tool, "parameters") else {}),
                         "is_dangerous": self._is_dangerous_tool(tool.name),
                         "requires_approval": cost_tier in ("medium", "high")
                         or self._is_dangerous_tool(tool.name),
@@ -962,9 +968,10 @@ class VictorAPIServer:
                 return
 
             orchestrator = await self._get_orchestrator()
+            chat_runtime = resolve_chat_runtime(orchestrator)
 
             try:
-                async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
+                async for chunk in chat_runtime.stream_chat(messages[-1].get("content", "")):
                     if chunk.get("type") == "content":
                         await ws.send_json({"type": "content", "content": chunk["content"]})
                     elif chunk.get("type") == "tool_call":
@@ -1040,14 +1047,17 @@ class VictorAPIServer:
             logger.warning(f"Delayed shutdown encountered error: {e}")
 
     async def _get_orchestrator(self) -> Any:
-        """Get or create the orchestrator."""
+        """Get or create the orchestrator via AgentFactory."""
         if self._orchestrator is None:
-            from victor.agent.orchestrator import AgentOrchestrator
             from victor.config.settings import load_settings
+            from victor.framework.agent_factory import AgentFactory
 
             settings = load_settings()
-            # Create orchestrator with settings
-            self._orchestrator = await AgentOrchestrator.from_settings(settings)
+            factory = AgentFactory(
+                settings=settings,
+                enable_observability=True,
+            )
+            self._orchestrator = await factory.create()
 
         return self._orchestrator
 
@@ -1161,7 +1171,14 @@ class VictorAPIServer:
 
             # Walk directory tree (limit depth)
             max_depth = int(request.query.get("depth", "3"))
-            exclude_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".victor"}
+            exclude_dirs = {
+                ".git",
+                "node_modules",
+                "__pycache__",
+                ".venv",
+                "venv",
+                ".victor",
+            }
 
             def scan_dir(path: Path, depth: int = 0) -> Dict[str, Any]:
                 if depth > max_depth:
@@ -1178,7 +1195,10 @@ class VictorAPIServer:
                     for entry in sorted(
                         path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())
                     ):
-                        if entry.name.startswith(".") and entry.name not in {".github", ".vscode"}:
+                        if entry.name.startswith(".") and entry.name not in {
+                            ".github",
+                            ".vscode",
+                        }:
                             continue
                         if entry.name in exclude_dirs:
                             continue
@@ -1320,14 +1340,26 @@ class VictorAPIServer:
 
             secret_patterns = [
                 (r'(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[\w-]{20,}', "API Key"),
-                (r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}', "Secret/Password"),
+                (
+                    r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}',
+                    "Secret/Password",
+                ),
                 (r"(?i)bearer\s+[\w-]{20,}", "Bearer Token"),
                 (r"sk-[a-zA-Z0-9]{20,}", "OpenAI API Key"),
                 (r"ghp_[a-zA-Z0-9]{36}", "GitHub Token"),
                 (r"AKIA[A-Z0-9]{16}", "AWS Access Key"),
             ]
 
-            code_extensions = {".py", ".ts", ".js", ".json", ".yaml", ".yml", ".env", ".sh"}
+            code_extensions = {
+                ".py",
+                ".ts",
+                ".js",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".env",
+                ".sh",
+            }
 
             for path in root.rglob("*"):
                 if path.is_file() and path.suffix.lower() in code_extensions:
@@ -2133,6 +2165,7 @@ class VictorAPIServer:
             async def run_agent():
                 try:
                     orchestrator = await self._get_orchestrator()
+                    chat_runtime = resolve_chat_runtime(orchestrator)
                     agent_data = self._agents.get(agent_id)
                     if not agent_data:
                         return
@@ -2140,7 +2173,7 @@ class VictorAPIServer:
                     # Track tool calls
                     tool_calls = []
 
-                    async for chunk in orchestrator.stream_chat(task):
+                    async for chunk in chat_runtime.stream_chat(task):
                         if agent_id not in self._agents:
                             break  # Agent was cancelled/deleted
 
@@ -2234,7 +2267,8 @@ class VictorAPIServer:
             agent = self._agents[agent_id]
             if agent.get("status") != "running":
                 return web.json_response(
-                    {"error": f"Agent is not running (status: {agent.get('status')})"}, status=400
+                    {"error": f"Agent is not running (status: {agent.get('status')})"},
+                    status=400,
                 )
 
             # Cancel the task
@@ -2294,7 +2328,11 @@ class VictorAPIServer:
                 cleared += 1
 
             return web.json_response(
-                {"success": True, "cleared": cleared, "message": f"Cleared {cleared} agents"}
+                {
+                    "success": True,
+                    "cleared": cleared,
+                    "message": f"Cleared {cleared} agents",
+                }
             )
 
         except Exception as e:
@@ -2405,7 +2443,11 @@ class VictorAPIServer:
             plan["approved_at"] = asyncio.get_event_loop().time()
 
             return web.json_response(
-                {"success": True, "message": f"Plan {plan_id} approved", "status": "approved"}
+                {
+                    "success": True,
+                    "message": f"Plan {plan_id} approved",
+                    "status": "approved",
+                }
             )
 
         except Exception as e:

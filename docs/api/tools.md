@@ -763,8 +763,207 @@ def configure_tools(tools: ToolsInput) -> ToolSet:
     return tools
 ```
 
+## Tool Deduplication
+
+Victor automatically deduplicates tools across multiple sources (native, LangChain, MCP, plugins) to prevent redundant tools and save tokens.
+
+### ToolSource Enum
+
+```python
+class ToolSource(str, Enum):
+    """Tool source with priority for deduplication resolution."""
+    
+    NATIVE = "native"          # Priority: 100 (highest)
+    LANGCHAIN = "langchain"    # Priority: 75
+    MCP = "mcp"                # Priority: 50
+    PLUGIN = "plugin"          # Priority: 25 (lowest)
+```
+
+### DeduplicationConfig
+
+```python
+from victor.tools.deduplication import DeduplicationConfig
+
+config = DeduplicationConfig(
+    enabled=True,
+    priority_order=["native", "langchain", "mcp", "plugin"],
+    whitelist=[],              # Tools to always allow
+    blacklist=[],              # Tools to always skip
+    strict_mode=False,         # Fail on conflicts vs. log and skip
+    naming_enforcement=True,   # Enforce lgc_*, mcp_*, plg_* prefixes
+    semantic_similarity_threshold=0.85
+)
+```
+
+### ToolDeduplicator
+
+```python
+from victor.tools.deduplication import ToolDeduplicator
+
+deduplicator = ToolDeduplicator(config)
+result = deduplicator.deduplicate(tools)
+
+# Result contains:
+# - kept_tools: List of tools to register
+# - skipped_tools: List of tools skipped due to conflicts
+# - conflicts_resolved: Number of conflicts detected
+# - logs: List of log messages
+```
+
+### Unified Naming Convention
+
+Tools from different sources use consistent prefixes:
+
+| Source | Prefix | Example | Priority |
+|--------|--------|---------|----------|
+| Native | none | `read`, `write`, `search` | 1 (highest) |
+| LangChain | `lgc_` | `lgc_wikipedia`, `lgc_wolfram_alpha` | 2 |
+| MCP | `mcp_` | `mcp_github_search`, `mcp_filesystem_read` | 3 |
+| Plugin | `plg_` | `plg_custom_tool` | 4 (lowest) |
+
+### Configuration
+
+```python
+from victor.config.tool_settings import ToolSettings
+
+settings = ToolSettings(
+    enable_tool_deduplication=True,
+    deduplication_priority_order=["native", "langchain", "mcp", "plugin"],
+    deduplication_whitelist=[],
+    deduplication_blacklist=[],
+    deduplication_strict_mode=False,
+    deduplication_naming_enforcement=True,
+    deduplication_semantic_threshold=0.85
+)
+```
+
+### Usage Example
+
+```python
+from victor.tools.registry import ToolRegistry
+from victor.tools.deduplication import ToolDeduplicator, DeduplicationConfig
+
+# Create registry with deduplication enabled
+config = DeduplicationConfig(enabled=True)
+registry = ToolRegistry(deduplication_config=config)
+
+# Register tools - deduplication happens automatically
+registry.register(native_tool)
+registry.register(langchain_adapter)  # Skipped if conflicts with native
+registry.register(mcp_adapter)        # Skipped if conflicts with native/langchain
+
+# Get deduplicated tool set
+tools = registry.list_tools(only_enabled=True)
+# Only includes highest priority tools from each conflict group
+```
+
+### Programmatic Usage
+
+```python
+from victor.tools.deduplication import ToolDeduplicator, DeduplicationConfig
+
+# Create deduplicator
+config = DeduplicationConfig(
+    enabled=True,
+    priority_order=["native", "langchain", "mcp"],
+    whitelist=["special_tool"],  # Always allow this tool
+    naming_enforcement=True
+)
+deduplicator = ToolDeduplicator(config)
+
+# Deduplicate tool list
+tools = [native_search, langchain_search, mcp_search]
+result = deduplicator.deduplicate(tools)
+
+# Check results
+print(f"Kept {len(result.kept_tools)} tools")
+print(f"Skipped {len(result.skipped_tools)} tools")
+print(f"Resolved {result.conflicts_resolved} conflicts")
+
+# Use kept tools
+for tool in result.kept_tools:
+    print(f"Registered: {tool.name}")
+```
+
+### Conflict Detection
+
+Tools are compared by **normalized name**:
+1. Convert to lowercase
+2. Remove source prefixes (`lgc_`, `mcp_`, `plg_`)
+3. Normalize separators (`_`, `-` → space)
+4. Remove extra whitespace
+
+**Examples**:
+- `search` ↔ `web_search` ↔ `lgc_search` → **Conflict** (same base name after normalization)
+- `read_file` ↔ `read` → **No conflict** (different base names)
+
+### Priority Resolution
+
+When conflicts are detected:
+1. Extract source of both tools (native, langchain, mcp, plugin)
+2. Compare priority weights
+3. Keep higher priority tool
+4. Skip lower priority tool
+5. Log resolution with reason
+
+**Example**:
+```python
+# Native 'search' (priority 100) vs LangChain 'search' (priority 75)
+# Result: Native tool kept, LangChain tool skipped
+
+# Logs show:
+# "Conflict resolved: kept search (source=native), skipped 1 lower-priority tools"
+# "Skipped lgc_search (source=langchain) in favor of search"
+```
+
+### NamingEnforcer
+
+```python
+from victor.tools.deduplication import NamingEnforcer, ToolSource
+
+enforcer = NamingEnforcer(enforce=True)
+
+# Enforce naming convention
+new_name = enforcer.enforce_name(tool, ToolSource.LANGCHAIN)
+# Input: "wikipedia"
+# Output: "lgc_wikipedia"
+
+# Strip prefix
+original = enforcer.strip_prefix("lgc_wikipedia")
+# Output: "wikipedia"
+
+# Detect source from name
+source = enforcer.detect_source_from_name("lgc_wikipedia")
+# Output: ToolSource.LANGCHAIN
+```
+
+### Troubleshooting Deduplication
+
+**Tool not appearing in list**:
+```python
+# Check if tool was skipped due to deduplication
+import logging
+logging.basicConfig(level=logging.DEBUG)
+# Logs will show: "Skipped lgc_search (source=langchain) in favor of search"
+```
+
+**Both tools needed**:
+```python
+# Add to whitelist to bypass deduplication
+config = DeduplicationConfig(
+    whitelist=["special_tool", "custom_search"]
+)
+```
+
+**Check tool source**:
+```python
+# Tool has _tool_source attribute
+print(tool._tool_source)  # "native", "langchain", "mcp", or "plugin"
+```
+
 ## See Also
 
 - [Agent API](agent.md) - Agent creation with tools
-- [Configuration API](config.md) - Tool configuration in profiles
+- [Configuration API](../users/reference/config.md) - Tool configuration in profiles
 - [Core APIs](core.md) - Tool execution framework
+- [Tool Deduplication Architecture](../architecture/tool-deduplication.md) - Detailed design documentation

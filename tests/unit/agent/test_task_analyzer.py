@@ -14,7 +14,11 @@
 
 """Tests for the unified TaskAnalyzer."""
 
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from victor.agent.task_analyzer import (
     TaskAnalyzer,
     TaskAnalysis,
@@ -201,7 +205,10 @@ class TestTaskAnalyzer:
         result = analyzer.analyze("Create a new file called hello.py")
 
         assert isinstance(result, TaskAnalysis)
-        assert result.action_intent in [ActionIntent.WRITE_ALLOWED, ActionIntent.AMBIGUOUS]
+        assert result.action_intent in [
+            ActionIntent.WRITE_ALLOWED,
+            ActionIntent.AMBIGUOUS,
+        ]
 
     def test_analyze_display_request(self):
         """Test analyzing a display-only request."""
@@ -234,6 +241,15 @@ class TestTaskAnalyzer:
         # Display request - should not authorize writes
         result2 = analyzer.check_write_authorization("Show me the contents of README.md")
         assert isinstance(result2, bool)
+
+    def test_unified_classifier_uses_runtime_intelligence_when_configured(self):
+        """TaskAnalyzer should build its unified classifier on the canonical runtime service."""
+        runtime_intelligence = MagicMock()
+        analyzer = TaskAnalyzer(runtime_intelligence=runtime_intelligence)
+
+        classifier = analyzer.unified_classifier
+
+        assert classifier._runtime_intelligence is runtime_intelligence
 
     def test_is_simple_query(self):
         """Test is_simple_query helper."""
@@ -272,14 +288,36 @@ class TestTaskAnalyzer:
         _ = analyzer.action_authorizer
         assert analyzer._action_authorizer is not None
 
-    def test_set_coordinator(self):
-        """Test setting the coordinator."""
+    def test_set_coordination_advisor(self):
+        """Test setting the canonical coordination advisor."""
         analyzer = TaskAnalyzer()
-        mock_coordinator = MagicMock()
+        advisor = MagicMock()
 
-        analyzer.set_coordinator(mock_coordinator)
+        analyzer.set_coordination_advisor(advisor)
 
-        assert analyzer._coordinator is mock_coordinator
+        assert analyzer._coordination_advisor is advisor
+
+    def test_set_coordinator_warns_and_updates_coordination_advisor(self):
+        """Deprecated coordinator setter should map to the canonical advisor surface."""
+        analyzer = TaskAnalyzer()
+        advisor = MagicMock()
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="TaskAnalyzer.set_coordinator\\(\\.\\.\\.\\) is deprecated",
+        ):
+            analyzer.set_coordinator(advisor)
+
+        assert analyzer._coordination_advisor is advisor
+
+    def test_set_coordination_runtime(self):
+        """Test setting the canonical coordination runtime."""
+        analyzer = TaskAnalyzer()
+        coordination_runtime = MagicMock()
+
+        analyzer.set_coordination_runtime(coordination_runtime)
+
+        assert analyzer._coordination_runtime is coordination_runtime
 
     def test_classify_task_keywords(self):
         """Test classify_task_keywords method."""
@@ -302,6 +340,89 @@ class TestTaskAnalyzer:
         assert isinstance(result, TaskAnalysis)
         # No coordinator means no suggestions
         assert not result.has_team_suggestion
+
+    def test_analyze_with_suggestions_uses_coordination_runtime_when_available(self):
+        """TaskAnalyzer should prefer the service-owned coordination runtime when bound."""
+        coordination_runtime = MagicMock()
+        analyzer = TaskAnalyzer(
+            coordination_runtime=coordination_runtime,
+            runtime_subject=SimpleNamespace(name="runtime"),
+        )
+        suggestion = MagicMock()
+        suggestion.has_team_suggestion = True
+        suggestion.team_recommendations = [MagicMock()]
+        suggestion.action.value = "auto_spawn"
+
+        coordination_runtime.suggest_for_task.return_value = suggestion
+
+        result = analyzer.analyze_with_suggestions("Refactor this code", mode="build")
+
+        assert result.coordination_suggestion is suggestion
+        coordination_runtime.suggest_for_task.assert_called_once_with(
+            runtime_subject=analyzer._runtime_subject,
+            coordination_advisor=None,
+            task_type=result.unified_task_type.value.lower(),
+            complexity=result.complexity.value.lower(),
+            mode="build",
+        )
+
+    def test_analyze_with_suggestions_auto_provisions_coordination_runtime(self):
+        """TaskAnalyzer should auto-provision the service runtime for runtime-subject paths."""
+        analyzer = TaskAnalyzer(runtime_subject=SimpleNamespace(name="runtime"))
+        suggestion = MagicMock()
+        suggestion.has_team_suggestion = True
+        suggestion.team_recommendations = [MagicMock()]
+        suggestion.action.value = "auto_spawn"
+
+        with patch(
+            "victor.agent.services.coordination_advisor_runtime.CoordinationAdvisorRuntime"
+        ) as runtime_cls:
+            runtime_cls.return_value.suggest_for_task.return_value = suggestion
+            result = analyzer.analyze_with_suggestions("Refactor this code", mode="build")
+
+        assert result.coordination_suggestion is suggestion
+        assert analyzer._coordination_runtime is runtime_cls.return_value
+        runtime_cls.return_value.suggest_for_task.assert_called_once_with(
+            runtime_subject=analyzer._runtime_subject,
+            coordination_advisor=None,
+            task_type=result.unified_task_type.value.lower(),
+            complexity=result.complexity.value.lower(),
+            mode="build",
+        )
+
+    def test_analyze_with_suggestions_uses_coordination_advisor_when_available(self):
+        """TaskAnalyzer should route advisor-only usage through the service runtime."""
+        advisor = MagicMock()
+        suggestion = MagicMock()
+        suggestion.has_team_suggestion = False
+        analyzer = TaskAnalyzer(coordination_advisor=advisor)
+
+        with patch(
+            "victor.agent.services.coordination_advisor_runtime.CoordinationAdvisorRuntime"
+        ) as runtime_cls:
+            runtime_cls.return_value.suggest_for_task.return_value = suggestion
+            result = analyzer.analyze_with_suggestions("Refactor this code", mode="plan")
+
+        assert result.coordination_suggestion is suggestion
+        runtime_cls.return_value.suggest_for_task.assert_called_once_with(
+            runtime_subject=None,
+            coordination_advisor=advisor,
+            task_type=result.unified_task_type.value.lower(),
+            complexity=result.complexity.value.lower(),
+            mode="plan",
+        )
+
+    def test_init_with_deprecated_coordinator_warns_and_maps_to_coordination_advisor(self):
+        """Deprecated constructor argument should forward to coordination_advisor."""
+        advisor = MagicMock()
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="TaskAnalyzer\\(coordinator=\\.\\.\\.\\) is deprecated",
+        ):
+            analyzer = TaskAnalyzer(coordinator=advisor)
+
+        assert analyzer._coordination_advisor is advisor
 
     def test_analyze_with_history_context(self):
         """Test analyze with proper history context."""

@@ -8,7 +8,10 @@ from typing import Optional, Tuple
 
 from victor.framework.rl.base import RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import RLCoordinator
-from victor.framework.rl.learners.model_selector import ModelSelectorLearner, SelectionStrategy
+from victor.framework.rl.learners.model_selector import (
+    ModelSelectorLearner,
+    SelectionStrategy,
+)
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 
@@ -165,7 +168,10 @@ class TestModelSelectorLearner:
         ],
     )
     def test_get_recommendation_strategies(
-        self, learner: ModelSelectorLearner, strategy: SelectionStrategy, expected_reason: str
+        self,
+        learner: ModelSelectorLearner,
+        strategy: SelectionStrategy,
+        expected_reason: str,
     ) -> None:
         """Test different selection strategies."""
         learner.strategy = strategy
@@ -188,7 +194,9 @@ class TestModelSelectorLearner:
         ):  # Ensure random.random() < learner.epsilon (which is 0.99)
             # Get recommendation for providers A and B
             rec = learner.get_recommendation(
-                provider='["provider_A", "provider_B"]', model="any-model", task_type="analysis"
+                provider='["provider_A", "provider_B"]',
+                model="any-model",
+                task_type="analysis",
             )
         assert rec is not None
         assert rec.value in ["provider_A", "provider_B"]
@@ -222,7 +230,9 @@ class TestModelSelectorLearner:
         )
 
         rec = learner.get_recommendation(
-            provider='["provider_X", "provider_Y"]', model="any-model", task_type="coding"
+            provider='["provider_X", "provider_Y"]',
+            model="any-model",
+            task_type="coding",
         )
         assert rec is not None
         # Provider_X should have higher Q-value and thus be selected more often

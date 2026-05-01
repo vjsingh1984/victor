@@ -366,8 +366,18 @@ DEPLOYMENT_HITL_COMPATIBILITY = {
         HITLMode.AUTO_REJECT,
     ],
     "spark": [HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],  # Batch-only typically
-    "ray": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
-    "dask": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
+    "ray": [
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
+    ],
+    "dask": [
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
+    ],
     # Task queues
     "celery": [
         HITLMode.API,
@@ -378,7 +388,12 @@ DEPLOYMENT_HITL_COMPATIBILITY = {
         HITLMode.AUTO_REJECT,
     ],
     # Serverless platforms
-    "modal": [HITLMode.API, HITLMode.WEBHOOK, HITLMode.AUTO_APPROVE, HITLMode.AUTO_REJECT],
+    "modal": [
+        HITLMode.API,
+        HITLMode.WEBHOOK,
+        HITLMode.AUTO_APPROVE,
+        HITLMode.AUTO_REJECT,
+    ],
 }
 
 

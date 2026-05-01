@@ -106,6 +106,24 @@ class AdaptiveAgentMode(Enum):
 AgentMode = AdaptiveAgentMode
 
 
+class RatioLevel(str, Enum):
+    """Discretized ratio bucket for adaptive mode state."""
+
+    LOW = "low"  # < 0.25
+    MID_LOW = "mid_low"  # 0.25-0.5
+    MID_HIGH = "mid_high"  # 0.5-0.75
+    HIGH = "high"  # > 0.75
+
+
+class QualityLevel(str, Enum):
+    """Discretized quality score bucket."""
+
+    POOR = "poor"  # < 0.4
+    FAIR = "fair"  # 0.4-0.6
+    GOOD = "good"  # 0.6-0.8
+    EXCELLENT = "excellent"  # > 0.8
+
+
 class TransitionTrigger(Enum):
     """Triggers for mode transitions."""
 
@@ -141,29 +159,29 @@ class ModeState:
         quality_bucket = self._discretize_quality(self.quality_score)
         grounding_bucket = self._discretize_quality(self.grounding_score)
 
-        return f"{self.mode.value}:{self.task_type}:{tool_ratio}:{iter_ratio}:{quality_bucket}:{grounding_bucket}"
+        return f"{self.mode.value}:{self.task_type}:{tool_ratio.value}:{iter_ratio.value}:{quality_bucket.value}:{grounding_bucket.value}"
 
-    def _discretize_ratio(self, ratio: float) -> str:
+    def _discretize_ratio(self, ratio: float) -> RatioLevel:
         """Discretize a ratio to buckets."""
         if ratio < 0.25:
-            return "low"
+            return RatioLevel.LOW
         elif ratio < 0.5:
-            return "mid_low"
+            return RatioLevel.MID_LOW
         elif ratio < 0.75:
-            return "mid_high"
+            return RatioLevel.MID_HIGH
         else:
-            return "high"
+            return RatioLevel.HIGH
 
-    def _discretize_quality(self, score: float) -> str:
+    def _discretize_quality(self, score: float) -> QualityLevel:
         """Discretize quality score."""
         if score < 0.4:
-            return "poor"
+            return QualityLevel.POOR
         elif score < 0.6:
-            return "fair"
+            return QualityLevel.FAIR
         elif score < 0.8:
-            return "good"
+            return QualityLevel.GOOD
         else:
-            return "excellent"
+            return QualityLevel.EXCELLENT
 
 
 @dataclass
@@ -212,11 +230,13 @@ class QLearningStore:
         """Initialize the Q-learning store.
 
         Args:
-            project_path: Path to project root. If None, uses current directory.
+            project_path: Ignored - RL data is stored in global database for cross-project learning.
         """
-        from victor.core.database import get_project_database
+        # Use GLOBAL database for RL data (cross-project, cross-provider learning)
+        # This enables GEPA and prompt optimization to learn from all projects
+        from victor.core.database import DatabaseManager
 
-        self._db = get_project_database(project_path)
+        self._db = DatabaseManager()
         self.db_path = self._db.db_path
         self._initialized = False
 
@@ -226,7 +246,7 @@ class QLearningStore:
         self.exploration_rate = 0.1  # Epsilon for epsilon-greedy
 
     def _ensure_initialized(self) -> None:
-        """Ensure database tables exist (handled by ProjectDatabaseManager)."""
+        """Ensure database tables exist (handled by global DatabaseManager)."""
         if self._initialized:
             return
 
@@ -275,6 +295,58 @@ class QLearningStore:
             CREATE INDEX IF NOT EXISTS idx_{_Q_TABLE}_state ON {_Q_TABLE}(state_key)
         """)
 
+        # Migration: Add missing columns if table exists with old schema
+        try:
+            # Check which columns exist and their constraints
+            cursor = conn.execute(f"PRAGMA table_info({_HISTORY_TABLE})")
+            columns_info = cursor.fetchall()
+            columns = {row[1]: row for row in columns_info}
+
+            # Add profile_name column if missing
+            if "profile_name" not in columns:
+                logger.info(
+                    f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding profile_name column"
+                )
+                conn.execute(
+                    f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN profile_name TEXT DEFAULT 'default'"
+                )
+                conn.execute(
+                    f"UPDATE {_HISTORY_TABLE} SET profile_name = 'default' WHERE profile_name IS NULL"
+                )
+                logger.info(
+                    f"[AdaptiveModeController] Migration complete: profile_name column added to {_HISTORY_TABLE}"
+                )
+
+            # Add trigger column if missing (old schema used task_type instead)
+            if "trigger" not in columns:
+                logger.info(
+                    f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding trigger column"
+                )
+
+                # If task_type exists and has NOT NULL constraint, make it nullable first
+                if "task_type" in columns:
+                    # SQLite doesn't support ALTER COLUMN directly, need to recreate table
+                    # For simplicity, we'll just provide a default value for task_type in new inserts
+                    # and make trigger NOT NULL with a default
+                    conn.execute(
+                        f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'"
+                    )
+                    # Migrate existing task_type values to trigger
+                    conn.execute(
+                        f"UPDATE {_HISTORY_TABLE} SET trigger = task_type WHERE trigger = 'unknown'"
+                    )
+                else:
+                    conn.execute(
+                        f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'"
+                    )
+
+                logger.info(
+                    f"[AdaptiveModeController] Migration complete: trigger column added to {_HISTORY_TABLE}"
+                )
+
+        except Exception as e:
+            logger.warning(f"[AdaptiveModeController] Migration failed (non-critical): {e}")
+
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_{_HISTORY_TABLE}_profile
             ON {_HISTORY_TABLE}(profile_name, timestamp)
@@ -302,7 +374,8 @@ class QLearningStore:
         conn = self._db.get_connection()
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            f"SELECT action_key, q_value FROM {_Q_TABLE} WHERE state_key = ?", (state_key,)
+            f"SELECT action_key, q_value FROM {_Q_TABLE} WHERE state_key = ?",
+            (state_key,),
         ).fetchall()
 
         return {row["action_key"]: row["q_value"] for row in rows}
@@ -376,23 +449,73 @@ class QLearningStore:
         self._ensure_initialized()
 
         conn = self._db.get_connection()
-        conn.execute(
-            f"""
-            INSERT INTO {_HISTORY_TABLE}
-            (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                profile_name,
-                from_mode.value,
-                to_mode.value,
-                trigger.value,
-                state_key,
-                action_key,
-                reward,
-                datetime.now().isoformat(),
-            ),
-        )
+
+        # Check schema to handle both old and new table structures
+        cursor = conn.execute(f"PRAGMA table_info({_HISTORY_TABLE})")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        # Old schema has task_type but no trigger, new schema has trigger
+        # Migrated schema has both columns
+        if "trigger" in columns:
+            # New or migrated schema: use trigger column (and task_type if it exists)
+            if "task_type" in columns:
+                # Migrated schema: both columns exist
+                conn.execute(
+                    f"""
+                    INSERT INTO {_HISTORY_TABLE}
+                    (profile_name, from_mode, to_mode, task_type, trigger, state_key, action_key, reward, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        profile_name,
+                        from_mode.value,
+                        to_mode.value,
+                        trigger.value,  # Store trigger in both columns for compatibility
+                        trigger.value,
+                        state_key,
+                        action_key,
+                        reward,
+                        datetime.now().isoformat(),
+                    ),
+                )
+            else:
+                # New schema: only trigger column
+                conn.execute(
+                    f"""
+                    INSERT INTO {_HISTORY_TABLE}
+                    (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        profile_name,
+                        from_mode.value,
+                        to_mode.value,
+                        trigger.value,
+                        state_key,
+                        action_key,
+                        reward,
+                        datetime.now().isoformat(),
+                    ),
+                )
+        else:
+            # Old schema: only task_type column
+            conn.execute(
+                f"""
+                INSERT INTO {_HISTORY_TABLE}
+                (profile_name, from_mode, to_mode, task_type, state_key, action_key, reward, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    profile_name,
+                    from_mode.value,
+                    to_mode.value,
+                    trigger.value,  # Store trigger value in task_type column
+                    state_key,
+                    action_key,
+                    reward,
+                    datetime.now().isoformat(),
+                ),
+            )
         conn.commit()
 
     def update_task_stats(
@@ -1080,7 +1203,7 @@ class AdaptiveModeController:
                 model=self._model_name or "unknown",
                 success=success,
                 quality_score=quality_score,
-                task_type=self._current_state.task_type if self._current_state else "general",
+                task_type=(self._current_state.task_type if self._current_state else "general"),
                 metadata={
                     "from_mode": from_mode,
                     "to_mode": to_mode,

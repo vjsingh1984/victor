@@ -776,7 +776,7 @@ class GroundingVerificationResult:
             files = [f"'{i.reference}'" for i in file_issues]
             feedback_parts.append(
                 f"- File(s) not found: {', '.join(files)}. "
-                "Use read_file or list_directory to verify paths before referencing."
+                "Use read or ls to verify paths before referencing."
             )
 
         if symbol_issues:

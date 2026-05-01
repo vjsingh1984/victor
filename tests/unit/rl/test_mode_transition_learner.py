@@ -25,7 +25,10 @@ from unittest.mock import patch
 
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.coordinator import RLCoordinator
-from victor.framework.rl.learners.mode_transition import ModeTransitionLearner, AgentMode
+from victor.framework.rl.learners.mode_transition import (
+    ModeTransitionLearner,
+    AgentMode,
+)
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 

@@ -12,16 +12,20 @@ from typing import Dict, Type
 from pydantic import BaseModel
 
 from victor.agent.decisions.schemas import (
+    CompactionDecision,
     ContinuationDecision,
     DecisionType,
     ErrorClassDecision,
     IntentDecision,
     LoopDetection,
+    MultiSkillDecision,
     PromptFocusDecision,
     QuestionTypeDecision,
+    SkillSelectionDecision,
     StageDetectionDecision,
     TaskCompletionDecision,
     TaskTypeDecision,
+    ToolNecessityDecision,
     ToolSelectionDecision,
 )
 
@@ -173,12 +177,72 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
     DecisionType.STAGE_DETECTION: DecisionPrompt(
         system="You classify conversation stages. Respond ONLY with JSON.",
         user_template=(
-            "What stage is this request in?\n\n"
+            "What stage is this conversation in?\n\n"
+            "Current stage: {current_stage}\n"
+            "Recent tools: {last_tools}\n"
+            "Files read: {files_observed}, Files modified: {files_modified}\n"
+            "Tool calls so far: {tool_call_count}\n"
+            "Heuristic guess: {detected_stage_heuristic}\n"
             "Request: {message_excerpt}\n\n"
-            "Stages: initial, planning, reading, analysis, execution, verification\n\n"
+            "Stages: initial, planning, reading, analysis, execution, verification\n"
+            "Rule: Stay in execution if files are being read/edited actively.\n\n"
             'JSON: {{"stage": "...", "confidence": 0.0-1.0}}'
         ),
         schema=StageDetectionDecision,
         max_tokens=25,
+    ),
+    DecisionType.SKILL_SELECTION: DecisionPrompt(
+        system=(
+            "You match user requests to available skills. "
+            "Respond ONLY with a JSON object, no other text."
+        ),
+        user_template=(
+            "Which skill best matches this request?\n\n"
+            "Request: {message_excerpt}\n\n"
+            "Available skills: {available_skills}\n\n"
+            'Respond: {{"skill": "name_or_empty", "confidence": 0.0-1.0}}'
+        ),
+        schema=SkillSelectionDecision,
+        max_tokens=30,
+    ),
+    DecisionType.MULTI_SKILL_DECOMPOSITION: DecisionPrompt(
+        system=(
+            "You decompose complex requests into ordered skill sequences. "
+            "Respond ONLY with a JSON object, no other text."
+        ),
+        user_template=(
+            "Decompose this request into skills to execute in order:\n\n"
+            "Request: {message_excerpt}\n\n"
+            "Available skills: {available_skills}\n\n"
+            'Respond: {{"skills": ["skill1", "skill2"], "confidence": 0.0-1.0}}'
+        ),
+        schema=MultiSkillDecision,
+        max_tokens=50,
+    ),
+    DecisionType.TOOL_NECESSITY: DecisionPrompt(
+        system="You assess if a coding request needs file/tool operations. Respond JSON only.",
+        user_template=(
+            "Does this need tools (file read/write/search/execute)?\n\n"
+            "Request: {message_excerpt}\n\n"
+            'JSON: {{"requires_tools": true/false, "confidence": 0.0-1.0}}'
+        ),
+        schema=ToolNecessityDecision,
+        max_tokens=30,
+    ),
+    DecisionType.COMPACTION: DecisionPrompt(
+        system="You classify conversation complexity for context compaction. Respond JSON only.",
+        user_template=(
+            "Classify this conversation for compaction routing.\n\n"
+            "Message count: {message_count}\n"
+            "Estimated tokens: {estimated_tokens}\n"
+            "Task complexity: {task_complexity}\n\n"
+            "Complexity: simple (≤8 messages) or complex (>8 messages)\n"
+            "Tiers: edge (fast), balanced (normal), performance (quality)\n\n"
+            'JSON: {{"complexity": "simple"|"complex", '
+            '"recommended_tier": "edge"|"balanced"|"performance", '
+            '"estimated_tokens": int, "confidence": 0.0-1.0, "reason": "brief explanation"}}'
+        ),
+        schema=CompactionDecision,
+        max_tokens=50,
     ),
 }

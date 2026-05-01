@@ -148,7 +148,7 @@ class IAgentRole(Protocol):
                 default_factory=lambda: {AgentCapability.READ, AgentCapability.SEARCH}
             )
             allowed_tools: Set[str] = field(
-                default_factory=lambda: {"read_file", "grep", "semantic_search"}
+                default_factory=lambda: {"read", "grep", "semantic_search"}
             )
             tool_budget: int = 20
 

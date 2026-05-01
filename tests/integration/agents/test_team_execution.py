@@ -819,7 +819,10 @@ class TestCrossFormation:
             if formation == TeamFormation.HIERARCHICAL:
                 manager_role = IntegrationTestRole(
                     name="manager",
-                    capabilities={AgentCapability.DELEGATE, AgentCapability.COMMUNICATE},
+                    capabilities={
+                        AgentCapability.DELEGATE,
+                        AgentCapability.COMMUNICATE,
+                    },
                 )
                 manager = IntegrationTestAgent("manager", role=manager_role)
                 worker = IntegrationTestAgent("worker")

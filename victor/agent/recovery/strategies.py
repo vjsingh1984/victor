@@ -191,7 +191,10 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
         return [FailureType.EMPTY_RESPONSE]
 
     def _matches_action(self, action: RecoveryAction) -> bool:
-        return action in (RecoveryAction.PROMPT_TOOL_CALL, RecoveryAction.ADJUST_TEMPERATURE)
+        return action in (
+            RecoveryAction.PROMPT_TOOL_CALL,
+            RecoveryAction.ADJUST_TEMPERATURE,
+        )
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
         """Attempt recovery from empty response."""

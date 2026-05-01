@@ -23,7 +23,7 @@ from typing import Any, Dict
 
 import pytest
 
-from victor.core.registry_base import ItemRegistry, SingletonRegistry
+from victor.core.registry import ItemRegistry, SingletonRegistry
 
 
 class TestSingletonRegistry:
@@ -33,6 +33,14 @@ class TestSingletonRegistry:
         """Reset test registries before each test."""
         # Create fresh subclasses for each test to ensure isolation
         pass
+
+    def test_compatibility_facade_exports_canonical_classes(self) -> None:
+        """registry_base should re-export the canonical registry package classes."""
+        from victor.core.registry_base import ItemRegistry as CompatItemRegistry
+        from victor.core.registry_base import SingletonRegistry as CompatSingletonRegistry
+
+        assert CompatItemRegistry is ItemRegistry
+        assert CompatSingletonRegistry is SingletonRegistry
 
     def test_get_instance_returns_singleton(self) -> None:
         """get_instance() should return the same instance."""

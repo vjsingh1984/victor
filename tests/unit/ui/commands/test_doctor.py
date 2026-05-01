@@ -15,6 +15,8 @@
 """Tests for victor doctor command."""
 
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -142,6 +144,39 @@ class TestDoctorChecks:
         # Should have summary
         assert "Summary:" in captured.out or "summary" in captured.out.lower()
         assert exit_code == 0
+
+    def test_check_config_directory_uses_global_victor_dir(self, tmp_path):
+        """Config directory checks should resolve through centralized Victor paths."""
+        doctor = DoctorChecks()
+        global_dir = tmp_path / ".victor"
+        global_dir.mkdir(exist_ok=True)
+
+        with patch(
+            "victor.ui.commands.doctor.get_project_paths",
+            return_value=SimpleNamespace(global_victor_dir=global_dir),
+        ):
+            doctor.check_config_directory()
+
+        assert any(
+            check.name == "Configuration Directory" and str(global_dir) in check.message
+            for check in doctor.checks
+        )
+
+    def test_fix_issues_creates_canonical_config_dir(self, tmp_path):
+        """Auto-fix should create the centralized global Victor config directory."""
+        doctor = DoctorChecks()
+        global_dir = tmp_path / "missing-victor-config"
+
+        with patch(
+            "victor.ui.commands.doctor.get_project_paths",
+            return_value=SimpleNamespace(global_victor_dir=global_dir),
+        ):
+            doctor.check_config_directory()
+            fixes = doctor.fix_issues()
+
+        assert global_dir.exists()
+        assert (global_dir / "config.yaml").exists()
+        assert any(str(global_dir) in fix for fix in fixes)
 
 
 class TestRunDoctor:

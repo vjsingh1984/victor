@@ -523,8 +523,14 @@ class CodeSandbox:
 
 
 async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
-    """Internal: Execute Python code in sandbox."""
-    result = sandbox_instance.execute(code)
+    """Internal: Execute Python code in sandbox.
+
+    Offloads the synchronous execute() call to a thread pool to avoid
+    blocking the event loop during Docker container execution.
+    """
+    import asyncio
+
+    result = await asyncio.to_thread(sandbox_instance.execute, code)
     output = f"Exit Code: {result['exit_code']}\n"
     if result["stdout"]:
         output += f"--- STDOUT ---\n{result['stdout']}\n"
@@ -534,9 +540,15 @@ async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
 
 
 async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) -> str:
-    """Internal: Upload files to sandbox."""
+    """Internal: Upload files to sandbox.
+
+    Offloads the synchronous put_files() call to a thread pool to avoid
+    blocking the event loop during Docker file operations.
+    """
+    import asyncio
+
     try:
-        sandbox_instance.put_files(file_paths)
+        await asyncio.to_thread(sandbox_instance.put_files, file_paths)
         return f"Successfully uploaded {len(file_paths)} files to the sandbox."
     except Exception as e:
         return f"Error uploading files: {e}"

@@ -321,7 +321,7 @@ class PipelineAnalysisResult:
             "recent_runs": [r.to_dict() for r in self.recent_runs],
             "coverage_trend": [c.to_dict() for c in self.coverage_trend],
             "success_rate": self.success_rate,
-            "avg_duration": self.avg_duration.total_seconds() if self.avg_duration else None,
+            "avg_duration": (self.avg_duration.total_seconds() if self.avg_duration else None),
             "recommendations": self.recommendations,
             "analyzed_at": self.analyzed_at.isoformat(),
         }

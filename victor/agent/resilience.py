@@ -58,14 +58,14 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING
 
-# Import canonical types from circuit_breaker.py to avoid duplication
-from victor.providers.circuit_breaker import (
+# Import shared circuit-breaker types from core to avoid cross-layer coupling
+from victor.core.circuit_breaker import (
     CircuitState as _CircuitState,
     CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
 )
 
 if TYPE_CHECKING:
-    from victor.providers.circuit_breaker import CircuitState
+    from victor.core.circuit_breaker import CircuitState
 
 logger = logging.getLogger(__name__)
 
@@ -328,10 +328,24 @@ class AgentRetryConfig:
 
 
 class RetryHandler:
-    """Retry handler with exponential backoff.
+    """Retry handler with exponential backoff (COMPATIBILITY WRAPPER).
 
-    Implements exponential backoff with optional jitter to handle
-    transient failures gracefully.
+    .. deprecated::
+        This class is a compatibility wrapper around the canonical retry
+        implementation in victor.core.retry. For new code, use:
+
+        - `from victor.core.retry import RetryExecutor` for direct control
+        - `from victor.core.retry import with_retry` for decorator-based usage
+        - `ExponentialBackoffStrategy` for strategy configuration
+
+        This wrapper will be removed in version 0.10.0.
+
+    The canonical implementation provides:
+    - More robust error handling with RetryContext
+    - Better observability with hooks (on_retry, on_success, on_failure)
+    - Support for multiple backoff strategies (exponential, linear, fixed, none)
+    - Jitter to prevent thundering herd problems
+    - Exception type filtering (retryable/non-retryable)
     """
 
     def __init__(self, config: Optional[AgentRetryConfig] = None):
@@ -340,10 +354,32 @@ class RetryHandler:
         Args:
             config: Retry configuration
         """
+        from victor.core.retry import (
+            RetryExecutor,
+            ExponentialBackoffStrategy,
+        )
+
         self.config = config or AgentRetryConfig()
+
+        # Create canonical retry strategy
+        self._strategy = ExponentialBackoffStrategy(
+            max_attempts=self.config.max_retries + 1,  # +1 because max_attempts includes initial
+            base_delay=self.config.base_delay,
+            max_delay=self.config.max_delay,
+            multiplier=self.config.exponential_base,
+            jitter=0.5 if self.config.jitter else 0.0,  # 0.5 = 50% jitter to match legacy behavior
+            retryable_exceptions=(
+                set(self.config.retryable_exceptions) if self.config.retryable_exceptions else None
+            ),
+        )
+
+        # Create canonical executor
+        self._executor = RetryExecutor(self._strategy)
 
     def calculate_delay(self, attempt: int) -> float:
         """Calculate delay for a retry attempt.
+
+        Delegates to canonical ExponentialBackoffStrategy.
 
         Args:
             attempt: Current attempt number (0-indexed)
@@ -351,22 +387,17 @@ class RetryHandler:
         Returns:
             Delay in seconds
         """
-        import random
+        from victor.core.retry import RetryContext
 
-        delay = min(
-            self.config.base_delay * (self.config.exponential_base**attempt),
-            self.config.max_delay,
-        )
-
-        if self.config.jitter:
-            # Add random jitter (0-50% of delay)
-            jitter = random.uniform(0, delay * 0.5)
-            delay += jitter
-
-        return delay
+        # Create a minimal context for delay calculation
+        ctx = RetryContext(attempt=attempt, max_attempts=self.config.max_retries + 1)
+        return self._strategy.get_delay(ctx)
 
     def should_retry(
-        self, attempt: int, error: Optional[Exception] = None, status_code: Optional[int] = None
+        self,
+        attempt: int,
+        error: Optional[Exception] = None,
+        status_code: Optional[int] = None,
     ) -> bool:
         """Check if a retry should be attempted.
 
@@ -378,16 +409,28 @@ class RetryHandler:
         Returns:
             True if retry should be attempted
         """
+        from victor.core.retry import RetryContext
+
+        # Check attempt limit
         if attempt >= self.config.max_retries:
             return False
 
+        # Create context for retry decision
+        ctx = RetryContext(
+            attempt=attempt, max_attempts=self.config.max_retries + 1, last_exception=error
+        )
+
+        # Check exception type
         if error:
-            return isinstance(error, self.config.retryable_exceptions)
+            if not isinstance(error, self.config.retryable_exceptions):
+                return False
 
-        if status_code:
-            return status_code in self.config.retryable_status_codes
+        # Check status code (HTTP-specific concern not in canonical implementation)
+        if status_code and status_code not in self.config.retryable_status_codes:
+            return False
 
-        return False
+        # Use canonical strategy for final decision
+        return self._strategy.should_retry(ctx)
 
     async def execute_with_retry(
         self,
@@ -397,6 +440,8 @@ class RetryHandler:
         **kwargs: Any,
     ) -> T:
         """Execute a function with retry logic.
+
+        Delegates to canonical RetryExecutor and extracts result for backward compatibility.
 
         Args:
             func: Async function to execute
@@ -410,32 +455,24 @@ class RetryHandler:
         Raises:
             Last exception if all retries exhausted
         """
-        last_error: Optional[Exception] = None
+        # Preserve on_retry callback if provided
+        if on_retry:
+            self._strategy.on_retry = lambda ctx: (
+                on_retry(ctx.attempt, ctx.last_exception) if ctx.last_exception else None
+            )
 
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                return await func(*args, **kwargs)
-            except self.config.retryable_exceptions as e:
-                last_error = e
+        # Use canonical executor
+        result = await self._executor.execute_async(func, *args, **kwargs)
 
-                if not self.should_retry(attempt, error=e):
-                    raise
-
-                delay = self.calculate_delay(attempt)
-                logger.warning(
-                    f"Retry {attempt + 1}/{self.config.max_retries} "
-                    f"after {delay:.2f}s due to: {type(e).__name__}: {e}"
-                )
-
-                if on_retry:
-                    on_retry(attempt, e)
-
-                await asyncio.sleep(delay)
-
-        # Should not reach here, but raise last error if we do
-        if last_error:
-            raise last_error
-        raise RuntimeError("Unexpected retry loop exit")
+        # Extract result from RetryResult for backward compatibility
+        # The canonical executor returns RetryResult, but legacy API expects direct result
+        if result.success:
+            return result.result  # type: ignore
+        else:
+            # Raise the exception if execution failed
+            if result.exception:
+                raise result.exception
+            raise RuntimeError("Retry execution failed with no exception")
 
 
 @dataclass

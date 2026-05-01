@@ -56,7 +56,9 @@ async def main():
     )
 
     print(f"📦 Vector Store: {config.vector_store}")
-    print(f"🤖 Embedding Model: {config.embedding_model_name} ({config.embedding_model_type})")
+    print(
+        f"🤖 Embedding Model: {config.embedding_model_name} ({config.embedding_model_type})"
+    )
     print(f"📁 Storage: {config.persist_directory}")
     print("🌐 Network Required: NO (100% offline)")
     print()
@@ -279,7 +281,9 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)) -> User:
     stats = await provider.get_stats()
     print(f"  Provider: {stats['provider']}")
     print(f"  Total documents: {stats['total_documents']}")
-    print(f"  Embedding model: {stats['embedding_model_name']} ({stats['embedding_model_type']})")
+    print(
+        f"  Embedding model: {stats['embedding_model_name']} ({stats['embedding_model_type']})"
+    )
     print(f"  Dimension: {stats['dimension']}")
     print(f"  Distance metric: {stats['distance_metric']}")
     print(f"  Storage: {stats['persist_directory']}")

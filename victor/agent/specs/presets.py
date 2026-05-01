@@ -50,8 +50,8 @@ researcher_agent = AgentSpec(
         tools={
             "glob",
             "grep",
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "code_search",
             "semantic_code_search",
             "web_search",
@@ -87,13 +87,13 @@ coder_agent = AgentSpec(
     description="Writes, modifies, and refactors code following best practices",
     capabilities=AgentCapabilities(
         tools={
-            "read_file",
-            "edit_file",
-            "write_file",
-            "list_directory",
+            "read",
+            "edit",
+            "write",
+            "ls",
             "glob",
             "grep",
-            "execute_bash",
+            "shell",
             "code_search",
         },
         skills={"coding", "refactoring", "debugging"},
@@ -130,7 +130,7 @@ reviewer_agent = AgentSpec(
     description="Reviews code changes for quality, security, and best practices",
     capabilities=AgentCapabilities(
         tools={
-            "read_file",
+            "read",
             "glob",
             "grep",
             "git_diff",
@@ -167,11 +167,11 @@ devops_agent = AgentSpec(
     description="Handles infrastructure, deployment, and operational tasks",
     capabilities=AgentCapabilities(
         tools={
-            "read_file",
-            "edit_file",
-            "write_file",
-            "execute_bash",
-            "list_directory",
+            "read",
+            "edit",
+            "write",
+            "shell",
+            "ls",
             "glob",
         },
         tool_patterns=["docker_*", "k8s_*", "terraform_*"],
@@ -210,11 +210,11 @@ analyst_agent = AgentSpec(
     description="Analyzes data, generates reports, and provides insights",
     capabilities=AgentCapabilities(
         tools={
-            "read_file",
+            "read",
             "execute_python",
-            "write_file",
+            "write",
             "web_search",
-            "list_directory",
+            "ls",
         },
         skills={"analysis", "visualization", "reporting"},
         can_execute_code=True,
@@ -246,10 +246,10 @@ tester_agent = AgentSpec(
     description="Writes and runs tests, ensures code quality",
     capabilities=AgentCapabilities(
         tools={
-            "read_file",
-            "write_file",
-            "edit_file",
-            "execute_bash",
+            "read",
+            "write",
+            "edit",
+            "shell",
             "glob",
             "grep",
         },

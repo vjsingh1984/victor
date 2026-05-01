@@ -34,7 +34,28 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
 from victor.agent.tool_executor import ToolExecutionResult, ToolExecutor
+
+
+def _get_embedding_config():
+    """Get embedding-intensive tool configuration from settings.
+
+    Returns:
+        Tuple of (max_embedding_concurrent, embedding_intensive_tools)
+    """
+    try:
+        from victor.config.tool_settings import get_tool_settings
+
+        settings = get_tool_settings()
+        return (
+            settings.max_embedding_concurrent,
+            settings.embedding_intensive_tools,
+        )
+    except Exception:
+        # Fallback if settings not available
+        return 2, {"code_search"}
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +70,23 @@ class ToolCategory(Enum):
 # Optimized tool categorization using frozenset for O(1) lookups
 READ_TOOLS = frozenset(
     {
-        "read_file",
-        "list_directory",
+        "read",
+        "ls",
         "code_search",
         "semantic_code_search",
         "grep_search",
-        "plan_files",
+        "plan",
         "git",
     }
 )
-WRITE_TOOLS = frozenset({"write_file", "edit_files", "execute_bash", "docker"})
-NETWORK_TOOLS = frozenset({"web_search", "web_fetch", "http_request"})
+WRITE_TOOLS = build_write_tool_set(
+    "docker",
+    "create_file",
+    "delete_file",
+    "rename_file",
+    "notebook_edit",
+)
+NETWORK_TOOLS = frozenset({"web_search", "web_fetch", "http"})
 
 # TOOL_CATEGORIES dictionary for backward compatibility with tests
 TOOL_CATEGORIES: Dict[str, ToolCategory] = {
@@ -69,12 +96,44 @@ TOOL_CATEGORIES: Dict[str, ToolCategory] = {
 }
 
 
+def _canonical_tool_name(tool_name: str) -> str:
+    """Normalize aliases to the canonical runtime tool name."""
+    return normalize_tool_name_for_policy(tool_name)
+
+
+def _extract_paths_from_arguments(tool_name: str, arguments: Dict[str, Any]) -> List[str]:
+    """Extract file paths from canonical tool arguments for dependency tracking."""
+    paths: List[str] = []
+    direct_path = arguments.get("path") or arguments.get("file_path")
+    if isinstance(direct_path, str) and direct_path:
+        paths.append(direct_path)
+
+    if tool_name == "edit":
+        ops = arguments.get("ops") or arguments.get("edits") or arguments.get("files") or []
+        if isinstance(ops, list):
+            for op in ops:
+                if not isinstance(op, dict):
+                    continue
+                path = op.get("path")
+                new_path = op.get("new_path")
+                if isinstance(path, str) and path:
+                    paths.append(path)
+                if isinstance(new_path, str) and new_path:
+                    paths.append(new_path)
+
+    return list(dict.fromkeys(paths))
+
+
 @dataclass
 class ParallelExecutionConfig:
     max_concurrent: int = 5
     enable_parallel: bool = True
     parallelize_reads: bool = True
     timeout_per_tool: float = 60.0
+    # Embedding-intensive tool concurrency limits
+    # Loaded from ToolSettings to support environment variable configuration
+    max_embedding_concurrent: int = 2
+    embedding_intensive_tools: Set[str] = field(default_factory=lambda: {"code_search"})
 
 
 @dataclass
@@ -95,20 +154,29 @@ class ParallelToolExecutor:
         progress_callback: Optional[Callable[[str, str, bool], None]] = None,
     ):
         self.executor = tool_executor
-        self.config = config or ParallelExecutionConfig()
+        # Load config with embedding settings from ToolSettings if not provided
+        if config is None:
+            max_emb, emb_tools = _get_embedding_config()
+            self.config = ParallelExecutionConfig(
+                max_embedding_concurrent=max_emb,
+                embedding_intensive_tools=emb_tools,
+            )
+        else:
+            self.config = config
         self.progress_callback = progress_callback
 
     def _get_category(self, tool_name: str) -> ToolCategory:
-        if tool_name in READ_TOOLS:
+        canonical_tool_name = _canonical_tool_name(tool_name)
+        if canonical_tool_name in READ_TOOLS:
             return ToolCategory.READ_ONLY
-        elif tool_name in WRITE_TOOLS:
+        elif canonical_tool_name in WRITE_TOOLS:
             return ToolCategory.WRITE
-        elif tool_name in NETWORK_TOOLS:
+        elif canonical_tool_name in NETWORK_TOOLS:
             return ToolCategory.NETWORK
         return ToolCategory.COMPUTE
 
     def _has_write_tools(self, tool_calls: List[Dict[str, Any]]) -> bool:
-        return any(tc.get("name", "") in WRITE_TOOLS for tc in tool_calls)
+        return any(_canonical_tool_name(tc.get("name", "")) in WRITE_TOOLS for tc in tool_calls)
 
     def _can_parallelize(self, tool_calls: List[Dict[str, Any]]) -> bool:
         """Check if the given tool calls can be parallelized.
@@ -125,27 +193,61 @@ class ParallelToolExecutor:
         # Cannot parallelize single or empty calls
         if len(tool_calls) <= 1:
             return False
-        # Cannot parallelize if writes are present
-        if self._has_write_tools(tool_calls):
-            return False
+        # Writes to different files CAN parallelize via dependency graph.
+        # Only serialize when multiple writes target the SAME file or when
+        # a write has no extractable file path (unknown target).
         return True
 
     def _extract_file_dependencies(self, tool_calls: List[Dict[str, Any]]) -> Dict[int, Set[int]]:
-        dependencies = {i: set() for i in range(len(tool_calls))}
-        path_writers = {}
+        """Build a per-file dependency graph for tool calls.
+
+        Dependency rules:
+        - A read on path P depends on all prior writes to P
+        - A write on path P depends on all prior writes to P (serialization)
+        - A write with no extractable path depends on ALL prior writes
+          (conservative: unknown target could conflict with anything)
+        """
+        dependencies: Dict[int, Set[int]] = {i: set() for i in range(len(tool_calls))}
+        path_writers: Dict[str, List[int]] = {}  # path -> [writer indices]
+        unresolved_writers: List[int] = []  # writes with no extractable path
 
         for i, tc in enumerate(tool_calls):
             name = tc.get("name", "")
             args = tc.get("arguments", {})
-            path = args.get("path") or args.get("file_path")
+            if isinstance(args, str):
+                import json as _json
 
-            if not path:
-                continue
+                try:
+                    args = _json.loads(args)
+                except Exception:
+                    args = {}
+            canonical_name = _canonical_tool_name(name)
+            paths = _extract_paths_from_arguments(canonical_name, args)
 
-            if name in WRITE_TOOLS:
-                path_writers.setdefault(path, []).append(i)
-            elif name in READ_TOOLS and path in path_writers:
-                dependencies[i].update(path_writers[path])
+            if canonical_name in WRITE_TOOLS:
+                if paths:
+                    # Write→write on same file: serialize
+                    for path in paths:
+                        if path in path_writers:
+                            dependencies[i].update(path_writers[path])
+                    dependencies[i].update(unresolved_writers)
+                    for path in paths:
+                        path_writers.setdefault(path, []).append(i)
+                else:
+                    # Unknown write target: depends on ALL prior writes
+                    for prev_writers in path_writers.values():
+                        dependencies[i].update(prev_writers)
+                    dependencies[i].update(unresolved_writers)
+                    unresolved_writers.append(i)
+                # All unresolved writes also depend on this one
+                # (handled by future iterations looking at unresolved_writers)
+            elif canonical_name in READ_TOOLS:
+                # Read depends on prior writes to same path
+                for path in paths:
+                    if path in path_writers:
+                        dependencies[i].update(path_writers[path])
+                # Read also depends on unresolved writes (conservative)
+                dependencies[i].update(unresolved_writers)
 
         return dependencies
 
@@ -162,12 +264,8 @@ class ParallelToolExecutor:
 
         context = context or {}
 
-        # Simple parallelization: skip if writes present or disabled
-        if (
-            not self.config.enable_parallel
-            or len(tool_calls) <= 1
-            or self._has_write_tools(tool_calls)
-        ):
+        # Sequential fallback only when parallelism is disabled or single call
+        if not self.config.enable_parallel or len(tool_calls) <= 1:
             return await self._execute_sequential(tool_calls, context, result, start_time)
 
         # Parallel execution with dependency handling
@@ -188,8 +286,50 @@ class ParallelToolExecutor:
                     result.failed_count += 1
                 break
 
-            # Execute batch with concurrency limit
-            batch = ready[: self.config.max_concurrent]
+            # Separate embedding-intensive tools from regular tools
+            embedding_ready = []
+            regular_ready = []
+            for i in ready:
+                tool_name = tool_calls[i].get("name", "")
+                if tool_name in self.config.embedding_intensive_tools:
+                    embedding_ready.append(i)
+                else:
+                    regular_ready.append(i)
+
+            # Build batch respecting both concurrency limits
+            # Count currently running embedding-intensive and regular tools
+            running_embedding = sum(
+                1
+                for i in pending
+                if i not in ready
+                and tool_calls[i].get("name", "") in self.config.embedding_intensive_tools
+            )
+            running_regular = sum(
+                1
+                for i in pending
+                if i not in ready
+                and tool_calls[i].get("name", "") not in self.config.embedding_intensive_tools
+            )
+
+            # Calculate how many of each type we can add
+            available_embedding_slots = max(
+                0, self.config.max_embedding_concurrent - running_embedding
+            )
+            available_regular_slots = max(
+                0, self.config.max_concurrent - running_embedding - running_regular
+            )
+
+            # Select tools for batch
+            batch = []
+            batch.extend(embedding_ready[:available_embedding_slots])
+            batch.extend(regular_ready[: available_regular_slots - len(batch)])
+
+            # If batch is empty but we have ready tasks, we're at capacity
+            if not batch and ready:
+                # Wait for current tasks to complete before adding more
+                await asyncio.sleep(0.01)
+                continue
+
             tasks = [self._execute_single(tool_calls[i], context) for i in batch]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -287,5 +427,12 @@ def create_parallel_executor(
     enable: bool = True,
     progress_callback: Optional[Callable[[str, str, bool], None]] = None,
 ) -> ParallelToolExecutor:
-    config = ParallelExecutionConfig(max_concurrent=max_concurrent, enable_parallel=enable)
+    # Load embedding settings from ToolSettings
+    max_emb, emb_tools = _get_embedding_config()
+    config = ParallelExecutionConfig(
+        max_concurrent=max_concurrent,
+        enable_parallel=enable,
+        max_embedding_concurrent=max_emb,
+        embedding_intensive_tools=emb_tools,
+    )
     return ParallelToolExecutor(tool_executor, config, progress_callback)

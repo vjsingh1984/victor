@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
+from victor.runtime.chat_runtime import resolve_chat_service, resolve_chat_runtime
 
 if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
@@ -49,8 +50,12 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             manager = get_agent_manager()
             if manager is None:
                 orchestrator = await server._get_orchestrator()
+                chat_service = resolve_chat_service(orchestrator) or resolve_chat_runtime(
+                    orchestrator
+                )
                 manager = init_agent_manager(
                     orchestrator=orchestrator,
+                    chat_service=chat_service,
                     max_concurrent=4,
                     event_callback=lambda t, d: asyncio.create_task(
                         server._broadcast_agent_event(t, d)

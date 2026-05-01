@@ -99,7 +99,7 @@ pytest tests/unit/ -v
         result = extractor.extract_from_text(text, ["shell"])
         assert result is not None
         assert result.tool_name == "shell"
-        assert "pytest" in result.arguments["command"]
+        assert "pytest" in result.arguments["cmd"]
 
     def test_extract_grep_search(self, extractor):
         """Test extraction of grep/search call."""

@@ -23,19 +23,80 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.syntax import Syntax
 from rich.table import Table
 
-from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+from victor.agent.conversation.store import ConversationStore
+from victor.ui.json_utils import create_json_option, print_json_data
 
-sessions_app = typer.Typer(name="sessions", help="Manage conversation sessions.")
+sessions_app = typer.Typer(name="session", help="Manage conversation sessions.")
 console = Console()
+
+
+def _truncate_preview_body(
+    preview_body: str,
+    *,
+    max_lines: int = 12,
+    max_chars: int = 1200,
+) -> str:
+    """Keep preview snippets compact in terminal output."""
+    body = preview_body[:max_chars]
+    lines = body.splitlines()
+    rendered = "\n".join(lines[:max_lines])
+
+    if len(lines) > max_lines or len(preview_body) > len(body):
+        return f"{rendered}\n..." if rendered else "..."
+
+    return rendered
+
+
+def _render_preview_messages(preview_messages: list[dict[str, object]]) -> None:
+    """Render replay-only preview sidecars in human-readable session output."""
+    if not preview_messages:
+        return
+
+    console.print("\n[bold]Preview Messages:[/]")
+    for preview in preview_messages[-3:]:
+        if not isinstance(preview, dict):
+            continue
+
+        content = str(preview.get("content", "")).strip()
+        if content:
+            console.print(f"[magenta]Preview:[/] {content}")
+
+        metadata = preview.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        preview_kind = str(metadata.get("preview_kind", "")).replace("_", " ").strip()
+        preview_path = str(metadata.get("preview_path", "")).strip()
+        details = []
+        if preview_kind:
+            details.append(preview_kind.title())
+        if preview_path:
+            details.append(preview_path)
+        if details:
+            console.print(f"[dim]{' | '.join(details)}[/]")
+
+        preview_body = metadata.get("preview_body")
+        if isinstance(preview_body, str) and preview_body:
+            language = str(metadata.get("preview_language") or "text")
+            console.print(
+                Syntax(
+                    _truncate_preview_body(preview_body),
+                    language,
+                    theme="monokai",
+                    line_numbers=False,
+                    word_wrap=True,
+                )
+            )
 
 
 @sessions_app.command("list")
 def sessions_list(
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of sessions to list"),
     all: bool = typer.Option(False, "--all", help="List all sessions (no limit)"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List saved conversation sessions.
 
@@ -46,18 +107,29 @@ def sessions_list(
         victor sessions list --json       # Output as JSON
     """
     try:
-        persistence = get_sqlite_session_persistence()
+        store = ConversationStore()
         # If --all is specified, use a very high limit
         actual_limit = 100000 if all else limit
-        sessions = persistence.list_sessions(limit=actual_limit)
+        sessions = store.list_sessions(limit=actual_limit)
 
         if not sessions:
             console.print("[dim]No sessions found[/]")
             sys.exit(0)
 
         if json_output:
-            # Output as JSON
-            console.print_json(json.dumps(sessions, indent=2))
+            # Output as JSON - convert ConversationSession objects to dicts
+            sessions_dict = [
+                {
+                    "session_id": s.session_id,
+                    "title": None,  # ConversationSession doesn't have title
+                    "model": s.model or "unknown",
+                    "provider": s.provider or "unknown",
+                    "message_count": len(s.messages),
+                    "created_at": s.created_at.isoformat(),
+                }
+                for s in sessions
+            ]
+            print_json_data({"sessions": sessions_dict, "count": len(sessions_dict)})
         else:
             # Output as table
             table = Table(title=f"Saved Sessions (last {len(sessions)})")
@@ -69,25 +141,15 @@ def sessions_list(
             table.add_column("Created", style="dim")
 
             for session in sessions:
-                try:
-                    from datetime import datetime
+                date_str = session.created_at.strftime("%Y-%m-%d %H:%M")
+                title = "Untitled"  # ConversationSession doesn't have title
 
-                    dt = datetime.fromisoformat(session["created_at"])
-                    date_str = dt.strftime("%Y-%m-%d %H:%M")
-                except Exception:
-                    date_str = session["created_at"][:16]
-
-                title = (
-                    session["title"][:40] + "..."
-                    if len(session["title"]) > 40
-                    else session["title"]
-                )
                 table.add_row(
-                    session["session_id"],
+                    session.session_id,
                     title,
-                    session["model"],
-                    session["provider"],
-                    str(session["message_count"]),
+                    session.model or "unknown",
+                    session.provider or "unknown",
+                    str(len(session.messages)),
                     date_str,
                 )
 
@@ -103,7 +165,7 @@ def sessions_list(
 @sessions_app.command("show")
 def sessions_show(
     session_id: str = typer.Argument(..., help="Session ID to show"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Show details of a specific session.
 
@@ -112,51 +174,65 @@ def sessions_show(
         victor sessions show myproj-9Kx7Z2 --json
     """
     try:
-        persistence = get_sqlite_session_persistence()
-        session_data = persistence.load_session(session_id)
+        store = ConversationStore()
+        session = store.get_session(session_id)
 
-        if not session_data:
+        if not session:
             console.print(f"[red]Session not found:[/] {session_id}")
             sys.exit(1)
 
-        metadata = session_data.get("metadata", {})
-
         if json_output:
-            # Output as JSON
-            console.print_json(json.dumps(session_data, indent=2))
+            # Output as JSON - convert ConversationSession to dict
+            session_dict = {
+                "session_id": session.session_id,
+                "title": None,  # ConversationSession doesn't have title
+                "model": session.model,
+                "provider": session.provider,
+                "profile": session.profile,
+                "messages": [
+                    {"role": msg.role.value, "content": msg.content} for msg in session.messages
+                ],
+                "message_count": len(session.messages),
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.last_activity.isoformat(),
+            }
+            print_json_data(session_dict)
         else:
             # Output formatted
             from rich.panel import Panel
 
-            # Get messages
-            messages = session_data.get("conversation", {}).get("messages", [])
-            message_count = len(messages)
+            message_count = len(session.messages)
 
             panel_content = (
-                f"[bold]Session ID:[/] {metadata.get('session_id', session_id)}\n"
-                f"[bold]Title:[/] {metadata.get('title', 'Untitled')}\n"
-                f"[bold]Model:[/] {metadata.get('model', 'N/A')}\n"
-                f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
-                f"[bold]Profile:[/] {metadata.get('profile', 'N/A')}\n"
+                f"[bold]Session ID:[/] {session.session_id}\n"
+                f"[bold]Title:[/] Untitled\n"
+                f"[bold]Model:[/] {session.model or 'N/A'}\n"
+                f"[bold]Provider:[/] {session.provider or 'N/A'}\n"
+                f"[bold]Profile:[/] {session.profile or 'N/A'}\n"
                 f"[bold]Messages:[/] {message_count}\n"
-                f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}\n"
-                f"[bold]Updated:[/] {metadata.get('updated_at', 'N/A')}\n"
+                f"[bold]Created:[/] {session.created_at.isoformat()}\n"
+                f"[bold]Updated:[/] {session.last_activity.isoformat()}\n"
             )
 
             console.print(Panel(panel_content, title="Session Details", border_style="cyan"))
 
             # Show recent messages (last 5)
-            if messages:
+            if session.messages:
                 console.print("\n[bold]Recent Messages:[/]")
-                for msg in messages[-5:]:
-                    role_style = {"user": "cyan", "assistant": "green", "system": "dim"}.get(
-                        msg.get("role", ""), "white"
-                    )
-                    content = msg.get("content", "")
+                for msg in session.messages[-5:]:
+                    role_style = {
+                        "user": "cyan",
+                        "assistant": "green",
+                        "system": "dim",
+                    }.get(msg.role.value, "white")
+                    content = msg.content
                     # Truncate long messages
                     if len(content) > 200:
                         content = content[:200] + "..."
-                    console.print(f"[{role_style}]{msg.get('role', '').capitalize()}:[/] {content}")
+                    console.print(f"[{role_style}]{msg.role.value.capitalize()}:[/] {content}")
+
+            # No preview messages in ConversationStore
+            console.print("[dim]No preview messages available[/]")
 
     except Exception as e:
         console.print(f"[red]Error showing session:[/] {e}")
@@ -167,7 +243,7 @@ def sessions_show(
 def sessions_search(
     query: str = typer.Argument(..., help="Search query string"),
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum results"),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Search sessions by title or content.
 
@@ -177,15 +253,40 @@ def sessions_search(
         victor sessions search test --json
     """
     try:
-        persistence = get_sqlite_session_persistence()
-        sessions = persistence.search_sessions(query, limit=limit)
+        store = ConversationStore()
+        all_sessions = store.list_sessions(limit=1000)  # Get all sessions for searching
+
+        # Filter sessions by query (search in messages)
+        query_lower = query.lower()
+        matched_sessions = []
+
+        for session in all_sessions:
+            # Search in message content
+            for msg in session.messages:
+                if query_lower in msg.content.lower():
+                    matched_sessions.append(session)
+                    break
+
+        # Apply limit
+        sessions = matched_sessions[:limit]
 
         if not sessions:
             console.print(f"[dim]No sessions found matching '{query}'[/]")
             sys.exit(0)
 
         if json_output:
-            console.print_json(json.dumps(sessions, indent=2))
+            sessions_dict = [
+                {
+                    "session_id": s.session_id,
+                    "title": None,
+                    "model": s.model or "unknown",
+                    "provider": s.provider or "unknown",
+                    "message_count": len(s.messages),
+                    "created_at": s.created_at.isoformat(),
+                }
+                for s in sessions
+            ]
+            print_json_data({"sessions": sessions_dict, "count": len(sessions), "query": query})
         else:
             table = Table(title=f"Sessions matching '{query}'")
             table.add_column("Session ID", style="cyan", no_wrap=True)
@@ -195,17 +296,13 @@ def sessions_search(
             table.add_column("Messages", justify="right")
 
             for session in sessions:
-                title = (
-                    session["title"][:40] + "..."
-                    if len(session["title"]) > 40
-                    else session["title"]
-                )
+                title = "Untitled"
                 table.add_row(
-                    session["session_id"],
+                    session.session_id,
                     title,
-                    session["model"],
-                    session["provider"],
-                    str(session["message_count"]),
+                    session.model or "unknown",
+                    session.provider or "unknown",
+                    str(len(session.messages)),
                 )
 
             console.print(table)
@@ -235,14 +332,10 @@ def sessions_delete(
                 console.print("[dim]Cancelled[/]")
                 sys.exit(0)
 
-        persistence = get_sqlite_session_persistence()
-        success = persistence.delete_session(session_id)
+        store = ConversationStore()
+        store.delete_session(session_id)
 
-        if success:
-            console.print(f"[green]✓[/] Deleted session: {session_id}")
-        else:
-            console.print(f"[red]Failed to delete session:[/] {session_id}")
-            sys.exit(1)
+        console.print(f"[green]✓[/] Deleted session: {session_id}")
 
     except Exception as e:
         console.print(f"[red]Error deleting session:[/] {e}")
@@ -262,20 +355,30 @@ def sessions_export(
         victor sessions export --no-pretty
     """
     try:
-        persistence = get_sqlite_session_persistence()
-        all_sessions = persistence.list_sessions(limit=1000)  # Get all sessions
+        store = ConversationStore()
+        all_sessions = store.list_sessions(limit=1000)  # Get all sessions
 
         if not all_sessions:
             console.print("[dim]No sessions to export[/]")
             sys.exit(0)
 
-        # Export data
+        # Export data - convert ConversationSession objects to dicts
         export_data = []
         for session in all_sessions:
-            session_id = session["session_id"]
-            full_session = persistence.load_session(session_id)
-            if full_session:
-                export_data.append(full_session)
+            export_data.append(
+                {
+                    "session_id": session.session_id,
+                    "model": session.model,
+                    "provider": session.provider,
+                    "profile": session.profile,
+                    "messages": [
+                        {"role": msg.role.value, "content": msg.content} for msg in session.messages
+                    ],
+                    "message_count": len(session.messages),
+                    "created_at": session.created_at.isoformat(),
+                    "updated_at": session.last_activity.isoformat(),
+                }
+            )
 
         # Determine output path
         if not output:
@@ -304,7 +407,9 @@ def sessions_clear(
         None, help="Clear sessions with IDs starting with this prefix (min 6 chars)"
     ),
     all: bool = typer.Option(
-        False, "--all", help="Clear all sessions (default behavior when no prefix specified)"
+        False,
+        "--all",
+        help="Clear all sessions (default behavior when no prefix specified)",
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
@@ -324,14 +429,14 @@ def sessions_clear(
             console.print("[red]Error:[/] Prefix must be at least 6 characters long.")
             sys.exit(1)
 
-        persistence = get_sqlite_session_persistence()
+        store = ConversationStore()
 
         # Get all sessions to show what will be deleted
-        all_sessions = persistence.list_sessions(limit=100000)
+        all_sessions = store.list_sessions(limit=100000)
 
         # Filter sessions by prefix if specified
         if prefix:
-            sessions_to_delete = [s for s in all_sessions if s["session_id"].startswith(prefix)]
+            sessions_to_delete = [s for s in all_sessions if s.session_id.startswith(prefix)]
             if not sessions_to_delete:
                 console.print(f"[dim]No sessions found matching prefix '{prefix}'[/]")
                 sys.exit(0)
@@ -371,9 +476,8 @@ def sessions_clear(
         # Delete sessions
         deleted_count = 0
         for session in sessions_to_delete:
-            session_id = session["session_id"]
-            if persistence.delete_session(session_id):
-                deleted_count += 1
+            store.delete_session(session.session_id)
+            deleted_count += 1
 
         if prefix:
             console.print(

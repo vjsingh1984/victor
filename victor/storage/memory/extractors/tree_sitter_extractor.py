@@ -22,7 +22,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from victor.storage.memory.entity_types import Entity, EntityRelation, EntityType, RelationType
+from victor.storage.memory.entity_types import (
+    Entity,
+    EntityRelation,
+    EntityType,
+    RelationType,
+)
 from victor.storage.memory.extractors.base import EntityExtractor, ExtractionResult
 
 logger = logging.getLogger(__name__)
@@ -71,8 +76,10 @@ class TreeSitterEntityExtractor(EntityExtractor):
             if provider is not None and registry.is_enhanced(TreeSitterExtractorProtocol):
                 self._extractor = provider
             else:
-                logger.warning("Tree-sitter not available: victor-coding not installed")
-                raise ImportError("Tree-sitter requires victor-coding package")
+                logger.warning(
+                    "Tree-sitter extractor not available: " "no enhanced provider registered"
+                )
+                raise ImportError("Tree-sitter extractor capability not registered")
         return self._extractor
 
     async def extract(

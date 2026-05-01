@@ -5,7 +5,7 @@ These protocols define how verticals provide workflow and handler configurations
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Dict, Any, Optional
+from typing import List, Protocol, runtime_checkable, Dict, Any, Optional
 
 from victor_sdk.core.types import StageDefinition
 

@@ -57,7 +57,7 @@ These are string literals in code that detects/matches TODO patterns:
 | `storage/embeddings/task_classifier.py` | 2 markers | Review: classifier improvements |
 | `verticals/contrib/coding/testgen/generator.py` | 4 markers | Review: test generation gaps |
 
-**Count**: ~19 markers. **Action**: Convert to GitHub issues for tracking.
+**Count**: ~19 markers. **Action**: Converted to GitHub issues (#86-#93) on 2026-04-10. All TODO markers replaced with issue references or clarified as intentional stubs.
 
 ## Summary
 

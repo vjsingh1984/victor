@@ -29,14 +29,47 @@ Database:
 import asyncio
 import logging
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+from victor.framework.rl.experiment_coordinator import get_experiment_coordinator
+
+if TYPE_CHECKING:
+    from victor.framework.rl.option_framework import OptionRegistry
 from victor.core.database import get_database
 from victor.core.schema import Tables, Schema
+from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PromptCandidateSuiteWorkflowResult:
+    """Result of processing a prompt-candidate benchmark suite."""
+
+    prompt_optimizer_sync: Optional[Any] = None
+    prompt_rollout: Optional[Dict[str, Any]] = None
+    prompt_rollout_analysis: Optional[Dict[str, Any]] = None
+    prompt_rollout_decision: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize workflow state for CLI artifacts."""
+        payload: Dict[str, Any] = {}
+        if self.prompt_optimizer_sync is not None:
+            payload["prompt_optimizer_sync"] = (
+                self.prompt_optimizer_sync.to_dict()
+                if hasattr(self.prompt_optimizer_sync, "to_dict")
+                else self.prompt_optimizer_sync
+            )
+        if self.prompt_rollout is not None:
+            payload["prompt_rollout"] = self.prompt_rollout
+        if self.prompt_rollout_analysis is not None:
+            payload["prompt_rollout_analysis"] = self.prompt_rollout_analysis
+        if self.prompt_rollout_decision is not None:
+            payload["prompt_rollout_decision"] = self.prompt_rollout_decision
+        return payload
 
 
 class AsyncWriterQueue:
@@ -139,7 +172,7 @@ class AsyncWriterQueue:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> bool:
         """Queue an outcome for async writing.
 
@@ -246,8 +279,8 @@ class AsyncWriterQueue:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -255,6 +288,7 @@ class AsyncWriterQueue:
                         outcome.model,
                         outcome.task_type,
                         outcome.vertical or "general",
+                        self.coordinator._repo_id,
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
@@ -345,7 +379,7 @@ class BatchedOutcomeWriter:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Queue an outcome for batched writing.
 
@@ -394,8 +428,8 @@ class BatchedOutcomeWriter:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -403,6 +437,7 @@ class BatchedOutcomeWriter:
                         outcome.model,
                         outcome.task_type,
                         outcome.vertical or "general",
+                        self.coordinator._repo_id,
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
@@ -488,8 +523,30 @@ class RLCoordinator:
         # Lifecycle state tracking
         self._is_closed = False
 
+        # Per-repo isolation: outcomes are tagged with repo_id
+        self._repo_id: Optional[str] = None
+
+        # Tool name prefixes to exclude from RL recording (test fixtures)
+        self._excluded_tool_prefixes = (
+            "dummy_",
+            "test_",
+            "flaky_",
+            "error_",
+            "always_",
+            "mock_",
+        )
+
+        # Lazy-initialized OptionRegistry for hierarchical RL options
+        self._option_registry: Optional["OptionRegistry"] = None
+
         # Ensure core tables exist
         self._ensure_core_tables()
+
+        # Migrate schema: add repo_id column if missing
+        self._migrate_add_repo_id()
+
+        # Migrate schema: add Phase 1 columns (feedback_source, session_id, etc.)
+        self._migrate_add_phase1_columns()
 
         # Auto-register default learners
         self._register_default_learners()
@@ -498,6 +555,28 @@ class RLCoordinator:
         self._connect_hooks_and_metrics()
 
         logger.info(f"RL: Coordinator initialized with unified database at {self.db_path}")
+
+    def _ensure_db_connection(self) -> None:
+        """Reacquire a usable SQLite connection if the cached one was closed.
+
+        Integration tests reset global database singletons between test cases.
+        The RL coordinator is a separate singleton and can outlive that reset,
+        leaving cached learner instances and the raw SQLite connection stale.
+        """
+        if self._is_closed:
+            raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
+
+        try:
+            self.db.execute("SELECT 1")
+            return
+        except Exception:
+            logger.info("RL: Reopening coordinator database connection")
+
+        self.db = self._db_manager.get_connection()
+        self._learners.clear()
+        self._ensure_core_tables()
+        self._migrate_add_repo_id()
+        self._migrate_add_phase1_columns()
 
     def _ensure_core_tables(self) -> None:
         """Create core tables for telemetry and cross-learner analysis."""
@@ -514,6 +593,96 @@ class RLCoordinator:
 
         self.db.commit()
         logger.debug("RL: Core tables ensured")
+
+    def _migrate_add_repo_id(self) -> None:
+        """Add repo_id column to rl_outcome if missing (backward-compatible)."""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(f"PRAGMA table_info({Tables.RL_OUTCOME})")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "repo_id" not in columns:
+                cursor.execute(
+                    f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN repo_id TEXT DEFAULT NULL"
+                )
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_repo "
+                    f"ON {Tables.RL_OUTCOME}(repo_id)"
+                )
+                self.db.commit()
+                logger.info("RL: Migrated rl_outcome — added repo_id column")
+        except Exception as e:
+            logger.debug(f"RL: repo_id migration skipped: {e}")
+
+    def _migrate_add_phase1_columns(self) -> None:
+        """Add Priority 4 Phase 1 columns to rl_outcome (backward-compatible)."""
+        phase1_columns = {
+            "feedback_source": "TEXT DEFAULT NULL",
+            "user_feedback": "TEXT DEFAULT NULL",
+            "helpful": "INTEGER DEFAULT NULL",
+            "correction": "TEXT DEFAULT NULL",
+            "session_summary": "TEXT DEFAULT NULL",
+            "session_id": "TEXT DEFAULT NULL",
+        }
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(f"PRAGMA table_info({Tables.RL_OUTCOME})")
+            existing = {row[1] for row in cursor.fetchall()}
+            added = []
+            for col, typedef in phase1_columns.items():
+                if col not in existing:
+                    cursor.execute(f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN {col} {typedef}")
+                    added.append(col)
+            if added:
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_feedback_source "
+                    f"ON {Tables.RL_OUTCOME}(feedback_source, created_at)"
+                )
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session_id "
+                    f"ON {Tables.RL_OUTCOME}(session_id)"
+                )
+                self.db.commit()
+                logger.info("RL: Migrated rl_outcome — added columns: %s", added)
+        except Exception as e:
+            logger.debug("RL: Phase 1 migration skipped: %s", e)
+
+    def set_repo_context(self, repo_id: Optional[str]) -> None:
+        """Set current repo context for outcome isolation.
+
+        When set, all recorded outcomes are tagged with this repo_id,
+        and queries prefer repo-specific data over global data.
+
+        Args:
+            repo_id: Repository identifier (e.g., directory name), or None for global
+        """
+        self._repo_id = repo_id
+        logger.debug(f"RL: Repo context set to {repo_id!r}")
+
+    def get_option_registry(self) -> "OptionRegistry":
+        """Get the OptionRegistry, creating it lazily on first access.
+
+        The OptionRegistry manages hierarchical RL options (Explore, Implement,
+        Debug, Review) — temporal abstractions for multi-step agent skills.
+        It is NOT a learner; use this method instead of ``get_learner()``.
+
+        Returns:
+            OptionRegistry instance with default options registered.
+        """
+        if self._option_registry is None:
+            from victor.framework.rl.option_framework import OptionRegistry
+
+            self._option_registry = OptionRegistry()
+            logger.info(
+                "RL: OptionRegistry initialized with %d options",
+                len(self._option_registry._options),
+            )
+        return self._option_registry
+
+    def _should_record_tool(self, tool_name: str) -> bool:
+        """Check if a tool outcome should be recorded (filters test fixtures)."""
+        if not tool_name:
+            return True
+        return not any(tool_name.startswith(p) for p in self._excluded_tool_prefixes)
 
     def _register_default_learners(self) -> None:
         """Register default learners.
@@ -556,7 +725,7 @@ class RLCoordinator:
             logger.warning(f"RL: Learner '{name}' already registered, replacing")
 
         self._learners[name] = learner
-        logger.info(f"RL: Registered learner '{name}'")
+        logger.debug(f"RL: Registered learner '{name}'")
 
     def set_active_learners(self, learners: List[str]) -> None:
         """Set the active learners allowlist.
@@ -587,6 +756,8 @@ class RLCoordinator:
         Returns:
             Learner instance or None if unknown or not in active_learners
         """
+        self._ensure_db_connection()
+
         if name in self._learners:
             return self._learners[name]
 
@@ -636,11 +807,15 @@ class RLCoordinator:
 
                 return SemanticThresholdLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "model_selector":
-                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+                from victor.framework.rl.learners.model_selector import (
+                    ModelSelectorLearner,
+                )
 
                 return ModelSelectorLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "cache_eviction":
-                from victor.framework.rl.learners.cache_eviction import CacheEvictionLearner
+                from victor.framework.rl.learners.cache_eviction import (
+                    CacheEvictionLearner,
+                )
 
                 return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "grounding_threshold":
@@ -652,19 +827,27 @@ class RLCoordinator:
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
             elif name == "quality_weights":
-                from victor.framework.rl.learners.quality_weights import QualityWeightLearner
+                from victor.framework.rl.learners.quality_weights import (
+                    QualityWeightLearner,
+                )
 
                 return QualityWeightLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "tool_selector":
-                from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
+                from victor.framework.rl.learners.tool_selector import (
+                    ToolSelectorLearner,
+                )
 
                 return ToolSelectorLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "mode_transition":
-                from victor.framework.rl.learners.mode_transition import ModeTransitionLearner
+                from victor.framework.rl.learners.mode_transition import (
+                    ModeTransitionLearner,
+                )
 
                 return ModeTransitionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "prompt_template":
-                from victor.framework.rl.learners.prompt_template import PromptTemplateLearner
+                from victor.framework.rl.learners.prompt_template import (
+                    PromptTemplateLearner,
+                )
 
                 return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "team_composition":
@@ -673,29 +856,97 @@ class RLCoordinator:
                 # TeamCompositionLearner has different signature - uses db_path instead of db_connection
                 return TeamCompositionLearner(learning_rate=0.1)
             elif name == "cross_vertical":
-                from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
+                from victor.framework.rl.learners.cross_vertical import (
+                    CrossVerticalLearner,
+                )
 
                 return CrossVerticalLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "workflow_execution":
-                from victor.framework.rl.learners.workflow_execution import WorkflowExecutionLearner
+                from victor.framework.rl.learners.workflow_execution import (
+                    WorkflowExecutionLearner,
+                )
 
                 return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "context_pruning":
-                from victor.framework.rl.learners.context_pruning import ContextPruningLearner
+                from victor.framework.rl.learners.context_pruning import (
+                    ContextPruningLearner,
+                )
 
                 return ContextPruningLearner(name=name, db_connection=self.db, learning_rate=0.15)
+            elif name == "prompt_optimizer":
+                # Check settings: skip when prompt optimization is off
+                try:
+                    from victor.config.settings import get_settings
+
+                    settings = get_settings()
+                    po_cfg = getattr(settings, "prompt_optimization", None)
+                    if po_cfg is not None and not po_cfg.enabled:
+                        logger.debug("Prompt optimization disabled — skipping prompt_optimizer")
+                        return None
+                except Exception:
+                    pass  # Settings unavailable — allow creation
+
+                from victor.framework.rl.learners.prompt_optimizer import (
+                    PromptOptimizerLearner,
+                )
+
+                # GEPA v2: use tiered service + Pareto when gepa.enabled
+                strategy = None
+                use_pareto = False
+                max_prompt_chars = 1500
+                try:
+                    from victor.config.settings import get_settings
+
+                    settings = get_settings()
+                    po_cfg = getattr(settings, "prompt_optimization", None)
+                    gepa_cfg = po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
+                    if gepa_cfg and gepa_cfg.enabled:
+                        from victor.framework.rl.gepa_strategy_adapter import (
+                            GEPAServiceStrategy,
+                        )
+                        from victor.framework.rl.gepa_tier_manager import (
+                            GEPATierManager,
+                        )
+
+                        tier_mgr = GEPATierManager(gepa_cfg)
+                        strategy = GEPAServiceStrategy(tier_mgr)
+                        use_pareto = True
+                        max_prompt_chars = getattr(gepa_cfg, "max_prompt_chars", 1500)
+                        logger.info(
+                            "GEPA v2 enabled: tier=%s, pareto=True",
+                            tier_mgr.get_current_tier(),
+                        )
+                except Exception as e:
+                    logger.debug("GEPA v2 init skipped: %s", e)
+
+                return PromptOptimizerLearner(
+                    name=name,
+                    db_connection=self.db,
+                    learning_rate=0.1,
+                    strategy=strategy,
+                    use_pareto=use_pareto,
+                    max_prompt_chars=max_prompt_chars,
+                )
+            elif name == "user_feedback":
+                from victor.framework.rl.learners.user_feedback import UserFeedbackLearner
+
+                return UserFeedbackLearner(name=name, db_connection=self.db, learning_rate=0.1)
+            elif name == "option_framework":
+                # OptionRegistry is not a learner — access via get_option_registry()
+                logger.debug("RL: option_framework is not a learner — use get_option_registry()")
+                return None
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None
-        except ImportError as e:
-            logger.warning(f"RL: Failed to import learner '{name}': {e}")
+        except (ImportError, TypeError) as e:
+            logger.warning(f"RL: Failed to create learner '{name}': {e}")
             return None
 
     def record_outcome(
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record an outcome for a specific learner.
 
@@ -706,7 +957,14 @@ class RLCoordinator:
             outcome: Outcome data
             vertical: Which vertical this came from (coding, devops, data_science)
         """
+        self._ensure_db_connection()
         outcome.vertical = vertical
+
+        # Filter test fixture tools from RL recording
+        tool_name = outcome.metadata.get("tool_name", "") if outcome.metadata else ""
+        if not self._should_record_tool(tool_name):
+            logger.debug(f"RL: Skipping test fixture tool '{tool_name}'")
+            return
 
         learner = self.get_learner(learner_name)
         if not learner:
@@ -717,24 +975,36 @@ class RLCoordinator:
             # Record in learner-specific tables
             learner.record_outcome(outcome)
 
-            # Record in shared outcomes table
+            # Record in shared outcomes table with repo_id and Phase 1 columns
+            meta = outcome.metadata or {}
             cursor = self.db.cursor()
             cursor.execute(
                 f"""
                 INSERT INTO {Tables.RL_OUTCOME} (
                     learner_id, provider, model, task_type, vertical,
-                    success, quality_score, metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    repo_id, success, quality_score, metadata,
+                    feedback_source, user_feedback, helpful, correction, session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    learner_name,  # Maps to learner_id column
+                    learner_name,
                     outcome.provider,
                     outcome.model,
                     outcome.task_type,
-                    outcome.vertical or "general",  # Default to "general" if None
+                    outcome.vertical or "general",
+                    self._repo_id,
                     1 if outcome.success else 0,
                     outcome.quality_score,
-                    outcome.to_dict()["metadata"],  # JSON string
+                    outcome.to_dict()["metadata"],
+                    meta.get("feedback_source"),
+                    meta.get("user_feedback"),
+                    (
+                        1
+                        if meta.get("helpful") is True
+                        else (0 if meta.get("helpful") is False else None)
+                    ),
+                    meta.get("correction"),
+                    meta.get("session_id"),
                 ),
             )
             self.db.commit()
@@ -772,6 +1042,7 @@ class RLCoordinator:
             metadata: Optional additional metadata dict
         """
         try:
+            self._ensure_db_connection()
             import json
 
             cursor = self.db.cursor()
@@ -827,6 +1098,7 @@ class RLCoordinator:
         Returns:
             Recommendation with value and confidence, or None if no data
         """
+        self._ensure_db_connection()
         learner = self.get_learner(learner_name)
         if not learner:
             logger.debug(f"RL: Unknown learner '{learner_name}', no recommendation")
@@ -838,6 +1110,509 @@ class RLCoordinator:
             logger.error(f"RL: Failed to get recommendation from {learner_name}: {e}")
             return None
 
+    def create_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Create and start a prompt rollout experiment through the prompt optimizer.
+
+        Returns:
+            Experiment ID if created and started successfully, else None.
+        """
+        learner = self.get_learner("prompt_optimizer")
+        if learner is None or not hasattr(learner, "create_rollout_experiment"):
+            return None
+
+        try:
+            experiment_coordinator = get_experiment_coordinator(self.db)
+            return learner.create_rollout_experiment(
+                experiment_coordinator,
+                section_name=section_name,
+                provider=provider,
+                treatment_hash=treatment_hash,
+                control_hash=control_hash,
+                traffic_split=traffic_split,
+                min_samples_per_variant=min_samples_per_variant,
+            )
+        except Exception as e:
+            logger.warning("RL: Failed to create prompt rollout experiment: %s", e)
+            return None
+
+    @staticmethod
+    def get_prompt_rollout_experiment_id(
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> str:
+        """Return the canonical experiment id for a prompt rollout candidate."""
+        return f"prompt_optimizer_{section_name.lower()}_{provider or 'default'}_{treatment_hash}"
+
+    @staticmethod
+    def _get_prompt_rollout_auto_action(result: Any) -> Optional[str]:
+        """Infer the safe action from rollout experiment analysis."""
+        recommendation = getattr(result, "recommendation", "")
+        is_significant = bool(getattr(result, "is_significant", False))
+        treatment_better = bool(getattr(result, "treatment_better", False))
+
+        if recommendation.startswith("Roll out treatment") and is_significant and treatment_better:
+            return "rollout"
+        if recommendation.startswith("Keep control") and is_significant and not treatment_better:
+            return "rollback"
+        return None
+
+    @staticmethod
+    def _resolve_prompt_rollout_context(sync_result: Any, suite: Any) -> Dict[str, str]:
+        """Resolve rollout identity for the benchmark-approved suite winner."""
+        approved_hash = getattr(sync_result, "approved_prompt_candidate_hash", None)
+        if not approved_hash:
+            raise ValueError("no benchmark-approved candidate available for rollout")
+
+        section_name = None
+        provider = None
+
+        for decision in getattr(sync_result, "decisions", []) or []:
+            if getattr(decision, "prompt_candidate_hash", None) != approved_hash:
+                continue
+            section_name = getattr(decision, "section_name", None)
+            provider = getattr(decision, "provider", None)
+            if section_name and provider:
+                break
+
+        if not section_name or not provider:
+            for run in getattr(suite, "runs", []) or []:
+                config = getattr(run, "config", None)
+                if getattr(config, "prompt_candidate_hash", None) != approved_hash:
+                    continue
+                section_name = getattr(config, "prompt_section_name", None)
+                provider = getattr(config, "provider", None)
+                if section_name and provider:
+                    break
+
+        if not section_name or not provider:
+            raise ValueError("approved candidate metadata unavailable for rollout")
+
+        experiment_id = RLCoordinator.get_prompt_rollout_experiment_id(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=approved_hash,
+        )
+        return {
+            "experiment_id": experiment_id,
+            "section_name": section_name,
+            "provider": provider,
+            "prompt_candidate_hash": approved_hash,
+        }
+
+    def analyze_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze the rollout experiment for a prompt candidate."""
+        experiment_id = RLCoordinator.get_prompt_rollout_experiment_id(
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+        experiment_coordinator = get_experiment_coordinator(self.db)
+        status = experiment_coordinator.get_experiment_status(experiment_id)
+        if status is None:
+            return None
+
+        result = experiment_coordinator.analyze_experiment(experiment_id)
+        if result is None:
+            return {
+                "experiment_id": experiment_id,
+                "section_name": section_name,
+                "provider": provider,
+                "prompt_candidate_hash": treatment_hash,
+                "status": status.get("status"),
+                "analysis_available": False,
+                "recommendation": "Prompt rollout analysis unavailable",
+                "auto_action": None,
+                "details": {},
+            }
+
+        return {
+            "experiment_id": experiment_id,
+            "section_name": section_name,
+            "provider": provider,
+            "prompt_candidate_hash": treatment_hash,
+            "status": status.get("status"),
+            "analysis_available": True,
+            "recommendation": result.recommendation,
+            "auto_action": RLCoordinator._get_prompt_rollout_auto_action(result),
+            "is_significant": result.is_significant,
+            "treatment_better": result.treatment_better,
+            "effect_size": result.effect_size,
+            "p_value": result.p_value,
+            "confidence_interval": result.confidence_interval,
+            "details": result.details,
+        }
+
+    def apply_prompt_rollout_recommendation(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Apply the rollout/rollback recommendation for a prompt experiment."""
+        report = RLCoordinator.analyze_prompt_rollout_experiment(
+            self,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+        if report is None:
+            return None
+        if not report.get("analysis_available", False):
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": None,
+                "applied": False,
+                "dry_run": dry_run,
+                "reason": report.get("recommendation"),
+            }
+
+        action = report.get("auto_action")
+        if not action:
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": None,
+                "applied": False,
+                "dry_run": dry_run,
+                "reason": report.get("recommendation"),
+            }
+
+        if dry_run:
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": action,
+                "applied": False,
+                "dry_run": True,
+            }
+
+        experiment_coordinator = get_experiment_coordinator(self.db)
+        if action == "rollout":
+            updated = experiment_coordinator.rollout_treatment(report["experiment_id"])
+        else:
+            updated = experiment_coordinator.rollback_experiment(report["experiment_id"])
+        if not updated:
+            return {
+                "experiment_id": report["experiment_id"],
+                "action": action,
+                "applied": False,
+                "dry_run": False,
+                "reason": f"unable to apply prompt rollout decision for {report['experiment_id']}",
+            }
+        return {
+            "experiment_id": report["experiment_id"],
+            "action": action,
+            "applied": True,
+            "dry_run": False,
+        }
+
+    def process_prompt_candidate_evaluation_suite(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Process a prompt-candidate suite through sync and rollout stages."""
+        if create_rollout and promote_best:
+            raise ValueError("--create-rollout cannot be combined with promote_best")
+        if apply_rollout_decision and promote_best:
+            raise ValueError("--apply-rollout-decision cannot be combined with promote_best")
+        if create_rollout and not 0.0 < rollout_traffic_split < 1.0:
+            raise ValueError("rollout_traffic_split must be between 0 and 1")
+        if create_rollout and rollout_min_samples_per_variant <= 0:
+            raise ValueError("rollout_min_samples_per_variant must be greater than 0")
+
+        learner = self.get_learner("prompt_optimizer")
+        if learner is None or not hasattr(learner, "sync_evaluation_suite"):
+            raise ValueError("prompt optimizer not available")
+
+        sync_result = learner.sync_evaluation_suite(
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+        )
+        workflow = PromptCandidateSuiteWorkflowResult(prompt_optimizer_sync=sync_result)
+
+        if not (create_rollout or analyze_rollout or apply_rollout_decision):
+            return workflow
+
+        try:
+            context = RLCoordinator._resolve_prompt_rollout_context(sync_result, suite)
+        except ValueError as exc:
+            error = str(exc)
+            if create_rollout:
+                workflow.prompt_rollout = {"created": False, "error": error}
+            if analyze_rollout:
+                workflow.prompt_rollout_analysis = {
+                    "analysis_available": False,
+                    "recommendation": error,
+                }
+            if apply_rollout_decision:
+                workflow.prompt_rollout_decision = {
+                    "applied": False,
+                    "dry_run": rollout_decision_dry_run,
+                    "error": error,
+                }
+            return workflow
+
+        if create_rollout:
+            experiment_id = RLCoordinator.create_prompt_rollout_experiment(
+                self,
+                section_name=context["section_name"],
+                provider=context["provider"],
+                treatment_hash=context["prompt_candidate_hash"],
+                control_hash=rollout_control_hash,
+                traffic_split=rollout_traffic_split,
+                min_samples_per_variant=rollout_min_samples_per_variant,
+            )
+            workflow.prompt_rollout = (
+                {"created": True, "experiment_id": experiment_id}
+                if experiment_id
+                else {"created": False, "error": "unable to start prompt rollout experiment"}
+            )
+
+        if analyze_rollout:
+            report = RLCoordinator.analyze_prompt_rollout_experiment(
+                self,
+                section_name=context["section_name"],
+                provider=context["provider"],
+                treatment_hash=context["prompt_candidate_hash"],
+            )
+            workflow.prompt_rollout_analysis = (
+                report
+                if report is not None
+                else {
+                    "analysis_available": False,
+                    "recommendation": (
+                        f"prompt rollout experiment not found: {context['experiment_id']}"
+                    ),
+                }
+            )
+
+        if apply_rollout_decision:
+            decision = RLCoordinator.apply_prompt_rollout_recommendation(
+                self,
+                section_name=context["section_name"],
+                provider=context["provider"],
+                treatment_hash=context["prompt_candidate_hash"],
+                dry_run=rollout_decision_dry_run,
+            )
+            workflow.prompt_rollout_decision = (
+                decision
+                if decision is not None
+                else {
+                    "applied": False,
+                    "dry_run": rollout_decision_dry_run,
+                    "error": f"prompt rollout experiment not found: {context['experiment_id']}",
+                }
+            )
+
+        return workflow
+
+    @staticmethod
+    def format_evolution_report(
+        section: str,
+        generation: int,
+        old_text: str,
+        new_text: str,
+        alpha: float = 1.0,
+        beta_val: float = 1.0,
+        sample_count: int = 0,
+    ) -> str:
+        """Format an auditable evolution report for user visibility.
+
+        Returns a structured text report showing before/after prompt text,
+        generation number, and Thompson Sampling statistics.
+        """
+        max_preview = 300
+        old_preview = (old_text[:max_preview] + "...") if len(old_text) > max_preview else old_text
+        new_preview = (new_text[:max_preview] + "...") if len(new_text) > max_preview else new_text
+        mean = alpha / (alpha + beta_val) if (alpha + beta_val) > 0 else 0.5
+
+        lines = [
+            f"[GEPA Evolution] section={section} gen-{generation}",
+            f"  Stats: α={alpha:.1f} β={beta_val:.1f} mean={mean:.2f} samples={sample_count}",
+            f"  Before ({len(old_text)} chars): {old_preview}",
+            f"  After  ({len(new_text)} chars): {new_preview}",
+        ]
+        return "\n".join(lines)
+
+    def try_evolve_on_session_end(self, provider: str, model: str):
+        """EvoTest: try evolving one prompt section after conversation end.
+
+        Lightweight evolution — picks one section (round-robin), collects
+        recent traces, evolves if enough data. Non-blocking, best-effort.
+
+        Returns:
+            dict with report on success, True for legacy compat, False on skip.
+        """
+        learner = self._learners.get("prompt_optimizer")
+        if learner is None:
+            return False
+
+        sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+        if not sections:
+            return False
+
+        idx = getattr(self, "_evolution_section_idx", 0)
+        section = sections[idx % len(sections)]
+        self._evolution_section_idx = idx + 1
+
+        rec = learner.get_recommendation(provider, model, "default", section_name=section)
+        current_text = rec.value if rec else ""
+        if not current_text:
+            return False
+
+        try:
+            result = learner.evolve(section, current_text, provider)
+            if result:
+                report = self.format_evolution_report(
+                    section=section,
+                    generation=getattr(result, "generation", 0),
+                    old_text=current_text,
+                    new_text=getattr(result, "text", ""),
+                    alpha=getattr(result, "alpha", 1.0),
+                    beta_val=getattr(result, "beta_val", 1.0),
+                    sample_count=getattr(result, "sample_count", 0),
+                )
+                logger.info(f"[evotest] {report}")
+                return {"evolved": True, "section": section, "report": report}
+        except Exception as e:
+            logger.debug(f"[evotest] Evolution skipped: {e}")
+        return False
+
+    def maybe_background_evolve(self, provider: str = "", model: str = "") -> None:
+        """Check staleness and spawn background evolution if needed.
+
+        Called once at chat startup.  If the newest prompt candidate is older
+        than ``_EVOLUTION_STALE_DAYS``, a daemon thread evolves all evolvable
+        sections from existing trace data.  The thread is fire-and-forget —
+        it never blocks the user.
+
+        A filesystem lock prevents concurrent evolution runs across
+        multiple ``victor chat`` sessions.
+        """
+        import threading
+        from datetime import datetime, timedelta, timezone
+
+        _EVOLUTION_STALE_DAYS = 7
+        lock_path = self.storage_path / ".evolution_lock"
+
+        # Quick check: skip if we already spawned a thread this session
+        if getattr(self, "_bg_evolution_started", False):
+            return
+        self._bg_evolution_started = True
+
+        # Check newest candidate timestamp
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("SELECT MAX(created_at) FROM agent_prompt_candidate")
+            row = cursor.fetchone()
+            if row and row[0]:
+                # Parse ISO timestamp
+                last_evolved = datetime.fromisoformat(row[0])
+                if last_evolved.tzinfo is None:
+                    last_evolved = last_evolved.replace(tzinfo=timezone.utc)
+                age = datetime.now(timezone.utc) - last_evolved
+                if age < timedelta(days=_EVOLUTION_STALE_DAYS):
+                    logger.debug(
+                        "RL: Last evolution was %s ago — still fresh, skipping background evolve",
+                        age,
+                    )
+                    return
+                logger.info(
+                    "RL: Last evolution was %s ago (>%dd) — starting background evolve",
+                    age,
+                    _EVOLUTION_STALE_DAYS,
+                )
+            else:
+                logger.info("RL: No prompt candidates found — starting background evolve")
+        except Exception as e:
+            logger.debug("RL: Could not check candidate staleness: %s", e)
+            return
+
+        def _evolve_in_background():
+            """Run evolution for all sections in a daemon thread."""
+            # Filesystem lock to prevent concurrent evolution
+            try:
+                lock_path.touch(exist_ok=True)
+                if lock_path.stat().st_size > 0:
+                    logger.debug("RL: Background evolution lock held, skipping")
+                    return
+                lock_path.write_text(str(datetime.now(timezone.utc).isoformat()))
+            except Exception:
+                return
+
+            try:
+                learner = self.get_learner("prompt_optimizer")
+                if learner is None:
+                    return
+
+                sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+                evolved_count = 0
+                for section in sections:
+                    try:
+                        rec = learner.get_recommendation(
+                            provider or "",
+                            model or "",
+                            "default",
+                            section_name=section,
+                        )
+                        current_text = rec.value if rec else ""
+                        if not current_text:
+                            continue
+                        result = learner.evolve(section, current_text, provider or "")
+                        if result:
+                            evolved_count += 1
+                    except Exception as e:
+                        logger.debug("RL: Background evolve '%s' failed: %s", section, e)
+
+                if evolved_count:
+                    logger.info(
+                        "RL: Background evolution complete — %d/%d sections evolved",
+                        evolved_count,
+                        len(sections),
+                    )
+            except Exception as e:
+                logger.debug("RL: Background evolution failed: %s", e)
+            finally:
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+        thread = threading.Thread(
+            target=_evolve_in_background,
+            name="rl-background-evolve",
+            daemon=True,
+        )
+        thread.start()
+
     # =========================================================================
     # Async Wrappers - Non-blocking versions for async orchestrator
     # =========================================================================
@@ -846,12 +1621,12 @@ class RLCoordinator:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         use_queue: Optional[bool] = None,
     ) -> None:
         """Async version of record_outcome - offloads SQLite to thread pool.
 
-        Use this from async code (like orchestrator.stream_chat) to avoid
+        Use this from async code (like ChatService.stream_chat) to avoid
         blocking the event loop during SQLite operations.
 
         When the writer queue is enabled (via enable_writer_queue()), outcomes
@@ -913,6 +1688,88 @@ class RLCoordinator:
         """
         return await asyncio.to_thread(self.get_all_recommendations, provider, model, task_type)
 
+    async def create_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 100,
+    ) -> Optional[str]:
+        """Async version of create_prompt_rollout_experiment."""
+        return await asyncio.to_thread(
+            self.create_prompt_rollout_experiment,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            control_hash=control_hash,
+            traffic_split=traffic_split,
+            min_samples_per_variant=min_samples_per_variant,
+        )
+
+    async def analyze_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of analyze_prompt_rollout_experiment."""
+        return await asyncio.to_thread(
+            self.analyze_prompt_rollout_experiment,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+        )
+
+    async def apply_prompt_rollout_recommendation_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of apply_prompt_rollout_recommendation."""
+        return await asyncio.to_thread(
+            self.apply_prompt_rollout_recommendation,
+            section_name=section_name,
+            provider=provider,
+            treatment_hash=treatment_hash,
+            dry_run=dry_run,
+        )
+
+    async def process_prompt_candidate_evaluation_suite_async(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> PromptCandidateSuiteWorkflowResult:
+        """Async version of process_prompt_candidate_evaluation_suite."""
+        return await asyncio.to_thread(
+            self.process_prompt_candidate_evaluation_suite,
+            suite,
+            min_pass_rate=min_pass_rate,
+            promote_best=promote_best,
+            create_rollout=create_rollout,
+            rollout_control_hash=rollout_control_hash,
+            rollout_traffic_split=rollout_traffic_split,
+            rollout_min_samples_per_variant=rollout_min_samples_per_variant,
+            analyze_rollout=analyze_rollout,
+            apply_rollout_decision=apply_rollout_decision,
+            rollout_decision_dry_run=rollout_decision_dry_run,
+        )
+
     async def export_metrics_async(self) -> Dict[str, Any]:
         """Async version of export_metrics.
 
@@ -968,7 +1825,11 @@ class RLCoordinator:
         """
         recommendations = {}
 
-        for name in ["continuation_patience", "continuation_prompts", "semantic_threshold"]:
+        for name in [
+            "continuation_patience",
+            "continuation_prompts",
+            "semantic_threshold",
+        ]:
             rec = self.get_recommendation(name, provider, model, task_type)
             if rec:
                 recommendations[name] = rec
@@ -1151,8 +2012,10 @@ def get_rl_coordinator() -> RLCoordinator:
         Global coordinator singleton
     """
     global _rl_coordinator
-    if _rl_coordinator is None:
+    if _rl_coordinator is None or _rl_coordinator.is_closed:
         _rl_coordinator = RLCoordinator()
+    else:
+        _rl_coordinator._ensure_db_connection()
     return _rl_coordinator
 
 
@@ -1172,7 +2035,9 @@ async def get_rl_coordinator_async() -> RLCoordinator:
         Global coordinator singleton
     """
     global _rl_coordinator
-    if _rl_coordinator is None:
+    if _rl_coordinator is None or _rl_coordinator.is_closed:
         # Initialize in thread to avoid blocking event loop
         _rl_coordinator = await asyncio.to_thread(RLCoordinator)
+    else:
+        await asyncio.to_thread(_rl_coordinator._ensure_db_connection)
     return _rl_coordinator

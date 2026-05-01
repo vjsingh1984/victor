@@ -28,12 +28,29 @@ Example:
 
     await store.upsert_nodes(nodes)
     await store.upsert_edges(edges)
+    callers = await store.get_neighbors("entity:2", direction="in", max_depth=2)
     ```
 
 This is a core framework module available to all verticals, not just coding.
 """
 
-from victor.storage.graph.protocol import GraphNode, GraphEdge, GraphStoreProtocol
+from victor.storage.graph.protocol import (
+    GraphNode,
+    GraphEdge,
+    GraphStoreProtocol,
+    GraphTraversalDirection,
+    RequirementNode,
+    Subgraph,
+    GraphQueryResult,
+)
+from victor.storage.graph.edge_types import (
+    EdgeType,
+    CFG_EDGE_TYPES,
+    CDG_EDGE_TYPES,
+    DDG_EDGE_TYPES,
+    CCG_EDGE_TYPES,
+    LEGACY_EDGE_TYPES,
+)
 from victor.storage.graph.registry import create_graph_store
 from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.storage.graph.memory_store import MemoryGraphStore
@@ -43,6 +60,17 @@ __all__ = [
     "GraphNode",
     "GraphEdge",
     "GraphStoreProtocol",
+    "GraphTraversalDirection",
+    "RequirementNode",
+    "Subgraph",
+    "GraphQueryResult",
+    # Edge types
+    "EdgeType",
+    "CFG_EDGE_TYPES",
+    "CDG_EDGE_TYPES",
+    "DDG_EDGE_TYPES",
+    "CCG_EDGE_TYPES",
+    "LEGACY_EDGE_TYPES",
     # Factory
     "create_graph_store",
     # Stores

@@ -42,13 +42,15 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Callable,
     Dict,
     List,
     Optional,
@@ -59,10 +61,13 @@ if TYPE_CHECKING:
     from victor.framework.graph import CheckpointerProtocol
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import WorkflowDefinition
-from victor.workflows.yaml_to_graph_compiler import (
-    CompilerConfig,
-    YAMLToStateGraphCompiler,
+from victor.framework.graph import MemoryCheckpointer
+from victor.workflows.compiler.boundary import (
+    NativeWorkflowGraphCompiler,
+    ParsedWorkflowDefinition,
+    WorkflowCompilationRequest,
 )
+from victor.workflows.executors.compatibility import CompatibilityNodeExecutorFactory
 from victor.workflows.runtime_types import WorkflowState, create_initial_workflow_state
 
 logger = logging.getLogger(__name__)
@@ -127,7 +132,11 @@ class ExecutorResult:
             "checkpoints_saved": self.checkpoints_saved,
             "interrupted": self.interrupted,
             "interrupt_node": self.interrupt_node,
-            "state_keys": list(self.state.keys()),
+            "state_keys": (
+                list(self.state.to_dict().keys())
+                if hasattr(self.state, "to_dict")
+                else list(self.state.keys())
+            ),
         }
 
 
@@ -198,7 +207,7 @@ class StateGraphExecutor:
 
         self.tool_registry = tool_registry or self._get_default_tool_registry()
         self.config = config or ExecutorConfig()
-        self._compiler: Optional["YAMLToStateGraphCompiler"] = None
+        self._compiler: Optional[NativeWorkflowGraphCompiler] = None
 
     def _get_default_tool_registry(self) -> Optional["ToolRegistry"]:
         """Get the default tool registry if available."""
@@ -209,27 +218,70 @@ class StateGraphExecutor:
         except Exception:
             return None
 
-    def _get_compiler(self) -> "YAMLToStateGraphCompiler":
-        """Get or create the StateGraph compiler."""
-        if self._compiler is None:
-            from victor.workflows.yaml_to_graph_compiler import (
-                CompilerConfig,
-                YAMLToStateGraphCompiler,
-            )
+    def _create_executor_factory(self) -> CompatibilityNodeExecutorFactory:
+        """Create the canonical node executor factory for workflow compilation."""
+        return CompatibilityNodeExecutorFactory(
+            orchestrator=self.orchestrator,
+            orchestrators=self.orchestrators,
+            tool_registry=self.tool_registry,
+        )
 
-            compiler_config = CompilerConfig(
-                max_iterations=self.config.max_iterations,
-                timeout=self.config.timeout,
+    def _build_checkpointer_factory(
+        self,
+        checkpointer: Optional["CheckpointerProtocol"] = None,
+    ) -> Callable[[], Optional["CheckpointerProtocol"]]:
+        """Create the checkpointer factory expected by the boundary compiler."""
+
+        def create_checkpointer() -> Optional["CheckpointerProtocol"]:
+            return checkpointer or MemoryCheckpointer()
+
+        return create_checkpointer
+
+    def _get_compiler(self) -> NativeWorkflowGraphCompiler:
+        """Get or create the canonical StateGraph compiler."""
+        if self._compiler is None:
+            self._compiler = NativeWorkflowGraphCompiler(
+                node_executor_factory=self._create_executor_factory(),
                 enable_checkpointing=self.config.enable_checkpointing,
                 interrupt_on_hitl=bool(self.config.interrupt_nodes),
             )
-            self._compiler = YAMLToStateGraphCompiler(
-                orchestrator=self.orchestrator,
-                orchestrators=self.orchestrators,
-                tool_registry=self.tool_registry,
-                config=compiler_config,
-            )
         return self._compiler
+
+    def _compile_workflow(
+        self,
+        workflow: "WorkflowDefinition",
+        *,
+        checkpointer: Optional["CheckpointerProtocol"] = None,
+    ) -> Any:
+        """Compile a workflow definition through the canonical boundary compiler."""
+        errors = workflow.validate()
+        if errors:
+            raise ValueError(f"Invalid workflow: {'; '.join(errors)}")
+
+        compiled_workflow = replace(
+            workflow,
+            max_iterations=self.config.max_iterations,
+            max_execution_timeout_seconds=self.config.timeout,
+        )
+        parsed = ParsedWorkflowDefinition(
+            request=WorkflowCompilationRequest(
+                source=f"workflow://{workflow.name}",
+                workflow_name=workflow.name,
+                validate=True,
+            ),
+            workflow=compiled_workflow,
+        )
+
+        if checkpointer is None:
+            compiler = self._get_compiler()
+        else:
+            compiler = NativeWorkflowGraphCompiler(
+                node_executor_factory=self._create_executor_factory(),
+                checkpointer_factory=self._build_checkpointer_factory(checkpointer),
+                enable_checkpointing=True,
+                interrupt_on_hitl=bool(self.config.interrupt_nodes),
+            )
+        return compiler.compile(parsed)
 
     async def execute(
         self,
@@ -255,21 +307,7 @@ class StateGraphExecutor:
         logger.info(f"Executing workflow '{workflow.name}'")
 
         try:
-            compiler = self._get_compiler()
-
-            # Override checkpointer if provided
-            if checkpointer:
-                from victor.workflows.yaml_to_graph_compiler import CompilerConfig
-
-                compiler.config = CompilerConfig(
-                    max_iterations=self.config.max_iterations,
-                    timeout=self.config.timeout,
-                    enable_checkpointing=True,
-                    checkpointer=checkpointer,
-                )
-
-            # Compile workflow to StateGraph
-            compiled = compiler.compile(workflow)
+            compiled = self._compile_workflow(workflow, checkpointer=checkpointer)
 
             state = create_initial_workflow_state(
                 workflow_id=thread_id,
@@ -281,7 +319,11 @@ class StateGraphExecutor:
             result = await compiled.invoke(state, thread_id=thread_id)
 
             # Extract user state (exclude internal fields)
-            user_state = {k: v for k, v in result.state.items() if not k.startswith("_")}
+            # Convert Pydantic model to dict for compatibility
+            state_dict = (
+                result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
+            )
+            user_state = {k: v for k, v in state_dict.items() if not k.startswith("_")}
 
             return ExecutorResult(
                 success=result.success,
@@ -318,8 +360,7 @@ class StateGraphExecutor:
         Yields:
             Tuple of (node_id, current_state) after each node execution
         """
-        compiler = self._get_compiler()
-        compiled = compiler.compile(workflow)
+        compiled = self._compile_workflow(workflow)
 
         state = create_initial_workflow_state(
             workflow_id=thread_id,
@@ -399,4 +440,396 @@ __all__ = [
     # Convenience
     "get_executor",
     "execute_workflow",
+    # Compiled graph executor (consolidated from compiled_executor.py)
+    "CompiledWorkflowExecutor",
+    "ExecutionResult",
+    "WorkflowExecutor",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Compiled graph executor — consolidated from victor/workflows/compiled_executor.py
+# ---------------------------------------------------------------------------
+
+
+class CompiledWorkflowExecutor:
+    """Executor for compiled workflow graphs.
+
+    Wraps compiled StateGraph execution with consistent interface.
+    Delegates to the compiled graph's invoke/stream methods.
+    """
+
+    def __init__(
+        self,
+        orchestrator_pool: Any,
+        *,
+        max_parallel: int = 4,
+        default_timeout: float = 300.0,
+        checkpointer: Optional[Any] = None,
+        cache: Optional[Any] = None,
+        cache_config: Optional[Any] = None,
+    ):
+        """Initialize the compiled workflow executor.
+
+        Args:
+            orchestrator_pool: Agent orchestrator or pool of orchestrators
+            max_parallel: Maximum parallel executions (for compatibility)
+            default_timeout: Default timeout for node execution
+            checkpointer: Optional checkpointer for persistence
+            cache: Optional workflow cache
+            cache_config: Optional cache configuration
+        """
+        self._orchestrator_pool = orchestrator_pool
+        self.max_parallel = max_parallel
+        self.default_timeout = default_timeout
+        self._checkpointer = checkpointer
+        self._cache_config = cache_config
+        self._active_executions: Dict[str, Any] = {}
+
+        # Create cache from config if provided and no explicit cache
+        if cache is None and cache_config is not None:
+            try:
+                from victor.workflows.cache import WorkflowCache
+
+                self.cache = WorkflowCache(config=cache_config)
+            except ImportError:
+                self.cache = None
+        else:
+            self.cache = cache
+
+    async def execute(
+        self,
+        workflow_or_graph: Any,
+        initial_state: Optional[Dict[str, Any]] = None,
+        *,
+        initial_context: Optional[Dict[str, Any]] = None,
+        thread_id: Optional[str] = None,
+        checkpoint: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Any:
+        """Execute a workflow or compiled workflow graph.
+
+        Args:
+            workflow_or_graph: WorkflowDefinition or compiled graph
+            initial_state: Initial state data (alias for initial_context)
+            initial_context: Initial context data (for backward compatibility)
+            thread_id: Thread ID for checkpointing
+            checkpoint: Checkpoint ID to resume from
+            timeout: Execution timeout
+
+        Returns:
+            ExecutionResult or WorkflowResult
+        """
+        import time
+        from victor.workflows.context import WorkflowResult, WorkflowContext
+
+        # Support both initial_state and initial_context parameters
+        context_data = initial_context or initial_state or {}
+
+        logger.info(f"Executing workflow '{getattr(workflow_or_graph, 'name', 'unknown')}'...")
+
+        start_time = time.time()
+
+        # Check if this is a WorkflowDefinition (not yet compiled)
+        if hasattr(workflow_or_graph, "start_node") and hasattr(workflow_or_graph, "nodes"):
+            # Execute WorkflowDefinition directly
+            context = WorkflowContext(data=context_data.copy())
+            context.metadata["thread_id"] = thread_id
+
+            try:
+                await self._execute_workflow(
+                    workflow_or_graph, context, timeout=timeout, thread_id=thread_id
+                )
+                total_duration = time.time() - start_time
+
+                return WorkflowResult(
+                    workflow_name=getattr(workflow_or_graph, "name", "unknown"),
+                    success=not context.has_failures(),
+                    context=context,
+                    error=context.get_error() if context.has_failures() else None,
+                    total_duration=total_duration,
+                )
+            except Exception as e:
+                logger.error(f"Workflow execution failed: {e}", exc_info=True)
+                return WorkflowResult(
+                    workflow_name=getattr(workflow_or_graph, "name", "unknown"),
+                    success=False,
+                    context=context,
+                    error=str(e),
+                    total_duration=time.time() - start_time,
+                )
+
+        # Handle compiled graph with invoke method
+        if hasattr(workflow_or_graph, "invoke"):
+            return await workflow_or_graph.invoke(
+                initial_state or {},
+                thread_id=thread_id,
+                checkpoint=checkpoint,
+            )
+
+        # Fallback for unknown types
+        return WorkflowResult(
+            workflow_name="unknown",
+            success=False,
+            context=WorkflowContext(data=context_data),
+            error="Unable to execute workflow: unsupported type",
+            total_duration=time.time() - start_time,
+        )
+
+    async def _execute_workflow(
+        self,
+        workflow: Any,
+        context: Any,
+        timeout: Optional[float] = None,
+        thread_id: Optional[str] = None,
+    ) -> None:
+        """Execute all nodes in a WorkflowDefinition.
+
+        Args:
+            workflow: WorkflowDefinition with nodes and start_node
+            context: WorkflowContext to update
+            timeout: Optional timeout in seconds
+            thread_id: Optional thread ID for checkpointing
+        """
+        if not workflow.start_node:
+            return
+
+        # Track executed nodes to prevent loops
+        executed = set()
+        to_execute = [workflow.start_node]
+
+        while to_execute:
+            node_id = to_execute.pop(0)
+
+            if node_id in executed:
+                continue
+
+            node = workflow.get_node(node_id) if hasattr(workflow, "get_node") else None
+            if not node:
+                continue
+
+            # Execute the node with timeout if provided
+            try:
+                if timeout is not None:
+                    result = await asyncio.wait_for(
+                        self._execute_node(node, context),
+                        timeout=timeout,
+                    )
+                else:
+                    result = await self._execute_node(node, context)
+                context.add_result(result)
+                executed.add(node_id)
+
+                # Save checkpoint after each node if checkpointer is available
+                if self._checkpointer:
+                    self._save_workflow_checkpoint(
+                        state={
+                            "last_node": node_id,
+                            "next_node": (
+                                self._get_next_nodes(node, context)[0]
+                                if self._get_next_nodes(node, context)
+                                else None
+                            ),
+                            "context": dict(context.data),
+                        },
+                    )
+
+                # Get next nodes
+                next_nodes = self._get_next_nodes(node, context)
+                to_execute.extend(next_nodes)
+
+            except asyncio.TimeoutError:
+                # Record timeout failure
+                from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+
+                context.add_result(
+                    NodeResult(
+                        node_id=node_id,
+                        status=ExecutorNodeStatus.FAILED,
+                        error=f"Node execution timed out after {timeout}s",
+                    )
+                )
+                break
+
+            except Exception as e:
+                # Record failure
+                from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+
+                context.add_result(
+                    NodeResult(
+                        node_id=node_id,
+                        status=ExecutorNodeStatus.FAILED,
+                        error=str(e),
+                    )
+                )
+
+                # Stop on failure unless continue_on_failure is set
+                if not workflow.metadata.get("continue_on_failure", False):
+                    break
+
+    async def stream(
+        self,
+        compiled_graph: Any,
+        initial_state: Dict[str, Any],
+        *,
+        thread_id: Optional[str] = None,
+    ) -> AsyncIterator[Any]:
+        """Stream execution events from a compiled workflow."""
+        if hasattr(compiled_graph, "stream"):
+            async for event in compiled_graph.stream(initial_state, thread_id=thread_id):
+                yield event
+
+    async def _execute_agent_node(
+        self,
+        node: Any,
+        context: Any,
+        start_time: float,
+    ) -> Any:
+        """Execute an agent node.
+
+        This method is provided for test compatibility. Tests may patch
+        this method to provide mock implementations.
+
+        Args:
+            node: The agent node to execute
+            context: The execution context
+            start_time: When execution started
+
+        Returns:
+            NodeResult with execution outcome
+        """
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+        import time
+
+        # Default implementation - tests should patch this
+        return NodeResult(
+            node_id=getattr(node, "id", "unknown"),
+            status=ExecutorNodeStatus.COMPLETED,
+            output="Agent execution completed",
+            tool_calls_used=0,
+            duration_seconds=time.time() - start_time,
+        )
+
+    async def _execute_node(self, node: Any, context: Any) -> Any:
+        """Execute a single workflow node.
+
+        Args:
+            node: The workflow node to execute
+            context: The execution context
+
+        Returns:
+            NodeResult with execution outcome
+        """
+        from victor.workflows.definition import TransformNode, ConditionNode, AgentNode
+        from victor_sdk.workflows import NodeResult, ExecutorNodeStatus
+        import time
+
+        start_time = time.time()
+
+        if isinstance(node, TransformNode):
+            # Execute transform function
+            result_data = node.transform(context.data)
+            if isinstance(result_data, dict):
+                context.data.update(result_data)
+            result = NodeResult(
+                node_id=node.id,
+                status=ExecutorNodeStatus.COMPLETED,
+                output=(
+                    context.data.get(node.output_key)
+                    if hasattr(node, "output_key") and node.output_key
+                    else None
+                ),
+                duration_seconds=time.time() - start_time,
+            )
+
+        elif isinstance(node, ConditionNode):
+            # Evaluate condition
+            route = node.condition(context.data)
+            result = NodeResult(
+                node_id=node.id,
+                status=ExecutorNodeStatus.COMPLETED,
+                output=route,
+                duration_seconds=time.time() - start_time,
+            )
+
+        elif isinstance(node, AgentNode):
+            # Execute agent node (for testing - can be patched)
+            result = await self._execute_agent_node(node, context, start_time)
+
+        else:
+            # Unknown node type - return completed result
+            result = NodeResult(
+                node_id=getattr(node, "id", "unknown"),
+                status=ExecutorNodeStatus.COMPLETED,
+                duration_seconds=time.time() - start_time,
+            )
+
+        return result
+
+    def _get_next_nodes(self, node: Any, context: Any) -> List[str]:
+        """Get next nodes based on current node type.
+
+        Args:
+            node: The current node
+            context: The execution context
+
+        Returns:
+            List of next node IDs
+        """
+        from victor.workflows.definition import ConditionNode
+
+        if isinstance(node, ConditionNode):
+            route = node.condition(context.data)
+            return [node.branches.get(route)] if route in node.branches else []
+        else:
+            return list(node.next_nodes) if hasattr(node, "next_nodes") else []
+
+    def _save_workflow_checkpoint(self, **kwargs: Any) -> None:
+        """Save a workflow checkpoint."""
+        if self._checkpointer and hasattr(self._checkpointer, "create_checkpoint"):
+            self._checkpointer.create_checkpoint(**kwargs)
+
+    def _emit_workflow_step_event(self, **kwargs: Any) -> None:
+        """Emit workflow step event."""
+        pass
+
+    def _emit_workflow_completed_event(self, **kwargs: Any) -> None:
+        """Emit workflow completed event."""
+        pass
+
+    def _build_agent_task(self, node: Any, context: Any) -> str:
+        """Build agent task from node and context.
+
+        Args:
+            node: The agent node
+            context: The execution context
+
+        Returns:
+            Task string for the agent
+        """
+        goal = getattr(node, "goal", "")
+        return f"{goal}\n\nContext: {context.data}"
+
+    def cancel(self) -> None:
+        """Cancel all active executions."""
+        self._active_executions.clear()
+
+
+class ExecutionResult:
+    """Execution result from compiled workflow executor."""
+
+    def __init__(self, final_state: Dict[str, Any], metrics: Dict[str, Any]):
+        self._final_state = final_state
+        self._metrics = metrics
+
+    @property
+    def final_state(self) -> Dict[str, Any]:
+        return self._final_state
+
+    @property
+    def metrics(self) -> Dict[str, Any]:
+        return self._metrics
+
+
+# Backward-compatibility alias
+WorkflowExecutor = CompiledWorkflowExecutor

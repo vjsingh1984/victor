@@ -4,7 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor.agent.conversation_controller import ConversationController
+from victor.agent.conversation.controller import ConversationController
+from victor.core.completion_markers import SUMMARY_MARKER
 from victor.providers.base import Message
 
 
@@ -54,9 +55,9 @@ class TestCompactionReminderRouting:
         result = controller_without_manager.inject_compaction_context()
 
         assert result is True
-        # Should have inserted a direct message
+        # Should have inserted a direct user reminder (P0 FIX: user role for higher salience).
         msgs = controller_without_manager.messages
-        reminders = [m for m in msgs if m.role == "assistant" and "Context reminder" in m.content]
+        reminders = [m for m in msgs if m.role == "user" and "CONTEXT COMPACTED" in m.content]
         assert len(reminders) == 1
 
     def test_compaction_summary_updates_state(self, controller_with_manager, mock_reminder_manager):
@@ -77,5 +78,32 @@ class TestCompactionReminderRouting:
 
         assert result is True
         msgs = controller_without_manager.messages
-        # Direct injection: assistant message with [Context reminder: ...]
-        assert any("Context reminder" in m.content for m in msgs if m.role == "assistant")
+        # Direct injection uses user role for higher salience (P0 FIX).
+        assert any("CONTEXT COMPACTED" in m.content for m in msgs if m.role == "user")
+
+    def test_compaction_summary_sanitizes_marker_for_reminder_manager(
+        self, controller_with_manager, mock_reminder_manager
+    ):
+        controller_with_manager._compaction_summaries = [
+            f"{SUMMARY_MARKER} Final findings stay available next turn."
+        ]
+
+        result = controller_with_manager.inject_compaction_context()
+
+        assert result is True
+        assert SUMMARY_MARKER not in mock_reminder_manager.state.compaction_summary
+        assert "Final findings stay available next turn." in (
+            mock_reminder_manager.state.compaction_summary
+        )
+
+    def test_compaction_fallback_sanitizes_marker_without_manager(self, controller_without_manager):
+        controller_without_manager._compaction_summaries = [
+            f"{SUMMARY_MARKER} Final findings stay available next turn."
+        ]
+
+        result = controller_without_manager.inject_compaction_context()
+
+        assert result is True
+        reminders = [m for m in controller_without_manager.messages if m.role == "user"]
+        assert any("Final findings stay available next turn." in m.content for m in reminders)
+        assert all(SUMMARY_MARKER not in m.content for m in reminders)

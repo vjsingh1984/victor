@@ -270,6 +270,33 @@ class TestFileNotFoundHandler:
         assert result.action == RecoveryAction.RETRY_WITH_INFERRED
         assert "tried_variations" in result.metadata
 
+    def test_handle_prefers_package_file_suggestion_for_reads(self, handler):
+        """Read retries should prefer concrete package files over directory suggestions."""
+        error = Exception(
+            "File not found: victor/core/registry.py\n"
+            "Did you mean one of these?\n"
+            "  - victor/core/registry/\n"
+            "  - victor/core/registry/base.py\n"
+            "  - victor/core/registry_base.py"
+        )
+
+        result = handler.handle(error, "read", {"path": "victor/core/registry.py"})
+
+        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.modified_args["path"] == "victor/core/registry/base.py"
+        assert result.metadata["suggested_paths"][0] == "victor/core/registry/"
+
+    def test_handle_uses_file_arg_key_when_retrying_suggestion(self, handler):
+        """Suggestion retries should preserve the original path argument key."""
+        error = Exception(
+            "File not found: setup.py\nDid you mean one of these?\n  - pyproject.toml"
+        )
+
+        result = handler.handle(error, "read", {"file": "setup.py"})
+
+        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.modified_args["file"] == "pyproject.toml"
+
     def test_get_path_variations_removes_leading_dot(self, handler):
         """Test path variation removes leading ./"""
         variations = handler._get_path_variations("./test.py")
@@ -618,7 +645,10 @@ class TestDeepSeekScenario:
         error2 = FileNotFoundError("Symbol not found in .")
         result2 = chain.process(error2, "symbol", result1.modified_args)
         # Should try path variations or skip
-        assert result2.action in (RecoveryAction.RETRY_WITH_INFERRED, RecoveryAction.SKIP)
+        assert result2.action in (
+            RecoveryAction.RETRY_WITH_INFERRED,
+            RecoveryAction.SKIP,
+        )
 
         # Third error: tool not found (after all retries)
         error3 = Exception("Tool 'symbol' not found")

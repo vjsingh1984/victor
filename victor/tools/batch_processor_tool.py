@@ -29,7 +29,13 @@ from typing import Any, Dict, List, Optional
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    BarColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
@@ -57,7 +63,10 @@ def _get_icon(name: str) -> str:
 
 
 async def _parallel_search(
-    files: List[Path], pattern: str, use_regex: bool, max_workers: int = _DEFAULT_MAX_WORKERS
+    files: List[Path],
+    pattern: str,
+    use_regex: bool,
+    max_workers: int = _DEFAULT_MAX_WORKERS,
 ) -> List[Dict[str, Any]]:
     """Search files in parallel with progress indication."""
     results = []
@@ -310,7 +319,10 @@ async def batch(
     # Search operation
     if operation == "search":
         if not pattern:
-            return {"success": False, "error": "Search operation requires 'pattern' parameter"}
+            return {
+                "success": False,
+                "error": "Search operation requires 'pattern' parameter",
+            }
 
         results = await _parallel_search(files, pattern, regex)
         total_matches = sum(len(r["matches"]) for r in results)
@@ -351,7 +363,10 @@ async def batch(
     # Replace operation
     elif operation == "replace":
         if not find:
-            return {"success": False, "error": "Replace operation requires 'find' parameter"}
+            return {
+                "success": False,
+                "error": "Replace operation requires 'find' parameter",
+            }
 
         results = await _parallel_replace(files, find, replace, regex, dry_run)
         total_replacements = sum(r.get("replacements", 0) for r in results)

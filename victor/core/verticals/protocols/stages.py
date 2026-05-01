@@ -38,7 +38,12 @@ from enum import Enum
 
 
 class ValidationError(Enum):
-    """Types of validation errors for stage definitions."""
+    """Types of validation errors for stage definitions.
+
+    NOTE: This enum is duplicated in victor_sdk.verticals.protocols.promoted_types
+    to maintain SDK independence and avoid circular imports. When updating,
+    please update BOTH definitions to maintain consistency.
+    """
 
     MISSING_REQUIRED_STAGE = "missing_required_stage"
     INVALID_TRANSITION = "invalid_transition"
@@ -58,6 +63,10 @@ class StageValidationResult:
         errors: List of validation errors
         warnings: List of validation warnings
         details: Additional validation details
+
+    NOTE: This class is duplicated in victor_sdk.verticals.protocols.promoted_types
+    to maintain SDK independence and avoid circular imports. When updating,
+    please update BOTH definitions to maintain consistency.
     """
 
     is_valid: bool

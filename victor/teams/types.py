@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     # Team member dependencies
-    from victor.agent.subagents.base import SubAgentRole
+    from victor.core.shared_types import SubAgentRole
     from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
     from victor.agent.presentation import PresentationProtocol
 
@@ -653,7 +653,7 @@ class TeamMember:
             "personality": self.personality,
             "max_delegation_depth": self.max_delegation_depth,
             "memory": self.memory,
-            "memory_config": self.memory_config.to_dict() if self.memory_config else None,
+            "memory_config": (self.memory_config.to_dict() if self.memory_config else None),
             "cache": self.cache,
             "verbose": self.verbose,
             "max_iterations": self.max_iterations,
@@ -758,7 +758,7 @@ class TeamConfig:
                     "personality": m.personality,
                     "max_delegation_depth": m.max_delegation_depth,
                     "memory": m.memory,
-                    "memory_config": m.memory_config.to_dict() if m.memory_config else None,
+                    "memory_config": (m.memory_config.to_dict() if m.memory_config else None),
                     "cache": m.cache,
                     "verbose": m.verbose,
                     "max_iterations": m.max_iterations,

@@ -27,9 +27,11 @@ if TYPE_CHECKING:
         ArgumentNormalizerProtocol,
         AstIndexerProtocol,
         ContentHasherProtocol,
+        ContextFitterProtocol,
         SimilarityComputerProtocol,
         SymbolExtractorProtocol,
         TextChunkerProtocol,
+        TokenCounterProtocol,
     )
 
 
@@ -383,7 +385,11 @@ ACCELERATOR_BENCHMARKS: Dict[str, AcceleratorBenchmark] = {
         "chunk_with_overlap", 0.03, 0.14, "rust", "Line-aware text chunking"
     ),
     "content_hashing": AcceleratorBenchmark(
-        "content_hashing", 0.71, 1.76, "rust", "Hash with normalization (SHA-256 dominates)"
+        "content_hashing",
+        0.71,
+        1.76,
+        "rust",
+        "Hash with normalization (SHA-256 dominates)",
     ),
     "count_lines": AcceleratorBenchmark(
         "count_lines", 0.004, 0.009, "rust", "SIMD-optimized line counting"
@@ -482,7 +488,26 @@ def get_all_benchmarks() -> Dict[str, Dict[str, Any]]:
 
 
 # =============================================================================
-# PROTOCOL-BASED DISPATCH (SOLID Design)
+# PROTOCOL-BASED DISPATCH (DEPRECATED - Unused)
+# =============================================================================
+#
+# NOTE: The following protocol-based dispatch functions are currently unused
+# throughout the codebase. All callers use the flat function dispatch from
+# victor.processing.native modules (similarity.py, chunking.py, etc.) instead.
+#
+# These functions are kept for potential future use (dependency injection,
+# testing) but add maintenance burden. Consider removing in v0.9.0 if still
+# unused, or alternatively migrate all callers to use this layer consistently.
+#
+# Current state (2025-04):
+# - get_symbol_extractor: Unused (no callers)
+# - get_argument_normalizer: Unused (no callers)
+# - get_similarity_computer: Unused (no callers)
+# - get_text_chunker: Unused (no callers)
+# - get_token_counter: Unused (no callers)
+# - get_context_fitter: Unused (no callers)
+#
+# Flat dispatch (Layer A) is the recommended approach for all new code.
 # =============================================================================
 
 
@@ -499,14 +524,21 @@ def get_symbol_extractor(backend: Optional[str] = None) -> "SymbolExtractorProto
     from victor.native.protocols import SymbolExtractorProtocol
 
     if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
-        pass
+        try:
+            from victor.native.rust.symbol_extractor import RustSymbolExtractor
+
+            return RustSymbolExtractor()
+        except ImportError:
+            pass
 
     from victor.native.python.symbol_extractor import PythonSymbolExtractor
 
     return PythonSymbolExtractor()
 
 
-def get_argument_normalizer(backend: Optional[str] = None) -> "ArgumentNormalizerProtocol":
+def get_argument_normalizer(
+    backend: Optional[str] = None,
+) -> "ArgumentNormalizerProtocol":
     """Get an argument normalizer implementation.
 
     Args:
@@ -519,14 +551,21 @@ def get_argument_normalizer(backend: Optional[str] = None) -> "ArgumentNormalize
     from victor.native.protocols import ArgumentNormalizerProtocol
 
     if backend == "rust" or (backend is None and _NATIVE_AVAILABLE):
-        pass
+        try:
+            from victor.native.rust.arg_normalizer import RustArgumentNormalizer
+
+            return RustArgumentNormalizer()
+        except ImportError:
+            pass
 
     from victor.native.python.arg_normalizer import PythonArgumentNormalizer
 
     return PythonArgumentNormalizer()
 
 
-def get_similarity_computer(backend: Optional[str] = None) -> "SimilarityComputerProtocol":
+def get_similarity_computer(
+    backend: Optional[str] = None,
+) -> "SimilarityComputerProtocol":
     """Get a similarity computer implementation.
 
     Note: Benchmark data shows NumPy+BLAS (Python) is ~6x faster than Rust FFI
@@ -616,6 +655,8 @@ _argument_normalizer_instance: Optional["ArgumentNormalizerProtocol"] = None
 _similarity_computer_instance: Optional["SimilarityComputerProtocol"] = None
 _text_chunker_instance: Optional["TextChunkerProtocol"] = None
 _ast_indexer_instance: Optional["AstIndexerProtocol"] = None
+_token_counter_instance: Optional["TokenCounterProtocol"] = None
+_context_fitter_instance: Optional["ContextFitterProtocol"] = None
 
 
 def get_default_symbol_extractor() -> "SymbolExtractorProtocol":
@@ -656,6 +697,72 @@ def get_default_ast_indexer() -> "AstIndexerProtocol":
     if _ast_indexer_instance is None:
         _ast_indexer_instance = get_ast_indexer()
     return _ast_indexer_instance
+
+
+def get_default_token_counter() -> "TokenCounterProtocol":
+    """Get the default token counter singleton."""
+    global _token_counter_instance
+    if _token_counter_instance is None:
+        _token_counter_instance = get_token_counter()
+    return _token_counter_instance
+
+
+def get_default_context_fitter() -> "ContextFitterProtocol":
+    """Get the default context fitter singleton."""
+    global _context_fitter_instance
+    if _context_fitter_instance is None:
+        _context_fitter_instance = get_context_fitter()
+    return _context_fitter_instance
+
+
+def get_token_counter(backend: Optional[str] = None) -> "TokenCounterProtocol":
+    """Get a token counter implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        TokenCounterProtocol implementation
+    """
+    effective_backend = backend or get_preferred_backend("token_counting")
+
+    if effective_backend == "rust" and _NATIVE_AVAILABLE:
+        try:
+            from victor.native.rust.tokenizer import RustTokenCounter
+
+            return RustTokenCounter()
+        except ImportError:
+            pass
+
+    from victor.native.python.tokenizer import PythonTokenCounter
+
+    return PythonTokenCounter()
+
+
+def get_context_fitter(backend: Optional[str] = None) -> "ContextFitterProtocol":
+    """Get a context fitter implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        ContextFitterProtocol implementation
+    """
+    effective_backend = backend or get_preferred_backend("context_fitting")
+
+    if effective_backend == "rust" and _NATIVE_AVAILABLE:
+        try:
+            from victor.native.rust.context_fitter import RustContextFitter
+
+            return RustContextFitter()
+        except ImportError:
+            pass
+
+    from victor.native.python.context_fitter import PythonContextFitter
+
+    return PythonContextFitter()
 
 
 def get_content_hasher(
@@ -718,6 +825,7 @@ def reset_protocol_singletons() -> None:
     global _symbol_extractor_instance, _argument_normalizer_instance
     global _similarity_computer_instance, _text_chunker_instance
     global _ast_indexer_instance, _content_hasher_fuzzy, _content_hasher_exact
+    global _token_counter_instance, _context_fitter_instance
     _symbol_extractor_instance = None
     _argument_normalizer_instance = None
     _similarity_computer_instance = None
@@ -725,3 +833,5 @@ def reset_protocol_singletons() -> None:
     _ast_indexer_instance = None
     _content_hasher_fuzzy = None
     _content_hasher_exact = None
+    _token_counter_instance = None
+    _context_fitter_instance = None

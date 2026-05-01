@@ -469,7 +469,13 @@ class SourceVerificationCapabilityProvider:
             # Check for documentation
             if any(
                 pattern in source_lower
-                for pattern in ["docs.", "developer.", "readthedocs", "/docs", "/documentation"]
+                for pattern in [
+                    "docs.",
+                    "developer.",
+                    "readthedocs",
+                    "/docs",
+                    "/documentation",
+                ]
             ):
                 return SourceType.DOCUMENTATION
 

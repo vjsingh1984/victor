@@ -622,6 +622,7 @@ class SessionStateManager:
         self._session_flags.consecutive_blocked_attempts = 0
         self._execution_state.read_files_session.clear()
         self._session_flags.all_files_read_nudge_sent = False
+        self._execution_state.tool_calls_used = 0  # Reset tool counter for new turn
 
         logger.debug("Session state reset for new turn")
 

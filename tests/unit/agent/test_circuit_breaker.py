@@ -19,10 +19,25 @@ import pytest
 
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
+    CircuitBreakerConfig,
     CircuitBreakerError,
     CircuitBreakerRegistry,
     CircuitState,
 )
+
+
+class TestSharedCircuitBreakerTypes:
+    """Tests for shared core circuit-breaker type exports."""
+
+    def test_provider_module_reexports_core_types(self) -> None:
+        """providers.circuit_breaker should expose shared core types."""
+        from victor.core.circuit_breaker import CircuitBreakerConfig as CoreConfig
+        from victor.core.circuit_breaker import CircuitBreakerError as CoreError
+        from victor.core.circuit_breaker import CircuitState as CoreState
+
+        assert CircuitBreakerConfig is CoreConfig
+        assert CircuitBreakerError is CoreError
+        assert CircuitState is CoreState
 
 
 class TestCircuitBreaker:

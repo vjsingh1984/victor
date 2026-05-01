@@ -47,10 +47,12 @@ from dataclasses import dataclass, field
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
+
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.context import WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -151,8 +153,6 @@ class HandlerErrorBoundary:
         Returns:
             NodeResult with execution outcome or error details
         """
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         # Snapshot context before execution (for debugging on failure)
@@ -250,8 +250,6 @@ class HandlerErrorBoundary:
         Returns:
             NodeResult with FAILED status and error details
         """
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         return NodeResult(
             node_id=node.id,
             status=ExecutorNodeStatus.FAILED,
@@ -330,8 +328,6 @@ class ParallelToolsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
         semaphore = asyncio.Semaphore(self.max_concurrent)
         outputs: Dict[str, Any] = {}
@@ -347,7 +343,11 @@ class ParallelToolsHandler:
                 try:
                     # Check constraints before execution
                     if not node.constraints.allows_tool(tool_name):
-                        return tool_name, None, f"Tool '{tool_name}' blocked by constraints"
+                        return (
+                            tool_name,
+                            None,
+                            f"Tool '{tool_name}' blocked by constraints",
+                        )
 
                     result = await asyncio.wait_for(
                         tool_registry.execute(
@@ -368,7 +368,11 @@ class ParallelToolsHandler:
                         return tool_name, None, result.error
 
                 except asyncio.TimeoutError:
-                    return tool_name, None, f"Timed out after {node.constraints.timeout}s"
+                    return (
+                        tool_name,
+                        None,
+                        f"Timed out after {node.constraints.timeout}s",
+                    )
                 except Exception as e:
                     return tool_name, None, str(e)
 
@@ -456,8 +460,6 @@ class SequentialToolsHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
         outputs: Dict[str, Any] = {}
         tool_calls_used = 0
@@ -596,8 +598,6 @@ class RetryBackoffHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
         outputs: Dict[str, Any] = {}
         tool_calls_used = 0
@@ -737,8 +737,6 @@ class DataTransformHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         # Get data and operations from inputs
@@ -882,8 +880,6 @@ class ConditionalBranchHandler:
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
     ) -> "NodeResult":
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         start_time = time.time()
 
         # Get condition from inputs
@@ -986,7 +982,7 @@ def register_framework_handlers() -> None:
         from victor.workflows.handlers import register_framework_handlers
         register_framework_handlers()
     """
-    from victor.workflows.executor import register_compute_handler
+    from victor.workflows.compute_registry import register_compute_handler
 
     for name, handler in FRAMEWORK_HANDLERS.items():
         register_compute_handler(name, handler)

@@ -42,6 +42,8 @@ from typing import (
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from victor.agent.services.protocols.chat_runtime import ExecutionMode
+
 T = TypeVar("T")
 
 
@@ -568,21 +570,12 @@ __all__ = [
 # =============================================================================
 
 
-class ExecutionMode(Enum):
-    """Execution mode for chat operations."""
-
-    SYNC = "sync"
-    STREAMING = "streaming"
-    AUTO = "auto"
-
-
 @runtime_checkable
 class ExecutionProvider(Protocol):
-    """Protocol for execution operations.
+    """[LEGACY PROTOCOL] Interface for execution operations.
 
-    Used by ExecutionCoordinator for executing model turns.
-    This enables coordinators to depend on protocol-based abstractions
-    rather than concrete orchestrator implementations.
+    Superseded by ChatServiceProtocol for high-level operations.
+    Used by TurnExecutor for executing model turns.
     """
 
     async def execute_turn(
@@ -612,10 +605,10 @@ class ExecutionProvider(Protocol):
 
 @runtime_checkable
 class ToolExecutor(Protocol):
-    """Protocol for tool execution.
+    """[LEGACY PROTOCOL] Interface for tool execution.
 
+    Superseded by ToolServiceProtocol for high-level operations.
     Used by coordinators for executing tools.
-    This enables loose coupling between coordinators and tool execution logic.
     """
 
     async def execute_tool(
@@ -654,10 +647,10 @@ class ToolExecutor(Protocol):
 
 @runtime_checkable
 class MessageStore(Protocol):
-    """Protocol for message storage.
+    """[LEGACY PROTOCOL] Interface for message storage.
 
+    Superseded by ContextServiceProtocol for high-level operations.
     Used by coordinators for conversation history.
-    This enables coordinators to work with any message storage implementation.
     """
 
     @property
@@ -665,7 +658,7 @@ class MessageStore(Protocol):
         """Get current message history."""
         ...
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **metadata: Any) -> None:
         """Add message to history.
 
         Args:
@@ -697,10 +690,11 @@ class MessageStore(Protocol):
 
 @runtime_checkable
 class StateManager(Protocol):
-    """Protocol for state management.
+    """[LEGACY PROTOCOL] Interface for state management.
 
+    Superseded by ContextServiceProtocol / SessionServiceProtocol for
+    high-level operations.
     Used by coordinators for state tracking.
-    This enables coordinators to work with any state management implementation.
     """
 
     def get_state(self, key: str, default: Any = None) -> Any:

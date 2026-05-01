@@ -33,6 +33,7 @@ from victor.agent.tool_registrar import (
     ToolRegistrarConfig,
     RegistrationStats,
 )
+from victor.tools.registry import ToolRegistry
 
 
 class TestToolRegistrarConfig:
@@ -205,6 +206,39 @@ class TestToolRegistrarBackgroundTasks:
         assert result is mock_task
 
 
+class TestCanonicalRegistrationSurfaces:
+    """Tests for canonical public registration entry points."""
+
+    @pytest.fixture
+    def registrar(self):
+        """Create registrar with mocks."""
+        tools = MagicMock(spec=ToolRegistry)
+        settings = MagicMock()
+        settings.use_mcp_tools = False
+        settings.load_tool_config.return_value = {}
+        return ToolRegistrar(tools=tools, settings=settings)
+
+    def test_register_default_tools_prefers_registrar_owned_surface(self, registrar):
+        with (
+            patch.object(registrar, "_setup_providers") as setup_providers,
+            patch.object(registrar, "_register_dynamic_tools", return_value=5) as register_dynamic,
+            patch.object(registrar, "_setup_mcp_integration") as setup_mcp,
+        ):
+            registered_count = registrar.register_default_tools()
+
+        assert registered_count == 5
+        setup_providers.assert_called_once_with()
+        register_dynamic.assert_called_once_with()
+        setup_mcp.assert_not_called()
+
+    def test_initialize_plugins_delegates_to_canonical_public_method(self, registrar):
+        with patch.object(registrar, "_load_plugin_tools", return_value=3) as initialize_plugins:
+            tool_count = registrar.initialize_plugins()
+
+        assert tool_count == 3
+        initialize_plugins.assert_called_once_with()
+
+
 class TestDynamicToolRegistration:
     """Tests for dynamic tool discovery and registration."""
 
@@ -226,6 +260,20 @@ class TestDynamicToolRegistration:
 
         # Should return a count >= 0
         assert count >= 0
+
+    def test_register_dynamic_tools_includes_graph_tool(self):
+        """Dynamic tool registration should include the graph tool."""
+        settings = MagicMock()
+        settings.load_tool_config.return_value = {}
+        registrar = ToolRegistrar(
+            tools=ToolRegistry(),
+            settings=settings,
+        )
+
+        count = registrar._register_dynamic_tools()
+
+        assert count > 0
+        assert registrar.tools.get("graph") is not None
 
     def test_excluded_files(self, registrar):
         """Test that excluded files are not loaded."""
@@ -343,7 +391,7 @@ class TestPluginInitialization:
         mock_registry.register_tools.return_value = 5
         mock_registry_class.return_value = mock_registry
 
-        count = registrar._initialize_plugins()
+        count = registrar.initialize_plugins()
 
         assert count == 5
         assert registrar.plugin_manager is mock_registry
@@ -360,7 +408,7 @@ class TestPluginInitialization:
         mock_registry.loaded_plugins = {}
         mock_registry_class.return_value = mock_registry
 
-        registrar._initialize_plugins()
+        registrar.initialize_plugins()
 
         call_args = mock_registry_class.call_args
         plugin_dirs = call_args.kwargs.get("plugin_dirs", [])
@@ -378,14 +426,17 @@ class TestPluginInitialization:
         mock_registry.loaded_plugins = {}
         mock_registry_class.return_value = mock_registry
 
-        registrar._initialize_plugins()
+        registrar.initialize_plugins()
 
         mock_registry.disable_plugin.assert_called_with("bad_plugin")
 
-    @patch("victor.tools.plugin_registry.ToolPluginRegistry", side_effect=ImportError("No plugins"))
+    @patch(
+        "victor.tools.plugin_registry.ToolPluginRegistry",
+        side_effect=ImportError("No plugins"),
+    )
     def test_plugin_init_error(self, mock_registry_class, registrar):
         """Test handling plugin initialization errors."""
-        count = registrar._initialize_plugins()
+        count = registrar.initialize_plugins()
 
         assert count == 0
         assert registrar.plugin_manager is None

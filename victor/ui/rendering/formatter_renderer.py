@@ -6,11 +6,19 @@ suitable for non-interactive CLI usage.
 
 from __future__ import annotations
 
+import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
+from victor.ui.rendering.metrics import StreamingMetrics
+
+logger = logging.getLogger(__name__)
+
 from victor.ui.rendering.utils import (
+    expand_tool_output,
+    format_tool_display_name,
     render_edit_preview,
     render_file_preview,
     render_thinking_indicator,
@@ -45,18 +53,48 @@ class FormatterRenderer:
         self.formatter = formatter
         self.console = console
         self._content_buffer = ""
+        self._pause_count = 0  # Depth counter for nested pause/resume
+        self._last_tool_result: dict | None = None
+        self._metrics = StreamingMetrics()
+        self._pause_start_ms: float | None = None  # Wall time when outermost pause began
 
     def start(self) -> None:
         """Start streaming mode in the formatter."""
         self.formatter.start_streaming()
 
+    def get_metrics(self) -> StreamingMetrics:
+        """Return accumulated streaming metrics for this session."""
+        return self._metrics
+
     def pause(self) -> None:
-        """End streaming to allow status output."""
-        self.formatter.end_streaming()
+        """End streaming to allow status output.
+
+        Supports nested calls via depth counting — the underlying formatter
+        is only paused on the first call, preventing redundant end/start cycles.
+        """
+        self._pause_count += 1
+        if self._pause_count == 1:
+            self._pause_start_ms = time.monotonic() * 1000
+            logger.debug("FormatterRenderer: paused (depth=1)")
 
     def resume(self) -> None:
-        """Resume streaming mode in the formatter."""
-        self.formatter.start_streaming()
+        """Resume streaming mode in the formatter.
+
+        Only resumes the underlying formatter when the depth counter reaches zero,
+        allowing nested pause/resume callers to unwind correctly.
+        """
+        if self._pause_count <= 0:
+            logger.warning("FormatterRenderer: resume() called with no matching pause — ignoring")
+            return
+        self._pause_count -= 1
+        if self._pause_count == 0:
+            if self._pause_start_ms is not None:
+                duration_ms = time.monotonic() * 1000 - self._pause_start_ms
+                self._metrics.record_pause(duration_ms)
+                self._pause_start_ms = None
+            self._metrics.record_resume()
+            self.formatter.start_streaming(preserve_buffer=True)
+            logger.debug("FormatterRenderer: resumed (depth=0)")
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
         """Handle tool execution start.
@@ -67,7 +105,7 @@ class FormatterRenderer:
         """
         self.pause()
         self.formatter.tool_start(name, arguments)
-        self.formatter.status(f"🔧 Running {name}...")
+        self.formatter.status(f"🔧 Running {format_tool_display_name(name)}...")
         self.resume()
 
     def on_tool_result(
@@ -78,6 +116,9 @@ class FormatterRenderer:
         arguments: dict[str, Any],
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
+        was_pruned: bool = False,
+        original_result: Any = None,
+        result: Any = None,  # Tool output for preview
     ) -> None:
         """Handle tool execution result.
 
@@ -87,14 +128,33 @@ class FormatterRenderer:
             elapsed: Execution time in seconds
             arguments: Tool arguments
             error: Error message if failed
+            follow_up_suggestions: Optional follow-up suggestions
+            result: Tool output (for preview display)
         """
+        preview_output = str(result) if result is not None else None
+        full_output = original_result or preview_output
+        self._last_tool_result = {
+            "name": name,
+            "success": success,
+            "result": full_output or "",
+            "arguments": arguments,
+            "elapsed": elapsed,
+        }
+        self._metrics.record_tool_result()
         self.pause()
-        self.formatter.tool_result(
-            tool_name=name,
-            success=success,
-            error=error,
-            follow_up_suggestions=follow_up_suggestions,
-        )
+        formatter_kwargs = {
+            "tool_name": name,
+            "success": success,
+            "error": error,
+            "follow_up_suggestions": follow_up_suggestions,
+        }
+        if full_output is not None:
+            formatter_kwargs["original_result"] = full_output
+        if preview_output is not None:
+            formatter_kwargs["result"] = preview_output
+        if was_pruned:
+            formatter_kwargs["was_pruned"] = True
+        self.formatter.tool_result(**formatter_kwargs)
         self.resume()
 
     def on_status(self, message: str) -> None:
@@ -135,8 +195,13 @@ class FormatterRenderer:
         Args:
             text: Content text to append
         """
+        t0 = time.monotonic() * 1000
         self._content_buffer += text
         self.formatter.stream_chunk(text)
+        duration_ms = time.monotonic() * 1000 - t0
+        self._metrics.record_content_chunk(duration_ms)
+        if duration_ms > 100:
+            logger.debug("FormatterRenderer: slow render %.1fms", duration_ms)
 
     def on_thinking_content(self, text: str) -> None:
         """Render thinking content as dimmed/italic text.
@@ -157,6 +222,10 @@ class FormatterRenderer:
         self.console.print()  # Newline after thinking
         self.resume()
 
+    def had_tool_calls(self) -> bool:
+        """Return True if at least one tool call was processed this turn."""
+        return self._last_tool_result is not None
+
     def finalize(self) -> str:
         """Finalize response and return accumulated content.
 
@@ -166,6 +235,18 @@ class FormatterRenderer:
         self.formatter.response(content=self._content_buffer)
         return self._content_buffer
 
+    def expand_last_output(self) -> None:
+        """Expand the last tool output to show full content."""
+        if not self._last_tool_result:
+            self.console.print("[dim]No tool output to expand[/]")
+            return
+
+        data = self._last_tool_result
+        if not data["success"] or not data["result"]:
+            return
+
+        expand_tool_output(self.console, data["name"], data["result"])
+
     def cleanup(self) -> None:
-        """Clean up resources (no-op for FormatterRenderer)."""
-        pass
+        """Clean up resources."""
+        self._last_tool_result = None

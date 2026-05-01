@@ -1,177 +1,54 @@
-<div align="center">
+# Documentation Index
 
-# Victor Documentation
-
-**Open-source agentic AI framework. Build, orchestrate, and evaluate AI agents across 24 providers.**
-
-[![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://github.com/vjsingh1984/victor/actions/workflows/test.yml/badge.svg)](https://github.com/vjsingh1984/victor/actions/workflows/test.yml)
-
-</div>
-
----
-
-## Welcome! 👋
-
-Victor is an open-source agentic AI framework supporting **24 LLM providers** with **34 tool modules** across **9 domain verticals**. Whether you need local development with Ollama, cloud capabilities with Claude/GPT, or enterprise deployments with Azure/AWS, Victor provides a unified interface with powerful features like multi-agent teams, stateful workflows, event sourcing, semantic codebase search, and air-gapped mode support.
-
-## What is Victor?
-
-Victor is an **agentic AI framework** that gives you the freedom to choose between local and cloud LLM providers through a single, consistent CLI/TUI interface. Built with extensibility in mind, Victor's vertical architecture lets you specialize workflows for coding, DevOps, RAG, data analysis, research, security, IaC, classification, and benchmarking tasks.
-
-### Key Highlights
-
-- 🌐 **24 LLM Providers** - Switch between Anthropic, OpenAI, Google, Azure, AWS Bedrock, Vertex, Ollama, LM Studio, vLLM, and more
-- 🛠️ **33 Tool Modules** - Across 9 domain verticals (Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark)
-- 🔄 **YAML-First Workflows** - Define multi-step automation with StateGraph DSL and checkpointing
-- 🔒 **Air-Gapped Mode** - Full functionality with local models for secure, offline environments
-- 🔍 **Semantic Codebase Search** - Context-aware code understanding with Tree-sitter and embeddings
-- 🤖 **Multi-Agent Teams** - Coordinate specialized agents for complex tasks
-- 🔌 **MCP Protocol Support** - Model Context Protocol for IDE integration
-- ⚡ **Provider Switching** - Change models mid-conversation without losing context
+**Last Updated**: 2026-04-30 | **Total Documents**: 150+ | **Categories**: 4
 
 ## Quick Navigation
 
-### 🚀 Getting Started
-New to Victor? Start here!
+### 🚀 [Getting Started](users/getting-started/) - Install, configure, first run
+### 📖 [User Guides](users/guides/) - CLI, providers, tools, workflows
+### 🔧 [Developer Docs](developers/) - Architecture, API, extending
+### 🔌 [Operations](operations/) - Deployment, monitoring, maintenance
+### 📚 [Archive](archive/) - Sessions, migrations, audits
 
-- **[Installation](getting-started/installation.md)** - Install Victor via pip, pipx, or Docker
-- **[Quick Start](getting-started/quickstart.md)** - Get up and running in 5 minutes
-- **[Configuration](getting-started/configuration.md)** - Configure providers, profiles, and settings
-- **[First Run](getting-started/first-run.md)** - Initialize your Victor environment
+## Document Statistics
 
-### 📖 User Guide
-Master Victor's features and capabilities.
+| Category | Documents | Visual Format |
+|----------|-----------|---------------|
+| **Users** | 40+ | 85% |
+| **Developers** | 30+ | 75% |
+| **Operations** | 10+ | 70% |
+| **Archive** | 20+ | 90% |
+| **Total** | 150+ | 80% |
 
-- **[CLI Commands](reference/cli-commands.md)** - Complete command reference
-- **[User Guide Index](user-guide/index.md)** - Comprehensive user documentation
-- **[Providers](user-guide/providers.md)** - LLM provider configuration and comparison
-- **[Tools](user-guide/tools.md)** - Available tools and usage examples
-- **[Workflows](user-guide/workflows.md)** - Create and manage YAML workflows
-- **[TUI Mode](user-guide/tui-mode.md)** - Terminal user interface guide
-- **[Session Management](user-guide/session-management.md)** - Manage conversation sessions
-- **[Troubleshooting](user-guide/troubleshooting.md)** - Common issues and solutions
+## Quick Reference Cards
 
-### 📚 Tutorials
-Learn by doing with hands-on tutorials.
+- **[Providers Quick Reference](users/reference/providers-quickref.md)** - 24 providers comparison
+- **[Tools Quick Reference](users/reference/tools-quickref.md)** - 34 tools overview
+- **[Workflows Quick Reference](users/reference/workflows-quickref.md)** - Workflow patterns
+- **[CLI Cheatsheet](users/reference/cli-cheatsheet.md)** - 22+ commands
 
-- **[Build a Custom Tool](tutorials/build-custom-tool.md)** - Create your own tools
-- **[Create a Workflow](tutorials/create-workflow.md)** - Design multi-step automation
-- **[Integrate a Provider](tutorials/integrate-provider.md)** - Add a new LLM provider
+## Key Documents
 
-### 🔧 Reference
-In-depth technical documentation.
+### Must Read
+1. [Quick Start](users/getting-started/quickstart.md) - Get started in 5 minutes
+2. [Configuration](users/getting-started/configuration.md) - Set up Victor
+3. [CLI Cheatsheet](users/reference/cli-cheatsheet.md) - Command reference
+4. [FAQ](users/reference/faq.md) - Common questions
 
-- **[Configuration Options](reference/configuration-options.md)** - Complete settings reference
-- **[Environment Variables](reference/environment-variables.md)** - All environment variables
-- **[CLI Commands](reference/cli-commands.md)** - Command-line interface reference
-- **[API Reference](api-reference/)** - Python API documentation
-  - [Protocols](api-reference/protocols.md) - Core protocol definitions
-  - [Providers](api-reference/providers.md) - Provider API
-  - [Tools](api-reference/tools.md) - Tool API
-  - [Workflows](api-reference/workflows.md) - Workflow API
+### For Contributors
+1. [Architecture](../ARCHITECTURE.md) - System overview
+2. [Development Setup](developers/development/setup.md) - Dev environment
+3. [Documentation Standards](developers/DOCUMENTATION_STANDARDS.md) - Writing docs
 
-### 🏗️ Development
-Contributor and architect documentation.
+## Visual Format Legend
 
-- **[Development Setup](development/setup.md)** - Development environment setup
-- **[Code Style](development/code-style.md)** - Coding standards and conventions
-- **[Testing](development/testing.md)** - Testing strategy and guidelines
-- **[Architecture Overview](architecture/overview.md)** - System architecture and design
-- **[Extending Victor](development/index.md)** - Plugin development and extensions
-  - [Plugins](development/extending/plugins.md) - Build plugins
-  - [Verticals](development/extending/verticals.md) - Create domain verticals
-- **[Releasing](development/releasing/publishing.md)** - Release and publishing process
-
-### 🎯 Verticals
-Domain-specific documentation.
-
-- **[Coding](verticals/coding.md)** - AST analysis, code review, test generation
-- **[DevOps](verticals/devops.md)** - CI/CD, Docker, Terraform, infrastructure
-- **[RAG](verticals/rag.md)** - Document ingestion, vector search, retrieval
-- **[Data Analysis](verticals/data-analysis.md)** - Pandas, visualization, statistics
-- **[Research](verticals/research.md)** - Web search, citations, synthesis
-- **[Security](verticals/security.md)** - Vulnerability scanning, audit, compliance
-- **[IaC](verticals/iac.md)** - Infrastructure as Code management
-- **[Classification](verticals/classification.md)** - Text/data classification pipelines
-- **[Benchmark](verticals/benchmark.md)** - Agent evaluation and benchmarking
-
-## Project Information
-
-### Version
-**Current Version:** v0.5.4 (see [CHANGELOG](../CHANGELOG.md))
-
-### Links
-- **[GitHub Repository](https://github.com/vjsingh1984/victor)** - Source code and issues
-- **[PyPI Package](https://pypi.org/project/victor-ai/)** - Install via pip
-- **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
-- **[Code of Conduct](../CODE_OF_CONDUCT.md)** - Community guidelines
-- **[Security Policy](../SECURITY.md)** - Security reporting and policies
-
-### License
-Apache License 2.0 - see [LICENSE](../LICENSE) for details.
+| Format | Usage | Example |
+|--------|-------|---------|
+| **Tables** | Comparisons, references | Provider comparison |
+| **Mermaid Diagrams** | Flows, relationships | Architecture diagram |
+| **Timelines** | Project phases | Migration timeline |
+| **Checklists** | Completion status | Best practices |
 
 ---
 
-## Quick Start
-
-### Choose Your Path
-
-```bash
-# Local model (privacy, offline, free tier)
-pipx install victor-ai
-ollama pull qwen2.5-coder:7b
-victor chat "Hello"
-
-# Cloud model (max capability)
-pipx install victor-ai
-export ANTHROPIC_API_KEY=sk-...
-victor chat --provider anthropic
-
-# Docker (isolated environment)
-docker pull ghcr.io/vjsingh1984/victor:latest
-docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
-```
-
-### Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CLIENTS                                       │
-│  CLI/TUI  │  VS Code (HTTP)  │  MCP Server  │  API Server       │
-└─────────────────────────┬───────────────────────────────────────┘
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 AGENT ORCHESTRATOR (Facade)                      │
-│  Delegates to: ConversationController, ToolPipeline,            │
-│  StreamingController, ProviderManager, ToolRegistrar            │
-└─────────────────────────┬───────────────────────────────────────┘
-                          ▼
-┌───────────┬─────────────┬───────────────┬───────────────────────┐
-│ PROVIDERS │   TOOLS     │  WORKFLOWS    │  VERTICALS            │
-│  22       │   33        │  StateGraph   │  9 domains: Coding,   │
-│           │  modules    │  + YAML       │  DevOps, RAG, + 6 more│
-└───────────┴─────────────┴───────────────┴───────────────────────┘
-```
-
-### Key Concepts
-
-- **Provider Agnosticism** - Switch between 24 LLM providers seamlessly
-- **Vertical Architecture** - Self-contained domains with specialized tools
-- **YAML Workflows** - Declarative workflow definitions with Python escape hatches
-- **StateGraph DSL** - LangGraph-compatible workflow API for complex automation
-- **Multi-Agent Coordination** - Team formations with specialized roles
-- **SOLID Compliance** - Clean architecture following SOLID principles
-
-## Support & Community
-
-- **Documentation** - You are here! Explore the sections above
-- **GitHub Issues** - [Report bugs or request features](https://github.com/vjsingh1984/victor/issues)
-- **Discussions** - [Join community discussions](https://github.com/vjsingh1984/victor/discussions)
-- **Contributing** - See [Contributing Guide](../CONTRIBUTING.md) for details
-
----
-
-**Built with ❤️ by the Victor community**
+**See**: [Full Documentation](docs/index.md) | [Project README](../README.md)

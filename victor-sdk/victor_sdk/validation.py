@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from importlib.metadata import PackageNotFoundError, distribution, version as installed_version
+from importlib.metadata import (
+    PackageNotFoundError,
+    distribution,
+    version as installed_version,
+)
 from typing import Any, List
 
 from victor_sdk.discovery import collect_verticals_from_candidate

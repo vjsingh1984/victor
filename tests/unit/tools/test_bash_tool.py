@@ -14,6 +14,8 @@
 
 """Tests for bash tool."""
 
+import asyncio
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -58,7 +60,7 @@ async def test_shell_allow_dangerous():
         mock_process.communicate = AsyncMock(return_value=(b"", b""))
         mock_subprocess.return_value = mock_process
 
-        await shell(cmd="rm -rf test", dangerous=True)
+        await shell(cmd="rm -rf test", dangerous=True, readonly=False)
 
         # Should attempt to execute
         mock_subprocess.assert_called_once()
@@ -79,10 +81,12 @@ async def test_shell_timeout():
     """Test bash command timeout."""
     with patch("asyncio.create_subprocess_shell") as mock_subprocess:
         mock_process = AsyncMock()
-        mock_process.communicate = AsyncMock(side_effect=TimeoutError())
+        mock_process.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_process.kill = MagicMock()
+        mock_process.wait = AsyncMock(return_value=None)
         mock_subprocess.return_value = mock_process
 
-        result = await shell(cmd="sleep 100", timeout=1)
+        result = await shell(cmd="sleep 100", timeout=1, readonly=False)
 
         assert result["success"] is False
         assert "timed out" in result["error"] or "Failed to execute" in result["error"]
@@ -101,11 +105,33 @@ async def test_shell_working_dir_not_found():
 @pytest.mark.asyncio
 async def test_shell_general_exception():
     """Test bash command general exception handling."""
-    with patch("asyncio.create_subprocess_shell") as mock_subprocess:
+    with (
+        patch("asyncio.create_subprocess_shell") as mock_subprocess,
+        patch("victor.tools.bash._is_readonly_command", return_value=False),
+    ):
         mock_subprocess.side_effect = RuntimeError("Unexpected error")
 
-        result = await shell(cmd="echo test")
+        result = await shell(cmd="echo test", readonly=False)
 
         assert result["success"] is False
         assert "Failed to execute command" in result["error"]
         assert result["return_code"] == -1
+
+
+@pytest.mark.asyncio
+async def test_shell_defaults_to_readonly_mode():
+    """Shell should default to readonly mode when the caller omits the flag."""
+    result = await shell(cmd="sleep 1")
+
+    assert result["success"] is False
+    assert "readonly mode" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_shell_heredoc_command():
+    """Heredoc commands should execute without extra escaping."""
+    cmd = "cat <<'EOF'\nprint('hello')\nEOF"
+    result = await shell(cmd=cmd)
+
+    assert result["success"] is True
+    assert "print('hello')" in result["stdout"]

@@ -414,7 +414,7 @@ class TestIntegrationWithDeduplicators:
 
     def test_tool_deduplication_tracker_uses_content_hasher(self):
         """Test that ToolDeduplicationTracker uses ContentHasher."""
-        from victor.agent.tool_deduplication import ToolDeduplicationTracker
+        from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
 
         tracker = ToolDeduplicationTracker()
 

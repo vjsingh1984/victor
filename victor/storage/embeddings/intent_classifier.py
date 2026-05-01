@@ -27,10 +27,22 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
+from victor.core.completion_markers import detect_active_completion_marker
+from victor.storage.embeddings.collections import (
+    CollectionItem,
+    StaticEmbeddingCollection,
+)
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
+
+# Import fuzzy matching for robust typo-tolerant intent classification
+try:
+    from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
+
+    _FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    _FUZZY_MATCHING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +71,14 @@ CONTINUATION_HEURISTIC_PATTERNS = [
     re.compile(r"\b(first|now|next),?\s+let\s+me\b", re.IGNORECASE),
     # "I'll read/check/examine..."
     re.compile(
-        r"\bi['']ll\s+(read|check|examine|look\s+at|analyze|review|explore)\b", re.IGNORECASE
+        r"\bi['']ll\s+(read|check|examine|look\s+at|analyze|review|explore)\b",
+        re.IGNORECASE,
     ),
     # "I need to read/check..."
-    re.compile(r"\bi\s+need\s+to\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
+    re.compile(
+        r"\bi\s+need\s+to\s+(read|check|examine|look\s+at|analyze|review)\b",
+        re.IGNORECASE,
+    ),
     # "I should read/check..."
     re.compile(r"\bi\s+should\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
     # "Let me start by..."
@@ -149,6 +165,105 @@ def _has_stuck_loop_heuristic(text: str) -> bool:
     return False
 
 
+def _has_continuation_heuristic_fuzzy(text: str) -> bool:
+    """Check for continuation patterns with fuzzy matching for typos.
+
+    This function provides a fallback that uses fuzzy matching to detect
+    continuation intent even when the user makes typos in keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if continuation patterns detected with fuzzy matching
+    """
+    if not _FUZZY_MATCHING_AVAILABLE:
+        return False
+
+    # Keywords from CONTINUATION_HEURISTIC_PATTERNS
+    continuation_keywords = {
+        "continue": 1.5,
+        "read": 1.3,
+        "check": 1.3,
+        "examine": 1.3,
+        "analyze": 1.3,
+        "review": 1.3,
+        "explore": 1.2,
+        "investigate": 1.2,
+        "look": 1.1,
+        "next": 1.4,
+        "proceed": 1.4,
+    }
+
+    matches, stats = match_keywords_cascading(text, continuation_keywords, use_fuzzy=True)
+    return len(matches) > 0
+
+
+def _has_stuck_loop_heuristic_fuzzy(text: str) -> bool:
+    """Check for stuck loop patterns with fuzzy matching for typos.
+
+    This function provides a fallback that uses fuzzy matching to detect
+    stuck loop patterns even when the user makes typos in keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if stuck loop patterns detected with fuzzy matching
+    """
+    if not _FUZZY_MATCHING_AVAILABLE:
+        return False
+
+    # Keywords from STUCK_LOOP_HEURISTIC_PATTERNS
+    stuck_loop_keywords = {
+        "going": 1.2,
+        "will": 1.1,
+        "read": 1.3,
+        "examine": 1.3,
+        "check": 1.3,
+        "call": 1.2,
+        "use": 1.2,
+        "begin": 1.1,
+        "start": 1.1,
+    }
+
+    matches, stats = match_keywords_cascading(text, stuck_loop_keywords, use_fuzzy=True)
+
+    # Need multiple planning keywords to indicate stuck loop
+    return len(matches) >= 2
+
+
+def _has_asking_input_heuristic_fuzzy(text: str) -> bool:
+    """Check for asking input patterns with fuzzy matching for typos.
+
+    This function provides a fallback that uses fuzzy matching to detect
+    asking input intent even when the user makes typos in keywords.
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if asking input patterns detected with fuzzy matching
+    """
+    if not _FUZZY_MATCHING_AVAILABLE:
+        return False
+
+    # Keywords from ASKING_INPUT_HEURISTIC_PATTERNS
+    asking_input_keywords = {
+        "should": 1.3,
+        "prefer": 1.3,
+        "like": 1.2,
+        "confirm": 1.3,
+        "approve": 1.3,
+        "would": 1.2,
+        "want": 1.2,
+        "know": 1.1,
+    }
+
+    matches, stats = match_keywords_cascading(text, asking_input_keywords, use_fuzzy=True)
+    return len(matches) > 0
+
+
 # Compiled regex patterns for explicit asking-for-input detection
 # These are strong signals that should override semantic classification
 ASKING_INPUT_HEURISTIC_PATTERNS = [
@@ -185,7 +300,8 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
     ),
     # "Let me know if you'd like more details on any of these"
     re.compile(
-        r"\blet\s+me\s+know\s+if\s+you.*(more\s+details?|elaborate|go\s+deeper)\b", re.IGNORECASE
+        r"\blet\s+me\s+know\s+if\s+you.*(more\s+details?|elaborate|go\s+deeper)\b",
+        re.IGNORECASE,
     ),
     # "Would you like more details on any of..."
     re.compile(
@@ -194,45 +310,17 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
     ),
     # "I can elaborate on any of these if you'd like"
     re.compile(
-        r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b", re.IGNORECASE
-    ),
-]
-
-
-# Compiled regex patterns for detecting bold/markdown-wrapped completion markers
-# These handle **DONE**: , __SUMMARY__: , DONE: , SUMMARY: etc.
-# The model is instructed to output these; markdown rendering strips formatting
-COMPLETION_MARKER_HEURISTIC_PATTERNS = [
-    # **DONE**: or DONE: at line start (with optional markdown bold/italic)
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:DONE|_DONE_)(?:\*\*|__)?[\s]*[:|-]",
-        re.IGNORECASE,
-    ),
-    # **SUMMARY**: or SUMMARY: at line start
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:SUMMARY|_SUMMARY_)(?:\*\*|__)?[\s]*[:|-]",
-        re.IGNORECASE,
-    ),
-    # **TASK_DONE**: or TASK_DONE: at line start
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:TASK[_\s]?DONE|_TASK_DONE_)(?:\*\*|__)?[\s]*[:|-]",
-        re.IGNORECASE,
-    ),
-    # **BLOCKED**: at line start
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:BLOCKED|_BLOCKED_)(?:\*\*|__)?[\s]*[:|-]",
+        r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b",
         re.IGNORECASE,
     ),
 ]
 
 
 def _has_completion_marker_heuristic(text: str) -> bool:
-    """Check if text contains explicit completion markers (DONE:, SUMMARY:, etc.).
+    """Check if text contains explicit rare completion markers.
 
     These markers are instructed in the system prompt and are the primary
-    mechanism for deterministic task completion detection. They survive
-    markdown rendering because the detector matches both the raw format
-    (**DONE**:) and the rendered format (DONE:).
+    mechanism for deterministic task completion detection.
 
     Args:
         text: Text to check
@@ -240,10 +328,10 @@ def _has_completion_marker_heuristic(text: str) -> bool:
     Returns:
         True if text contains completion markers
     """
-    for pattern in COMPLETION_MARKER_HEURISTIC_PATTERNS:
-        if pattern.search(text):
-            logger.debug(f"Completion-marker heuristic matched: {pattern.pattern[:40]}...")
-            return True
+    marker = detect_active_completion_marker(text)
+    if marker:
+        logger.debug(f"Completion-marker heuristic matched: {marker}")
+        return True
     return False
 
 
@@ -477,7 +565,7 @@ def _classify_with_heuristics(
     duplicating the heuristic override chain.
 
     Heuristic priority order:
-    0. Completion markers (**DONE**:, **SUMMARY**:) - highest, deterministic
+    0. Rare completion markers (VICTOR_*::) - highest, deterministic
     1. Stuck loop patterns - model planning but not executing
     2. Continuation patterns - "let me read", "let me check"
     3. Completion offer patterns - task done + offering to elaborate
@@ -497,9 +585,9 @@ def _classify_with_heuristics(
     Returns:
         IntentResult with classified intent
     """
-    # HEURISTIC OVERRIDE 0 (HIGHEST PRIORITY): Completion markers
-    # **DONE**: , **SUMMARY**: , **TASK_DONE**: - these are definitive completion signals
-    # instructed in the system prompt, checked first because they are unambiguous
+    # HEURISTIC OVERRIDE 0 (HIGHEST PRIORITY): Rare completion markers
+    # VICTOR_*:: markers are definitive completion signals instructed in the
+    # system prompt, checked first because they are unambiguous.
     if _has_completion_marker_heuristic(text):
         top_matches.append(("heuristic:completion_marker", 0.95))
         logger.debug("COMPLETION detected via marker heuristic (conf=0.95)")
@@ -510,7 +598,7 @@ def _classify_with_heuristics(
         )
 
     # HEURISTIC OVERRIDE 1: Check for stuck loop patterns
-    if _has_stuck_loop_heuristic(text):
+    if _has_stuck_loop_heuristic(text) or _has_stuck_loop_heuristic_fuzzy(text):
         top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
         logger.debug("STUCK_LOOP detected via heuristic override (conf=0.85)")
         return IntentResult(
@@ -520,7 +608,7 @@ def _classify_with_heuristics(
         )
 
     # HEURISTIC OVERRIDE 2: Check for explicit continuation patterns
-    if _has_continuation_heuristic(text):
+    if _has_continuation_heuristic(text) or _has_continuation_heuristic_fuzzy(text):
         heuristic_confidence = max(best_continuation, 0.75)
         top_matches.append(("heuristic:continuation_pattern", heuristic_confidence))
         logger.debug(
@@ -546,7 +634,7 @@ def _classify_with_heuristics(
         )
 
     # HEURISTIC OVERRIDE 4: Check for explicit asking-for-input patterns
-    if _has_asking_input_heuristic(text):
+    if _has_asking_input_heuristic(text) or _has_asking_input_heuristic_fuzzy(text):
         heuristic_confidence = max(best_asking_input, 0.75)
         top_matches.append(("heuristic:asking_input_pattern", heuristic_confidence))
         logger.debug(
@@ -949,6 +1037,119 @@ class IntentClassifier:
             completion_threshold=self.completion_threshold,
             asking_input_threshold=self.asking_input_threshold,
         )
+
+    def classify_with_triage(
+        self,
+        text: str,
+        context: Dict[str, Any],
+        tiered_service: Optional[Any] = None,
+        runtime_policy: Optional[Any] = None,
+    ) -> Tuple[IntentType, float, str]:
+        """Classify intent with confidence-based triage.
+
+        Extends the base intent classification with tiered triage:
+        - High confidence (≥0.8): Accept immediately
+        - Medium confidence (0.5-0.8): Verify with edge LLM
+        - Low confidence (<0.5): Reject and return CONTINUATION
+
+        Args:
+            text: Text to classify (usually model's response tail)
+            context: Additional context (has_tool_calls, etc.)
+            tiered_service: Optional TieredDecisionService for triage
+            runtime_policy: Optional RuntimeEvaluationPolicy for thresholds
+
+        Returns:
+            Tuple of (intent, confidence, source) where source is one of:
+            - "keyword", "semantic", "llm", "edge_verification", "heuristic_fallback"
+        """
+        from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
+        from victor.agent.services.tiered_decision_service import ClassificationTriage
+
+        if runtime_policy is None:
+            runtime_policy = RuntimeEvaluationPolicy()
+
+        # Get base classification
+        base_result = self.classify_intent_sync(text)
+        base_confidence = base_result.confidence
+
+        # High confidence: Accept immediately
+        if base_confidence >= runtime_policy.high_confidence_threshold:
+            logger.debug(
+                "Intent classification: high confidence (%.2f), accepting %s immediately",
+                base_confidence,
+                base_result.intent.value,
+            )
+            return base_result.intent, base_confidence, "semantic"
+
+        # No tiered service: Return base result
+        if tiered_service is None:
+            logger.debug(
+                "Intent classification: no tiered service, using base result (conf=%.2f)",
+                base_confidence,
+            )
+            return base_result.intent, base_confidence, "semantic"
+
+        # Medium/Low confidence: Use tiered triage
+        try:
+            from victor.agent.decisions.schemas import DecisionType
+
+            triage_result = tiered_service.classify_with_triage(
+                DecisionType.INTENT_CLASSIFICATION,
+                context={
+                    "text_tail": text[-300:],
+                    "has_tool_calls": str(context.get("has_tool_calls", False)).lower(),
+                    **{k: v for k, v in context.items() if k != "has_tool_calls"},
+                },
+                heuristic_result=base_result.intent,
+                heuristic_confidence=base_confidence,
+                runtime_policy=runtime_policy,
+            )
+
+            if triage_result.triage_outcome == ClassificationTriage.REJECT:
+                # Conservative fallback: CONTINUATION
+                logger.debug(
+                    "Intent classification: low confidence rejected, using CONTINUATION fallback"
+                )
+                return IntentType.CONTINUATION, 0.4, "heuristic_fallback"
+
+            # Map triage result back to IntentType
+            verified_intent = self._map_to_intent_type(triage_result.result)
+            return verified_intent, triage_result.confidence, triage_result.source
+
+        except Exception:
+            logger.debug("Intent triage failed, using base result", exc_info=True)
+            return base_result.intent, base_confidence, "semantic"
+
+    def _map_to_intent_type(self, result: Any) -> IntentType:
+        """Map triage result to IntentType.
+
+        Args:
+            result: Result from tiered triage (string, IntentType, or object with intent attribute)
+
+        Returns:
+            IntentType enum value
+        """
+        # If already an IntentType, return it
+        if isinstance(result, IntentType):
+            return result
+
+        # If it's a string, try to map it
+        if isinstance(result, str):
+            intent_map = {
+                "continuation": IntentType.CONTINUATION,
+                "completion": IntentType.COMPLETION,
+                "asking_input": IntentType.ASKING_INPUT,
+                "stuck_loop": IntentType.STUCK_LOOP,
+                "neutral": IntentType.NEUTRAL,
+            }
+            return intent_map.get(result.lower(), IntentType.NEUTRAL)
+
+        # If it's an object with intent attribute
+        if hasattr(result, "intent"):
+            return self._map_to_intent_type(result.intent)
+
+        # Default fallback
+        return IntentType.NEUTRAL
 
     def intends_to_continue(self, text: str) -> bool:
         """Quick check if text indicates continuation intent.

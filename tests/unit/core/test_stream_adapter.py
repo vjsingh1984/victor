@@ -515,7 +515,12 @@ class TestOllamaAdapter:
                 "message": {
                     "content": "",
                     "tool_calls": [
-                        {"function": {"name": "read_file", "arguments": {"path": "test.py"}}}
+                        {
+                            "function": {
+                                "name": "read_file",
+                                "arguments": {"path": "test.py"},
+                            }
+                        }
                     ],
                 },
                 "done": False,

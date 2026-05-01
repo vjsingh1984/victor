@@ -64,8 +64,7 @@ VERTICAL_TOOLS = {
         "edit",
         "ls",
         "git",
-        "bash",
-        "shell_readonly",
+        "shell",
         "grep",
         "find_files",
         "code_search",
@@ -169,7 +168,10 @@ def discover_tools(
                     ):
                         try:
                             tool_instance = obj()
-                            if allowed_tools is None or tool_instance.name in allowed_tools:
+                            if (
+                                allowed_tools is None
+                                or tool_instance.name in allowed_tools
+                            ):
                                 registry.register(tool_instance)
                                 registered_count += 1
                         except Exception:
@@ -195,7 +197,11 @@ def list_available_tools():
         for name in tool_names:
             if name in all_tools:
                 tool = all_tools[name]
-                desc = tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
+                desc = (
+                    tool.description[:50] + "..."
+                    if len(tool.description) > 50
+                    else tool.description
+                )
                 print(f"  {name:25} {desc}")
             else:
                 print(f"  {name:25} (not loaded)")
@@ -211,7 +217,11 @@ def list_available_tools():
         print("-" * 40)
         for name in sorted(other_tools):
             tool = all_tools[name]
-            desc = tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
+            desc = (
+                tool.description[:50] + "..."
+                if len(tool.description) > 50
+                else tool.description
+            )
             print(f"  {name:25} {desc}")
 
     print()
@@ -223,7 +233,9 @@ async def run_demo():
     print("Victor MCP Toolkit Demo")
     print("=" * 70)
     print()
-    print("Victor can be run as an MCP server, exposing its 33 tool modules to external")
+    print(
+        "Victor can be run as an MCP server, exposing its 33 tool modules to external"
+    )
     print("clients like Claude Desktop, VS Code, or any MCP-compatible application.")
     print()
 
@@ -252,8 +264,10 @@ async def run_demo():
         tool_registry=registry,
     )
     print(f"   Server: {server.name} v{server.version}")
-    print(f"   Capabilities: tools={server.info.capabilities.tools}, "
-          f"resources={server.info.capabilities.resources}")
+    print(
+        f"   Capabilities: tools={server.info.capabilities.tools}, "
+        f"resources={server.info.capabilities.resources}"
+    )
     print()
 
     # Register sample resources
@@ -283,38 +297,46 @@ async def run_demo():
     print("-" * 40)
 
     # Initialize
-    init_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "1",
-        "method": "initialize",
-        "params": {"clientInfo": {"name": "Demo Client", "version": "1.0.0"}},
-    })
+    init_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "initialize",
+            "params": {"clientInfo": {"name": "Demo Client", "version": "1.0.0"}},
+        }
+    )
     print(f"   Initialize: {init_response['result']['serverInfo']['name']}")
 
     # List tools
-    list_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "2",
-        "method": "tools/list",
-    })
+    list_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "2",
+            "method": "tools/list",
+        }
+    )
     tools_count = len(list_response["result"]["tools"])
     print(f"   List tools: {tools_count} tools available")
 
     # List resources
-    resources_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "3",
-        "method": "resources/list",
-    })
+    resources_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "3",
+            "method": "resources/list",
+        }
+    )
     resources_count = len(resources_response["result"]["resources"])
     print(f"   List resources: {resources_count} resources registered")
 
     # Ping
-    ping_response = await server.handle_message({
-        "jsonrpc": "2.0",
-        "id": "4",
-        "method": "ping",
-    })
+    ping_response = await server.handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": "4",
+            "method": "ping",
+        }
+    )
     print(f"   Ping: {ping_response['result']}")
     print()
 
@@ -362,7 +384,9 @@ async def run_stdio_server(
         filter_vertical: Optional vertical name to filter tools by
     """
     # Discover tools with filters
-    registry = discover_tools(filter_tools=filter_tools, filter_vertical=filter_vertical)
+    registry = discover_tools(
+        filter_tools=filter_tools, filter_vertical=filter_vertical
+    )
     tools_count = len(registry.list_tools())
 
     # Create MCP server
@@ -373,12 +397,14 @@ async def run_stdio_server(
     )
 
     # Register default resources
-    server.register_resource(MCPResource(
-        uri="file://./README.md",
-        name="Victor README",
-        description="Victor project documentation",
-        mime_type="text/markdown",
-    ))
+    server.register_resource(
+        MCPResource(
+            uri="file://./README.md",
+            name="Victor README",
+            description="Victor project documentation",
+            mime_type="text/markdown",
+        )
+    )
 
     print(f"Victor MCP Server starting with {tools_count} tools", file=sys.stderr)
 
@@ -447,10 +473,12 @@ Examples:
         filter_tools = [t.strip() for t in args.tools.split(",")]
 
     if args.stdio:
-        asyncio.run(run_stdio_server(
-            filter_tools=filter_tools,
-            filter_vertical=args.vertical,
-        ))
+        asyncio.run(
+            run_stdio_server(
+                filter_tools=filter_tools,
+                filter_vertical=args.vertical,
+            )
+        )
     else:
         asyncio.run(run_demo())
 

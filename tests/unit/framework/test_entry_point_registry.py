@@ -27,7 +27,9 @@ from victor.framework.entry_point_registry import (
     UnifiedEntryPointRegistry,
     get_entry_point,
     get_entry_point_group,
+    get_entry_point_objects,
     get_entry_point_registry,
+    get_entry_point_values,
     scan_all_entry_points,
 )
 
@@ -453,6 +455,52 @@ class TestConvenienceFunctions:
             group = get_entry_point_group("victor.plugins")
             assert group is not None
             assert group.group_name == "victor.plugins"
+
+    def test_get_entry_point_objects_convenience(self):
+        """Test retrieving raw entry point objects through the shared helper."""
+        mock_ep = MagicMock()
+        mock_ep.group = "victor.plugins"
+        mock_ep.name = "coding"
+        mock_ep.value = "victor_coding.plugin:plugin"
+
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
+            mock_eps.return_value = [mock_ep]
+
+            result = get_entry_point_objects("victor.plugins")
+
+        assert result == (mock_ep,)
+
+    def test_get_entry_point_values_convenience(self):
+        """Test retrieving entry point name/value mappings through the shared helper."""
+        mock_ep = MagicMock()
+        mock_ep.group = "victor.plugins"
+        mock_ep.name = "coding"
+        mock_ep.value = "victor_coding.plugin:plugin"
+
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
+            mock_eps.return_value = [mock_ep]
+
+            result = get_entry_point_values("victor.plugins")
+
+        assert result == {"coding": "victor_coding.plugin:plugin"}
+
+    def test_get_entry_point_values_force_invalidates_registry(self):
+        """Force lookups should invalidate the shared registry before reading values."""
+        registry = UnifiedEntryPointRegistry.get_instance()
+        registry.invalidate()
+
+        mock_ep = MagicMock()
+        mock_ep.group = "victor.plugins"
+        mock_ep.name = "coding"
+        mock_ep.value = "victor_coding.plugin:plugin"
+
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
+            mock_eps.return_value = [mock_ep]
+            with patch.object(registry, "invalidate", wraps=registry.invalidate) as mock_invalidate:
+                result = get_entry_point_values("victor.plugins", force=True)
+
+        assert result == {"coding": "victor_coding.plugin:plugin"}
+        mock_invalidate.assert_called_once()
 
 
 class TestPerformanceBenchmarks:

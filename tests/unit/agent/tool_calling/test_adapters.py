@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 
 from victor.agent.tool_calling.adapters import (
     AnthropicToolCallingAdapter,
+    GoogleToolCallingAdapter,
     OpenAIToolCallingAdapter,
     OllamaToolCallingAdapter,
     _CapabilityLoaderHolder,
@@ -215,9 +216,15 @@ class TestAnthropicAdapterParseToolCalls:
             raw_tool_calls=raw_calls,
         )
 
-        # Only read_file should pass validation
-        assert len(result.tool_calls) == 1
+        # read_file passes validation; invalid names kept with ids for error responses
+        # (OpenAI spec: every tool_calls[].id needs a role=tool response)
+        assert len(result.tool_calls) == 4  # 1 valid + 3 invalid (all have ids)
         assert result.tool_calls[0].name == "read_file"
+        assert result.tool_calls[0].arguments == {"path": "/test/file.txt"}
+        # Invalid tools have empty args
+        assert result.tool_calls[1].name == "example_tool"
+        assert result.tool_calls[1].arguments == {}
+        assert result.tool_calls[1].id == "call-2"
 
     def test_parse_tool_calls_empty_raw_calls(self):
         """Empty raw_tool_calls returns result with no tool calls."""
@@ -610,6 +617,38 @@ class TestOllamaAdapterThinkingMode:
         )
 
         assert adapter._has_thinking_mode() is False
+
+
+class TestGoogleAdapterFallbackCanonicalization:
+    """Tests for canonical tool names emitted by Gemini fallback parsing."""
+
+    def test_execute_bash_text_fallback_emits_shell(self):
+        """Gemini execute_bash tags should normalize to canonical shell tool."""
+        adapter = GoogleToolCallingAdapter(
+            model="gemini-2.5-pro",
+            config=None,
+        )
+        adapter._valid_tool_names = {"shell"}
+
+        result = adapter.parse_tool_calls("<execute_bash>ls -la</execute_bash>", None)
+
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "shell"
+        assert result.tool_calls[0].arguments == {"cmd": "ls -la"}
+
+    def test_tool_code_read_file_emits_canonical_read(self):
+        """Gemini tool_code read_file snippets should normalize to canonical read."""
+        adapter = GoogleToolCallingAdapter(
+            model="gemini-2.5-pro",
+            config=None,
+        )
+        adapter._valid_tool_names = {"read"}
+
+        result = adapter.parse_tool_calls('<tool_code>print(read_file("foo.py"))</tool_code>', None)
+
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "read"
+        assert result.tool_calls[0].arguments == {"path": "foo.py"}
 
 
 # =============================================================================

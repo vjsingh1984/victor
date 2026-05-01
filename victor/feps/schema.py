@@ -303,7 +303,9 @@ class FEPValidator:
         if metadata.fep < 0:
             errors.append(
                 FEPValidationError(
-                    severity="error", section="metadata", message="FEP number must be >= 0"
+                    severity="error",
+                    section="metadata",
+                    message="FEP number must be >= 0",
                 )
             )
 
@@ -311,7 +313,9 @@ class FEPValidator:
         if not metadata.title or len(metadata.title.strip()) == 0:
             errors.append(
                 FEPValidationError(
-                    severity="error", section="metadata", message="Title cannot be empty"
+                    severity="error",
+                    section="metadata",
+                    message="Title cannot be empty",
                 )
             )
 
@@ -359,7 +363,9 @@ class FEPValidator:
         if not metadata.authors:
             errors.append(
                 FEPValidationError(
-                    severity="error", section="metadata", message="At least one author required"
+                    severity="error",
+                    section="metadata",
+                    message="At least one author required",
                 )
             )
 

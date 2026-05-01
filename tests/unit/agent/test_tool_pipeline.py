@@ -1,6 +1,7 @@
 """Tests for ToolPipeline, ToolCallResult, ToolPipelineConfig."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
+import logging
 
 import pytest
 
@@ -11,6 +12,26 @@ from victor.agent.tool_pipeline import (
     PipelineExecutionResult,
     LRUToolCache,
 )
+from victor.agent.tool_executor import ToolExecutionResult
+
+
+@pytest.fixture
+def log_capture():
+    """Fixture to capture log messages."""
+    log_messages = []
+
+    class LogHandler(logging.Handler):
+        def emit(self, record):
+            log_messages.append(self.format(record))
+
+    handler = LogHandler()
+    logger = logging.getLogger("victor.agent.tool_pipeline")
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+    yield log_messages
+
+    logger.removeHandler(handler)
 
 
 @pytest.fixture
@@ -110,6 +131,9 @@ class TestExecuteToolCalls:
         result = await pipeline.execute_tool_calls(tool_calls)
         assert result.results[0].skipped is True
         assert "budget" in result.results[0].skip_reason.lower()
+        assert result.results[0].outcome_kind == "budget_exhausted"
+        assert result.results[0].block_source == "tool_budget"
+        assert result.results[0].retryable is False
 
     async def test_unknown_tool_skipped(self, pipeline):
         pipeline.tools.is_tool_enabled.return_value = False
@@ -126,6 +150,76 @@ class TestExecuteToolCalls:
         await pipeline.execute_tool_calls(tool_calls)
         on_start.assert_called()
         on_complete.assert_called()
+
+    async def test_legacy_read_file_uses_exact_dedup_key(self, pipeline):
+        await pipeline.execute_tool_calls(
+            [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
+        )
+        assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
+
+    async def test_write_file_invalidates_read_dedup_key(self, pipeline, mock_tool_executor):
+        await pipeline.execute_tool_calls(
+            [{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}]
+        )
+        assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
+
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="write",
+            success=True,
+            result="updated",
+            execution_time=0.01,
+        )
+        await pipeline.execute_tool_calls(
+            [{"name": "write_file", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+        )
+
+        assert "/tmp/f.py:None:None" not in pipeline._read_file_timestamps
+
+    async def test_duplicate_read_sets_structured_skip_metadata(self, pipeline):
+        with patch.object(pipeline, "_is_duplicate_read", return_value=True):
+            result = await pipeline.execute_tool_calls(
+                [{"name": "read", "arguments": {"path": "/tmp/f.py"}}]
+            )
+
+        call_result = result.results[0]
+        assert call_result.skipped is True
+        assert call_result.success is True
+        assert call_result.outcome_kind == "duplicate_read"
+        assert call_result.block_source == "session_read_dedup"
+        assert call_result.retryable is True
+        assert "already read with the same offset/limit" in call_result.user_message
+
+    async def test_log_message_shows_actual_skip_reasons(self, pipeline, log_capture):
+        """Test that log messages show actual skip reasons, not hardcoded text."""
+        # Force budget exhaustion
+        pipeline.config.tool_budget = 1
+        pipeline._calls_used = 1
+
+        # Execute a tool call that will be skipped due to budget
+        await pipeline.execute_tool_calls([{"name": "read", "arguments": {"path": "/tmp/f.py"}}])
+
+        # Check that the log message contains the actual skip reason
+        log_text = " ".join(log_capture)
+        assert "Tool budget exhausted" in log_text or "budget" in log_text.lower()
+
+    async def test_log_message_multiple_skip_reasons(self, pipeline, log_capture):
+        """Test that log messages show multiple different skip reasons."""
+        # First call exhausts budget
+        pipeline.config.tool_budget = 1
+        pipeline._calls_used = 1
+
+        # Execute multiple tool calls that will be skipped
+        await pipeline.execute_tool_calls(
+            [
+                {"name": "read", "arguments": {"path": "/tmp/f1.py"}},
+                {"name": "ls", "arguments": {"path": "/tmp"}},
+            ]
+        )
+
+        # Check that the log message contains skip reason information
+        log_text = " ".join(log_capture)
+        # Should mention tools were skipped
+        assert "skipped" in log_text.lower()
 
 
 class TestLRUToolCache:

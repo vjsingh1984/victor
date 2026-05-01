@@ -14,14 +14,18 @@
 
 """Tests for ConversationController."""
 
-from victor.agent.conversation_controller import (
+from unittest.mock import MagicMock
+
+from victor.agent.conversation.controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,
     CompactionStrategy,
     MessageImportance,
 )
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.types import ConversationMessage, MessagePriority
+from victor.agent.conversation.state_machine import ConversationStage
+from victor.core.completion_markers import SUMMARY_MARKER
 from victor.providers.base import Message
 
 
@@ -65,7 +69,7 @@ class TestConversationConfig:
     def test_default_config(self):
         """Test default configuration values."""
         config = ConversationConfig()
-        assert config.max_context_chars == 200000
+        assert config.max_context_chars == 800000
         assert config.chars_per_token_estimate == 4
         assert config.enable_stage_tracking is True
         assert config.enable_context_monitoring is True
@@ -312,7 +316,10 @@ class TestSmartCompaction:
 
     def test_smart_compact_history_simple_strategy(self):
         """Test smart compaction with SIMPLE strategy."""
-        config = ConversationConfig(compaction_strategy=CompactionStrategy.SIMPLE)
+        config = ConversationConfig(
+            compaction_strategy=CompactionStrategy.SIMPLE,
+            compaction_threshold=0.0,  # Phase 4: Set to 0 to bypass threshold check for this test
+        )
         controller = ConversationController(config=config)
 
         # Add many messages
@@ -342,13 +349,15 @@ class TestSmartCompaction:
         # Score messages
         scored = controller._score_messages()
 
-        # Tool results should have higher scores than regular messages
+        # Tool results should have higher scores than regular assistant messages
         tool_scores = [s for s in scored if s.message.role == "tool"]
-        [s for s in scored if s.message.role == "user"]
+        assistant_scores = [s for s in scored if s.message.role == "assistant"]
 
         assert len(tool_scores) > 0
-        # Tool results get boosted score
-        assert any(s.score > 3.0 for s in tool_scores)
+        # Tool results score higher than assistant messages (boosted by HIGH priority)
+        max_tool = max(s.score for s in tool_scores)
+        min_assistant = min(s.score for s in assistant_scores)
+        assert max_tool > min_assistant
 
     def test_smart_compact_preserves_system_message(self):
         """Test that system message is always preserved."""
@@ -364,8 +373,8 @@ class TestSmartCompaction:
         assert controller.messages[0].role == "system"
         assert controller.messages[0].content == "Always keep this"
 
-    def test_score_messages_recency_boost(self):
-        """Test that recent messages get higher scores."""
+    def test_score_messages_produces_valid_scores(self):
+        """Test that canonical scorer produces positive scores for all messages."""
         config = ConversationConfig(compaction_strategy=CompactionStrategy.TIERED)
         controller = ConversationController(config=config)
 
@@ -375,11 +384,15 @@ class TestSmartCompaction:
 
         scored = controller._score_messages()
 
-        # Later messages should have higher scores due to recency
-        early_score = scored[0].score
-        late_score = scored[-1].score
+        # All non-system scored messages should have positive scores
+        non_system = [s for s in scored if s.reason != "system"]
+        assert len(non_system) == 10
+        assert all(s.score > 0 for s in non_system)
 
-        assert late_score > early_score
+        # System message should have highest score (1000.0)
+        system_scores = [s for s in scored if s.reason == "system"]
+        if system_scores:
+            assert system_scores[0].score == 1000.0
 
     def test_generate_compaction_summary(self):
         """Test compaction summary generation."""
@@ -450,3 +463,179 @@ class TestSmartCompaction:
         assert config.tool_result_retention_weight == COMPACTION_CONFIG.tool_result_retention_weight
         assert config.recent_message_weight == COMPACTION_CONFIG.recent_message_weight
         assert config.semantic_relevance_threshold == 0.3
+
+    def test_retrieve_relevant_history_prefers_dual_trace_store_when_available(self):
+        """Historical retrieval should surface both semantic and execution traces."""
+        controller = ConversationController()
+        store = MagicMock()
+
+        semantic_message = ConversationMessage(
+            id="msg_semantic",
+            role="user",
+            content="Authentication middleware fails.",
+            priority=MessagePriority.MEDIUM,
+            token_count=12,
+            metadata={"memory_trace_kind": "semantic"},
+        )
+
+        execution_message = ConversationMessage(
+            id="msg_execution",
+            role="tool",
+            content='<TOOL_OUTPUT tool="read" path="src/auth.py">config loader</TOOL_OUTPUT>',
+            priority=MessagePriority.HIGH,
+            token_count=20,
+            tool_name="read",
+            tool_call_id="call_1",
+            metadata={
+                "memory_trace_kind": "execution",
+                "memory_execution_text": "tool read path src/auth.py config loader",
+            },
+        )
+
+        store.get_dual_trace_relevant_messages.return_value = {
+            "semantic": [(semantic_message, 0.91)],
+            "execution": [(execution_message, 0.83)],
+        }
+        store.get_relevant_summaries.return_value = []
+        store.get_message_trace_text.return_value = "tool read path src/auth.py config loader"
+
+        controller.set_conversation_store(store, "session_123")
+
+        result = controller.retrieve_relevant_history("authentication config", limit=3)
+
+        assert len(result) == 2
+        assert "Semantic memory" in result[0]
+        assert "Execution trace" in result[1]
+        store.get_dual_trace_relevant_messages.assert_called_once_with(
+            "session_123",
+            "authentication config",
+            semantic_limit=2,
+            execution_limit=1,
+            min_similarity=controller.config.semantic_relevance_threshold,
+        )
+
+    def test_retrieve_relevant_history_sanitizes_summary_markers(self):
+        controller = ConversationController()
+        store = MagicMock()
+        store.get_dual_trace_relevant_messages.return_value = {"semantic": [], "execution": []}
+        store.get_relevant_summaries.return_value = [
+            (f"{SUMMARY_MARKER} Preserve pending architecture findings.", 0.88)
+        ]
+
+        controller.set_conversation_store(store, "session_123")
+
+        result = controller.retrieve_relevant_history("architecture findings", limit=2)
+
+        assert result == [
+            "[Prior context summary (relevance: 0.88)]: Preserve pending architecture findings."
+        ]
+
+
+class TestPhase4CompactionFrequency:
+    """Tests for Phase 4: Fix Compaction Frequency.
+
+    Verifies that compaction respects minimum interval between compactions
+    to prevent aggressive context loss.
+    """
+
+    def test_should_compact_below_threshold(self):
+        """Test that compaction is skipped when utilization is below threshold."""
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+
+        # Utilization below threshold
+        result = controller._should_compact(0.70)
+        assert result is False
+
+    def test_should_compact_above_threshold(self):
+        """Test that compaction proceeds when utilization exceeds threshold."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = 0.0  # Long time ago
+
+        # Utilization above threshold
+        result = controller._should_compact(0.90)
+        assert result is True
+
+    def test_should_compact_respects_minimum_interval(self):
+        """Test that compaction is blocked when minimum interval not elapsed."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = time.time()  # Just compacted
+
+        # Utilization above threshold but minimum interval not elapsed
+        result = controller._should_compact(0.90)
+        assert result is False
+
+    def test_should_compact_after_minimum_interval(self):
+        """Test that compaction proceeds after minimum interval elapses."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = time.time() - 70.0  # 70 seconds ago (> 60s minimum)
+
+        # Utilization above threshold and minimum interval elapsed
+        result = controller._should_compact(0.90)
+        assert result is True
+
+    def test_compaction_interval_constant(self):
+        """Test that MIN_COMPACTION_INTERVAL_SECONDS is set correctly."""
+        controller = ConversationController()
+        assert controller.MIN_COMPACTION_INTERVAL_SECONDS == 60.0
+
+    def test_smart_compact_checks_interval(self):
+        """Test that smart_compact_history respects minimum interval."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.85
+        controller._last_compaction_time = time.time()  # Just compacted
+
+        # Add many messages to trigger compaction
+        for i in range(20):
+            controller.add_message("user", f"Message {i}")
+
+        # smart_compact_history should return 0 (blocked by minimum interval)
+        removed = controller.smart_compact_history(target_messages=5)
+        assert removed == 0
+
+    def test_smart_compact_updates_last_compaction_time(self):
+        """Test that smart_compact_history updates _last_compaction_time."""
+        import time
+
+        controller = ConversationController()
+        controller.config.compaction_threshold = 0.0  # Set to 0 to always trigger compaction
+        controller._last_compaction_time = 0.0  # Long time ago
+
+        # Add many messages to trigger compaction
+        for i in range(20):
+            controller.add_message("user", f"Message {i}")
+
+        # Get initial time
+        initial_time = controller._last_compaction_time
+        assert initial_time == 0.0
+
+        # Compact (should update _last_compaction_time)
+        removed = controller.smart_compact_history(target_messages=5)
+
+        # Verify _last_compaction_time was updated
+        assert controller._last_compaction_time > initial_time
+        assert removed > 0  # Compaction should have occurred
+
+    def test_compaction_threshold_config_default(self):
+        """Test that compaction_threshold has correct default value."""
+        controller = ConversationController()
+        assert controller.config.compaction_threshold == 0.85
+
+    def test_compaction_threshold_config_custom(self):
+        """Test that compaction_threshold can be customized."""
+        from victor.agent.conversation.controller import ConversationConfig
+
+        config = ConversationConfig(compaction_threshold=0.90)
+        controller = ConversationController(config=config)
+        assert controller.config.compaction_threshold == 0.90

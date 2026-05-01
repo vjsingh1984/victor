@@ -12,15 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Framework-level middleware implementations.
+"""Tool execution middleware implementing ``MiddlewareProtocol``.
 
-This module provides common middleware that all verticals can use:
+This module provides ready-made tool-pipeline middlewares for verticals:
 
-1. LoggingMiddleware - Log all tool calls for audit/debugging
+1. LoggingMiddleware - Audit log for every tool call
 2. SecretMaskingMiddleware - Mask secrets in tool results
-3. MetricsMiddleware - Record tool execution metrics
+3. MetricsMiddleware - Per-tool execution metrics + Prometheus export
 4. GitSafetyMiddleware - Block dangerous git operations
 5. OutputValidationMiddleware - Validate and optionally fix tool outputs
+
+All classes implement ``MiddlewareProtocol`` (from
+``victor.core.verticals.protocols.middleware``) and are processed by
+``victor.agent.middleware_chain.MiddlewareChain`` during tool execution.
+
+**Do NOT inherit from** ``victor.core.middleware.Middleware`` here. That ABC is
+for HTTP/provider pipelines. Use ``MiddlewareProtocol`` structural typing only.
 
 Example usage:
     from victor.framework.middleware import (
@@ -69,6 +76,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Set, runtime_c
 
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 from victor.core.verticals.protocols import MiddlewareProtocol
+from victor.framework.tool_naming import ToolNames, get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +232,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         middleware = LoggingMiddleware(
             log_level=logging.DEBUG,
             include_arguments=True,
-            exclude_tools={"read_file"},  # Skip verbose tools
+            exclude_tools={"read"},  # Skip verbose tools
         )
     """
 
@@ -251,7 +259,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         self._include_arguments = include_arguments
         self._include_results = include_results
         self._sanitize_arguments = sanitize_arguments
-        self._exclude_tools = exclude_tools or set()
+        self._exclude_tools = {get_canonical_name(tool) for tool in (exclude_tools or set())}
         self._logger = logging.getLogger(logger_name) if logger_name else logger
         self._start_times: Dict[str, float] = {}
 
@@ -316,7 +324,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         Returns:
             MiddlewareResult (always proceeds)
         """
-        if tool_name in self._exclude_tools:
+        if get_canonical_name(tool_name) in self._exclude_tools:
             return MiddlewareResult()
 
         # Track start time for timing
@@ -346,7 +354,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         Returns:
             None (no modification)
         """
-        if tool_name in self._exclude_tools:
+        if get_canonical_name(tool_name) in self._exclude_tools:
             return None
 
         # Calculate duration
@@ -823,6 +831,16 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         }
     )
 
+    APPLICABLE_TOOLS: frozenset[str] = frozenset(
+        {
+            ToolNames.GIT,
+            ToolNames.SHELL,
+            "execute_bash",
+            "bash",
+            "run_command",
+        }
+    )
+
     def __init__(
         self,
         block_dangerous: bool = True,
@@ -893,8 +911,12 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         Returns:
             MiddlewareResult with safety check results
         """
+        canonical_tool_name = get_canonical_name(tool_name)
         # Only check git-related tools
-        if tool_name not in {"git", "execute_bash", "bash", "shell", "run_command"}:
+        if (
+            canonical_tool_name not in {ToolNames.GIT, ToolNames.SHELL}
+            and tool_name != "run_command"
+        ):
             return MiddlewareResult()
 
         command = arguments.get("command", "") or arguments.get("args", "")
@@ -969,7 +991,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         Returns:
             Set of git-related tools
         """
-        return {"git", "execute_bash", "bash", "shell", "run_command"}
+        return set(self.APPLICABLE_TOOLS)
 
 
 # =============================================================================
@@ -1044,7 +1066,13 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         """
         self.validator = validator
         self._applicable_tools = applicable_tools
-        self._argument_names = argument_names or {"content", "code", "data", "text", "body"}
+        self._argument_names = argument_names or {
+            "content",
+            "code",
+            "data",
+            "text",
+            "body",
+        }
         self.auto_fix = auto_fix
         self.block_on_error = block_on_error
         self.max_fix_iterations = max_fix_iterations
@@ -1125,7 +1153,11 @@ class OutputValidationMiddleware(MiddlewareProtocol):
 
         if all_issues:
             metadata["validation_issues"] = [
-                {"message": i.message, "severity": i.severity.value, "location": i.location}
+                {
+                    "message": i.message,
+                    "severity": i.severity.value,
+                    "location": i.location,
+                }
                 for i in all_issues[:10]  # Limit to first 10 issues
             ]
 

@@ -1,32 +1,50 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
-"""Conversation management components.
+"""Conversation management package.
 
-This package provides focused components for conversation management,
-extracted from ConversationManager to follow the Single Responsibility
-Principle (SRP).
-
-Part of SOLID-based refactoring to eliminate god class anti-pattern.
+Canonical modules:
+- types: ConversationMessage, MessageRole, MessagePriority
+- scoring: score_messages(), ScoringWeights, weight presets
+- assembler: TurnBoundaryContextAssembler (context budget)
+- message_store: MessageStore (SOLID extraction)
+- context_handler: ContextOverflowHandler
+- session_manager: SessionManager
+- embedding_manager: EmbeddingManager
 """
 
+from victor.agent.conversation.types import (
+    ConversationMessage,
+    MessagePriority,
+    MessageRole,
+)
+from victor.agent.conversation.scoring import (
+    CONTROLLER_WEIGHTS,
+    DEFAULT_WEIGHTS,
+    STORE_WEIGHTS,
+    ScoringWeights,
+    score_messages,
+)
+from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 from victor.agent.conversation.message_store import MessageStore
 from victor.agent.conversation.context_handler import ContextOverflowHandler
 from victor.agent.conversation.session_manager import SessionManager
 from victor.agent.conversation.embedding_manager import EmbeddingManager
 
 __all__ = [
+    # Canonical types
+    "ConversationMessage",
+    "MessagePriority",
+    "MessageRole",
+    # Scoring
+    "CONTROLLER_WEIGHTS",
+    "DEFAULT_WEIGHTS",
+    "STORE_WEIGHTS",
+    "ScoringWeights",
+    "score_messages",
+    # Assembler
+    "TurnBoundaryContextAssembler",
+    # SOLID extraction modules
     "MessageStore",
     "ContextOverflowHandler",
     "SessionManager",

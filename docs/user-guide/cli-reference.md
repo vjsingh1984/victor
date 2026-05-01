@@ -13,6 +13,7 @@ Complete reference for all Victor CLI commands.
 | `victor mcp` | Run as MCP server |
 | `victor keys` | Manage API keys |
 | `victor providers list` | List available providers |
+| `victor capabilities` | Inspect shared tools, teams, workflows, and recommendations |
 | `victor profiles` | Manage provider profiles |
 | `victor tools` | Manage and list tools |
 | `victor models` | Manage Ollama models |
@@ -153,8 +154,36 @@ victor serve --reload               # Auto-reload on changes
 |----------|--------|-------------|
 | `/chat` | POST | Send a message |
 | `/capabilities` | GET | List available tools |
+| `/capabilities/recommend` | GET | Recommend teams/workflows from shared catalogs |
 | `/health` | GET | Health check |
 | `/providers` | GET | List providers |
+
+---
+
+### victor capabilities
+
+Inspect shared capability catalogs and ask the framework recommendation engine for
+the best team/workflow matches for a task.
+
+```bash
+victor capabilities
+victor capabilities --vertical coding
+victor capabilities recommend feature high
+victor capabilities recommend feature high --mode build --vertical coding --json
+```
+
+**Examples:**
+
+```bash
+# Show all discovered capability catalogs
+victor capabilities
+
+# Restrict inspection to one vertical
+victor capabilities --vertical coding
+
+# Ask for framework-backed coordination suggestions
+victor capabilities recommend feature high --mode build
+```
 
 ---
 

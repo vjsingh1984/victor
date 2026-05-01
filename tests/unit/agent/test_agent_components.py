@@ -22,8 +22,9 @@ from victor.framework.agent_components import (
     create_builder,
     create_session,
 )
+from victor.agent.config import UnifiedAgentConfig
 from victor.framework.config import AgentConfig
-from victor.framework.errors import AgentError, ConfigurationError
+from victor.core.errors import AgentError, ConfigurationError
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet
@@ -109,6 +110,14 @@ class TestAgentBuildOptions:
         assert options.model == "gpt-4"
         assert options.temperature == 0.5
         assert options.thinking
+
+    def test_legacy_config_is_normalized(self):
+        """Legacy AgentConfig inputs should be stored canonically."""
+        options = AgentBuildOptions(config=AgentConfig.high_budget())
+
+        assert isinstance(options.config, UnifiedAgentConfig)
+        assert options.config.tool_budget == 200
+        assert options.config.max_iterations == 100
 
 
 # =============================================================================
@@ -200,7 +209,9 @@ class TestAgentBuilder:
         """Test fluent config setting."""
         config = AgentConfig.high_budget()
         builder = AgentBuilder().config(config)
-        assert builder._options.config is config
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.tool_budget == config.tool_budget
+        assert builder._options.config.max_iterations == config.max_iterations
 
     def test_system_prompt_chain(self):
         """Test fluent system prompt setting."""
@@ -264,19 +275,21 @@ class TestBuilderPresets:
         """Test DEFAULT preset."""
         builder = AgentBuilder().preset(BuilderPreset.DEFAULT)
         assert builder._options.tools is not None
-        assert builder._options.config is not None
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.mode == "foreground"
         assert BuilderPreset.DEFAULT in builder._presets_applied
 
     def test_preset_minimal(self):
         """Test MINIMAL preset."""
         builder = AgentBuilder().preset(BuilderPreset.MINIMAL)
         assert not builder._options.enable_observability
-        assert builder._options.config is not None
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.tool_budget == 15
 
     def test_preset_high_budget(self):
         """Test HIGH_BUDGET preset."""
         builder = AgentBuilder().preset(BuilderPreset.HIGH_BUDGET)
-        assert builder._options.config is not None
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
         # High budget config should have higher limits
         assert builder._options.config.tool_budget > AgentConfig.default().tool_budget
 
@@ -284,6 +297,9 @@ class TestBuilderPresets:
         """Test AIRGAPPED preset."""
         builder = AgentBuilder().preset(BuilderPreset.AIRGAPPED)
         assert builder._options.airgapped
+        assert isinstance(builder._options.config, UnifiedAgentConfig)
+        assert builder._options.config.enable_semantic_search is False
+        assert builder._options.config.enable_analytics is False
 
     def test_multiple_presets(self):
         """Test applying multiple presets."""
@@ -421,6 +437,16 @@ class TestAgentSession:
         assert result is not None
         assert len(session.turns) == 1
         assert session.turns[0]["context"] == {"error": "IndexError"}
+
+    @pytest.mark.asyncio
+    async def test_send_uses_message_when_initial_prompt_not_provided(self, mock_agent):
+        """Deferred sessions should use the first send() message as the opening turn."""
+        session = AgentSession(mock_agent)
+
+        await session.send("Deferred first turn")
+
+        assert session.turn_count == 1
+        assert session.turns[0]["prompt"] == "Deferred first turn"
 
     @pytest.mark.asyncio
     async def test_stream(self, mock_agent):

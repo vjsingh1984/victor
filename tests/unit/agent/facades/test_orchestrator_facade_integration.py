@@ -17,9 +17,18 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from victor.agent.coordinators.coordination_state_passed import (
+    CoordinationStatePassedCoordinator,
+)
+from victor.agent.coordinators.exploration_state_passed import (
+    ExplorationStatePassedCoordinator,
+)
+from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
+from victor.agent.coordinators.system_prompt_state_passed import (
+    SystemPromptStatePassedCoordinator,
+)
+from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.facades.chat_facade import ChatFacade
-from victor.agent.facades.tool_facade import ToolFacade
 from victor.config.settings import Settings
 
 
@@ -47,7 +56,10 @@ def orchestrator_settings():
 @pytest.fixture
 def orchestrator(mock_provider, orchestrator_settings):
     """Create an orchestrator for testing."""
-    with patch("victor.agent.orchestrator.UsageLogger"):
+    with (
+        patch("victor.agent.orchestrator.UsageLogger"),
+        patch("victor.core.bootstrap_services.bootstrap_new_services"),
+    ):
         return AgentOrchestrator(
             settings=orchestrator_settings,
             provider=mock_provider,
@@ -59,14 +71,35 @@ class TestFacadeCreation:
     """Tests that orchestrator creates facade instances."""
 
     def test_chat_facade_created(self, orchestrator):
-        """Orchestrator creates a ChatFacade instance."""
+        """Orchestrator creates a lazy chat-facade compatibility proxy."""
         assert hasattr(orchestrator, "_chat_facade")
-        assert isinstance(orchestrator._chat_facade, ChatFacade)
+        assert isinstance(orchestrator._chat_facade, LazyRuntimeProxy)
+        assert orchestrator._chat_facade.initialized is False
 
     def test_tool_facade_created(self, orchestrator):
-        """Orchestrator creates a ToolFacade instance."""
+        """Orchestrator creates a lazy tool-facade compatibility proxy."""
         assert hasattr(orchestrator, "_tool_facade")
-        assert isinstance(orchestrator._tool_facade, ToolFacade)
+        assert isinstance(orchestrator._tool_facade, LazyRuntimeProxy)
+        assert orchestrator._tool_facade.initialized is False
+
+    def test_orchestration_facade_has_state_passed_handles(self, orchestrator):
+        """OrchestrationFacade should expose state-passed coordinator surfaces."""
+        assert isinstance(
+            orchestrator._orchestration_facade.exploration_state_passed,
+            ExplorationStatePassedCoordinator,
+        )
+        assert isinstance(
+            orchestrator._orchestration_facade.system_prompt_state_passed,
+            SystemPromptStatePassedCoordinator,
+        )
+        assert isinstance(
+            orchestrator._orchestration_facade.safety_state_passed,
+            SafetyStatePassedCoordinator,
+        )
+        assert isinstance(
+            orchestrator._orchestration_facade.coordination_state_passed,
+            CoordinationStatePassedCoordinator,
+        )
 
 
 class TestChatFacadeDelegation:

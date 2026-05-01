@@ -53,7 +53,10 @@ from victor.agent.factory.coordination_builders import CoordinationBuildersMixin
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.agent.context_project import ProjectContext
@@ -61,7 +64,7 @@ if TYPE_CHECKING:
     from victor.agent.action_authorizer import ActionAuthorizer
     from victor.agent.search_router import SearchRouter
     from victor.agent.metrics_collector import MetricsCollector
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.context_compactor import ContextCompactor
@@ -75,9 +78,9 @@ if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.tool_registrar import ToolRegistrar
-    from victor.agent.conversation_memory import ConversationStore
-    from victor.analytics.logger import UsageLogger  # noqa: F811
-    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.agent.conversation.store import ConversationStore
+    from victor.observability.analytics.logger import UsageLogger  # noqa: F811
+    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.parallel_executor import ParallelToolExecutor
     from victor.agent.response_completer import ResponseCompleter
@@ -98,18 +101,17 @@ if TYPE_CHECKING:
     from victor.agent.session_ledger import SessionLedger
     from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
-    from victor.agent.context_assembler import TurnBoundaryContextAssembler
+    from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
-    from victor.agent.streaming.pipeline import StreamingChatPipeline
-    from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+    from victor.agent.services.chat_stream_executor import StreamingChatExecutor
+    from victor.agent.provider import ProviderSwitchCoordinator
     from victor.agent.lifecycle_manager import LifecycleManager
-    from victor.agent.tool_deduplication import ToolDeduplicationTracker
+    from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
     from victor.agent.provider_manager import ProviderManager
     from victor.agent.presentation.protocols import PresentationProtocol
-    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.tools.plugin_registry import ToolPluginRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
     from victor.storage.cache.tool_cache import ToolCache
@@ -117,27 +119,26 @@ if TYPE_CHECKING:
     from victor.observability.tracing import ExecutionTracer, ToolCallTracer
     from victor.config.model_capabilities import ToolCallingMatrix
     from victor.agent.argument_normalizer import ArgumentNormalizer
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
-    from victor.agent.protocols.streaming_protocols import (
-        StreamingMetricsCollectorProtocol,
-        StreamingRecoveryCoordinatorProtocol as StreamingRecoveryCoordinatorProto,
-        ChunkGeneratorProtocol as ChunkGeneratorProto,
-    )
     from victor.agent.protocols.infrastructure_protocols import (
         SafetyCheckerProtocol,
         AutoCommitterProtocol,
-        ReminderManagerProtocol,
         TaskTrackerProtocol,
-        RLCoordinatorProtocol,
         CodeExecutionManagerProtocol,
         WorkflowRegistryProtocol,
         ArgumentNormalizerProtocol,
         DebugLoggerProtocol,
     )
-    from victor.agent.protocols.coordination_protocols import (
-        ToolPlannerProtocol,
-        TaskCoordinatorProtocol,
+    from victor.agent.services.protocols import (
+        ChunkRuntimeProtocol as ChunkGeneratorProto,
+        ReminderManagerProtocol,
+        RLLearningRuntimeProtocol as RLCoordinatorProtocol,
+        ResponseSanitizerProtocol,
+        StreamingMetricsCollectorProtocol,
+        StreamingRecoveryRuntimeProtocol as StreamingRecoveryCoordinatorProto,
+        TaskRuntimeProtocol as TaskCoordinatorProtocol,
+        ToolPlanningRuntimeProtocol as ToolPlannerProtocol,
     )
     from victor.agent.protocols.budget_protocols import (
         IBudgetManager,
@@ -378,10 +379,16 @@ class OrchestratorFactory(
     # -----------------------------------------------------------------
 
     def create_sanitizer(self) -> "ResponseSanitizer":
-        """Create response sanitizer (from DI container)."""
-        from victor.agent.protocols import ResponseSanitizerProtocol
+        """Create response sanitizer (from DI container with fallback)."""
+        from victor.agent.services.protocols import ResponseSanitizerProtocol
 
-        return self.container.get(ResponseSanitizerProtocol)
+        sanitizer = self.container.get_optional(ResponseSanitizerProtocol)
+        if sanitizer is not None:
+            return sanitizer
+        # Fallback: construct directly when not registered (e.g. tests patching bootstrap)
+        from victor.agent.response_sanitizer import ResponseSanitizer
+
+        return ResponseSanitizer()
 
     def create_prompt_builder(
         self,
@@ -408,12 +415,24 @@ class OrchestratorFactory(
         except Exception as e:
             logger.debug(f"Could not load vertical prompt contributors: {e}")
 
+        # Detect if provider supports prompt caching (e.g., Anthropic ephemeral cache)
+        provider_caches = (
+            hasattr(self.provider, "supports_prompt_caching")
+            and self.provider.supports_prompt_caching()
+        )
+        provider_has_kv_cache = (
+            hasattr(self.provider, "supports_kv_prefix_caching")
+            and self.provider.supports_kv_prefix_caching()
+        ) or provider_caches  # API caching providers also have KV caching
+
         return SystemPromptBuilder(
             provider_name=self.provider_name or self.provider.__class__.__name__.lower(),
             model=self.model,
             tool_adapter=tool_adapter,
             capabilities=capabilities,
             prompt_contributors=prompt_contributors,
+            provider_caches=provider_caches,
+            provider_has_kv_cache=provider_has_kv_cache,
         )
 
     def create_project_context(self) -> "ProjectContext":
@@ -496,16 +515,73 @@ class OrchestratorFactory(
         except Exception as e:
             logger.debug(f"Could not load vertical prompt contributors: {e}")
 
+        # Detect if provider supports prompt caching
+        provider_caches = (
+            hasattr(self.provider, "supports_prompt_caching")
+            and self.provider.supports_prompt_caching()
+        )
+        provider_has_kv_cache = (
+            hasattr(self.provider, "supports_kv_prefix_caching")
+            and self.provider.supports_kv_prefix_caching()
+        ) or provider_caches
+
         prompt_builder = SystemPromptBuilder(
             provider_name=provider_name,
             model=model,
             tool_adapter=tool_adapter,
             capabilities=tool_calling_caps,
             prompt_contributors=prompt_contributors,
+            provider_caches=provider_caches,
+            provider_has_kv_cache=provider_has_kv_cache,
         )
 
         logger.debug(f"SystemPromptBuilder created for {provider_name}/{model}")
         return prompt_builder
+
+    def create_prompt_pipeline(
+        self,
+        builder: Any,
+        get_context_window: Optional[Any] = None,
+    ) -> Any:
+        """Create UnifiedPromptPipeline with all dependencies.
+
+        Args:
+            builder: SystemPromptBuilder instance
+            get_context_window: Callable returning model context window size
+
+        Returns:
+            Configured UnifiedPromptPipeline
+        """
+        from victor.agent.content_registry import create_default_registry
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.agent.prompt_pipeline import UnifiedPromptPipeline
+        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+        from victor.evaluation.runtime_feedback import (
+            runtime_evaluation_feedback_scope_from_context,
+        )
+
+        optimizer = OptimizationInjector()
+        registry = create_default_registry()
+        runtime_intelligence = RuntimeIntelligenceService(
+            optimization_injector=optimizer,
+            evaluation_feedback_scope=runtime_evaluation_feedback_scope_from_context(
+                {
+                    "provider_name": getattr(self.provider, "provider_name", None)
+                    or getattr(self.provider, "name", None),
+                    "model": getattr(builder, "model", None)
+                    or getattr(self.provider, "model", None),
+                }
+            ),
+        )
+
+        return UnifiedPromptPipeline(
+            provider=self.provider,
+            builder=builder,
+            registry=registry,
+            optimizer=optimizer,
+            runtime_intelligence=runtime_intelligence,
+            get_context_window=get_context_window,
+        )
 
     def create_workflow_optimization_components(
         self, timeout_seconds: Optional[float] = None

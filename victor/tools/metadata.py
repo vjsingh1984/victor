@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tool metadata and registry for semantic tool selection."""
+"""Tool metadata models plus a deprecated registry compatibility wrapper."""
 
 import re
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -30,13 +31,16 @@ if TYPE_CHECKING:
     from victor.tools.base import BaseTool
 
 
+_LEGACY_METADATA_REGISTRY_WARNING_EMITTED = False
+
+
 @dataclass
 class ToolMetadata:
     """Semantic metadata for tool selection and discovery.
 
     This dataclass allows tools to define their own semantic information
     inline, enabling fully dynamic tool registration without needing to
-    manually update tool_knowledge.yaml or tool_selection.py.
+    manually update configuration files or tool_selection.py.
 
     Attributes:
         category: Tool category (e.g., 'git', 'security', 'pipeline')
@@ -53,9 +57,10 @@ class ToolMetadata:
                            E.g., ["show diff", "compare"] for shell tool.
         task_types: Task types this tool is relevant for (analysis, action, generation,
                    search, edit, default). Used for classification-aware tool selection.
-        progress_params: Parameters that indicate progress in loop detection.
-                        If these params change between calls, it's progress not a loop.
-                        E.g., ["path", "offset", "limit"] for read tool.
+        signature_params: Parameters to track in loop detection signatures.
+                         Only these parameters are included in the signature. Pagination
+                         parameters (offset, limit, k, etc.) should be excluded.
+                         E.g., ["path"] for read tool (excludes offset/limit).
         execution_category: Category for parallel execution and dependency analysis.
                            Determines which tools can safely run concurrently.
     """
@@ -75,8 +80,10 @@ class ToolMetadata:
     mandatory_keywords: List[str] = field(default_factory=list)  # e.g., ["show diff", "compare"]
     # NEW: Task types for classification-aware selection
     task_types: List[str] = field(default_factory=list)  # e.g., ["analysis", "search", "default"]
-    # NEW: Progress parameters for loop detection
-    progress_params: List[str] = field(default_factory=list)  # e.g., ["path", "offset", "limit"]
+    # NEW: Signature parameters for loop detection
+    signature_params: List[str] = field(
+        default_factory=list
+    )  # e.g., ["path"] (excludes offset/limit)
     # NEW: Execution category for parallel execution
     execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
 
@@ -120,7 +127,7 @@ class ToolMetadata:
             "stages": self.stages,
             "mandatory_keywords": self.mandatory_keywords,
             "task_types": self.task_types,
-            "progress_params": self.progress_params,
+            "signature_params": self.signature_params,
             "execution_category": (
                 self.execution_category.value if self.execution_category else "read_only"
             ),
@@ -414,334 +421,153 @@ class ToolMetadata:
         return examples[:2]  # Limit to 2 examples
 
 
+def _canonical_registry_cls():
+    """Resolve the canonical metadata registry lazily to avoid import cycles."""
+    from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+
+    return CanonicalToolMetadataRegistry
+
+
+def _entry_to_tool_metadata(entry: Any) -> Optional[ToolMetadata]:
+    """Convert a canonical ToolMetadataEntry into the legacy ToolMetadata shape."""
+    if entry is None:
+        return None
+
+    return ToolMetadata(
+        category=entry.category or "",
+        keywords=sorted(entry.keywords),
+        use_cases=[],
+        examples=[],
+        priority_hints=[],
+        priority=entry.priority,
+        access_mode=entry.access_mode,
+        danger_level=entry.danger_level,
+        stages=sorted(entry.stages),
+        mandatory_keywords=sorted(entry.mandatory_keywords),
+        task_types=sorted(entry.task_types),
+        signature_params=sorted(entry.signature_params),
+        execution_category=entry.execution_category,
+    )
+
+
+def _warn_legacy_registry_usage(stacklevel: int = 2) -> None:
+    """Emit a one-time deprecation warning for the legacy registry wrapper."""
+    global _LEGACY_METADATA_REGISTRY_WARNING_EMITTED
+    if _LEGACY_METADATA_REGISTRY_WARNING_EMITTED:
+        return
+
+    warnings.warn(
+        "Importing ToolMetadataRegistry from victor.tools.metadata is deprecated. "
+        "Use 'from victor.tools.metadata_registry import ToolMetadataRegistry' instead. "
+        "This compatibility wrapper will be removed in version 0.10.0.",
+        DeprecationWarning,
+        stacklevel=stacklevel,
+    )
+    _LEGACY_METADATA_REGISTRY_WARNING_EMITTED = True
+
+
 class ToolMetadataRegistry:
-    """Centralized registry for tool metadata.
+    """Compatibility wrapper over victor.tools.metadata_registry.ToolMetadataRegistry.
 
-    This singleton class provides a unified interface for accessing tool metadata
-    across the application. It supports:
-    - Automatic metadata collection from registered tools
-    - Hash-based smart reindexing (only reindex when tools change)
-    - Caching to avoid regeneration
-    - Category and keyword indexing for fast lookup
-    - Export for debugging and analysis
-    - Plugin tool support (incremental registration)
-
-    Usage:
-        registry = ToolMetadataRegistry.get_instance()
-        registry.refresh_from_tools(tools)  # Populate from ToolRegistry
-
-        # Check if reindex needed
-        if registry.needs_reindex(tools):
-            registry.refresh_from_tools(tools)
-
-        # Access metadata
-        metadata = registry.get_metadata("git")
-        tools_in_category = registry.get_tools_by_category("filesystem")
-        tools_with_keyword = registry.get_tools_by_keyword("search")
-
-        # Export all metadata for debugging
-        all_metadata = registry.export_all()
+    This preserves the older API surface exported through ``victor.tools.base``
+    while delegating all runtime state to the canonical registry implementation.
     """
 
     _instance: Optional["ToolMetadataRegistry"] = None
 
-    def __init__(self) -> None:
-        """Initialize the registry."""
-        self._metadata_cache: Dict[str, ToolMetadata] = {}
-        self._category_index: Dict[str, List[str]] = {}  # category -> tool names
-        self._keyword_index: Dict[str, List[str]] = {}  # keyword -> tool names
-        self._tools_hash: Optional[str] = None  # Hash of registered tools for change detection
-        self._last_refresh_count: int = 0  # Number of tools at last refresh
+    def __init__(self, delegate: Optional[Any] = None) -> None:
+        _warn_legacy_registry_usage(stacklevel=3)
+        self._delegate = delegate or _canonical_registry_cls().get_instance()
 
     @classmethod
     def get_instance(cls) -> "ToolMetadataRegistry":
-        """Get or create the singleton instance.
-
-        Returns:
-            The singleton ToolMetadataRegistry instance
-        """
+        """Get the singleton compatibility wrapper."""
+        _warn_legacy_registry_usage(stacklevel=3)
         if cls._instance is None:
             cls._instance = cls()
+        cls._instance._delegate = _canonical_registry_cls().get_instance()
         return cls._instance
 
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset the singleton instance (mainly for testing)."""
+        """Reset both the compatibility wrapper and canonical singleton."""
+        _warn_legacy_registry_usage(stacklevel=3)
         cls._instance = None
+        _canonical_registry_cls().reset_instance()
 
     @staticmethod
     def _calculate_tools_hash(tools: List["BaseTool"]) -> str:
-        """Calculate hash of all tool definitions to detect changes.
+        """Delegate hash calculation to the canonical registry."""
+        _warn_legacy_registry_usage(stacklevel=3)
+        return _canonical_registry_cls()._calculate_tools_hash(tools)
 
-        Args:
-            tools: List of BaseTool instances
-
-        Returns:
-            SHA256 hash of tool definitions (name, description, parameters)
-        """
-        import hashlib
-
-        # Create deterministic string from all tool definitions
-        tool_strings = []
-        for tool in sorted(tools, key=lambda t: t.name):
-            # Include name, description, and parameters in hash
-            tool_string = f"{tool.name}:{tool.description}:{tool.parameters}"
-            tool_strings.append(tool_string)
-
-        combined = "|".join(tool_strings)
-        return hashlib.sha256(combined.encode()).hexdigest()
-
-    def needs_reindex(self, tools: List["BaseTool"]) -> bool:
-        """Check if tools have changed and reindexing is needed.
-
-        Uses hash-based change detection to avoid unnecessary reindexing.
-        Returns True if:
-        - No previous hash exists (first run)
-        - Tool count has changed
-        - Tool definitions have changed (hash mismatch)
-
-        Args:
-            tools: List of BaseTool instances to check
-
-        Returns:
-            True if reindexing is needed, False if cache is valid
-        """
-        # First run - always needs indexing
-        if self._tools_hash is None:
-            return True
-
-        # Quick check: tool count changed
-        if len(tools) != self._last_refresh_count:
-            return True
-
-        # Full check: compute hash and compare
-        current_hash = self._calculate_tools_hash(tools)
-        return current_hash != self._tools_hash
-
-    def refresh_from_tools(self, tools: List["BaseTool"], force: bool = False) -> bool:
-        """Refresh metadata cache from a list of tools.
-
-        Uses smart reindexing: only rebuilds if tools have changed (hash mismatch)
-        or if force=True. This enables efficient plugin support where new tools
-        can be added without full reindexing.
-
-        Args:
-            tools: List of BaseTool instances to collect metadata from
-            force: Force reindex even if hash matches (default: False)
-
-        Returns:
-            True if reindexing was performed, False if cache was valid
-        """
-        # Smart reindex: skip if tools haven't changed
-        if not force and not self.needs_reindex(tools):
-            return False
-
-        # Clear existing cache
-        self._metadata_cache.clear()
-        self._category_index.clear()
-        self._keyword_index.clear()
-
-        # Register all tools
-        for tool in tools:
-            self.register_tool(tool)
-
-        # Update hash and count for future change detection
-        self._tools_hash = self._calculate_tools_hash(tools)
-        self._last_refresh_count = len(tools)
-
-        return True
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._delegate, name)
 
     def register_tool(self, tool: "BaseTool") -> None:
-        """Register a single tool's metadata.
-
-        Args:
-            tool: BaseTool instance to register
-        """
-        # Get metadata (explicit or auto-generated)
-        metadata = tool.get_metadata()
-        self._metadata_cache[tool.name] = metadata
-
-        # Index by category
-        if metadata.category:
-            if metadata.category not in self._category_index:
-                self._category_index[metadata.category] = []
-            if tool.name not in self._category_index[metadata.category]:
-                self._category_index[metadata.category].append(tool.name)
-
-        # Index by keywords
-        for keyword in metadata.keywords:
-            keyword_lower = keyword.lower()
-            if keyword_lower not in self._keyword_index:
-                self._keyword_index[keyword_lower] = []
-            if tool.name not in self._keyword_index[keyword_lower]:
-                self._keyword_index[keyword_lower].append(tool.name)
+        self._delegate.register_tool(tool)
 
     def unregister_tool(self, tool_name: str) -> None:
-        """Unregister a tool's metadata.
-
-        Args:
-            tool_name: Name of tool to unregister
-        """
-        if tool_name in self._metadata_cache:
-            metadata = self._metadata_cache.pop(tool_name)
-
-            # Remove from category index
-            if metadata.category and metadata.category in self._category_index:
-                if tool_name in self._category_index[metadata.category]:
-                    self._category_index[metadata.category].remove(tool_name)
-
-            # Remove from keyword index
-            for keyword in metadata.keywords:
-                keyword_lower = keyword.lower()
-                if keyword_lower in self._keyword_index:
-                    if tool_name in self._keyword_index[keyword_lower]:
-                        self._keyword_index[keyword_lower].remove(tool_name)
+        self._delegate.unregister_tool(tool_name)
 
     def get_metadata(self, tool_name: str) -> Optional[ToolMetadata]:
-        """Get metadata for a specific tool.
-
-        Args:
-            tool_name: Name of the tool
-
-        Returns:
-            ToolMetadata if found, None otherwise
-        """
-        return self._metadata_cache.get(tool_name)
+        return _entry_to_tool_metadata(self._delegate.get_metadata(tool_name))
 
     def get_all_metadata(self) -> Dict[str, ToolMetadata]:
-        """Get all registered metadata.
-
-        Returns:
-            Dictionary mapping tool names to ToolMetadata
-        """
-        return self._metadata_cache.copy()
+        return {
+            name: metadata
+            for name, metadata in (
+                (name, _entry_to_tool_metadata(entry))
+                for name, entry in self._delegate.get_all().items()
+            )
+            if metadata is not None
+        }
 
     def get_tools_by_category(self, category: str) -> List[str]:
-        """Get tool names in a specific category.
-
-        Args:
-            category: Category name
-
-        Returns:
-            List of tool names in the category
-        """
-        return self._category_index.get(category, []).copy()
+        return sorted(self._delegate.get_tools_by_category(category))
 
     def get_tools_by_keyword(self, keyword: str) -> List[str]:
-        """Get tool names matching a keyword.
-
-        Args:
-            keyword: Keyword to search for
-
-        Returns:
-            List of tool names with this keyword
-        """
-        return self._keyword_index.get(keyword.lower(), []).copy()
+        return sorted(entry.name for entry in self._delegate.get_by_keyword(keyword))
 
     def get_all_categories(self) -> List[str]:
-        """Get all registered categories.
-
-        Returns:
-            List of unique category names
-        """
-        return list(self._category_index.keys())
+        return sorted(self._delegate.get_all_categories())
 
     def get_all_keywords(self) -> List[str]:
-        """Get all registered keywords.
-
-        Returns:
-            List of unique keywords
-        """
-        return list(self._keyword_index.keys())
+        return sorted(self._delegate.get_all_keywords())
 
     def search_tools(self, query: str) -> List[str]:
-        """Search for tools matching a query string.
-
-        Searches across tool names, categories, and keywords.
-
-        Args:
-            query: Search query
-
-        Returns:
-            List of matching tool names (deduplicated)
-        """
         query_lower = query.lower()
         matches = set()
 
-        # Direct name match
-        for tool_name in self._metadata_cache:
+        for tool_name in self._delegate.get_all_tool_names():
             if query_lower in tool_name.lower():
                 matches.add(tool_name)
 
-        # Keyword match
-        for keyword, tool_names in self._keyword_index.items():
-            if query_lower in keyword:
-                matches.update(tool_names)
+        matches.update(self._delegate.get_tools_matching_text(query))
 
-        # Category match
-        for category, tool_names in self._category_index.items():
+        for category in self._delegate.get_all_categories():
             if query_lower in category.lower():
-                matches.update(tool_names)
+                matches.update(self._delegate.get_tools_by_category(category))
 
-        return list(matches)
+        return sorted(matches)
 
     def export_all(self) -> Dict[str, Dict[str, Any]]:
-        """Export all metadata as dictionaries.
-
-        Useful for debugging, analysis, or generating tool_knowledge.yaml.
-
-        Returns:
-            Dictionary mapping tool names to metadata dicts
-        """
-        return {name: metadata.to_dict() for name, metadata in self._metadata_cache.items()}
+        return {name: metadata.to_dict() for name, metadata in self.get_all_metadata().items()}
 
     def get_statistics(self) -> Dict[str, Any]:
-        """Get statistics about registered tools and metadata.
-
-        Returns:
-            Dictionary with statistics
-        """
-        total_tools = len(self._metadata_cache)
-        tools_with_explicit_metadata = sum(
-            1
-            for m in self._metadata_cache.values()
-            if m.category and m.keywords  # Non-empty = likely explicit
-        )
-
-        return {
-            "total_tools": total_tools,
-            "tools_with_explicit_metadata": tools_with_explicit_metadata,
-            "tools_with_auto_metadata": total_tools - tools_with_explicit_metadata,
-            "total_categories": len(self._category_index),
-            "total_keywords": len(self._keyword_index),
-            "categories": list(self._category_index.keys()),
-        }
+        return self._delegate.get_statistics()
 
     def get_category_tools_map(self) -> Dict[str, List[str]]:
-        """Get mapping of categories to tool names.
-
-        This method returns a dictionary in the same format as the legacy
-        TOOL_CATEGORIES constant, enabling migration from hardcoded categories
-        to dynamic metadata-based categories.
-
-        Returns:
-            Dictionary mapping category names to lists of tool names
-        """
-        return {category: list(tools) for category, tools in self._category_index.items()}
+        return {
+            category: sorted(self._delegate.get_tools_by_category(category))
+            for category in self._delegate.get_all_categories()
+        }
 
     def get_tools_for_task_type(self, task_type: str) -> List[str]:
-        """Get relevant tools for a task type.
+        matched = self._delegate.get_tools_by_task_type(task_type)
+        if matched:
+            return sorted(matched)
 
-        Maps high-level task types to appropriate categories and returns
-        the combined list of tools.
-
-        Args:
-            task_type: Task type (edit, search, analyze, design, create, general)
-
-        Returns:
-            List of relevant tool names for the task type
-        """
-        # Task type to category mappings
         task_category_mapping = {
             "edit": ["filesystem", "code", "refactoring", "git"],
             "search": ["search", "code", "code_intel"],
@@ -751,12 +577,8 @@ class ToolMetadataRegistry:
             "general": ["filesystem", "code", "search"],
         }
 
-        # Get categories for this task type
         categories = task_category_mapping.get(task_type, ["filesystem", "code"])
-
-        # Collect tools from all relevant categories
         tools = set()
         for category in categories:
-            tools.update(self.get_tools_by_category(category))
-
-        return list(tools)
+            tools.update(self._delegate.get_tools_by_category(category))
+        return sorted(tools)

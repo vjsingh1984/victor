@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from victor.providers.huggingface_provider import HuggingFaceProvider, HUGGINGFACE_MODELS
+from victor.providers.huggingface_provider import (
+    HuggingFaceProvider,
+    HUGGINGFACE_MODELS,
+)
 
 
 class TestHuggingFaceProviderInitialization:
@@ -64,7 +67,8 @@ class TestHuggingFaceProviderInitialization:
     def test_hf_token_priority_over_huggingface_api_key(self):
         """Test HF_TOKEN takes priority over HUGGINGFACE_API_KEY."""
         with patch.dict(
-            "os.environ", {"HF_TOKEN": "primary_token", "HUGGINGFACE_API_KEY": "secondary_key"}
+            "os.environ",
+            {"HF_TOKEN": "primary_token", "HUGGINGFACE_API_KEY": "secondary_key"},
         ):
             provider = HuggingFaceProvider()
             assert provider._api_key == "primary_token"

@@ -236,6 +236,20 @@ class AzureOpenAIProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Azure OpenAI automatic caching (50-75% discount, 1024 min tokens, 10m TTL)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Azure OpenAI reuses KV cache for matching prompt prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import AZURE_OPENAI, AZURE_OPENAI_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(AZURE_OPENAI, target, AZURE_OPENAI_DEFAULT)
+
     def _get_deployment_url(
         self, model_or_deployment: str, endpoint_type: str = "chat/completions"
     ) -> str:
@@ -378,7 +392,7 @@ class AzureOpenAIProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                            tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                             stop_reason="stop",
                             is_final=True,
                         )

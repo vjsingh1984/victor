@@ -27,7 +27,8 @@ from typing import Any, Dict, List, Optional, Type, TYPE_CHECKING
 from victor.core.aot_manifest import AOTManifestManager
 from victor.core.container import ServiceContainer, get_container
 from victor.core.plugins.protocol import VictorPlugin
-from victor.framework.module_loader import get_entry_point_cache
+from victor.core.registry import SingletonRegistry
+from victor.framework.entry_point_registry import get_entry_point_values
 
 if TYPE_CHECKING:
     from victor.core.plugins.context import HostPluginContext
@@ -135,40 +136,35 @@ class _ExternalPluginAdapter:
         }
 
 
-class PluginRegistry:
+# CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+# PluginRegistry is the single authority for "installed Victor plugins + their verticals".
+# VerticalLoader, VerticalRegistryManager, UnifiedVerticalRegistry, and bootstrap
+# capability discovery all read from it via get_vertical_classes() / list_plugins().
+class PluginRegistry(SingletonRegistry["PluginRegistry"]):
     """Registry for discovering and managing Victor plugins.
 
     Discovers plugins via the 'victor.plugins' entry point group
     and optionally from external manifest-based plugins.
     """
 
-    _instance: Optional[PluginRegistry] = None
-    _lock = threading.Lock()
     ENTRY_POINT_GROUP = "victor.plugins"
     AOT_GROUPS = ["victor.plugins"]
 
     def __init__(self) -> None:
         """Initialize registry."""
+        super().__init__()
         self._plugins: Dict[str, VictorPlugin] = {}
         self._context: Optional[HostPluginContext] = None
         self._discovered = False
-
-    @classmethod
-    def get_instance(cls) -> PluginRegistry:
-        """Get the singleton instance of PluginRegistry."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = PluginRegistry()
-        return cls._instance
+        self._vertical_classes: Optional[Dict[str, Type[Any]]] = None
 
     def discover(self, force: bool = False) -> List[VictorPlugin]:
         """Discover and load plugins from entry points.
 
         Uses a three-tier discovery strategy:
         1. AOT manifest (O(1) file read, fastest)
-        2. EntryPointCache (memory/disk cache with env hash)
-        3. Full entry_points() scan (slowest, updates caches)
+        2. Shared entry-point registry helpers (single-pass scan, process cache)
+        3. Registry invalidation on forced refresh
 
         Args:
             force: Whether to force re-discovery.
@@ -179,6 +175,10 @@ class PluginRegistry:
         if self._discovered and not force:
             return list(self._plugins.values())
 
+        # Invalidate derived caches on forced refresh.
+        if force:
+            self._vertical_classes = None
+
         # Try AOT manifest fast-path (skip when forcing refresh)
         aot_entries = None
         if not force:
@@ -187,8 +187,7 @@ class PluginRegistry:
         if aot_entries is not None:
             ep_entries = aot_entries.get(self.ENTRY_POINT_GROUP, {})
         else:
-            cache = get_entry_point_cache()
-            ep_entries = cache.get_entry_points(self.ENTRY_POINT_GROUP, force_refresh=force)
+            ep_entries = get_entry_point_values(self.ENTRY_POINT_GROUP, force=force)
 
         for name, value in ep_entries.items():
             try:
@@ -401,3 +400,58 @@ class PluginRegistry:
             )
 
         return sorted(entries, key=lambda e: e["name"])
+
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+    def get_vertical_classes(self) -> Dict[str, Type[Any]]:
+        """Return the vertical classes each discovered plugin registers.
+
+        The single authority for "which plugin provides which vertical". Uses a
+        capture-only PluginContext (no side effects) so VerticalLoader,
+        VerticalRegistryManager, and bootstrap capability discovery can read
+        the same materialized result without repeating entry-point scans or
+        re-instantiating plugins.
+
+        Returns:
+            Mapping from vertical name to the SDK ``VerticalBase`` subclass
+            the plugin registered.
+        """
+        if self._vertical_classes is not None:
+            return dict(self._vertical_classes)
+
+        # Ensure plugins are instantiated; avoid forcing a re-scan.
+        if not self._discovered:
+            self.discover()
+
+        try:
+            from victor_sdk.discovery import collect_verticals_from_candidate
+        except ImportError:
+            logger.debug("victor_sdk.discovery not importable; skipping vertical capture")
+            self._vertical_classes = {}
+            return {}
+
+        result: Dict[str, Type[Any]] = {}
+        for plugin_name, plugin in self._plugins.items():
+            if isinstance(plugin, _ExternalPluginAdapter):
+                # External subprocess plugins don't provide SDK verticals.
+                continue
+            try:
+                for vertical_name, vertical_cls in collect_verticals_from_candidate(plugin).items():
+                    # First plugin to register wins; emit a warning on collision.
+                    if vertical_name in result and result[vertical_name] is not vertical_cls:
+                        logger.warning(
+                            "Vertical name collision on '%s': keeping %s, ignoring %s",
+                            vertical_name,
+                            result[vertical_name].__name__,
+                            vertical_cls.__name__,
+                        )
+                        continue
+                    result[vertical_name] = vertical_cls
+            except Exception as exc:
+                logger.debug(
+                    "Failed to collect verticals from plugin '%s': %s",
+                    plugin_name,
+                    exc,
+                )
+
+        self._vertical_classes = result
+        return dict(result)

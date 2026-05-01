@@ -198,7 +198,11 @@ class EnvironmentSetup:
 
         # Check for requirements-dev.txt
         if config.install_dev_deps:
-            for dev_req in ["requirements-dev.txt", "requirements_dev.txt", "dev-requirements.txt"]:
+            for dev_req in [
+                "requirements-dev.txt",
+                "requirements_dev.txt",
+                "dev-requirements.txt",
+            ]:
                 if (project_dir / dev_req).exists():
                     install_cmds.append(f"{sys.executable} -m pip install -r {dev_req}")
                     break

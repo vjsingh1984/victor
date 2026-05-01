@@ -136,6 +136,109 @@ class TestAsyncWrappers:
         assert "total_outcomes" in stats
         assert "learner_count" in stats
 
+    @pytest.mark.asyncio
+    async def test_create_prompt_rollout_experiment_async(self, coordinator: RLCoordinator) -> None:
+        """Test async prompt rollout creation offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "create_prompt_rollout_experiment",
+            return_value="prompt_exp_123",
+        ) as create_mock:
+            experiment_id = await coordinator.create_prompt_rollout_experiment_async(
+                section_name="GROUNDING_RULES",
+                provider="ollama",
+                treatment_hash="candidate123",
+                traffic_split=0.2,
+                min_samples_per_variant=25,
+            )
+
+        assert experiment_id == "prompt_exp_123"
+        create_mock.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="candidate123",
+            control_hash=None,
+            traffic_split=0.2,
+            min_samples_per_variant=25,
+        )
+
+    @pytest.mark.asyncio
+    async def test_analyze_prompt_rollout_experiment_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
+        """Test async prompt rollout analysis offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "analyze_prompt_rollout_experiment",
+            return_value={"auto_action": "rollout"},
+        ) as analyze_mock:
+            report = await coordinator.analyze_prompt_rollout_experiment_async(
+                section_name="GROUNDING_RULES",
+                provider="ollama",
+                treatment_hash="candidate123",
+            )
+
+        assert report == {"auto_action": "rollout"}
+        analyze_mock.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="candidate123",
+        )
+
+    @pytest.mark.asyncio
+    async def test_apply_prompt_rollout_recommendation_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
+        """Test async prompt rollout decision application offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "apply_prompt_rollout_recommendation",
+            return_value={"action": "rollout", "applied": True},
+        ) as apply_mock:
+            decision = await coordinator.apply_prompt_rollout_recommendation_async(
+                section_name="GROUNDING_RULES",
+                provider="ollama",
+                treatment_hash="candidate123",
+                dry_run=True,
+            )
+
+        assert decision == {"action": "rollout", "applied": True}
+        apply_mock.assert_called_once_with(
+            section_name="GROUNDING_RULES",
+            provider="ollama",
+            treatment_hash="candidate123",
+            dry_run=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_process_prompt_candidate_evaluation_suite_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
+        """Test async suite workflow helper offloads to thread pool."""
+        with patch.object(
+            coordinator,
+            "process_prompt_candidate_evaluation_suite",
+            return_value={"prompt_rollout": {"created": True}},
+        ) as workflow_mock:
+            workflow = await coordinator.process_prompt_candidate_evaluation_suite_async(
+                {"runs": []},
+                create_rollout=True,
+            )
+
+        assert workflow == {"prompt_rollout": {"created": True}}
+        workflow_mock.assert_called_once_with(
+            {"runs": []},
+            min_pass_rate=0.5,
+            promote_best=False,
+            create_rollout=True,
+            rollout_control_hash=None,
+            rollout_traffic_split=0.1,
+            rollout_min_samples_per_variant=100,
+            analyze_rollout=False,
+            apply_rollout_decision=False,
+            rollout_decision_dry_run=False,
+        )
+
 
 class TestAsyncSingleton:
     """Tests for async singleton getter."""

@@ -19,7 +19,16 @@ Defines the interface for error recovery and resilience operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from enum import Enum
@@ -87,14 +96,11 @@ class RecoveryContext(Protocol):
 
 @runtime_checkable
 class RecoveryServiceProtocol(Protocol):
-    """Protocol for error recovery and resilience service.
+    """[CANONICAL] Protocol for error recovery and resilience service.
 
-    Handles:
-    - Error classification and analysis
-    - Recovery action selection
-    - Automatic retry with exponential backoff
-    - Circuit breaker management
-    - Recovery metrics and tracking
+    This protocol represents the target architecture for recovery operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on recovery-related operations.
@@ -229,6 +235,97 @@ class RecoveryServiceProtocol(Protocol):
                     # Give up
                     raise
         """
+        ...
+
+    def should_attempt_recovery(
+        self,
+        error_type: str,
+        consecutive_failures: int = 0,
+    ) -> bool:
+        """Check whether recovery should be attempted for the given error type."""
+        ...
+
+    async def handle_recovery_with_integration(
+        self,
+        ctx: Any,
+        full_content: str,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        mentioned_tools: Optional[List[str]] = None,
+        message_adder: Any = None,
+    ) -> Any:
+        """Handle streaming recovery through the canonical runtime path."""
+        ...
+
+    def apply_recovery_action(
+        self,
+        recovery_action: Any,
+        ctx: Any,
+        message_adder: Any = None,
+    ) -> Any:
+        """Apply a recovery action through the canonical runtime path."""
+        ...
+
+    def check_natural_completion(
+        self,
+        ctx: Any,
+        has_tool_calls: bool,
+        content_length: int,
+    ) -> Any:
+        """Check whether the current streaming turn should terminate naturally."""
+        ...
+
+    def handle_empty_response(
+        self,
+        ctx: Any,
+    ) -> Any:
+        """Handle an empty model response during streaming."""
+        ...
+
+    def get_recovery_fallback_message(
+        self,
+        ctx: Any,
+    ) -> str:
+        """Get the fallback recovery message for streaming."""
+        ...
+
+    def check_tool_budget(
+        self,
+        ctx: Any,
+        warning_threshold: int = 250,
+    ) -> Any:
+        """Check whether the streaming tool budget is approaching exhaustion."""
+        ...
+
+    def truncate_tool_calls(
+        self,
+        ctx: Any,
+        tool_calls: List[Dict[str, Any]],
+        max_calls: int,
+    ) -> Any:
+        """Truncate tool calls to the allowed budget."""
+        ...
+
+    def filter_blocked_tool_calls(
+        self,
+        ctx: Any,
+        tool_calls: List[Dict[str, Any]],
+    ) -> Any:
+        """Filter tool calls that are blocked by runtime safeguards."""
+        ...
+
+    def check_blocked_threshold(
+        self,
+        ctx: Any,
+        all_blocked: bool,
+    ) -> Any:
+        """Check whether blocked-tool thresholds require recovery action."""
+        ...
+
+    def check_force_action(
+        self,
+        ctx: Any,
+    ) -> Any:
+        """Check whether recovery should force a follow-up action."""
         ...
 
     def get_recovery_metrics(self) -> Dict[str, Any]:

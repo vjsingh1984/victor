@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence
 from victor.framework.prompt_builder import PromptBuilder
 
 if TYPE_CHECKING:
-    from victor.agent.prompt_coordinator import TaskContext
+    from victor.agent.services.prompt_runtime import PromptRuntimeContext as TaskContext
 
 # Default prompt fragments used when contributors fail to populate sections.
 DEFAULT_VICTOR_IDENTITY = (
@@ -90,7 +90,7 @@ class SystemPromptPolicy:
             )
 
         if self._config.enforce_unique_sections:
-            self._deduplicate_sections(builder)
+            builder.deduplicate_sections()
 
         if self._config.max_section_chars:
             builder.trim_sections_by_priority(
@@ -124,21 +124,6 @@ class SystemPromptPolicy:
             provider=provider,
         )
 
-    def _deduplicate_sections(self, builder: PromptBuilder) -> None:
-        """Remove duplicate or empty sections to keep prompts lean."""
-        seen_content: set[str] = set()
-        for name, section in list(builder.iter_named_sections()):
-            normalized = " ".join(section.content.split())
-            if not normalized:
-                builder.remove_section(name)
-                continue
-
-            key = normalized.lower()
-            if key in seen_content:
-                builder.remove_section(name)
-            else:
-                seen_content.add(key)
-
 
 def create_policy_from_settings(settings: Optional[Any]) -> SystemPromptPolicy:
     """Create a SystemPromptPolicy using VictorSettings or similar config objects."""
@@ -161,7 +146,8 @@ def create_policy_from_settings(settings: Optional[Any]) -> SystemPromptPolicy:
         enforce_identity=_get("prompt_policy_enforce_identity", base_config.enforce_identity),
         enforce_guidelines=_get("prompt_policy_enforce_guidelines", base_config.enforce_guidelines),
         enforce_operating_preamble=_get(
-            "prompt_policy_enforce_operating_preamble", base_config.enforce_operating_preamble
+            "prompt_policy_enforce_operating_preamble",
+            base_config.enforce_operating_preamble,
         ),
         enforce_unique_sections=_get(
             "prompt_policy_enforce_unique_sections", base_config.enforce_unique_sections

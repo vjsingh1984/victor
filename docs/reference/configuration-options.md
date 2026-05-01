@@ -21,7 +21,7 @@ settings.resilience.circuit_breaker_failure_threshold  # 5
 settings.security.write_approval_mode  # "risky_only"
 settings.search.codebase_vector_store  # "lancedb"
 settings.events.event_backend_type     # "in_memory"
-settings.pipeline.intelligent_pipeline_enabled  # True
+settings.pipeline.runtime_intelligence_enabled  # True
 ```
 
 | Config Group | Fields | Purpose |
@@ -32,7 +32,7 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 | `ResilienceSettings` | 17 | Circuit breaker, retry, rate limiting |
 | `SecuritySettings` | 19 | Server security, sandboxing, approval |
 | `EventSettings` | 24 | Event system backend and configuration |
-| `PipelineSettings` | 30+ | Intelligent pipeline, quality scoring, recovery |
+| `PipelineSettings` | 30+ | Runtime intelligence, evaluation, recovery, and compatibility aliases |
 
 ## Configuration Files
 
@@ -102,13 +102,25 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 
 ## Tool Settings
 
-### Tool Execution
+All tool settings are under the `tools` config group (`settings.tools.*`).
+
+### Tool Execution & Budgets
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `tool_call_budget` | `500` | Maximum tool calls per session |
-| `tool_call_budget_warning_threshold` | `400` | Warn when approaching budget |
-| `fallback_max_tools` | `8` | Cap tool list when stage pruning removes all |
+| `tool_call_budget` | `2000` | Maximum tool calls per session (hard limit) |
+| `tool_call_budget_warning_threshold` | `1800` | Warn when approaching budget (90%) |
+| `fallback_max_tools` | `8` | Cap tool list broadcast to LLM per turn (1-20, CI-guarded) |
+
+Task-based budgets override the default based on detected complexity:
+
+| Task Type | Budget | Description |
+|-----------|--------|-------------|
+| simple | 20 | Quick queries, single file edits |
+| medium | 50 | Multi-file analysis, refactoring |
+| complex | 100 | Architecture changes, migrations |
+| action | 200 | Building features, large refactors |
+| analysis | 500 | Deep codebase exploration, audits |
 
 ### Tool Retry
 
@@ -116,16 +128,31 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 |---------|---------|-------------|
 | `tool_retry_enabled` | `True` | Enable automatic retry for failed tools |
 | `tool_retry_max_attempts` | `3` | Maximum retry attempts per tool |
-| `tool_retry_base_delay` | `1.0` | Base delay in seconds |
+| `tool_retry_base_delay` | `1.0` | Base delay in seconds (exponential backoff) |
 | `tool_retry_max_delay` | `10.0` | Maximum delay between retries |
 
-### Tool Caching
+### Tool Result Caching
+
+Three independent caching layers prevent redundant tool execution:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `tool_cache_enabled` | `True` | Enable tool result caching |
-| `tool_cache_ttl` | `600` | Cache TTL in seconds |
-| `tool_cache_allowlist` | `["code_search", ...]` | Tools eligible for caching |
+| `tool_cache_enabled` | `True` | Enable persistent tool result caching |
+| `tool_cache_ttl` | `600` | Persistent cache TTL in seconds (10 min) |
+| `tool_cache_allowlist` | `["code_search", ...]` | Tools eligible for persistent caching |
+| `generic_result_cache_enabled` | `False` | Enable generic result cache |
+| `generic_result_cache_ttl` | `300` | Generic result cache TTL in seconds |
+
+**Idempotent cache** (session-level, always active): LRU cache with 50 entries and 5-min TTL for read-only tools (`read`, `ls`, `code_search`, `grep`, `graph`, `glob`). Prevents re-reading same files within a session.
+
+**Cross-turn dedup** (session-level, configurable):
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `cross_turn_dedup_enabled` | `True` | Cache results for "effectively idempotent" tools across turns |
+| `cross_turn_dedup_ttl` | `300` | Cross-turn dedup cache TTL in seconds (5 min) |
+
+Covers tools that produce identical results for identical args within a session window but aren't classified as strictly idempotent: `web_search`, `web_fetch`, `http_request`, `grep_search`, `plan_files`, `git`. Prevents re-executing the same search or git command 2-3 turns later.
 
 ### Tool Validation
 
@@ -133,12 +160,12 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 |---------|---------|-------------|
 | `tool_validation_mode` | `lenient` | Validation mode: `strict`, `lenient`, `off` |
 
-### Tool Deduplication
+### Tool Deduplication (Batch-Level)
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `enable_tool_deduplication` | `True` | Prevent redundant tool calls |
-| `tool_deduplication_window_size` | `20` | Number of recent calls to track |
+| `enable_tool_deduplication` | `True` | Prevent duplicate tool calls within a single batch |
+| `tool_deduplication_window_size` | `20` | Number of recent calls to track for dedup |
 
 ### Tool Selection (Semantic)
 
@@ -147,6 +174,66 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 | `use_semantic_tool_selection` | `True` | Use embeddings for tool selection |
 | `embedding_provider` | `sentence-transformers` | Embedding provider |
 | `embedding_model` | `BAAI/bge-small-en-v1.5` | Embedding model |
+| `tool_selection_cache_enabled` | `True` | Cache semantic selection results across turns |
+| `tool_selection_cache_ttl` | `300` | Selection cache TTL in seconds (5 min) |
+
+Adaptive selection adjusts thresholds by model size:
+
+| Model Size | Similarity Threshold | Max Tools |
+|-----------|---------------------|-----------|
+| tiny (0.5B-3B) | 0.35 | 5 |
+| small (7B-8B) | 0.25 | 7 |
+| medium (13B-15B) | 0.20 | 10 |
+| large (30B+) | 0.15 | 12 |
+| cloud (Claude/GPT) | 0.18 | 10 |
+
+### Tool Schema Broadcasting
+
+Victor uses a three-tier schema system to reduce token cost when broadcasting tool definitions to the LLM. Tools are sent via the provider's native `tools` parameter at varying verbosity levels.
+
+**Schema levels:**
+
+| Level | ~Tokens | Max Desc | Max Param Desc | Optional Params | Usage |
+|-------|---------|----------|----------------|-----------------|-------|
+| FULL | 125 | 500 chars | 100 chars | Yes | Mandatory tools (read, write, shell) |
+| COMPACT | 70 | 150 chars | 50 chars | Yes | Vertical core + stage-specific tools |
+| STUB | 32 | 80 chars | 25 chars | No (required only) | Semantic pool + MCP tools |
+
+**Token budget and schema promotion:**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `max_tool_schema_tokens` | `4000` | Max tokens for all tool schemas combined. Enforced by demoting COMPACT→STUB then dropping tail STUBs. Set `0` to disable. |
+| `schema_promotion_threshold` | `0.8` | Semantic similarity above which STUB tools are promoted to COMPACT for richer schemas |
+
+With `fallback_max_tools=8`, typical token usage is ~650 (3 FULL + 3 COMPACT + 2 STUB). The 4000 budget is a safety net that only activates with large registries (30+ tools). The tiered system, KV cache ordering, and Anthropic cache boundaries all function regardless of this budget setting.
+
+```yaml
+# Example: conservative token budget for small context models
+tools:
+  max_tool_schema_tokens: 2500
+  schema_promotion_threshold: 0.85
+  fallback_max_tools: 6
+```
+
+### MCP Tool Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `max_mcp_tools_per_turn` | `12` | Max MCP tools broadcast when relevance filtering is active |
+
+MCP tools are registered at STUB schema level by default. When `MCPToolProjector.project()` is called with a `user_message`, only tools whose name/description match the query are included, capped at this limit. Without a user message, all MCP tools are included (backward compatible).
+
+### Parallel Tool Execution
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `enable_parallel_execution` | `True` | Enable parallel tool execution |
+| `max_concurrent_tools` | `5` | Maximum concurrent tool calls |
+| `parallel_batch_size` | `10` | Batch size for parallel execution |
+| `parallel_timeout_per_tool` | `60.0` | Timeout per tool in parallel batch (seconds) |
+
+Writes to different files parallelize automatically via a per-file dependency graph. Same-file writes serialize. Reads that depend on a prior write to the same file wait for the write to complete. Writes with no extractable file path conservatively serialize against all prior writes.
 
 ---
 
@@ -228,6 +315,35 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 |---------|---------|-------------|
 | `max_context_tokens` | `100000` | Maximum tokens in context window |
 | `response_token_reserve` | `4096` | Tokens reserved for model response |
+
+### Cache & KV Prefix Optimization
+
+These settings control how Victor optimizes for provider-level prompt caching (API billing discounts) and KV prefix stability (latency savings). They live under `context`:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `cache_optimization_enabled` | `True` | API prompt caching: lock all tools at session start for billing discount (90% on Anthropic, 50% on DeepSeek) |
+| `kv_optimization_enabled` | `True` | KV prefix stability: freeze system prompt, sort tools deterministically for prefix matching |
+| `kv_tool_strategy` | `per_turn` | Tool selection strategy for KV providers: `per_turn` (fresh selection, breaks prefix) or `session_stable` (lock after first query, stable prefix) |
+| `tiered_schema_enabled` | `True` | Enable FULL/COMPACT/STUB schema levels for tiered broadcasting |
+| `tool_approval_mode` | `auto` | HITL tool approval: `auto` (all approved), `dangerous` (MEDIUM+ require approval), `all` (every call) |
+
+**How they interact:**
+
+| Provider Type | API Cache | KV Cache | Tool Strategy |
+|--------------|-----------|----------|---------------|
+| Cloud (Anthropic, OpenAI, DeepSeek) | Yes — 90% discount | Yes — latency savings | Session-locked (full set cached) |
+| Local (Ollama, LMStudio, vLLM) | No | Yes — KV prefix stability | Configurable (`per_turn` or `session_stable`) |
+| Unknown/custom | No | No | Fresh selection each turn |
+
+The system prompt is **frozen** after first build for providers that support caching (Tier A/B). Dynamic content (skills, reminders, credit guidance) is injected into the **user message** instead, keeping the system prompt byte-identical across turns.
+
+```yaml
+# Example: disable KV optimization for debugging
+context:
+  kv_optimization_enabled: false
+  kv_tool_strategy: per_turn
+```
 
 ### Context Compaction
 
@@ -386,11 +502,17 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 
 ---
 
-## Intelligent Pipeline
+## Runtime Intelligence And Evaluation
+
+These settings live under `settings.pipeline.*`. The canonical enablement flag
+is `runtime_intelligence_enabled`; several related compatibility aliases retain
+the older "intelligent pipeline" wording for backward compatibility even though
+the live runtime now flows through the service-owned chat runtime and
+`StreamingChatExecutor`.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `intelligent_pipeline_enabled` | `True` | Master switch |
+| `runtime_intelligence_enabled` | `True` | Master switch for runtime-intelligence features on the live chat/runtime path |
 | `intelligent_quality_scoring` | `True` | Enable quality scoring |
 | `intelligent_mode_learning` | `True` | Enable Q-learning for modes |
 | `intelligent_prompt_optimization` | `True` | Enable prompt optimization |

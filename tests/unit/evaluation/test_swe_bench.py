@@ -17,6 +17,7 @@
 Tests for SWE-bench, HumanEval, and MBPP benchmark runners.
 """
 
+import logging
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
@@ -26,7 +27,7 @@ from victor.evaluation.benchmarks.swe_bench import (
     HumanEvalRunner,
     MBPPRunner,
 )
-from victor.evaluation.protocol import BenchmarkType, EvaluationConfig, TaskStatus
+from victor.evaluation.protocol import BenchmarkType, EvaluationConfig, TaskResult, TaskStatus
 
 # =============================================================================
 # SWEBenchRunner Tests
@@ -301,6 +302,76 @@ class TestRunTaskErrorHandling:
 
             assert result.status == TaskStatus.ERROR
             assert "Setup failed" in result.error_message
+
+    @pytest.mark.asyncio
+    async def test_cached_repo_success_logs_test_output_at_debug_only(self, tmp_path, caplog):
+        """Passing test output should not pollute INFO logs."""
+        runner = SWEBenchRunner()
+        task = MagicMock()
+        task.task_id = "test-1"
+        task.base_commit = None
+        task.test_code = None
+        task.repo = None
+
+        result = TaskResult(task_id="test-1", status=TaskStatus.RUNNING, generated_code="diff")
+        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test")
+        cached_repo = tmp_path / "repo"
+        cached_repo.mkdir()
+        diff_patch = (
+            "diff --git a/file.py b/file.py\n"
+            "--- a/file.py\n"
+            "+++ b/file.py\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+
+        apply_proc = MagicMock()
+        apply_proc.returncode = 0
+        apply_proc.communicate = AsyncMock(return_value=(b"", b""))
+
+        test_proc = MagicMock()
+        test_proc.communicate = AsyncMock(
+            return_value=(
+                b"astropy/test_example.py::test_ok PASSED\n================ 1 passed in 0.10s ================\n",
+                b"",
+            )
+        )
+
+        runner_config = MagicMock()
+        runner_config.command = ["python", "-m", "pytest", "astropy/test_example.py"]
+        runner_config.env = {}
+        runner_config.runner_type = "pytest"
+
+        caplog.set_level(logging.DEBUG, logger="victor.evaluation.benchmarks.swe_bench")
+
+        with (
+            patch(
+                "asyncio.create_subprocess_exec",
+                side_effect=[apply_proc, test_proc],
+            ),
+            patch(
+                "victor.context.test_runner.detect_test_runner",
+                return_value=runner_config,
+            ),
+        ):
+            updated = await runner._run_tests_in_cached_repo(
+                task,
+                result,
+                diff_patch,
+                cached_repo,
+                config,
+            )
+
+        assert updated.status == TaskStatus.PASSED
+        assert any(
+            record.levelno == logging.DEBUG and "Test stdout (last 500)" in record.message
+            for record in caplog.records
+        )
+        assert not any(
+            record.levelno == logging.INFO and "Test stdout (last 500)" in record.message
+            for record in caplog.records
+        )
 
 
 # =============================================================================

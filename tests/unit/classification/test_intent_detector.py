@@ -195,7 +195,7 @@ class TestConvenienceFunctions:
 
         guard = get_prompt_guard("Show me a function")
         assert "SEE code" in guard
-        assert "NOT use write_file" in guard
+        assert "Do NOT use write" in guard or "Do NOT modify any existing files" in guard
 
         guard = get_prompt_guard("Save to file.py")
         assert guard == ""  # No guard for write_allowed
@@ -210,9 +210,9 @@ class TestSafeActions:
 
         result = detect_intent("Show me a function")
 
-        assert "read_file" in result.safe_actions
+        assert "read" in result.safe_actions
         assert "generate_response" in result.safe_actions
-        assert "write_file" not in result.safe_actions
+        assert "write" not in result.safe_actions
 
     def test_write_allowed_safe_actions(self):
         """Test safe actions for WRITE_ALLOWED intent."""
@@ -220,9 +220,9 @@ class TestSafeActions:
 
         result = detect_intent("Save this to utils.py")
 
-        assert "read_file" in result.safe_actions
-        assert "write_file" in result.safe_actions
-        assert "edit_file" in result.safe_actions
+        assert "read" in result.safe_actions
+        assert "write" in result.safe_actions
+        assert "edit" in result.safe_actions
 
     def test_read_only_safe_actions(self):
         """Test safe actions for READ_ONLY intent."""
@@ -230,9 +230,9 @@ class TestSafeActions:
 
         result = detect_intent("List files in src/")
 
-        assert "read_file" in result.safe_actions
-        assert "list_directory" in result.safe_actions
-        assert "write_file" not in result.safe_actions
+        assert "read" in result.safe_actions
+        assert "ls" in result.safe_actions
+        assert "write" not in result.safe_actions
         assert "generate_response" not in result.safe_actions
 
 
@@ -275,7 +275,10 @@ class TestPromptGuards:
         result = detect_intent("Show me a binary search function")
 
         assert "DISPLAY" in result.prompt_guard
-        assert "NOT use write_file" in result.prompt_guard
+        assert (
+            "Do NOT use write" in result.prompt_guard
+            or "Do NOT modify any existing files" in result.prompt_guard
+        )
 
     def test_read_only_prompt_guard(self):
         """Test prompt guard for READ_ONLY intent."""

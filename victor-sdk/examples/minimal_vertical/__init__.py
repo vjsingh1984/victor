@@ -6,8 +6,8 @@ that only depends on victor-sdk (protocols only).
 
 from victor_sdk import PluginContext, VictorPlugin
 from victor_sdk.verticals.protocols.base import VerticalBase
-from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider
-from victor_sdk.core.types import Tier
+from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider  # noqa: F401
+from victor_sdk.core.types import Tier  # noqa: F401
 
 
 class MinimalVertical(VerticalBase):

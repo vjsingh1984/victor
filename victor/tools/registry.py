@@ -14,16 +14,36 @@
 
 """Tool registry for managing available tools."""
 
+import logging
 import threading
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from victor.tools.registration.strategies import ToolRegistrationStrategy
     from victor.tools.registration.registry import ToolRegistrationStrategyRegistry
+
+
+# Type alias: Any at runtime, BaseTool for type-checkers
+# This avoids circular import while preserving type safety
+_ToolType = Any  # Runtime: avoid circular import
+if TYPE_CHECKING:
+    _ToolType = "BaseTool"
 
 
 class HookError(Exception):
@@ -70,7 +90,7 @@ class Hook:
         return self.callback(*args, **kwargs)
 
 
-class ToolRegistry(BaseRegistry[str, Any]):
+class ToolRegistry(BaseRegistry[str, _ToolType]):
     """Registry for managing available tools.
 
     Extends BaseRegistry to provide tool-specific functionality including:
@@ -107,6 +127,33 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._batch_mode: bool = False
         self._batch_dirty: bool = False
 
+        # Tool deduplication (optional, based on settings)
+        self._deduplicator: Optional[Any] = None
+        self._deduplication_enabled: bool = False
+        try:
+            from victor.config.tool_settings import get_tool_settings
+
+            tool_settings = get_tool_settings()
+            if tool_settings.enable_tool_deduplication:
+                from victor.tools.deduplication import (
+                    DeduplicationConfig,
+                    ToolDeduplicator,
+                )
+
+                config = DeduplicationConfig(
+                    enabled=tool_settings.enable_tool_deduplication,
+                    priority_order=tool_settings.deduplication_priority_order,
+                    whitelist=tool_settings.deduplication_whitelist,
+                    blacklist=tool_settings.deduplication_blacklist,
+                    strict_mode=tool_settings.deduplication_strict_mode,
+                    naming_enforcement=tool_settings.deduplication_naming_enforcement,
+                    semantic_similarity_threshold=tool_settings.deduplication_semantic_threshold,
+                )
+                self._deduplicator = ToolDeduplicator(config)
+                self._deduplication_enabled = True
+        except ImportError:
+            pass  # Deduplication not available
+
         # Strategy pattern support (when flag enabled)
         # Initialize strategy registry if flag is enabled
         self._strategy_registry: Optional["ToolRegistrationStrategyRegistry"] = None
@@ -134,6 +181,125 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """Setter for _tools alias."""
         self._items = value
 
+    def _extract_tool_name(self, tool: Any) -> str:
+        """Extract tool name from various tool types.
+
+        Args:
+            tool: Tool object (BaseTool, decorated function, etc.)
+
+        Returns:
+            Tool name
+        """
+        if hasattr(tool, "name"):
+            return tool.name
+        elif hasattr(tool, "__name__"):
+            return tool.__name__
+        else:
+            return str(tool)
+
+    def _should_register_tool(self, tool: Any, tool_name: str) -> bool:
+        """Check if tool should be registered based on deduplication rules.
+
+        Args:
+            tool: Tool to check
+            tool_name: Extracted tool name
+
+        Returns:
+            True if tool should be registered, False if it should be skipped
+        """
+        if not self._deduplication_enabled or not self._deduplicator:
+            return True
+
+        # Check if tool with same normalized name already exists
+        # Import here to avoid circular dependency
+
+        # Detect source of new tool
+        new_tool_source = self._detect_tool_source(tool)
+
+        # Check for existing tools with same normalized name
+        for existing_name, existing_tool in self._tools.items():
+            # Normalize names for comparison
+            if self._normalize_name(tool_name) == self._normalize_name(existing_name):
+                # Found a conflict - check priorities
+                existing_source = self._detect_tool_source(existing_tool)
+
+                # Compare sources (higher priority = should be kept)
+                if self._compare_sources(existing_source, new_tool_source) > 0:
+                    # Existing tool has higher priority, skip new tool
+                    logger.debug(
+                        f"Skipping '{tool_name}' (source={new_tool_source.value}) "
+                        f"in favor of '{existing_name}' (source={existing_source.value})"
+                    )
+                    return False
+
+        # No conflict or new tool has higher priority
+        return True
+
+    def _detect_tool_source(self, tool: Any) -> Any:
+        """Detect tool source from metadata or heuristics.
+
+        Args:
+            tool: Tool to analyze
+
+        Returns:
+            Detected ToolSource
+        """
+        # Import here to avoid circular dependency
+        from victor.tools.deduplication import ToolSource
+
+        # Check for source metadata
+        if hasattr(tool, "_tool_source"):
+            return ToolSource(tool._tool_source)
+
+        # Heuristic detection based on tool name
+        tool_name = self._extract_tool_name(tool).lower()
+
+        if tool_name.startswith("lgc_") or tool_name.startswith("langchain_"):
+            return ToolSource.LANGCHAIN
+        elif tool_name.startswith("mcp_"):
+            return ToolSource.MCP
+        elif tool_name.startswith("plg_"):
+            return ToolSource.PLUGIN
+        else:
+            return ToolSource.NATIVE
+
+    def _normalize_name(self, name: str) -> str:
+        """Normalize tool name for conflict detection.
+
+        Args:
+            name: Tool name to normalize
+
+        Returns:
+            Normalized name
+        """
+        normalized = name.lower()
+
+        # Remove source prefixes
+        for prefix in ["lgc_", "langchain_", "mcp_", "plg_", "plugin_"]:
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix) :]
+                break
+
+        # Normalize separators
+        normalized = normalized.replace("_", " ").replace("-", " ")
+
+        # Remove extra whitespace
+        normalized = " ".join(normalized.split())
+
+        return normalized
+
+    def _compare_sources(self, source1: Any, source2: Any) -> int:
+        """Compare two tool sources by priority.
+
+        Args:
+            source1: First tool source
+            source2: Second tool source
+
+        Returns:
+            Positive if source1 has higher priority, negative if source2 has higher priority, 0 if equal
+        """
+        return source1.priority_weight - source2.priority_weight
+
     def _invalidate_schema_cache(self) -> None:
         """Invalidate the schema cache by bumping the version counter.
 
@@ -156,7 +322,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         if isinstance(hook, Hook):
             return hook
         return Hook(
-            callback=hook, name=name or getattr(hook, "__name__", "hook"), critical=critical
+            callback=hook,
+            name=name or getattr(hook, "__name__", "hook"),
+            critical=critical,
         )
 
     def register_before_hook(
@@ -206,6 +374,10 @@ class ToolRegistry(BaseRegistry[str, Any]):
         this method uses the strategy pattern to automatically determine the
         appropriate registration strategy based on the tool type.
 
+        When tool deduplication is enabled, this method checks for conflicts
+        with already-registered tools and skips registration if a higher-priority
+        tool with the same normalized name exists.
+
         Args:
             *args: Either (tool,) or (key, value)
             enabled: Whether the tool is enabled by default (default: True)
@@ -219,9 +391,27 @@ class ToolRegistry(BaseRegistry[str, Any]):
             # Single argument: register(tool) - extract name automatically
             tool = args[0]
 
+            # Extract tool name for deduplication check
+            tool_name = self._extract_tool_name(tool)
+
+            # Check for conflicts with already-registered tools
+            if self._deduplication_enabled and not self._should_register_tool(tool, tool_name):
+                logger.debug(f"Tool '{tool_name}' skipped due to deduplication")
+                return
+
+            # LazyToolProxy — register directly (bypass strategy pattern)
+            if hasattr(tool, "is_loaded") and hasattr(tool, "execute"):
+                super().register(tool.name, tool)
+                self._tool_enabled[tool.name] = enabled
+                self._invalidate_schema_cache()
+                return
+
             # Check feature flag for strategy-based registration
             try:
-                from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+                from victor.core.feature_flags import (
+                    get_feature_flag_manager,
+                    FeatureFlag,
+                )
 
                 if get_feature_flag_manager().is_enabled(
                     FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
@@ -238,13 +428,23 @@ class ToolRegistry(BaseRegistry[str, Any]):
             elif isinstance(tool, self._BaseTool):  # It's a BaseTool instance
                 super().register(tool.name, tool)
                 self._tool_enabled[tool.name] = enabled
+            elif hasattr(tool, "name") and hasattr(tool, "execute"):
+                # LazyToolProxy or duck-typed tool with name + execute
+                super().register(tool.name, tool)
+                self._tool_enabled[tool.name] = enabled
             else:
                 raise TypeError(
-                    "Can only register BaseTool instances or functions decorated with @tool"
+                    "Can only register BaseTool instances, @tool functions, or LazyToolProxy"
                 )
         elif len(args) == 2:
             # Two arguments: register(key, value) - LSP-compatible
             key, value = args
+
+            # Check for conflicts with already-registered tools
+            if self._deduplication_enabled and not self._should_register_tool(value, key):
+                logger.debug(f"Tool '{key}' skipped due to deduplication")
+                return
+
             super().register(key, value)
             self._tool_enabled[key] = enabled
         else:
@@ -262,7 +462,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
             tool: Tool to register
             enabled: Whether tool is enabled
         """
-        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+        from victor.tools.registration.registry import (
+            get_tool_registration_strategy_registry,
+        )
 
         if self._strategy_registry is None:
             self._strategy_registry = get_tool_registration_strategy_registry()
@@ -317,7 +519,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Args:
             strategy: Strategy to add
         """
-        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+        from victor.tools.registration.registry import (
+            get_tool_registration_strategy_registry,
+        )
 
         if self._strategy_registry is None:
             self._strategy_registry = get_tool_registration_strategy_registry()
@@ -507,7 +711,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         if only_enabled:
             return [
-                tool for name, tool in self._tools.items() if self._tool_enabled.get(name, False)
+                tool
+                for name, tool in self._tools.items()
+                if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
             ]
         return list(self._tools.values())
 
@@ -525,28 +731,48 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         with self._schema_cache_lock:
             current_version = self._schema_cache_version
+            use_cache = not (only_enabled and self._has_dynamic_availability_checks())
 
             # O(1) cache check via version counter
-            cache_entry = self._schema_cache.get(only_enabled)
-            if cache_entry is not None:
-                cached_version, cached_schemas = cache_entry
-                if cached_version == current_version:
-                    return cached_schemas
+            if use_cache:
+                cache_entry = self._schema_cache.get(only_enabled)
+                if cache_entry is not None:
+                    cached_version, cached_schemas = cache_entry
+                    if cached_version == current_version:
+                        return cached_schemas
 
             # Cache miss - generate schemas
             if only_enabled:
                 schemas = [
                     tool.to_json_schema()
                     for name, tool in self._tools.items()
-                    if self._tool_enabled.get(name, False)
+                    if self._tool_enabled.get(name, False) and self._tool_is_available(tool)
                 ]
             else:
                 schemas = [tool.to_json_schema() for tool in self._tools.values()]
 
             # Update cache with current version
-            self._schema_cache[only_enabled] = (current_version, schemas)
+            if use_cache:
+                self._schema_cache[only_enabled] = (current_version, schemas)
 
             return schemas
+
+    def _tool_is_available(self, tool: Any) -> bool:
+        """Return whether a tool is currently available for selection."""
+        checker = getattr(tool, "is_available", None)
+        if not callable(checker):
+            return True
+        return bool(checker())
+
+    def _has_dynamic_availability_checks(self) -> bool:
+        """Detect tools whose availability changes outside registry mutations."""
+        for tool in self._tools.values():
+            requires_configuration = getattr(tool, "requires_configuration", False)
+            if callable(requires_configuration):
+                requires_configuration = requires_configuration()
+            if requires_configuration:
+                return True
+        return False
 
     def get_tool_cost(self, name: str) -> Optional[CostTier]:
         """Get the cost tier for a tool.
@@ -649,3 +875,190 @@ class ToolRegistry(BaseRegistry[str, Any]):
             hook(result)
 
         return result
+
+    # ========================================================================
+    # Plugin-Based Tool Registration
+    # ========================================================================
+
+    def register_plugin(self, plugin: Any) -> None:
+        """Register a tool plugin with the registry.
+
+        Tool plugins enable external verticals to dynamically register
+        tools at runtime. The plugin's register() method is called to perform
+        the actual registration.
+
+        This method accepts any object with a register() method, including:
+        - VictorPlugin from victor_sdk.core.plugins
+        - ToolFactoryAdapter from victor_sdk.verticals.protocols.tool_plugins
+        - Any class with a register(registry) method
+
+        Args:
+            plugin: Object with register() method (VictorPlugin protocol)
+
+        Raises:
+            AttributeError: If plugin doesn't have a register() method
+            Exception: If plugin.register() raises an exception
+
+        Example:
+            from victor_sdk.verticals.protocols import ToolPluginHelper
+
+            # Using helper
+            tools = {"code_search": CodeSearchTool(), "refactor": RefactoringTool()}
+            plugin = ToolPluginHelper.from_instances(tools)
+            registry.register_plugin(plugin)
+
+        Example:
+            # Custom plugin class
+            class MyVerticalPlugin:
+                def register(self, registry: ToolRegistry) -> None:
+                    registry.register(CodeSearchTool())
+                    registry.register(RefactoringTool())
+
+            plugin = MyVerticalPlugin()
+            registry.register_plugin(plugin)
+        """
+        if not hasattr(plugin, "register"):
+            raise AttributeError(f"Tool plugin must have a 'register' method. Got: {type(plugin)}")
+
+        # Call plugin's register method
+        plugin.register(self)
+
+    def discover_plugins(self, entry_point_group: str = "victor.plugins") -> int:
+        """Discover and register tool plugins from entry points.
+
+        Uses UnifiedEntryPointRegistry for efficient single-pass discovery
+        instead of redundant importlib.metadata.entry_points() calls.
+
+        Handles multiple plugin formats:
+        - Objects with a ``register`` method (ToolPlugin protocol)
+        - Lists/tuples of tool instances (wrapped via ToolPluginHelper)
+
+        Args:
+            entry_point_group: Entry point group to scan (default: victor.plugins)
+
+        Returns:
+            Number of plugins discovered and registered
+
+        Example:
+            # In setup.py / pyproject.toml:
+            # [project.entry-points."victor.plugins"]
+            # my_plugin = "my_package.plugin:MyPlugin"
+
+            # At runtime:
+            count = registry.discover_plugins()
+            print(f"Registered {count} tool plugins")
+        """
+        from victor.framework.entry_point_registry import get_entry_point_objects
+
+        count = 0
+
+        try:
+            group_eps = get_entry_point_objects(entry_point_group)
+
+            for ep in group_eps:
+                try:
+                    plugin = ep.load()
+
+                    if hasattr(plugin, "register"):
+                        self.register_plugin(plugin)
+                        count += 1
+                    elif isinstance(plugin, (list, tuple)):
+                        from victor_sdk.verticals.protocols import ToolPluginHelper
+
+                        tools = {f"tool_{i}": tool for i, tool in enumerate(plugin)}
+                        adapter = ToolPluginHelper.from_instances(tools)
+                        self.register_plugin(adapter)
+                        count += 1
+
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    ep_name = getattr(ep, "name", "unknown")
+                    logger.warning(f"Failed to load tool plugin from '{ep_name}': {e}")
+
+        except Exception:
+            pass
+
+        return count
+
+    # Backward-compatible alias for discover_plugins()
+    register_from_entry_points = discover_plugins
+
+    # ========================================================================
+    # Lightweight Tool Discovery (for CLI)
+    # ========================================================================
+
+    @classmethod
+    def discover_lightweight(cls) -> List[Tuple[str, str, str]]:
+        """Discover tools without full orchestrator initialization.
+
+        Dynamically discovers tools from the victor/tools directory by scanning
+        for @tool decorated functions and BaseTool subclasses. This is useful
+        for CLI commands that need to list tools without the overhead of
+        initializing the full agent.
+
+        Returns:
+            List of tuples: (name, description, cost_tier)
+        """
+        from victor.tools.base import BaseTool
+        import importlib
+        import inspect
+        import os
+
+        tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
+        excluded_files = {
+            "__init__.py",
+            "base.py",
+            "decorators.py",
+            "semantic_selector.py",
+            "enums.py",
+            "registry.py",
+            "metadata.py",
+            "metadata_registry.py",
+            "tool_names.py",
+            "output_utils.py",
+            "shared_ast_utils.py",
+            "dependency_graph.py",
+            "plugin_registry.py",
+        }
+
+        discovered_tools = []
+
+        for filename in os.listdir(tools_dir):
+            if filename.endswith(".py") and filename not in excluded_files:
+                module_name = f"victor.tools.{filename[:-3]}"
+                try:
+                    module = importlib.import_module(module_name)
+                    for _name, obj in inspect.getmembers(module):
+                        # Check @tool decorated functions
+                        if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+                            tool_instance = getattr(obj, "Tool", None)
+                            if tool_instance:
+                                name = tool_instance.name
+                                description = tool_instance.description or "No description"
+                                cost_tier = getattr(tool_instance, "cost_tier", None)
+                                cost_str = cost_tier.value if cost_tier else "unknown"
+                                discovered_tools.append((name, description, cost_str))
+                        # Check BaseTool class instances
+                        elif (
+                            inspect.isclass(obj)
+                            and issubclass(obj, BaseTool)
+                            and obj is not BaseTool
+                            and hasattr(obj, "name")
+                        ):
+                            try:
+                                tool_instance = obj()
+                                name = tool_instance.name
+                                description = tool_instance.description or "No description"
+                                cost_tier = getattr(tool_instance, "cost_tier", None)
+                                cost_str = cost_tier.value if cost_tier else "unknown"
+                                discovered_tools.append((name, description, cost_str))
+                            except Exception:
+                                # Skip tools that can't be instantiated
+                                pass
+                except Exception:
+                    # Log but continue with other modules
+                    pass
+
+        return discovered_tools

@@ -242,7 +242,9 @@ class TestVerticalService:
         assert result.context.config.tools.tools == {"read", "write"}
         assert result.context.config.metadata["runtime_adapter"] == "sdk"
 
-    def test_apply_vertical_configuration_records_capability_requirement_diagnostics(self):
+    def test_apply_vertical_configuration_records_capability_requirement_diagnostics(
+        self,
+    ):
         """Capability requirements should be resolved and surfaced during application."""
         orchestrator = StubOrchestrator()
         get_vertical_integration_pipeline(reset=True)

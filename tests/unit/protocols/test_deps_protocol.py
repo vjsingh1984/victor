@@ -368,7 +368,10 @@ class TestDependencyUpdate:
     def test_required_fields(self):
         """Test required fields."""
         update = DependencyUpdate(
-            package="test", current_version="1.0.0", new_version="2.0.0", change_type="major"
+            package="test",
+            current_version="1.0.0",
+            new_version="2.0.0",
+            change_type="major",
         )
         assert update.package == "test"
         assert update.current_version == "1.0.0"
@@ -378,7 +381,10 @@ class TestDependencyUpdate:
     def test_default_values(self):
         """Test default values."""
         update = DependencyUpdate(
-            package="test", current_version="1.0.0", new_version="1.1.0", change_type="minor"
+            package="test",
+            current_version="1.0.0",
+            new_version="1.1.0",
+            change_type="minor",
         )
         assert update.breaking is False
         assert update.changelog_url is None
@@ -498,7 +504,9 @@ class TestDepsConfig:
     def test_custom_values(self):
         """Test custom values."""
         config = DepsConfig(
-            package_manager=PackageManager.POETRY, check_vulnerabilities=False, cache_ttl=7200
+            package_manager=PackageManager.POETRY,
+            check_vulnerabilities=False,
+            cache_ttl=7200,
         )
         assert config.package_manager == PackageManager.POETRY
         assert config.check_vulnerabilities is False

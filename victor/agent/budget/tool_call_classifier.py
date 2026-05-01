@@ -22,29 +22,33 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
+from enum import Enum
 from typing import Optional, Set
 
+from victor.agent.action_authorizer import build_write_tool_set, normalize_tool_name_for_policy
 from victor.agent.protocols import IToolCallClassifier
 
 logger = logging.getLogger(__name__)
 
 
+class OperationType(str, Enum):
+    """Tool operation type classification."""
+
+    WRITE = "write"  # Write/modify operations
+    READ = "read"  # Read-only operations
+    UNKNOWN = "unknown"  # Unclassified operations
+
+
 # Default set of write tools (can be extended via OCP)
-DEFAULT_WRITE_TOOLS: Set[str] = frozenset(
-    {
-        "write_file",
-        "write",
-        "edit_files",
-        "edit",
-        "shell",
-        "bash",
-        "execute_bash",
-        "git_commit",
-        "git_push",
-        "delete_file",
-        "create_directory",
-        "mkdir",
-    }
+DEFAULT_WRITE_TOOLS: Set[str] = build_write_tool_set(
+    "git_commit",
+    "git_push",
+    "delete_file",
+    "create_directory",
+    "mkdir",
+    "create_file",
+    "rename_file",
+    "notebook_edit",
 )
 
 
@@ -85,25 +89,25 @@ class ToolCallClassifier(IToolCallClassifier):
         Returns:
             True if this is a write/modify operation
         """
-        return tool_name.lower() in self._write_tools
+        return normalize_tool_name_for_policy(tool_name.lower()) in self._write_tools
 
-    def classify_operation(self, tool_name: str) -> str:
+    def classify_operation(self, tool_name: str) -> OperationType:
         """Classify tool operation type.
 
         Args:
             tool_name: Name of the tool
 
         Returns:
-            Operation type: "write", "read", or "unknown"
+            Operation type enum value
         """
-        tool_lower = tool_name.lower()
+        tool_lower = normalize_tool_name_for_policy(tool_name.lower())
 
         if tool_lower in self._write_tools:
-            return "write"
-        elif tool_lower in {"read", "read_file", "grep", "search"}:
-            return "read"
+            return OperationType.WRITE
+        elif tool_lower in {"read", "grep", "search"}:
+            return OperationType.READ
         else:
-            return "unknown"
+            return OperationType.UNKNOWN
 
     def add_write_tool(self, tool_name: str) -> None:
         """Add a tool to the write operations set (OCP compliance).
@@ -114,7 +118,7 @@ class ToolCallClassifier(IToolCallClassifier):
             tool_name: Name of the tool to add
         """
         self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
-        self._write_tools.add(tool_name.lower())
+        self._write_tools.add(normalize_tool_name_for_policy(tool_name.lower()))
         logger.debug(f"ToolCallClassifier: added write tool '{tool_name}'")
 
     def remove_write_tool(self, tool_name: str) -> None:
@@ -123,9 +127,10 @@ class ToolCallClassifier(IToolCallClassifier):
         Args:
             tool_name: Name of the tool to remove
         """
-        if tool_name.lower() in self._write_tools:
+        canonical_tool_name = normalize_tool_name_for_policy(tool_name.lower())
+        if canonical_tool_name in self._write_tools:
             self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
-            self._write_tools.discard(tool_name.lower())
+            self._write_tools.discard(canonical_tool_name)
             logger.debug(f"ToolCallClassifier: removed write tool '{tool_name}'")
 
     def get_write_tools(self) -> Set[str]:

@@ -28,7 +28,9 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
+import asyncio
 import logging
+import os
 import re
 
 logger = logging.getLogger(__name__)
@@ -298,14 +300,25 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
         )
 
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
-        # Try common path variations
         path = args.get("path") or args.get("file_path") or args.get("file")
 
         if path:
+            suggested_paths = self._extract_suggested_paths(str(error))
+            suggested_retry = self._choose_best_suggested_path(path, suggested_paths, tool_name)
+            if suggested_retry:
+                self._logger.info(f"Trying suggested path: {suggested_retry}")
+                path_key = self._get_path_arg_key(args)
+                return RecoveryResult(
+                    action=RecoveryAction.RETRY_WITH_INFERRED,
+                    modified_args={**args, path_key: suggested_retry},
+                    user_message=f"Trying suggested path: {suggested_retry}",
+                    metadata={"suggested_paths": suggested_paths},
+                )
+
             variations = self._get_path_variations(path)
             if variations:
                 self._logger.info(f"Trying path variation: {variations[0]}")
-                path_key = "path" if "path" in args else "file_path"
+                path_key = self._get_path_arg_key(args)
                 return RecoveryResult(
                     action=RecoveryAction.RETRY_WITH_INFERRED,
                     modified_args={**args, path_key: variations[0]},
@@ -341,6 +354,59 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
 
         return variations
 
+    def _get_path_arg_key(self, args: Dict[str, Any]) -> str:
+        """Select the canonical path-like argument key for retries."""
+        if "path" in args:
+            return "path"
+        if "file_path" in args:
+            return "file_path"
+        if "file" in args:
+            return "file"
+        return "path"
+
+    def _extract_suggested_paths(self, error_str: str) -> List[str]:
+        """Parse candidate paths from "Did you mean" style error text."""
+        suggested_paths = re.findall(r"^\s*-\s+(.+?)\s*$", error_str, re.MULTILINE)
+        if suggested_paths:
+            return suggested_paths
+
+        inline_match = re.search(r"Did you mean:\s*(.+)", error_str)
+        if not inline_match:
+            return []
+
+        return [
+            candidate.strip() for candidate in inline_match.group(1).split(",") if candidate.strip()
+        ]
+
+    def _choose_best_suggested_path(
+        self, original_path: str, suggestions: List[str], tool_name: str
+    ) -> Optional[str]:
+        """Prefer the most relevant suggestion for the tool being retried."""
+        if not suggestions:
+            return None
+
+        normalized_original = original_path.rstrip("/").replace("\\", "/")
+        base_path, _ = os.path.splitext(normalized_original)
+        file_suggestions = [candidate for candidate in suggestions if not candidate.endswith("/")]
+        directory_suggestions = [candidate for candidate in suggestions if candidate.endswith("/")]
+
+        if tool_name in {"read", "open", "cat"}:
+            package_file_matches = [
+                candidate
+                for candidate in file_suggestions
+                if candidate.replace("\\", "/").startswith(f"{base_path}/")
+            ]
+            if package_file_matches:
+                return package_file_matches[0]
+            if file_suggestions:
+                return file_suggestions[0]
+            return suggestions[0]
+
+        if tool_name in {"ls", "find"} and directory_suggestions:
+            return directory_suggestions[0]
+
+        return suggestions[0]
+
 
 class RateLimitHandler(ErrorRecoveryHandler):
     """Handle rate limit errors with exponential backoff."""
@@ -369,6 +435,26 @@ class RateLimitHandler(ErrorRecoveryHandler):
             max_retries=3,
             user_message=f"Rate limited, waiting {retry_after}s...",
             metadata={"retry_delay_seconds": retry_after, "exponential_backoff": True},
+        )
+
+
+class TimeoutErrorHandler(ErrorRecoveryHandler):
+    """Handle tool timeout errors.
+
+    Timeouts are expected for slow tools (code_search, web_search, etc.)
+    and do not require handler intervention beyond clear messaging.
+    """
+
+    def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
+        if isinstance(error, asyncio.TimeoutError):
+            return True
+        error_str = str(error).lower()
+        return "timed out" in error_str or "timeout" in error_str
+
+    def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
+        return RecoveryResult(
+            action=RecoveryAction.SKIP,
+            user_message=f"Tool '{tool_name}' timed out. Consider increasing --tool-budget or simplifying the operation.",
         )
 
 
@@ -446,6 +532,7 @@ def build_recovery_chain() -> ErrorRecoveryHandler:
         .set_next(ToolNotFoundHandler())
         .set_next(RateLimitHandler())
         .set_next(NetworkErrorHandler())
+        .set_next(TimeoutErrorHandler())
         .set_next(PermissionErrorHandler())
     )
     return chain

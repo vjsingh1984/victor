@@ -31,7 +31,6 @@ class ToolNames:
     LS = "ls"
     PLAN = "plan"
     SHELL = "shell"
-    SHELL_READONLY = "shell_readonly"
     SANDBOX = "sandbox"
     SANDBOX_UPLOAD = "sandbox_upload"
     GREP = "grep"
@@ -94,6 +93,8 @@ TOOL_ALIASES: Dict[str, str] = {
     "read_file": ToolNames.READ,
     "write_file": ToolNames.WRITE,
     "edit_files": ToolNames.EDIT,
+    "edit_file": ToolNames.EDIT,
+    "patch_file": ToolNames.EDIT,
     "list_directory": ToolNames.LS,
     "plan_files": ToolNames.PLAN,
     "get_project_overview": ToolNames.OVERVIEW,
@@ -120,7 +121,8 @@ TOOL_ALIASES: Dict[str, str] = {
     "tool.list_directory": ToolNames.LS,
     "execute_python_in_sandbox": ToolNames.SANDBOX,
     "upload_files_to_sandbox": ToolNames.SANDBOX_UPLOAD,
-    "code_search": ToolNames.GREP,
+    "search": ToolNames.CODE_SEARCH,
+    "code_search": ToolNames.CODE_SEARCH,
     "semantic_code_search": ToolNames.CODE_SEARCH,
     "web_summarize": ToolNames.SUMMARIZE,
     "find_symbol": ToolNames.SYMBOL,
@@ -157,7 +159,6 @@ TOOL_ALIASES: Dict[str, str] = {
     "pipeline_analyzer": ToolNames.PIPELINE,
     "iac_scanner": ToolNames.IAC,
 }
-
 
 CANONICAL_TO_ALIASES: Dict[str, Set[str]] = {}
 for alias, canonical in TOOL_ALIASES.items():

@@ -126,7 +126,7 @@ class CapabilityAwareAgent:
         output_parts = []
 
         if self.has_capability(AgentCapability.READ):
-            if self.use_tool("read_file"):
+            if self.use_tool("read"):
                 output_parts.append("Read files")
 
         if self.has_capability(AgentCapability.SEARCH):
@@ -134,7 +134,7 @@ class CapabilityAwareAgent:
                 output_parts.append("Searched codebase")
 
         if self.has_capability(AgentCapability.WRITE):
-            if self.can_use_tool("write_file") and self.use_tool("write_file"):
+            if self.can_use_tool("write") and self.use_tool("write"):
                 output_parts.append("Wrote files")
 
         return (
@@ -341,7 +341,7 @@ class TestToolBudgetEnforcement:
         """Agent tracks number of tool calls made."""
         agent = CapabilityAwareAgent("researcher", ResearcherRole())
 
-        agent.use_tool("read_file")
+        agent.use_tool("read")
         agent.use_tool("grep")
         agent.use_tool("semantic_search")
 
@@ -363,13 +363,13 @@ class TestToolAccessRestrictions:
         role = ManagerRole()
 
         # Manager can use these
-        assert "read_file" in role.allowed_tools
-        assert "list_directory" in role.allowed_tools
+        assert "read" in role.allowed_tools
+        assert "ls" in role.allowed_tools
         assert "task_complete" in role.allowed_tools
 
         # Manager cannot use these
-        assert "write_file" not in role.allowed_tools
-        assert "bash" not in role.allowed_tools
+        assert "write" not in role.allowed_tools
+        assert "shell" not in role.allowed_tools
 
     def test_researcher_allowed_tools(self):
         """Researcher has search-focused tools."""
@@ -382,38 +382,37 @@ class TestToolAccessRestrictions:
         assert "grep" in role.allowed_tools
 
         # Researcher cannot modify files
-        assert "write_file" not in role.allowed_tools
-        assert "edit_file" not in role.allowed_tools
+        assert "write" not in role.allowed_tools
+        assert "edit" not in role.allowed_tools
 
     def test_executor_allowed_tools(self):
         """Executor has full modification tools."""
         role = ExecutorRole()
 
         # Executor can modify
-        assert "write_file" in role.allowed_tools
-        assert "edit_file" in role.allowed_tools
-        assert "create_file" in role.allowed_tools
+        assert "write" in role.allowed_tools
+        assert "edit" in role.allowed_tools
         assert "delete_file" in role.allowed_tools
-        assert "bash" in role.allowed_tools
+        assert "shell" in role.allowed_tools
 
     def test_reviewer_allowed_tools(self):
         """Reviewer has read and review tools."""
         role = ReviewerRole()
 
         # Reviewer can read and search
-        assert "read_file" in role.allowed_tools
+        assert "read" in role.allowed_tools
         assert "git" in role.allowed_tools
         assert "code_search" in role.allowed_tools
 
         # Reviewer cannot modify
-        assert "write_file" not in role.allowed_tools
+        assert "write" not in role.allowed_tools
 
     def test_agent_cannot_use_disallowed_tool(self):
         """Agent cannot use tools not in allowed list."""
         agent = CapabilityAwareAgent("researcher", ResearcherRole())
 
-        # Researcher cannot use write_file
-        result = agent.use_tool("write_file")
+        # Researcher cannot use write
+        result = agent.use_tool("write")
         assert result is False
         assert agent.tool_calls_made == 0  # Didn't count
 

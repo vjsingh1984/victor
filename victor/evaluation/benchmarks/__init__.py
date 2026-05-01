@@ -33,6 +33,15 @@ from victor.evaluation.benchmarks.swe_bench import (
     MBPPRunner,
     SWEBenchRunner,
 )
+from victor.evaluation.benchmarks.external_agentic import (
+    ExternalAgenticBenchmarkRunner,
+)
+from victor.evaluation.benchmarks.browser_tasks import (
+    BrowserTaskBenchmarkRunner,
+)
+from victor.evaluation.benchmarks.deep_research import (
+    DeepResearchBenchmarkRunner,
+)
 from victor.evaluation.benchmarks.framework_comparison import (
     ComparisonMetrics,
     ComparisonReport,
@@ -42,8 +51,11 @@ from victor.evaluation.benchmarks.framework_comparison import (
     FRAMEWORK_CAPABILITIES,
     PUBLISHED_RESULTS,
     compute_metrics_from_result,
+    compute_metrics_from_saved_result,
     create_comparison_report,
+    create_comparison_report_from_saved_result,
     get_published_result,
+    load_framework_result_from_file,
 )
 
 __all__ = [
@@ -51,6 +63,9 @@ __all__ = [
     "HumanEvalRunner",
     "MBPPRunner",
     "SWEBenchRunner",
+    "ExternalAgenticBenchmarkRunner",
+    "BrowserTaskBenchmarkRunner",
+    "DeepResearchBenchmarkRunner",
     # Framework comparison
     "ComparisonMetrics",
     "ComparisonReport",
@@ -60,6 +75,9 @@ __all__ = [
     "FRAMEWORK_CAPABILITIES",
     "PUBLISHED_RESULTS",
     "compute_metrics_from_result",
+    "compute_metrics_from_saved_result",
     "create_comparison_report",
+    "create_comparison_report_from_saved_result",
     "get_published_result",
+    "load_framework_result_from_file",
 ]

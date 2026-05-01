@@ -37,9 +37,35 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, Iterable, List, Optional, Set, Tuple
+
+from victor.agent.safety import get_write_tool_names
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+from victor.tools.tool_names import ToolNames, get_canonical_name
 
 logger = logging.getLogger(__name__)
+
+
+READ_TOOL_ALIASES = frozenset({ToolNames.READ, "read_file"})
+LIST_TOOL_ALIASES = frozenset({ToolNames.LS, "list_directory"})
+WRITE_TOOL_ALIASES = frozenset({ToolNames.WRITE, "write_file", "create_file"})
+EDIT_TOOL_ALIASES = frozenset({ToolNames.EDIT, "edit_files", "edit_file", "patch_file"})
+SHELL_TOOL_ALIASES = frozenset({ToolNames.SHELL, "execute_bash", "bash"})
+
+
+def _canonicalize_tool_set(tools: Set[str]) -> Set[str]:
+    """Canonicalize only the compact file/shell tool aliases."""
+    return {canonicalize_core_tool_name(tool) for tool in tools}
+
+
+def _canonicalize_tool_name(tool_name: str) -> str:
+    """Canonicalize compact file/shell aliases for shared policy lookups."""
+    return canonicalize_core_tool_name(tool_name)
+
+
+def normalize_tool_name_for_policy(tool_name: str) -> str:
+    """Normalize a tool name for shared policy/classification lookups."""
+    return get_canonical_name(_canonicalize_tool_name(tool_name))
 
 
 class ActionIntent(Enum):
@@ -69,12 +95,13 @@ class ActionIntent(Enum):
 WRITE_TOOLS: frozenset[str] = frozenset(
     {
         # Direct file modifications
-        "write_file",  # filesystem.py
-        "edit_files",  # file_editor_tool.py
+        ToolNames.WRITE,
+        ToolNames.EDIT,
+        "notebook_edit",
         # Patch/diff application
         "apply_patch",  # patch_tool.py
         # Bash execution (can modify files)
-        "execute_bash",  # bash.py
+        ToolNames.SHELL,
         # Git write operations
         "git",  # git_tool.py (commit, push, etc.)
         # Refactoring (modifies files)
@@ -93,8 +120,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
 # Tools that are safe for all intents (read-only operations)
 READ_ONLY_TOOLS: frozenset[str] = frozenset(
     {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "semantic_code_search",
         "grep_search",
@@ -116,6 +143,61 @@ GENERATION_TOOLS: frozenset[str] = frozenset(
         "generate_docs",
         "refactor_code",
     }
+)
+
+# Signals that indicate the user explicitly wants readonly shell/SQLite inspection.
+READONLY_SHELL_SIGNALS: List[Tuple[str, str]] = [
+    (r"\b(sqlite|sqlite3|sqllite|sqllite3)\b", "sqlite"),
+    (
+        r"\b(use|run|query|inspect|review|check|look\s+at)\b.*\b(shell|bash|terminal|sqlite3?)\b",
+        "explicit_shell_request",
+    ),
+    (
+        r"\b(shell|bash|terminal)\b.*\b(read|review|inspect|query|check|look\s+at)\b",
+        "explicit_shell_request_reverse",
+    ),
+    # Database-related signals - allow shell for database operations
+    (
+        r"\b(read|query|inspect|review|check|view|explore)\b.*\b(database|db|table|schema)\b",
+        "database_read",
+    ),
+    (
+        r"\b(database|db|table|schema)\b.*\b(read|query|inspect|review|check|view|list)\b",
+        "database_read_reverse",
+    ),
+    (r"\b(list|show)\s+(all\s+)?(tables|rows|data)\b", "database_list"),
+    (r"\b\.tables\b", "sqlite_dot_tables"),
+    (r"\bSELECT\b.*\bFROM\b", "sql_query"),
+    # File extensions that indicate databases
+    (r"\.(db|sqlite|sqlite3)\b", "database_file"),
+]
+
+CONTINUATION_KEYWORDS: tuple[str, ...] = (
+    "continue please",
+    "keep it up",
+    "keep going",
+    "go ahead",
+    "carry on",
+    "yes please",
+    "resume",
+    "continue",
+    "proceed",
+    "go on",
+    "okay",
+    "next",
+    "do it",
+    "yes",
+    "ok",
+    "go",
+)
+
+_CONTINUATION_CONNECTORS: tuple[str, ...] = (
+    "to ",
+    "and ",
+    "with ",
+    "by ",
+    "on ",
+    "please ",
 )
 
 # Mapping of intent to blocked tool sets
@@ -146,16 +228,153 @@ class IntentClassification:
     prompt_guard: str
 
 
+READ_ONLY_INTENTS: frozenset[ActionIntent] = frozenset(
+    {ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY}
+)
+
+
+def _coerce_action_intent(intent: Optional[object]) -> Optional[ActionIntent]:
+    """Normalize enums, strings, or mock-like objects into ActionIntent."""
+    if isinstance(intent, ActionIntent):
+        return intent
+    if isinstance(intent, str):
+        try:
+            return ActionIntent(intent.lower())
+        except ValueError:
+            try:
+                return ActionIntent[intent.upper()]
+            except KeyError:
+                return None
+    intent_name = getattr(intent, "name", None)
+    if isinstance(intent_name, str):
+        try:
+            return ActionIntent[intent_name.upper()]
+        except KeyError:
+            return None
+    return None
+
+
+def get_write_tools_for_policy() -> frozenset[str]:
+    """Return the canonical write/execute tool set used by intent policy."""
+    return build_write_tool_set()
+
+
+def build_write_tool_set(*extra_tool_names: str) -> frozenset[str]:
+    """Build a shared write-tool set with canonical and compatibility spellings."""
+    tool_names: Set[str] = set(get_write_tool_names()) | set(WRITE_TOOLS)
+    tool_names.update(extra_tool_names)
+    normalized = {normalize_tool_name_for_policy(name) for name in tool_names if name}
+    raw = {name for name in tool_names if name}
+    canonicalized = {_canonicalize_tool_name(name) for name in tool_names if name}
+    return frozenset(normalized | raw | canonicalized)
+
+
+def get_intent_blocked_tools(intent: ActionIntent) -> frozenset[str]:
+    """Return blocked tools for an intent using shared, registry-aware policy."""
+    intent = _coerce_action_intent(intent)
+    if intent is None:
+        return frozenset()
+    if intent == ActionIntent.DISPLAY_ONLY:
+        return get_write_tools_for_policy()
+    if intent == ActionIntent.READ_ONLY:
+        return frozenset(set(get_write_tools_for_policy()) | set(GENERATION_TOOLS))
+    return frozenset()
+
+
+def has_explicit_readonly_shell_request(message: Optional[str]) -> bool:
+    """Return True when the user explicitly requests readonly shell/SQLite access."""
+    if not message:
+        return False
+    lowered = message.lower()
+    return any(re.search(pattern, lowered, re.IGNORECASE) for pattern, _ in READONLY_SHELL_SIGNALS)
+
+
+def split_continuation_request(message: Optional[str]) -> tuple[bool, str]:
+    """Return whether the message is a continuation request and its trailing payload."""
+    if not message:
+        return False, ""
+
+    stripped = message.strip()
+    lowered = stripped.lower()
+
+    for keyword in CONTINUATION_KEYWORDS:
+        if lowered == keyword:
+            return True, ""
+
+        if not lowered.startswith(keyword):
+            continue
+
+        next_char_index = len(keyword)
+        if next_char_index >= len(lowered):
+            return True, ""
+
+        next_char = lowered[next_char_index]
+        if next_char.isalnum():
+            continue
+
+        remainder = stripped[next_char_index:].lstrip(" \t,.:;-")
+        lowered_remainder = remainder.lower()
+        for connector in _CONTINUATION_CONNECTORS:
+            if lowered_remainder.startswith(connector):
+                remainder = remainder[len(connector) :].lstrip()
+                break
+        return True, remainder
+
+    return False, ""
+
+
+def is_continuation_request(message: Optional[str]) -> bool:
+    """Return True when the message resumes or carries forward the prior task."""
+    is_continuation, _ = split_continuation_request(message)
+    return is_continuation
+
+
+def should_allow_shell_for_read_only_intent(
+    intent: Optional[ActionIntent],
+    message: Optional[str],
+) -> bool:
+    """Allow the single shell tool on read-only turns when the user explicitly asks for it."""
+    intent = _coerce_action_intent(intent)
+    if intent not in READ_ONLY_INTENTS:
+        return False
+    return has_explicit_readonly_shell_request(message)
+
+
+def is_tool_blocked_for_intent(
+    tool_name: str,
+    intent: Optional[ActionIntent],
+    user_message: Optional[str] = None,
+) -> bool:
+    """Check whether a tool is blocked for a given intent under shared policy."""
+    intent = _coerce_action_intent(intent)
+    if intent is None:
+        return False
+    canonical_tool_name = normalize_tool_name_for_policy(tool_name)
+    if canonical_tool_name == ToolNames.SHELL and should_allow_shell_for_read_only_intent(
+        intent, user_message
+    ):
+        return False
+    return canonical_tool_name in get_intent_blocked_tools(intent)
+
+
 # Signals that indicate "display only" intent
 DISPLAY_SIGNALS: List[Tuple[str, float, str]] = [
     (r"\bshow\s+me\b", 1.0, "show_me"),
     (r"\bgive\s+me\s+(an?\s+)?(example|code)\b", 0.9, "give_example"),
-    (r"\bcreate\s+(a|an)\s+\w*\s*(function|class|method|script)\b", 0.8, "create_function"),
+    (
+        r"\bcreate\s+(a|an)\s+\w*\s*(function|class|method|script)\b",
+        0.8,
+        "create_function",
+    ),
     (r"\bwrite\s+(a|an)\s+\w*\s*(function|class|method)\b", 0.7, "write_function"),
     (r"\bhow\s+(do|would)\s+(i|you)\s+(write|create|implement)\b", 0.9, "how_to_write"),
     (r"\bwhat\s+(does|would)\s+\w+\s+look\s+like\b", 0.8, "what_looks_like"),
     (r"\bjust\s+(show|display|print)\b", 1.0, "just_show"),
-    (r"\bdon'?t\s+(save|write|create)\s+(any\s+)?(files?|to\s+disk)\b", 1.0, "dont_write"),
+    (
+        r"\bdon'?t\s+(save|write|create)\s+(any\s+)?(files?|to\s+disk)\b",
+        1.0,
+        "dont_write",
+    ),
     (r"\bdisplay\s+(only|it)\b", 1.0, "display_only"),
     (r"\bwithout\s+(saving|writing)\b", 0.9, "without_saving"),
 ]
@@ -170,14 +389,53 @@ WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         0.9,
         "add_to_file",
     ),
-    (r"\badd\s+(this|it)\s+(function\s+)?(into|to)\s+\w+\.(py|js|ts)", 0.9, "add_into_file"),
+    (
+        r"\badd\s+(this|it)\s+(function\s+)?(into|to)\s+\w+\.(py|js|ts)",
+        0.9,
+        "add_into_file",
+    ),
     (r"\bupdate\s+(the\s+)?file\b", 0.9, "update_file"),
     (r"\bmodify\s+(the\s+)?\w+\.(py|js|ts|java|cpp)", 0.9, "modify_file"),
     (r"\b(edit|change)\s+(the\s+)?file\b", 0.8, "edit_file"),
     (r"\bsave\s+changes\b", 0.9, "save_changes"),
     (r"\bwrite\s+(this|it)\s+to\s+disk\b", 1.0, "write_to_disk"),
     (r"\badd\s+(this\s+)?to\s+\w+\.(py|js|ts)", 0.8, "add_to_ext"),
-    (r"\bimplement\s+(this\s+)?(in|into)\s+\w+\.(py|js|ts)", 0.8, "implement_into_file"),
+    (
+        r"\bimplement\s+(this\s+)?(in|into)\s+\w+\.(py|js|ts)",
+        0.8,
+        "implement_into_file",
+    ),
+    # "Address/handle/tackle the rest/findings/issues" - action-oriented continuation
+    (
+        r"\b(address|handle|tackle)\s+(the\s+)?(rest\s+of\s+)?(findings|issues|concerns|problems|tasks)\b",
+        0.95,
+        "address_findings",
+    ),
+    # Generic "address/handle/fix X" patterns
+    (
+        r"\b(address|handle|tackle|resolve)\s+\w+",
+        0.85,
+        "address_generic",
+    ),
+    # "gitignore X" as a verb (add to .gitignore)
+    (
+        r"\bgitignore\s+[\w\./]+",
+        0.9,
+        "gitignore_files",
+    ),
+    # "consolidate/merge/eliminate/deduplicate" - refactoring actions
+    (
+        r"\b(consolidate|merge|eliminate|deduplicate|remove|reduce)\s+\w+",
+        0.85,
+        "consolidate_action",
+    ),
+    (
+        r"\b(fix(?:ing)?|update(?:ing)?|modify(?:ing)?|edit(?:ing)?|implement(?:ing)?|"
+        r"apply(?:ing)?|finish(?:ing)?|complete(?:ing)?)\b.*\b(remaining|rest|last|final|"
+        r"these|those|the)\b.*\b(file|files|module|modules|artifact|artifacts|task|tasks)\b",
+        0.9,
+        "complete_remaining_artifacts",
+    ),
 ]
 
 # Signals that indicate read-only intent (no generation)
@@ -200,7 +458,74 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         1.0,
         "analyze_then_fix",
     ),
-    (r"\b(identify|detect|find)\b.*\b(and\s+)?(fix|correct|resolve)\b", 1.0, "find_and_fix"),
+    # "Identify/find areas for consolidation/improvement" - refactoring context
+    (
+        r"\b(identify|find|locate|detect)\b.*\b(for)\s+(consolidation|refactoring|improvement|optimization|reduction)\b",
+        0.95,
+        "identify_for_improvement",
+    ),
+    # "Identify/find areas that need/require/should (be) X" - implies action should be taken
+    # Matches verb forms: consolidate, consolidated, consolidating; remove, removed, removal; etc.
+    (
+        r"\b(identify|find|locate|detect)\b.*?\s+(that\s+)?(needs?|requires?|should(\s+be)?)\s+(?:consolidat|refactor|improv|fix|remov|eliminat|reduc)(?:e|ed|ing|ement|ement|al|ation|ion|tion)?\b",
+        0.9,
+        "identify_needing_action",
+    ),
+    # "Review... and consolidate/eliminate/remove/reduce"
+    (
+        r"\b(review|analyze|examine)\b.*\b(and\s+)?(consolidate|eliminate|remove|reduce|deduplicate|merge)\b",
+        0.9,
+        "review_and_consolidate",
+    ),
+    # =============================================================================
+    # Review + output/documentation patterns - when review results need to be written
+    # =============================================================================
+    # "Review... and document/save/report/output the findings"
+    (
+        r"\b(review|analyze|examine|audit|inspect)\b.*\b(and|then)\s+(document|save|report|output|write)\b",
+        0.95,
+        "review_and_document",
+    ),
+    # "Generate/create a review/analysis report/document"
+    (
+        r"\b(generate|create|write|produce)\s+(a\s+)?(review|analysis|audit|summary)\s+(report|document|documentation)\b",
+        0.95,
+        "generate_review_report",
+    ),
+    # "Document the findings/issues/results"
+    (
+        r"\b(document|write|record|log)\s+(the\s+)?(findings|issues|results|analysis|review)\b",
+        0.9,
+        "document_findings",
+    ),
+    # "Save/output findings to file"
+    (
+        r"\b(save|output|export)\s+(the\s+)?(findings|results|analysis|review)\s+(to|as)\b",
+        0.9,
+        "save_findings_to_file",
+    ),
+    # "Write up the review/analysis/findings"
+    (
+        r"\bwrite\s+(up\s+)?(the\s+)?(review|analysis|findings|results)\b",
+        0.85,
+        "write_up_findings",
+    ),
+    # "Create summary/document of review"
+    (
+        r"\b(create|make)\s+(a\s+)?(summary|document|report)\s+(of|for|from)\s+(the\s+)?(review|analysis|audit)\b",
+        0.85,
+        "create_summary_document",
+    ),
+    (
+        r"\b(review|analyze|find|gather)\b.*\b(apply|implement)\s+(the\s+)?fix(?:es)?\b",
+        1.0,
+        "analyze_then_apply_fixes",
+    ),
+    (
+        r"\b(identify|detect|find)\b.*\b(and\s+)?(fix|correct|resolve)\b",
+        1.0,
+        "find_and_fix",
+    ),
     (
         r"\b(fix|correct|resolve)\s+(any|all|the)?\s*(bugs?|issues?|errors?|problems?)\b",
         0.9,
@@ -209,11 +534,19 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
     # "Fix the bug in X" patterns
     (r"\bfix\s+(the\s+)?(bug|issue|error|problem)\s+(in|with)\b", 0.9, "fix_in"),
     # "Apply the fix/changes" patterns
-    (r"\b(apply|implement)\s+(the\s+)?(fix|changes?|improvements?)\b", 0.9, "apply_fix"),
+    (
+        r"\b(apply|implement)\s+(the\s+)?(fix(?:es)?|changes?|improvements?)\b",
+        0.9,
+        "apply_fix",
+    ),
     # "Make the changes" / "make it work"
     (r"\bmake\s+(the\s+)?(changes?|it\s+work|corrections?)\b", 0.8, "make_changes"),
     # "Refactor and improve"
-    (r"\b(refactor|clean\s*up)\s+(and\s+)?(improve|optimize)?\b", 0.8, "refactor_improve"),
+    (
+        r"\b(refactor|clean\s*up)\s+(and\s+)?(improve|optimize)?\b",
+        0.8,
+        "refactor_improve",
+    ),
     # =============================================================================
     # Implementation task patterns - tasks that require creating/modifying artifacts
     # =============================================================================
@@ -264,7 +597,11 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         "add_feature",
     ),
     # "Set up/Configure {tool/system}" - setup tasks
-    (r"\b(set\s*up|configure|initialize|bootstrap)\s+(a\s+)?\w+", 0.8, "setup_configure"),
+    (
+        r"\b(set\s*up|configure|initialize|bootstrap)\s+(a\s+)?\w+",
+        0.8,
+        "setup_configure",
+    ),
     # "Build/Deploy {service/app}" - deployment tasks
     (
         r"\b(build|deploy|release)\s+(the\s+)?\w+\s*(service|app|application|container)?",
@@ -288,28 +625,32 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
 
 # Safe actions by intent type
 SAFE_ACTIONS: dict[ActionIntent, Set[str]] = {
-    ActionIntent.READ_ONLY: {"read_file", "list_directory", "code_search", "git_status"},
+    ActionIntent.READ_ONLY: {
+        ToolNames.READ,
+        ToolNames.LS,
+        "code_search",
+        "git_status",
+    },
     ActionIntent.DISPLAY_ONLY: {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "git_status",
         "generate_response",  # Can generate code in response, just not write
     },
     ActionIntent.WRITE_ALLOWED: {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "git_status",
         "generate_response",
-        "write_file",
-        "edit_file",
-        "create_file",
-        "execute_bash",
+        ToolNames.WRITE,
+        ToolNames.EDIT,
+        ToolNames.SHELL,
     },
     ActionIntent.AMBIGUOUS: {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "git_status",
         "generate_response",
@@ -321,7 +662,7 @@ PROMPT_GUARDS: dict[ActionIntent, str] = {
     ActionIntent.DISPLAY_ONLY: """
 IMPORTANT: The user wants to SEE code, not save it to a file.
 - Generate and DISPLAY the requested code directly in your response
-- Do NOT use write_file or create_file tools
+- Do NOT use write or edit tools
 - Do NOT modify any existing files
 - Present code in markdown code blocks
 - Be concise and complete the task in one response
@@ -330,7 +671,7 @@ IMPORTANT: The user wants to SEE code, not save it to a file.
 """,
     ActionIntent.READ_ONLY: """
 IMPORTANT: This is a read-only query.
-- Only use read operations (read_file, list_directory, code_search)
+- Only use read operations (read, ls, code_search)
 - Be concise and answer directly
 - Do NOT ask follow-up questions - just provide the information requested
 - Do NOT write, create, or modify any files
@@ -355,7 +696,7 @@ class IntentDetector:
         detector = IntentDetector()
         result = detector.detect("Show me a function that calculates factorial")
         print(result.intent)  # ActionIntent.DISPLAY_ONLY
-        print(result.safe_actions)  # {"read_file", "generate_response", ...}
+        print(result.safe_actions)  # {"read", "generate_response", ...}
     """
 
     def __init__(
@@ -420,12 +761,30 @@ class IntentDetector:
             if result is not None:
                 return result
 
+        # Short-circuit: bare continuation commands resume an in-progress task and
+        # must not receive a DISPLAY_ONLY guard that blocks tool use and file writes.
+        is_continuation, continuation_payload = split_continuation_request(message)
+        if is_continuation and not continuation_payload:
+            return IntentClassification(
+                intent=ActionIntent.WRITE_ALLOWED,
+                confidence=0.9,
+                matched_signals=["continuation_keyword"],
+                safe_actions=SAFE_ACTIONS[ActionIntent.WRITE_ALLOWED].copy(),
+                prompt_guard=PROMPT_GUARDS[ActionIntent.WRITE_ALLOWED],
+            )
+
+        scoring_message = continuation_payload or message
+
         # Score each intent type
-        display_score, display_matched = self._score_patterns(message, self._display_patterns)
-        write_score, write_matched = self._score_patterns(message, self._write_patterns)
-        read_only_score, read_only_matched = self._score_patterns(message, self._read_only_patterns)
+        display_score, display_matched = self._score_patterns(
+            scoring_message, self._display_patterns
+        )
+        write_score, write_matched = self._score_patterns(scoring_message, self._write_patterns)
+        read_only_score, read_only_matched = self._score_patterns(
+            scoring_message, self._read_only_patterns
+        )
         compound_score, compound_matched = self._score_patterns(
-            message, self._compound_write_patterns
+            scoring_message, self._compound_write_patterns
         )
 
         # Determine intent based on scores
@@ -459,6 +818,9 @@ class IntentDetector:
             intent = self.default_intent
             confidence = 0.2
             matched = []
+
+        if is_continuation and continuation_payload:
+            matched = ["continuation_with_payload", *matched]
 
         return IntentClassification(
             intent=intent,
@@ -557,15 +919,14 @@ def get_safe_tools(message: str, all_tools: Set[str]) -> Set[str]:
     # Map safe action categories to actual tool names
     # This is a simple mapping - can be extended
     action_to_tools = {
-        "read_file": {"read_file"},
-        "list_directory": {"list_directory"},
+        ToolNames.READ: READ_TOOL_ALIASES,
+        ToolNames.LS: LIST_TOOL_ALIASES,
         "code_search": {"code_search", "semantic_code_search"},
-        "git_status": {"execute_bash"},  # Only for git read commands
+        "git_status": SHELL_TOOL_ALIASES | {"git_status"},
         "generate_response": set(),  # Not a tool, just allow text response
-        "write_file": {"write_file", "create_file"},
-        "edit_file": {"edit_file", "patch_file"},
-        "create_file": {"write_file", "create_file"},
-        "execute_bash": {"execute_bash"},
+        ToolNames.WRITE: WRITE_TOOL_ALIASES,
+        ToolNames.EDIT: EDIT_TOOL_ALIASES,
+        ToolNames.SHELL: SHELL_TOOL_ALIASES,
     }
 
     safe = set()
@@ -573,7 +934,12 @@ def get_safe_tools(message: str, all_tools: Set[str]) -> Set[str]:
         tools = action_to_tools.get(action, set())
         safe.update(tools)
 
-    return safe.intersection(all_tools)
+    safe_canonical = _canonicalize_tool_set(safe)
+    return {
+        tool
+        for tool in all_tools
+        if tool in safe or canonicalize_core_tool_name(tool) in safe_canonical
+    }
 
 
 # Semantic alias for clarity

@@ -57,13 +57,13 @@ from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 from cachetools import TTLCache  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
+    from victor_sdk.workflows import NodeResult
     from victor.workflows.definition import (
         ConditionNode,
         TransformNode,
         WorkflowDefinition,
         WorkflowNode,
     )
-    from victor.workflows.executor import NodeResult
 
 logger = logging.getLogger(__name__)
 
@@ -592,7 +592,7 @@ class WorkflowCache:
         # Build key data
         key_data = {
             "node_id": node.id,
-            "node_type": node.node_type.value if hasattr(node, "node_type") else "unknown",
+            "node_type": (node.node_type.value if hasattr(node, "node_type") else "unknown"),
             "context": relevant_context,
         }
 

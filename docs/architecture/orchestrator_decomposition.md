@@ -26,13 +26,13 @@ AgentOrchestrator (3,940 LOC facade)
 │   ├── MemoryRuntime               ← memory manager + conversation embedding store
 │   ├── ResilienceRuntime           ← recovery handler + integration
 │   ├── CoordinationRuntime         ← recovery/chunk/planner/task coordinators
-│   ├── InteractionRuntime          ← chat/tool/session coordinators
+│   ├── InteractionRuntime          ← service-first chat/tool/session surfaces + compat shims
 │   └── ServicesRuntime             ← DI service layer (Strangler Fig pattern)
 ├── 21 Coordinators (victor/agent/coordinators/)
 │   ├── ExecutionCoordinator        ← agentic loop execution
-│   ├── SyncChatCoordinator         ← non-streaming execution path
-│   ├── StreamingChatCoordinator    ← streaming execution path
-│   ├── UnifiedChatCoordinator      ← sync/streaming facade
+│   ├── SyncChatCoordinator         ← deprecated non-streaming compatibility shim
+│   ├── StreamingChatCoordinator    ← deprecated streaming compatibility shim
+│   ├── UnifiedChatCoordinator      ← deprecated sync/streaming facade shim
 │   ├── ProtocolAdapter             ← DIP compliance adapter
 │   ├── MetricsCoordinator          ← centralized metrics
 │   ├── SafetyCoordinator           ← safety rule evaluation
@@ -79,6 +79,10 @@ orchestrator.conversation_controller   # simple accessor
 orchestrator.protocol_adapter          # lazy-inits on first access
 orchestrator.tool_calls_used = 5       # setter works via property
 ```
+
+Current chat/runtime note:
+- Canonical chat entry points are `ChatService` and `ServiceStreamingRuntime`
+- Deprecated chat coordinators remain only as compatibility import/runtime shims
 
 ## Extension Loader Decomposition
 

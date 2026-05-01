@@ -40,7 +40,13 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING, Union
 
-from victor_sdk.core.types import Tier
+from victor_sdk.core.types import (
+    StageDefinition,
+    StageDefinitionLike,
+    Tier,
+    normalize_stage_definition,
+    normalize_stage_definitions,
+)
 from victor_sdk.verticals.protocols.promoted_types import (
     MiddlewarePriority,
     MiddlewareResult,
@@ -55,66 +61,9 @@ if TYPE_CHECKING:
 # Stage Types
 # =============================================================================
 
-
-@dataclass
-class StageDefinition:
-    """Definition of a conversation stage for a vertical.
-
-    Stages represent distinct phases in a conversation workflow (e.g., planning,
-    execution, verification). Each vertical can define its own stages with
-    appropriate tools and transitions.
-
-    This type is used by:
-    - VerticalBase.get_stages() to define vertical stages
-    - ConversationStateMachine for stage tracking
-    - Agent orchestration for stage-based tool selection
-
-    Attributes:
-        name: Stage name (e.g., "PLANNING", "EXECUTION")
-        description: Human-readable description
-        tools: Tools relevant to this stage
-        keywords: Keywords that suggest this stage
-        next_stages: Valid stages to transition to
-        min_confidence: Minimum confidence to enter this stage
-    """
-
-    name: str
-    description: str = ""
-    tools: Set[str] = field(default_factory=set)
-    keywords: List[str] = field(default_factory=list)
-    next_stages: Set[str] = field(default_factory=set)
-    min_confidence: float = 0.5
-    required_tools: List[str] = field(default_factory=list)
-    optional_tools: List[str] = field(default_factory=list)
-    allow_custom_tools: bool = True
-
-    def __post_init__(self) -> None:
-        """Normalize legacy and SDK-compatible tool declarations."""
-
-        self.required_tools = list(self.required_tools)
-        self.optional_tools = list(self.optional_tools)
-
-        if not self.required_tools and not self.optional_tools and self.tools:
-            self.optional_tools = sorted(self.tools)
-
-        normalized_tools = set(self.tools)
-        normalized_tools.update(self.required_tools)
-        normalized_tools.update(self.optional_tools)
-        self.tools = normalized_tools
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "tools": sorted(self.tools),
-            "required_tools": self.required_tools.copy(),
-            "optional_tools": self.optional_tools.copy(),
-            "allow_custom_tools": self.allow_custom_tools,
-            "keywords": self.keywords.copy(),
-            "next_stages": sorted(self.next_stages),
-            "min_confidence": self.min_confidence,
-        }
+# Canonical stage contract now lives in victor-sdk. This module re-exports the
+# shared definition for in-repo compatibility while StageBuilder and older
+# framework shims continue to use the familiar import path.
 
 
 # =============================================================================
@@ -249,6 +198,9 @@ class StandardGroundingRules:
 
     Provides base grounding rule templates that verticals can use
     or extend with domain-specific rules.
+
+    External verticals can register their own addendums via
+    ``register_addendum()`` without modifying this module (OCP).
     """
 
     # Base grounding rule - applies to all verticals
@@ -270,20 +222,32 @@ When you receive tool output in <TOOL_OUTPUT> tags:
 
 VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
 
-    # Research-specific addendum
-    RESEARCH_ADDENDUM: str = (
-        "Always cite URLs for claims. Acknowledge uncertainty when sources conflict."
-    )
+    # Registry for vertical-specific addendums (OCP: open for extension).
+    # Verticals register addendums via register_addendum() in their
+    # VictorPlugin.register() call — no hardcoded strings in core.
+    _grounding_addendums: Dict[str, str] = {}
 
-    # Data-specific addendum
-    DATA_ADDENDUM: str = (
-        "Verify calculations with actual data. Always show code that produced results."
-    )
+    @classmethod
+    def register_addendum(cls, vertical_name: str, text: str) -> None:
+        """Register a grounding addendum for a vertical.
 
-    # DevOps-specific addendum
-    DEVOPS_ADDENDUM: str = (
-        "Verify configuration syntax before suggesting. Always check existing resources first."
-    )
+        External verticals call this to extend grounding rules
+        without modifying this module.
+
+        Args:
+            vertical_name: Vertical name (e.g. "research", "devops")
+            text: Addendum text to append after base grounding rules
+        """
+        cls._grounding_addendums[vertical_name] = text
+
+    @classmethod
+    def unregister_addendum(cls, vertical_name: str) -> None:
+        """Remove a previously registered addendum.
+
+        Args:
+            vertical_name: Vertical name to remove
+        """
+        cls._grounding_addendums.pop(vertical_name, None)
 
     @classmethod
     def get_base(cls, extended: bool = False) -> str:
@@ -301,6 +265,9 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
     def for_vertical(cls, vertical: str, extended: bool = False) -> str:
         """Get grounding rules for a specific vertical.
 
+        Looks up addendums from the registry populated via
+        ``register_addendum()``.
+
         Args:
             vertical: Vertical name
             extended: Whether to use extended rules
@@ -309,15 +276,13 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
             Grounding rules string with vertical addendum
         """
         base = cls.get_base(extended)
-        addendums = {
-            "research": cls.RESEARCH_ADDENDUM,
-            "data_analysis": cls.DATA_ADDENDUM,
-            "devops": cls.DEVOPS_ADDENDUM,
-        }
-        addendum = addendums.get(vertical, "")
+        addendum = cls._grounding_addendums.get(vertical, "")
         if addendum:
             return f"{base}\n{addendum}"
         return base
+
+    # NOTE: No _register_defaults() — verticals register their own
+    # addendums via VictorPlugin.register(context) calls at startup.
 
 
 # =============================================================================
@@ -589,23 +554,61 @@ class TieredToolTemplate:
     # Standard mandatory tools - essential for any task across all verticals
     DEFAULT_MANDATORY: Set[str] = {"read", "ls", "grep"}
 
-    # Pre-configured vertical cores
-    VERTICAL_CORES: Dict[str, Set[str]] = {
-        "coding": {"edit", "write", "shell", "git", "search", "overview"},
-        "research": {"web_search", "web_fetch", "overview"},
-        "devops": {"shell", "git", "docker", "overview"},
-        "data_analysis": {"shell", "write", "overview"},
-        "rag": {"rag_search", "rag_query", "rag_list", "rag_stats", "rag_delete"},
-    }
+    # Legacy dicts emptied — verticals MUST register via register_vertical_tools().
+    # Kept as empty dicts for structural backward compatibility.
+    _LEGACY_CORES: Dict[str, Set[str]] = {}
+    _LEGACY_READONLY: Dict[str, bool] = {}
 
-    # Vertical-specific readonly_only_for_analysis settings
-    VERTICAL_READONLY_DEFAULTS: Dict[str, bool] = {
-        "coding": False,  # Coding often needs write tools
-        "research": True,  # Research is primarily reading
-        "devops": False,  # DevOps needs execution tools
-        "data_analysis": False,  # Data analysis often writes results
-        "rag": True,  # RAG is primarily reading/retrieval
-    }
+    # Backward-compat aliases (empty, kept for import compatibility)
+    VERTICAL_CORES = _LEGACY_CORES
+    VERTICAL_READONLY_DEFAULTS = _LEGACY_READONLY
+
+    # Dynamic registry for vertical tool configs (OCP extension point)
+    # Verticals register via register_vertical_tools() at activation time.
+    # Takes precedence over VERTICAL_CORES/VERTICAL_READONLY_DEFAULTS.
+    _registered_verticals: Dict[str, Dict[str, Any]] = {}
+
+    @classmethod
+    def register_vertical_tools(
+        cls,
+        vertical: str,
+        core_tools: Set[str],
+        readonly_for_analysis: bool = True,
+    ) -> None:
+        """Register tool configuration for a vertical dynamically.
+
+        This enables new verticals to register their tool configs without
+        modifying core code (OCP compliance).
+
+        Args:
+            vertical: Vertical name
+            core_tools: Set of core tool names for this vertical
+            readonly_for_analysis: Whether to restrict writes in analysis mode
+        """
+        cls._registered_verticals[vertical] = {
+            "core_tools": core_tools,
+            "readonly_for_analysis": readonly_for_analysis,
+        }
+
+        # Propagate to ToolTierRegistry so the tool access controller
+        # and other consumers can discover the tier centrally.
+        try:
+            from victor.core.tool_tier_registry import ToolTierRegistry
+
+            config = cls.create(
+                vertical_core=core_tools,
+                readonly_only_for_analysis=readonly_for_analysis,
+            )
+            registry = ToolTierRegistry.get_instance()
+            registry.register(
+                name=vertical,
+                config=config,
+                parent="base",
+                description=f"Tiered configuration for {vertical} vertical",
+                overwrite=True,
+            )
+        except Exception:
+            pass  # Registry not available yet during early bootstrap
 
     @classmethod
     def create(
@@ -629,7 +632,7 @@ class TieredToolTemplate:
             Configured TieredToolConfig
         """
         return TieredToolConfig(
-            mandatory=mandatory if mandatory is not None else cls.DEFAULT_MANDATORY.copy(),
+            mandatory=(mandatory if mandatory is not None else cls.DEFAULT_MANDATORY.copy()),
             vertical_core=vertical_core,
             semantic_pool=semantic_pool or set(),
             stage_tools=stage_tools or {},
@@ -638,68 +641,50 @@ class TieredToolTemplate:
 
     @classmethod
     def for_vertical(cls, vertical: str) -> Optional[TieredToolConfig]:
-        """Get pre-configured TieredToolConfig for a known vertical.
+        """Get TieredToolConfig for a vertical.
+
+        Checks dynamic registry first, then falls back to built-in defaults.
 
         Args:
-            vertical: Vertical name (coding, research, devops, data_analysis, rag)
+            vertical: Vertical name
 
         Returns:
             Configured TieredToolConfig or None if vertical not known
         """
-        if vertical not in cls.VERTICAL_CORES:
-            return None
+        # Dynamic registry only (OCP extension point)
+        if vertical in cls._registered_verticals:
+            reg = cls._registered_verticals[vertical]
+            return cls.create(
+                vertical_core=set(reg["core_tools"]),
+                readonly_only_for_analysis=reg.get("readonly_for_analysis", True),
+            )
 
-        return cls.create(
-            vertical_core=cls.VERTICAL_CORES[vertical].copy(),
-            readonly_only_for_analysis=cls.VERTICAL_READONLY_DEFAULTS.get(vertical, True),
-        )
-
-    @classmethod
-    def for_coding(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for coding vertical."""
-        return cls.for_vertical("coding")  # type: ignore
+        return None
 
     @classmethod
-    def for_research(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for research vertical."""
-        return cls.for_vertical("research")  # type: ignore
+    def unregister_vertical_tools(cls, vertical: str) -> None:
+        """Remove a vertical's tool configuration from the dynamic registry.
 
-    @classmethod
-    def for_devops(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for devops vertical."""
-        return cls.for_vertical("devops")  # type: ignore
-
-    @classmethod
-    def for_data_analysis(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for data analysis vertical."""
-        return cls.for_vertical("data_analysis")  # type: ignore
-
-    @classmethod
-    def for_rag(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for RAG vertical."""
-        return cls.for_vertical("rag")  # type: ignore
-
-    @classmethod
-    def register_vertical(
-        cls,
-        name: str,
-        vertical_core: Set[str],
-        readonly_only_for_analysis: bool = True,
-    ) -> None:
-        """Register a new vertical's tool configuration.
+        Primarily for test cleanup to ensure isolation between tests.
 
         Args:
-            name: Vertical name
-            vertical_core: Core tools for the vertical
-            readonly_only_for_analysis: Whether to hide write tools for analysis
+            vertical: Vertical name to unregister
         """
-        cls.VERTICAL_CORES[name] = vertical_core
-        cls.VERTICAL_READONLY_DEFAULTS[name] = readonly_only_for_analysis
+        cls._registered_verticals.pop(vertical, None)
+
+        # Propagate removal to ToolTierRegistry
+        try:
+            from victor.core.tool_tier_registry import ToolTierRegistry
+
+            registry = ToolTierRegistry.get_instance()
+            registry.unregister(vertical)
+        except Exception:
+            pass  # Registry not available or entry doesn't exist
 
     @classmethod
     def list_verticals(cls) -> List[str]:
-        """List all registered verticals."""
-        return list(cls.VERTICAL_CORES.keys())
+        """List all dynamically registered verticals."""
+        return list(cls._registered_verticals.keys())
 
 
 # =============================================================================

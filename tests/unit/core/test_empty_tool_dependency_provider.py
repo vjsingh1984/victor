@@ -32,7 +32,14 @@ class TestEmptyToolDependencyProviderInitialization:
 
     def test_init_with_different_verticals(self):
         """Provider should work with any vertical name."""
-        for vertical in ["coding", "devops", "research", "rag", "dataanalysis", "custom"]:
+        for vertical in [
+            "coding",
+            "devops",
+            "research",
+            "rag",
+            "dataanalysis",
+            "custom",
+        ]:
             provider = EmptyToolDependencyProvider(vertical)
             assert provider.vertical == vertical
 
@@ -175,7 +182,9 @@ class TestEmptyToolDependencyProviderFactoryIntegration:
 
     def test_factory_returns_empty_provider_for_missing_yaml(self, tmp_path, monkeypatch):
         """Factory should return EmptyToolDependencyProvider when YAML missing."""
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_dependency_loader import (
+            create_vertical_tool_dependency_provider,
+        )
 
         # Monkeypatch the yaml_paths to point to non-existent file
         fake_yaml_path = tmp_path / "nonexistent.yaml"

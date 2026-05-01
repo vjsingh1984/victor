@@ -218,7 +218,9 @@ class TestGitTool:
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "committed", "")
             result = await git(
-                operation="commit", message="test commit", author_email="custom@example.com"
+                operation="commit",
+                message="test commit",
+                author_email="custom@example.com",
             )
             assert result["success"] is True
             call_kwargs = mock.call_args.kwargs
@@ -453,17 +455,14 @@ class TestGitSuggestCommit:
     @pytest.mark.asyncio
     async def test_no_provider(self):
         """Test commit_msg without provider in context."""
-        from victor.tools.git_tool import commit_msg
-
         # No context means no provider
-        result = await commit_msg(context=None)
+        result = await git(operation="commit_msg", context=None)
         assert result["success"] is False
         assert "provider" in result["error"].lower()
 
     @pytest.mark.asyncio
     async def test_diff_failure(self):
         """Test commit_msg when diff fails."""
-        from victor.tools.git_tool import commit_msg
         from victor.tools.base import ToolConfig
 
         mock_provider = MagicMock()
@@ -472,14 +471,13 @@ class TestGitSuggestCommit:
 
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error getting diff")
-            result = await commit_msg(context=context)
+            result = await git(operation="commit_msg", context=context)
             assert result["success"] is False
             assert "error getting diff" in result["error"]
 
     @pytest.mark.asyncio
     async def test_no_staged_changes(self):
         """Test commit_msg with no staged changes."""
-        from victor.tools.git_tool import commit_msg
         from victor.tools.base import ToolConfig
 
         mock_provider = MagicMock()
@@ -488,14 +486,13 @@ class TestGitSuggestCommit:
 
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "", "")  # Empty diff
-            result = await commit_msg(context=context)
+            result = await git(operation="commit_msg", context=context)
             assert result["success"] is False
             assert "No staged changes" in result["error"]
 
     @pytest.mark.asyncio
     async def test_successful_generation(self):
         """Test successful commit message generation."""
-        from victor.tools.git_tool import commit_msg
         from victor.tools.base import ToolConfig
 
         mock_provider = MagicMock()
@@ -510,14 +507,13 @@ class TestGitSuggestCommit:
                 (True, "+ new line\n- old line", ""),  # diff --staged
                 (True, "test.py\napi.py", ""),  # diff --staged --name-only
             ]
-            result = await commit_msg(context=context)
+            result = await git(operation="commit_msg", context=context)
             assert result["success"] is True
             assert "feat(api)" in result["output"]
 
     @pytest.mark.asyncio
     async def test_llm_error(self):
         """Test commit_msg when LLM fails."""
-        from victor.tools.git_tool import commit_msg
         from victor.tools.base import ToolConfig
 
         mock_provider = MagicMock()
@@ -531,7 +527,7 @@ class TestGitSuggestCommit:
                 (True, "+ new line", ""),  # diff --staged
                 (True, "test.py", ""),  # diff --staged --name-only
             ]
-            result = await commit_msg(context=context)
+            result = await git(operation="commit_msg", context=context)
             assert result["success"] is False
             assert "AI generation failed" in result["error"]
 
@@ -649,53 +645,45 @@ class TestGitCreatePR:
 
 
 class TestGitAnalyzeConflicts:
-    """Tests for conflicts function."""
+    """Tests for conflicts operation."""
 
     @pytest.mark.asyncio
     async def test_status_failure(self):
         """Test conflicts when status fails."""
-        from victor.tools.git_tool import conflicts
-
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error")
-            result = await conflicts()
+            result = await git(operation="conflicts")
             assert result["success"] is False
 
     @pytest.mark.asyncio
     async def test_no_conflicts(self):
         """Test conflicts with no conflicts."""
-        from victor.tools.git_tool import conflicts
-
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, " M test.py\n", "")
-            result = await conflicts()
+            result = await git(operation="conflicts")
             assert result["success"] is True
             assert "No merge conflicts" in result["output"]
 
     @pytest.mark.asyncio
     async def test_with_conflicts(self):
         """Test conflicts with conflicts."""
-        from victor.tools.git_tool import conflicts
-
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "UU conflict.py\n", "")
             with patch("builtins.open") as mock_open:
                 mock_open.return_value.__enter__.return_value.read.return_value = (
                     "<<<<<<< HEAD\nour content\n=======\ntheir content\n>>>>>>> branch\n"
                 )
-                result = await conflicts()
+                result = await git(operation="conflicts")
                 assert result["success"] is True
                 assert "1 conflicted file" in result["output"]
 
     @pytest.mark.asyncio
     async def test_file_read_error(self):
         """Test conflicts when file read fails."""
-        from victor.tools.git_tool import conflicts
-
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "UU missing.py\n", "")
             with patch("builtins.open") as mock_open:
                 mock_open.side_effect = FileNotFoundError("file not found")
-                result = await conflicts()
+                result = await git(operation="conflicts")
                 assert result["success"] is True
                 assert "Error reading file" in result["output"]

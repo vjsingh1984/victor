@@ -29,7 +29,7 @@ import asyncio
 import argparse
 from victor.integrations.mcp import MCPServer, MCPResource
 from victor.tools.base import ToolRegistry
-from victor.tools.bash import shell_readonly
+from victor.tools.bash import shell
 from victor.tools.filesystem import read, write, ls
 from victor.tools.git_tool import git
 
@@ -48,7 +48,7 @@ async def demo_server():
     tool_registry.register(read)
     tool_registry.register(write)
     tool_registry.register(ls)
-    tool_registry.register(shell_readonly)
+    tool_registry.register(shell)
     tool_registry.register(git)
 
     tools_list = tool_registry.list_tools()
@@ -59,7 +59,9 @@ async def demo_server():
     # Create MCP server
     print("\n2️⃣ Creating MCP Server...")
     print("-" * 70)
-    server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)
+    server = MCPServer(
+        name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry
+    )
 
     print(f"✓ Server created: {server.name} v{server.version}")
     print("  Capabilities:")
@@ -183,8 +185,7 @@ async def demo_server():
     print("  ✓ Full MCP specification compliance")
 
     print("\n\n📚 Usage Examples:")
-    print(
-        """
+    print("""
 # Run as stdio server (for MCP clients to connect)
 python examples/mcp_server_demo.py --stdio
 
@@ -195,12 +196,10 @@ python examples/mcp_client_demo.py
 # - Claude Desktop
 # - VS Code with MCP extension
 # - Custom MCP clients
-"""
-    )
+""")
 
     print("\n\n🔌 Integration:")
-    print(
-        """
+    print("""
 Victor can now be used by any MCP-compatible application!
 
 Example with Claude Desktop:
@@ -221,8 +220,7 @@ Example with Claude Desktop:
    - Git commands
    - Bash execution
    - And more!
-"""
-    )
+""")
 
 
 async def run_stdio_server():
@@ -232,11 +230,13 @@ async def run_stdio_server():
     tool_registry.register(read)
     tool_registry.register(write)
     tool_registry.register(ls)
-    tool_registry.register(shell_readonly)
+    tool_registry.register(shell)
     tool_registry.register(git)
 
     # Create and start server
-    server = MCPServer(name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry)
+    server = MCPServer(
+        name="Victor MCP Server", version="1.0.0", tool_registry=tool_registry
+    )
 
     # Register resources
     server.register_resource(
@@ -256,7 +256,9 @@ def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Victor MCP Server Demo")
     parser.add_argument(
-        "--stdio", action="store_true", help="Run as stdio server (for MCP client connections)"
+        "--stdio",
+        action="store_true",
+        help="Run as stdio server (for MCP client connections)",
     )
 
     args = parser.parse_args()

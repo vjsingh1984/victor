@@ -42,17 +42,15 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
     async def reset_conversation() -> JSONResponse:
         """Reset conversation history."""
         await server._record_rl_feedback()
-        if server._orchestrator:
-            server._orchestrator.reset_conversation()
+        # ✅ NEW: Use VictorClient (service layer) instead of direct orchestrator access
+        await server.reset_conversation()
         return JSONResponse({"success": True, "message": "Conversation reset"})
 
     @router.get("/conversation/export", tags=["Conversation"])
     async def export_conversation(format: str = Query("json")) -> Any:
         """Export conversation history."""
-        if not server._orchestrator:
-            return JSONResponse({"messages": []})
-
-        messages = server._orchestrator.get_messages()
+        # ✅ NEW: Use VictorClient (service layer) instead of direct orchestrator access
+        messages = await server.get_conversation_messages()
 
         if format == "markdown":
             content = server._format_messages_markdown(messages)

@@ -22,11 +22,15 @@ with the Python fallback implementations.
 from victor.native.rust.arg_normalizer import RustArgumentNormalizer
 from victor.native.rust.ast_indexer import RustAstIndexer
 from victor.native.rust.chunker import RustTextChunker
+from victor.native.rust.context_fitter import RustContextFitter
 from victor.native.rust.similarity import RustSimilarityComputer
+from victor.native.rust.tokenizer import RustTokenCounter
 
 __all__ = [
     "RustArgumentNormalizer",
     "RustAstIndexer",
+    "RustContextFitter",
     "RustSimilarityComputer",
     "RustTextChunker",
+    "RustTokenCounter",
 ]

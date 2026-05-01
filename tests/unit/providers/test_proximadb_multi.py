@@ -782,3 +782,183 @@ def parse_json(data):
                 },
             }
         ]
+
+    @pytest.mark.asyncio
+    async def test_localize_issue_returns_seed_and_graph_related_files(
+        self,
+        provider_config: EmbeddingConfig,
+        fake_client: FakeProximaClient,
+        stub_model: StubEmbeddingModel,
+    ) -> None:
+        with patch(
+            "victor.storage.vector_stores.proximadb_multi.create_embedding_model",
+            return_value=stub_model,
+        ):
+            provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
+            await provider.initialize()
+
+        provider.hybrid_search = AsyncMock(
+            return_value=[
+                {
+                    "id": "hit:1",
+                    "file_path": "src/repository.py",
+                    "symbol_name": "BaseRepository.save",
+                    "content": "class BaseRepository:\n    def save(self, entity): ...",
+                    "score": 0.82,
+                    "sources": ["vector", "document"],
+                    "metadata": {
+                        "file_path": "src/repository.py",
+                        "language": "python",
+                        "qualified_name": "BaseRepository.save",
+                    },
+                }
+            ]
+        )
+        provider.find_callers = AsyncMock(
+            return_value=[
+                {
+                    "id": "caller:1",
+                    "name": "UserService.create_user",
+                    "file_path": "src/service.py",
+                    "line_start": 12,
+                    "line_end": 18,
+                    "labels": ["Function"],
+                    "metadata": {"name": "UserService.create_user"},
+                }
+            ]
+        )
+        provider.find_callees = AsyncMock(
+            return_value=[
+                {
+                    "id": "callee:1",
+                    "name": "AuditLogger.log_save",
+                    "file_path": "src/audit.py",
+                    "line_start": 4,
+                    "line_end": 8,
+                    "labels": ["Function"],
+                    "metadata": {"name": "AuditLogger.log_save"},
+                }
+            ]
+        )
+
+        results = await provider.localize_issue(
+            "which files should I edit to add a logger parameter to BaseRepository.save",
+            language="python",
+            top_k=5,
+            context_limit=2,
+        )
+
+        provider.hybrid_search.assert_awaited_once_with(
+            query="which files should I edit to add a logger parameter to BaseRepository.save",
+            document_filter={"language": "python"},
+            top_k=10,
+        )
+        provider.find_callers.assert_awaited_once_with(
+            "BaseRepository.save",
+            file_path="src/repository.py",
+            max_depth=1,
+        )
+        provider.find_callees.assert_awaited_once_with(
+            "BaseRepository.save",
+            file_path="src/repository.py",
+            max_depth=1,
+        )
+        assert results[0]["file_path"] == "src/repository.py"
+        assert {row["file_path"] for row in results} >= {
+            "src/repository.py",
+            "src/service.py",
+            "src/audit.py",
+        }
+        localization = results[0]["metadata"]["localization"]
+        assert localization["matched_hints"] == ["BaseRepository.save"]
+        assert localization["graph_score"] > 0
+
+    @pytest.mark.asyncio
+    async def test_analyze_change_impact_returns_seed_and_impacted_neighbors(
+        self,
+        provider_config: EmbeddingConfig,
+        fake_client: FakeProximaClient,
+        stub_model: StubEmbeddingModel,
+    ) -> None:
+        with patch(
+            "victor.storage.vector_stores.proximadb_multi.create_embedding_model",
+            return_value=stub_model,
+        ):
+            provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
+            await provider.initialize()
+
+        provider.hybrid_search = AsyncMock(
+            return_value=[
+                {
+                    "id": "hit:1",
+                    "file_path": "src/repository.py",
+                    "symbol_name": "BaseRepository.save",
+                    "content": "class BaseRepository:\n    def save(self, entity): ...",
+                    "score": 0.84,
+                    "sources": ["vector", "document"],
+                    "metadata": {
+                        "file_path": "src/repository.py",
+                        "language": "python",
+                        "qualified_name": "BaseRepository.save",
+                    },
+                }
+            ]
+        )
+        provider.find_callers = AsyncMock(
+            return_value=[
+                {
+                    "id": "caller:1",
+                    "name": "UserService.create_user",
+                    "file_path": "src/service.py",
+                    "line_start": 12,
+                    "line_end": 18,
+                    "labels": ["Function"],
+                    "metadata": {"name": "UserService.create_user"},
+                }
+            ]
+        )
+        provider.find_callees = AsyncMock(
+            return_value=[
+                {
+                    "id": "callee:1",
+                    "name": "AuditLogger.log_save",
+                    "file_path": "src/audit.py",
+                    "line_start": 4,
+                    "line_end": 8,
+                    "labels": ["Function"],
+                    "metadata": {"name": "AuditLogger.log_save"},
+                }
+            ]
+        )
+
+        results = await provider.analyze_change_impact(
+            "what breaks if I change BaseRepository.save",
+            language="python",
+            top_k=5,
+            context_limit=2,
+        )
+
+        provider.hybrid_search.assert_awaited_once_with(
+            query="what breaks if I change BaseRepository.save",
+            document_filter={"language": "python"},
+            top_k=10,
+        )
+        provider.find_callers.assert_awaited_once_with(
+            "BaseRepository.save",
+            file_path="src/repository.py",
+            max_depth=2,
+        )
+        provider.find_callees.assert_awaited_once_with(
+            "BaseRepository.save",
+            file_path="src/repository.py",
+            max_depth=1,
+        )
+        assert results[0]["file_path"] == "src/repository.py"
+        assert {row["file_path"] for row in results} >= {
+            "src/repository.py",
+            "src/service.py",
+            "src/audit.py",
+        }
+        impact = results[0]["metadata"]["impact"]
+        assert impact["matched_hints"] == ["BaseRepository.save"]
+        assert impact["graph_score"] > 0

@@ -27,16 +27,25 @@ import logging
 import re
 import time
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional, Awaitable
 
 from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
     BenchmarkTask,
+    BenchmarkType,
     EvaluationConfig,
     TaskStatus,
     TokenUsage,
+    get_benchmark_metadata,
+    is_external_agentic_benchmark,
+)
+from victor.evaluation.topology_feedback import (
+    aggregate_topology_feedback,
+    summarize_topology_feedback,
 )
 from victor.evaluation.test_runners import (
     TestRunnerRegistry,
@@ -45,6 +54,9 @@ from victor.evaluation.test_runners import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+from victor.core.utils import clamp as _clamp
 
 
 class AgenticValidationType(Enum):
@@ -91,6 +103,8 @@ class AgenticExecutionTrace:
     task_id: str
     start_time: float
     end_time: float = 0.0
+    benchmark: str = ""
+    benchmark_source: str = ""
 
     # Multi-turn interaction tracking
     turns: int = 0
@@ -109,6 +123,8 @@ class AgenticExecutionTrace:
     # Validation results
     validations: dict[str, bool] = field(default_factory=dict)
     validation_errors: dict[str, str] = field(default_factory=dict)
+    completion_signals: dict[str, Any] = field(default_factory=dict)
+    topology_events: list[dict[str, Any]] = field(default_factory=list)
 
     # Correction/self-correction metrics
     correction_metrics: dict[str, Any] = field(default_factory=dict)
@@ -141,10 +157,38 @@ class AgenticExecutionTrace:
         """Alias for turns (for compatibility with orchestrator)."""
         return self.turns
 
+    def count_tool_calls(self, *tool_names: str) -> int:
+        """Count tool calls matching one or more tool names."""
+        if not tool_names:
+            return self.total_tool_calls
+        requested = set(tool_names)
+        return sum(1 for call in self.tool_calls if call.name in requested)
+
+    def tool_usage_counts(self) -> dict[str, int]:
+        """Return tool call counts by tool name."""
+        return dict(Counter(call.name for call in self.tool_calls))
+
+    @property
+    def code_search_calls(self) -> int:
+        """Number of `code_search` tool calls."""
+        return self.count_tool_calls("code_search")
+
+    @property
+    def graph_calls(self) -> int:
+        """Number of `graph` tool calls."""
+        return self.count_tool_calls("graph")
+
+    @property
+    def code_intelligence_calls(self) -> int:
+        """Combined `code_search` and `graph` tool calls."""
+        return self.count_tool_calls("code_search", "graph")
+
     def to_dict(self) -> dict[str, Any]:
         """Export trace as dictionary for serialization."""
         return {
             "task_id": self.task_id,
+            "benchmark": self.benchmark,
+            "benchmark_source": self.benchmark_source,
             "start_time": self.start_time,
             "end_time": self.end_time,
             "duration_seconds": self.duration_seconds,
@@ -164,7 +208,7 @@ class AgenticExecutionTrace:
                 {
                     "path": fe.path,
                     "action": fe.action,
-                    "before_content": fe.before_content[:500] if fe.before_content else "",
+                    "before_content": (fe.before_content[:500] if fe.before_content else ""),
                     "after_content": fe.after_content[:500] if fe.after_content else "",
                     "diff": fe.diff,
                 }
@@ -174,8 +218,13 @@ class AgenticExecutionTrace:
             "generated_code": self.generated_code,
             "validations": self.validations,
             "validation_errors": self.validation_errors,
+            "completion_signals": self.completion_signals,
+            "topology_events": list(self.topology_events),
             "total_tool_calls": self.total_tool_calls,
             "successful_tool_calls": self.successful_tool_calls,
+            "code_search_calls": self.code_search_calls,
+            "graph_calls": self.graph_calls,
+            "code_intelligence_calls": self.code_intelligence_calls,
             "files_modified": self.files_modified,
             "correction_metrics": self.correction_metrics,
             "token_usage": {
@@ -193,6 +242,7 @@ class AgenticTaskResult:
     task_id: str
     status: TaskStatus
     trace: AgenticExecutionTrace
+    benchmark: BenchmarkType = BenchmarkType.CUSTOM
 
     # Test results
     tests_passed: int = 0
@@ -204,11 +254,15 @@ class AgenticTaskResult:
     test_score: float = 0.0  # Test pass rate
     edit_accuracy: float = 0.0  # File edit accuracy
     tool_efficiency: float = 0.0  # Tool usage efficiency
+    completion_precision: float = 0.0  # Completion detector accuracy
+    unsupported_claim_rate: float = 0.0  # Share of unsupported completion claims
     overall_score: float = 0.0  # Weighted overall score
 
     # Error info
     error_message: str = ""
     traceback: str = ""
+    failure_category: Optional[BenchmarkFailureCategory] = None
+    failure_details: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_success(self) -> bool:
@@ -231,6 +285,124 @@ class AgenticTaskResult:
         )
         return self.overall_score
 
+    def evaluate_generative_optimization(
+        self,
+        *,
+        gate: Optional["GenerativeOptimizationFeasibilityGate"] = None,
+        weights: Optional["GenerativeOptimizationWeights"] = None,
+    ) -> "GenerativeOptimizationAssessment":
+        """Evaluate the task using a continuous reward plus feasibility gate."""
+        resolved_gate = gate or GenerativeOptimizationFeasibilityGate()
+        resolved_weights = weights or GenerativeOptimizationWeights()
+        topology_summary = summarize_topology_feedback(self)
+        topology_reward = self.overall_score
+        if topology_summary is not None:
+            topology_reward = float(
+                topology_summary.get("topology_reward", self.overall_score) or 0.0
+            )
+        reward_components = {
+            "overall_score": round(self.overall_score, 4),
+            "completion_precision": round(self.completion_precision, 4),
+            "topology_reward": round(topology_reward, 4),
+        }
+        reward = _clamp(
+            (reward_components["overall_score"] * resolved_weights.overall_score)
+            + (reward_components["completion_precision"] * resolved_weights.completion_precision)
+            + (reward_components["topology_reward"] * resolved_weights.topology_reward),
+            0.0,
+            1.0,
+        )
+
+        feasibility_failures: list[str] = []
+        if self.status == TaskStatus.TIMEOUT:
+            feasibility_failures.append("timeout")
+        elif self.status == TaskStatus.ERROR:
+            feasibility_failures.append("execution_error")
+
+        patch_validation = self.trace.validations.get(AgenticValidationType.PATCH_APPLIES.value)
+        if resolved_gate.require_patch_application and patch_validation is False:
+            feasibility_failures.append(AgenticValidationType.PATCH_APPLIES.value)
+
+        test_validation = self.trace.validations.get(AgenticValidationType.TESTS_PASS.value)
+        if resolved_gate.require_tests_pass and test_validation is False:
+            feasibility_failures.append(AgenticValidationType.TESTS_PASS.value)
+
+        if self.unsupported_claim_rate > resolved_gate.max_unsupported_claim_rate:
+            feasibility_failures.append("unsupported_claim_rate")
+
+        if self.completion_precision < resolved_gate.min_completion_precision:
+            feasibility_failures.append("completion_precision")
+
+        if (
+            resolved_gate.require_task_complete_validation
+            and self.trace.validations.get(AgenticValidationType.TASK_COMPLETE.value) is False
+        ):
+            feasibility_failures.append(AgenticValidationType.TASK_COMPLETE.value)
+
+        return GenerativeOptimizationAssessment(
+            feasible=not feasibility_failures,
+            reward=round(reward, 4),
+            reward_components=reward_components,
+            feasibility_failures=feasibility_failures,
+            gate=resolved_gate,
+            topology_summary=topology_summary,
+        )
+
+
+@dataclass(frozen=True)
+class GenerativeOptimizationWeights:
+    """Reward weights for PR2-style continuous optimization scoring."""
+
+    overall_score: float = 0.7
+    completion_precision: float = 0.15
+    topology_reward: float = 0.15
+
+
+@dataclass(frozen=True)
+class GenerativeOptimizationFeasibilityGate:
+    """Hard constraints for PR2-style optimization benchmarks."""
+
+    require_patch_application: bool = True
+    require_tests_pass: bool = True
+    require_task_complete_validation: bool = False
+    max_unsupported_claim_rate: float = 0.25
+    min_completion_precision: float = 0.0
+
+
+@dataclass(frozen=True)
+class GenerativeOptimizationAssessment:
+    """Structured task-level reward and feasibility signal."""
+
+    feasible: bool
+    reward: float
+    reward_components: dict[str, float] = field(default_factory=dict)
+    feasibility_failures: list[str] = field(default_factory=list)
+    gate: GenerativeOptimizationFeasibilityGate = field(
+        default_factory=GenerativeOptimizationFeasibilityGate
+    )
+    topology_summary: Optional[dict[str, Any]] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize assessment data for benchmark artifacts."""
+        return {
+            "feasible": self.feasible,
+            "reward": round(self.reward, 4),
+            "reward_components": dict(self.reward_components),
+            "feasibility_failures": list(self.feasibility_failures),
+            "gate": {
+                "require_patch_application": self.gate.require_patch_application,
+                "require_tests_pass": self.gate.require_tests_pass,
+                "require_task_complete_validation": self.gate.require_task_complete_validation,
+                "max_unsupported_claim_rate": round(self.gate.max_unsupported_claim_rate, 4),
+                "min_completion_precision": round(self.gate.min_completion_precision, 4),
+            },
+            "topology_reward": (
+                round(float(self.topology_summary.get("topology_reward", 0.0) or 0.0), 4)
+                if self.topology_summary is not None
+                else None
+            ),
+        }
+
 
 @dataclass
 class AgenticMetrics:
@@ -252,6 +424,8 @@ class AgenticMetrics:
     avg_test_score: float = 0.0
     avg_edit_accuracy: float = 0.0
     avg_tool_efficiency: float = 0.0
+    avg_completion_precision: float = 0.0
+    avg_unsupported_claim_rate: float = 0.0
     avg_overall_score: float = 0.0
 
     # Per-task results
@@ -298,8 +472,59 @@ class AgenticMetrics:
             return 0.0
         return self.total_correction_time_seconds / self.total_corrections
 
+    @property
+    def benchmarks_evaluated(self) -> list[str]:
+        """Unique benchmark ids covered by this run."""
+        return sorted({result.benchmark.value for result in self.task_results})
+
+    @property
+    def external_benchmark_task_count(self) -> int:
+        """Number of tasks sourced from external perception benchmarks."""
+        return sum(
+            1 for result in self.task_results if is_external_agentic_benchmark(result.benchmark)
+        )
+
+    @property
+    def failure_categories(self) -> dict[str, int]:
+        """Count benchmark failures by normalized category."""
+        counts: dict[str, int] = {}
+        for result in self.task_results:
+            if result.failure_category is None:
+                continue
+            key = result.failure_category.value
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    @property
+    def optimization_assessments(self) -> list[GenerativeOptimizationAssessment]:
+        """Task-level PR2 optimization assessments."""
+        return [result.evaluate_generative_optimization() for result in self.task_results]
+
     def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
+        topology_metrics = aggregate_topology_feedback(
+            self.task_results, total_tasks=self.total_tasks
+        )
+        optimization_assessments = self.optimization_assessments
+        feasible_tasks = sum(1 for assessment in optimization_assessments if assessment.feasible)
+        infeasible_tasks = max(0, len(optimization_assessments) - feasible_tasks)
+        avg_optimization_reward = (
+            sum(assessment.reward for assessment in optimization_assessments)
+            / len(optimization_assessments)
+            if optimization_assessments
+            else 0.0
+        )
+        feasible_rewards = [
+            assessment.reward for assessment in optimization_assessments if assessment.feasible
+        ]
+        infeasible_rewards = [
+            assessment.reward for assessment in optimization_assessments if not assessment.feasible
+        ]
+        gate_failures = Counter(
+            failure
+            for assessment in optimization_assessments
+            for failure in assessment.feasibility_failures
+        )
         return {
             "summary": {
                 "total_tasks": self.total_tasks,
@@ -308,6 +533,16 @@ class AgenticMetrics:
                 "errors": self.errors,
                 "timeouts": self.timeouts,
                 "pass_rate": round(self.pass_rate, 4),
+                "benchmarks_evaluated": self.benchmarks_evaluated,
+                "external_benchmark_tasks": self.external_benchmark_task_count,
+                "failure_categories": self.failure_categories,
+                "topology_feedback_coverage": topology_metrics["topology_feedback_coverage"],
+                "optimization_feasible_tasks": feasible_tasks,
+                "optimization_infeasible_tasks": infeasible_tasks,
+                "optimization_feasibility_rate": round(
+                    feasible_tasks / max(1, self.total_tasks),
+                    4,
+                ),
             },
             "efficiency": {
                 "total_turns": self.total_turns,
@@ -315,13 +550,31 @@ class AgenticMetrics:
                 "total_tool_calls": self.total_tool_calls,
                 "avg_tool_calls": round(self.avg_tool_calls, 2),
                 "total_time_seconds": round(self.total_time_seconds, 2),
+                "avg_coordination_overhead": topology_metrics["avg_coordination_overhead"],
             },
             "quality": {
                 "avg_patch_score": round(self.avg_patch_score, 4),
                 "avg_test_score": round(self.avg_test_score, 4),
                 "avg_edit_accuracy": round(self.avg_edit_accuracy, 4),
                 "avg_tool_efficiency": round(self.avg_tool_efficiency, 4),
+                "avg_completion_precision": round(self.avg_completion_precision, 4),
+                "avg_unsupported_claim_rate": round(self.avg_unsupported_claim_rate, 4),
                 "avg_overall_score": round(self.avg_overall_score, 4),
+                "avg_optimization_reward": round(avg_optimization_reward, 4),
+                "avg_feasible_optimization_reward": round(
+                    (sum(feasible_rewards) / len(feasible_rewards) if feasible_rewards else 0.0),
+                    4,
+                ),
+                "avg_infeasible_optimization_reward": round(
+                    (
+                        sum(infeasible_rewards) / len(infeasible_rewards)
+                        if infeasible_rewards
+                        else 0.0
+                    ),
+                    4,
+                ),
+                "avg_topology_reward": topology_metrics["avg_topology_reward"],
+                "avg_topology_confidence": topology_metrics["avg_topology_confidence"],
             },
             "correction": {
                 "total_corrections": self.total_corrections,
@@ -331,10 +584,32 @@ class AgenticMetrics:
                 "total_correction_time_seconds": round(self.total_correction_time_seconds, 2),
                 "avg_correction_time": round(self.avg_correction_time, 2),
             },
+            "optimization": {
+                "feasible_tasks": feasible_tasks,
+                "infeasible_tasks": infeasible_tasks,
+                "feasibility_rate": round(feasible_tasks / max(1, self.total_tasks), 4),
+                "avg_reward": round(avg_optimization_reward, 4),
+                "avg_feasible_reward": round(
+                    (sum(feasible_rewards) / len(feasible_rewards) if feasible_rewards else 0.0),
+                    4,
+                ),
+                "avg_infeasible_reward": round(
+                    (
+                        sum(infeasible_rewards) / len(infeasible_rewards)
+                        if infeasible_rewards
+                        else 0.0
+                    ),
+                    4,
+                ),
+                "gate_failures": dict(gate_failures),
+            },
+            "topology": topology_metrics,
             "tasks": [
                 {
                     "task_id": r.task_id,
+                    "benchmark": r.benchmark.value,
                     "status": r.status.value,
+                    "failure_category": (r.failure_category.value if r.failure_category else None),
                     "turns": r.trace.turns,
                     "tool_calls": r.trace.total_tool_calls,
                     "duration": round(r.trace.duration_seconds, 2),
@@ -342,7 +617,11 @@ class AgenticMetrics:
                     "tests_total": r.tests_total,
                     "patch_score": round(r.patch_score, 4),
                     "test_score": round(r.test_score, 4),
+                    "completion_precision": round(r.completion_precision, 4),
+                    "unsupported_claim_rate": round(r.unsupported_claim_rate, 4),
                     "overall_score": round(r.overall_score, 4),
+                    "optimization_summary": r.evaluate_generative_optimization().to_dict(),
+                    "topology_summary": summarize_topology_feedback(r),
                 }
                 for r in self.task_results
             ],
@@ -746,9 +1025,17 @@ class SemanticMatchValidator(AgenticValidator):
 
             # Determine pass/fail and message
             if avg_similarity >= self.HIGH_SIMILARITY_THRESHOLD:
-                return True, f"Excellent semantic match: {avg_similarity:.2%}", avg_similarity
+                return (
+                    True,
+                    f"Excellent semantic match: {avg_similarity:.2%}",
+                    avg_similarity,
+                )
             elif avg_similarity >= self._threshold:
-                return True, f"Good semantic match: {avg_similarity:.2%}", avg_similarity
+                return (
+                    True,
+                    f"Good semantic match: {avg_similarity:.2%}",
+                    avg_similarity,
+                )
             elif max_similarity >= self._threshold:
                 # At least one comparison passed
                 return (
@@ -757,7 +1044,11 @@ class SemanticMatchValidator(AgenticValidator):
                     max_similarity,
                 )
             else:
-                return False, f"Poor semantic match: {avg_similarity:.2%}", avg_similarity
+                return (
+                    False,
+                    f"Poor semantic match: {avg_similarity:.2%}",
+                    avg_similarity,
+                )
 
         except Exception as e:
             logger.warning(f"Semantic match validation error: {e}")
@@ -987,15 +1278,19 @@ class AgenticBenchmarkRunner:
         workspace_dir = self._workspace_base / f"task_{safe_task_id}_{int(time.time())}"
         workspace_dir.mkdir(parents=True, exist_ok=True)
 
+        benchmark_metadata = get_benchmark_metadata(task.benchmark)
         trace = AgenticExecutionTrace(
             task_id=task.task_id,
             start_time=time.time(),
+            benchmark=task.benchmark.value,
+            benchmark_source=benchmark_metadata.source_name if benchmark_metadata else "",
         )
 
         result = AgenticTaskResult(
             task_id=task.task_id,
             status=TaskStatus.RUNNING,
             trace=trace,
+            benchmark=task.benchmark,
         )
 
         try:
@@ -1024,6 +1319,12 @@ class AgenticBenchmarkRunner:
             result.test_score = scores.get(AgenticValidationType.TESTS_PASS.value, 0.0)
             result.edit_accuracy = scores.get(AgenticValidationType.FILE_EDITS.value, 0.0)
             result.tool_efficiency = scores.get(AgenticValidationType.TOOL_USAGE.value, 0.0)
+            result.completion_precision = float(
+                trace.completion_signals.get("completion_precision", 0.0) or 0.0
+            )
+            result.unsupported_claim_rate = float(
+                trace.completion_signals.get("unsupported_claim_rate", 0.0) or 0.0
+            )
             result.calculate_overall_score()
 
             # Determine pass/fail
@@ -1036,14 +1337,31 @@ class AgenticBenchmarkRunner:
             else:
                 result.status = TaskStatus.FAILED
 
+            result.failure_category = self._classify_failure_category(result, trace)
+            topology_summary = summarize_topology_feedback(result)
+            if topology_summary is not None:
+                trace.completion_signals.setdefault("topology_summary", topology_summary)
+            optimization_summary = result.evaluate_generative_optimization().to_dict()
+            trace.completion_signals.setdefault("optimization_summary", optimization_summary)
+            if result.failure_category is not None:
+                result.failure_details = {
+                    "validation_errors": dict(trace.validation_errors),
+                    "unsupported_claim_rate": result.unsupported_claim_rate,
+                    "optimization_summary": optimization_summary,
+                }
+                if topology_summary is not None:
+                    result.failure_details["topology_summary"] = topology_summary
+
         except asyncio.TimeoutError:
             result.status = TaskStatus.TIMEOUT
             result.error_message = "Agent timeout"
+            result.failure_category = BenchmarkFailureCategory.TIMEOUT
             trace.end_time = time.time()
 
         except Exception as e:
             result.status = TaskStatus.ERROR
             result.error_message = str(e)
+            result.failure_category = BenchmarkFailureCategory.EXECUTION_ERROR
             import traceback
 
             result.traceback = traceback.format_exc()
@@ -1094,6 +1412,12 @@ class AgenticBenchmarkRunner:
             metrics.avg_test_score = sum(r.test_score for r in metrics.task_results) / n
             metrics.avg_edit_accuracy = sum(r.edit_accuracy for r in metrics.task_results) / n
             metrics.avg_tool_efficiency = sum(r.tool_efficiency for r in metrics.task_results) / n
+            metrics.avg_completion_precision = (
+                sum(r.completion_precision for r in metrics.task_results) / n
+            )
+            metrics.avg_unsupported_claim_rate = (
+                sum(r.unsupported_claim_rate for r in metrics.task_results) / n
+            )
             metrics.avg_overall_score = sum(r.overall_score for r in metrics.task_results) / n
 
         return metrics
@@ -1202,6 +1526,33 @@ class AgenticBenchmarkRunner:
         else:
             metrics.errors += 1
 
+    def _classify_failure_category(
+        self,
+        result: AgenticTaskResult,
+        trace: AgenticExecutionTrace,
+    ) -> Optional[BenchmarkFailureCategory]:
+        """Infer a normalized failure category for agentic runs."""
+        if result.status == TaskStatus.PASSED:
+            return None
+        if result.status == TaskStatus.TIMEOUT:
+            return BenchmarkFailureCategory.TIMEOUT
+        if result.status == TaskStatus.ERROR:
+            message = result.error_message.lower()
+            if "environment" in message or "test runner" in message:
+                return BenchmarkFailureCategory.ENVIRONMENT_ERROR
+            return BenchmarkFailureCategory.EXECUTION_ERROR
+        if trace.validations.get(AgenticValidationType.PATCH_APPLIES.value) is False:
+            return BenchmarkFailureCategory.PATCH_APPLICATION
+        if trace.validations.get(AgenticValidationType.TESTS_PASS.value) is False:
+            return BenchmarkFailureCategory.TEST_FAILURE
+        if trace.validations.get(AgenticValidationType.TOOL_USAGE.value) is False:
+            return BenchmarkFailureCategory.TOOL_USAGE
+        if result.unsupported_claim_rate > 0.0:
+            return BenchmarkFailureCategory.UNSUPPORTED_CLAIM
+        if trace.validations.get(AgenticValidationType.TASK_COMPLETE.value) is False:
+            return BenchmarkFailureCategory.TASK_COMPLETION
+        return BenchmarkFailureCategory.UNKNOWN
+
     async def _setup_workspace(self, task: BenchmarkTask, workspace_dir: Path) -> None:
         """Set up the task workspace."""
         # Clone repository if specified
@@ -1257,6 +1608,16 @@ def generate_agentic_report(metrics: AgenticMetrics) -> str:
     lines.append(f"  Failed:         {metrics.failed}")
     lines.append(f"  Errors:         {metrics.errors}")
     lines.append(f"  Timeouts:       {metrics.timeouts}")
+    if metrics.benchmarks_evaluated:
+        lines.append(f"  Benchmarks:     {', '.join(metrics.benchmarks_evaluated)}")
+        lines.append(f"  External Tasks: {metrics.external_benchmark_task_count}")
+    if metrics.failure_categories:
+        lines.append(
+            "  Failures:       "
+            + ", ".join(
+                f"{name}={count}" for name, count in sorted(metrics.failure_categories.items())
+            )
+        )
     lines.append("")
 
     lines.append("EFFICIENCY")
@@ -1273,6 +1634,9 @@ def generate_agentic_report(metrics: AgenticMetrics) -> str:
     lines.append(f"  Edit Accuracy:  {metrics.avg_edit_accuracy:.3f}")
     lines.append(f"  Tool Efficiency:{metrics.avg_tool_efficiency:.3f}")
     lines.append(f"  Overall Score:  {metrics.avg_overall_score:.3f}")
+    optimization_metrics = metrics.to_dict()["optimization"]
+    lines.append(f"  Feasibility:    {optimization_metrics['feasibility_rate']:.1%}")
+    lines.append(f"  Opt Reward:     {optimization_metrics['avg_reward']:.3f}")
     lines.append("")
 
     lines.append("=" * 70)

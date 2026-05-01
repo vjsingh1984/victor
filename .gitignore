@@ -96,13 +96,15 @@ dmypy.json
 # Temporary files
 tmp/
 temp/
+victor/analysis/
 *.tmp
 coverage.json
 victor_debug.log
 demo_workspace/
 
 # Victor project-local storage directory
-# Contains: conversation.db, embeddings/, backups/, sessions/, init.md
+# Contains: project.db (consolidated database), embeddings/, backups/, sessions/, init.md
+# Database consolidation moved conversation.db → project.db (project-specific) and victor.db (global)
 .victor/
 
 # Legacy context file location (now .victor/init.md)
@@ -238,3 +240,19 @@ victor-dataanalysis/
 victor-devops/
 victor-rag/
 victor-research/
+
+# Scratch / temp files
+*.bak
+*.orig
+*.tmp
+hello.txt
+answer.txt
+MagicMock/
+# Workflow Pydantic models (Python code, not ML models)
+!victor/workflows/models/
+victor/workflows/models/__pycache__/
+.coverage*
+
+# Documentation Archive
+docs/archive/sessions/*.md
+

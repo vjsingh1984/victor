@@ -5,7 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from victor.core.tool_types import EmptyToolDependencyProvider
-from victor.framework.entry_point_loader import load_tool_dependency_provider_from_entry_points
+from victor.framework.entry_point_loader import (
+    load_tool_dependency_provider_from_entry_points,
+)
 
 
 @patch("victor.framework.entry_point_loader._cached_entry_points")
@@ -24,7 +26,9 @@ def test_load_tool_dependency_provider_prefers_entry_points(mock_cached_eps):
 
 
 @patch("victor.framework.entry_point_loader._cached_entry_points")
-def test_load_tool_dependency_provider_normalizes_entry_point_alias_names(mock_cached_eps):
+def test_load_tool_dependency_provider_normalizes_entry_point_alias_names(
+    mock_cached_eps,
+):
     """Alias entry point names (data-analysis) should match normalized caller input."""
     provider = object()
 

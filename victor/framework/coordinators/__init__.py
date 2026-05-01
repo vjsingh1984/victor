@@ -18,14 +18,14 @@ This package splits the WorkflowEngine responsibilities into focused
 coordinators, each handling a single domain:
 
 - YAMLWorkflowCoordinator: YAML workflow loading and execution
-- GraphExecutionCoordinator: StateGraph/CompiledGraph execution
+- GraphTurnExecutor: StateGraph/CompiledGraph execution
 - HITLCoordinator: Human-in-the-Loop integration
 - CacheCoordinator: Workflow caching management
 
 Architecture:
     WorkflowEngine (Facade)
     ├── YAMLWorkflowCoordinator     # execute_yaml(), stream_yaml()
-    ├── GraphExecutionCoordinator   # execute_graph(), stream_graph()
+    ├── GraphTurnExecutor   # execute_graph(), stream_graph()
     ├── HITLCoordinator             # execute_with_hitl()
     └── CacheCoordinator            # enable_caching(), clear_cache()
 
@@ -42,7 +42,7 @@ from victor.framework.coordinators.protocols import (
     ICacheManager,
 )
 from victor.framework.coordinators.yaml_coordinator import YAMLWorkflowCoordinator
-from victor.framework.coordinators.graph_coordinator import GraphExecutionCoordinator
+from victor.framework.coordinators.graph_coordinator import GraphTurnExecutor
 from victor.framework.coordinators.hitl_coordinator import HITLCoordinator
 from victor.framework.coordinators.cache_coordinator import CacheCoordinator
 
@@ -56,7 +56,7 @@ __all__ = [
     "ICacheManager",
     # Coordinators
     "YAMLWorkflowCoordinator",
-    "GraphExecutionCoordinator",
+    "GraphTurnExecutor",
     "HITLCoordinator",
     "CacheCoordinator",
 ]

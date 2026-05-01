@@ -27,61 +27,64 @@ References:
 """
 
 import json
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-import httpx
-
-from victor.providers.base import (
-    BaseProvider,
-    CompletionResponse,
-    Message,
-    ProviderAuthError,
-    ProviderError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
-    StreamChunk,
-    ToolDefinition,
-)
-from victor.providers.openai_compat import convert_tools_to_openai_format
+from victor.providers.base import CompletionResponse, ProviderError
+from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
     APIKeyNotFoundError,
 )
-from victor.providers.logging import ProviderLogger
 
 # Z.AI endpoint URLs for different access tiers
 # Reference: https://docs.z.ai/api-reference/introduction
 ZAI_BASE_URLS = {
     "standard": "https://api.z.ai/api/paas/v4/",
+    # Coding Plan keys require the /coding/ endpoint (standard endpoint returns 429)
     "coding": "https://api.z.ai/api/coding/paas/v4/",
     "china": "https://open.bigmodel.cn/api/paas/v4/",
+    "china-coding": "https://open.bigmodel.cn/api/coding/paas/v4/",
     "anthropic": "https://api.z.ai/api/anthropic/v1/",
 }
 
 # Available zhipuAI GLM models
 # Reference: https://open.bigmodel.cn/dev/api
 ZAI_MODELS = {
-    # Paid flagship models
+    # Paid flagship models (context windows from docs.z.ai and OpenRouter)
+    "glm-5.1": {
+        "description": "GLM-5.1 - Latest SOTA model, rivals Claude Opus 4.6",
+        "context_window": 200000,
+        "max_output": 65535,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
     "glm-5": {
         "description": "GLM-5 - SOTA flagship model with agentic capabilities",
-        "context_window": 128000,
-        "max_output": 8192,
+        "context_window": 200000,
+        "max_output": 65535,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
+    "glm-5-turbo": {
+        "description": "GLM-5-Turbo - Fast flagship model for coding",
+        "context_window": 200000,
+        "max_output": 16384,
         "supports_tools": True,
         "supports_thinking": True,
     },
     "glm-5-code": {
-        "description": "GLM-5-Code - Specialized coding model (coming soon)",
-        "context_window": 128000,
-        "max_output": 8192,
+        "description": "GLM-5-Code - Specialized coding model",
+        "context_window": 200000,
+        "max_output": 65535,
         "supports_tools": True,
         "supports_thinking": True,
     },
     "glm-4.7": {
-        "description": "GLM-4.7 - Latest flagship model",
-        "context_window": 128000,
-        "max_output": 4096,
+        "description": "GLM-4.7 - Flagship model with 200K context",
+        "context_window": 200000,
+        "max_output": 8192,
         "supports_tools": True,
-        "supports_thinking": False,
+        "supports_thinking": True,
     },
     "glm-4.6": {
         "description": "GLM-4.6 - Advanced agentic, reasoning, and coding",
@@ -151,31 +154,22 @@ ZAI_MODELS = {
 }
 
 
-class ZAIProvider(BaseProvider):
+class ZAIProvider(HttpxOpenAICompatProvider):
     """Provider for z.ai GLM models (OpenAI-compatible API).
 
-    Features:
-    - Native tool calling support (OpenAI-compatible format)
-    - Streaming with tool call accumulation
-    - Thinking mode with reasoning_content
-    - OpenAI-compatible API format
+    Extends ``HttpxOpenAICompatProvider`` with ZAI-specific behaviour:
+    - Multi-endpoint routing (standard / coding-plan / china / anthropic)
+    - Model suffix notation: "glm-5.1:coding" routes to the coding endpoint
+    - Thinking mode (``thinking=True``) for GLM-4.6/4.5/4.5-Air
+    - Larger default timeout (300 s) for complex multi-tool tasks
 
     Example:
-        from victor.providers.zai_provider import ZAIProvider
-
-        provider = ZAIProvider(
-            api_key="your-zai-api-key",
-            base_url="https://open.bigmodel.cn/api/paas/v4/"
-        )
-
-        response = await provider.chat(
-            messages=[Message(role="user", content="Hello!")],
-            model="glm-5"
-        )
+        provider = ZAIProvider(api_key="...", model="glm-5.1:coding")
+        response = await provider.chat(messages=[...], model="glm-5")
     """
 
-    # Reasonable timeout for cloud API
-    DEFAULT_TIMEOUT = 120
+    # GLM models can take 200-400 s for complex multi-tool tasks.
+    DEFAULT_TIMEOUT = 300
 
     def __init__(
         self,
@@ -203,432 +197,132 @@ class ZAIProvider(BaseProvider):
             **kwargs: Additional configuration
 
         Model Suffix Format:
-            Models can include an endpoint suffix using colon notation:
-            - "glm-4.6:coding" - GLM coding plan endpoint
-            - "glm-4.6:standard" - Standard endpoint
-            - "glm-4.6:china" - China endpoint
-            - "glm-4.6:anthropic" - Anthropic-compatible endpoint
-
-            This is the recommended way to specify endpoint variants.
+            "glm-4.6:coding"   → coding endpoint
+            "glm-4.6:standard" → standard endpoint
+            "glm-4.6:china"    → china endpoint
         """
-        # Resolve base URL priority:
-        # 1. Explicit base_url (highest)
-        # 2. endpoint parameter
-        # 3. coding_plan flag
-        # 4. Model suffix parsing
-        # 5. Default to standard
+        # Strip model suffix for endpoint routing
+        self._model_suffix_stripped = None
+        model_endpoint = None
+        if model and ":" in model:
+            model_name, endpoint_variant = model.rsplit(":", 1)
+            if endpoint_variant in ZAI_BASE_URLS:
+                model_endpoint = endpoint_variant
+                self._model_suffix_stripped = model
+                model = model_name
+        self._clean_model_init = model
 
+        # Resolve base URL (priority: explicit > endpoint param > coding_plan > model suffix > default)
         if base_url is None:
-            # Try model suffix first (e.g., "glm-4.6:coding" -> endpoint="coding")
-            model_endpoint = None
-            if model and ":" in model:
-                # Parse model suffix for endpoint variant
-                _model_name, endpoint_variant = model.rsplit(":", 1)
-                if endpoint_variant in ZAI_BASE_URLS:
-                    model_endpoint = endpoint_variant
-
             if endpoint is not None:
                 base_url = ZAI_BASE_URLS.get(endpoint, ZAI_BASE_URLS["standard"])
             elif coding_plan:
                 base_url = ZAI_BASE_URLS["coding"]
             elif model_endpoint is not None:
-                # Use endpoint from model suffix
                 base_url = ZAI_BASE_URLS[model_endpoint]
             else:
                 base_url = ZAI_BASE_URLS["standard"]
-        # Initialize structured logger
-        self._provider_logger = ProviderLogger("zai", __name__)
 
-        # Resolve API key using unified resolver
+        # Resolve API key
+        from victor.providers.logging import ProviderLogger as _PL
+
+        _logger = _PL("zai", __name__)
         resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
         key_result = resolver.get_api_key("zai", explicit_key=api_key)
-
-        # Log API key resolution
-        self._provider_logger.log_api_key_resolution(key_result)
-
+        _logger.log_api_key_resolution(key_result)
         if key_result.key is None:
-            # Raise detailed error with actionable suggestions
             raise APIKeyNotFoundError(
                 provider="zai",
                 sources_attempted=key_result.sources_attempted,
                 non_interactive=key_result.non_interactive,
             )
-
-        self._api_key = key_result.key
-
-        # Log provider initialization
-        self._provider_logger.log_provider_init(
-            model="zai",  # Will be set on chat()
+        resolved_key = key_result.key
+        _logger.log_provider_init(
+            model="zai",
             key_source=key_result.source_detail,
             non_interactive=key_result.non_interactive,
             config={"base_url": base_url, "timeout": timeout, **kwargs},
         )
 
         super().__init__(
-            api_key=self._api_key,
+            api_key=resolved_key,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
+            provider_name="zai",
             **kwargs,
         )
-        self.client = httpx.AsyncClient(
-            base_url=base_url,
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=httpx.Timeout(timeout),
-        )
+
+    # ── BaseProvider identity ─────────────────────────────────────────────────
 
     @property
     def name(self) -> str:
-        """Provider name."""
         return "zai"
 
     def supports_tools(self) -> bool:
-        """z.ai GLM models support function calling."""
         return True
 
     def supports_streaming(self) -> bool:
-        """z.ai supports streaming."""
         return True
 
-    def get_context_window(self, model: str) -> int:
-        """Get context window size for a model.
+    # ── Template Method overrides ─────────────────────────────────────────────
 
-        Args:
-            model: Model name (e.g., "glm-4.7", "glm-4.6")
+    def _clean_model_name(self, model: str) -> str:
+        """Strip Z.AI endpoint suffix (e.g., "glm-5.1:coding" → "glm-5.1")."""
+        if model and ":" in model:
+            parts = model.rsplit(":", 1)
+            if parts[1] in ZAI_BASE_URLS:
+                return parts[0]
+        return model
 
-        Returns:
-            Context window size in tokens (default: 128000 for unknown models)
-        """
-        # Try exact match first
-        if model in ZAI_MODELS:
-            return ZAI_MODELS[model]["context_window"]
-
-        # Try prefix match (e.g., "glm-4.7-custom" matches "glm-4.7")
-        for model_prefix, info in ZAI_MODELS.items():
-            if model.startswith(model_prefix):
-                return info["context_window"]
-
-        # Default to 128K for unknown GLM models
-        return 128000
-
-    async def chat(
+    def _get_provider_params(
         self,
-        messages: List[Message],
-        *,
-        model: str = "glm-5",
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        thinking: bool = False,
-        **kwargs: Any,
-    ) -> CompletionResponse:
-        """Send chat completion request to z.ai.
-
-        Args:
-            messages: Conversation messages
-            model: Model name (e.g., "glm-4.7", "glm-4.6")
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            thinking: Enable thinking mode for reasoning (GLM-4.6/4.5/4.5-Air)
-            **kwargs: Additional z.ai parameters
-
-        Returns:
-            CompletionResponse with generated content
-
-        Raises:
-            ProviderAuthError: If authentication fails
-            ProviderRateLimitError: If rate limit is exceeded
-            ProviderTimeoutError: If request times out
-            ProviderError: For other errors
-        """
-        # Use structured logging context manager
-        with self._provider_logger.log_api_call(
-            endpoint="/chat/completions",
-            model=model,
-            operation="chat",
-            num_messages=len(messages),
-            has_tools=tools is not None,
-        ) as log_success:
-            try:
-                payload = self._build_request_payload(
-                    messages=messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=tools,
-                    stream=False,
-                    thinking=thinking,
-                    **kwargs,
-                )
-
-                response = await self._execute_with_circuit_breaker(
-                    self.client.post, "/chat/completions", json=payload
-                )
-                response.raise_for_status()
-
-                result = response.json()
-                parsed = self._parse_response(result, model)
-
-                # Log success with usage info
-                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                log_success(tokens=tokens)
-
-                return parsed
-
-            except httpx.TimeoutException as e:
-                raise ProviderTimeoutError(
-                    message=f"z.ai request timed out after {self.timeout}s",
-                    provider=self.name,
-                ) from e
-            except httpx.HTTPStatusError as e:
-                # Convert HTTP errors to specific provider error types
-                error_text = e.response.text[:200] if e.response.text else ""
-                if e.response.status_code == 401:
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {error_text or 'HTTP 401'}",
-                        provider=self.name,
-                        status_code=401,
-                    ) from e
-                elif e.response.status_code == 429:
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {error_text or 'HTTP 429'}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    error_body = ""
-                    try:
-                        error_body = e.response.text[:500]
-                    except Exception:
-                        pass
-                    raise ProviderError(
-                        message=f"z.ai HTTP error {e.response.status_code}: {error_body}",
-                        provider=self.name,
-                        status_code=e.response.status_code,
-                        raw_error=e,
-                    ) from e
-            except Exception as e:
-                raise self.classify_error(e) from e
-
-    async def stream(
-        self,
-        messages: List[Message],
-        *,
-        model: str = "glm-5",
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        thinking: bool = False,
-        **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from z.ai with tool call accumulation.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            thinking: Enable thinking mode for reasoning (GLM-4.6/4.5/4.5-Air)
-            **kwargs: Additional parameters
-
-        Yields:
-            StreamChunk with incremental content
-
-        Raises:
-            ProviderAuthError: If authentication fails
-            ProviderRateLimitError: If rate limit is exceeded
-            ProviderTimeoutError: If request times out
-            ProviderError: For other errors
-        """
-        try:
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                stream=True,
-                thinking=thinking,
-                **kwargs,
-            )
-
-            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
-                response.raise_for_status()
-
-                accumulated_tool_calls: List[Dict[str, Any]] = []
-                has_sent_final = False
-
-                async for line in response.aiter_lines():
-                    if not line.strip():
-                        continue
-
-                    # OpenAI SSE format: "data: {...}" or "data: [DONE]"
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-
-                        if data_str.strip() == "[DONE]":
-                            # Only yield final chunk if we haven't already sent one
-                            # OR if there are accumulated tool calls that haven't been emitted
-                            if not has_sent_final or accumulated_tool_calls:
-                                yield StreamChunk(
-                                    content="",
-                                    tool_calls=(
-                                        accumulated_tool_calls if accumulated_tool_calls else None
-                                    ),
-                                    stop_reason="stop",
-                                    is_final=True,
-                                )
-                            break
-
-                        try:
-                            chunk_data = json.loads(data_str)
-                            chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
-                            if chunk:
-                                if chunk.is_final:
-                                    has_sent_final = True
-                                yield chunk
-                        except json.JSONDecodeError:
-                            self._provider_logger.logger.warning(
-                                f"z.ai JSON decode error on line: {line[:100]}"
-                            )
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"z.ai stream timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            # Convert HTTP errors to specific provider error types
-            error_text = e.response.text[:200] if e.response.text else ""
-            if e.response.status_code == 401:
-                raise ProviderAuthError(
-                    message=f"Authentication failed: {error_text or 'HTTP 401'}",
-                    provider=self.name,
-                    status_code=401,
-                ) from e
-            elif e.response.status_code == 429:
-                raise ProviderRateLimitError(
-                    message=f"Rate limit exceeded: {error_text or 'HTTP 429'}",
-                    provider=self.name,
-                    status_code=429,
-                ) from e
-            else:
-                error_body = ""
-                try:
-                    error_body = e.response.text[:500]
-                except Exception:
-                    pass
-                raise ProviderError(
-                    message=f"z.ai streaming HTTP error {e.response.status_code}: {error_body}",
-                    provider=self.name,
-                    status_code=e.response.status_code,
-                    raw_error=e,
-                ) from e
-        except Exception as e:
-            raise self.classify_error(e) from e
-
-    def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
-        """Convert standard tools to z.ai format (OpenAI-compatible)."""
-        return convert_tools_to_openai_format(tools)
-
-    def _build_request_payload(
-        self,
-        messages: List[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]],
-        stream: bool,
         thinking: bool = False,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Build request payload for z.ai's OpenAI-compatible API.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens
-            tools: Available tools
-            stream: Whether to stream response
-            thinking: Whether to enable thinking mode
-            **kwargs: Additional options
-
-        Returns:
-            Request payload dictionary
-        """
-        # Build messages in OpenAI format
-        formatted_messages = []
-        for msg in messages:
-            formatted_msg: Dict[str, Any] = {
-                "role": msg.role,
-                "content": msg.content,
-            }
-            # Handle tool results (tool response messages)
-            if msg.role == "tool" and hasattr(msg, "tool_call_id") and msg.tool_call_id:
-                formatted_msg["tool_call_id"] = msg.tool_call_id
-            formatted_messages.append(formatted_msg)
-
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": formatted_messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": stream,
-        }
-
-        # Add tools if provided
-        if tools:
-            payload["tools"] = self._convert_tools(tools)
-            payload["tool_choice"] = "auto"
-
-        # Add thinking mode if requested (for GLM-4.6/4.5/4.5-Air)
-        # Note: z.ai uses extra_body with thinking parameter
-        # Since we're using httpx directly, we'll pass it as a top-level parameter
+        """Standard params + optional thinking mode for GLM reasoning models."""
+        params: Dict[str, Any] = {"temperature": temperature, "max_tokens": max_tokens}
         if thinking:
-            payload["thinking"] = {"type": "enabled"}
+            params["thinking"] = {"type": "enabled"}
+        return params
 
-        # Merge additional options (excluding internal ones)
-        internal_keys = {"api_key"}
-        for key, value in kwargs.items():
-            if key not in internal_keys and value is not None:
-                payload[key] = value
+    def _extract_response_metadata(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Capture reasoning_content from thinking-mode responses."""
+        if "reasoning_content" in message:
+            return {"reasoning_content": message.get("reasoning_content")}
+        return None
 
-        return payload
+    def _extract_stream_metadata(self, delta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Capture reasoning_content from thinking-mode streaming deltas."""
+        rc = delta.get("reasoning_content")
+        if rc:
+            return {"reasoning_content": rc, "thinking_mode": True}
+        return None
 
     def _normalize_tool_calls(
         self, tool_calls: Optional[List[Dict[str, Any]]]
     ) -> Optional[List[Dict[str, Any]]]:
-        """Normalize tool calls from OpenAI format.
+        """Normalize tool calls into Victor's provider-neutral shape.
 
-        Converts:
-        {'id': '...', 'type': 'function', 'function': {'name': 'tool_name', 'arguments': '...'}}
-
-        To:
-        {'id': '...', 'name': 'tool_name', 'arguments': {...}}
-
-        Args:
-            tool_calls: Raw tool calls from API
-
-        Returns:
-            Normalized tool calls with parsed arguments
+        ``ZAIProvider`` now inherits the shared OpenAI-compatible transport and
+        parsing stack, but several repo-local call sites and tests still reach
+        this helper directly. Keep the provider surface stable and coerce
+        malformed JSON arguments to ``{}``, which matches the existing runtime
+        behavior of the neighboring provider implementations.
         """
         if not tool_calls:
             return None
 
-        normalized = []
+        normalized: List[Dict[str, Any]] = []
         for call in tool_calls:
             if isinstance(call, dict) and "function" in call:
                 function = call.get("function", {})
                 name = function.get("name")
                 arguments = function.get("arguments", "{}")
 
-                # Parse arguments if string
                 if isinstance(arguments, str):
                     try:
                         arguments = json.loads(arguments)
@@ -638,44 +332,34 @@ class ZAIProvider(BaseProvider):
                 if name:
                     normalized.append(
                         {
-                            "id": call.get("id"),
+                            "id": call.get("id", ""),
                             "name": name,
                             "arguments": arguments,
                         }
                     )
             elif isinstance(call, dict) and "name" in call:
-                # Already normalized
                 normalized.append(call)
 
         return normalized if normalized else None
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
-        """Parse z.ai API response.
+        """Parse a non-streaming chat completion response.
 
-        Args:
-            result: Raw API response
-            model: Model name
-
-        Returns:
-            Normalized CompletionResponse
+        The base compat provider already handles most of this flow, but ZAI
+        keeps its own tool-call normalizer so invalid JSON arguments degrade to
+        an empty object instead of propagating raw strings into tool execution.
         """
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
-                content="",
-                role="assistant",
-                model=model,
-                raw_response=result,
+                content="", role="assistant", model=model, raw_response=result
             )
 
         choice = choices[0]
         message = choice.get("message", {})
         content = message.get("content", "") or ""
-
-        # Normalize tool calls (parses arguments to dict)
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
 
-        # Parse usage
         usage = None
         usage_data = result.get("usage")
         if usage_data:
@@ -685,10 +369,7 @@ class ZAIProvider(BaseProvider):
                 "total_tokens": usage_data.get("total_tokens", 0),
             }
 
-        # Extract reasoning_content if present (thinking mode)
-        metadata = None
-        if "reasoning_content" in message:
-            metadata = {"reasoning_content": message.get("reasoning_content")}
+        metadata = self._extract_response_metadata(message)
 
         return CompletionResponse(
             content=content,
@@ -701,111 +382,33 @@ class ZAIProvider(BaseProvider):
             metadata=metadata,
         )
 
-    def _parse_stream_chunk(
-        self, chunk_data: Dict[str, Any], accumulated_tool_calls: List[Dict[str, Any]]
-    ) -> Optional[StreamChunk]:
-        """Parse streaming chunk from z.ai with tool call accumulation.
+    # ── ZAI-specific helpers ──────────────────────────────────────────────────
+
+    def get_context_window(self, model: str) -> int:
+        """Get context window size for a GLM model.
 
         Args:
-            chunk_data: Raw chunk data
-            accumulated_tool_calls: List to accumulate tool call deltas
+            model: Model name (e.g., "glm-4.7", "glm-4.6")
 
         Returns:
-            StreamChunk or None
+            Context window size in tokens (default 128K for unknown models)
         """
-        choices = chunk_data.get("choices", [])
-        if not choices:
-            return None
-
-        choice = choices[0]
-        delta = choice.get("delta", {})
-        content = delta.get("content", "") or ""
-        finish_reason = choice.get("finish_reason")
-
-        # Extract reasoning_content if present (thinking mode)
-        metadata = None
-        if "reasoning_content" in delta:
-            metadata = {"reasoning_content": delta.get("reasoning_content")}
-
-        # Handle tool call deltas (OpenAI streaming format)
-        tool_call_deltas = delta.get("tool_calls", [])
-        for tc_delta in tool_call_deltas:
-            idx = tc_delta.get("index", 0)
-            # Extend accumulated list if needed
-            while len(accumulated_tool_calls) <= idx:
-                accumulated_tool_calls.append({"id": "", "name": "", "arguments": ""})
-
-            # Accumulate tool call ID
-            if "id" in tc_delta:
-                accumulated_tool_calls[idx]["id"] = tc_delta["id"]
-
-            if "function" in tc_delta:
-                func_delta = tc_delta["function"]
-                if "name" in func_delta:
-                    accumulated_tool_calls[idx]["name"] = func_delta["name"]
-                if "arguments" in func_delta:
-                    accumulated_tool_calls[idx]["arguments"] += func_delta["arguments"]
-
-        # Finalize tool calls on stream end
-        final_tool_calls = None
-        if finish_reason == "tool_calls" or (finish_reason == "stop" and accumulated_tool_calls):
-            final_tool_calls = []
-            for tc in accumulated_tool_calls:
-                if tc.get("name"):
-                    args = tc.get("arguments", "{}")
-                    try:
-                        parsed_args = json.loads(args) if isinstance(args, str) else args
-                    except json.JSONDecodeError:
-                        parsed_args = {}
-                    final_tool_calls.append(
-                        {
-                            "id": tc.get("id"),
-                            "name": tc["name"],
-                            "arguments": parsed_args,
-                        }
-                    )
-
-        # Parse usage from final chunk
-        usage = None
-        if finish_reason and "usage" in chunk_data:
-            usage_data = chunk_data.get("usage")
-            if usage_data:
-                usage = {
-                    "prompt_tokens": usage_data.get("prompt_tokens", 0),
-                    "completion_tokens": usage_data.get("completion_tokens", 0),
-                    "total_tokens": usage_data.get("total_tokens", 0),
-                }
-
-        return StreamChunk(
-            content=content,
-            tool_calls=final_tool_calls,
-            stop_reason=finish_reason,
-            is_final=finish_reason is not None,
-            metadata=metadata,
-            usage=usage,
-        )
+        if model in ZAI_MODELS:
+            return ZAI_MODELS[model]["context_window"]
+        for prefix, info in ZAI_MODELS.items():
+            if model.startswith(prefix):
+                return info["context_window"]
+        return 128000
 
     async def list_models(self) -> List[Dict[str, Any]]:
-        """List available z.ai GLM models.
-
-        Returns:
-            List of available models with metadata
-
-        Raises:
-            ProviderError: If request fails
-        """
+        """List available z.ai GLM models."""
         try:
             response = await self.client.get("/models")
             response.raise_for_status()
-            result = response.json()
-            return result.get("data", [])
+            return response.json().get("data", [])
         except Exception as e:
             raise ProviderError(
-                message=f"z.ai failed to list models: {str(e)}",
+                message=f"z.ai failed to list models: {e}",
                 provider=self.name,
                 raw_error=e,
             ) from e
-
-    async def close(self) -> None:
-        """Close HTTP client."""
-        await self.client.aclose()

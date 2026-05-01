@@ -29,22 +29,20 @@ Simple API (recommended):
     result = await agent.run("Write a hello world function")
     print(result.content)
 
+Advanced Config:
+    from victor import Agent, UnifiedAgentConfig
+
+    agent = await Agent.create(config=UnifiedAgentConfig.high_budget())
+
 Full API (advanced):
     from victor import AgentOrchestrator, Settings
 
     settings = Settings()
     orchestrator = await AgentOrchestrator.from_settings(settings, "default")
 
-For coding-specific features:
-try:
-        from victor_coding import CodingVertical
-try:
-            from victor_coding.codebase import CodebaseIndex
-except ImportError:
-    # External vertical package may not be installed
-    pass
-except ImportError:
-    # victor-coding is an external package and may not be installed
+For coding-specific features, install the victor-coding package:
+    pip install victor-coding
+Verticals are discovered automatically via the victor.plugins entry point.
 """
 
 import os
@@ -75,6 +73,7 @@ if not _LIGHT_IMPORT:
     from victor.framework import (
         Agent,
         AgentConfig,
+        UnifiedAgentConfig,
         AgentError,
         AgentExecutionEvent,
         BudgetExhaustedError,
@@ -95,7 +94,20 @@ if not _LIGHT_IMPORT:
         ToolSet,
     )
 
+    # Decorator API — @victor.agent / @victor.task
+    from victor.framework.decorators import (
+        agent,
+        task,
+        AgentCallable,
+        TaskDefinition,
+    )
+
     __all__ = [
+        # Decorator API
+        "agent",
+        "task",
+        "AgentCallable",
+        "TaskDefinition",
         # Framework API (5 core concepts + supporting classes)
         "Agent",
         "Task",
@@ -112,6 +124,7 @@ if not _LIGHT_IMPORT:
         "StateHooks",
         "EventType",
         "AgentConfig",
+        "UnifiedAgentConfig",
         # Errors
         "AgentError",
         "ProviderError",

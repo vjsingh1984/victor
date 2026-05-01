@@ -157,6 +157,21 @@ def foo():
         assert dedup.duplicates_removed == 0
         assert dedup.get_stats()["total_blocks"] == 0
 
+    def test_native_and_python_paths_deduplicate_across_calls(self):
+        """Repeated blocks should be suppressed across separate process() calls."""
+        content = (
+            "Now I have enough data to produce the complete analysis based on the "
+            "evidence collected from the repository."
+        )
+
+        dedup = OutputDeduplicator(min_block_length=40)
+        first = dedup.process(f"{content}\n\nFirst unique detail.")
+        second = dedup.process(f"{content}\n\nSecond unique detail.")
+
+        assert "First unique detail." in first
+        assert second == "Second unique detail."
+        assert dedup.duplicates_removed >= 1
+
     def test_get_stats(self, dedup):
         """Test getting statistics."""
         content = """First unique paragraph with enough content to count.
@@ -328,7 +343,7 @@ The quick brown fox jumps over the lazy dog."""
 
 
 class TestIntelligentPipelineDeduplication:
-    """Tests for IntelligentAgentPipeline deduplication integration.
+    """Tests for RuntimeIntelligencePipeline deduplication integration.
 
     These tests verify that the pipeline correctly integrates the output
     deduplicator with provider-aware configuration (Strategy Pattern).
@@ -337,9 +352,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def grok_pipeline(self):
         """Create pipeline for Grok provider (deduplication enabled)."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        return IntelligentAgentPipeline(
+        return RuntimeIntelligencePipeline(
             provider_name="grok",
             model="grok-beta",
             profile_name="test-grok",
@@ -348,9 +363,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def xai_pipeline(self):
         """Create pipeline for xAI provider (deduplication enabled)."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        return IntelligentAgentPipeline(
+        return RuntimeIntelligencePipeline(
             provider_name="xai",
             model="grok-2-1212",
             profile_name="test-xai",
@@ -359,9 +374,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def anthropic_pipeline(self):
         """Create pipeline for Anthropic provider (deduplication disabled)."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        return IntelligentAgentPipeline(
+        return RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
             profile_name="test-anthropic",
@@ -370,9 +385,9 @@ class TestIntelligentPipelineDeduplication:
     @pytest.fixture
     def deepseek_pipeline(self):
         """Create pipeline for DeepSeek provider (deduplication disabled)."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        return IntelligentAgentPipeline(
+        return RuntimeIntelligencePipeline(
             provider_name="deepseek",
             model="deepseek-chat",
             profile_name="test-deepseek",
@@ -458,11 +473,11 @@ This is repeated content for testing purposes."""
 
     def test_provider_name_case_insensitive(self):
         """Test provider detection is case-insensitive."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
         # All variations should enable deduplication
         for provider in ["GROK", "Grok", "grok", "XAI", "xai", "X-AI", "x-ai"]:
-            pipeline = IntelligentAgentPipeline(
+            pipeline = RuntimeIntelligencePipeline(
                 provider_name=provider,
                 model="test",
                 profile_name="test",
@@ -508,7 +523,9 @@ Here is a list of Python files with descriptions.
 
     def test_providers_with_repetition_issues_constant(self):
         """Test PROVIDERS_WITH_REPETITION_ISSUES contains expected providers."""
-        from victor.agent.intelligent_pipeline import PROVIDERS_WITH_REPETITION_ISSUES
+        from victor.agent.runtime_intelligence_pipeline import (
+            PROVIDERS_WITH_REPETITION_ISSUES,
+        )
 
         assert "xai" in PROVIDERS_WITH_REPETITION_ISSUES
         assert "grok" in PROVIDERS_WITH_REPETITION_ISSUES

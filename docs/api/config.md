@@ -66,7 +66,9 @@ print(settings.resilience.circuit_breaker_failure_threshold)  # 5
 print(settings.security.write_approval_mode)  # "risky_only"
 print(settings.search.codebase_vector_store)  # "lancedb"
 print(settings.events.event_backend_type)     # "in_memory"
-print(settings.pipeline.intelligent_pipeline_enabled)  # True
+print(settings.pipeline.runtime_intelligence_enabled)  # True
+# Preferred canonical field name for the runtime-intelligence path used by the
+# streaming executor, evaluation, and recovery surfaces.
 ```
 
 ### Nested Config Groups
@@ -305,7 +307,7 @@ class ProjectPaths:
 ```
 {project_root}/.victor/
 ├── init.md              # Project context
-├── conversation.db      # Conversation history
+├── project.db           # Consolidated project database (conversations, graph, entities)
 ├── embeddings/          # Vector embeddings
 ├── graph/               # Graph data
 ├── backups/             # File edit backups
@@ -314,6 +316,7 @@ class ProjectPaths:
 └── mcp.yaml             # MCP configuration
 
 ~/.victor/
+├── victor.db            # Global user database (RL, prompt opt, sessions, tool usage)
 ├── profiles.yaml        # Global profiles
 ├── plugins/             # Plugins directory
 ├── cache/               # Global cache
@@ -322,13 +325,18 @@ class ProjectPaths:
 └── embeddings/          # Global embeddings
 ```
 
+**Database Consolidation**: All conversation data migrated from `conversation.db` to:
+- **project.db**: Project-specific data (conversations, graph, entities) - local to each project
+- **victor.db**: Global user data (RL learning, prompt optimization, cross-project sessions)
+
 ### Project-Local Paths
 
 | Property | Type | Path |
 |----------|------|------|
 | `project_victor_dir` | `Path` | `{project_root}/.victor/` |
 | `project_context_file` | `Path` | `.victor/init.md` |
-| `conversation_db` | `Path` | `.victor/conversation.db` |
+| `project_db` | `Path` | `.victor/project.db` (consolidated database) |
+| `conversation_db` | `Path` | Alias for `project_db` (backward compatibility) |
 | `embeddings_dir` | `Path` | `.victor/embeddings/` |
 | `graph_dir` | `Path` | `.victor/graph/` |
 | `backups_dir` | `Path` | `.victor/backups/` |

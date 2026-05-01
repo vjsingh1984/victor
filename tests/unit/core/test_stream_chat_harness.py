@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict, List
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.stream_handler import StreamChunk
+from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.config.settings import Settings, ProfileConfig
 
 # Singleton reset is handled globally in tests/conftest.py
@@ -92,15 +94,44 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
             max_tokens=2048,
         )
     }
-    settings.use_semantic_tool_selection = False
-    settings.use_mcp_tools = False
+    settings.tools.use_semantic_tool_selection = False
+    settings.mcp.mcp_enabled = False
     settings.analytics_log_file = None
     settings.analytics_enabled = False
-    settings.tool_call_budget = 300
-    settings.airgapped_mode = False
+    settings.tools.tool_call_budget = 300
+    settings.security.airgapped_mode = False
     settings.load_tool_config = lambda: {}
 
-    return AgentOrchestrator(settings=settings, provider=provider, model="fake")
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orchestrator = AgentOrchestrator(settings=settings, provider=provider, model="fake")
+
+    def _detect_task_type(_: str) -> TrackerTaskType:
+        orchestrator.unified_tracker.set_task_type(TrackerTaskType.GENERAL)
+        return TrackerTaskType.GENERAL
+
+    orchestrator.unified_tracker.detect_task_type = _detect_task_type
+
+    # Wire up a lightweight mock chat service that delegates streaming to the provider
+    mock_chat_service = MagicMock()
+
+    async def _mock_stream_chat(user_message: str, **kwargs):
+        """Delegate streaming directly to the FakeProvider."""
+        messages = [{"role": "user", "content": user_message}]
+        if provider.supports_streaming():
+            async for chunk in provider.stream(
+                messages=messages, model="fake", temperature=0.7, max_tokens=2048
+            ):
+                yield StreamChunk(content=chunk.content or "")
+        else:
+            resp = await provider.chat(
+                messages=messages, model="fake", temperature=0.7, max_tokens=2048
+            )
+            yield StreamChunk(content=resp.content or "")
+
+    mock_chat_service.stream_chat = _mock_stream_chat
+    orchestrator._chat_service = mock_chat_service
+
+    return orchestrator
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +142,10 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
 @pytest.mark.asyncio
 async def test_streaming_basic_passes_through_chunks():
     provider = FakeProvider(
-        stream_chunks=[FakeStreamChunk(content="hello"), FakeStreamChunk(content=" world")]
+        stream_chunks=[
+            FakeStreamChunk(content="hello"),
+            FakeStreamChunk(content=" world"),
+        ]
     )
     orchestrator = _make_orchestrator(provider)
 

@@ -47,8 +47,13 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import yaml
 
+from victor.agent.action_authorizer import build_write_tool_set
+from victor.core.loop_thresholds import (
+    DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
+    derive_blocked_total_threshold,
+)
 from victor.tools.tool_names import ToolNames, get_canonical_name
-from victor.tools.metadata_registry import get_progress_params
+from victor.tools.metadata_registry import get_signature_params
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
@@ -139,6 +144,20 @@ DEFAULT_READ_LIMIT = 500
 
 # Canonical tool name for file reading (from centralized registry)
 CANONICAL_READ_TOOL = ToolNames.READ
+CANONICAL_LIST_TOOL = ToolNames.LS
+CANONICAL_WRITE_TOOL = ToolNames.WRITE
+CANONICAL_EDIT_TOOL = ToolNames.EDIT
+CANONICAL_SHELL_TOOL = ToolNames.SHELL
+CANONICAL_TEST_TOOL = ToolNames.TEST
+
+FALLBACK_SIGNATURE_PARAMS: Dict[str, Tuple[str, ...]] = {
+    CANONICAL_READ_TOOL: ("path",),
+    CANONICAL_LIST_TOOL: ("path",),
+    CANONICAL_WRITE_TOOL: ("path",),
+    CANONICAL_SHELL_TOOL: ("cmd",),
+    ToolNames.GREP: ("query", "pattern", "path"),
+    ToolNames.CODE_SEARCH: ("query", "path"),
+}
 
 
 # =============================================================================
@@ -264,15 +283,15 @@ class UnifiedTaskConfigLoader:
                 "force_action_after_target_read": True,
                 "tool_budget": 25,
                 "loop_repeat_threshold": 8,
-                "required_tools": ["edit_files", "read_file"],
+                "required_tools": ["edit", "read"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["edit_files", "read_file"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["edit", "read"],
+                    "verifying": ["read", "test"],
                 },
                 "force_action_hints": {
-                    "after_target_read": "Use edit_files to make the change.",
+                    "after_target_read": "Use edit to make the change.",
                     "max_iterations": "Please make the change or explain blockers.",
                 },
             },
@@ -281,12 +300,12 @@ class UnifiedTaskConfigLoader:
                 "force_action_after_target_read": False,
                 "tool_budget": 25,
                 "loop_repeat_threshold": 8,
-                "required_tools": ["write_file"],
+                "required_tools": ["write"],
                 "stage_tools": {
-                    "initial": ["list_directory", "read_file"],
-                    "reading": ["read_file"],
-                    "executing": ["write_file", "edit_files"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "read"],
+                    "reading": ["read"],
+                    "executing": ["write", "edit"],
+                    "verifying": ["read", "test"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please create the file.",
@@ -297,15 +316,15 @@ class UnifiedTaskConfigLoader:
                 "force_action_after_target_read": False,
                 "tool_budget": 20,
                 "loop_repeat_threshold": 6,
-                "required_tools": ["write_file"],
+                "required_tools": ["write"],
                 "stage_tools": {
-                    "initial": ["write_file"],
+                    "initial": ["write"],
                     "reading": [],
-                    "executing": ["write_file"],
-                    "verifying": ["read_file"],
+                    "executing": ["write"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
-                    "immediate": "Create the code directly using write_file.",
+                    "immediate": "Create the code directly using write.",
                 },
             },
             "search": {
@@ -313,12 +332,12 @@ class UnifiedTaskConfigLoader:
                 "force_action_after_target_read": False,
                 "tool_budget": 25,
                 "loop_repeat_threshold": 6,
-                "required_tools": ["code_search", "read_file"],
+                "required_tools": ["code_search", "read"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["read_file"],
-                    "verifying": ["read_file"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["read"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please summarize your findings.",
@@ -329,12 +348,12 @@ class UnifiedTaskConfigLoader:
                 "force_action_after_target_read": False,
                 "tool_budget": 40,
                 "loop_repeat_threshold": 10,
-                "required_tools": ["read_file", "execute_bash"],
+                "required_tools": ["read", "shell"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search", "execute_bash"],
-                    "executing": ["execute_bash"],
-                    "verifying": ["read_file"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search", "shell"],
+                    "executing": ["shell"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please summarize your analysis.",
@@ -365,12 +384,12 @@ class UnifiedTaskConfigLoader:
                 "tool_budget": 40,
                 "loop_repeat_threshold": 10,
                 "needs_tools": True,
-                "required_tools": ["read_file", "list_directory", "code_search"],
+                "required_tools": ["read", "ls", "code_search"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search", "read_file"],
-                    "reading": ["read_file", "code_search", "list_directory"],
+                    "initial": ["ls", "code_search", "read"],
+                    "reading": ["read", "code_search", "ls"],
                     "executing": [],
-                    "verifying": ["read_file"],
+                    "verifying": ["read"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please summarize the architecture and provide your recommendations.",
@@ -381,12 +400,12 @@ class UnifiedTaskConfigLoader:
                 "force_action_after_target_read": False,
                 "tool_budget": 35,
                 "loop_repeat_threshold": 8,
-                "required_tools": ["read_file", "list_directory"],
+                "required_tools": ["read", "ls"],
                 "stage_tools": {
-                    "initial": ["list_directory", "code_search", "read_file"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["edit_files", "write_file", "execute_bash"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "code_search", "read"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["edit", "write", "shell"],
+                    "verifying": ["read", "test"],
                 },
                 "force_action_hints": {
                     "max_iterations": "Please complete the task or explain blockers.",
@@ -441,7 +460,7 @@ class UnifiedTaskConfigLoader:
 
                 # Restructure to match our expected format
                 self._config = {
-                    "task_types": task_config.get("task_types", {}),
+                    "task_types": self._normalize_task_types(task_config.get("task_types", {})),
                     "global": {
                         "max_total_iterations": 50,
                         "min_content_threshold": 150,
@@ -455,15 +474,54 @@ class UnifiedTaskConfigLoader:
                 logger.debug(f"Loaded task config from {task_config_path}")
             except Exception as e:
                 logger.warning(f"Failed to load task config: {e}, using defaults")
-                self._config = self.DEFAULT_CONFIG
+                self._config = {
+                    **self.DEFAULT_CONFIG,
+                    "task_types": self._normalize_task_types(
+                        self.DEFAULT_CONFIG.get("task_types", {})
+                    ),
+                }
         else:
             logger.debug("Using default task config (task_tool_config.yaml not found)")
-            self._config = self.DEFAULT_CONFIG
+            self._config = {
+                **self.DEFAULT_CONFIG,
+                "task_types": self._normalize_task_types(self.DEFAULT_CONFIG.get("task_types", {})),
+            }
 
     def reload(self) -> None:
         """Force reload configuration."""
         self._config = None
         self._load_config()
+
+    @staticmethod
+    def _normalize_task_types(task_types: Any) -> Dict[str, Any]:
+        """Normalize loaded task types to canonical runtime tool names."""
+        if not isinstance(task_types, dict):
+            return {}
+
+        normalized: Dict[str, Any] = {}
+        for task_name, task_data in task_types.items():
+            if not isinstance(task_data, dict):
+                continue
+            task_copy = dict(task_data)
+            required = task_data.get("required_tools", [])
+            task_copy["required_tools"] = [
+                get_canonical_name(tool) if isinstance(tool, str) else tool for tool in required
+            ]
+
+            raw_stage_tools = task_data.get("stage_tools", {})
+            normalized_stage_tools = {}
+            if isinstance(raw_stage_tools, dict):
+                for stage_name, tools in raw_stage_tools.items():
+                    if isinstance(tools, list):
+                        normalized_stage_tools[stage_name] = [
+                            get_canonical_name(tool) if isinstance(tool, str) else tool
+                            for tool in tools
+                        ]
+                    else:
+                        normalized_stage_tools[stage_name] = []
+            task_copy["stage_tools"] = normalized_stage_tools
+            normalized[task_name] = task_copy
+        return normalized
 
     def get_task_config(self, task_type: TrackerTaskType) -> TaskConfig:
         """Get configuration for a specific task type."""
@@ -793,20 +851,18 @@ class UnifiedTaskTracker(ModeAwareMixin):
     # =========================================================================
 
     # Tools that perform write/modify actions (don't count toward exploration limit)
-    WRITE_TOOLS = {
-        "edit_files",
-        "write_file",
-        "shell",
-        "bash",
-        "git_commit",
-        "git_push",
-        "create_file",
-        "delete_file",
-        "rename_file",
-        "notebook_edit",
-        "refactor",
-        "rename",
-    }
+    WRITE_TOOLS = set(
+        build_write_tool_set(
+            "git_commit",
+            "git_push",
+            "create_file",
+            "delete_file",
+            "rename_file",
+            "notebook_edit",
+            "refactor",
+            "rename",
+        )
+    )
 
     def record_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Record a tool call - updates milestones, loops, and budgets.
@@ -819,14 +875,25 @@ class UnifiedTaskTracker(ModeAwareMixin):
         self._progress.tool_calls += 1
         self._progress.iteration_count += 1
         self._progress.total_turns += 1
+        canonical_tool_name = get_canonical_name(tool_name)
 
         # Classify as exploration vs action
         # Shell commands with write-like operations are actions
-        is_write_operation = tool_name in self.WRITE_TOOLS
-        if tool_name in {"shell", "bash"} and arguments:
-            cmd = arguments.get("cmd", "")
+        is_write_operation = canonical_tool_name in self.WRITE_TOOLS
+        if canonical_tool_name == CANONICAL_SHELL_TOOL and arguments:
+            cmd = arguments.get("cmd") or arguments.get("command", "")
             # Check for write-like shell commands
-            write_commands = ["mkdir", "touch", "echo", "cat >", "cp", "mv", "rm", "chmod", "chown"]
+            write_commands = [
+                "mkdir",
+                "touch",
+                "echo",
+                "cat >",
+                "cp",
+                "mv",
+                "rm",
+                "chmod",
+                "chown",
+            ]
             is_write_operation = any(wc in cmd for wc in write_commands)
 
         if is_write_operation:
@@ -836,22 +903,22 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Delegate to BudgetManager if available (parallel operation)
         if self._budget_manager:
-            self._budget_manager.record_tool_call(tool_name, is_write_operation)
+            self._budget_manager.record_tool_call(canonical_tool_name, is_write_operation)
 
         # Update milestones
-        self._update_milestones(tool_name, arguments)
+        self._update_milestones(canonical_tool_name, arguments)
 
         # Update loop detection
-        self._update_loop_state(tool_name, arguments)
+        self._update_loop_state(canonical_tool_name, arguments)
 
         # Track resources
-        self._track_resource(tool_name, arguments)
+        self._track_resource(canonical_tool_name, arguments)
 
         # Update stage
-        self._update_stage(tool_name)
+        self._update_stage(canonical_tool_name)
 
         logger.debug(
-            f"UnifiedTaskTracker: tool_call={tool_name}, "
+            f"UnifiedTaskTracker: tool_call={canonical_tool_name}, "
             f"iteration={self._progress.iteration_count}, "
             f"exploration={self._progress.exploration_iterations}, "
             f"action={self._progress.action_iterations}"
@@ -1039,6 +1106,18 @@ class UnifiedTaskTracker(ModeAwareMixin):
                     # Add to permanent block list IMMEDIATELY when warning is given
                     # This ensures it stays blocked even if model tries other operations
                     self._progress.permanently_blocked.add(sig)
+
+                    # Parse signature for logging
+                    sig_parts = sig.split("|")
+                    tool_name = sig_parts[0] if sig_parts else sig
+
+                    logger.info(
+                        f"[dedup-warning] Tool call approaching loop threshold: {tool_name} | "
+                        f"signature={sig[:80]}... | "
+                        f"count={count}/{threshold} | "
+                        f"Adding to permanent block list"
+                    )
+
                     return f"Approaching loop ({count}/{threshold}): {sig[:80]}"
 
         return None
@@ -1058,6 +1137,15 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Check if this signature is permanently blocked
         if proposed_sig in self._progress.permanently_blocked:
+            # Log detailed information about the blocked tool call
+            args_summary = ", ".join(
+                f"{k}={repr(v)[:30]}" for k, v in arguments.items() if k not in {"offset", "limit"}
+            )
+            logger.info(
+                f"[dedup-block] Tool call BLOCKED: {tool_name}({args_summary}) | "
+                f"signature={proposed_sig[:60]}... | "
+                f"permanently_blocked after loop warning"
+            )
             return f"Blocked: same operation after warning ({proposed_sig[:50]})"
 
         return None
@@ -1071,10 +1159,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
             - total_limit: Force completion after N total blocked attempts (across conversation)
         """
         threshold = self._get_loop_threshold()
-        # Consecutive: same as threshold (4 by default)
-        # Total: 1.5x threshold (6 by default when threshold is 4)
         consecutive_limit = threshold
-        total_limit = int(threshold * 1.5)
+        total_limit = derive_blocked_total_threshold(threshold)
         return consecutive_limit, total_limit
 
     # =========================================================================
@@ -1105,37 +1191,39 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
     def _update_milestones(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Update milestones based on tool call."""
-        if tool_name in {"list_directory", "code_search", "semantic_code_search"}:
+        if tool_name in {CANONICAL_LIST_TOOL, "code_search", "semantic_code_search"}:
             self._progress.milestones.add(Milestone.TARGET_IDENTIFIED)
 
-        elif get_canonical_name(tool_name) == CANONICAL_READ_TOOL:
+        elif tool_name == CANONICAL_READ_TOOL:
             path = arguments.get("path", "")
             if path:
                 self._progress.files_read.add(path)
                 if path in self._progress.target_files:
                     self._progress.milestones.add(Milestone.TARGET_READ)
 
-        elif tool_name in {"edit_files", "write_file"}:
+        elif tool_name in {CANONICAL_EDIT_TOOL, CANONICAL_WRITE_TOOL}:
             self._progress.milestones.add(Milestone.CHANGE_MADE)
-            if tool_name == "edit_files":
-                files = arguments.get("files", [])
-                if isinstance(files, list):
-                    for f in files:
-                        if isinstance(f, dict):
-                            self._progress.files_modified.add(f.get("path", ""))
+            if tool_name == CANONICAL_EDIT_TOOL:
+                ops = arguments.get("ops") or arguments.get("files", [])
+                if isinstance(ops, list):
+                    for op in ops:
+                        if isinstance(op, dict):
+                            path = op.get("path") or op.get("new_path")
+                            if path:
+                                self._progress.files_modified.add(path)
             else:
                 path = arguments.get("path", "")
                 if path:
                     self._progress.files_modified.add(path)
 
-        elif tool_name in {"run_tests", "execute_bash"}:
+        elif tool_name in {CANONICAL_TEST_TOOL, CANONICAL_SHELL_TOOL}:
             if Milestone.CHANGE_MADE in self._progress.milestones:
                 self._progress.milestones.add(Milestone.CHANGE_VERIFIED)
 
     def _update_loop_state(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Update loop detection state."""
         # Track file reads with offset-aware detection
-        if get_canonical_name(tool_name) == CANONICAL_READ_TOOL:
+        if tool_name == CANONICAL_READ_TOOL:
             self._track_file_read(arguments)
         else:
             # Track base resources for non-file operations
@@ -1184,20 +1272,24 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
     def _update_stage(self, tool_name: str) -> None:
         """Update conversation stage based on tool usage."""
-        canonical = get_canonical_name(tool_name)
-        if canonical in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.CODE_SEARCH}:
+        if tool_name in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.CODE_SEARCH}:
             if self._progress.stage == ConversationStage.INITIAL:
                 self._progress.stage = ConversationStage.READING
 
-        elif tool_name in {"edit_files", "write_file"}:
+        elif tool_name in {CANONICAL_EDIT_TOOL, CANONICAL_WRITE_TOOL}:
             self._progress.stage = ConversationStage.EXECUTING
 
-        elif tool_name in {"run_tests", "execute_bash"}:
+        elif tool_name in {CANONICAL_TEST_TOOL, CANONICAL_SHELL_TOOL}:
             if Milestone.CHANGE_MADE in self._progress.milestones:
                 self._progress.stage = ConversationStage.VERIFYING
 
     def _check_loop(self) -> Optional[str]:
         """Check for loop patterns."""
+        # Check for read-only loop (too many reads without any writes)
+        readonly_loop = self._check_readonly_loop()
+        if readonly_loop:
+            return readonly_loop
+
         # Check file read overlaps
         file_loop = self._check_file_read_loops()
         if file_loop:
@@ -1222,6 +1314,38 @@ class UnifiedTaskTracker(ModeAwareMixin):
             for sig, count in sig_counts.items():
                 if count >= threshold:
                     return f"Same signature repeated {count} times: {sig[:50]}"
+
+        return None
+
+    def _check_readonly_loop(self) -> Optional[str]:
+        """Check for read-only loop - too many reads without any writes.
+
+        This catches the case where the agent keeps reading different files
+        without making any progress on the actual task (no edits/creates/writes).
+        """
+        # Only check for analysis/research tasks after minimum iterations
+        if self._progress.task_type not in {
+            TrackerTaskType.ANALYZE,
+            TrackerTaskType.SEARCH,
+            TrackerTaskType.RESEARCH,
+        }:
+            return None
+
+        # Need at least some iterations before checking
+        if self._progress.iteration_count < 10:
+            return None
+
+        # Check if we've read many files without any write operations
+        files_read = len(self._progress.files_read)
+        files_modified = len(self._progress.files_modified)
+
+        # If we've read more than 20 files without modifying anything, flag it
+        if files_read > 20 and files_modified == 0:
+            return f"Read-only loop: {files_read} files read, 0 files modified"
+
+        # If we've read more than 50 files with fewer than 5 modifications, flag it
+        if files_read > 50 and files_modified < 5:
+            return f"Read-heavy loop: {files_read} files read, only {files_modified} files modified"
 
         return None
 
@@ -1353,7 +1477,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         - PLAN mode: 2.5x (e.g., threshold 4 becomes 10)
         - EXPLORE mode: 3.0x (e.g., threshold 4 becomes 12)
         """
-        base_threshold = 4
+        base_threshold = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
         if self._task_config:
             base_threshold = self._task_config.loop_repeat_threshold
 
@@ -1387,15 +1511,20 @@ class UnifiedTaskTracker(ModeAwareMixin):
     ) -> str:
         """Generate context-aware signature for loop detection.
 
-        For progressive tools (with progress_params defined via @tool decorator),
-        only the specified parameters are used in the signature - this allows
-        different queries/paths to be treated as exploration, not loops.
+        Tools declare signature_params via @tool decorator to explicitly control
+        which parameters are included in loop detection signatures. Only params in
+        signature_params affect the signature - pagination parameters (offset, limit, k)
+        are excluded to allow reading results in chunks.
+
+        Examples:
+            read(path="file.py", offset=0)   → signature="read|file.py|stage:initial"
+            read(path="file.py", offset=500) → signature="read|file.py|stage:initial" (SAME!)
+            This enables pagination - different chunks of same file = exploration, not loop.
 
         Context-Awareness:
         - Includes conversation stage to prevent false loop detection when the same
           operation is performed in different stages (e.g., reading a file in
-          EXPLORING stage vs IMPLEMENTING stage)
-        - Excludes volatile parameters like offset/limit for progressive reads
+          READING stage vs EXECUTING stage)
 
         Args:
             tool_name: Name of the tool being called
@@ -1405,29 +1534,14 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Context-aware signature string for loop detection
         """
-        # Volatile fields that shouldn't count towards loop detection
-        # Reading the same file with different offsets is NOT a loop
-        volatile_fields = {
-            "offset",
-            "limit",
-            "line_start",
-            "line_end",
-            "start_line",
-            "end_line",
-            "page",
-            "page_size",
-            "count",
-            "max_results",
-            "timeout",
-        }
-
-        params = list(get_progress_params(tool_name))
+        canonical_tool_name = get_canonical_name(tool_name)
+        params = list(get_signature_params(canonical_tool_name))
+        if not params:
+            params = list(FALLBACK_SIGNATURE_PARAMS.get(canonical_tool_name, ()))
         if params:
-            sig_parts = [tool_name]
+            # Use only declared signature_params - explicit positive allowlist
+            sig_parts = [canonical_tool_name]
             for param in params:
-                # Skip volatile fields for progressive tools
-                if param in volatile_fields:
-                    continue
                 value = arguments.get(param, "")
                 if isinstance(value, str) and len(value) > 100:
                     value = value[:100]
@@ -1439,10 +1553,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
             return "|".join(sig_parts)
         else:
-            # Filter out volatile fields for non-progressive tools too
-            stable_args = {k: v for k, v in arguments.items() if k not in volatile_fields}
-            args_str = str(sorted(stable_args.items()))
-            base_sig = f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
+            # For tools without signature_params, use all arguments
+            args_str = str(sorted(arguments.items()))
+            base_sig = f"{canonical_tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
 
             # Add stage for context-awareness
             if include_stage:
@@ -1465,21 +1578,21 @@ class UnifiedTaskTracker(ModeAwareMixin):
             directory = arguments.get("directory", ".")
             return f"search:{directory}:{query[:50]}" if query else None
         elif canonical == ToolNames.SHELL:
-            command = arguments.get("command", "")
+            command = arguments.get("cmd") or arguments.get("command", "")
             return f"bash:{command[:50]}" if command else None
         return None
 
     def _get_base_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate base resource key for loop detection."""
-        if tool_name == "list_directory":
+        if tool_name == CANONICAL_LIST_TOOL:
             path = arguments.get("path", "")
             return f"dir:{path}" if path else None
         elif tool_name in {"code_search", "semantic_code_search"}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             return f"search:{directory}:{query[:20]}" if query else None
-        elif tool_name == "execute_bash":
-            command = arguments.get("command", "")
+        elif tool_name == CANONICAL_SHELL_TOOL:
+            command = arguments.get("cmd") or arguments.get("command", "")
             if command:
                 parts = command.strip().split()
                 if parts:
@@ -1529,7 +1642,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Detected TrackerTaskType
         """
-        from victor.storage.embeddings.task_classifier import TaskType as ClassifierTaskType
+        from victor.storage.embeddings.task_classifier import (
+            TaskType as ClassifierTaskType,
+        )
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
         # Use the singleton classifier instance
@@ -1547,6 +1662,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             ClassifierTaskType.ANALYZE: TrackerTaskType.ANALYZE,
             ClassifierTaskType.DESIGN: TrackerTaskType.DESIGN,
             ClassifierTaskType.GENERAL: TrackerTaskType.GENERAL,
+            ClassifierTaskType.GENERAL_QUERY: TrackerTaskType.GENERAL,
             # Map additional types to closest match
             ClassifierTaskType.ACTION: TrackerTaskType.GENERAL,  # Actions use general limits
             ClassifierTaskType.ANALYSIS_DEEP: TrackerTaskType.ANALYZE,  # Deep analysis uses analyze limits
@@ -1774,7 +1890,9 @@ def create_tracker_for_task(task_type: TrackerTaskType) -> UnifiedTaskTracker:
     return tracker
 
 
-def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TrackerTaskType]:
+def create_tracker_from_message(
+    message: str,
+) -> Tuple[UnifiedTaskTracker, TrackerTaskType]:
     """Create a tracker by classifying a message.
 
     Args:

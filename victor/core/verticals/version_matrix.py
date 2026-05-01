@@ -74,7 +74,10 @@ class CompatibilityRule:
     message: str = ""
 
     def __post_init__(self) -> None:
-        """Validate version constraints."""
+        """Validate version constraints and coerce types."""
+        # Coerce string status to enum (e.g., from JSON/dict data)
+        if isinstance(self.status, str):
+            object.__setattr__(self, "status", CompatibilityStatus(self.status))
         try:
             # Validate min version
             SpecifierSet(self.min_framework_version)
@@ -111,7 +114,10 @@ class CompatibilityResult:
     @property
     def is_compatible(self) -> bool:
         """Check if vertical is compatible."""
-        return self.status in (CompatibilityStatus.COMPATIBLE, CompatibilityStatus.DEGRADED)
+        return self.status in (
+            CompatibilityStatus.COMPATIBLE,
+            CompatibilityStatus.DEGRADED,
+        )
 
     @property
     def is_incompatible(self) -> bool:
@@ -126,13 +132,12 @@ class VersionCompatibilityMatrix:
     specific vertical versions are compatible with the framework version.
 
     Rules can be loaded from:
-    - External JSON file (victor/data/compatibility_matrix.json)
-    - Programmatic registration
+    - Programmatic registration via register_rule()
     - Built-in defaults for known verticals
+    - External JSON files (optional, for testing)
 
     Example:
         >>> matrix = VersionCompatibilityMatrix.get_instance()
-        >>> matrix.load_from_file("victor/data/compatibility_matrix.json")
         >>> result = matrix.check_compatibility("coding", "2.0.0", "0.6.0")
         >>> if result.is_compatible:
         ...     print("Compatible!")

@@ -158,7 +158,11 @@ class TestToolCatalogLoaderLoad:
         loader = ToolCatalogLoader(registry=mock_registry, settings=mock_settings)
 
         # Make registry.register raise an exception for some tools
-        mock_registry.register.side_effect = [None, Exception("Registration failed"), None]
+        mock_registry.register.side_effect = [
+            None,
+            Exception("Registration failed"),
+            None,
+        ]
 
         mock_shared = MagicMock()
         mock_tools = [MagicMock() for _ in range(3)]

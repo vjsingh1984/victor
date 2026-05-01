@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
+from victor.agent.conversation.state_machine import ConversationStage, ConversationStateMachine
 from victor.agent.tool_selection import ToolSelector
 from victor.tools.base import (
     AccessMode,
@@ -26,9 +26,9 @@ from victor.tools.base import (
     ExecutionCategory,
     Priority,
     ToolMetadata,
-    ToolRegistry,
     ToolResult,
 )
+from victor.tools.registry import ToolRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools import metadata_registry
 

@@ -45,23 +45,56 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, ClassVar, Dict, List, Optional, TypeVar
+
+if TYPE_CHECKING:
+    from victor.core.retry import RetryContext
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-# Import canonical types from circuit_breaker.py to avoid duplication
-from victor.providers.circuit_breaker import (
+# Import shared circuit-breaker types from core to avoid cross-layer coupling
+from victor.core.circuit_breaker import (
     CircuitState,
     CircuitBreakerConfig,
     CircuitBreakerError as CanonicalCircuitBreakerError,
 )
 
+# Import the canonical CircuitBreaker for composition
+from victor.providers.circuit_breaker import CircuitBreaker as CanonicalCircuitBreaker
+
+
+# CircuitOpenError is a compatibility adapter for the canonical CircuitBreakerError
+# It provides the CircuitOpenError API that existing code expects
+class CircuitOpenError(CanonicalCircuitBreakerError):
+    """Raised when circuit breaker is open.
+
+    Compatibility adapter for CircuitBreakerError that provides the
+    CircuitOpenError API (circuit_name, retry_after attributes).
+    """
+
+    def __init__(self, circuit_name: str, retry_after: Optional[float] = None):
+        # Convert CircuitOpenError signature to CircuitBreakerError signature
+        self.circuit_name = circuit_name
+        self.retry_after = retry_after
+        message = f"Circuit breaker '{circuit_name}' is open"
+        if retry_after is not None:
+            message += f". Retry after {retry_after:.1f}s"
+        # Call parent with state=OPEN and retry_after
+        from victor.core.circuit_breaker import CircuitState
+
+        super().__init__(message, state=CircuitState.OPEN, retry_after=retry_after or 0)
+
 
 @dataclass
 class CircuitBreakerState:
-    """Runtime state of circuit breaker."""
+    """
+    Runtime state of circuit breaker.
+
+    DEPRECATED: This is kept for backward compatibility only.
+    New code should use the canonical CircuitBreaker from victor.providers.circuit_breaker.
+    """
 
     state: CircuitState = CircuitState.CLOSED
     failure_count: int = 0
@@ -72,27 +105,19 @@ class CircuitBreakerState:
     consecutive_successes: int = 0
 
 
-class CircuitOpenError(Exception):
-    """Raised when circuit breaker is open."""
-
-    def __init__(self, circuit_name: str, retry_after: Optional[float] = None):
-        self.circuit_name = circuit_name
-        self.retry_after = retry_after
-        message = f"Circuit breaker '{circuit_name}' is open"
-        if retry_after:
-            message += f". Retry after {retry_after:.1f}s"
-        super().__init__(message)
-
-
 class ProviderCircuitBreaker:
     """
-    Circuit breaker optimized for provider resilience workflow.
+    Circuit breaker adapter for provider resilience workflow.
 
-    Renamed from CircuitBreaker to be semantically distinct:
-    - CircuitBreaker (victor.providers.circuit_breaker): Standalone with decorator/context manager
-    - MultiCircuitBreaker (victor.agent.resilience): Manages multiple named circuits
-    - ObservableCircuitBreaker (victor.observability.resilience): Metrics/callback focused
-    - ProviderCircuitBreaker (here): ResilientProvider workflow with execute(), is_available
+    This is now a thin wrapper around the canonical CircuitBreaker from
+    victor.providers.circuit_breaker. It provides the ProviderCircuitBreaker
+    API (is_available, time_until_retry, execute) for backward compatibility
+    while delegating all state management to the canonical implementation.
+
+    Design: Composition over reimplementation
+    - Wraps CanonicalCircuitBreaker instead of duplicating logic
+    - Provides is_available/time_until_retry properties that ResilientProvider expects
+    - Maintains backward compatibility with existing code
 
     States:
     - CLOSED: Normal operation, tracking failures
@@ -125,8 +150,12 @@ class ProviderCircuitBreaker:
         """
         self.name = name
         self.config = config or CircuitBreakerConfig()
-        self._state = CircuitBreakerState()
-        self._lock = asyncio.Lock()
+
+        # Create the canonical circuit breaker with our config
+        self._breaker = CanonicalCircuitBreaker(
+            name=name,
+            config=self.config,
+        )
 
         logger.debug(
             f"CircuitBreaker '{name}' initialized. "
@@ -137,39 +166,31 @@ class ProviderCircuitBreaker:
     @property
     def state(self) -> CircuitState:
         """Current circuit state."""
-        return self._state.state
+        return self._breaker.state
 
     @property
     def failure_count(self) -> int:
         """Current failure count."""
-        return self._state.failure_count
+        # Access the internal state from the canonical breaker
+        return self._breaker._failure_count
 
     @property
     def is_available(self) -> bool:
         """Check if circuit allows requests."""
-        if self._state.state == CircuitState.CLOSED:
-            return True
-
-        if self._state.state == CircuitState.OPEN:
-            # Check if timeout has passed
-            if self._state.last_failure_time:
-                elapsed = (datetime.now() - self._state.last_failure_time).total_seconds()
-                if elapsed >= self.config.timeout_seconds:
-                    return True  # Will transition to half-open
-            return False
-
-        # Half-open: allow limited calls
-        return self._state.half_open_calls < self.config.half_open_max_calls
+        # Delegate to canonical breaker's can_execute method
+        return self._breaker.can_execute()
 
     @property
     def time_until_retry(self) -> Optional[float]:
         """Seconds until circuit might allow requests."""
-        if self._state.state != CircuitState.OPEN:
+        if self.state != CircuitState.OPEN:
             return None
 
-        if self._state.last_failure_time:
-            elapsed = (datetime.now() - self._state.last_failure_time).total_seconds()
-            remaining = self.config.timeout_seconds - elapsed
+        if self._breaker._last_failure_time:
+            import time
+
+            elapsed = time.time() - self._breaker._last_failure_time
+            remaining = self._breaker.recovery_timeout - elapsed
             return max(0, remaining)
 
         return None
@@ -193,93 +214,42 @@ class ProviderCircuitBreaker:
         Raises:
             CircuitOpenError: If circuit is open
         """
-        async with self._lock:
-            if not self.is_available:
-                raise CircuitOpenError(self.name, self.time_until_retry)
-
-            # Transition to half-open if timeout passed
-            if self._state.state == CircuitState.OPEN:
-                self._transition_to(CircuitState.HALF_OPEN)
-
-            if self._state.state == CircuitState.HALF_OPEN:
-                self._state.half_open_calls += 1
+        if not self.is_available:
+            raise CircuitOpenError(self.name, self.time_until_retry)
 
         try:
             result = await func(*args, **kwargs)
-            await self._record_success()
+            self._breaker.record_success()
             return result
         except Exception as e:
-            await self._record_failure(e)
+            self._breaker.record_failure(e)
             raise
-
-    async def _record_success(self):
-        """Record successful call."""
-        async with self._lock:
-            self._state.consecutive_successes += 1
-
-            if self._state.state == CircuitState.HALF_OPEN:
-                self._state.success_count += 1
-                if self._state.success_count >= self.config.success_threshold:
-                    self._transition_to(CircuitState.CLOSED)
-            else:
-                # Reset failure count on success in closed state
-                self._state.failure_count = max(0, self._state.failure_count - 1)
-
-    async def _record_failure(self, error: Exception):
-        """Record failed call."""
-        async with self._lock:
-            self._state.failure_count += 1
-            self._state.last_failure_time = datetime.now()
-            self._state.consecutive_successes = 0
-
-            if self._state.state == CircuitState.HALF_OPEN:
-                # Any failure in half-open goes back to open
-                self._transition_to(CircuitState.OPEN)
-            elif self._state.failure_count >= self.config.failure_threshold:
-                self._transition_to(CircuitState.OPEN)
-
-            logger.warning(
-                f"CircuitBreaker '{self.name}' recorded failure: {error}. "
-                f"State: {self._state.state.value}, "
-                f"Failures: {self._state.failure_count}/{self.config.failure_threshold}"
-            )
-
-    def _transition_to(self, new_state: CircuitState):
-        """Transition to new state."""
-        old_state = self._state.state
-        self._state.state = new_state
-        self._state.last_state_change = datetime.now()
-
-        if new_state == CircuitState.HALF_OPEN:
-            self._state.half_open_calls = 0
-            self._state.success_count = 0
-        elif new_state == CircuitState.CLOSED:
-            self._state.failure_count = 0
-            self._state.success_count = 0
-
-        logger.info(
-            f"CircuitBreaker '{self.name}' transitioned: " f"{old_state.value} -> {new_state.value}"
-        )
 
     def reset(self):
         """Reset circuit breaker to initial state."""
-        self._state = CircuitBreakerState()
+        # Reset the canonical breaker's state
+        self._breaker._state = CircuitState.CLOSED
+        self._breaker._failure_count = 0
+        self._breaker._success_count = 0
+        self._breaker._last_failure_time = None
+        self._breaker._last_exception = None
+        self._breaker._half_open_calls = 0
         logger.info(f"CircuitBreaker '{self.name}' reset")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get circuit breaker statistics."""
         return {
             "name": self.name,
-            "state": self._state.state.value,
-            "failure_count": self._state.failure_count,
-            "success_count": self._state.success_count,
-            "consecutive_successes": self._state.consecutive_successes,
+            "state": self.state.value,
+            "failure_count": self.failure_count,
+            "success_count": self._breaker._success_count,
             "is_available": self.is_available,
             "time_until_retry": self.time_until_retry,
             "last_failure_time": (
-                self._state.last_failure_time.isoformat() if self._state.last_failure_time else None
+                datetime.fromtimestamp(self._breaker._last_failure_time).isoformat()
+                if self._breaker._last_failure_time
+                else None
             ),
-            "last_state_change": self._state.last_state_change.isoformat(),
         }
 
 
@@ -317,12 +287,32 @@ class ProviderRetryConfig:
         ConnectionError,
         TimeoutError,
         asyncio.TimeoutError,
+        CanonicalCircuitBreakerError,
+        CircuitOpenError,
+        # httpx transport errors: RemoteProtocolError, ReadError, etc.
+        # "Server disconnected without sending a response"
+    )
+
+    # Extended patterns that catch httpx transport errors by class name
+    retryable_exception_names: tuple = (
+        "APIConnectionError",
+        "RemoteProtocolError",
+        "ProtocolError",
+        "TransportError",
+        "ConnectTimeout",
+        "ReadError",
+        "ReadTimeout",
+        "ConnectError",
+        "WriteError",
     )
 
     retryable_status_codes: tuple = (429, 500, 502, 503, 504)
 
     # Retryable error message patterns
     retryable_patterns: tuple = (
+        r"connection.?error",
+        r"connection.?reset",
+        r"bad.?record.?mac",
         r"rate.?limit",
         r"overloaded",
         r"capacity",
@@ -345,8 +335,12 @@ class ProviderRetryStrategy:
     """
     Intelligent provider retry strategy with exponential backoff and jitter.
 
+    This class now extends BaseRetryStrategy from victor.core.retry to
+    eliminate duplicate retry logic. Provider-specific features (retryable
+    patterns, status codes, Retry-After headers) are handled via adapter methods.
+
     Renamed from RetryStrategy to be semantically distinct:
-    - ProviderRetryStrategy (here): Concrete provider retry with execute()
+    - ProviderRetryStrategy (here): Concrete provider retry with provider-specific logic
     - BaseRetryStrategy (victor.core.retry): Abstract base with should_retry(), get_delay()
     - BatchRetryStrategy (victor.workflows.batch_executor): Enum for batch retry modes
 
@@ -354,7 +348,12 @@ class ProviderRetryStrategy:
     - Exponential backoff with configurable base
     - Random jitter to prevent thundering herd
     - Respects Retry-After headers from rate limit responses
-    - Configurable retryable conditions
+    - Configurable retryable conditions (provider-specific patterns, status codes)
+    - Integrates with core BaseRetryStrategy for consistent retry behavior
+
+    Architecture:
+        Uses BaseRetryStrategy internally for retry decision logic, while
+        providing provider-specific enhancements through adapter methods.
 
     Usage:
         retry = ProviderRetryStrategy()
@@ -371,10 +370,27 @@ class ProviderRetryStrategy:
         Args:
             config: Retry configuration
         """
+        from victor.core.retry import (
+            BaseRetryStrategy,
+            ExponentialBackoffStrategy,
+            RetryContext,
+        )
+
         self.config = config or ProviderRetryConfig()
         self._compiled_patterns = [
             re.compile(p, re.IGNORECASE) for p in self.config.retryable_patterns
         ]
+
+        # Use core BaseRetryStrategy for standard retry logic
+        # ProviderRetryConfig maps to ExponentialBackoffStrategy parameters
+        self._base_strategy = ExponentialBackoffStrategy(
+            max_attempts=self.config.max_retries
+            + 1,  # BaseRetryStrategy counts attempts, ProviderRetryStrategy counts retries
+            base_delay=self.config.base_delay_seconds,
+            max_delay=self.config.max_delay_seconds,
+            multiplier=self.config.exponential_base,
+            jitter=self.config.jitter_factor,
+        )
 
         logger.debug(
             f"ProviderRetryStrategy initialized. "
@@ -390,6 +406,9 @@ class ProviderRetryStrategy:
     ) -> T:
         """Execute function with retry logic.
 
+        Uses core BaseRetryStrategy for retry decisions, with provider-specific
+        enhancements for error detection and Retry-After header handling.
+
         Args:
             func: Async function to execute
             *args: Positional arguments for func
@@ -401,32 +420,43 @@ class ProviderRetryStrategy:
         Raises:
             RetryExhaustedError: If all retries are exhausted
         """
-        last_exception: Optional[Exception] = None
+        from victor.core.retry import RetryContext
 
-        for attempt in range(self.config.max_retries + 1):
+        last_exception: Optional[Exception] = None
+        context = RetryContext(max_attempts=self.config.max_retries + 1)
+
+        while context.attempt < context.max_attempts:
+            context.attempt += 1
+
             try:
-                return await func(*args, **kwargs)
+                result = await func(*args, **kwargs)
+                # Notify base strategy of success
+                self._base_strategy.on_success(context)
+                return result
 
             except Exception as e:
                 last_exception = e
+                context.record_exception(e)
 
-                # Check if retryable
+                # Check provider-specific retryability (patterns, status codes, etc.)
                 if not self._is_retryable(e):
                     logger.debug(f"Non-retryable error: {e}")
                     raise
 
-                # Check if max retries exceeded
-                if attempt >= self.config.max_retries:
-                    logger.error(
-                        f"Max retries ({self.config.max_retries}) exceeded. " f"Last error: {e}"
-                    )
-                    raise RetryExhaustedError(self.config.max_retries, e)
+                # Use base strategy to determine if we should retry
+                if not self._base_strategy.should_retry(context):
+                    self._base_strategy.on_failure(context)
+                    raise RetryExhaustedError(context.attempt - 1, e)
 
-                # Calculate delay
-                delay = self._calculate_delay(attempt, e)
+                # Calculate delay using base strategy, with provider-specific override
+                delay = self._get_delay(context, e)
+
+                # Notify base strategy of retry
+                self._base_strategy.on_retry(context)
+                context.record_delay(delay)
 
                 logger.warning(
-                    f"Retry {attempt + 1}/{self.config.max_retries} "
+                    f"Retry {context.attempt}/{self.config.max_retries} "
                     f"after {delay:.2f}s. Error: {e}"
                 )
 
@@ -434,8 +464,29 @@ class ProviderRetryStrategy:
 
         # Should not reach here, but just in case
         if last_exception:
-            raise RetryExhaustedError(self.config.max_retries, last_exception)
+            raise RetryExhaustedError(context.attempt, last_exception)
         raise RuntimeError("Unexpected state in retry loop")
+
+    def _get_delay(self, context: "RetryContext", error: Exception) -> float:
+        """Calculate delay before next retry attempt.
+
+        Uses provider-specific Retry-After header if available, otherwise
+        delegates to base strategy's delay calculation.
+
+        Args:
+            context: Current retry context
+            error: Exception that triggered retry
+
+        Returns:
+            Delay in seconds before next attempt
+        """
+        # Check for Retry-After header in error (provider-specific)
+        retry_after = self._extract_retry_after(error)
+        if retry_after is not None:
+            return min(retry_after, self.config.max_delay_seconds)
+
+        # Use base strategy's delay calculation
+        return self._base_strategy.get_delay(context)
 
     def _is_retryable(self, error: Exception) -> bool:
         """Check if error is retryable.
@@ -446,48 +497,42 @@ class ProviderRetryStrategy:
         Returns:
             True if error should be retried
         """
-        # Check exception type
-        if isinstance(error, self.config.retryable_exceptions):
-            return True
+        seen: set[int] = set()
+        current: Optional[BaseException] = error
 
-        # Check error message patterns
-        error_str = str(error).lower()
-        for pattern in self._compiled_patterns:
-            if pattern.search(error_str):
+        while isinstance(current, Exception) and id(current) not in seen:
+            seen.add(id(current))
+
+            # Check exception type
+            if isinstance(current, self.config.retryable_exceptions):
                 return True
 
-        # Check for status code in error
-        for status_code in self.config.retryable_status_codes:
-            if str(status_code) in error_str:
-                return True
+            # Check exception class name (catches httpx/openai transport errors
+            # without requiring those libraries as direct dependencies here)
+            error_class = type(current).__name__
+            if hasattr(self.config, "retryable_exception_names"):
+                for name in self.config.retryable_exception_names:
+                    if error_class == name:
+                        return True
+                # Also check parent classes
+                for parent in type(current).__mro__:
+                    if parent.__name__ in self.config.retryable_exception_names:
+                        return True
+
+            # Check error message patterns
+            error_str = str(current).lower()
+            for pattern in self._compiled_patterns:
+                if pattern.search(error_str):
+                    return True
+
+            # Check for status code in error
+            for status_code in self.config.retryable_status_codes:
+                if str(status_code) in error_str:
+                    return True
+
+            current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
 
         return False
-
-    def _calculate_delay(self, attempt: int, error: Exception) -> float:
-        """Calculate delay before next retry.
-
-        Args:
-            attempt: Current attempt number (0-based)
-            error: Exception that triggered retry
-
-        Returns:
-            Delay in seconds
-        """
-        # Check for Retry-After header in error
-        retry_after = self._extract_retry_after(error)
-        if retry_after is not None:
-            return min(retry_after, self.config.max_delay_seconds)
-
-        # Exponential backoff
-        delay = self.config.base_delay_seconds * (self.config.exponential_base**attempt)
-
-        # Add jitter
-        jitter_range = delay * self.config.jitter_factor
-        jitter = random.uniform(-jitter_range, jitter_range)
-        delay += jitter
-
-        # Cap at max delay
-        return min(max(0, delay), self.config.max_delay_seconds)
 
     def _extract_retry_after(self, error: Exception) -> Optional[float]:
         """Extract Retry-After value from error if present.
@@ -521,7 +566,11 @@ class ProviderRetryStrategy:
 class ProviderUnavailableError(Exception):
     """Raised when no providers are available."""
 
-    def __init__(self, primary_error: Exception, fallback_errors: Optional[List[Exception]] = None):
+    def __init__(
+        self,
+        primary_error: Exception,
+        fallback_errors: Optional[List[Exception]] = None,
+    ):
         self.primary_error = primary_error
         self.fallback_errors = fallback_errors or []
 
@@ -542,6 +591,7 @@ class ResilientProvider:
     - Fallback to alternative providers
     - Request timeout handling
     - Comprehensive error logging
+    - ObservabilityBus integration for fallback notifications
 
     Usage:
         resilient = ResilientProvider(
@@ -551,6 +601,21 @@ class ResilientProvider:
 
         response = await resilient.chat(messages, model=model)
     """
+
+    _observability_bus: ClassVar[Optional[Any]] = None
+
+    @classmethod
+    def wire_observability(cls, bus: Any) -> None:
+        """Wire an ObservabilityBus for provider fallback notifications.
+
+        Follows the same pattern as ``CircuitBreakerRegistry.wire_observability``.
+        When wired, lifecycle events are emitted on fallback activation and
+        exhaustion so the dashboard and other subscribers gain visibility.
+
+        Args:
+            bus: ObservabilityBus instance with ``emit_lifecycle_event()`` method.
+        """
+        cls._observability_bus = bus
 
     def __init__(
         self,
@@ -692,6 +757,16 @@ class ResilientProvider:
 
                 self._stats["fallback_successes"] += 1
                 logger.info(f"Fallback provider '{fb_name}' succeeded")
+                if self.__class__._observability_bus is not None:
+                    self.__class__._observability_bus.emit_lifecycle_event(
+                        "provider.fallback.activated",
+                        {
+                            "primary": self._provider_name,
+                            "fallback": fb_name,
+                            "error": str(primary_error),
+                            "model": model,
+                        },
+                    )
                 return result
 
             except CircuitOpenError as e:
@@ -704,6 +779,16 @@ class ResilientProvider:
 
         # All providers failed
         self._stats["total_failures"] += 1
+        if self.__class__._observability_bus is not None:
+            self.__class__._observability_bus.emit_lifecycle_event(
+                "provider.fallback.exhausted",
+                {
+                    "primary": self._provider_name,
+                    "fallback_count": len(self.fallback_providers),
+                    "error": str(primary_error),
+                    "model": model,
+                },
+            )
         raise ProviderUnavailableError(primary_error, fallback_errors)
 
     async def stream(
@@ -771,12 +856,34 @@ class ResilientProvider:
                     async for chunk in stream:
                         yield chunk
                     self._stats["fallback_successes"] += 1
+                    if self.__class__._observability_bus is not None:
+                        self.__class__._observability_bus.emit_lifecycle_event(
+                            "provider.fallback.activated",
+                            {
+                                "primary": self._provider_name,
+                                "fallback": fb_name,
+                                "error": str(primary_err),
+                                "model": model,
+                                "streaming": True,
+                            },
+                        )
                     return
                 except Exception as e:
                     logger.warning(f"Fallback stream '{fb_name}' failed: {e}")
                     continue
 
             self._stats["total_failures"] += 1
+            if self.__class__._observability_bus is not None:
+                self.__class__._observability_bus.emit_lifecycle_event(
+                    "provider.fallback.exhausted",
+                    {
+                        "primary": self._provider_name,
+                        "fallback_count": len(self.fallback_providers),
+                        "error": str(primary_err),
+                        "model": model,
+                        "streaming": True,
+                    },
+                )
             raise primary_err
 
     def get_stats(self) -> Dict[str, Any]:

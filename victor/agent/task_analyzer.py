@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -35,13 +36,15 @@ from victor.agent.unified_classifier import (
 if TYPE_CHECKING:
     from victor.storage.embeddings.task_classifier import TaskType
     from victor.storage.embeddings.intent_classifier import IntentType
-    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
+    from victor.protocols.coordination import CoordinationAdvisorProtocol
     from victor.protocols.coordination import CoordinationSuggestion
+    from victor.framework.task.complexity import ComplexityBudget
 
 # Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
 from victor.core.protocols import TaskClassifierProtocol, IntentClassifierProtocol
 
 logger = logging.getLogger(__name__)
+_DEPRECATED_COORDINATOR = object()
 
 
 @dataclass
@@ -103,6 +106,9 @@ class TaskAnalysis:
         rec = self.coordination_suggestion.primary_team
         return rec.team_name if rec else None
 
+    # Framework-driven resource allocation from ComplexityBudget
+    budget: Optional["ComplexityBudget"] = None
+
     def should_force_completion(self, tool_calls: int) -> bool:
         return tool_calls >= self.tool_budget
 
@@ -111,27 +117,74 @@ class TaskAnalyzer:
 
     def __init__(
         self,
-        coordinator: Optional["ModeWorkflowTeamCoordinator"] = None,
+        coordination_advisor: Optional["CoordinationAdvisorProtocol"] = None,
+        coordinator: Any = _DEPRECATED_COORDINATOR,
+        coordination_runtime: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
+        runtime_subject: Optional[Any] = None,
     ):
         """Initialize task analyzer.
 
         Args:
-            coordinator: Optional ModeWorkflowTeamCoordinator for team/workflow suggestions
+            coordination_advisor: Optional canonical coordination advisor compatibility surface
+            coordinator: Deprecated compatibility alias for ``coordination_advisor``
+            coordination_runtime: Optional service-owned coordination runtime
+            runtime_intelligence: Optional canonical runtime-intelligence service
+            runtime_subject: Optional orchestrator-like runtime for shared coordination suggestions
         """
+        if coordinator is not _DEPRECATED_COORDINATOR:
+            warnings.warn(
+                "TaskAnalyzer(coordinator=...) is deprecated. "
+                "Use TaskAnalyzer(coordination_advisor=...) instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if coordination_advisor is None:
+                coordination_advisor = coordinator
+
         self._complexity_classifier = None
         self._action_authorizer = None
         self._unified_classifier = None
         self._task_classifier = None
         self._intent_classifier = None
-        self._coordinator = coordinator
+        self._coordination_advisor = coordination_advisor
+        self._coordination_runtime = coordination_runtime
+        self._runtime_intelligence = runtime_intelligence
+        self._runtime_subject = runtime_subject
 
-    def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
-        """Set the coordinator for team/workflow suggestions.
+    def set_coordination_advisor(
+        self,
+        coordination_advisor: "CoordinationAdvisorProtocol",
+    ) -> None:
+        """Set the canonical coordination advisor compatibility surface.
 
         Args:
-            coordinator: ModeWorkflowTeamCoordinator instance
+            coordination_advisor: Compatibility coordination surface
         """
-        self._coordinator = coordinator
+        self._coordination_advisor = coordination_advisor
+
+    def set_coordinator(self, coordinator: "CoordinationAdvisorProtocol") -> None:
+        """Deprecated compatibility alias for ``set_coordination_advisor()``."""
+        warnings.warn(
+            "TaskAnalyzer.set_coordinator(...) is deprecated. "
+            "Use TaskAnalyzer.set_coordination_advisor(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.set_coordination_advisor(coordinator)
+
+    def set_coordination_runtime(self, coordination_runtime: Any) -> None:
+        """Attach the canonical coordination runtime used for shared suggestions."""
+        self._coordination_runtime = coordination_runtime
+
+    def set_runtime_intelligence(self, runtime_intelligence: Any) -> None:
+        """Attach the canonical runtime-intelligence service to this analyzer."""
+        self._runtime_intelligence = runtime_intelligence
+        self._unified_classifier = None
+
+    def set_runtime_subject(self, runtime_subject: Any) -> None:
+        """Attach the orchestrator-like runtime used for shared coordination suggestions."""
+        self._runtime_subject = runtime_subject
 
     @property
     def complexity_classifier(self) -> ComplexityClassifier:
@@ -155,7 +208,9 @@ class TaskAnalyzer:
     def unified_classifier(self) -> UnifiedTaskClassifier:
         if not self._unified_classifier:
             self._unified_classifier = UnifiedTaskClassifier(
-                task_analyzer=self, enable_semantic=True
+                task_analyzer=self,
+                enable_semantic=True,
+                runtime_intelligence=self._runtime_intelligence,
             )
         return self._unified_classifier
 
@@ -199,10 +254,16 @@ class TaskAnalyzer:
             else self.unified_classifier.classify(message)
         )
 
+        # Get framework-driven resource allocation
+        from victor.framework.task.complexity import ComplexityBudget as _CB
+
+        _budget = _CB.for_complexity(complexity_result.complexity)
+
         analysis = TaskAnalysis(
             complexity=complexity_result.complexity,
             tool_budget=complexity_result.tool_budget,
             complexity_confidence=complexity_result.confidence,
+            budget=_budget,
             unified_task_type=unified_result.task_type,
             unified_confidence=unified_result.confidence,
             is_action_task=unified_result.is_action_task,
@@ -254,7 +315,8 @@ class TaskAnalyzer:
         """Analyze task and get coordination suggestions.
 
         This extends the base analyze() method by adding coordination suggestions
-        from the ModeWorkflowTeamCoordinator based on task type and complexity.
+        from the service-owned coordination runtime, with direct framework and
+        coordinator fallbacks retained for compatibility surfaces.
 
         Args:
             message: User message to analyze
@@ -274,24 +336,21 @@ class TaskAnalyzer:
             context=context,
         )
 
-        # Add coordination suggestions if coordinator is available
-        if self._coordinator:
+        if (
+            self._coordination_runtime is not None
+            or self._runtime_subject is not None
+            or self._coordination_advisor is not None
+        ):
             try:
-                # Map complexity to string
                 complexity_str = analysis.complexity.value.lower()
-
-                # Get task type string
                 task_type_str = analysis.unified_task_type.value.lower()
-
-                # Get suggestions from coordinator
-                suggestion = self._coordinator.suggest_for_task(
+                suggestion = self._build_coordination_suggestion(
                     task_type=task_type_str,
                     complexity=complexity_str,
                     mode=mode,
                 )
                 analysis.coordination_suggestion = suggestion
 
-                # Log if there are team suggestions for high complexity
                 if suggestion.has_team_suggestion:
                     logger.debug(
                         f"Task analysis with suggestions: task={task_type_str}, "
@@ -303,6 +362,44 @@ class TaskAnalyzer:
                 logger.warning(f"Failed to get coordination suggestions: {e}")
 
         return analysis
+
+    def _build_coordination_suggestion(
+        self,
+        *,
+        task_type: str,
+        complexity: str,
+        mode: str,
+    ) -> "CoordinationSuggestion":
+        """Build coordination suggestions through the service runtime when available."""
+        runtime = self._resolve_coordination_runtime()
+        if runtime is not None:
+            return runtime.suggest_for_task(
+                runtime_subject=self._runtime_subject,
+                coordination_advisor=self._coordination_advisor,
+                task_type=task_type,
+                complexity=complexity,
+                mode=mode,
+            )
+
+        assert self._coordination_advisor is not None
+        return self._coordination_advisor.suggest_for_task(
+            task_type=task_type,
+            complexity=complexity,
+            mode=mode,
+        )
+
+    def _resolve_coordination_runtime(self) -> Optional[Any]:
+        """Resolve the coordination runtime, lazily creating the service adapter if needed."""
+        if self._coordination_runtime is not None:
+            return self._coordination_runtime
+
+        if self._runtime_subject is None and self._coordination_advisor is None:
+            return None
+
+        from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+
+        self._coordination_runtime = CoordinationAdvisorRuntime()
+        return self._coordination_runtime
 
     def classify_complexity(self, message: str) -> TaskClassification:
         return self.complexity_classifier.classify(message)

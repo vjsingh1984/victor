@@ -38,7 +38,7 @@ async def main():
 
     # Register core tools (filesystem, shell, git, etc.)
     from victor.tools.filesystem import read, write, ls
-    from victor.tools.bash import shell_readonly
+    from victor.tools.bash import shell
     from victor.tools.git_tool import git
     from victor.tools.file_editor_tool import edit
     from victor.tools.code_review_tool import code_review
@@ -50,7 +50,7 @@ async def main():
     registry.register(read)
     registry.register(write)
     registry.register(ls)
-    registry.register(shell_readonly)
+    registry.register(shell)
     registry.register(git)
     registry.register(edit)
     registry.register(code_review)

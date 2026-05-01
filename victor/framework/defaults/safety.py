@@ -128,11 +128,11 @@ class DefaultSafetyExtension:
         """Get tool-specific argument restrictions.
 
         Returns:
-            Restrictions for ``write_file`` (credential paths) and
+            Restrictions for ``write`` (credential paths) and
             ``shell`` (recursive deletion).
         """
         return {
-            "write_file": [r"\.env", r"\.git/", r"secrets", r"credentials"],
+            "write": [r"\.env", r"\.git/", r"secrets", r"credentials"],
             "shell": [r"rm -rf \."],
         }
 

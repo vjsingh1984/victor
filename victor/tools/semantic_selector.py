@@ -31,15 +31,20 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import httpx
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
-from victor.storage.embeddings.service import EmbeddingService
-from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
+from victor.tools.enums import CostTier
+from victor.tools.registry import ToolRegistry
+from victor.agent.tool_sequence_tracker import (
+    ToolSequenceTracker,
+    create_sequence_tracker,
+)
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
+    ToolMetadataRegistry,
     get_core_readonly_tools,
     get_tools_matching_mandatory_keywords,
     get_tools_by_task_type,
 )
+from victor.tools.tool_names import get_canonical_name
 from victor.config.tool_selection_defaults import (
     SemanticSelectorDefaults,
     FallbackTools,
@@ -53,11 +58,32 @@ if TYPE_CHECKING:
     import numpy as np
 
     from victor.agent.unified_classifier import ClassificationResult
+    from victor.storage.embeddings.service import (
+        EmbeddingService as EmbeddingServiceType,
+    )
 
 logger = logging.getLogger(__name__)
 
+# Import fuzzy matching for robust typo-tolerant tool selection
+try:
+    from victor.storage.embeddings.fuzzy_matcher import match_keywords_cascading
+
+    _FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    _FUZZY_MATCHING_AVAILABLE = False
+
+_PREFERRED_SEQUENCE_TOOL_ALIASES = {
+    "read": "read_file",
+    "write": "write_file",
+    "edit": "edit_files",
+    "test": "run_tests",
+    "ls": "list_directory",
+    "shell": "execute_bash",
+}
+
 # Lazy numpy import — keeps ``import victor`` lightweight when numpy is absent.
 _np = None
+EmbeddingService = None  # type: ignore[assignment]
 
 
 def _ensure_numpy():  # type: ignore[no-untyped-def]
@@ -68,6 +94,19 @@ def _ensure_numpy():  # type: ignore[no-untyped-def]
 
         _np = numpy
     return _np
+
+
+def _get_embedding_service_class():
+    """Load EmbeddingService only when embedding execution is needed."""
+
+    global EmbeddingService
+    if EmbeddingService is None:
+        from victor.storage.embeddings.service import (
+            EmbeddingService as _EmbeddingService,
+        )
+
+        EmbeddingService = _EmbeddingService
+    return EmbeddingService
 
 
 # Lazy hook initialization to avoid circular imports
@@ -106,26 +145,6 @@ class SemanticToolSelector:
     - No hardcoded keyword lists
     - Self-improving with better tool descriptions
     """
-
-    # NOTE: _load_tool_knowledge() and related class variables were removed.
-    # All tools now provide metadata via get_metadata() which auto-generates
-    # from tool properties. Legacy tool_knowledge.yaml has been archived.
-
-    @classmethod
-    def _build_use_case_text(cls, tool_name: str) -> str:
-        """Build use case text for embedding (legacy method, returns empty).
-
-        NOTE: This method previously loaded from tool_knowledge.yaml which
-        has been archived. All metadata now comes from get_metadata().
-        Kept for API compatibility but always returns empty string.
-
-        Args:
-            tool_name: Name of the tool (unused)
-
-        Returns:
-            Empty string - use get_metadata() for tool metadata
-        """
-        return ""
 
     def __init__(
         self,
@@ -179,6 +198,7 @@ class SemanticToolSelector:
 
         # In-memory cache: tool_name → embedding vector
         self._tool_embedding_cache: Dict[str, Any] = {}
+        self._embedding_index: Optional[Any] = None
 
         # Tool version hash (to detect when tools change)
         self._tools_hash: Optional[str] = None
@@ -248,6 +268,7 @@ class SemanticToolSelector:
 
         # Try to load from cache
         if self._load_from_cache(tools_hash):
+            self._build_embedding_index()
             logger.info(
                 f"Loaded tool embeddings from cache for {len(self._tool_embedding_cache)} tools"
             )
@@ -271,10 +292,44 @@ class SemanticToolSelector:
 
         # Save to disk
         self._save_to_cache(tools_hash)
+        self._build_embedding_index()
 
         logger.info(
             f"Tool embeddings computed and cached for {len(self._tool_embedding_cache)} tools"
         )
+
+    def _build_embedding_index(self) -> None:
+        """Build a native embedding index from cached tool embeddings."""
+        if not self._tool_embedding_cache:
+            self._embedding_index = None
+            return
+
+        try:
+            import victor_native
+
+            vectors = [embedding.tolist() for embedding in self._tool_embedding_cache.values()]
+            labels = list(self._tool_embedding_cache.keys())
+            self._embedding_index = victor_native.EmbeddingIndex(vectors, labels)
+        except Exception as exc:
+            self._embedding_index = None
+            logger.debug("Native EmbeddingIndex unavailable, using batch fallback: %s", exc)
+
+    def _query_embedding_index(
+        self, query_embedding: np.ndarray, k: int, threshold: float
+    ) -> Optional[Dict[str, float]]:
+        """Query the native embedding index if it is available."""
+        if self._embedding_index is None:
+            return None
+
+        try:
+            results = self._embedding_index.query(
+                query_embedding.tolist(), k=k, threshold=threshold
+            )
+        except Exception as exc:
+            logger.debug("Native EmbeddingIndex query failed, using batch fallback: %s", exc)
+            return None
+
+        return {name: float(score) for name, score in results}
 
     # Cache version - aligned with Victor version, increment on breaking cache format changes
     # Format: "{victor_version}.{cache_revision}" e.g., "0.2.0.1" for first revision of 0.2.0
@@ -722,10 +777,36 @@ class SemanticToolSelector:
         return list(set(relevant_tools))
 
     def _is_analysis_query(self, query: str) -> bool:
-        """Heuristic check for analysis/review intents."""
+        """Heuristic check for analysis/review intents with fuzzy matching for typos."""
         query_lower = query.lower()
-        analysis_keywords = ["analyze", "analysis", "review", "check", "scan", "audit", "inspect"]
-        return any(kw in query_lower for kw in analysis_keywords)
+
+        # Use fuzzy matching if available
+        if _FUZZY_MATCHING_AVAILABLE:
+            analysis_keywords = {
+                "analyze": 1.0,
+                "analysis": 1.0,
+                "review": 1.0,
+                "check": 1.0,
+                "scan": 1.0,
+                "audit": 1.0,
+                "inspect": 1.0,
+                "examine": 1.0,
+                "investigate": 1.0,
+            }
+            matches, _ = match_keywords_cascading(query_lower, analysis_keywords, use_fuzzy=True)
+            return len(matches) > 0
+        else:
+            # Fallback to exact matching
+            analysis_keywords = [
+                "analyze",
+                "analysis",
+                "review",
+                "check",
+                "scan",
+                "audit",
+                "inspect",
+            ]
+            return any(kw in query_lower for kw in analysis_keywords)
 
     def _extract_pending_actions(self, conversation_history: List[Dict[str, Any]]) -> List[str]:
         """Extract actions mentioned in original request but not yet completed.
@@ -755,11 +836,21 @@ class SemanticToolSelector:
         # NOTE: Be specific to avoid false positives. Generic words like "check"
         # or "examine" in analysis tasks shouldn't trigger pending actions.
         action_patterns = {
-            "edit": ["edit the file", "modify the file", "change the code", "update the file"],
+            "edit": [
+                "edit the file",
+                "modify the file",
+                "change the code",
+                "update the file",
+            ],
             "show_diff": ["show diff", "show the diff", "git diff", "compare changes"],
             "read": ["read the file", "read this file", "show me the file"],
             "propose": ["propose changes", "suggest changes", "recommend changes"],
-            "create": ["create a file", "create new file", "generate a file", "make a file"],
+            "create": [
+                "create a file",
+                "create new file",
+                "generate a file",
+                "make a file",
+            ],
             "test": ["run tests", "run the tests", "execute tests"],
             "commit": ["commit the changes", "make a commit", "git commit"],
             "pr": ["create a pull request", "open a pr", "make a pr", "raise a pr"],
@@ -791,12 +882,12 @@ class SemanticToolSelector:
         """
         # Map action types to tool names that complete them
         action_to_tools = {
-            "show_diff": ["git", "shell", "shell_readonly"],
+            "show_diff": ["git", "shell"],
             "edit": ["edit", "write", "patch"],
             "read": ["read", "symbol", "search", "overview", "ls"],
             "create": ["write", "scaffold"],
             "test": ["test", "shell"],
-            "commit": ["git", "commit_msg"],
+            "commit": ["git"],
             "pr": ["pr", "git"],
         }
 
@@ -1080,10 +1171,11 @@ class SemanticToolSelector:
 
         # Get sequence suggestions (confidence ordered)
         suggestions = self._sequence_tracker.get_next_suggestions(top_k=10)
+        canonical_tool_name = get_canonical_name(tool_name)
 
         # Find this tool's confidence in suggestions
         for suggested_tool, confidence in suggestions:
-            if suggested_tool == tool_name:
+            if suggested_tool == canonical_tool_name:
                 # Scale confidence to boost value (max 0.15)
                 boost = confidence * 0.15
                 logger.log(
@@ -1094,6 +1186,12 @@ class SemanticToolSelector:
                 return boost
 
         return 0.0
+
+    @staticmethod
+    def _to_sequence_public_tool_name(tool_name: str) -> str:
+        """Expose stable selector-facing aliases for canonical sequence names."""
+        canonical_tool_name = get_canonical_name(tool_name)
+        return _PREFERRED_SEQUENCE_TOOL_ALIASES.get(canonical_tool_name, canonical_tool_name)
 
     def _apply_sequence_boosts(
         self, similarities: List[Tuple[Any, float]]
@@ -1146,7 +1244,8 @@ class SemanticToolSelector:
 
         if penalty > 0:
             logger.log(
-                TRACE, f"Cost penalty for {tool.name}: -{penalty:.3f} (tier={cost_tier.value})"
+                TRACE,
+                f"Cost penalty for {tool.name}: -{penalty:.3f} (tier={cost_tier.value})",
             )
 
         return penalty
@@ -1246,7 +1345,7 @@ class SemanticToolSelector:
         pending_action_tools = {
             "show_diff": ["shell"],
             "edit": ["edit", "read"],
-            "commit": ["commit_msg", "shell"],
+            "commit": ["git"],
             "pr": ["pr"],
             "test": ["shell", "test"],
         }
@@ -1269,31 +1368,18 @@ class SemanticToolSelector:
         # Get embedding for enhanced query
         query_embedding = await self._get_embedding(enhanced_query)
 
-        # Collect relevant tools and their embeddings for batch processing
         relevant_tools: List[Any] = []
-        tool_embeddings: List[np.ndarray] = []
 
         for tool in tools.list_tools():
             # Skip if not in relevant categories and not mandatory
             if tool.name not in category_tools and tool.name not in mandatory_tool_names:
                 continue
 
-            # Get cached embedding or compute on-demand
-            if tool.name in self._tool_embedding_cache:
-                tool_embedding = self._tool_embedding_cache[tool.name]
-            else:
-                tool_text = self._create_tool_text(tool)
-                tool_embedding = await self._get_embedding(tool_text)
-
             relevant_tools.append(tool)
-            tool_embeddings.append(tool_embedding)
-
-        # Batch compute all similarities in one FFI call (5-10x speedup)
-        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in zip(relevant_tools, all_similarities):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
@@ -1346,7 +1432,10 @@ class SemanticToolSelector:
                     fallback_tool = tools.get(fallback_name)
                     if fallback_tool:
                         selected_tools.append(
-                            (fallback_tool, SemanticSelectorDefaults.FALLBACK_TOOL_SCORE)
+                            (
+                                fallback_tool,
+                                SemanticSelectorDefaults.FALLBACK_TOOL_SCORE,
+                            )
                         )
                         selected_names.add(fallback_name)
             logger.debug(
@@ -1380,11 +1469,24 @@ class SemanticToolSelector:
             excluded_count=0,
         )
 
+        # Store last selection scores for schema promotion (STUB→COMPACT)
+        self._last_selection_scores: Dict[str, float] = {
+            tool.name: score for tool, score in selected_tools
+        }
+
         # Convert to ToolDefinition
         return [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
             for tool, _ in selected_tools
         ]
+
+    def get_last_selection_scores(self) -> Dict[str, float]:
+        """Return similarity scores from the most recent selection.
+
+        Used by ToolSelector to promote high-confidence STUB tools to
+        COMPACT schema level for better LLM call accuracy.
+        """
+        return getattr(self, "_last_selection_scores", {})
 
     async def select_relevant_tools(
         self,
@@ -1424,31 +1526,18 @@ class SemanticToolSelector:
         # Get embedding for user message
         query_embedding = await self._get_embedding(user_message)
 
-        # Collect relevant tools and their embeddings for batch processing
         relevant_tools: List[Any] = []
-        tool_embeddings: List[np.ndarray] = []
 
         for tool in tools.list_tools():
             # Skip if not in relevant categories and not mandatory
             if tool.name not in category_tools and tool.name not in mandatory_tool_names:
                 continue
 
-            # Get cached embedding or compute on-demand
-            if tool.name in self._tool_embedding_cache:
-                tool_embedding = self._tool_embedding_cache[tool.name]
-            else:
-                tool_text = self._create_tool_text(tool)
-                tool_embedding = await self._get_embedding(tool_text)
-
             relevant_tools.append(tool)
-            tool_embeddings.append(tool_embedding)
-
-        # Batch compute all similarities in one FFI call (5-10x speedup)
-        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in zip(relevant_tools, all_similarities):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
@@ -1498,7 +1587,10 @@ class SemanticToolSelector:
                     fallback_tool = tools.get(fallback_name)
                     if fallback_tool:
                         selected_tools.append(
-                            (fallback_tool, SemanticSelectorDefaults.FALLBACK_TOOL_SCORE)
+                            (
+                                fallback_tool,
+                                SemanticSelectorDefaults.FALLBACK_TOOL_SCORE,
+                            )
                         )
                         selected_names.add(fallback_name)
             logger.debug(
@@ -1563,7 +1655,9 @@ class SemanticToolSelector:
         """
         try:
             # Use shared embedding service (singleton)
-            embedding_service = EmbeddingService.get_instance(model_name=self.embedding_model)
+            embedding_service = _get_embedding_service_class().get_instance(
+                model_name=self.embedding_model
+            )
             return await embedding_service.embed_text(text)
 
         except Exception as e:
@@ -1597,6 +1691,50 @@ class SemanticToolSelector:
             # Fallback to random embedding (better than crashing)
             np = _ensure_numpy()
             return np.random.randn(768).astype(np.float32)
+
+    async def _score_candidate_tools(
+        self, query_embedding: np.ndarray, candidate_tools: List[Any]
+    ) -> List[Tuple[Any, float]]:
+        """Compute similarity scores for candidate tools.
+
+        Prefers the native EmbeddingIndex when available and falls back to the
+        existing batch cosine-similarity path otherwise.
+        """
+        if not candidate_tools:
+            return []
+
+        index_scores = self._query_embedding_index(
+            query_embedding=query_embedding,
+            k=max(len(self._tool_embedding_cache), len(candidate_tools)),
+            threshold=0.0,
+        )
+        if index_scores is not None:
+            similarities: List[Tuple[Any, float]] = []
+            for tool in candidate_tools:
+                if tool.name in index_scores:
+                    similarity = index_scores[tool.name]
+                elif tool.name in self._tool_embedding_cache:
+                    similarity = self._cosine_similarity(
+                        query_embedding, self._tool_embedding_cache[tool.name]
+                    )
+                else:
+                    tool_text = self._create_tool_text(tool)
+                    tool_embedding = await self._get_embedding(tool_text)
+                    similarity = self._cosine_similarity(query_embedding, tool_embedding)
+                similarities.append((tool, similarity))
+            return similarities
+
+        tool_embeddings: List[np.ndarray] = []
+        for tool in candidate_tools:
+            if tool.name in self._tool_embedding_cache:
+                tool_embedding = self._tool_embedding_cache[tool.name]
+            else:
+                tool_text = self._create_tool_text(tool)
+                tool_embedding = await self._get_embedding(tool_text)
+            tool_embeddings.append(tool_embedding)
+
+        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
+        return list(zip(candidate_tools, all_similarities))
 
     @staticmethod
     def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -1647,8 +1785,8 @@ class SemanticToolSelector:
 
         Uses the ToolMetadataProvider contract: tool.get_metadata() is guaranteed
         to return valid ToolMetadata (either explicit or auto-generated from
-        tool properties). Falls back to YAML only for legacy tools without
-        get_metadata().
+        tool properties). Legacy tools without get_metadata() rely on
+        name + description only.
 
         Args:
             tool: Tool object
@@ -1680,35 +1818,9 @@ class SemanticToolSelector:
                 parts.append(f"Common requests: {', '.join(metadata.keywords)}.")
             if metadata.examples:
                 parts.append(f"Examples: {', '.join(metadata.examples)}.")
-        else:
-            # Fallback for legacy tools without get_metadata()
-            use_cases = cls._get_tool_use_cases(tool.name)
-            if use_cases:
-                parts.append(use_cases)
+        # Legacy tools without get_metadata() rely on name + description only
 
         return ". ".join(parts)
-
-    @classmethod
-    def _get_tool_use_cases(cls, tool_name: str) -> str:
-        """Get common use cases for a tool to improve semantic matching.
-
-        Loads tool knowledge from YAML configuration file (tool_knowledge.yaml)
-        which is more maintainable than hardcoded dictionaries.
-
-        Args:
-            tool_name: Name of the tool
-
-        Returns:
-            String describing common use cases with rich keywords and examples
-        """
-        # Try to get from YAML-loaded knowledge first
-        use_case_text = cls._build_use_case_text(tool_name)
-        if use_case_text:
-            return use_case_text
-
-        # Fallback to empty string if not found in YAML
-        # The tool's description from the tool definition will still be used
-        return ""
 
     # ========================================================================
     # Classification-Aware Tool Selection (UnifiedTaskClassifier Integration)
@@ -1853,9 +1965,7 @@ class SemanticToolSelector:
         # Get query embedding
         query_embedding = await self._get_embedding(user_message)
 
-        # Collect relevant tools and their embeddings for batch processing
         relevant_tools: List[Any] = []
-        tool_embeddings: List[np.ndarray] = []
 
         for tool in tools.list_tools():
             # Skip excluded tools
@@ -1870,22 +1980,11 @@ class SemanticToolSelector:
             ):
                 continue
 
-            # Get cached embedding or compute on-demand
-            if tool.name in self._tool_embedding_cache:
-                tool_embedding = self._tool_embedding_cache[tool.name]
-            else:
-                tool_text = self._create_tool_text(tool)
-                tool_embedding = await self._get_embedding(tool_text)
-
             relevant_tools.append(tool)
-            tool_embeddings.append(tool_embedding)
-
-        # Batch compute all similarities in one FFI call (5-10x speedup)
-        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in zip(relevant_tools, all_similarities):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)
@@ -1940,7 +2039,10 @@ class SemanticToolSelector:
                     fallback_tool = tools.get(fallback_name)
                     if fallback_tool:
                         selected_tools.append(
-                            (fallback_tool, SemanticSelectorDefaults.FALLBACK_TOOL_SCORE)
+                            (
+                                fallback_tool,
+                                SemanticSelectorDefaults.FALLBACK_TOOL_SCORE,
+                            )
                         )
                         selected_names.add(fallback_name)
 
@@ -2016,7 +2118,11 @@ class SemanticToolSelector:
         if not self._sequence_tracker:
             return []
 
-        return self._sequence_tracker.get_next_suggestions(top_k=top_k)
+        suggestions = self._sequence_tracker.get_next_suggestions(top_k=top_k)
+        return [
+            (self._to_sequence_public_tool_name(tool_name), confidence)
+            for tool_name, confidence in suggestions
+        ]
 
     def get_current_workflow(self) -> Optional[Tuple[str, float]]:
         """Detect if we're in the middle of a known workflow (Phase 9).
@@ -2091,10 +2197,14 @@ class SemanticToolSelector:
                 task_type=task_type,
                 metadata={
                     "tools_selected": len(selected_tools),
+                    "results_count": len(selected_tools),  # Key expected by learner
                     "classification_aware": classification_aware,
                     "excluded_count": excluded_count,
                     "avg_similarity": avg_score,
                     "top_scores": [s for _, s in selected_tools[:3]],  # Top 3 scores
+                    "embedding_model": self.embedding_model,
+                    "embedding_provider": self.embedding_provider,
+                    "threshold_used": threshold,
                 },
             )
             hooks.emit(event)

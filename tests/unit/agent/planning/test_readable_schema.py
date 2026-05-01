@@ -85,7 +85,10 @@ class TestReadableTaskPlan:
             name="Feature X",
             complexity=TaskComplexity.MODERATE,
             desc="Implement feature X",
-            steps=[[1, "feature", "Create module", "write"], [2, "test", "Test", "pytest", [1]]],
+            steps=[
+                [1, "feature", "Create module", "write"],
+                [2, "test", "Test", "pytest", [1]],
+            ],
         )
 
         exec_plan = plan.to_execution_plan()
@@ -325,7 +328,10 @@ class TestHelperFunctions:
             name="Feature X",
             complexity=TaskComplexity.MODERATE,
             desc="Implement feature X",
-            steps=[[1, "feature", "Create module", "write"], [2, "test", "Test", "pytest", [1]]],
+            steps=[
+                [1, "feature", "Create module", "write"],
+                [2, "test", "Test", "pytest", [1]],
+            ],
         )
 
         yaml_str = plan_to_workflow_yaml(plan)

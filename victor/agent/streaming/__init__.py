@@ -57,15 +57,10 @@ from victor.agent.streaming.intent_classification import (
 )
 from victor.agent.streaming.handler import StreamingChatHandler
 from victor.agent.streaming.iteration import IterationResult, IterationAction
-from victor.agent.streaming.pipeline import (
-    StreamingChatPipeline,
-    create_streaming_chat_pipeline,
-)
 
 __all__ = [
     "StreamingChatContext",
     "StreamingChatHandler",
-    "StreamingChatPipeline",
     "IterationCoordinator",
     "StreamingCoordinator",
     "CoordinatorConfig",
@@ -86,5 +81,4 @@ __all__ = [
     "create_intent_classification_handler",
     "create_tracking_state",
     "apply_tracking_state_updates",
-    "create_streaming_chat_pipeline",
 ]

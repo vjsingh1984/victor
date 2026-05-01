@@ -386,7 +386,7 @@ class EntityMemory:
                     name=row["name"],
                     entity_type=EntityType(row["entity_type"]),
                     description=row["description"],
-                    attributes=json.loads(row["attributes"]) if row["attributes"] else {},
+                    attributes=(json.loads(row["attributes"]) if row["attributes"] else {}),
                     source=row["source"],
                     confidence=row["confidence"],
                     mentions=row["mentions"],

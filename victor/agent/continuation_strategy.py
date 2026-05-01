@@ -28,7 +28,15 @@ import re
 from typing import Any, Dict, List, Optional
 
 from victor.core.events import ObservabilityBus
-from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
+from victor.agent.continuation_contract import (
+    ContinuationActionType,
+    ContinuationDirective,
+    coerce_continuation_action,
+)
+from victor.agent.tool_call_extractor import (
+    extract_tool_call_from_text,
+    ExtractedToolCall,
+)
 
 # Patterns for detecting output requirements in response content
 # PRE-COMPILED at module load for performance (avoid re.compile in hot path)
@@ -159,15 +167,18 @@ class ContinuationStrategy:
         self,
         event_bus: Optional[ObservabilityBus] = None,
         decision_service: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize continuation strategy.
 
         Args:
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
             decision_service: Optional LLMDecisionService for ambiguous continuation decisions
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self._event_bus = event_bus or self._get_default_bus()
         self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
 
     def _get_default_bus(self) -> Optional[ObservabilityBus]:
         """Get default ObservabilityBus from DI container.
@@ -203,7 +214,10 @@ class ContinuationStrategy:
                     loop.create_task(
                         self._event_bus.emit(
                             topic=topic,
-                            data={**data, "category": "state"},  # Preserve for observability
+                            data={
+                                **data,
+                                "category": "state",
+                            },  # Preserve for observability
                             source=source,
                         )
                     )
@@ -212,6 +226,58 @@ class ContinuationStrategy:
                     logger.debug(f"No event loop, skipping event emission for {topic}")
             except Exception as e:
                 logger.debug(f"Failed to emit continuation event: {e}")
+
+    def _has_decision_support(self) -> bool:
+        """Return whether LLM-backed continuation decisions are available."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Route continuation decisions through the canonical runtime service when present."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
+
+    @staticmethod
+    def _make_action_result(
+        action: ContinuationActionType,
+        reason: str,
+        *,
+        message: Optional[str] = None,
+        updates: Optional[Dict[str, Any]] = None,
+        extracted_call: Optional[ExtractedToolCall] = None,
+        mentioned_tools: Optional[List[str]] = None,
+    ) -> ContinuationDirective:
+        """Build a typed continuation directive with legacy payload compatibility."""
+
+        return ContinuationDirective.from_legacy(
+            action=action,
+            reason=reason,
+            message=message,
+            updates=updates,
+            extracted_call=extracted_call,
+            mentioned_tools=mentioned_tools,
+        )
 
     @staticmethod
     def detect_mentioned_tools(
@@ -300,6 +366,33 @@ class ContinuationStrategy:
 
         return True
 
+    @staticmethod
+    def _should_finish_direct_response(
+        *,
+        content_length: int,
+        task_completion_signals: Optional[Dict[str, Any]],
+    ) -> bool:
+        """Return whether a direct-response turn should terminate immediately.
+
+        Direct-response prompts are answer-only contracts. Once the model has
+        produced a non-empty response and the turn does not carry explicit file
+        or database inspection requirements, continuation/recovery heuristics
+        should not reopen the loop.
+        """
+        if content_length <= 0 or not task_completion_signals:
+            return False
+
+        if not bool(task_completion_signals.get("direct_response_requested", False)):
+            return False
+
+        if task_completion_signals.get("required_files"):
+            return False
+
+        if task_completion_signals.get("explicit_database_query_requested", False):
+            return False
+
+        return True
+
     def determine_continuation_action(
         self,
         intent_result: Any,  # IntentClassificationResult
@@ -323,7 +416,10 @@ class ContinuationStrategy:
         # Dynamic budget parameters
         query_classification: Any = None,  # Optional[QueryClassification]
         plan_step_count: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        # P1 FIX: Compaction continuation bonus parameters
+        compaction_occurred: bool = False,
+        compaction_messages_removed: int = 0,
+    ) -> ContinuationDirective:
         """Determine what continuation action to take when model doesn't call tools.
 
         Encapsulates the complex decision logic for handling responses without tool
@@ -350,17 +446,37 @@ class ContinuationStrategy:
             task_completion_signals: Optional signals for task completion detection
 
         Returns:
-            Dictionary with:
-            - action: str - One of: "continue_asking_input", "return_to_user",
-                          "prompt_tool_call", "request_summary",
-                          "request_completion", "finish", "force_tool_execution"
-            - message: Optional[str] - System message to inject (if any)
-            - reason: str - Human-readable reason for the action
-            - updates: Dict - State updates (continuation_prompts, asking_input_prompts)
+            Typed continuation directive with legacy mapping compatibility.
         """
         from victor.storage.embeddings.intent_classifier import IntentType
 
         updates: Dict[str, Any] = {}
+
+        # Algorithmic loop detection: only fire near the actual max to avoid cutting
+        # off legitimate multi-step work (previous 1/3 threshold was too aggressive).
+        if task_completion_signals and "current_iteration" in task_completion_signals:
+            current_iteration = task_completion_signals["current_iteration"]
+            max_iterations = unified_tracker_config.get("max_total_iterations", 50)
+            iteration_threshold = max(max_iterations - 5, max_iterations * 4 // 5)
+
+            if current_iteration >= iteration_threshold:
+                logger.warning(
+                    f"Algorithmic loop detection: iteration {current_iteration} >= "
+                    f"threshold {iteration_threshold} - forcing completion to prevent wasted turns"
+                )
+                self._emit_event(
+                    topic="state.continuation.loop_detected",
+                    data={
+                        "reason": "iteration_threshold_exceeded",
+                        "current_iteration": current_iteration,
+                        "threshold": iteration_threshold,
+                    },
+                )
+                return self._make_action_result(
+                    ContinuationActionType.FINISH,
+                    f"Loop detection: iteration {current_iteration} >= threshold {iteration_threshold}",
+                    updates=updates,
+                )
 
         # TASK COMPLETION CHECK: If all required files read and output requirements met,
         # finish immediately to prevent prompting loop (prompting loop fix)
@@ -392,12 +508,11 @@ class ContinuationStrategy:
                             "output_requirements": required_outputs,
                         },
                     )
-                    return {
-                        "action": "finish",
-                        "message": None,
-                        "reason": "Task completion: all required files read and output requirements met",
-                        "updates": updates,
-                    }
+                    return self._make_action_result(
+                        ContinuationActionType.FINISH,
+                        "Task completion: all required files read and output requirements met",
+                        updates=updates,
+                    )
 
                 # SYNTHESIS NUDGE: If all files read but output not produced,
                 # gently remind model to synthesize (not force - allow exploration)
@@ -422,16 +537,16 @@ class ContinuationStrategy:
                     output_hints = (
                         ", ".join(required_outputs[:3]) if required_outputs else "your findings"
                     )
-                    return {
-                        "action": "continue_with_synthesis_hint",
-                        "message": (
+                    return self._make_action_result(
+                        ContinuationActionType.CONTINUE_WITH_SYNTHESIS_HINT,
+                        "Gentle synthesis nudge - all required files read",
+                        message=(
                             f"You've read all the required files. When ready, please synthesize "
                             f"your analysis into {output_hints}. You may continue exploring if "
                             f"needed, but don't forget to produce the final output."
                         ),
-                        "reason": "Gentle synthesis nudge - all required files read",
-                        "updates": updates,
-                    }
+                        updates=updates,
+                    )
 
             # CYCLE DETECTION: If we're cycling between stages too much,
             # force synthesis to prevent infinite exploration loops
@@ -451,16 +566,16 @@ class ContinuationStrategy:
                 output_hints = (
                     ", ".join(required_outputs[:3]) if required_outputs else "your findings"
                 )
-                return {
-                    "action": "request_summary",
-                    "message": (
+                return self._make_action_result(
+                    ContinuationActionType.REQUEST_SUMMARY,
+                    f"Stage cycling detected (count={cycle_count}) - forcing synthesis",
+                    message=(
                         f"You've been exploring for a while and cycling between stages. "
                         f"Please stop exploring and synthesize your analysis now into {output_hints}. "
                         f"Provide your findings based on what you've already read."
                     ),
-                    "reason": f"Stage cycling detected (count={cycle_count}) - forcing synthesis",
-                    "updates": updates,
-                }
+                    updates=updates,
+                )
 
             # CUMULATIVE INTERVENTION CHECK: If we've had too many prompt interventions
             # across the session, nudge or force synthesis (prevents sessions that never finish)
@@ -486,28 +601,31 @@ class ContinuationStrategy:
                 )
                 # After 8+ interventions, force synthesis; before that, just nudge
                 if cumulative_interventions >= 8:
-                    return {
-                        "action": "request_summary",
-                        "message": (
+                    return self._make_action_result(
+                        ContinuationActionType.REQUEST_SUMMARY,
+                        (
+                            f"Excessive prompt interventions ({cumulative_interventions}) - "
+                            "forcing synthesis"
+                        ),
+                        message=(
                             f"You've explored extensively with {len(read_files)} files read and "
                             f"multiple continuation prompts. Please synthesize your analysis now "
                             f"into {output_hints}. Provide your findings based on what you've already read."
                         ),
-                        "reason": f"Excessive prompt interventions ({cumulative_interventions}) - forcing synthesis",
-                        "updates": updates,
-                    }
+                        updates=updates,
+                    )
                 elif synthesis_nudge_count < 3:
                     updates["synthesis_nudge_count"] = synthesis_nudge_count + 1
-                    return {
-                        "action": "continue_with_synthesis_hint",
-                        "message": (
+                    return self._make_action_result(
+                        ContinuationActionType.CONTINUE_WITH_SYNTHESIS_HINT,
+                        f"Cumulative interventions ({cumulative_interventions}) nudge",
+                        message=(
                             f"You've read {len(read_files)} files so far. When ready, please synthesize "
                             f"your analysis into {output_hints}. You may continue exploring briefly, "
                             f"but please produce the final output soon."
                         ),
-                        "reason": f"Cumulative interventions ({cumulative_interventions}) nudge",
-                        "updates": updates,
-                    }
+                        updates=updates,
+                    )
 
         # CRITICAL FIX: If summary was already requested in a previous iteration,
         # we should finish now - don't ask for another summary or loop again.
@@ -522,18 +640,28 @@ class ContinuationStrategy:
                     "continuation_prompts": continuation_prompts,
                 },
             )
-            return {
-                "action": "finish",
-                "message": None,
-                "reason": "Summary already requested - final response received",
-                "updates": updates,
-            }
+            return self._make_action_result(
+                ContinuationActionType.FINISH,
+                "Summary already requested - final response received",
+                updates=updates,
+            )
 
         # Extract intent type
         intends_to_continue = intent_result.intent == IntentType.CONTINUATION
         is_completion = intent_result.intent == IntentType.COMPLETION
         is_asking_input = intent_result.intent == IntentType.ASKING_INPUT
         is_stuck_loop = intent_result.intent == IntentType.STUCK_LOOP
+
+        if not is_asking_input and self._should_finish_direct_response(
+            content_length=content_length,
+            task_completion_signals=task_completion_signals,
+        ):
+            logger.info("Direct-response prompt satisfied directly - finishing")
+            return self._make_action_result(
+                ContinuationActionType.FINISH,
+                "Direct-response prompt satisfied directly",
+                updates=updates,
+            )
 
         # CRITICAL FIX: Handle stuck loop immediately - model is planning but not executing
         if is_stuck_loop:
@@ -559,9 +687,10 @@ class ContinuationStrategy:
                     "continuation_prompts": 99,  # Force max
                 },
             )
-            return {
-                "action": "request_summary",
-                "message": (
+            return self._make_action_result(
+                ContinuationActionType.REQUEST_SUMMARY,
+                "STUCK_LOOP detected - forcing summary",
+                message=(
                     "You appear to be stuck in a planning loop - you keep describing what "
                     "you will do but are not making actual tool calls.\n\n"
                     "Please either:\n"
@@ -569,9 +698,8 @@ class ContinuationStrategy:
                     "2. Provide your response based on what you already know.\n\n"
                     "Do not describe what you will do - just do it or provide your answer."
                 ),
-                "reason": "STUCK_LOOP detected - forcing summary",
-                "updates": {"continuation_prompts": 99},  # Prevent further prompting
-            }
+                updates={"continuation_prompts": 99},
+            )
 
         # Configuration - use configurable thresholds from settings
         max_asking_input_prompts = 3
@@ -640,6 +768,30 @@ class ContinuationStrategy:
             else (max_cont_action if is_action_task else max_cont_default)
         )
 
+        # P1 FIX: Apply model-specific compaction continuation bonus
+        # After compaction, models (especially DeepSeek) need more continuation help
+        if compaction_occurred:
+            try:
+                from victor.agent.compaction_continuation_bonus import get_compaction_bonus
+
+                bonus_calculator = get_compaction_bonus()
+                compaction_bonus = bonus_calculator.get_bonus(
+                    provider=provider_name,
+                    model=model,
+                    compaction_occurred=compaction_occurred,
+                    messages_removed=compaction_messages_removed,
+                )
+                if compaction_bonus > 0:
+                    original_budget = max_continuation_prompts
+                    max_continuation_prompts += compaction_bonus
+                    logger.info(
+                        f"[compaction-bonus] Added {compaction_bonus} continuation prompts for "
+                        f"{provider_name}:{model} (after {compaction_messages_removed} messages removed): "
+                        f"{original_budget} → {max_continuation_prompts}"
+                    )
+            except Exception as e:
+                logger.debug(f"Failed to apply compaction continuation bonus: {e}")
+
         # Budget/iteration thresholds (reserved for future use)
         _budget_threshold = (
             tool_budget // 4 if requires_continuation_support else tool_budget // 2
@@ -649,10 +801,53 @@ class ContinuationStrategy:
             max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
         )
 
+        if task_completion_signals:
+            explicit_database_query_requested = task_completion_signals.get(
+                "explicit_database_query_requested", False
+            )
+            database_query_satisfied = task_completion_signals.get(
+                "database_query_satisfied", False
+            )
+            if explicit_database_query_requested and not database_query_satisfied:
+                logger.info(
+                    "Explicit database inspection request not yet satisfied; "
+                    "requiring a real db/shell tool call before completion"
+                )
+                if continuation_prompts >= max_continuation_prompts:
+                    return self._make_action_result(
+                        ContinuationActionType.REQUEST_SUMMARY,
+                        "Explicit database inspection request remained unmet after continuation budget",
+                        message=(
+                            "You still have not directly inspected the database even though the "
+                            "user explicitly asked for it. Make one actual database or readonly "
+                            "shell tool call now if possible; otherwise explain clearly that the "
+                            "direct database inspection step remains unmet and why."
+                        ),
+                        updates={
+                            "continuation_prompts": continuation_prompts,
+                            "max_prompts_summary_requested": True,
+                        },
+                    )
+
+                updates["continuation_prompts"] = continuation_prompts + 1
+                return self._make_action_result(
+                    ContinuationActionType.PROMPT_TOOL_CALL,
+                    "Explicit database inspection request not yet satisfied",
+                    message=(
+                        "The user explicitly asked you to inspect/query the database directly. "
+                        "Before you finish, make an actual database or readonly shell tool call "
+                        "now, such as listing tables, inspecting schema, or running a SELECT. "
+                        "Do not rely on code inspection alone."
+                    ),
+                    updates=updates,
+                )
+
         # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
         # If model says "let me call search()" but didn't actually call it, try to extract
         # the intended tool call from the text and execute it automatically.
-        if mentioned_tools and len(mentioned_tools) > 0:
+        # BUT: If the model indicated COMPLETION, don't override it — the model may
+        # mention tool names in its summary text without intending to call them.
+        if mentioned_tools and len(mentioned_tools) > 0 and not is_completion:
             logger.info(
                 f"Model mentioned tools but didn't call them: {mentioned_tools}. "
                 "Attempting to extract tool call from text."
@@ -682,13 +877,12 @@ class ContinuationStrategy:
                         "mentioned_tools": mentioned_tools,
                     },
                 )
-                return {
-                    "action": "execute_extracted_tool",
-                    "extracted_call": extracted_call,
-                    "message": None,  # No message to model - we'll execute directly
-                    "reason": f"Extracted {extracted_call.tool_name} call from model text",
-                    "updates": {},
-                }
+                return self._make_action_result(
+                    ContinuationActionType.EXECUTE_EXTRACTED_TOOL,
+                    f"Extracted {extracted_call.tool_name} call from model text",
+                    updates={},
+                    extracted_call=extracted_call,
+                )
 
             # Could not extract - fall back to asking model to retry
             logger.warning(
@@ -730,40 +924,38 @@ class ContinuationStrategy:
                         "continuation_prompts": continuation_prompts,
                     },
                 )
-                return {
-                    "action": "request_summary",
-                    "message": (
+                return self._make_action_result(
+                    ContinuationActionType.REQUEST_SUMMARY,
+                    "Tool calling resistance detected - escalating to summary",
+                    message=(
                         "You've mentioned tools multiple times without executing them. "
                         "Please provide your response based on what you already know, "
                         "or make a single tool call now if needed."
                     ),
-                    "reason": "Tool calling resistance detected - escalating to summary",
-                    "updates": {"continuation_prompts": continuation_prompts + 1},
-                }
+                    updates={"continuation_prompts": continuation_prompts + 1},
+                )
 
-            return {
-                "action": "force_tool_execution",
-                "message": (
+            return self._make_action_result(
+                ContinuationActionType.FORCE_TOOL_EXECUTION,
+                f"Hallucinated tool calls detected: {mentioned_tools}",
+                message=(
                     f"You mentioned calling {', '.join(mentioned_tools)} but didn't actually make the tool call. "
-                    "Please make the ACTUAL tool call now. Use the exact tool format:\n"
-                    "For write: write(path='filename.py', content='...')\n"
-                    "For edit: edit(path='filename.py', old_string='...', new_string='...')\n"
-                    "For shell: shell(command='...')"
+                    "Please make the ACTUAL tool call now via the tool interface, not as plain text. "
+                    "Do not emit pseudo-calls, function signatures, or placeholder arguments like query=query."
                 ),
-                "reason": f"Hallucinated tool calls detected: {mentioned_tools}",
-                "updates": {},
-            }
+                updates={},
+                mentioned_tools=mentioned_tools,
+            )
 
         # Handle asking input intent - use QuestionTypeClassifier for smarter decisions
         if is_asking_input:
             if one_shot_mode:
                 logger.info("Model asking for input in one-shot mode - returning to user")
-                return {
-                    "action": "return_to_user",
-                    "message": None,
-                    "reason": "Model needs user input (one-shot mode)",
-                    "updates": updates,
-                }
+                return self._make_action_result(
+                    ContinuationActionType.RETURN_TO_USER,
+                    "Model needs user input (one-shot mode)",
+                    updates=updates,
+                )
 
             # Use QuestionTypeClassifier to determine if question is rhetorical/continuation
             # or if it genuinely needs user input (clarification/information)
@@ -791,24 +983,22 @@ class ContinuationStrategy:
                     f"Model asking {question_result.question_type.value} question "
                     f"(confidence={question_result.confidence:.2f}) - returning to user"
                 )
-                return {
-                    "action": "return_to_user",
-                    "message": None,
-                    "reason": f"Model needs user input: {question_result.question_type.value} question",
-                    "updates": updates,
-                }
+                return self._make_action_result(
+                    ContinuationActionType.RETURN_TO_USER,
+                    f"Model needs user input: {question_result.question_type.value} question",
+                    updates=updates,
+                )
 
             if asking_input_prompts >= max_asking_input_prompts:
                 logger.info(
                     f"Max asking-input prompts reached ({asking_input_prompts}/{max_asking_input_prompts}) - "
                     "returning to user"
                 )
-                return {
-                    "action": "return_to_user",
-                    "message": None,
-                    "reason": "Max asking-input attempts reached",
-                    "updates": updates,
-                }
+                return self._make_action_result(
+                    ContinuationActionType.RETURN_TO_USER,
+                    "Max asking-input attempts reached",
+                    updates=updates,
+                )
 
             # Only auto-continue for rhetorical/continuation questions
             if question_result.should_auto_continue:
@@ -817,27 +1007,26 @@ class ContinuationStrategy:
                     f"(confidence={question_result.confidence:.2f}) - auto-continuing"
                 )
                 updates["asking_input_prompts"] = asking_input_prompts + 1
-                return {
-                    "action": "continue_asking_input",
-                    "message": (
+                return self._make_action_result(
+                    ContinuationActionType.CONTINUE_ASKING_INPUT,
+                    f"Auto-responding to {question_result.question_type.value} question",
+                    message=(
                         "Yes, please continue with your analysis/implementation. "
                         "If you need information, use available tools to gather it."
                     ),
-                    "reason": f"Auto-responding to {question_result.question_type.value} question",
-                    "updates": updates,
-                }
+                    updates=updates,
+                )
 
             # Unknown question type with low confidence - return to user to be safe
             logger.info(
                 f"Unknown/low-confidence question (type={question_result.question_type.value}, "
                 f"confidence={question_result.confidence:.2f}) - returning to user"
             )
-            return {
-                "action": "return_to_user",
-                "message": None,
-                "reason": "Unknown question type - returning to user for safety",
-                "updates": updates,
-            }
+            return self._make_action_result(
+                ContinuationActionType.RETURN_TO_USER,
+                "Unknown question type - returning to user for safety",
+                updates=updates,
+            )
 
         # Handle completion intent
         if is_completion:
@@ -850,12 +1039,11 @@ class ContinuationStrategy:
                     "intent": "COMPLETION",
                 },
             )
-            return {
-                "action": "finish",
-                "message": None,
-                "reason": "Model indicated task completion",
-                "updates": updates,
-            }
+            return self._make_action_result(
+                ContinuationActionType.FINISH,
+                "Model indicated task completion",
+                updates=updates,
+            )
 
         # Check if we should prompt for tool calls (continuation support)
         if requires_continuation_support and continuation_prompts < max_continuation_prompts:
@@ -864,26 +1052,56 @@ class ContinuationStrategy:
             )
             updates["continuation_prompts"] = continuation_prompts + 1
 
-            # Determine message based on task type
-            if is_analysis_task:
-                message = (
-                    "Continue your analysis. Use tools like read_file, list_directory, "
-                    "code_search to gather more information."
-                )
-            elif is_action_task:
-                message = (
-                    "Continue with the implementation. Use tools like write_file, "
-                    "edit_files to make the necessary changes."
-                )
-            else:
-                message = "Continue. Use appropriate tools if needed."
+            # P2 FIX: Use adaptive continuation strategy for model-specific prompts
+            # This addresses DeepSeek Chat issue where simple "continue" causes stop
+            from victor.agent.adaptive_continuation_strategy import (
+                get_continuation_prompt as get_adaptive_continuation_prompt,
+            )
 
-            return {
-                "action": "prompt_tool_call",
-                "message": message,
-                "reason": "Encouraging tool usage for task completion",
-                "updates": updates,
-            }
+            # Build task description for adaptive strategy
+            task_description = ""
+            if is_analysis_task:
+                task_description = "analysis"
+            elif is_action_task:
+                task_description = "implementation"
+
+            # Get adaptive continuation prompt
+            adaptive_message = get_adaptive_continuation_prompt(
+                provider=provider_name,
+                model=model,
+                compaction_occurred=compaction_occurred,
+                messages_removed=compaction_messages_removed,
+                current_turn=continuation_prompts + 1,  # Approximate turn count
+                task_description=task_description,
+                compaction_summary=(
+                    f"Removed {compaction_messages_removed} messages" if compaction_occurred else ""
+                ),
+            )
+
+            # If adaptive strategy returned a message, use it
+            if adaptive_message and adaptive_message != "Continue.":
+                message = adaptive_message
+            else:
+                # Fall back to task-type-based messages
+                if is_analysis_task:
+                    message = (
+                        "Continue your analysis. Use tools like read, ls, "
+                        "code_search to gather more information."
+                    )
+                elif is_action_task:
+                    message = (
+                        "Continue with the implementation. Use tools like write "
+                        "and edit to make the necessary changes."
+                    )
+                else:
+                    message = "Continue. Use appropriate tools if needed."
+
+            return self._make_action_result(
+                ContinuationActionType.PROMPT_TOOL_CALL,
+                "Encouraging tool usage for task completion",
+                message=message,
+                updates=updates,
+            )
 
         # Max continuation prompts reached - request summary/completion
         if continuation_prompts >= max_continuation_prompts:
@@ -915,68 +1133,107 @@ class ContinuationStrategy:
                 },
             )
             updates["max_prompts_summary_requested"] = True
-            return {
-                "action": "request_summary",
-                "message": (
+            return self._make_action_result(
+                ContinuationActionType.REQUEST_SUMMARY,
+                "Max continuation prompts reached",
+                message=(
                     "Please provide a summary of your findings/work so far. "
                     "Conclude your response."
                 ),
-                "reason": "Max continuation prompts reached",
-                "updates": updates,
-            }
+                updates=updates,
+            )
 
         # LLM augmentation: before defaulting to finish, consult LLM if task has been
         # running for 3+ turns without clear resolution
-        if self._decision_service is not None and continuation_prompts >= 3:
+        if self._has_decision_support() and continuation_prompts >= 3:
             try:
-                from victor.agent.decisions.schemas import DecisionType
+                from victor.agent.decisions.chain import should_use_llm
 
-                response_excerpt = (full_content or "")[-500:]
-                decision = self._decision_service.decide_sync(
-                    DecisionType.CONTINUATION_ACTION,
-                    context={
-                        "response_excerpt": response_excerpt,
-                        "continuation_prompts": str(continuation_prompts),
-                        "task_type": (
-                            "analysis"
-                            if is_analysis_task
-                            else ("action" if is_action_task else "default")
-                        ),
-                    },
-                    heuristic_confidence=0.5,
-                )
-                if decision.source == "llm" and hasattr(decision.result, "action"):
-                    llm_action = decision.result.action
+                if not should_use_llm("continuation_action"):
+                    decision = None
+                else:
+                    from victor.agent.decisions.schemas import DecisionType
+
+                    response_excerpt = (full_content or "")[-500:]
+                    decision = self._decide_sync(
+                        DecisionType.CONTINUATION_ACTION,
+                        context={
+                            "response_excerpt": response_excerpt,
+                            "continuation_prompts": str(continuation_prompts),
+                            "task_type": (
+                                "analysis"
+                                if is_analysis_task
+                                else ("action" if is_action_task else "default")
+                            ),
+                        },
+                        heuristic_confidence=0.5,
+                    )
+                if (
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
+                    and hasattr(decision.result, "action")
+                ):
+                    llm_action = coerce_continuation_action(decision.result.action)
                     llm_reason = getattr(decision.result, "reason", "LLM decision")
-                    if llm_action != "finish":
+                    if llm_action is not ContinuationActionType.FINISH:
                         logger.info(
                             "LLM continuation action: %s (reason: %s)",
-                            llm_action,
+                            llm_action.value,
                             llm_reason,
                         )
                         message = None
-                        if llm_action == "prompt_tool_call":
+                        if llm_action is ContinuationActionType.PROMPT_TOOL_CALL:
                             message = "Continue. Use appropriate tools if needed."
                             updates["continuation_prompts"] = continuation_prompts + 1
-                        elif llm_action == "request_summary":
+                        elif llm_action is ContinuationActionType.REQUEST_SUMMARY:
                             message = (
                                 "Please provide a summary of your findings/work so far. "
                                 "Conclude your response."
                             )
-                        return {
-                            "action": llm_action,
-                            "message": message,
-                            "reason": f"LLM: {llm_reason}",
-                            "updates": updates,
-                        }
+                        return self._make_action_result(
+                            llm_action,
+                            f"LLM: {llm_reason}",
+                            message=message,
+                            updates=updates,
+                        )
             except Exception:
                 logger.debug("LLM continuation decision failed", exc_info=True)
 
+        # Short preamble with no tool calls: model started a response but stalled,
+        # typically because context compaction erased the pending task state.
+        # "Let me verify the files I need to modify:" is 164 chars — a classic symptom.
+        _PREAMBLE_START = re.compile(
+            r"^\s*(?:(?:yes|yeah|yep|sure|ok|okay|alright)[,!.\s]+)?"
+            r"(?:let me\b|i'll\b|i will\b|i need to\b|first,\b|first i\b|"
+            r"to implement\b|to complete\b|to continue\b|next,\s*i\b)",
+            re.IGNORECASE,
+        )
+        if (
+            not is_completion
+            and content_length < 400
+            and full_content
+            and _PREAMBLE_START.match(full_content)
+        ):
+            logger.warning(
+                f"Short preamble ({content_length} chars) with no tool calls — "
+                "model likely lost context. Injecting continuation prompt."
+            )
+            return self._make_action_result(
+                ContinuationActionType.PROMPT_TOOL_CALL,
+                "Short preamble with no tool calls (likely context loss)",
+                message=(
+                    "You started your response but didn't complete it or make any tool calls. "
+                    "If you need to verify or read files, do so now using the available tools. "
+                    "Do not describe what you will do — just do it."
+                ),
+                updates=updates,
+            )
+
         # Default: finish
         logger.info("No continuation needed - finishing")
-        return {
-            "action": "finish",
-            "message": None,
-            "reason": "Response appears complete",
-            "updates": updates,
-        }
+        return self._make_action_result(
+            ContinuationActionType.FINISH,
+            "Response appears complete",
+            updates=updates,
+        )

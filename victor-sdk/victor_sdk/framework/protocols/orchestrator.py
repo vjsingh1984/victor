@@ -5,7 +5,16 @@ These protocols define how verticals interact with the agent orchestrator.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Callable, Awaitable
+from typing import (
+    Protocol,
+    runtime_checkable,
+    Dict,
+    Any,
+    List,
+    Optional,
+    Callable,
+    Awaitable,
+)
 
 
 @runtime_checkable

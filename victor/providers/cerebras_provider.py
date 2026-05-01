@@ -495,6 +495,20 @@ class CerebrasProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Cerebras auto-caches prompts with 5min TTL (latency savings)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Cerebras reuses KV cache with 5min TTL for matching prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import CEREBRAS, CEREBRAS_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(CEREBRAS, target, CEREBRAS_DEFAULT)
+
     async def chat(
         self,
         messages: List[Message],
@@ -662,7 +676,7 @@ class CerebrasProvider(BaseProvider):
                     # Emit final chunk with remaining content and metadata
                     yield StreamChunk(
                         content=remaining_content,
-                        tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                        tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                         stop_reason="stop",
                         is_final=True,
                         metadata=(

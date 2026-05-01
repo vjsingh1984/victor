@@ -17,7 +17,7 @@
 This module provides the ContinuationHandler class which encapsulates
 the continuation decision logic that previously lived inside the legacy
 ``ChatCoordinator._stream_chat_impl`` and is now invoked through the
-``StreamingChatPipeline``.
+``StreamingChatExecutor``.
 
 The handler processes ContinuationStrategy action results and applies them
 to the streaming context, yielding appropriate chunks and returning control
@@ -64,10 +64,21 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
     TYPE_CHECKING,
 )
 
+from victor.agent.continuation_strategy import (
+    ContinuationActionType,
+    coerce_continuation_action,
+)
+from victor.agent.continuation_contract import ContinuationDirective
+from victor.agent.conversation.history_metadata import build_internal_history_metadata
+from victor.agent.services.protocols.streaming_runtime import (
+    StreamingChunkRuntimeProtocol,
+    StreamingMessageAdderProtocol,
+    StreamingProviderRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+)
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
 
@@ -79,47 +90,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Protocols for Dependencies
-# =============================================================================
+def _internal_prompt_metadata(kind: str) -> dict[str, Any]:
+    """Build metadata for internal user-role continuation prompts."""
+    return build_internal_history_metadata(kind)
 
-
-class ChunkGeneratorProtocol(Protocol):
-    """Protocol for chunk generation."""
-
-    def generate_content_chunk(
-        self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> StreamChunk: ...
-
-    def generate_final_marker_chunk(self) -> StreamChunk: ...
-
-    def generate_metrics_chunk(
-        self, metrics_line: str, is_final: bool = False, prefix: str = "\n\n"
-    ) -> StreamChunk: ...
-
-    def format_completion_metrics(
-        self,
-        ctx: StreamingChatContext,
-        elapsed_time: float,
-        cost_str: Optional[str] = None,
-    ) -> str: ...
-
-
-class SanitizerProtocol(Protocol):
-    """Protocol for content sanitization."""
-
-    def sanitize(self, content: str) -> str: ...
-
-
-class MessageAdderProtocol(Protocol):
-    """Protocol for adding messages to conversation."""
-
-    def add_message(self, role: str, content: str) -> None: ...
-
-
-# ProviderProtocol imported from core.protocols for consistency
-# Uses **kwargs which accepts model, temperature, max_tokens
-from victor.core.protocols import ProviderProtocol
 
 # =============================================================================
 # Result Types
@@ -184,11 +158,11 @@ class ContinuationHandler:
 
     def __init__(
         self,
-        message_adder: MessageAdderProtocol,
-        chunk_generator: ChunkGeneratorProtocol,
-        sanitizer: SanitizerProtocol,
+        message_adder: StreamingMessageAdderProtocol,
+        chunk_generator: StreamingChunkRuntimeProtocol,
+        sanitizer: StreamingSanitizerRuntimeProtocol,
         settings: "Settings",
-        provider: Optional[ProviderProtocol] = None,
+        provider: Optional[StreamingProviderRuntimeProtocol] = None,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -235,7 +209,7 @@ class ContinuationHandler:
 
     async def handle_action(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -252,28 +226,60 @@ class ContinuationHandler:
         Returns:
             ContinuationResult with chunks and control flags.
         """
+        if not isinstance(action_result, ContinuationDirective):
+            legacy_payload = dict(action_result) if isinstance(action_result, dict) else {}
+            action_result = ContinuationDirective.from_legacy(
+                action=legacy_payload.get("action", ContinuationActionType.FINISH),
+                reason=legacy_payload.get("reason", "legacy_action_result"),
+                message=legacy_payload.get("message"),
+                updates=legacy_payload.get("updates"),
+                extracted_call=legacy_payload.get("extracted_call"),
+                mentioned_tools=legacy_payload.get("mentioned_tools"),
+                set_final_summary_requested=bool(
+                    legacy_payload.get("set_final_summary_requested", False)
+                ),
+                set_max_prompts_summary_requested=bool(
+                    legacy_payload.get("set_max_prompts_summary_requested", False)
+                ),
+            )
+
         # Apply state updates from action result
         self._apply_state_updates(action_result)
+        action = coerce_continuation_action(action_result.get("action"))
 
-        action = action_result.get("action", "finish")
+        # AGENTIC LOOP FIX: Check if continuation should be skipped due to forced completion
+        # This prevents continuation strategy from overriding task completion detector
+        recovery_actions = {
+            ContinuationActionType.EXECUTE_EXTRACTED_TOOL,
+            ContinuationActionType.FORCE_TOOL_EXECUTION,
+        }
+        if getattr(stream_ctx, "skip_continuation", False) and action not in recovery_actions:
+            logger.info("Continuation skipped: skip_continuation flag set (completion was forced)")
+            return ContinuationResult(
+                chunks=[],
+                should_return=True,
+                should_continue_loop=False,
+            )
 
         # Dispatch to specific handler
         handlers = {
-            "continue_asking_input": self._handle_continue_asking_input,
-            "return_to_user": self._handle_return_to_user,
-            "prompt_tool_call": self._handle_prompt_tool_call,
-            "continue_with_synthesis_hint": self._handle_continue_with_synthesis_hint,
-            "request_summary": self._handle_request_summary,
-            "request_completion": self._handle_request_completion,
-            "execute_extracted_tool": self._handle_execute_extracted_tool,
-            "force_tool_execution": self._handle_force_tool_execution,
-            "finish": self._handle_finish,
+            ContinuationActionType.CONTINUE_ASKING_INPUT: self._handle_continue_asking_input,
+            ContinuationActionType.RETURN_TO_USER: self._handle_return_to_user,
+            ContinuationActionType.PROMPT_TOOL_CALL: self._handle_prompt_tool_call,
+            ContinuationActionType.CONTINUE_WITH_SYNTHESIS_HINT: (
+                self._handle_continue_with_synthesis_hint
+            ),
+            ContinuationActionType.REQUEST_SUMMARY: self._handle_request_summary,
+            ContinuationActionType.REQUEST_COMPLETION: self._handle_request_completion,
+            ContinuationActionType.EXECUTE_EXTRACTED_TOOL: self._handle_execute_extracted_tool,
+            ContinuationActionType.FORCE_TOOL_EXECUTION: self._handle_force_tool_execution,
+            ContinuationActionType.FINISH: self._handle_finish,
         }
 
         handler = handlers.get(action, self._handle_finish)
         return await handler(action_result, stream_ctx, full_content)
 
-    def _apply_state_updates(self, action_result: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_state_updates(self, action_result: ContinuationDirective) -> Dict[str, Any]:
         """Apply state updates from action result.
 
         Args:
@@ -282,24 +288,24 @@ class ContinuationHandler:
         Returns:
             Dict of updates that were applied.
         """
-        updates = action_result.get("updates", {})
+        updates = action_result.state_patch.to_updates_dict()
         applied = {}
 
         if "cumulative_prompt_interventions" in updates:
             # Note: This is tracked internally but also returned for orchestrator sync
             applied["cumulative_prompt_interventions"] = updates["cumulative_prompt_interventions"]
 
-        if action_result.get("set_final_summary_requested"):
+        if action_result.state_patch.final_summary_requested:
             applied["final_summary_requested"] = True
 
-        if action_result.get("set_max_prompts_summary_requested"):
+        if action_result.state_patch.max_prompts_summary_requested:
             applied["max_prompts_summary_requested"] = True
 
         return applied
 
     async def _handle_continue_asking_input(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -310,34 +316,30 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("continue_asking_input"),
+            )
         return result
 
     async def _handle_return_to_user(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
         """Handle return_to_user action.
 
-        Yields accumulated content and exits the loop.
+        Content is already yielded by the pipeline before continuation handling.
         """
         result = ContinuationResult(should_return=True)
-
-        # Yield accumulated content
-        if full_content:
-            sanitized = self._sanitizer.sanitize(full_content)
-            if sanitized:
-                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
-
-        # Add final marker
         result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
         return result
 
     async def _handle_prompt_tool_call(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -348,7 +350,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("prompt_tool_call"),
+            )
 
         # Increment turn in tracker
         if self._unified_tracker:
@@ -364,7 +370,7 @@ class ContinuationHandler:
 
     async def _handle_continue_with_synthesis_hint(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -375,7 +381,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("synthesis_hint"),
+            )
 
         # Update synthesis nudge count in tracker
         updates = action_result.get("updates", {})
@@ -387,7 +397,7 @@ class ContinuationHandler:
 
     async def _handle_request_summary(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -404,7 +414,11 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("request_summary"),
+            )
 
         return result
 
@@ -462,7 +476,7 @@ class ContinuationHandler:
                     else time.time() - stream_ctx.start_time
                 )
                 cost_str = None
-                if self._settings.show_cost_metrics and final_metrics:
+                if self._settings.analytics.show_cost_metrics and final_metrics:
                     cost_str = final_metrics.format_cost()
                 metrics_line = self._chunk_generator.format_completion_metrics(
                     stream_ctx, elapsed_time, cost_str
@@ -479,7 +493,7 @@ class ContinuationHandler:
 
     async def _handle_request_completion(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -490,12 +504,16 @@ class ContinuationHandler:
         result = ContinuationResult(should_skip_rest=True)
         message = action_result.get("message", "")
         if message:
-            self._message_adder.add_message("user", message)
+            self._message_adder.add_message(
+                "user",
+                message,
+                metadata=_internal_prompt_metadata("request_completion"),
+            )
         return result
 
     async def _handle_execute_extracted_tool(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -519,7 +537,7 @@ class ContinuationHandler:
 
     async def _handle_force_tool_execution(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -543,10 +561,15 @@ class ContinuationHandler:
                 "user",
                 "You are unable to make tool calls. Please provide your response "
                 "NOW based on what you know. Do not mention any tools.",
+                metadata=_internal_prompt_metadata("force_tool_execution_give_up"),
             )
             stream_ctx.reset_force_tool_attempts()
         elif force_message:
-            self._message_adder.add_message("user", force_message)
+            self._message_adder.add_message(
+                "user",
+                force_message,
+                metadata=_internal_prompt_metadata("force_tool_execution"),
+            )
         else:
             # Default message
             tools_str = ", ".join(mentioned_tools)
@@ -555,7 +578,11 @@ class ContinuationHandler:
                 "Please make the actual tool call now, or provide your final answer without "
                 "mentioning tools you cannot use."
             )
-            self._message_adder.add_message("user", default_message)
+            self._message_adder.add_message(
+                "user",
+                default_message,
+                metadata=_internal_prompt_metadata("force_tool_execution"),
+            )
 
         # Increment turn in tracker (mirrors _handle_force_tool_execution_with_handler)
         if self._unified_tracker:
@@ -565,7 +592,7 @@ class ContinuationHandler:
 
     async def _handle_finish(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -575,11 +602,7 @@ class ContinuationHandler:
         """
         result = ContinuationResult(should_return=True)
 
-        # Yield accumulated content
-        if full_content:
-            sanitized = self._sanitizer.sanitize(full_content)
-            if sanitized:
-                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
+        # Content is already yielded by the pipeline before continuation handling.
 
         # Finalize and display metrics
         if self._finalize_metrics:
@@ -590,7 +613,7 @@ class ContinuationHandler:
                 else time.time() - stream_ctx.start_time
             )
             cost_str = None
-            if self._settings.show_cost_metrics and final_metrics:
+            if self._settings.analytics.show_cost_metrics and final_metrics:
                 cost_str = final_metrics.format_cost()
             metrics_line = self._chunk_generator.format_completion_metrics(
                 stream_ctx, elapsed_time, cost_str
@@ -638,6 +661,6 @@ def create_continuation_handler(
         messages_getter=lambda: orchestrator.messages,
         unified_tracker=orchestrator.unified_tracker,
         finalize_metrics=orchestrator._finalize_stream_metrics,
-        record_outcome=orchestrator._record_intelligent_outcome,
+        record_outcome=orchestrator._record_runtime_intelligence_outcome,
         execute_extracted_tool=getattr(orchestrator, "_execute_extracted_tool_call", None),
     )

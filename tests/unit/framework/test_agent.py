@@ -26,10 +26,19 @@ These tests cover:
 
 import pytest
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Set, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 from victor_sdk.core.types import VerticalDefinition
+
+
+# Agent.__init__ validates type(orchestrator).__name__ == "AgentOrchestrator".
+# Defining this class at module level gives inline tests a lightweight mock that
+# passes the check without importing the real orchestrator (which has heavy deps).
+class AgentOrchestrator(MagicMock):
+    """MagicMock subclass whose type name satisfies Agent.__init__ validation."""
+
 
 # =============================================================================
 # Test Fixtures
@@ -39,16 +48,17 @@ from victor_sdk.core.types import VerticalDefinition
 @pytest.fixture
 def mock_orchestrator():
     """Create a mock AgentOrchestrator for testing."""
-    orchestrator = MagicMock()
+
+    orchestrator = AgentOrchestrator()
     orchestrator.provider = MagicMock()
     orchestrator.provider.name = "test_provider"
     orchestrator.model = "test-model"
     orchestrator.messages = []
     orchestrator.reset_conversation = MagicMock()
-    orchestrator.stream_chat = AsyncMock(return_value=AsyncMock())
 
     # NEW: Add chat method for direct sync execution (Phase 2 refactoring)
     from victor.providers.base import CompletionResponse
+    from victor.providers.base import StreamChunk
 
     def mock_chat_response(content="Hello World", tool_calls=None):
         """Create a mock CompletionResponse."""
@@ -62,6 +72,17 @@ def mock_orchestrator():
         )
 
     orchestrator.chat = AsyncMock(return_value=mock_chat_response())
+
+    async def mock_stream_chat(_prompt):
+        yield StreamChunk(content="Test", is_final=False)
+        yield StreamChunk(content="", is_final=True, stop_reason="stop")
+
+    orchestrator.stream_chat = mock_stream_chat
+    orchestrator._chat_service = SimpleNamespace(
+        chat=orchestrator.chat,
+        stream_chat=orchestrator.stream_chat,
+    )
+    orchestrator._container = None
 
     # Add protocol methods for State wrapper
     orchestrator.get_stage = MagicMock(return_value=MagicMock(value="INITIAL"))
@@ -118,6 +139,18 @@ def mock_stream_chunk():
     chunk.metadata = {}
     chunk.tool_calls = []
     return chunk
+
+
+@pytest.fixture(autouse=True)
+def reset_feature_flags_for_agent_tests():
+    """Reset feature flags for isolation between Agent tests."""
+    from victor.core.feature_flags import reset_feature_flag_manager
+
+    reset_feature_flag_manager()
+
+    yield
+
+    reset_feature_flag_manager()
 
 
 # =============================================================================
@@ -196,7 +229,7 @@ class TestAgentFromOrchestrator:
         """from_orchestrator should handle missing provider name."""
         from victor.framework.agent import Agent
 
-        orchestrator = MagicMock()
+        orchestrator = AgentOrchestrator()
         orchestrator.provider = MagicMock(spec=[])  # No 'name' attribute
         orchestrator.model = None
 
@@ -216,7 +249,7 @@ class TestAgentRun:
 
     @pytest.mark.asyncio
     async def test_run_basic(self, mock_orchestrator):
-        """run should call orchestrator.chat and return TaskResult."""
+        """run should call the service-backed chat runtime and return TaskResult."""
         from victor.framework.agent import Agent
 
         agent = Agent(mock_orchestrator)
@@ -268,7 +301,7 @@ class TestAgentRun:
     async def test_run_with_cancellation_error(self, mock_orchestrator):
         """run should handle CancellationError."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import CancellationError
+        from victor.core.errors import CancellationError
 
         # Make chat raise CancellationError
         mock_orchestrator.chat.side_effect = CancellationError("User cancelled")
@@ -297,7 +330,6 @@ class TestAgentRun:
     async def test_run_with_context(self, mock_orchestrator):
         """run should format context into prompt."""
         from victor.framework.agent import Agent
-        from victor.providers.base import CompletionResponse
 
         agent = Agent(mock_orchestrator)
         context = {"file": "test.py", "error": "SyntaxError"}
@@ -313,6 +345,43 @@ class TestAgentRun:
 
         assert result.success is True
 
+    @pytest.mark.asyncio
+    async def test_run_normalizes_exact_response_output(self, mock_orchestrator):
+        """run should normalize exact-response literals through framework policy."""
+        from victor.framework.agent import Agent
+        from victor.providers.base import CompletionResponse
+
+        mock_orchestrator.chat = AsyncMock(
+            return_value=CompletionResponse(
+                content="The user asked for exactly READY, so the answer is READY",
+                role="assistant",
+                tool_calls=[],
+                stop_reason="stop",
+                usage=None,
+                model="test-model",
+            )
+        )
+        mock_orchestrator._chat_service = SimpleNamespace(chat=mock_orchestrator.chat)
+
+        agent = Agent(mock_orchestrator)
+        result = await agent.run("Reply with exactly READY")
+
+        assert result.success is True
+        assert result.content == "READY"
+
+    @pytest.mark.asyncio
+    async def test_run_falls_back_to_orchestrator_without_chat_service(self, mock_orchestrator):
+        """run should preserve compatibility for bare orchestrator wrappers."""
+        from victor.framework.agent import Agent
+
+        mock_orchestrator._chat_service = None
+        agent = Agent(mock_orchestrator)
+
+        result = await agent.run("test prompt")
+
+        mock_orchestrator.chat.assert_called_once_with("test prompt")
+        assert result.success is True
+
 
 # =============================================================================
 # Agent.stream Tests (lines 462-490)
@@ -324,12 +393,13 @@ class TestAgentStream:
 
     @pytest.mark.asyncio
     async def test_stream_basic(self, mock_orchestrator):
-        """stream should yield events from orchestrator."""
+        """stream should yield framework events from the service-backed runtime."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
 
         # Mock the internal stream function
-        async def mock_stream_with_events(orchestrator, prompt):
+        async def mock_stream_with_events(runtime, prompt, **kwargs):
+            assert runtime is mock_orchestrator._chat_service
             yield AgentExecutionEvent(type=EventType.STREAM_START)
             yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
             yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
@@ -352,10 +422,12 @@ class TestAgentStream:
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
 
-        captured_prompt = {}
+        captured = {}
 
-        async def mock_stream_with_events(orchestrator, prompt):
-            captured_prompt["prompt"] = prompt
+        async def mock_stream_with_events(runtime, prompt, **kwargs):
+            captured["runtime"] = runtime
+            captured["prompt"] = prompt
+            captured["response_prompt"] = kwargs.get("response_prompt")
             yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
@@ -365,15 +437,17 @@ class TestAgentStream:
                 pass
 
         # Context should be prepended to prompt
-        assert "File: test.py" in captured_prompt["prompt"]
-        assert "fix bug" in captured_prompt["prompt"]
+        assert captured["runtime"] is mock_orchestrator._chat_service
+        assert "File: test.py" in captured["prompt"]
+        assert "fix bug" in captured["prompt"]
+        assert captured["response_prompt"] == "fix bug"
 
     @pytest.mark.asyncio
     async def test_stream_notifies_state_observers(self, mock_orchestrator):
         """stream should notify state observers on stage changes."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         observer_called = []
 
@@ -391,7 +465,7 @@ class TestAgentStream:
 
         mock_orchestrator.get_stage.side_effect = get_stage_side_effect
 
-        async def mock_stream_with_events(orchestrator, prompt):
+        async def mock_stream_with_events(orchestrator, prompt, **kwargs):
             yield AgentExecutionEvent(type=EventType.STREAM_START)
             yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
             yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
@@ -412,7 +486,7 @@ class TestAgentStream:
         """stream should catch and suppress observer exceptions."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         # Create an observer that raises an exception
         def failing_observer(old_state, new_state):
@@ -429,7 +503,7 @@ class TestAgentStream:
 
         mock_orchestrator.get_stage.side_effect = get_stage_side_effect
 
-        async def mock_stream_with_events(orchestrator, prompt):
+        async def mock_stream_with_events(orchestrator, prompt, **kwargs):
             yield AgentExecutionEvent(type=EventType.STREAM_START)
             yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
             yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
@@ -445,6 +519,30 @@ class TestAgentStream:
 
         # All events should be yielded despite observer error
         assert len(events) == 3
+
+    @pytest.mark.asyncio
+    async def test_stream_falls_back_to_orchestrator_without_chat_service(self, mock_orchestrator):
+        """stream should use the internal fallback adapter for bare orchestrators."""
+        from victor.framework.agent import Agent
+        from victor.framework.events import AgentExecutionEvent, EventType
+        from victor.runtime import resolve_chat_runtime
+
+        mock_orchestrator._chat_service = None
+        mock_orchestrator._container = None
+        captured = {}
+
+        async def mock_stream_with_events(runtime, prompt, **kwargs):
+            captured["runtime"] = runtime
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
+
+        agent = Agent(mock_orchestrator)
+
+        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
+            async for _ in agent.stream("test"):
+                pass
+
+        assert captured["runtime"] is not mock_orchestrator
+        assert type(captured["runtime"]) is type(resolve_chat_runtime(mock_orchestrator))
 
 
 # =============================================================================
@@ -916,7 +1014,7 @@ class TestAgentWorkflows:
     async def test_run_workflow_no_vertical(self, mock_orchestrator):
         """run_workflow should raise AgentError when no vertical."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         agent = Agent(mock_orchestrator)
 
@@ -927,7 +1025,7 @@ class TestAgentWorkflows:
     async def test_run_workflow_no_provider(self, mock_orchestrator, mock_vertical):
         """run_workflow should raise AgentError when vertical has no workflow provider."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_vertical.get_workflow_provider = MagicMock(return_value=None)
 
@@ -940,7 +1038,7 @@ class TestAgentWorkflows:
     async def test_run_workflow_not_found(self, mock_orchestrator, mock_vertical):
         """run_workflow should raise AgentError when workflow not found."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock()
         # Mock run_compiled_workflow to raise error for not found workflow
@@ -1011,7 +1109,7 @@ class TestAgentTeams:
     async def test_run_team_no_vertical(self, mock_orchestrator):
         """run_team should raise AgentError when no vertical."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         agent = Agent(mock_orchestrator)
 
@@ -1022,7 +1120,7 @@ class TestAgentTeams:
     async def test_run_team_no_team_provider(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when vertical has no team spec provider."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         # Remove get_team_spec_provider method
         del mock_vertical.get_team_spec_provider
@@ -1036,7 +1134,7 @@ class TestAgentTeams:
     async def test_run_team_no_specs(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when team specs are empty."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock()
         mock_provider.get_team_specs = MagicMock(return_value={})
@@ -1051,7 +1149,7 @@ class TestAgentTeams:
     async def test_run_team_not_found(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when team not found."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock()
         mock_provider.get_team_specs = MagicMock(
@@ -1136,17 +1234,81 @@ class TestAgentTeams:
         teams = agent.get_available_teams()
         assert set(teams) == {"team1", "team2"}
 
+    def test_get_coordination_suggestion_uses_shared_framework_runtime(
+        self, mock_orchestrator, mock_vertical
+    ):
+        """get_coordination_suggestion should prefer the orchestrator coordination API."""
+        from victor.framework.agent import Agent
+
+        suggestion = MagicMock()
+        mock_orchestrator.get_coordination_suggestion = MagicMock(return_value=suggestion)
+
+        agent = Agent(mock_orchestrator, vertical=mock_vertical)
+        result = agent.get_coordination_suggestion("feature", "high", mode="plan")
+
+        assert result is suggestion
+        mock_orchestrator.get_coordination_suggestion.assert_called_once_with(
+            "feature",
+            "high",
+            mode="plan",
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_coordination_transitions_uses_state_passed_surface(
+        self, mock_orchestrator, mock_vertical
+    ):
+        """get_coordination_transitions should use orchestration_facade.coordination_state_passed."""
+        from victor.framework.agent import Agent
+
+        result = MagicMock(name="coordination_result")
+        coordination_state_passed = SimpleNamespace(suggest=AsyncMock(return_value=result))
+        mock_orchestrator.orchestration_facade = SimpleNamespace(
+            coordination_state_passed=coordination_state_passed
+        )
+        mock_orchestrator.mode_controller = SimpleNamespace(
+            current_mode=SimpleNamespace(value="build")
+        )
+        mock_orchestrator.conversation_state = {"complexity": "high"}
+        mock_orchestrator.session_state = {}
+        mock_orchestrator.provider_name = "test_provider"
+        mock_orchestrator.temperature = 0.7
+        mock_orchestrator.max_tokens = 4096
+        mock_orchestrator.settings = MagicMock()
+        mock_orchestrator.session_id = "session-1"
+        mock_orchestrator.conversation_stage = "initial"
+        mock_orchestrator.observed_files = []
+        mock_orchestrator._capabilities = {}
+
+        agent = Agent(mock_orchestrator, vertical=mock_vertical)
+        coordination_result = await agent.get_coordination_transitions(
+            "feature",
+            complexity="high",
+            mode="plan",
+        )
+
+        assert coordination_result is result
+        coordination_state_passed.suggest.assert_awaited_once()
+        args = coordination_state_passed.suggest.await_args.args
+        kwargs = coordination_state_passed.suggest.await_args.kwargs
+        assert args[0].session_id == "session-1"
+        assert kwargs == {
+            "task_type": "feature",
+            "complexity": "high",
+            "mode": "plan",
+        }
+
     @pytest.mark.asyncio
     async def test_run_team_success(self, mock_orchestrator, mock_vertical):
         """run_team should execute team and return result."""
         from victor.framework.agent import Agent
-        from victor.framework.teams import AgentTeam
+        from victor.framework.team_runtime import ResolvedTeamExecutionPlan
+        from victor.teams.types import TeamFormation, TeamResult
 
         # Create a team spec
         mock_team_spec = MagicMock()
-        mock_team_spec.name = "test_team"
+        mock_team_spec.name = "Test Team"
         mock_team_spec.members = [MagicMock()]
-        mock_team_spec.formation = MagicMock()
+        mock_team_spec.formation = TeamFormation.PARALLEL
         mock_team_spec.total_tool_budget = 100
         mock_team_spec.max_iterations = 50
 
@@ -1159,16 +1321,31 @@ class TestAgentTeams:
         )
         mock_vertical.get_team_spec_provider = MagicMock(return_value=mock_provider)
 
-        # Create mock team and result
-        mock_team_instance = MagicMock()
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.final_output = "Team completed work"
-        mock_team_instance.run = AsyncMock(return_value=mock_result)
+        resolved_plan = ResolvedTeamExecutionPlan(
+            team_name="test_team",
+            display_name="Test Team",
+            formation=TeamFormation.PARALLEL,
+            member_count=1,
+            total_tool_budget=100,
+            max_iterations=50,
+            recommendation_source="explicit",
+            _team_spec=mock_team_spec,
+            _members=(MagicMock(),),
+        )
+        team_result = TeamResult(
+            success=True,
+            final_output="Team completed work",
+            member_results={},
+            formation=TeamFormation.PARALLEL,
+            total_tool_calls=3,
+        )
 
         agent = Agent(mock_orchestrator, vertical=mock_vertical)
 
-        with patch.object(AgentTeam, "create", new=AsyncMock(return_value=mock_team_instance)):
+        with patch(
+            "victor.framework.team_runtime.run_named_team",
+            new=AsyncMock(return_value=(resolved_plan, team_result)),
+        ) as run_named_team:
             result = await agent.run_team(
                 "test_team",
                 "Test goal",
@@ -1179,14 +1356,23 @@ class TestAgentTeams:
         assert result["success"] is True
         assert result["final_output"] == "Team completed work"
         assert result["team_name"] == "test_team"
+        assert result["team_display_name"] == "Test Team"
         assert result["goal"] == "Test goal"
-        mock_team_instance.run.assert_called_once()
+        assert result["recommendation_source"] == "explicit"
+        assert result["total_tool_calls"] == 3
+        run_named_team.assert_awaited_once_with(
+            mock_orchestrator,
+            team_name="test_team",
+            goal="Test goal",
+            context={"key": "value"},
+            timeout_seconds=60.0,
+        )
 
     @pytest.mark.asyncio
     async def test_run_team_no_get_team_specs_method(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when team provider has no get_team_specs."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock(spec=[])  # No get_team_specs method
         mock_vertical.get_team_spec_provider = MagicMock(return_value=mock_provider)
@@ -1300,11 +1486,14 @@ class TestAgentCreate:
         """create should create Agent with orchestrator."""
         from victor.framework.agent import Agent
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             agent = await Agent.create(provider="anthropic")
 
@@ -1316,11 +1505,14 @@ class TestAgentCreate:
         """create should apply vertical configuration."""
         from victor.framework.agent import Agent
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             agent = await Agent.create(
                 provider="anthropic",
@@ -1335,7 +1527,7 @@ class TestAgentCreate:
         """create should respect provider hints from vertical config."""
         from victor.framework.agent import Agent
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
         mock_vertical.get_definition = MagicMock(
             return_value=VerticalDefinition(
@@ -1348,9 +1540,12 @@ class TestAgentCreate:
             )
         )
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             # User still chooses anthropic despite not being preferred
             agent = await Agent.create(
@@ -1379,11 +1574,14 @@ class TestAgentCreate:
             def get_system_prompt(cls):
                 return "Use direct config path."
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             agent = await Agent.create(
                 provider="anthropic",
@@ -1398,11 +1596,14 @@ class TestAgentCreate:
     async def test_create_provider_error(self):
         """create should raise ProviderError for provider issues."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import ProviderError
+        from victor.core.errors import ProviderError
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(side_effect=Exception("Provider API error")),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(side_effect=Exception("Provider API error")),
+            ),
         ):
             with pytest.raises(ProviderError, match="API error"):
                 await Agent.create(provider="anthropic")
@@ -1411,14 +1612,107 @@ class TestAgentCreate:
     async def test_create_agent_error(self):
         """create should raise AgentError for other errors."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(side_effect=Exception("Configuration invalid")),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(side_effect=Exception("Configuration invalid")),
+            ),
         ):
             with pytest.raises(AgentError, match="Configuration invalid"):
                 await Agent.create(provider="anthropic")
+
+    @pytest.mark.asyncio
+    async def test_create_forwards_session_provider_overrides_into_factory(self):
+        """create should route explicit session overrides through AgentFactory."""
+        from victor.framework.agent import Agent
+        from victor.framework.session_config import SessionConfig
+
+        mock_orchestrator = AgentOrchestrator()
+        settings = MagicMock()
+        settings.provider = SimpleNamespace(
+            default_provider="ollama",
+            default_model="qwen3.5:27b-q4_K_M",
+            ollama_base_url="http://localhost:11434",
+        )
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_orchestrator)
+
+        config = SessionConfig.from_cli_flags(
+            agent_profile="zai-coding",
+            provider="zai",
+            model="glm-4.7",
+            auth_mode="oauth",
+            coding_plan=True,
+        )
+
+        with (
+            patch("victor.config.settings.load_settings", return_value=settings),
+            patch(
+                "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+            ) as factory_cls,
+        ):
+            agent = await Agent.create(session_config=config)
+
+        assert agent._orchestrator is mock_orchestrator
+        factory_cls.assert_called_once_with(
+            settings=settings,
+            profile="zai-coding",
+            provider="zai",
+            model="glm-4.7",
+            temperature=0.7,
+            max_tokens=4096,
+            vertical=None,
+            thinking=False,
+            session_id=None,
+            enable_observability=True,
+            profile_overrides={"auth_mode": "oauth", "coding_plan": True},
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_profile_timeout_override_does_not_force_default_provider(self):
+        """Profile-scoped runtime overrides must not synthesize a provider override."""
+        from victor.framework.agent import Agent
+        from victor.framework.session_config import SessionConfig
+
+        mock_orchestrator = AgentOrchestrator()
+        settings = MagicMock()
+        settings.provider = SimpleNamespace(
+            default_provider="ollama",
+            default_model="qwen3.5:27b-q4_K_M",
+        )
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_orchestrator)
+
+        config = SessionConfig.from_cli_flags(
+            agent_profile="zai-coding",
+            provider_timeout=180,
+        )
+
+        with (
+            patch("victor.config.settings.load_settings", return_value=settings),
+            patch(
+                "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+            ) as factory_cls,
+        ):
+            agent = await Agent.create(session_config=config)
+
+        assert agent._orchestrator is mock_orchestrator
+        factory_cls.assert_called_once_with(
+            settings=settings,
+            profile="zai-coding",
+            provider=None,
+            model=None,
+            temperature=0.7,
+            max_tokens=4096,
+            vertical=None,
+            thinking=False,
+            session_id=None,
+            enable_observability=True,
+            profile_overrides={"timeout": 180},
+        )
 
 
 # =============================================================================
@@ -1435,15 +1729,19 @@ class TestAgentCreateTeam:
         from victor.framework.agent import Agent
         from victor.framework.teams import TeamMemberSpec
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
         mock_team = MagicMock()
 
         with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.framework._internal.create_orchestrator_from_options",
+                "victor.framework.agent_factory.AgentFactory.create",
                 new=AsyncMock(return_value=mock_orchestrator),
             ),
-            patch("victor.framework.teams.AgentTeam.create", new=AsyncMock(return_value=mock_team)),
+            patch(
+                "victor.framework.teams.AgentTeam.create",
+                new=AsyncMock(return_value=mock_team),
+            ),
         ):
             team = await Agent.create_team(
                 name="Test Team",
@@ -1463,16 +1761,18 @@ class TestAgentCreateTeam:
         from victor.framework.teams import TeamMemberSpec
         from victor.teams import TeamFormation
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
         mock_team = MagicMock()
 
         with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.framework._internal.create_orchestrator_from_options",
+                "victor.framework.agent_factory.AgentFactory.create",
                 new=AsyncMock(return_value=mock_orchestrator),
             ),
             patch(
-                "victor.framework.teams.AgentTeam.create", new=AsyncMock(return_value=mock_team)
+                "victor.framework.teams.AgentTeam.create",
+                new=AsyncMock(return_value=mock_team),
             ) as mock_create,
         ):
             await Agent.create_team(
@@ -1492,16 +1792,18 @@ class TestAgentCreateTeam:
         from victor.framework.teams import TeamMemberSpec
         from victor.teams import TeamFormation
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
         mock_team = MagicMock()
 
         with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.framework._internal.create_orchestrator_from_options",
+                "victor.framework.agent_factory.AgentFactory.create",
                 new=AsyncMock(return_value=mock_orchestrator),
             ),
             patch(
-                "victor.framework.teams.AgentTeam.create", new=AsyncMock(return_value=mock_team)
+                "victor.framework.teams.AgentTeam.create",
+                new=AsyncMock(return_value=mock_team),
             ) as mock_create,
         ):
             await Agent.create_team(

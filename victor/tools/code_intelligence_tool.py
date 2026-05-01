@@ -83,7 +83,12 @@ PYTHON_QUERIES = {
         "code for",
         "implementation",
     ],
-    stages=["initial", "planning", "reading", "analysis"],  # Available early when symbol name known
+    stages=[
+        "initial",
+        "planning",
+        "reading",
+        "analysis",
+    ],  # Available early when symbol name known
     mandatory_keywords=[
         "find",
         "find symbol",
@@ -182,7 +187,12 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         "list references",
         "where used",
     ],
-    stages=["initial", "planning", "reading", "analysis"],  # Available early for impact analysis
+    stages=[
+        "initial",
+        "planning",
+        "reading",
+        "analysis",
+    ],  # Available early for impact analysis
     execution_category=ExecutionCategory.READ_ONLY,
     mandatory_keywords=[
         "find",

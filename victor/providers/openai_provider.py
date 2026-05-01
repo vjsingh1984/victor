@@ -30,6 +30,7 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.openai_compat import (
+    build_openai_messages,
     convert_tools_to_openai_format,
 )
 from victor.providers.resolution import (
@@ -199,6 +200,15 @@ class OpenAIProvider(BaseProvider):
         model_lower = model.lower()
         return any(model_lower.startswith(prefix) for prefix in ["o1", "o3"])
 
+    def _uses_max_completion_tokens(self, model: str) -> bool:
+        """Check if model requires max_completion_tokens instead of max_tokens.
+
+        GPT-5.x and O-series models use max_completion_tokens.
+        GPT-5.x still supports temperature and tools unlike O-series.
+        """
+        model_lower = model.lower()
+        return any(model_lower.startswith(prefix) for prefix in ["o1", "o3", "gpt-5", "gpt5"])
+
     @property
     def name(self) -> str:
         """Provider name."""
@@ -211,6 +221,20 @@ class OpenAIProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         """OpenAI supports streaming."""
         return True
+
+    def supports_prompt_caching(self) -> bool:
+        """OpenAI automatic prefix caching (90% discount, 1024 min tokens, 5m-24h TTL)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """OpenAI reuses KV cache server-side for matching prefixes."""
+        return True
+
+    def context_window(self, model: Optional[str] = None) -> int:
+        from victor.providers.context_windows import OPENAI, OPENAI_DEFAULT, lookup
+
+        target = model or getattr(self, "_current_model", None)
+        return lookup(OPENAI, target, OPENAI_DEFAULT)
 
     async def chat(
         self,
@@ -252,8 +276,9 @@ class OpenAIProvider(BaseProvider):
             has_tools=tools is not None,
         ) as log_success:
             try:
-                # Convert messages to OpenAI format
-                openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+                # Serialize messages: preserves tool_calls on assistant turns and
+                # cleans orphaned tool pairs after context compaction (ZAI refinement).
+                openai_messages = build_openai_messages(messages)
 
                 # Check if O-series reasoning model
                 is_o_series = self._is_o_series_model(model)
@@ -271,6 +296,14 @@ class OpenAIProvider(BaseProvider):
                     request_params["max_completion_tokens"] = max_tokens
                     # Remove any temperature if passed in kwargs
                     request_params.pop("temperature", None)
+                elif self._uses_max_completion_tokens(model):
+                    # GPT-5.x uses max_completion_tokens but still supports
+                    # temperature and tools
+                    request_params["max_completion_tokens"] = max_tokens
+                    request_params["temperature"] = temperature
+                    if tools:
+                        request_params["tools"] = self._convert_tools(tools)
+                        request_params["tool_choice"] = "auto"
                 else:
                     # Standard models use max_tokens and temperature
                     request_params["temperature"] = temperature
@@ -294,40 +327,7 @@ class OpenAIProvider(BaseProvider):
                 return parsed
 
             except Exception as e:
-                # Convert to specific provider error types based on error message
-                # Skip if already a ProviderError to avoid double-wrapping
-                if isinstance(e, ProviderError):
-                    raise
-
-                error_str = str(e).lower()
-                if any(
-                    term in error_str
-                    for term in [
-                        "auth",
-                        "unauthorized",
-                        "invalid key",
-                        "invalid api",
-                        "api_key",
-                        "401",
-                    ]
-                ):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    # Wrap generic errors in ProviderError
-                    raise ProviderError(
-                        message=f"OpenAI API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
+                raise self.classify_error(e) from e
 
     async def stream(
         self,
@@ -359,8 +359,9 @@ class OpenAIProvider(BaseProvider):
             # Refresh OAuth token if needed
             await self._ensure_valid_token()
 
-            # Convert messages
-            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+            # Serialize messages: preserves tool_calls on assistant turns and
+            # cleans orphaned tool pairs after context compaction (ZAI refinement).
+            openai_messages = build_openai_messages(messages)
 
             # Check if O-series reasoning model
             is_o_series = self._is_o_series_model(model)
@@ -380,6 +381,13 @@ class OpenAIProvider(BaseProvider):
                 request_params["max_completion_tokens"] = max_tokens
                 # Remove any temperature if passed in kwargs
                 request_params.pop("temperature", None)
+            elif self._uses_max_completion_tokens(model):
+                # GPT-5.x uses max_completion_tokens but supports temperature/tools
+                request_params["max_completion_tokens"] = max_tokens
+                request_params["temperature"] = temperature
+                if tools:
+                    request_params["tools"] = self._convert_tools(tools)
+                    request_params["tool_choice"] = "auto"
             else:
                 # Standard models use max_tokens and temperature
                 request_params["temperature"] = temperature
@@ -451,7 +459,7 @@ class OpenAIProvider(BaseProvider):
             stop_reason=choice.finish_reason,
             usage=usage,
             model=model,
-            raw_response=response.model_dump() if hasattr(response, "model_dump") else None,
+            raw_response=(response.model_dump() if hasattr(response, "model_dump") else None),
         )
 
     def _parse_stream_chunk(
@@ -557,27 +565,7 @@ class OpenAIProvider(BaseProvider):
         Raises:
             ProviderError: Always raises after converting
         """
-        error_msg = str(error)
-
-        if "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
-        elif "rate_limit" in error_msg.lower() or "429" in error_msg:
-            raise ProviderRateLimitError(
-                message=f"Rate limit exceeded: {error_msg}",
-                provider=self.name,
-                status_code=429,
-                raw_error=error,
-            )
-        else:
-            raise ProviderError(
-                message=f"OpenAI API error: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
+        raise self.classify_error(error)
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available OpenAI models.

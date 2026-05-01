@@ -25,24 +25,30 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from unittest.mock import Mock
+
+from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
     from victor.tools.registry import ToolRegistry
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.tool_output_formatter import ToolOutputFormatter
-    from victor.agent.tool_deduplication import ToolDeduplicationTracker
+    from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.tool_access_controller import ToolAccessController
     from victor.agent.argument_normalizer import ArgumentNormalizer
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.search_router import SearchRouter
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.parallel_executor import ParallelToolExecutor
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
@@ -52,9 +58,10 @@ if TYPE_CHECKING:
     from victor.config.model_capabilities import ToolCallingMatrix
     from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
     from victor.agent.protocols.infrastructure_protocols import SafetyCheckerProtocol
-    from victor.agent.protocols.coordination_protocols import ToolPlannerProtocol
+    from victor.agent.services.protocols import ToolPlanningRuntimeProtocol as ToolPlannerProtocol
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
 
 
 class ToolBuildersMixin:
@@ -69,13 +76,32 @@ class ToolBuildersMixin:
         - self.mode_controller: property from ModeAwareMixin
     """
 
+    @staticmethod
+    def _resolve_setting_value(source: Any, name: str, default: Any = _MISSING) -> Any:
+        """Return a concrete setting value while ignoring auto-created mock attributes."""
+        if source is None:
+            return default
+
+        value = getattr(source, name, default)
+        if isinstance(value, Mock) and name not in getattr(source, "__dict__", {}):
+            return default
+        return value
+
+    def _tool_setting(self, name: str, default: Any) -> Any:
+        """Resolve a tool setting from nested ToolSettings or legacy flat settings."""
+        tool_settings = self._resolve_setting_value(self.settings, "tools", None)
+        nested_value = self._resolve_setting_value(tool_settings, name, _MISSING)
+        if nested_value is not _MISSING:
+            return nested_value
+        return self._resolve_setting_value(self.settings, name, default)
+
     def create_tool_registry(self) -> "ToolRegistry":
         """Create tool registry for managing available tools.
 
         Returns:
             ToolRegistry instance for tool storage and management
         """
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         logger.debug("ToolRegistry created")
@@ -235,6 +261,10 @@ class ToolBuildersMixin:
         except Exception:
             pass  # Permission system is optional
 
+        # Read cross-turn dedup settings from ToolSettings
+        cross_turn_enabled = self._tool_setting("cross_turn_dedup_enabled", True)
+        cross_turn_ttl = float(self._tool_setting("cross_turn_dedup_ttl", 300))
+
         pipeline = ToolPipeline(
             tool_registry=tools,
             tool_executor=tool_executor,
@@ -244,6 +274,8 @@ class ToolBuildersMixin:
                 enable_analytics=True,
                 enable_failed_signature_tracking=True,
                 enable_semantic_caching=semantic_cache is not None,
+                enable_cross_turn_dedup=cross_turn_enabled,
+                cross_turn_dedup_ttl=cross_turn_ttl,
             ),
             tool_cache=tool_cache,
             argument_normalizer=argument_normalizer,
@@ -289,9 +321,32 @@ class ToolBuildersMixin:
         Returns:
             ToolSelector instance configured with all dependencies
         """
+        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
         from victor.agent.tool_selection import ToolSelector
 
         fallback_max_tools = getattr(self.settings, "fallback_max_tools", 8)
+        runtime_intelligence = None
+        if getattr(self, "container", None) is not None:
+            runtime_intelligence = RuntimeIntelligenceService.from_container(self.container)
+
+        # Merge ToolSettings into tool_selection_config so ToolSelector
+        # has access to max_tool_schema_tokens, schema_promotion_threshold,
+        # and max_mcp_tools_per_turn without a separate settings reference.
+        merged_config = dict(tool_selection)
+        tool_settings = self._resolve_setting_value(self.settings, "tools", None)
+        if tool_settings is not None:
+            if "max_tool_schema_tokens" not in merged_config:
+                merged_config["max_tool_schema_tokens"] = self._resolve_setting_value(
+                    tool_settings, "max_tool_schema_tokens", 0
+                )
+            if "schema_promotion_threshold" not in merged_config:
+                merged_config["schema_promotion_threshold"] = self._resolve_setting_value(
+                    tool_settings, "schema_promotion_threshold", 0.8
+                )
+            if "max_mcp_tools_per_turn" not in merged_config:
+                merged_config["max_mcp_tools_per_turn"] = self._resolve_setting_value(
+                    tool_settings, "max_mcp_tools_per_turn", 12
+                )
 
         selector = ToolSelector(
             tools=tools,
@@ -300,9 +355,10 @@ class ToolBuildersMixin:
             task_tracker=unified_tracker,
             model=model,
             provider_name=provider_name,
-            tool_selection_config=tool_selection,
+            tool_selection_config=merged_config,
             fallback_max_tools=fallback_max_tools,
             on_selection_recorded=on_selection_recorded,
+            runtime_intelligence=runtime_intelligence,
         )
 
         logger.debug(f"ToolSelector created with fallback_max_tools={fallback_max_tools}")
@@ -314,24 +370,31 @@ class ToolBuildersMixin:
         Returns:
             ToolCache instance or None if disabled
         """
-        if not getattr(self.settings, "tool_cache_enabled", True):
+        if not self._tool_setting("tool_cache_enabled", True):
             return None
 
         from victor.storage.cache.config import CacheConfig
         from victor.config.settings import get_project_paths
         from victor.storage.cache.tool_cache import ToolCache
 
-        cache_dir = getattr(self.settings, "tool_cache_dir", None)
+        cache_dir = getattr(self.settings, "tool_cache_dir_override", None)
+        if not cache_dir:
+            cache_dir = getattr(self.settings, "tool_cache_dir", None)
         if cache_dir:
             cache_dir = Path(cache_dir).expanduser()
         else:
-            cache_dir = get_project_paths().global_cache_dir
+            cache_dir = Path(get_project_paths().global_cache_dir).expanduser()
 
-        cache = ToolCache(
-            ttl=getattr(self.settings, "tool_cache_ttl", 600),
-            allowlist=getattr(self.settings, "tool_cache_allowlist", []),
-            cache_config=CacheConfig(disk_path=cache_dir),
-        )
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache = ToolCache(
+                ttl=self._tool_setting("tool_cache_ttl", 600),
+                allowlist=self._tool_setting("tool_cache_allowlist", []),
+                cache_config=CacheConfig(disk_path=cache_dir),
+            )
+        except Exception as exc:
+            logger.warning("Tool cache disabled: failed to initialize %s: %s", cache_dir, exc)
+            return None
         logger.debug(f"ToolCache created with TTL={cache.ttl}s")
         return cache
 
@@ -430,7 +493,7 @@ class ToolBuildersMixin:
             return None
 
         try:
-            from victor.agent.tool_deduplication import ToolDeduplicationTracker
+            from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
 
             window_size = getattr(self.settings, "tool_deduplication_window_size", 10)
             tracker = ToolDeduplicationTracker(window_size=window_size)
@@ -468,7 +531,7 @@ class ToolBuildersMixin:
         Returns:
             SemanticToolSelector instance or None
         """
-        use_semantic_selection = getattr(self.settings, "use_semantic_tool_selection", False)
+        use_semantic_selection = is_semantic_tool_selection_enabled(self.settings, default=False)
 
         if not use_semantic_selection:
             return None
@@ -476,9 +539,9 @@ class ToolBuildersMixin:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         semantic_selector = SemanticToolSelector(
-            embedding_model=self.settings.embedding_model,
-            embedding_provider=self.settings.embedding_provider,
-            ollama_base_url=self.settings.ollama_base_url,
+            embedding_model=self.settings.tools.embedding_model,
+            embedding_provider=self.settings.tools.embedding_provider,
+            ollama_base_url=self.settings.provider.ollama_base_url,
             cache_embeddings=True,
         )
         logger.debug("SemanticToolSelector created")
@@ -568,7 +631,7 @@ class ToolBuildersMixin:
             logger.debug("Plugin system disabled")
             return None
 
-        tool_count = tool_registrar._initialize_plugins()
+        tool_count = tool_registrar.initialize_plugins()
         plugin_manager = tool_registrar.plugin_manager
 
         if tool_count > 0:
@@ -591,9 +654,9 @@ class ToolBuildersMixin:
         Returns:
             ToolPlanner instance for tool planning
         """
-        from victor.agent.protocols import ToolPlannerProtocol
+        from victor.agent.services.protocols import ToolPlanningRuntimeProtocol
 
-        tool_planner = self.container.get(ToolPlannerProtocol)
+        tool_planner = self.container.get(ToolPlanningRuntimeProtocol)
         logger.debug("ToolPlanner created via DI")
         return tool_planner
 

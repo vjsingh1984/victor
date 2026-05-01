@@ -1,8 +1,7 @@
 """Callback coordinator for orchestrator tool/streaming lifecycle events.
 
 Extracts callback logic from AgentOrchestrator into a focused component
-that delegates to existing coordinators (MetricsCoordinator, ToolCoordinator,
-UsageAnalytics, RL coordinator).
+that delegates to canonical services.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult
     from victor.agent.streaming_controller import StreamingSession
-    from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+    from victor.agent.services.metrics_service import MetricsCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -22,31 +21,31 @@ class CallbackCoordinator:
     """Coordinates callbacks for tool and streaming lifecycle events.
 
     Replaces inline callback methods on the orchestrator with clean delegation
-    to MetricsCoordinator, ToolCoordinator, and UsageAnalytics.
+    to MetricsCoordinator, ToolService, and UsageAnalytics.
     """
 
     def __init__(
         self,
         *,
         metrics_coordinator: "MetricsCoordinator",
-        get_tool_coordinator: Callable[[], Any],
         get_observability: Callable[[], Optional[Any]],
-        get_pipeline_calls_used: Callable[[], int],
+        get_iteration_count: Callable[[], int],
         get_usage_analytics: Callable[[], Optional[Any]],
         get_rl_coordinator: Callable[[], Any],
         get_vertical_context: Callable[[], Any],
+        get_tool_service: Optional[Callable[[], Optional[Any]]] = None,
     ) -> None:
         self._metrics = metrics_coordinator
-        self._get_tool_coordinator = get_tool_coordinator
         self._get_observability = get_observability
-        self._get_pipeline_calls_used = get_pipeline_calls_used
+        self._get_iteration_count = get_iteration_count
         self._get_usage_analytics = get_usage_analytics
         self._get_rl_coordinator = get_rl_coordinator
         self._get_vertical_context = get_vertical_context
+        self._get_tool_service = get_tool_service
 
     def on_tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Called when tool execution starts (from ToolPipeline)."""
-        iteration = self._get_pipeline_calls_used()
+        iteration = self._get_iteration_count()
         self._metrics.on_tool_start(tool_name, arguments, iteration)
 
         obs = self._get_observability()
@@ -65,17 +64,22 @@ class CallbackCoordinator:
         add_message: Callable,
     ) -> None:
         """Called when tool execution completes (from ToolPipeline)."""
-        self._get_tool_coordinator().on_tool_complete(
-            result=result,
-            metrics_collector=self._metrics.metrics_collector,
-            read_files_session=read_files_session,
-            required_files=required_files,
-            required_outputs=required_outputs,
-            nudge_sent_flag=nudge_sent_flag,
-            add_message=add_message,
-            observability=self._get_observability(),
-            pipeline_calls_used=self._get_pipeline_calls_used(),
-        )
+        tool_service = self._get_tool_service() if self._get_tool_service is not None else None
+        if tool_service is not None and hasattr(tool_service, "on_tool_complete"):
+            tool_service.on_tool_complete(
+                result=result,
+                metrics_collector=self._metrics.metrics_collector,
+                read_files_session=read_files_session,
+                required_files=required_files,
+                required_outputs=required_outputs,
+                nudge_sent_flag=nudge_sent_flag,
+                add_message=add_message,
+                observability=self._get_observability(),
+                iteration_count=self._get_iteration_count(),
+            )
+            return
+
+        raise RuntimeError("ToolService is unavailable or does not expose on_tool_complete")
 
     def on_streaming_session_complete(self, session: "StreamingSession") -> None:
         """Called when streaming session completes (from StreamingController)."""

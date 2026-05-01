@@ -29,6 +29,15 @@ from victor.agent.provider_tool_guidance import (
     ToolGuidanceStrategy,
 )
 from victor.agent.prompt_normalizer import get_prompt_normalizer
+from victor.core.completion_markers import (
+    BLOCKED_MARKER,
+    FILE_DONE_MARKER,
+    SUMMARY_MARKER,
+    TASK_DONE_MARKER,
+)
+from victor.core.constants import DEFAULT_VERTICAL
+from victor.framework.prompt_document import PromptBlock, PromptDocument
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.query_classifier import QueryClassification
@@ -42,14 +51,22 @@ logger = logging.getLogger(__name__)
 
 
 # Provider classifications
-CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
+CLOUD_PROVIDERS: Set[str] = {
+    "anthropic",
+    "openai",
+    "google",
+    "xai",
+    "moonshot",
+    "kimi",
+    "deepseek",
+}
 LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
 
 # Critical grounding rules to prevent hallucination
-# Concise version for cloud providers - they handle context well
+# Evolved Gen 3 version from GEPA v2 (1093 chars) - strongest anti-hallucination language
+# Drift from baseline: Added schema validation emphasis, removed git/npm checks, strengthened "only" constraint
 GROUNDING_RULES = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
+GROUNDING: Base ALL responses strictly on tool output only. Never assume, invent, or fabricate file paths, content, or any information not explicitly present in tool responses. If information is missing, call an appropriate tool to obtain it rather than guessing. Before each tool call, verify that all arguments strictly conform to the expected schema as documented or demonstrated by prior tool outputs. Always verify file existence with a dedicated ls() or code_search() call before attempting to read or operate on files to prevent file_not_found errors. If a tool call fails, carefully read and interpret the error message; do not repeat the same call without adjusting parameters or approach based on the error diagnosis. Keep tool calls focused and targeted—avoid broad directory scans, large data reads, or complex shell commands. Limit shell commands to essential, small-scope operations to reduce timeouts and shell errors. Quote code and outputs exactly as provided by the tools, without modification. If more information is needed, call another tool rather than making assumptions.
 """.strip()
 
 # Parallel read optimization guidance
@@ -74,31 +91,29 @@ OUTPUT STYLE: CONCISE
 """.strip()
 
 # Active completion signaling - deterministic detection
-# This guidance is always included to ensure predictable task completion detection
-# Uses bold-wrapped markers with colon suffix for markdown-safe rendering:
-#   **DONE**: description  → rendered as bold "DONE:" → stripped to "DONE:"
-#   __DONE__: description  → rendered as italic "DONE:" → stripped to "DONE:"
-# The detector strips markdown formatting (**, __, *, _) and matches "KEYWORD:"
-COMPLETION_GUIDANCE = """
+# This guidance is always included to ensure predictable task completion detection.
+# The markers are intentionally rare to avoid collisions with ordinary prose.
+COMPLETION_GUIDANCE = f"""
 TASK COMPLETION (MANDATORY):
 When you complete a task, you MUST signal completion using these EXACT markers.
-Use the bold format with a colon suffix exactly as shown:
+Put the marker at the START of its own line exactly as shown:
 
 1. For FILE OPERATIONS (create/edit/write):
-   **DONE**: Created/Modified <filename>
+   {FILE_DONE_MARKER} Created/Modified <filename>
 
 2. For BUG FIXES / ISSUE RESOLUTION:
-   **TASK_DONE**: <what was fixed>
+   {TASK_DONE_MARKER} <what was fixed>
 
 3. For ANALYSIS / QUESTIONS / RESEARCH:
-   **SUMMARY**: <key findings>
+   {SUMMARY_MARKER} <key findings>
 
 4. For FAILED / BLOCKED TASKS:
-   **BLOCKED**: <reason>
+   {BLOCKED_MARKER} <reason>
 
 IMPORTANT:
 - These markers are REQUIRED for the system to detect task completion
-- Always use the bold format with colon: **DONE**: or **SUMMARY**: or **TASK_DONE**:
+- Use the exact uppercase marker token including the trailing double colon
+- Do NOT wrap the marker in markdown or change its spelling
 - After signaling completion, STOP - do NOT ask follow-up questions
 - Do NOT say "would you like me to continue?" after completing the task
 - Do NOT re-read files you have already read
@@ -137,6 +152,24 @@ The file contains more data at different offsets. To find what you need:
 
 DO NOT re-read the full file without parameters - you will get the same truncated view.
 DO NOT assume content is missing - use offset/search to access additional sections.
+""".strip()
+
+# ASI-derived guidance: Lessons learned from execution trace analysis (GEPA-inspired).
+# Evolved Gen 3 version from GEPA v2 (1500 chars, g_e_p_a_service+cot_distillation strategy)
+# Drift from baseline: Added schema validation emphasis, structured as step-by-step approach
+ASI_TOOL_EFFECTIVENESS_GUIDANCE = """
+TOOL EFFECTIVENESS (from execution data):
+
+- Use code_search(query='...', mode='semantic') FIRST to locate relevant files efficiently. Avoid browsing files sequentially with multiple read() calls.
+- Use mode='literal' in code_search only for exact known identifiers.
+- Before calling any tool, verify argument names and types exactly match the tool schema. If an error occurs, consult the error message and adjust arguments before retrying.
+- Always confirm file or directory existence with ls() before using read() or other file access tools. Avoid guessing or hardcoding paths.
+- Use ls() for directories and read() for files. Avoid read('directory_name') as it wastes a tool call.
+- Only access files within the current project directory. Use ls('.') to verify your location. If read('victor') or read('../') fails, you are in the wrong directory.
+- Do NOT use shell('rg ...') or shell('grep ...') commands for searching code. Always use code_search(query='...') for reliable, semantic search.
+- For edits, include 3+ surrounding lines of context in old_str to ensure unique matches. If old_str appears multiple times, add more context.
+- After a failed edit (old_str not found), re-read the file at the exact location, copying text character-by-character. Do NOT guess from memory.
+- After any tool failure, carefully read the error message and analyze the root cause before retrying. Do not repeat the same tool call with unchanged arguments immediately.
 """.strip()
 
 # Task-type hints are now in vertical prompt contributors (E5 M3).
@@ -228,6 +261,10 @@ class SystemPromptBuilder:
         vertical: Optional[str] = None,
         concise_mode: bool = False,
         query_classification: Optional["QueryClassification"] = None,
+        mode_prompt_addition: str = "",
+        provider_caches: bool = False,
+        provider_has_kv_cache: bool = False,
+        system_prompt_strategy: str = "static",
     ):
         """Initialize the prompt builder.
 
@@ -243,6 +280,16 @@ class SystemPromptBuilder:
             enrichment_service: Optional prompt enrichment service for context injection
             vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
             concise_mode: If True, adds guidance to produce brief, direct responses
+            provider_caches: If True, provider supports API-level prompt caching (Anthropic).
+                Full prompt is optimal (cached at 90% discount). If False, aggressively
+                prune sections and skip MIPROv2 few-shots to save tokens.
+            provider_has_kv_cache: If True, provider supports KV prefix caching (Ollama,
+                LMStudio, etc.). Sections are reduced AND frozen at session start so the
+                system prompt prefix stays byte-identical across turns.
+            system_prompt_strategy: Strategy for system prompt management.
+                - 'static': Freeze at session start for cache optimization (default)
+                - 'dynamic': Rebuild per-turn based on context/tool calls
+                - 'hybrid': Static for API providers, dynamic for local providers
         """
         # Handle both string and ProviderSettings object for provider_name
         # (backward compatibility with settings refactor)
@@ -262,9 +309,13 @@ class SystemPromptBuilder:
         self.task_type = task_type
         self.available_tools = available_tools or []
         self.enrichment_service = enrichment_service
-        self.vertical = vertical or "coding"
+        self.vertical = vertical or DEFAULT_VERTICAL
         self.concise_mode = concise_mode
         self.query_classification = query_classification
+        self.mode_prompt_addition = mode_prompt_addition.strip()
+        self.provider_caches = provider_caches
+        self.provider_has_kv_cache = provider_has_kv_cache
+        self.system_prompt_strategy = system_prompt_strategy
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -275,6 +326,10 @@ class SystemPromptBuilder:
 
         # Cache merged task hints from vertical contributors
         self._merged_task_hints = None
+
+        # Prompt caching for static mode
+        self._cached_prompt: Optional[str] = None
+        self._cache_key: Optional[str] = None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
@@ -522,11 +577,18 @@ class SystemPromptBuilder:
         }
         return guidance_map.get(self.query_classification.query_type, "")
 
+    def _get_mode_guidance_section(self) -> str:
+        """Get current mode-specific guidance from the live runtime."""
+        return self.mode_prompt_addition.strip()
+
     def _get_tool_constraint_section(self) -> str:
         """Get tool constraint section listing available tools."""
-        if not self.available_tools:
+        normalized_tools = sorted(
+            {canonicalize_core_tool_name(tool) for tool in self.available_tools if tool}
+        )
+        if not normalized_tools:
             return ""
-        tool_list = ", ".join(sorted(self.available_tools))
+        tool_list = ", ".join(normalized_tools)
         return (
             f"IMPORTANT: Only use tools from this list: {tool_list}. "
             "Do not attempt to call unlisted tools."
@@ -547,43 +609,195 @@ class SystemPromptBuilder:
         5. Completion guidance (always included for deterministic task completion)
         6. Provider-specific tool guidance (GAP-5)
 
+        System Prompt Strategy:
+        - 'static': Cache prompt after first build, reuse for all turns (default)
+        - 'dynamic': Rebuild every turn based on current context
+        - 'hybrid': Static for API providers (cache benefit), dynamic for local providers
+
         Returns:
             System prompt string tailored to the provider/model
         """
-        # Try adapter-based prompt first
+        # Determine if we should use cached prompt or rebuild
+        strategy = self._get_effective_strategy()
+
+        if strategy == "static":
+            # Return cached prompt if available
+            if self._cached_prompt is not None:
+                logger.debug(
+                    "[SystemPrompt→Cache] Using cached prompt (strategy=static, len=%d)",
+                    len(self._cached_prompt),
+                )
+                return self._cached_prompt
+
+        # Build the prompt
+        prompt = self.build_document().render()
+
+        # Cache for static mode
+        if strategy == "static":
+            self._cached_prompt = prompt
+            logger.debug(
+                "[SystemPrompt→Cache] Cached prompt (strategy=static, len=%d)",
+                len(prompt),
+            )
+        elif strategy == "dynamic":
+            # Clear cache to ensure rebuild next time
+            self._cached_prompt = None
+            logger.debug(
+                "[SystemPrompt→Dynamic] Rebuilt prompt (strategy=dynamic, len=%d)",
+                len(prompt),
+            )
+        # hybrid: cache for API providers, no cache for local
+
+        return prompt
+
+    def build_document(self) -> PromptDocument:
+        """Build the canonical system prompt document."""
+        document = PromptDocument()
+
         if self.tool_adapter:
             base_prompt = self._build_with_adapter()
         else:
-            # Fall back to provider-specific prompt
             base_prompt = self._build_for_provider()
 
-        # Determine which prompt sections to include.
-        # Edge model can select only task-relevant sections to save tokens.
         sections_to_include = self._get_active_sections()
+        document.upsert(
+            PromptBlock(
+                name="base_prompt",
+                content=base_prompt,
+                priority=10,
+                header="",
+                kind="system_base",
+            )
+        )
 
         if "concise_mode" in sections_to_include and self.concise_mode:
-            base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
+            document.upsert(
+                PromptBlock(
+                    name="concise_mode",
+                    content=CONCISE_MODE_GUIDANCE,
+                    priority=20,
+                    header="",
+                    kind="guidance",
+                )
+            )
             logger.debug("Concise mode enabled - added brevity guidance to prompt")
+
+        if "mode_guidance" in sections_to_include:
+            mode_guidance = self._get_mode_guidance_section()
+            if mode_guidance:
+                document.upsert(
+                    PromptBlock(
+                        name="mode_guidance",
+                        content=mode_guidance,
+                        priority=30,
+                        header="",
+                        kind="guidance",
+                    )
+                )
 
         if "task_guidance" in sections_to_include:
             task_guidance = self._get_task_guidance_section()
             if task_guidance:
-                base_prompt = f"{base_prompt}\n\n{task_guidance}"
+                document.upsert(
+                    PromptBlock(
+                        name="task_guidance",
+                        content=task_guidance,
+                        priority=40,
+                        header="",
+                        kind="guidance",
+                    )
+                )
 
+        tool_constraint = ""
         if "tool_constraint" in sections_to_include:
             tool_constraint = self._get_tool_constraint_section()
             if tool_constraint:
-                base_prompt = f"{base_prompt}\n\n{tool_constraint}"
+                document.upsert(
+                    PromptBlock(
+                        name="tool_constraint",
+                        content=tool_constraint,
+                        priority=50,
+                        header="",
+                        kind="tooling",
+                    )
+                )
 
         if "completion" in sections_to_include:
-            base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
+            document.upsert(
+                PromptBlock(
+                    name="completion_guidance",
+                    content=COMPLETION_GUIDANCE,
+                    priority=60,
+                    header="",
+                    kind="completion",
+                )
+            )
 
+        provider_tool_guidance = ""
         if "tool_guidance" in sections_to_include:
-            tool_guidance = self.get_provider_tool_guidance()
-            if tool_guidance:
-                base_prompt = f"{base_prompt}\n\n{tool_guidance}"
+            provider_tool_guidance = self.get_provider_tool_guidance()
+            if provider_tool_guidance:
+                document.upsert(
+                    PromptBlock(
+                        name="provider_tool_guidance",
+                        content=provider_tool_guidance,
+                        priority=70,
+                        header="",
+                        kind="tooling",
+                    )
+                )
 
-        return base_prompt
+            document.upsert(
+                PromptBlock(
+                    name="tool_effectiveness_guidance",
+                    content=ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                    priority=80,
+                    header="",
+                    kind="tooling",
+                )
+            )
+
+        rendered = document.render()
+        logger.debug(
+            "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
+            "tool_guidance_len=%d prompt_total_len=%d strategy=%s",
+            self.provider_name,
+            sorted(sections_to_include),
+            tool_constraint[:300] if tool_constraint else "(none)",
+            len(provider_tool_guidance),
+            len(rendered),
+            self.system_prompt_strategy,
+        )
+        return document
+
+    def invalidate_cache(self) -> None:
+        """Clear any cached prompt so runtime state changes are reflected."""
+        self._cached_prompt = None
+
+    def _get_effective_strategy(self) -> str:
+        """Get the effective strategy based on configuration and provider type.
+
+        Returns:
+            'static', 'dynamic', or 'hybrid'
+        """
+        strategy = self.system_prompt_strategy
+
+        if strategy == "hybrid":
+            # Static for API providers (cache benefit), dynamic for local
+            if self.provider_caches or self.provider_has_kv_cache:
+                return "static"
+            else:
+                return "dynamic"
+
+        return strategy
+
+    def _build_prompt_internal(self) -> str:
+        """Internal method to build the prompt without caching logic.
+
+        Returns:
+            System prompt string tailored to the provider/model
+        """
+        return self.build_document().render()
 
     def _get_active_sections(self) -> set:
         """Determine which prompt sections to include.
@@ -594,10 +808,12 @@ class SystemPromptBuilder:
         """
         all_sections = {
             "concise_mode",
+            "mode_guidance",
             "task_guidance",
             "tool_constraint",
             "completion",
             "tool_guidance",
+            "few_shot_examples",
         }
 
         try:
@@ -635,6 +851,17 @@ class SystemPromptBuilder:
         except Exception:
             pass
 
+        # For non-caching providers without edge model, use a reduced set.
+        # Full sections are expensive (reparsed every turn) with no cache benefit.
+        if not self.provider_caches:
+            reduced = {"completion", "mode_guidance", "task_guidance", "tool_constraint"}
+            if self.concise_mode:
+                reduced.add("concise_mode")
+            logger.debug(
+                f"Non-caching provider: using reduced sections {len(reduced)}/{len(all_sections)}"
+            )
+            return reduced
+
         return all_sections
 
     def _build_with_adapter(self) -> str:
@@ -664,8 +891,9 @@ class SystemPromptBuilder:
                 f"{base_prompt}\n\n"
                 "Tool usage guidelines:\n"
                 "1. For code generation tasks: write the code directly in your response.\n"
-                "2. For exploration tasks: use list_directory and read_file to examine code.\n"
-                "3. For modification tasks: use write_file or edit_files after understanding context.\n"
+                "2. For exploration tasks: use ls and read to examine code.\n"
+                "3. For modification tasks: use write or edit "
+                "after understanding context.\n"
                 "4. Provide clear, working solutions.\n\n"
                 f"{GROUNDING_RULES}"
             )
@@ -714,8 +942,9 @@ class SystemPromptBuilder:
         return (
             "You are an expert code analyst with access to tools for exploring "
             "and modifying code. Use them effectively:\n\n"
-            "1. Use list_directory and read_file to examine code before conclusions.\n"
-            "2. If asked to modify code, use write_file or edit_files after understanding context.\n"
+            "1. Use ls and read to examine code before conclusions.\n"
+            "2. If asked to modify code, use write or edit "
+            "after understanding context.\n"
             "3. For call-graph questions, prefer graph(mode='callers'|'callees'|'trace').\n"
             "4. Provide clear, actionable responses based on actual file contents.\n"
             "5. Always cite specific file paths and line numbers when referencing code.\n"
@@ -778,8 +1007,8 @@ class SystemPromptBuilder:
             "• If unsure about content, read the file ONCE\n"
             "• Never cite line numbers you haven't verified\n\n"
             "TOOL EFFICIENCY:\n"
-            "• list_directory first to understand structure\n"
-            "• read_file ONCE per file, remember contents\n"
+            "• ls first to understand structure\n"
+            "• read ONCE per file, remember contents\n"
             "• For large files, use search/offset parameters (see above)\n"
             "• Use semantic_code_search for specific symbols\n"
             "• Use graph(mode='callers'|'callees'|'trace') for call-graph questions\n"
@@ -802,8 +1031,8 @@ class SystemPromptBuilder:
         return (
             "You are an expert code analyst with access to tools.\n\n"
             "EFFECTIVE TOOL USAGE:\n"
-            "• Use list_directory to understand project structure first\n"
-            "• Use read_file to examine specific files (one read per file)\n"
+            "• Use ls to understand project structure first\n"
+            "• Use read to examine specific files (one read per file)\n"
             "• Use semantic_code_search for finding specific code patterns\n"
             "• Use graph(mode='callers'|'callees'|'trace') for call-graph questions\n"
             "• Parallel tool calls are allowed for independent operations\n\n"
@@ -845,7 +1074,8 @@ class SystemPromptBuilder:
         """Build prompt for LMStudio provider."""
         if self.has_native_tool_support():
             return (
-                "You are an expert coding assistant. You can analyze, explain, and generate code.\n\n"
+                "You are an expert coding assistant. "
+                "You can analyze, explain, and generate code.\n\n"
                 "CAPABILITIES:\n"
                 "- Code generation: Write working implementations directly in your response.\n"
                 "- Code analysis: Use tools to explore and understand existing code.\n"
@@ -888,7 +1118,7 @@ class SystemPromptBuilder:
             base_prompt = (
                 "You are a code analyst with tool calling capability.\n\n"
                 "TOOL USAGE:\n"
-                "- Use list_directory and read_file to inspect code.\n"
+                "- Use ls and read to inspect code.\n"
                 "- You can call multiple read tools in parallel for efficiency.\n"
                 "- After reading relevant files, provide your answer.\n"
                 "- Do NOT make identical repeated tool calls.\n\n"
@@ -938,7 +1168,7 @@ class SystemPromptBuilder:
         return (
             "You are a code analyst. Follow these rules strictly:\n\n"
             "TOOL USAGE:\n"
-            "- Use list_directory or read_file to inspect files before answering.\n"
+            "- Use ls or read to inspect files before answering.\n"
             "- Call tools ONE AT A TIME. Wait for results before calling the next tool.\n"
             "- After reading 2-3 relevant files, STOP and provide your answer.\n"
             "- Do NOT repeatedly call the same tool with similar arguments.\n\n"

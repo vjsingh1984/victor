@@ -629,7 +629,12 @@ class CheckpointTree:
         for i, child_id in enumerate(node.children_ids):
             is_last_child = i == len(node.children_ids) - 1
             self._ascii_node(
-                child_id, child_prefix, is_last_child, lines, max_depth, current_depth + 1
+                child_id,
+                child_prefix,
+                is_last_child,
+                lines,
+                max_depth,
+                current_depth + 1,
             )
 
 
@@ -977,7 +982,12 @@ class BranchManager:
 
         return MergeResult(
             success=False,
-            conflicts=[{"type": "unsupported", "message": f"Strategy {strategy} not implemented"}],
+            conflicts=[
+                {
+                    "type": "unsupported",
+                    "message": f"Strategy {strategy} not implemented",
+                }
+            ],
         )
 
     def _default_state_merge(

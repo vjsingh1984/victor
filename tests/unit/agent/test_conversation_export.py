@@ -44,7 +44,11 @@ def sample_messages():
             content="Sure! What kind of function would you like me to write?",
             timestamp=datetime(2024, 1, 15, 10, 30, 15),
             tool_calls=[
-                {"name": "read_file", "arguments": {"path": "test.py"}, "result": "content"}
+                {
+                    "name": "read_file",
+                    "arguments": {"path": "test.py"},
+                    "result": "content",
+                }
             ],
         ),
         ConversationMessage(

@@ -108,7 +108,15 @@ class SchemaRefiner:
         "coordinator",
     }
 
-    VALID_NODE_TYPES = {"agent", "compute", "condition", "parallel", "transform", "team", "hitl"}
+    VALID_NODE_TYPES = {
+        "agent",
+        "compute",
+        "condition",
+        "parallel",
+        "transform",
+        "team",
+        "hitl",
+    }
 
     def __init__(self, conservative: bool = True):
         """Initialize schema refiner.
@@ -465,7 +473,10 @@ class StructureRefiner:
         return refined, fixes
 
     def _fix_error(
-        self, schema: Dict[str, Any], nodes_map: Dict[str, Any], error: WorkflowValidationError
+        self,
+        schema: Dict[str, Any],
+        nodes_map: Dict[str, Any],
+        error: WorkflowValidationError,
     ) -> Optional[WorkflowFix]:
         """Fix a single structure error."""
         # Orphan node
@@ -484,7 +495,10 @@ class StructureRefiner:
         return None
 
     def _fix_orphan_node(
-        self, schema: Dict[str, Any], nodes_map: Dict[str, Any], error: WorkflowValidationError
+        self,
+        schema: Dict[str, Any],
+        nodes_map: Dict[str, Any],
+        error: WorkflowValidationError,
     ) -> Optional[WorkflowFix]:
         """Fix orphan node by removing it."""
         # Extract node ID
@@ -513,7 +527,10 @@ class StructureRefiner:
         return None
 
     def _fix_entry_point(
-        self, schema: Dict[str, Any], nodes_map: Dict[str, Any], error: WorkflowValidationError
+        self,
+        schema: Dict[str, Any],
+        nodes_map: Dict[str, Any],
+        error: WorkflowValidationError,
     ) -> Optional[WorkflowFix]:
         """Fix missing entry point by setting first node."""
         nodes = schema.get("nodes", [])
@@ -842,7 +859,9 @@ class WorkflowRefiner:
         self.security_refiner = SecurityRefiner(conservative=conservative)
 
     def refine(
-        self, schema: Dict[str, Any], validation_result: WorkflowGenerationValidationResult
+        self,
+        schema: Dict[str, Any],
+        validation_result: WorkflowGenerationValidationResult,
     ) -> RefinementResult:
         """Apply automated refinements to workflow.
 

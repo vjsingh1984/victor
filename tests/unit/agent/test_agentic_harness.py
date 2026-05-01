@@ -29,12 +29,20 @@ from victor.evaluation.agentic_harness import (
     AgenticValidator,
     FileEdit,
     FileEditValidator,
+    GenerativeOptimizationAssessment,
+    GenerativeOptimizationFeasibilityGate,
     PatchApplicationValidator,
     TestPassingValidator,
     EvalToolCall,
     ToolUsageValidator,
+    generate_agentic_report,
 )
-from victor.evaluation.protocol import BenchmarkTask, BenchmarkType, TaskStatus
+from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
+    BenchmarkTask,
+    BenchmarkType,
+    TaskStatus,
+)
 
 
 class TestEvalToolCall:
@@ -125,6 +133,8 @@ class TestAgenticExecutionTrace:
         assert trace.turns == 0
         assert trace.generated_patch == ""
         assert trace.validation_errors == {}
+        assert trace.completion_signals == {}
+        assert trace.topology_events == []
 
     def test_duration_calculation(self):
         """Test trace duration calculation."""
@@ -166,7 +176,10 @@ class TestAgenticExecutionTrace:
         """Test to_dict serialization method."""
         calls = [
             EvalToolCall(
-                name="file_read", arguments={"path": "a.py"}, result="content", success=True
+                name="file_read",
+                arguments={"path": "a.py"},
+                result="content",
+                success=True,
             ),
         ]
         edits = [
@@ -182,6 +195,14 @@ class TestAgenticExecutionTrace:
             generated_patch="--- a/a.py\n+++ b/a.py",
             validations={"patch_applies": True},
             validation_errors={"tests_pass": "Some tests failed"},
+            topology_events=[
+                {
+                    "action": "team_plan",
+                    "topology": "team",
+                    "execution_mode": "team_execution",
+                    "confidence": 0.83,
+                }
+            ],
         )
         result = trace.to_dict()
 
@@ -199,7 +220,21 @@ class TestAgenticExecutionTrace:
         assert "tests_pass" in result["validation_errors"]
         assert result["total_tool_calls"] == 1
         assert result["successful_tool_calls"] == 1
+        assert result["topology_events"][0]["action"] == "team_plan"
         assert result["files_modified"] == ["a.py"]
+
+    def test_to_dict_includes_benchmark_metadata(self):
+        """Test trace export includes benchmark metadata for reporting."""
+        trace = AgenticExecutionTrace(
+            task_id="test-003",
+            start_time=0.0,
+            benchmark=BenchmarkType.CLAW_BENCH.value,
+            benchmark_source="Research",
+        )
+        result = trace.to_dict()
+
+        assert result["benchmark"] == "claw_bench"
+        assert result["benchmark_source"] == "Research"
 
     def test_to_dict_empty_trace(self):
         """Test to_dict with minimal trace."""
@@ -258,6 +293,60 @@ class TestAgenticTaskResult:
         expected = 1.0 * 0.3 + 0.8 * 0.4 + 0.9 * 0.2 + 0.7 * 0.1
         assert abs(score - expected) < 0.001
 
+    def test_evaluate_generative_optimization_feasible_reward(self):
+        """PR2 optimization assessment should produce feasible continuous reward."""
+        trace = AgenticExecutionTrace(
+            task_id="test-001",
+            start_time=0.0,
+            validations={
+                AgenticValidationType.PATCH_APPLIES.value: True,
+                AgenticValidationType.TESTS_PASS.value: True,
+            },
+        )
+        result = AgenticTaskResult(
+            task_id="test-001",
+            status=TaskStatus.PASSED,
+            trace=trace,
+            overall_score=0.8,
+            completion_precision=0.6,
+        )
+
+        assessment = result.evaluate_generative_optimization()
+
+        assert isinstance(assessment, GenerativeOptimizationAssessment)
+        assert assessment.feasible is True
+        assert assessment.feasibility_failures == []
+        assert assessment.reward == pytest.approx(0.77)
+        assert assessment.reward_components["topology_reward"] == pytest.approx(0.8)
+
+    def test_evaluate_generative_optimization_tracks_gate_failures(self):
+        """Optimization feasibility should expose the exact hard-constraint failures."""
+        trace = AgenticExecutionTrace(
+            task_id="test-002",
+            start_time=0.0,
+            validations={
+                AgenticValidationType.PATCH_APPLIES.value: True,
+                AgenticValidationType.TESTS_PASS.value: False,
+            },
+        )
+        result = AgenticTaskResult(
+            task_id="test-002",
+            status=TaskStatus.FAILED,
+            trace=trace,
+            overall_score=0.45,
+            completion_precision=0.3,
+            unsupported_claim_rate=0.4,
+        )
+
+        assessment = result.evaluate_generative_optimization(
+            gate=GenerativeOptimizationFeasibilityGate(max_unsupported_claim_rate=0.25)
+        )
+
+        assert assessment.feasible is False
+        assert "tests_pass" in assessment.feasibility_failures
+        assert "unsupported_claim_rate" in assessment.feasibility_failures
+        assert assessment.reward > 0.0
+
 
 class TestAgenticMetrics:
     """Tests for AgenticMetrics dataclass."""
@@ -273,6 +362,8 @@ class TestAgenticMetrics:
         assert metrics.pass_rate == 0.0
         assert metrics.avg_tool_calls == 0.0
         assert metrics.avg_turns == 0.0
+        assert metrics.avg_completion_precision == 0.0
+        assert metrics.avg_unsupported_claim_rate == 0.0
 
     def test_pass_rate(self):
         """Test pass rate calculation."""
@@ -291,11 +382,175 @@ class TestAgenticMetrics:
 
     def test_to_dict(self):
         """Test metrics export to dict."""
-        metrics = AgenticMetrics(total_tasks=2, passed=1, failed=1)
+        metrics = AgenticMetrics(
+            total_tasks=2,
+            passed=1,
+            failed=1,
+            avg_completion_precision=0.75,
+            avg_unsupported_claim_rate=0.1,
+        )
         d = metrics.to_dict()
         assert "summary" in d
         assert d["summary"]["total_tasks"] == 2
         assert d["summary"]["pass_rate"] == 0.5
+        assert d["quality"]["avg_completion_precision"] == 0.75
+        assert d["quality"]["avg_unsupported_claim_rate"] == 0.1
+
+    def test_to_dict_includes_optimization_metrics(self):
+        """Agentic metrics should export PR2 feasibility and reward summaries."""
+        feasible_trace = AgenticExecutionTrace(
+            task_id="test-007",
+            start_time=0.0,
+            validations={
+                AgenticValidationType.PATCH_APPLIES.value: True,
+                AgenticValidationType.TESTS_PASS.value: True,
+            },
+        )
+        feasible_result = AgenticTaskResult(
+            task_id="test-007",
+            status=TaskStatus.PASSED,
+            trace=feasible_trace,
+            benchmark=BenchmarkType.SWE_BENCH,
+            overall_score=0.8,
+            completion_precision=0.6,
+        )
+        infeasible_trace = AgenticExecutionTrace(
+            task_id="test-008",
+            start_time=0.0,
+            validations={
+                AgenticValidationType.PATCH_APPLIES.value: True,
+                AgenticValidationType.TESTS_PASS.value: False,
+            },
+        )
+        infeasible_result = AgenticTaskResult(
+            task_id="test-008",
+            status=TaskStatus.FAILED,
+            trace=infeasible_trace,
+            benchmark=BenchmarkType.SWE_BENCH,
+            overall_score=0.4,
+            completion_precision=0.2,
+            unsupported_claim_rate=0.4,
+        )
+        metrics = AgenticMetrics(
+            total_tasks=2,
+            passed=1,
+            failed=1,
+            task_results=[feasible_result, infeasible_result],
+        )
+
+        exported = metrics.to_dict()
+
+        assert exported["summary"]["optimization_feasible_tasks"] == 1
+        assert exported["summary"]["optimization_infeasible_tasks"] == 1
+        assert exported["summary"]["optimization_feasibility_rate"] == 0.5
+        assert exported["quality"]["avg_optimization_reward"] == pytest.approx(0.57)
+        assert exported["optimization"]["gate_failures"] == {
+            "tests_pass": 1,
+            "unsupported_claim_rate": 1,
+        }
+        assert exported["tasks"][0]["optimization_summary"]["feasible"] is True
+        assert exported["tasks"][1]["optimization_summary"]["feasible"] is False
+
+    def test_to_dict_includes_external_benchmark_summary(self):
+        """Test external benchmark coverage is surfaced in metrics export."""
+        trace = AgenticExecutionTrace(
+            task_id="test-004",
+            start_time=0.0,
+            benchmark=BenchmarkType.CLAW_BENCH.value,
+        )
+        result = AgenticTaskResult(
+            task_id="test-004",
+            status=TaskStatus.PASSED,
+            trace=trace,
+            benchmark=BenchmarkType.CLAW_BENCH,
+        )
+        metrics = AgenticMetrics(total_tasks=1, passed=1, task_results=[result])
+
+        exported = metrics.to_dict()
+        assert exported["summary"]["benchmarks_evaluated"] == ["claw_bench"]
+        assert exported["summary"]["external_benchmark_tasks"] == 1
+        assert exported["tasks"][0]["benchmark"] == "claw_bench"
+
+    def test_to_dict_includes_failure_taxonomy(self):
+        """Test normalized failure categories are aggregated in agentic metrics."""
+        trace = AgenticExecutionTrace(
+            task_id="test-005",
+            start_time=0.0,
+            benchmark=BenchmarkType.GUIDE.value,
+        )
+        result = AgenticTaskResult(
+            task_id="test-005",
+            status=TaskStatus.FAILED,
+            trace=trace,
+            benchmark=BenchmarkType.GUIDE,
+            failure_category=BenchmarkFailureCategory.TEST_FAILURE,
+        )
+        metrics = AgenticMetrics(total_tasks=1, failed=1, task_results=[result])
+
+        exported = metrics.to_dict()
+        assert exported["summary"]["failure_categories"] == {"test_failure": 1}
+        assert exported["tasks"][0]["failure_category"] == "test_failure"
+
+    def test_to_dict_includes_topology_metrics(self):
+        """Topology coverage and reward should be surfaced for agentic tasks."""
+        trace = AgenticExecutionTrace(
+            task_id="test-006",
+            start_time=0.0,
+            benchmark=BenchmarkType.SWE_BENCH.value,
+            turns=3,
+            tool_calls=[EvalToolCall(name="code_search", arguments={}, success=True)],
+            topology_events=[
+                {
+                    "action": "team_plan",
+                    "topology": "team",
+                    "execution_mode": "team_execution",
+                    "formation": "parallel",
+                    "confidence": 0.84,
+                }
+            ],
+        )
+        result = AgenticTaskResult(
+            task_id="test-006",
+            status=TaskStatus.PASSED,
+            trace=trace,
+            benchmark=BenchmarkType.SWE_BENCH,
+            overall_score=0.8,
+        )
+        metrics = AgenticMetrics(total_tasks=1, passed=1, task_results=[result])
+
+        exported = metrics.to_dict()
+
+        assert exported["summary"]["topology_feedback_coverage"] == 1.0
+        assert exported["quality"]["avg_topology_reward"] >= 0.0
+        assert exported["topology"]["topology_actions"] == {"team_plan": 1}
+        assert exported["tasks"][0]["topology_summary"]["final_execution_mode"] == (
+            "team_execution"
+        )
+
+    def test_generate_agentic_report_includes_optimization_summary(self):
+        """Human-readable reports should surface PR2 optimization metrics."""
+        trace = AgenticExecutionTrace(
+            task_id="test-009",
+            start_time=0.0,
+            validations={
+                AgenticValidationType.PATCH_APPLIES.value: True,
+                AgenticValidationType.TESTS_PASS.value: True,
+            },
+        )
+        result = AgenticTaskResult(
+            task_id="test-009",
+            status=TaskStatus.PASSED,
+            trace=trace,
+            benchmark=BenchmarkType.SWE_BENCH,
+            overall_score=0.8,
+            completion_precision=0.6,
+        )
+        metrics = AgenticMetrics(total_tasks=1, passed=1, task_results=[result])
+
+        report = generate_agentic_report(metrics)
+
+        assert "Feasibility:" in report
+        assert "Opt Reward:" in report
 
 
 class TestPatchApplicationValidator:

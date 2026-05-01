@@ -37,6 +37,7 @@ import logging
 import re
 import threading
 import time
+import traceback
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
@@ -56,16 +57,17 @@ from victor.agent.output_aggregator import (
     OutputAggregator,
     AggregationState,
 )
+from victor.core.errors import ErrorInfo, ErrorCategory, ErrorSeverity
 from victor.agent.synthesis_checkpoint import (
-    SynthesisCheckpoint,
     CompositeSynthesisCheckpoint,
-    CheckpointResult,
     get_checkpoint_for_complexity,
 )
+from victor.agent.file_state import capture_file_state, normalize_file_path
 from victor.config.tool_selection_defaults import (
     ToolPipelineDefaults,
     IdempotentTools,
 )
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 # Import native compute_signature for 10-20x faster signature generation
 try:
@@ -78,7 +80,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
@@ -107,7 +109,8 @@ class ToolPipelineConfig:
     code_correction_auto_fix: bool = True
 
     # Per-tool-call timeout for serial execution path
-    per_tool_timeout_seconds: float = 30.0
+    # Increased from 30 to 60 seconds for semantic search (code_search, etc.)
+    per_tool_timeout_seconds: float = 60.0
 
     # Parallel execution settings
     enable_parallel_execution: bool = True
@@ -133,6 +136,11 @@ class ToolPipelineConfig:
     # Enables intelligent caching based on semantic similarity, reducing redundant tool calls
     enable_semantic_caching: bool = True
 
+    # Cross-turn dedup: cache results for "effectively idempotent" tools
+    # (web_search, grep_search, http_request, git) across turns within a session.
+    enable_cross_turn_dedup: bool = True
+    cross_turn_dedup_ttl: float = 300.0  # seconds
+
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
 # Include both lowercase and capitalized variants for tool name normalization
@@ -144,11 +152,25 @@ IDEMPOTENT_TOOLS = IdempotentTools.IDEMPOTENT_TOOLS | frozenset(
         "Grep",
         "Graph",
         "Glob",
-        "read_file",  # Alternative name for 'read'
-        "list_directory",  # Alternative name for 'ls'
         "code_search",  # Semantic code search alias
         "semantic_code_search",
         "refs",  # Reference lookup
+    }
+)
+
+# Cross-turn dedup: tools that are "effectively idempotent" within a session
+# window even though they may be classified as non-idempotent. These produce
+# the same result for identical args within a short time window (e.g., 5 min),
+# making re-execution wasteful. Separate from IDEMPOTENT_TOOLS to allow
+# a shorter TTL and explicit opt-in.
+CROSS_TURN_DEDUP_TOOLS = frozenset(
+    {
+        "web_search",
+        "web_fetch",
+        "http_request",
+        "grep_search",
+        "plan_files",
+        "git",  # git status/log/diff are read-only
     }
 )
 
@@ -416,10 +438,224 @@ class ToolCallResult:
     normalization_applied: Optional[str] = None
     skipped: bool = False
     skip_reason: Optional[str] = None
+    outcome_kind: Optional[str] = None
+    block_source: Optional[str] = None
+    retryable: Optional[bool] = None
+    user_message: Optional[str] = None
 
     # Code correction tracking
     code_corrected: bool = False
     code_validation_errors: Optional[List[str]] = None
+
+    # OpenAI-compatible tool_call_id — links response to assistant's tool_calls[].id
+    tool_call_id: Optional[str] = None
+
+    # Structured error information with traceback and metadata
+    error_info: Optional["ErrorInfo"] = None
+
+
+def _build_skip_result(
+    *,
+    tool_name: str,
+    arguments: Dict[str, Any],
+    success: bool,
+    skip_reason: str,
+    outcome_kind: str,
+    block_source: str,
+    retryable: bool,
+    user_message: Optional[str] = None,
+    result: Any = None,
+    error: Optional[str] = None,
+    execution_time_ms: float = 0.0,
+    cached: bool = False,
+    normalization_applied: Optional[str] = None,
+    tool_call_id: Optional[str] = None,
+) -> ToolCallResult:
+    """Create a skipped tool-call result with structured block metadata."""
+    return ToolCallResult(
+        tool_name=tool_name,
+        arguments=arguments,
+        success=success,
+        result=result,
+        error=error,
+        execution_time_ms=execution_time_ms,
+        cached=cached,
+        normalization_applied=normalization_applied,
+        skipped=True,
+        skip_reason=skip_reason,
+        outcome_kind=outcome_kind,
+        block_source=block_source,
+        retryable=retryable,
+        user_message=user_message or error or skip_reason,
+        tool_call_id=tool_call_id,
+    )
+
+
+def _format_tool_command_value(value: Any) -> str:
+    """Serialize a tool argument value for compact follow-up guidance."""
+    if isinstance(value, str):
+        return json.dumps(value)
+    return repr(value)
+
+
+def _build_tool_follow_up_command(tool_name: str, arguments: Dict[str, Any]) -> str:
+    """Build a compact tool command example for recovery suggestions."""
+    serialized_args = ", ".join(
+        f"{key}={_format_tool_command_value(value)}"
+        for key, value in arguments.items()
+        if value is not None
+    )
+    return f"{tool_name}({serialized_args})"
+
+
+def _build_follow_up_suggestion(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    description: str,
+) -> Dict[str, Any]:
+    """Create a normalized follow-up suggestion payload."""
+    return {
+        "tool": tool_name,
+        "command": _build_tool_follow_up_command(tool_name, arguments),
+        "arguments": arguments,
+        "description": description,
+        "reason": description,
+    }
+
+
+def _build_redundant_call_recovery(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Build actionable recovery guidance for redundant tool calls."""
+    canonical_name = canonicalize_core_tool_name(tool_name.lower())
+    scope_path = str(arguments.get("path") or arguments.get("search_path") or ".")
+    query = arguments.get("query") or arguments.get("pattern")
+    symbol_name = arguments.get("symbol_name")
+    suggestions: List[Dict[str, Any]] = []
+
+    if canonical_name in {"code_search", "semantic_code_search", "grep"}:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "overview",
+                {"path": scope_path, "max_depth": 2},
+                "Inspect the surrounding project structure instead of repeating the same search.",
+            )
+        )
+        if query:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "search", "query": str(query), "path": scope_path, "top_k": 5},
+                    f'Search the graph index for "{query}" instead of repeating the same text search.',
+                )
+            )
+        else:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "overview", "path": scope_path, "top_k": 5},
+                    "Use the graph overview to find the next module or symbol to inspect.",
+                )
+            )
+        message = (
+            f"[The same {_build_tool_follow_up_command(tool_name, arguments)} was already tried "
+            "recently and is unlikely to return new information. Do not repeat the same search "
+            "with identical arguments. Change the query or mode, narrow or broaden the path, or "
+            "switch to structure-aware tools such as overview(...) or graph(...).]"
+        )
+    elif canonical_name == "refs":
+        if symbol_name:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "graph",
+                    {"mode": "callers|callees", "node": str(symbol_name), "depth": 2},
+                    f'Explore call relationships for "{symbol_name}" instead of repeating refs().',
+                )
+            )
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "code_search",
+                    {"query": str(symbol_name), "path": scope_path, "mode": "text", "k": 5},
+                    f'Search textually for "{symbol_name}" to find concrete files to read next.',
+                )
+            )
+        else:
+            suggestions.append(
+                _build_follow_up_suggestion(
+                    "overview",
+                    {"path": scope_path, "max_depth": 2},
+                    "Inspect the project structure to choose a more specific symbol target.",
+                )
+            )
+        message = (
+            f"[The same {_build_tool_follow_up_command(tool_name, arguments)} was already tried "
+            "recently and is unlikely to reveal new references. Do not repeat the same refs() "
+            "scan with identical arguments. Inspect the symbol through graph relationships or "
+            "switch to a more targeted search to identify a concrete file to read.]"
+        )
+    else:
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "overview",
+                {"path": scope_path, "max_depth": 2},
+                "Inspect the nearby project structure before choosing a different tool or scope.",
+            )
+        )
+        suggestions.append(
+            _build_follow_up_suggestion(
+                "graph",
+                {"mode": "overview", "path": scope_path, "top_k": 5},
+                "Use the graph overview to identify a higher-value next step.",
+            )
+        )
+        message = (
+            f"[{_build_tool_follow_up_command(tool_name, arguments)} overlaps with a recent call "
+            "and was skipped. Do not repeat the same tool with identical arguments. Change the "
+            "scope or switch to a different discovery tool.]"
+        )
+
+    return {
+        "success": False,
+        "error": message,
+        "metadata": {"follow_up_suggestions": suggestions[:2]},
+    }
+
+
+def _build_repeated_failure_recovery(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Build recovery guidance for a call that already failed with the same arguments."""
+    recovery = _build_redundant_call_recovery(tool_name, arguments)
+    original_error = recovery.get("error", "")
+    repeated_message = (
+        f"[{_build_tool_follow_up_command(tool_name, arguments)} already failed earlier in this "
+        "session with the same arguments. Do not repeat the same failing call. Change the path, "
+        "query, or tool choice before retrying.]"
+    )
+    if original_error:
+        repeated_message = f"{repeated_message}\n{original_error}"
+    return {
+        "success": False,
+        "error": repeated_message,
+        "metadata": recovery.get("metadata", {}),
+    }
+
+
+def _has_informative_skip_payload(call_result: "ToolCallResult") -> bool:
+    """Return True when a skipped call still gave the model actionable information."""
+    if not getattr(call_result, "skipped", False):
+        return False
+
+    output = getattr(call_result, "result", None)
+    if isinstance(output, str):
+        return bool(output.strip())
+    if isinstance(output, dict):
+        return bool(
+            output
+            and (
+                output.get("error")
+                or output.get("result") is not None
+                or output.get("metadata")
+                or output.get("success") is False
+            )
+        )
+    return output is not None
 
 
 @dataclass
@@ -496,7 +732,8 @@ class ToolPipeline:
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
             code_correction_middleware: Optional middleware for code validation/fixing
-            signature_store: Optional persistent storage for failed signatures (cross-session learning)
+            signature_store: Optional persistent storage for failed
+                signatures (cross-session learning)
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
             deduplication_tracker: Optional tracker for detecting redundant tool calls
@@ -521,6 +758,10 @@ class ToolPipeline:
         self.on_tool_start = on_tool_start
         self.on_tool_complete = on_tool_complete
         self.on_tool_event = on_tool_event
+
+        # Spin detection: track whether last batch had all calls blocked
+        self.last_batch_all_skipped: bool = False
+        self.last_batch_effectively_blocked: bool = False
 
         # Output aggregation and synthesis checkpoints
         self._output_aggregator: Optional[OutputAggregator] = None
@@ -560,9 +801,42 @@ class ToolPipeline:
         # Batch-level deduplication tracking
         self._batch_dedup_count = 0  # Total duplicates skipped
 
+        # Cross-turn dedup cache for "effectively idempotent" tools
+        # Uses the same LRU structure but covers tools outside IDEMPOTENT_TOOLS
+        # (web_search, http_request, grep_search, etc.) with configurable TTL.
+        self._cross_turn_enabled = self.config.enable_cross_turn_dedup
+        self._cross_turn_cache: LRUToolCache = LRUToolCache(
+            max_size=30,
+            ttl_seconds=self.config.cross_turn_dedup_ttl,
+        )
+        self._cross_turn_hits = 0
+
         # File read timestamp tracking for deduplication (prompting loop fix)
         # Prevents re-reading identical files within TTL window
         self._read_file_timestamps: Dict[str, float] = {}
+        self._read_file_paths: Dict[str, str] = {}
+        self._read_file_snapshots: Dict[str, Any] = {}
+
+        # Observability: pre-execution intent logging (LogAct-inspired)
+        self._observability_bus: Optional[Any] = None
+        self._trace_enricher: Optional[Any] = None
+
+        # Credit assignment: automatic tool-level credit tracking (FEP-0001 Phase 3)
+        self._credit_tracking_service: Optional[Any] = None
+
+        # Online tool reputation: mid-turn credit feedback (updates per tool call)
+        self._tool_reputation: Optional[Any] = None
+        try:
+            from victor.framework.rl.tool_reputation import ToolReputationTracker
+
+            self._tool_reputation = ToolReputationTracker()
+        except ImportError:
+            pass
+
+    @property
+    def credit_tracking_service(self) -> Any:
+        """Credit tracking service (if enabled). None otherwise."""
+        return self._credit_tracking_service
 
     @property
     def calls_used(self) -> int:
@@ -575,9 +849,34 @@ class ToolPipeline:
         return max(0, self.config.tool_budget - self._calls_used)
 
     @property
+    def tool_budget(self) -> int:
+        """Configured maximum tool budget for the current turn."""
+        return self.config.tool_budget
+
+    @property
     def executed_tools(self) -> List[str]:
         """List of executed tool names."""
         return list(self._executed_tools)
+
+    def set_tool_budget(self, budget: int) -> None:
+        """Update the configured tool budget limit."""
+        if budget < 0:
+            raise ValueError(f"Tool budget must be non-negative: {budget}")
+        self.config.tool_budget = budget
+        if self._output_aggregator is not None and hasattr(self._output_aggregator, "_max_results"):
+            self._output_aggregator._max_results = budget
+
+    def start_new_turn(self) -> None:
+        """Reset per-turn budget counters while preserving caches and learned state."""
+        self._calls_used = 0
+        self.last_batch_all_skipped = False
+        self.last_batch_effectively_blocked = False
+
+    def consume_budget(self, amount: int = 1) -> None:
+        """Record externally executed tool usage against the shared turn budget."""
+        if amount < 0:
+            raise ValueError(f"Cannot consume negative tool budget: {amount}")
+        self._calls_used += amount
 
     @property
     def parallel_executor(self) -> ParallelToolExecutor:
@@ -747,14 +1046,81 @@ class ToolPipeline:
 
         return routed_tool_name, routed_args, changed
 
+    @staticmethod
+    def _coerce_bool_like(value: Any) -> Any:
+        """Coerce common boolean-like strings for tool parameters."""
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "off"}:
+                return False
+        return value
+
+    def _apply_shell_policy(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> tuple[Dict[str, Any], bool]:
+        """Apply the single-shell readonly policy.
+
+        The runtime now exposes a single ``shell`` tool and defaults it to
+        ``readonly=True`` unless the caller explicitly opts out. On read-only
+        or display-only turns, ``readonly`` is pinned back to True.
+        """
+        if tool_name != "shell":
+            return arguments, False
+
+        from victor.agent.action_authorizer import ActionIntent
+
+        adjusted = dict(arguments)
+        changed = False
+
+        readonly = adjusted.get("readonly")
+        if readonly is None:
+            adjusted["readonly"] = True
+            changed = True
+        else:
+            coerced = self._coerce_bool_like(readonly)
+            if coerced is not readonly:
+                adjusted["readonly"] = coerced
+                changed = True
+
+        raw_intent = (context or {}).get("current_intent")
+        intent: Optional[ActionIntent] = None
+        if isinstance(raw_intent, ActionIntent):
+            intent = raw_intent
+        elif isinstance(raw_intent, str):
+            try:
+                intent = ActionIntent(raw_intent)
+            except ValueError:
+                intent = None
+
+        if (
+            intent in {ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY}
+            and adjusted.get("readonly") is not True
+        ):
+            adjusted["readonly"] = True
+            changed = True
+            logger.info("Pinned shell readonly=True due to %s intent", intent.value)
+
+        return adjusted, changed
+
     def _normalize_tool_call(
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[str, Dict[str, Any], NormalizationStrategy]:
         """Normalize a full tool call, including search-routing adjustments."""
         normalized_args, strategy = self._normalize_arguments(tool_name, arguments, context=context)
-        normalized_tool_name, normalized_args, changed = self._apply_search_routing(
+        normalized_args, readonly_changed = self._apply_shell_policy(
+            tool_name,
+            normalized_args,
+            context=context,
+        )
+        normalized_tool_name, normalized_args, search_changed = self._apply_search_routing(
             tool_name, normalized_args
         )
+        changed = readonly_changed or search_changed
         if changed and strategy == NormalizationStrategy.DIRECT:
             strategy = NormalizationStrategy.MANUAL_REPAIR
         return normalized_tool_name, normalized_args, strategy
@@ -785,6 +1151,24 @@ class ToolPipeline:
         except Exception:
             args_str = str(args)
         return f"{tool_name}:{args_str}"
+
+    def _generate_tool_call_id(self, tool_name: str) -> str:
+        """Generate a deterministic tool_call_id if one isn't provided.
+
+        Uses tool name + timestamp to create a unique ID that's consistent
+        for the same tool call within a session.
+
+        Args:
+            tool_name: Name of the tool being called
+
+        Returns:
+            A 16-character hex string tool_call_id
+        """
+        import hashlib
+
+        timestamp = int(time.time() * 1000)
+        hash_input = f"{tool_name}_{timestamp}"
+        return hashlib.md5(hash_input.encode()).hexdigest()[:16]
 
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
         """Check if a tool call is known to fail.
@@ -995,6 +1379,8 @@ class ToolPipeline:
                 else 0.0
             ),
             "batch_dedup_count": self._batch_dedup_count,
+            "cross_turn_hits": self._cross_turn_hits,
+            "cross_turn_cache_size": len(self._cross_turn_cache),
         }
         # Include semantic cache stats if available
         if self.semantic_cache is not None:
@@ -1016,22 +1402,54 @@ class ToolPipeline:
         if file_path not in self._read_file_timestamps:
             return False
         age = time.monotonic() - self._read_file_timestamps[file_path]
-        return age < max_age_seconds
+        if age >= max_age_seconds:
+            return False
 
-    def record_file_read(self, file_path: str) -> None:
+        current_path = self._read_file_paths.get(file_path, file_path)
+        previous_snapshot = self._read_file_snapshots.get(file_path)
+        current_snapshot = capture_file_state(current_path)
+        if previous_snapshot is None and current_snapshot is None:
+            return True
+        if previous_snapshot is None or current_snapshot is None:
+            return False
+        return previous_snapshot == current_snapshot
+
+    def record_file_read(self, read_key: str, file_path: Optional[str] = None) -> None:
         """Record that a file was read.
 
         Updates the timestamp for deduplication tracking.
 
         Args:
-            file_path: Path of the file that was read
+            read_key: Deduplication key for the file read, including offset/limit
+            file_path: Actual file path associated with the read key
         """
         # Evict oldest entries if at capacity (prevent unbounded growth)
         if len(self._read_file_timestamps) >= 2000:
             oldest_key = next(iter(self._read_file_timestamps))
             del self._read_file_timestamps[oldest_key]
-        self._read_file_timestamps[file_path] = time.monotonic()
-        logger.debug(f"Recorded file read: {file_path}")
+            self._read_file_paths.pop(oldest_key, None)
+            self._read_file_snapshots.pop(oldest_key, None)
+        self._read_file_timestamps[read_key] = time.monotonic()
+        actual_path = file_path or read_key
+        self._read_file_paths[read_key] = actual_path
+        self._read_file_snapshots[read_key] = capture_file_state(actual_path)
+        logger.debug(f"Recorded file read: {read_key}")
+
+    def _clear_read_tracking_for_file(self, file_path: str) -> None:
+        """Clear read-tracking entries for a file after it changes."""
+        normalized_target = normalize_file_path(file_path)
+        if not normalized_target:
+            return
+
+        stale_keys = [
+            read_key
+            for read_key, tracked_path in self._read_file_paths.items()
+            if normalize_file_path(tracked_path) == normalized_target
+        ]
+        for read_key in stale_keys:
+            self._read_file_timestamps.pop(read_key, None)
+            self._read_file_paths.pop(read_key, None)
+            self._read_file_snapshots.pop(read_key, None)
 
     def deduplicate_tool_calls(
         self,
@@ -1121,7 +1539,41 @@ class ToolPipeline:
         tool_history: List[Dict[str, Any]] = []
 
         for tool_call in unique_calls:
-            call_result = await self._execute_single_call(tool_call, context)
+            # Capture tool_call_id BEFORE execution so it's set even if the call fails
+            tc_id = tool_call.get("id") if isinstance(tool_call, dict) else None
+
+            # Handle pre-invalidated tool calls (hallucinated names marked by coordinator)
+            if isinstance(tool_call, dict) and tool_call.get("_invalid"):
+                tool_name = tool_call.get("name", "unknown")
+                # Generate tool_call_id if not provided
+                if tc_id is None:
+                    tc_id = self._generate_tool_call_id(tool_name)
+                call_result = _build_skip_result(
+                    tool_name=tool_name,
+                    arguments={},
+                    success=False,
+                    error=tool_call.get("_error", "Unknown tool"),
+                    skip_reason=tool_call.get("_error"),
+                    outcome_kind="invalid_tool_name",
+                    block_source="tool_validation",
+                    retryable=False,
+                    tool_call_id=tc_id,
+                )
+            else:
+                call_result = await self._execute_single_call(tool_call, context)
+            # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec.
+            # Only auto-generate an ID for executed calls — internally-skipped calls
+            # without a provider ID have no corresponding tool_call entry, so they
+            # must NOT get an ID (process_tool_results would otherwise emit a spurious
+            # tool response for them, double-counting executed_tools).
+            if tc_id is not None:
+                call_result.tool_call_id = tc_id
+            elif not call_result.skipped:
+                tool_name = (
+                    tool_call.get("name", "unknown") if isinstance(tool_call, dict) else "unknown"
+                )
+                tc_id = self._generate_tool_call_id(tool_name)
+                call_result.tool_call_id = tc_id
             result.results.append(call_result)
 
             # Store result by signature for duplicate resolution (only for dict items)
@@ -1155,7 +1607,7 @@ class ToolPipeline:
                     "tool": tool_name,
                     "args": raw_args,
                     "success": call_result.success,
-                    "result": str(call_result.result)[:500] if call_result.result else "",
+                    "result": (str(call_result.result)[:500] if call_result.result else ""),
                     "error": call_result.error,
                 }
             )
@@ -1177,8 +1629,12 @@ class ToolPipeline:
         for original_idx, signature in duplicate_info:
             if signature in results_by_signature:
                 original_result = results_by_signature[signature]
-                # Create a copy marked as from deduplication
-                dup_result = ToolCallResult(
+                # Use the provider-given ID for the duplicate call if available.
+                # If the provider gave no ID, leave it None — process_tool_results
+                # will then skip the entry (no tool_call to respond to per OpenAI spec).
+                dup_call = tool_calls[original_idx] if original_idx < len(tool_calls) else {}
+                dup_tc_id = dup_call.get("id") if isinstance(dup_call, dict) else None
+                dup_result = _build_skip_result(
                     tool_name=original_result.tool_name,
                     arguments=original_result.arguments,
                     success=original_result.success,
@@ -1186,11 +1642,56 @@ class ToolPipeline:
                     error=original_result.error,
                     execution_time_ms=0.0,  # Deduplicated, no execution time
                     cached=True,  # Mark as effectively cached
-                    skipped=True,
                     skip_reason="Deduplicated (duplicate call in batch)",
+                    outcome_kind="duplicate_in_batch",
+                    block_source="batch_deduplication",
+                    retryable=True,
+                    user_message=(
+                        "This tool call duplicated another call in the same batch, so the "
+                        "existing result was reused."
+                    ),
+                    tool_call_id=dup_tc_id,
                 )
                 result.results.append(dup_result)
                 result.skipped_calls += 1
+
+        # Track whether ALL tool calls in this batch were skipped.
+        # Some skipped batches still return actionable recovery content and should
+        # not count as a hard blocked turn for spin detection.
+        self.last_batch_all_skipped = len(result.results) > 0 and all(
+            getattr(r, "skipped", False) for r in result.results
+        )
+        self.last_batch_effectively_blocked = self.last_batch_all_skipped and not any(
+            _has_informative_skip_payload(r) for r in result.results
+        )
+        if self.last_batch_all_skipped:
+            # Collect actual skip reasons for accurate logging
+            skip_reasons = []
+            block_sources = []
+            for r in result.results:
+                reason = getattr(r, "skip_reason", None)
+                source = getattr(r, "block_source", None)
+                if reason:
+                    skip_reasons.append(reason)
+                if source:
+                    block_sources.append(source)
+
+            # Build informative log message
+            if skip_reasons:
+                # Count unique reasons
+                from collections import Counter
+
+                reason_counts = Counter(skip_reasons)
+                reason_summary = ", ".join(f"{r} ({c})" for r, c in reason_counts.items())
+                logger.info(
+                    f"[pipeline] All {len(result.results)} tool calls in batch were "
+                    f"skipped: {reason_summary}"
+                )
+            else:
+                logger.info(
+                    f"[pipeline] All {len(result.results)} tool calls in batch were "
+                    f"skipped/blocked"
+                )
 
         # Check synthesis checkpoint
         if self._synthesis_checkpoint and tool_history:
@@ -1198,6 +1699,9 @@ class ToolPipeline:
                 "elapsed_time": context.get("elapsed_time", 0),
                 "timeout": context.get("timeout", 180),
                 "task_type": context.get("task_type", "unknown"),
+                "unified_task_tracker": context.get(
+                    "unified_task_tracker"
+                ),  # Phase 3: Pass UnifiedTaskTracker
             }
             checkpoint_result = self._synthesis_checkpoint.check(tool_history, task_context)
             if checkpoint_result.should_synthesize:
@@ -1231,12 +1735,10 @@ class ToolPipeline:
         context: Optional[Dict[str, Any]] = None,
         force_parallel: bool = False,
     ) -> PipelineExecutionResult:
-        """Execute tool calls with parallelization when beneficial.
+        """[POTENTIALLY OBSOLETE] Execute tool calls with parallelization.
 
-        Automatically decides whether to use parallel execution based on:
-        - Number of tool calls (>1 for parallel)
-        - Tool categories (read-only tools can parallelize)
-        - Configuration settings
+        Note: The main execute_tool_calls() method now handles internal
+        parallelization via AsyncToolExecutor. This method may be removed.
 
         Args:
             tool_calls: List of tool call requests
@@ -1268,12 +1770,14 @@ class ToolPipeline:
             # Quick validation checks
             if not tool_name or not self.is_valid_tool_name(tool_name):
                 skipped_results.append(
-                    ToolCallResult(
+                    _build_skip_result(
                         tool_name=tool_name or "unknown",
                         arguments={},
                         success=False,
-                        skipped=True,
                         skip_reason=f"Invalid tool name: {tool_name}",
+                        outcome_kind="invalid_tool_name",
+                        block_source="validation",
+                        retryable=False,
                     )
                 )
                 continue
@@ -1285,12 +1789,14 @@ class ToolPipeline:
 
             if not self.tools.is_tool_enabled(tool_name):
                 skipped_results.append(
-                    ToolCallResult(
+                    _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
                         success=False,
-                        skipped=True,
                         skip_reason=f"Unknown or disabled tool: {tool_name}",
+                        outcome_kind="tool_unavailable",
+                        block_source="tool_registry",
+                        retryable=False,
                     )
                 )
                 continue
@@ -1300,12 +1806,18 @@ class ToolPipeline:
                 signature = self._get_call_signature(tool_name, normalized_args)
                 if signature in self._failed_signatures:
                     skipped_results.append(
-                        ToolCallResult(
+                        _build_skip_result(
                             tool_name=tool_name,
                             arguments=normalized_args,
                             success=False,
-                            skipped=True,
                             skip_reason="Repeated failing call with same arguments",
+                            outcome_kind="repeated_failure",
+                            block_source="failed_signature_tracker",
+                            retryable=True,
+                            user_message=(
+                                "This exact tool call already failed recently. Change the "
+                                "arguments or choose a different tool."
+                            ),
                         )
                     )
                     continue
@@ -1367,6 +1879,39 @@ class ToolPipeline:
 
         return result
 
+    def _emit_tool_intent(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Emit pre-execution intent event (LogAct-inspired).
+
+        Records tool intent BEFORE execution, enabling future voting/gating.
+        Uses ObservabilityBus for event emission.
+        """
+        bus = getattr(self, "_observability_bus", None)
+        if bus is None:
+            return
+
+        import hashlib
+
+        args_str = str(sorted(arguments.items())) if arguments else ""
+        args_hash = hashlib.md5(args_str.encode()).hexdigest()[:12]
+
+        reasoning = ""
+        enricher = getattr(self, "_trace_enricher", None)
+        if enricher:
+            reasoning = getattr(enricher, "_pending_reasoning", "") or ""
+
+        try:
+            bus.emit_sync(
+                "tool.intent",
+                {
+                    "tool_name": tool_name,
+                    "arguments_hash": args_hash,
+                    "reasoning_before": reasoning[:500],
+                    "timestamp": time.time(),
+                },
+            )
+        except Exception:
+            pass  # Intent logging is non-critical
+
     async def _execute_single_call(
         self,
         tool_call: Dict[str, Any],
@@ -1383,12 +1928,14 @@ class ToolPipeline:
         """
         # Validate structure
         if not isinstance(tool_call, dict):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name="unknown",
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason="Invalid tool call structure (not a dict)",
+                outcome_kind="invalid_tool_call",
+                block_source="validation",
+                retryable=False,
             )
 
         tool_name = tool_call.get("name", "")
@@ -1396,21 +1943,25 @@ class ToolPipeline:
 
         # Validate tool name
         if not tool_name:
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name="unknown",
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason="Tool call missing name",
+                outcome_kind="missing_tool_name",
+                block_source="validation",
+                retryable=False,
             )
 
         if not self.is_valid_tool_name(tool_name):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments={},
                 success=False,
-                skipped=True,
                 skip_reason=f"Invalid tool name format: {tool_name}",
+                outcome_kind="invalid_tool_name",
+                block_source="validation",
+                retryable=False,
             )
 
         # Check if tool exists
@@ -1419,36 +1970,42 @@ class ToolPipeline:
         )
 
         if not self.tools.is_tool_enabled(tool_name):
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 success=False,
-                skipped=True,
                 skip_reason=f"Unknown or disabled tool: {tool_name}",
+                outcome_kind="tool_unavailable",
+                block_source="tool_registry",
+                retryable=False,
             )
 
         # Check permission policy (if configured)
         if self._permission_policy is not None:
             decision = self._permission_policy.authorize(tool_name, normalized_args)
             if not decision.allowed and not decision.needs_prompt:
-                return ToolCallResult(
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=False,
-                    skipped=True,
                     skip_reason=f"Permission denied: {decision.reason}",
+                    outcome_kind="permission_denied",
+                    block_source="permission_policy",
+                    retryable=False,
                 )
             # needs_prompt tools are allowed through — the UI layer
             # handles escalation prompting before reaching the pipeline.
 
         # Check budget
         if self._calls_used >= self.config.tool_budget:
-            return ToolCallResult(
+            return _build_skip_result(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 success=False,
-                skipped=True,
                 skip_reason="Tool budget exhausted",
+                outcome_kind="budget_exhausted",
+                block_source="tool_budget",
+                retryable=False,
             )
 
         normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
@@ -1472,6 +2029,31 @@ class ToolPipeline:
                 except Exception as e:
                     logger.warning(f"on_tool_complete callback failed: {e}")
             return cached_result
+
+        # Cross-turn dedup: cache "effectively idempotent" tools (web_search, etc.)
+        # These produce identical results for identical args within a session window.
+        if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+            signature = self._get_call_signature(tool_name, normalized_args)
+            cross_cached = self._cross_turn_cache.get(signature)
+            if cross_cached is not None:
+                self._cross_turn_hits += 1
+                logger.info(
+                    "[Pipeline] Cross-turn dedup hit for %s (hits=%d)",
+                    tool_name,
+                    self._cross_turn_hits,
+                )
+                self._executed_tools.append(tool_name)
+                if self.on_tool_start:
+                    try:
+                        self.on_tool_start(tool_name, normalized_args)
+                    except Exception as e:
+                        logger.warning(f"on_tool_start callback failed: {e}")
+                if self.on_tool_complete:
+                    try:
+                        self.on_tool_complete(cross_cached)
+                    except Exception as e:
+                        logger.warning(f"on_tool_complete callback failed: {e}")
+                return cross_cached
 
         # Check semantic cache (FAISS-based with mtime invalidation)
         # This catches similar-but-not-identical queries that would return same results
@@ -1508,23 +2090,48 @@ class ToolPipeline:
 
         # Session-level file read dedup - prevents re-reading files even if cache was cleared
         # This is a fallback for the prompting loop fix when idempotent cache doesn't match
-        if tool_name.lower() in ("read", "read_file"):
+        # NOTE: Only dedup reads of the EXACT same file+args within a short window.
+        # Do NOT block re-reads after the file has been edited (agent needs to verify).
+        # Allow re-reads with different offset/limit (reading different sections).
+        canonical_core_tool = canonicalize_core_tool_name(tool_name.lower())
+
+        if canonical_core_tool == "read":
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
-            if file_path and self._is_duplicate_read(file_path):
+            offset = normalized_args.get("offset")
+            limit = normalized_args.get("limit")
+            # Only dedup exact same file+offset+limit reads
+            dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
+            if dedup_key and self._is_duplicate_read(dedup_key):
                 logger.info(
                     f"[Pipeline] Skipping duplicate read of {file_path} "
                     "(file was read recently in this session)"
                 )
-                return ToolCallResult(
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=True,  # Mark as success but indicate it was cached
-                    result=f"[File '{file_path}' was already read in this session - "
-                    "content unchanged. See previous read result.]",
-                    skipped=True,
+                    result=(
+                        f"[File '{file_path}' was already read in this session and "
+                        "content is unchanged. Do not repeat the same read(path, offset, limit). "
+                        "Use a different offset/limit, read a different file, or switch tools "
+                        "such as find, code_search, graph, or project_overview.]"
+                    ),
                     skip_reason="Duplicate file read within session",
+                    outcome_kind="duplicate_read",
+                    block_source="session_read_dedup",
+                    retryable=True,
+                    user_message=(
+                        f"File '{file_path}' was already read with the same offset/limit. "
+                        "Choose a different range, file, or tool."
+                    ),
                     normalization_applied=normalization_applied,
                 )
+
+        # Invalidate read cache for files that were just edited/written
+        if canonical_core_tool in {"edit", "write"}:
+            edited_path = normalized_args.get("path") or normalized_args.get("file_path")
+            if edited_path:
+                self._clear_read_tracking_for_file(edited_path)
 
         # Code correction middleware - validate and fix code arguments
         code_corrected = False
@@ -1567,12 +2174,26 @@ class ToolPipeline:
         if self.config.enable_failed_signature_tracking:
             signature = self._get_call_signature(tool_name, normalized_args)
             if signature in self._failed_signatures:
-                return ToolCallResult(
+                logger.info(
+                    "[Pipeline] Skipping repeated failing call: %s(%s)",
+                    tool_name,
+                    normalized_args,
+                )
+                recovery_result = _build_repeated_failure_recovery(tool_name, normalized_args)
+                return _build_skip_result(
                     tool_name=tool_name,
                     arguments=normalized_args,
                     success=False,
-                    skipped=True,
+                    result=recovery_result,
+                    error=recovery_result.get("error"),
                     skip_reason="Repeated failing call with same arguments",
+                    outcome_kind="repeated_failure",
+                    block_source="failed_signature_tracker",
+                    retryable=True,
+                    user_message=(
+                        "This exact tool call already failed recently. Use the recovery "
+                        "guidance or try different arguments."
+                    ),
                     normalization_applied=normalization_applied,
                 )
 
@@ -1584,12 +2205,21 @@ class ToolPipeline:
                         f"[Pipeline] Skipping redundant tool call: {tool_name} "
                         f"(semantic overlap with recent calls)"
                     )
-                    return ToolCallResult(
+                    recovery_result = _build_redundant_call_recovery(tool_name, normalized_args)
+                    return _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
-                        success=False,
-                        skipped=True,
+                        success=True,
+                        result=recovery_result,
+                        error=recovery_result.get("error"),
                         skip_reason="Redundant call (semantic overlap with recent operations)",
+                        outcome_kind="redundant_call",
+                        block_source="semantic_deduplication",
+                        retryable=True,
+                        user_message=(
+                            "This tool call overlaps with recent work. Use the suggested next "
+                            "step instead of repeating it unchanged."
+                        ),
                         normalization_applied=normalization_applied,
                     )
             except (ValueError, TypeError) as e:
@@ -1608,12 +2238,15 @@ class ToolPipeline:
                         f"[Pipeline] Tool '{tool_name}' blocked by middleware: "
                         f"{before_result.error_message}"
                     )
-                    return ToolCallResult(
+                    return _build_skip_result(
                         tool_name=tool_name,
                         arguments=normalized_args,
                         success=False,
-                        skipped=True,
                         skip_reason=f"Blocked by middleware: {before_result.error_message}",
+                        outcome_kind="middleware_blocked",
+                        block_source="middleware_chain",
+                        retryable=True,
+                        user_message=before_result.error_message,
                         normalization_applied=normalization_applied,
                     )
                 # Apply any argument modifications from middleware
@@ -1624,6 +2257,9 @@ class ToolPipeline:
             except AttributeError as e:
                 logger.debug(f"Middleware chain not properly configured: {e}")
 
+        # Emit pre-execution intent event (LogAct-inspired)
+        self._emit_tool_intent(tool_name, normalized_args)
+
         # Notify start
         if self.on_tool_start:
             try:
@@ -1632,6 +2268,12 @@ class ToolPipeline:
                 logger.warning(f"on_tool_start callback failed: {e}")
 
         # Execute with per-tool timeout
+        # Log tool call sent to LLM
+        logger.debug(
+            "[ToolCall→LLM] Executing tool=%s args=%s",
+            tool_name,
+            json.dumps(normalized_args, default=str)[:500],
+        )
         start_time = time.monotonic()
         try:
             exec_result = await asyncio.wait_for(
@@ -1640,18 +2282,74 @@ class ToolPipeline:
                     arguments=normalized_args,
                     context=context,
                 ),
-                timeout=self.config.per_tool_timeout_seconds,
+                timeout=self._get_tool_timeout(tool_name),
             )
         except asyncio.TimeoutError:
+            effective_timeout = self._get_tool_timeout(tool_name)
+            tb_str = traceback.format_exc()
+
+            # Build user-friendly error message with command details
+            if tool_name == "shell" and "cmd" in normalized_args:
+                cmd = normalized_args.get("cmd", "unknown command")
+                error_msg = f"Command timed out after {effective_timeout}s: {cmd}"
+                suggestion = (
+                    "The command may be hung or waiting for input.\n"
+                    "Try: Run the command manually to check if it's interactive, "
+                    "increase timeout with --tool-budget, or use a non-interactive alternative."
+                )
+            else:
+                error_msg = f"Tool '{tool_name}' timed out after {effective_timeout}s"
+                suggestion = (
+                    f"The tool execution exceeded the time limit of {effective_timeout}s.\n"
+                    f"Try: Increase timeout with --tool-budget or check if the operation is valid."
+                )
+
+            # Log technical details for debugging (hidden from user)
             logger.warning(
-                f"[Pipeline] Tool '{tool_name}' timed out after "
-                f"{self.config.per_tool_timeout_seconds}s"
+                f"[Pipeline] Tool '{tool_name}' timed out after {effective_timeout}s",
+                exc_info=False,  # Don't log full traceback to reduce noise
             )
+
             exec_result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
-                error=f"Tool execution timed out after {self.config.per_tool_timeout_seconds}s",
+                error=error_msg,
+                error_info=ErrorInfo(
+                    message=error_msg,
+                    category=ErrorCategory.TOOL_TIMEOUT,
+                    severity=ErrorSeverity.WARNING,
+                    correlation_id=f"timeout_{tool_name}_{int(time.time())}",
+                    traceback=tb_str[-2000:],  # Last 2000 chars
+                    details={
+                        "tool_name": tool_name,
+                        "timeout_seconds": effective_timeout,
+                        "arguments": normalized_args,
+                        "suggestion": suggestion,
+                    },
+                ),
+            )
+        except Exception as e:
+            tb_str = traceback.format_exc()
+            logger.error(f"[Pipeline] Tool '{tool_name}' execution failed: {e}", exc_info=True)
+            exec_result = ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=str(e),
+                error_info=ErrorInfo(
+                    message=f"Tool '{tool_name}' execution failed: {str(e)}",
+                    category=ErrorCategory.TOOL_EXECUTION,
+                    severity=ErrorSeverity.ERROR,
+                    correlation_id=f"error_{tool_name}_{int(time.time())}",
+                    traceback=tb_str[-2000:],  # Last 2000 chars
+                    details={
+                        "tool_name": tool_name,
+                        "exception_type": type(e).__name__,
+                        "arguments": normalized_args,
+                    },
+                    original_exception=str(e),
+                ),
             )
         execution_time_ms = (time.monotonic() - start_time) * 1000
 
@@ -1670,40 +2368,83 @@ class ToolPipeline:
             normalization_applied=normalization_applied,
             code_corrected=code_corrected,
             code_validation_errors=code_validation_errors,
+            error_info=exec_result.error_info,  # Preserve structured error info
+        )
+
+        # Log tool result returned to LLM
+        result_preview = str(exec_result.result)[:500] if exec_result.result else "(empty)"
+        logger.debug(
+            "[ToolResult→LLM] tool=%s success=%s time=%.0fms result_preview=%s",
+            tool_name,
+            exec_result.success,
+            execution_time_ms,
+            result_preview,
         )
 
         # Attempt error recovery fallback on failure
         if not exec_result.success and exec_result.error:
             try:
-                from victor.agent.error_recovery import recover_from_error, RecoveryAction
+                from victor.agent.error_recovery import (
+                    recover_from_error,
+                    RecoveryAction,
+                )
 
                 recovery = recover_from_error(
                     Exception(exec_result.error), tool_name, normalized_args
                 )
-                if recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
+                recovery_tool_name = tool_name
+                recovery_args = normalized_args
+
+                if (
+                    recovery.action
+                    in {
+                        RecoveryAction.RETRY_WITH_INFERRED,
+                        RecoveryAction.RETRY_WITH_DEFAULTS,
+                    }
+                    and recovery.modified_args
+                ):
+                    recovery_args = recovery.modified_args
+                    logger.info(
+                        "[Pipeline] Retrying %s with recovered arguments: %s",
+                        tool_name,
+                        recovery_args,
+                    )
+                elif recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
                     fallback_name = recovery.fallback_tool
                     if self.tools.is_tool_enabled(fallback_name):
-                        logger.info(f"[Pipeline] Falling back from {tool_name} to {fallback_name}")
-                        try:
-                            fb_result = await asyncio.wait_for(
-                                self.executor.execute(
-                                    tool_name=fallback_name,
-                                    arguments=normalized_args,
-                                    context=context,
-                                ),
-                                timeout=self.config.per_tool_timeout_seconds,
-                            )
-                        except asyncio.TimeoutError:
-                            fb_result = None
-                        if fb_result is not None and fb_result.success:
-                            call_result = ToolCallResult(
-                                tool_name=fallback_name,
-                                arguments=normalized_args,
-                                success=fb_result.success,
-                                result=fb_result.result,
-                                error=fb_result.error,
-                                execution_time_ms=((time.monotonic() - start_time) * 1000),
-                            )
+                        recovery_tool_name = fallback_name
+                        logger.info(
+                            "[Pipeline] Falling back from %s to %s",
+                            tool_name,
+                            fallback_name,
+                        )
+
+                if recovery_tool_name != tool_name or recovery_args is not normalized_args:
+                    try:
+                        recovered_exec_result = await asyncio.wait_for(
+                            self.executor.execute(
+                                tool_name=recovery_tool_name,
+                                arguments=recovery_args,
+                                context=context,
+                            ),
+                            timeout=self._get_tool_timeout(recovery_tool_name),
+                        )
+                    except asyncio.TimeoutError:
+                        recovered_exec_result = None
+
+                    if recovered_exec_result is not None and recovered_exec_result.success:
+                        call_result = ToolCallResult(
+                            tool_name=recovery_tool_name,
+                            arguments=recovery_args,
+                            success=recovered_exec_result.success,
+                            result=recovered_exec_result.result,
+                            error=recovered_exec_result.error,
+                            execution_time_ms=((time.monotonic() - start_time) * 1000),
+                            normalization_applied=normalization_applied,
+                            code_corrected=code_corrected,
+                            code_validation_errors=code_validation_errors,
+                            error_info=recovered_exec_result.error_info,
+                        )
             except Exception as e:
                 logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")
 
@@ -1759,10 +2500,12 @@ class ToolPipeline:
 
         # Record file read for deduplication (prompting loop fix)
         # Include capitalized variants for tool name normalization
-        if call_result.success and tool_name.lower() in ("read", "read_file"):
+        if call_result.success and canonical_core_tool == "read":
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             if file_path:
-                self.record_file_read(file_path)
+                offset = normalized_args.get("offset")
+                limit = normalized_args.get("limit")
+                self.record_file_read(f"{file_path}:{offset}:{limit}", file_path=file_path)
 
         # Track failed signatures
         if not exec_result.success and self.config.enable_failed_signature_tracking:
@@ -1772,6 +2515,21 @@ class ToolPipeline:
         # Cache successful results for idempotent tools
         if call_result.success:
             self.cache_result(tool_name, normalized_args, call_result)
+
+            # Cross-turn dedup: cache results for effectively-idempotent tools
+            if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+                signature = self._get_call_signature(tool_name, normalized_args)
+                dedup_result = ToolCallResult(
+                    tool_name=call_result.tool_name,
+                    arguments=call_result.arguments,
+                    success=call_result.success,
+                    result=call_result.result,
+                    error=call_result.error,
+                    execution_time_ms=0.0,
+                    cached=True,
+                    normalization_applied=call_result.normalization_applied,
+                )
+                self._cross_turn_cache.set(signature, dedup_result)
 
             # Store in semantic cache (FAISS-based with mtime tracking)
             if self.config.enable_semantic_caching and self.semantic_cache is not None:
@@ -1833,6 +2591,33 @@ class ToolPipeline:
             except Exception:
                 logger.debug("on_tool_event fallback emission failed", exc_info=True)
 
+        # Record tool result for credit assignment (FEP-0001 Phase 3)
+        if self._credit_tracking_service is not None:
+            try:
+                self._credit_tracking_service.record_tool_result(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    execution_time_ms=call_result.execution_time_ms,
+                    error=call_result.error,
+                    arguments=call_result.arguments,
+                    agent_id=context.get("agent_id", "default"),
+                    team_id=context.get("team_id"),
+                    session_id=context.get("session_id"),
+                )
+            except Exception:
+                pass  # Credit tracking is non-critical
+
+        # Update online tool reputation (mid-turn feedback)
+        if self._tool_reputation is not None:
+            try:
+                self._tool_reputation.record(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    duration_ms=call_result.execution_time_ms,
+                )
+            except Exception:
+                pass  # Reputation tracking is non-critical
+
         return call_result
 
     def _update_analytics(self, result: ToolCallResult) -> None:
@@ -1870,6 +2655,31 @@ class ToolPipeline:
             "remaining": self.calls_remaining,
             "tools": dict(self._tool_stats),
         }
+
+    def _get_tool_timeout(self, tool_name: str) -> float:
+        """Get effective timeout for a tool, preferring per-tool override.
+
+        Resolution order:
+        1. Per-tool timeout from @tool(timeout=N) decorator (_tool_timeout attribute)
+        2. Per-tool timeout from ToolDefinition.timeout (wrapped by registry)
+        3. Pipeline default (config.per_tool_timeout_seconds)
+        """
+        try:
+            tool_func = self.executor.get_tool_function(tool_name)
+            if tool_func:
+                # Check raw function attribute (set by @tool decorator)
+                if hasattr(tool_func, "_tool_timeout"):
+                    per_tool = tool_func._tool_timeout
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
+                # Check ToolDefinition object (wrapped by registry)
+                if hasattr(tool_func, "timeout"):
+                    per_tool = tool_func.timeout
+                    if isinstance(per_tool, (int, float)) and per_tool > 0:
+                        return float(per_tool)
+        except Exception:
+            pass
+        return self.config.per_tool_timeout_seconds
 
     def clear_failed_signatures(self) -> None:
         """Clear the failed signature cache."""

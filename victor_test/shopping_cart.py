@@ -78,7 +78,9 @@ class ShoppingCart:
         total = self.get_total()
         discount = (total / 100) * percent
         discounted_total = round(total - discount, 2)
-        print(f"Applied {percent}% discount. Total: ${total:.2f} -> ${discounted_total:.2f}")
+        print(
+            f"Applied {percent}% discount. Total: ${total:.2f} -> ${discounted_total:.2f}"
+        )
         return discounted_total
 
     def get_items(self) -> List[ShoppingCartItem]:

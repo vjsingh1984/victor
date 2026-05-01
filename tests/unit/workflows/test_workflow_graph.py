@@ -7,6 +7,7 @@ and cycle detection capabilities.
 import pytest
 from typing import Any, Dict, Optional
 
+import victor.workflows.graph as workflow_graph_module
 from victor.workflows.protocols import (
     ProtocolNodeStatus,
     RetryPolicy,
@@ -565,3 +566,23 @@ class TestGraphHelperMethods:
         next_b = graph.get_next_nodes("router", {"route": "path_b"})
         assert len(next_b) == 1
         assert next_b[0].id == "path_b"
+
+
+class TestWorkflowGraphCompatibilityAlias:
+    """Tests for the deprecated WorkflowGraph compatibility alias."""
+
+    def test_workflowgraph_alias_warns_with_replacement_and_milestone(self):
+        """WorkflowGraph alias should warn and return BasicWorkflowGraph."""
+        with pytest.warns(
+            DeprecationWarning,
+            match=r"WorkflowGraph from victor\.workflows\.graph is deprecated",
+        ) as caught:
+            alias = workflow_graph_module.WorkflowGraph
+
+        assert alias is BasicWorkflowGraph
+        message = str(caught[0].message)
+        assert "BasicWorkflowGraph" in message
+        assert "victor.workflows.graph_dsl.WorkflowGraph" in message
+        assert "v0.8.0" in message
+        assert "2026-12-31" in message
+        assert "docs/architecture/migration.md" in message

@@ -14,6 +14,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.core.constants import DEFAULT_VERTICAL
+
 __all__ = [
     "ObservabilityProtocol",
     "MetricsCollectorProtocol",
@@ -377,14 +379,15 @@ class ReminderManagerProtocol(Protocol):
 class RLCoordinatorProtocol(Protocol):
     """Protocol for reinforcement learning coordinator.
 
-    Manages all RL learners with unified SQLite storage.
+    Manages all RL learners with unified SQLite storage, including
+    benchmark-gated prompt rollout experiments.
     """
 
     def record_outcome(
         self,
         learner_name: str,
         outcome: Any,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record an outcome for a specific learner."""
         ...
@@ -401,6 +404,108 @@ class RLCoordinatorProtocol(Protocol):
 
     def export_metrics(self) -> Dict[str, Any]:
         """Export all learned values and metrics for monitoring."""
+        ...
+
+    def create_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 50,
+    ) -> Optional[str]:
+        """Create a prompt rollout experiment for an approved prompt candidate."""
+        ...
+
+    async def create_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        control_hash: Optional[str] = None,
+        traffic_split: float = 0.1,
+        min_samples_per_variant: int = 50,
+    ) -> Optional[str]:
+        """Async version of create_prompt_rollout_experiment."""
+        ...
+
+    def analyze_prompt_rollout_experiment(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze a prompt rollout experiment for a candidate."""
+        ...
+
+    async def analyze_prompt_rollout_experiment_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of analyze_prompt_rollout_experiment."""
+        ...
+
+    def apply_prompt_rollout_recommendation(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Apply the recommended rollout/rollback action for a prompt candidate."""
+        ...
+
+    async def apply_prompt_rollout_recommendation_async(
+        self,
+        *,
+        section_name: str,
+        provider: str,
+        treatment_hash: str,
+        dry_run: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Async version of apply_prompt_rollout_recommendation."""
+        ...
+
+    def process_prompt_candidate_evaluation_suite(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> Any:
+        """Process a prompt-candidate benchmark suite through rollout stages."""
+        ...
+
+    async def process_prompt_candidate_evaluation_suite_async(
+        self,
+        suite: Any,
+        *,
+        min_pass_rate: float = 0.5,
+        promote_best: bool = False,
+        create_rollout: bool = False,
+        rollout_control_hash: Optional[str] = None,
+        rollout_traffic_split: float = 0.1,
+        rollout_min_samples_per_variant: int = 100,
+        analyze_rollout: bool = False,
+        apply_rollout_decision: bool = False,
+        rollout_decision_dry_run: bool = False,
+    ) -> Any:
+        """Async version of process_prompt_candidate_evaluation_suite."""
         ...
 
     def close(self) -> None:

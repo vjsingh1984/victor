@@ -116,7 +116,11 @@ class TestCLIFrameworkIntegration:
         )
         orch.get_capability = MagicMock(
             side_effect=lambda name: (
-                {"name": name, "version": capabilities[name][0], "callable": capabilities[name][1]}
+                {
+                    "name": name,
+                    "version": capabilities[name][0],
+                    "callable": capabilities[name][1],
+                }
                 if name in capabilities
                 else None
             )
@@ -271,9 +275,10 @@ class TestCLIFrameworkIntegration:
 
             # Emit session start
             shim.emit_session_start({"mode": "integration_test"})
-            shim._observability.on_session_start.assert_called_once_with(
-                {"mode": "integration_test"}
-            )
+            shim._observability.on_session_start.assert_called_once()
+            start_payload = shim._observability.on_session_start.call_args.args[0]
+            assert start_payload["mode"] == "integration_test"
+            assert start_payload["session_id"] == "test-session-123"
 
             # Emit session end
             shim.emit_session_end(tool_calls=5, duration_seconds=10.0, success=True)
@@ -384,8 +389,9 @@ class TestVerticalRegistryIntegration:
     def test_list_verticals_includes_builtins(self):
         """Test list_verticals includes built-in verticals."""
         names = list_verticals()
-        # Built-in verticals
-        assert "coding" in names
+        # benchmark is always built-in; contrib verticals (coding, etc.)
+        # are external packages and may not be installed
+        assert "benchmark" in names
 
 
 class TestBackwardCompatibility:

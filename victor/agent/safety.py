@@ -31,6 +31,7 @@ import re
 import logging
 
 from victor.tools.metadata_registry import get_write_tools as registry_get_write_tools
+from victor.tools.tool_names import get_canonical_name
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -112,12 +113,12 @@ class ApprovalMode(Enum):
 _STATIC_WRITE_TOOL_NAMES: frozenset[str] = frozenset(
     {
         # Direct file modifications
-        "write_file",  # filesystem.py - writes/overwrites files
-        "edit_files",  # file_editor_tool.py - edits files with transactions
+        "write",  # filesystem.py - writes/overwrites files
+        "edit",  # file_editor_tool.py - edits files with transactions
         # Patch/diff application
         "apply_patch",  # patch_tool.py - applies unified diffs
         # Bash execution (can run any command including destructive ones)
-        "execute_bash",  # bash.py - executes shell commands
+        "shell",  # bash.py - executes shell commands
         # Git write operations
         "git",  # git_tool.py - commit, push, reset, etc. (read ops are fine)
         # Refactoring (modifies files in place)
@@ -440,11 +441,12 @@ class SafetyChecker:
             True if the tool can modify files/state
         """
         # Primary: check decorator-driven registry
-        registry_write_tools = registry_get_write_tools()
-        if tool_name in registry_write_tools:
+        canonical_tool_name = get_canonical_name(tool_name)
+        registry_write_tools = {get_canonical_name(name) for name in registry_get_write_tools()}
+        if canonical_tool_name in registry_write_tools:
             return True
         # Fallback: check static list for tools without decorator metadata
-        return tool_name in _STATIC_WRITE_TOOL_NAMES
+        return canonical_tool_name in _STATIC_WRITE_TOOL_NAMES
 
     async def check_and_confirm(
         self,
@@ -460,6 +462,8 @@ class SafetyChecker:
         Returns:
             Tuple of (should_proceed, optional_rejection_reason)
         """
+        canonical_tool_name = get_canonical_name(tool_name)
+
         # Fast path: approval mode OFF - auto-approve everything
         if self.approval_mode == ApprovalMode.OFF:
             return True, None
@@ -467,26 +471,28 @@ class SafetyChecker:
         risk_level = OperationalRiskLevel.SAFE
         descriptions: List[str] = []
         details: List[str] = []
-        is_write_operation = self.is_write_tool(tool_name)
+        is_write_operation = self.is_write_tool(canonical_tool_name)
 
         # Check bash commands
-        if tool_name == "execute_bash":
-            command = arguments.get("command", "")
+        if canonical_tool_name == "shell":
+            command = arguments.get("cmd") or arguments.get("command", "")
             risk_level, details = self.check_bash_command(command)
             if details:
                 descriptions.append(f"Execute: {command[:100]}...")
 
         # Check file write operations
-        elif tool_name == "write_file":
+        elif canonical_tool_name == "write":
             file_path = arguments.get("path", arguments.get("file_path", ""))
             risk_level, details = self.check_file_operation("write", file_path, overwrite=True)
             if details:
                 descriptions.append(f"Write to: {file_path}")
 
         # Check file edit operations
-        elif tool_name == "edit_files":
-            edits = arguments.get("edits", [])
+        elif canonical_tool_name == "edit":
+            edits = arguments.get("ops") or arguments.get("edits") or arguments.get("files") or []
             for edit in edits:
+                if not isinstance(edit, dict):
+                    continue
                 file_path = edit.get("path", "")
                 edit_risk, edit_details = self.check_file_operation("edit", file_path)
                 if _RISK_ORDER[edit_risk] > _RISK_ORDER[risk_level]:
@@ -543,9 +549,11 @@ class SafetyChecker:
 
         # Create confirmation request
         request = ConfirmationRequest(
-            tool_name=tool_name,
+            tool_name=canonical_tool_name,
             risk_level=risk_level,
-            description="; ".join(descriptions) if descriptions else f"Execute {tool_name}",
+            description=(
+                "; ".join(descriptions) if descriptions else f"Execute {canonical_tool_name}"
+            ),
             details=details,
             arguments=arguments,
         )
@@ -594,7 +602,7 @@ def get_safety_checker() -> SafetyChecker:
             from victor.config.settings import load_settings
 
             settings = load_settings()
-            approval_mode = _resolve_approval_mode(settings.write_approval_mode)
+            approval_mode = _resolve_approval_mode(settings.security.write_approval_mode)
         except Exception:
             # Default to RISKY_ONLY if settings unavailable
             approval_mode = ApprovalMode.RISKY_ONLY
@@ -734,7 +742,10 @@ def create_hitl_confirmation_callback(
         except Exception as e:
             logger.error(f"HITL confirmation error: {e}")
             # Block high-risk operations on error
-            if request.risk_level in (OperationalRiskLevel.HIGH, OperationalRiskLevel.CRITICAL):
+            if request.risk_level in (
+                OperationalRiskLevel.HIGH,
+                OperationalRiskLevel.CRITICAL,
+            ):
                 return False
             return True
 

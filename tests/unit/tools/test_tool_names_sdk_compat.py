@@ -15,5 +15,7 @@ def test_legacy_tool_names_module_reexports_sdk_registry() -> None:
     assert LegacyToolNames is SdkToolNames
     assert legacy_get_canonical_name is sdk_get_canonical_name
     assert LegacyToolNames.SHELL == "shell"
+    assert not hasattr(LegacyToolNames, "SHELL_READONLY")
     assert legacy_get_canonical_name("execute_bash") == SdkToolNames.SHELL
+    assert legacy_get_canonical_name("shell_readonly") == "shell_readonly"
     assert LegacyToolNames.file_operations() == SdkToolNames.file_operations()

@@ -84,7 +84,9 @@ async def main():
 
             if results:
                 for i, result in enumerate(results, 1):
-                    print(f"\n{i}. {result['file_path']}:{result.get('symbol_name', 'N/A')}")
+                    print(
+                        f"\n{i}. {result['file_path']}:{result.get('symbol_name', 'N/A')}"
+                    )
                     print(f"   Line: {result.get('line_number', 'N/A')}")
                     print(f"   Relevance: {result['score']:.3f}")
                     print(f"   Preview: {result['content'][:100]}...")

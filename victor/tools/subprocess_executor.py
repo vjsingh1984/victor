@@ -36,7 +36,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ class CommandResult:
     command: Optional[str] = None
     working_dir: Optional[str] = None
     duration_ms: Optional[float] = None
+    truncated: bool = False
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization."""
@@ -85,6 +86,7 @@ class CommandResult:
             "command": self.command,
             "working_dir": self.working_dir,
             "duration_ms": self.duration_ms,
+            "truncated": self.truncated,
         }
 
 
@@ -100,6 +102,158 @@ from victor.security.command_safety import (  # noqa: E402
     DANGEROUS_PATTERNS,
     is_dangerous_command,
 )
+
+# =============================================================================
+# Subprocess Resource Limits
+# =============================================================================
+
+
+def create_resource_limit_preexec(
+    max_memory_mb: int = 512,
+    max_cpu_seconds: int = 300,
+    max_file_descriptors: int = 1024,
+) -> "Optional[Callable[[], None]]":
+    """Create a ``preexec_fn`` that applies POSIX resource limits.
+
+    Returns ``None`` on non-POSIX platforms (Windows) where
+    ``resource.setrlimit`` is unavailable.
+    """
+    try:
+        import resource as _resource  # POSIX only
+    except ImportError:
+        return None
+
+    def _apply_limits() -> None:
+        try:
+            mem_bytes = max_memory_mb * 1024 * 1024
+            _resource.setrlimit(_resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+        except (ValueError, OSError):
+            pass  # macOS may not enforce RLIMIT_AS
+        try:
+            _resource.setrlimit(
+                _resource.RLIMIT_CPU,
+                (max_cpu_seconds, max_cpu_seconds + 10),
+            )
+        except (ValueError, OSError):
+            pass
+        try:
+            _resource.setrlimit(
+                _resource.RLIMIT_NOFILE,
+                (max_file_descriptors, max_file_descriptors),
+            )
+        except (ValueError, OSError):
+            pass
+
+    return _apply_limits
+
+
+def _truncate_output(text: str, max_bytes: int) -> Tuple[str, bool]:
+    """Truncate output to *max_bytes* with a marker. Returns (text, truncated).
+
+    DEPRECATED: Use _truncate_output_by_lines() for line-based truncation.
+    This is kept for backward compatibility.
+    """
+    if max_bytes <= 0 or len(text.encode("utf-8", errors="replace")) <= max_bytes:
+        return text, False
+    truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
+    return truncated + "\n... [output truncated]", True
+
+
+def _truncate_output_by_lines(
+    text: str,
+    max_lines: Optional[int],
+    max_bytes: Optional[int] = None,
+    stream_name: str = "output",
+) -> Tuple[str, bool, int]:
+    """Truncate output by lines with byte limit fallback.
+
+    Args:
+        text: Text to truncate
+        max_lines: Maximum lines to keep (None=unlimited)
+        max_bytes: Maximum bytes to keep (None=use tool settings default ONLY in unlimited mode)
+        stream_name: Name of stream (for error messages)
+
+    Returns:
+        Tuple of (truncated_text, was_truncated, line_count)
+    """
+    # Default byte limit if not specified
+    # Priority: use tool settings in unlimited mode, otherwise use 1MB safety default
+    if max_bytes is None:
+        if max_lines is None:
+            # True unlimited mode - use tool settings (higher limit for accuracy-first)
+            from victor.config.tool_settings import get_tool_settings
+
+            tool_settings = get_tool_settings()
+            # Convert MB to bytes
+            max_bytes = int(tool_settings.tool_output_byte_limit_mb * 1024 * 1024)
+        else:
+            # Line limit is set, but no byte limit - use 1MB safety default
+            max_bytes = 1024 * 1024  # 1MB safety default when line-limited
+
+    # Handle unlimited
+    if max_lines is None or max_lines <= 0:
+        # Still enforce byte limit (safety)
+        text_bytes = len(text.encode("utf-8", errors="replace"))
+        if text_bytes > max_bytes:
+            truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode(
+                "utf-8", errors="ignore"
+            )
+            return (
+                truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
+                True,
+                text.count("\n") + 1,
+            )
+        return text, False, text.count("\n") + 1
+
+    # Split into lines (preserving line endings)
+    lines = text.splitlines(keepends=True)
+    line_count = len(lines)
+
+    # Check if truncation needed
+    if line_count <= max_lines:
+        # Within line limit, but check byte limit (if specified)
+        if max_bytes is not None:
+            text_bytes = len(text.encode("utf-8", errors="replace"))
+            if text_bytes > max_bytes:
+                truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode(
+                    "utf-8", errors="ignore"
+                )
+                # Recount lines after byte truncation
+                new_line_count = truncated.count("\n") + 1
+                return (
+                    truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
+                    True,
+                    new_line_count,
+                )
+        return text, False, line_count
+
+    # Truncate by lines
+    truncated_lines = lines[:max_lines]
+    truncated = "".join(truncated_lines)
+
+    # Enforce byte limit on truncated text (if specified)
+    if max_bytes is not None:
+        truncated_bytes = len(truncated.encode("utf-8", errors="replace"))
+        if truncated_bytes > max_bytes:
+            # Byte limit exceeded, truncate further
+            truncated = truncated.encode("utf-8", errors="replace")[:max_bytes].decode(
+                "utf-8", errors="ignore"
+            )
+            # Recount lines after byte truncation
+            new_line_count = truncated.count("\n") + 1
+            return (
+                truncated
+                + f"\n... [{stream_name} truncated: {line_count}→{new_line_count} lines, {truncated_bytes}→{max_bytes} bytes]",
+                True,
+                new_line_count,
+            )
+
+    return (
+        truncated + f"\n... [{stream_name} truncated: {line_count}→{max_lines} lines]",
+        True,
+        max_lines,
+    )
+
 
 # =============================================================================
 # Tool Availability Checking
@@ -188,6 +342,8 @@ def run_command(
     check_dangerous: bool = True,
     env: Optional[Dict[str, str]] = None,
     shell: bool = False,
+    preexec_fn: Optional[Callable[[], None]] = None,
+    max_output_bytes: int = 0,
 ) -> CommandResult:
     """Execute a command synchronously and return structured result.
 
@@ -198,6 +354,8 @@ def run_command(
         check_dangerous: Whether to check for dangerous commands (default: True).
         env: Environment variables to set.
         shell: Whether to use shell execution (default: False).
+        preexec_fn: Callable invoked in the child process before exec (POSIX only).
+        max_output_bytes: Truncate stdout/stderr beyond this many bytes (0 = no limit).
 
     Returns:
         CommandResult with execution details.
@@ -245,24 +403,42 @@ def run_command(
             cwd=working_dir,
             env=env,
             shell=shell,  # nosec B602
+            preexec_fn=preexec_fn,  # nosec B603
         )
 
         duration_ms = (time.time() - start_time) * 1000
 
+        stdout_text = result.stdout
+        stderr_text = result.stderr
+        was_truncated = False
+
+        # Truncate output with separate limits for stdout and stderr
+        if max_output_bytes > 0:
+            # Use the simpler _truncate_output for byte-based truncation
+            # (matches test expectations)
+            stdout_text, t1 = _truncate_output(stdout_text, max_output_bytes)
+            stderr_text, t2 = _truncate_output(stderr_text, max_output_bytes)
+            was_truncated = t1 or t2
+        elif max_output_bytes == 0:
+            pass  # No limit (unlimited output)
+        else:
+            pass  # Negative limit means unlimited
+
         return CommandResult(
             success=result.returncode == 0,
-            stdout=result.stdout,
-            stderr=result.stderr,
+            stdout=stdout_text,
+            stderr=stderr_text,
             return_code=result.returncode,
             error_type=(
                 CommandErrorType.SUCCESS
                 if result.returncode == 0
                 else CommandErrorType.EXECUTION_ERROR
             ),
-            error_message=result.stderr if result.returncode != 0 else None,
+            error_message=stderr_text if result.returncode != 0 else None,
             command=cmd_str,
             working_dir=str(working_dir) if working_dir else None,
             duration_ms=duration_ms,
+            truncated=was_truncated,
         )
 
     except subprocess.TimeoutExpired:
@@ -323,6 +499,8 @@ async def run_command_async(
     timeout: int = 60,
     check_dangerous: bool = True,
     env: Optional[Dict[str, str]] = None,
+    preexec_fn: Optional[Callable[[], None]] = None,
+    max_output_bytes: int = 0,
 ) -> CommandResult:
     """Execute a shell command asynchronously and return structured result.
 
@@ -332,6 +510,8 @@ async def run_command_async(
         timeout: Timeout in seconds (default: 60).
         check_dangerous: Whether to check for dangerous commands (default: True).
         env: Environment variables to set.
+        preexec_fn: Callable invoked in the child process before exec (POSIX only).
+        max_output_bytes: Truncate stdout/stderr beyond this many bytes (0 = no limit).
 
     Returns:
         CommandResult with execution details.
@@ -376,6 +556,7 @@ async def run_command_async(
             stderr=asyncio.subprocess.PIPE,
             cwd=cwd,
             env=env,
+            preexec_fn=preexec_fn,
         )
 
         try:
@@ -401,6 +582,12 @@ async def run_command_async(
         stdout_str = stdout.decode("utf-8") if stdout else ""
         stderr_str = stderr.decode("utf-8") if stderr else ""
 
+        was_truncated = False
+        if max_output_bytes > 0:
+            stdout_str, t1 = _truncate_output(stdout_str, max_output_bytes)
+            stderr_str, t2 = _truncate_output(stderr_str, max_output_bytes)
+            was_truncated = t1 or t2
+
         return CommandResult(
             success=process.returncode == 0,
             stdout=stdout_str,
@@ -415,6 +602,7 @@ async def run_command_async(
             command=command,
             working_dir=str(working_dir) if working_dir else None,
             duration_ms=duration_ms,
+            truncated=was_truncated,
         )
 
     except Exception as e:

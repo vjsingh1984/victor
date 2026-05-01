@@ -23,7 +23,7 @@ SOLID Principles:
 - DIP: Depends on EventBus abstraction
 
 Usage:
-    from victor.observability.tracing import ExecutionTracer
+    from victor.observability.tracing import ExecutionTracer, SpanStatus
     from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
     event_bus = EventBus()
@@ -34,8 +34,8 @@ Usage:
     child_span = tracer.start_span("agent-1", "tool", parent_id=root_span)
 
     # End spans
-    tracer.end_span(child_span, status="success")
-    tracer.end_span(root_span, status="success")
+    tracer.end_span(child_span, status=SpanStatus.SUCCESS)
+    tracer.end_span(root_span, status=SpanStatus.SUCCESS)
 
     # Get span tree
     tree = tracer.get_span_tree()
@@ -46,11 +46,20 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 logger = logging.getLogger(__name__)
+
+
+class SpanStatus(str, Enum):
+    """Status of an execution span."""
+
+    RUNNING = "running"  # Span is currently active
+    SUCCESS = "success"  # Span completed successfully
+    ERROR = "error"  # Span failed with error
 
 
 @dataclass
@@ -66,7 +75,7 @@ class ExecutionSpan:
         span_type: Type of span ("agent", "tool", "llm_call")
         start_time: Unix timestamp when span started
         end_time: Unix timestamp when span ended (None if running)
-        status: Current status ("running", "success", "error")
+        status: Current status (running, success, error)
         metadata: Optional metadata about the span
         children: List of child span IDs
     """
@@ -77,7 +86,7 @@ class ExecutionSpan:
     span_type: str
     start_time: float
     end_time: Optional[float] = None
-    status: str = "running"
+    status: SpanStatus = SpanStatus.RUNNING
     metadata: Dict[str, Any] = field(default_factory=dict)
     children: List[str] = field(default_factory=list)
 
@@ -221,7 +230,7 @@ class ExecutionTracer:
     def end_span(
         self,
         span_id: str,
-        status: str = "success",
+        status: SpanStatus = SpanStatus.SUCCESS,
         result: Optional[Any] = None,
         error: Optional[str] = None,
     ) -> None:
@@ -229,9 +238,9 @@ class ExecutionTracer:
 
         Args:
             span_id: Span ID to end
-            status: Final status ("success", "error")
+            status: Final status (SUCCESS, ERROR)
             result: Optional result data
-            error: Optional error message if status is "error"
+            error: Optional error message if status is ERROR
         """
         if span_id not in self._spans:
             logger.warning(f"Span not found: {span_id}")
@@ -354,7 +363,7 @@ class ExecutionTracer:
         Returns:
             List of spans with status "running"
         """
-        return [span for span in self._spans.values() if span.status == "running"]
+        return [span for span in self._spans.values() if span.status == SpanStatus.RUNNING]
 
     def get_span_count(self) -> int:
         """Get total number of spans.

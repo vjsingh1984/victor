@@ -47,6 +47,7 @@ from victor.framework.defaults import (
 from victor.framework.defaults.safety import DefaultSafetyExtension as DirectSafety
 from victor.framework.defaults.stages import get_default_stages as direct_get_stages
 from victor.framework.stage_manager import get_default_stages as sm_get_stages
+from victor_sdk import StageDefinition as SdkStageDefinition
 
 # =============================================================================
 # Default Stages
@@ -77,11 +78,11 @@ class TestGetDefaultStages:
         stages = get_default_stages()
         for defn in stages.values():
             assert isinstance(defn, StageDefinition)
+            assert isinstance(defn, SdkStageDefinition)
 
-    def test_ordering_is_sequential(self):
+    def test_stage_order_matches_runtime_default_sequence(self):
         stages = get_default_stages()
-        orders = [defn.order for defn in stages.values()]
-        assert sorted(orders) == list(range(7))
+        assert list(stages.keys()) == list(sm_get_stages().keys())
 
     def test_all_stages_have_keywords(self):
         stages = get_default_stages()
@@ -95,11 +96,11 @@ class TestGetDefaultStages:
 
     def test_initial_stage_is_order_zero(self):
         stages = get_default_stages()
-        assert stages["initial"].order == 0
+        assert list(stages.keys())[0] == "initial"
 
     def test_completion_is_last(self):
         stages = get_default_stages()
-        assert stages["completion"].order == 6
+        assert list(stages.keys())[-1] == "completion"
 
     def test_returns_fresh_dict_each_call(self):
         stages1 = get_default_stages()
@@ -107,8 +108,17 @@ class TestGetDefaultStages:
         assert stages1 is not stages2
 
     def test_reexport_matches_stage_manager(self):
-        """Ensure the defaults re-export matches stage_manager source."""
-        assert direct_get_stages is sm_get_stages
+        """Ensure defaults normalize the runtime stage-manager defaults into SDK contracts."""
+        default_stages = direct_get_stages()
+        runtime_stages = sm_get_stages()
+
+        assert list(default_stages.keys()) == list(runtime_stages.keys())
+        for name, stage in default_stages.items():
+            runtime_stage = runtime_stages[name]
+            assert stage.name == runtime_stage.name
+            assert stage.description == runtime_stage.description
+            assert stage.keywords == runtime_stage.keywords
+            assert stage.tools == runtime_stage.tools
 
 
 # =============================================================================
@@ -155,7 +165,7 @@ class TestDefaultSafetyExtension:
 
     def test_get_tool_restrictions(self, ext):
         restrictions = ext.get_tool_restrictions()
-        assert "write_file" in restrictions
+        assert "write" in restrictions
         assert "shell" in restrictions
 
     def test_category_is_default(self, ext):
@@ -245,7 +255,7 @@ class TestDefaultsReexports:
         assert DefaultSafetyExtension is not None
 
     def test_stage_definition(self):
-        assert StageDefinition is not None
+        assert StageDefinition is SdkStageDefinition
 
     def test_base_rl_config(self):
         assert BaseRLConfig is not None
@@ -539,15 +549,15 @@ class TestStageToolMappings:
         assert set(EXECUTION_STAGE_TOOLS.keys()) == _REQUIRED_STAGES
 
     def test_modification_executing_has_edit(self):
-        assert "edit_files" in MODIFICATION_STAGE_TOOLS["executing"]
+        assert "edit" in MODIFICATION_STAGE_TOOLS["executing"]
 
     def test_analysis_executing_is_read_only(self):
         tools = ANALYSIS_STAGE_TOOLS["executing"]
-        assert "edit_files" not in tools
-        assert "read_file" in tools
+        assert "edit" not in tools
+        assert "read" in tools
 
     def test_execution_executing_has_bash(self):
-        assert "execute_bash" in EXECUTION_STAGE_TOOLS["executing"]
+        assert "shell" in EXECUTION_STAGE_TOOLS["executing"]
 
 
 class TestGetStageToolsForCategory:

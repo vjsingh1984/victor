@@ -1,6 +1,6 @@
 from typing import List
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -58,7 +58,8 @@ class _DummyProvider(BaseProvider):
 @pytest.fixture()
 def orchestrator() -> AgentOrchestrator:
     settings = Settings(analytics_enabled=False, tool_selection_strategy="keyword")
-    orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
     try:
         yield orch
     finally:
@@ -67,7 +68,9 @@ def orchestrator() -> AgentOrchestrator:
         asyncio.run(orch.shutdown())
 
 
-def test_prioritize_tools_stage_minimizes_broadcast(orchestrator: AgentOrchestrator) -> None:
+def test_prioritize_tools_stage_minimizes_broadcast(
+    orchestrator: AgentOrchestrator,
+) -> None:
     """If stage pruning removes everything, ensure we return a minimal slice instead of all tools."""
     tools = [
         ToolDefinition(name=f"custom{i}", description="desc", parameters={}) for i in range(12)
@@ -82,7 +85,9 @@ def test_prioritize_tools_stage_minimizes_broadcast(orchestrator: AgentOrchestra
     assert len(pruned) < len(tools)
 
 
-def test_prioritize_tools_stage_prefers_core_fallback(orchestrator: AgentOrchestrator) -> None:
+def test_prioritize_tools_stage_prefers_core_fallback(
+    orchestrator: AgentOrchestrator,
+) -> None:
     """When no stage tools match, core tools should be preferred if present."""
     tools = [
         ToolDefinition(name="read_file", description="desc", parameters={}),

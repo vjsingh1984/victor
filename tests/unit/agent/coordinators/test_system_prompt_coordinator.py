@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.system_prompt_coordinator import (
+from victor.agent.services.system_prompt_runtime import (
     SystemPromptCoordinator,
 )
 
@@ -68,6 +68,14 @@ def coordinator(mock_prompt_builder, mock_task_analyzer, mock_tools):
 class TestSystemPromptCoordinator:
     """Test suite for SystemPromptCoordinator."""
 
+    def test_legacy_module_reexports_service_runtime(self):
+        """Legacy coordinator path should re-export service-owned runtime."""
+        from victor.agent.services.system_prompt_runtime import (
+            SystemPromptCoordinator as legacy_coordinator,
+        )
+
+        assert legacy_coordinator is SystemPromptCoordinator
+
     def test_build_system_prompt_large_context(self, mock_prompt_builder, mock_task_analyzer):
         """Prompt includes parallel read budget for >= 32K context."""
         coord = SystemPromptCoordinator(
@@ -102,10 +110,10 @@ class TestSystemPromptCoordinator:
         """Shell variant resolution delegates to shell_resolver module."""
         with patch(
             "victor.agent.shell_resolver.resolve_shell_variant",
-            return_value="shell_readonly",
+            return_value="shell",
         ) as mock_resolve:
             result = coordinator.resolve_shell_variant("bash")
-            assert result == "shell_readonly"
+            assert result == "shell"
             mock_resolve.assert_called_once_with("bash", mock_tools, None)
 
     def test_classify_task_keywords(self, coordinator, mock_task_analyzer):

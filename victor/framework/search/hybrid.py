@@ -16,7 +16,7 @@
 
 This module implements Reciprocal Rank Fusion (RRF) to combine results from:
 1. Semantic search (embedding-based similarity)
-2. Keyword search (BM25-like term frequency)
+2. Keyword search (term-frequency exact matching)
 
 RRF Algorithm:
     For each result r and ranking source s:
@@ -131,6 +131,9 @@ class HybridSearchEngine:
         Returns:
             Combined and ranked results
         """
+        semantic_results = self._filter_ranked_results(semantic_results)
+        keyword_results = self._filter_ranked_results(keyword_results)
+
         # Build mapping of file_path -> (semantic_rank, semantic_score)
         semantic_map: Dict[str, Tuple[int, float]] = {}
         for rank, result in enumerate(semantic_results):
@@ -199,6 +202,19 @@ class HybridSearchEngine:
         )
 
         return hybrid_results
+
+    def _filter_ranked_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Drop empty or non-positive results before applying rank-only fusion."""
+        filtered: List[Dict[str, Any]] = []
+        for result in results:
+            file_path = str(result.get("file_path", "") or "").strip()
+            score = result.get("score", 0.0)
+            if not file_path:
+                continue
+            if not isinstance(score, (int, float)) or score <= 0:
+                continue
+            filtered.append(result)
+        return filtered
 
     def keyword_search(
         self,
@@ -304,7 +320,7 @@ def create_hybrid_search_engine(
         Configured HybridSearchEngine instance
 
     Example:
-        >>> engine = create_hybrid_search_engine(semantic_weight=0.7, keyword_weight=0.3)
+        >>> engine = create_hybrid_search_engine(semantic_weight=0.6, keyword_weight=0.4)
         >>> hybrid_results = engine.combine_results(semantic_results, keyword_results)
     """
     # Normalize weights to sum to 1.0

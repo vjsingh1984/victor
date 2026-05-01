@@ -42,9 +42,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
-from victor.framework.chain_registry import ChainRegistry, ChainMetadata, reset_chain_registry
-from victor.framework.persona_registry import PersonaRegistry, PersonaSpec, reset_persona_registry
+from victor.framework.capabilities.base import (
+    BaseCapabilityProvider,
+    CapabilityMetadata,
+)
+from victor.framework.chain_registry import (
+    ChainRegistry,
+    ChainMetadata,
+    reset_chain_registry,
+)
+from victor.framework.persona_registry import (
+    PersonaRegistry,
+    PersonaSpec,
+    reset_persona_registry,
+)
 from victor.framework.middleware import (
     GitSafetyMiddleware,
     LoggingMiddleware,

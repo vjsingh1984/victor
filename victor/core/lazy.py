@@ -302,9 +302,9 @@ KNOWN_CIRCULAR_IMPORTS: Dict[str, CircularImportInfo] = {
         solution_type="deferred_import_in_property",
     ),
     "intelligent_pipeline_components": CircularImportInfo(
-        module="intelligent_pipeline.py",
+        module="runtime_intelligence_pipeline.py",
         chain=[
-            "intelligent_pipeline",
+            "runtime_intelligence_pipeline",
             "prompt_builder",
             "mode_controller",
             "quality_scorer",
@@ -312,7 +312,7 @@ KNOWN_CIRCULAR_IMPORTS: Dict[str, CircularImportInfo] = {
             "resilient_executor",
         ],
         reason="Pipeline components might reference each other or orchestrator",
-        solution_file="victor/agent/intelligent_pipeline.py",
+        solution_file="victor/agent/runtime_intelligence_pipeline.py",
         solution_line=196,
         solution_type="deferred_import_async",
     ),
@@ -333,7 +333,7 @@ KNOWN_CIRCULAR_IMPORTS: Dict[str, CircularImportInfo] = {
         chain=[
             "orchestrator",
             "orchestrator_integration",
-            "intelligent_pipeline",
+            "runtime_intelligence_pipeline",
             "orchestrator (type hints)",
         ],
         reason="Integration bridge needs orchestrator types but is imported by orchestrator",

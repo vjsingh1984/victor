@@ -149,7 +149,7 @@ coordinator.add_member(researcher).add_member(executor)
 from victor.teams.protocols import ITeamMember, ITeamCoordinator
 ```
 
-**New Code** (still works, but imports from canonical location):
+**New Code**:
 ```python
 from victor.protocols.team import ITeamMember, ITeamCoordinator
 ```

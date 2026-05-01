@@ -25,6 +25,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
+from victor.core.verticals.manifest_contract import (
+    VerticalRuntimeProvenance,
+    get_vertical_runtime_provenance,
+)
+
 if TYPE_CHECKING:
     from victor_sdk.verticals.manifest import ExtensionManifest
 
@@ -145,16 +150,21 @@ class VerticalMetadata:
                                 "version", getattr(vertical_class, "version", "1.0.0")
                             ),
                             api_version=manifest.get(
-                                "api_version", getattr(vertical_class, "VERTICAL_API_VERSION", 1)
+                                "api_version",
+                                getattr(vertical_class, "VERTICAL_API_VERSION", 1),
                             ),
                             module_path=getattr(vertical_class, "__module__", "<unknown>"),
                             qualname=getattr(
                                 vertical_class, "__qualname__", vertical_class.__name__
                             ),
-                            is_contrib="verticals.contrib"
-                            in getattr(vertical_class, "__module__", ""),
-                            is_external="verticals.contrib"
-                            not in getattr(vertical_class, "__module__", ""),
+                            is_contrib=(
+                                get_vertical_runtime_provenance(vertical_class)
+                                is VerticalRuntimeProvenance.CONTRIB
+                            ),
+                            is_external=(
+                                get_vertical_runtime_provenance(vertical_class)
+                                is VerticalRuntimeProvenance.EXTERNAL
+                            ),
                         )
                 else:
                     # ExtensionManifest object
@@ -167,10 +177,10 @@ class VerticalMetadata:
             # Use pattern detection
             name = cls._extract_name_from_classname(vertical_class.__name__)
 
-        # Detect if this is a contrib or external vertical
         module_path = getattr(vertical_class, "__module__", "<unknown>")
-        is_contrib = "verticals.contrib" in module_path
-        is_external = not is_contrib and not module_path.startswith("victor.verticals")
+        runtime_provenance = get_vertical_runtime_provenance(vertical_class)
+        is_contrib = runtime_provenance is VerticalRuntimeProvenance.CONTRIB
+        is_external = runtime_provenance is VerticalRuntimeProvenance.EXTERNAL
 
         return cls(
             name=name,
@@ -198,8 +208,9 @@ class VerticalMetadata:
             VerticalMetadata instance
         """
         module_path = getattr(vertical_class, "__module__", "<unknown>")
-        is_contrib = "verticals.contrib" in module_path
-        is_external = not is_contrib and not module_path.startswith("victor.verticals")
+        runtime_provenance = get_vertical_runtime_provenance(vertical_class)
+        is_contrib = runtime_provenance is VerticalRuntimeProvenance.CONTRIB
+        is_external = runtime_provenance is VerticalRuntimeProvenance.EXTERNAL
 
         return cls(
             name=manifest.name,
@@ -265,17 +276,10 @@ class VerticalMetadata:
         # Emit deprecation warning for legacy pattern
         import warnings
 
-        warnings.warn(
-            f"Vertical class '{classname}' does not follow the recommended "
-            f"naming convention (Assistant or Vertical suffix). "
-            f"Support for name inference will be removed in v1.0. "
-            f"Use the @register_vertical decorator or define a 'name' attribute.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-        logger.debug(
-            f"Using classname '{classname}' as vertical name " f"(no recognized suffix pattern)"
+        logger.warning(
+            "Vertical class '%s' does not follow the recommended naming convention "
+            "(Assistant or Vertical suffix). Use @register_vertical or define a 'name' attribute.",
+            classname,
         )
         return classname.lower()
 

@@ -6,12 +6,154 @@ renderer implementations to ensure consistent visual output.
 
 from __future__ import annotations
 
+import logging
+import re
 from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
+
+logger = logging.getLogger(__name__)
+
+_TOOL_NAME_SEPARATOR_PATTERN = re.compile(r"[\s_\-]+")
+
+_REASONING_PREFIX_MARKERS = (
+    "💭 Thinking...",
+    "💭",
+    "🤔 Thinking...",
+    "🤔",
+    "Thinking...",
+)
+
+_THINKING_STATUS_PREFIXES = ("💭", "🤔", "◌")
+
+
+class StreamDeltaNormalizer:
+    """Normalize provider stream chunks to append-only deltas.
+
+    Some providers stream true deltas while others resend cumulative snapshots.
+    Renderers should receive append-only text so UI surfaces do not duplicate
+    already-rendered content.
+    """
+
+    _TAIL_WINDOW = 4096
+    _MIN_OVERLAP_CHARS = 8
+
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self._last_raw = ""
+        self._emitted_tail = ""
+
+    def consume(self, text: str) -> str:
+        """Return only the unseen portion of ``text``."""
+        if not text:
+            return ""
+
+        if text == self._last_raw:
+            logger.debug("StreamDeltaNormalizer: exact duplicate, returning empty")
+            return ""
+
+        if self._last_raw and text.startswith(self._last_raw):
+            delta = text[len(self._last_raw) :]
+            self._last_raw = text
+            self._extend_tail(delta)
+            logger.debug(
+                "StreamDeltaNormalizer: accumulated content, "
+                "last_raw_len=%d, new_text_len=%d, delta_len=%d",
+                len(self._last_raw) - len(delta),
+                len(text),
+                len(delta),
+            )
+            return delta
+
+        overlap = self._find_overlap(text)
+        self._last_raw = text
+        if overlap and (overlap >= self._MIN_OVERLAP_CHARS or overlap * 2 >= len(text)):
+            delta = text[overlap:]
+            self._extend_tail(delta)
+            logger.debug(
+                "StreamDeltaNormalizer: found overlap=%d, text_len=%d, delta_len=%d",
+                overlap,
+                len(text),
+                len(delta),
+            )
+            return delta
+
+        self._extend_tail(text)
+        logger.debug("StreamDeltaNormalizer: no overlap, returning full text (%d chars)", len(text))
+        return text
+
+    def _extend_tail(self, text: str) -> None:
+        if not text:
+            return
+        self._emitted_tail = (self._emitted_tail + text)[-self._TAIL_WINDOW :]
+
+    # Cap the overlap search to avoid O(n×m) scans on large payloads.
+    _OVERLAP_SEARCH_CAP = 256
+
+    def _find_overlap(self, text: str) -> int:
+        max_len = min(len(self._emitted_tail), len(text), self._OVERLAP_SEARCH_CAP)
+        for size in range(max_len, 0, -1):
+            if self._emitted_tail[-size:] == text[:size]:
+                return size
+        return 0
+
+
+def normalize_reasoning_content(text: str) -> str:
+    """Strip provider-added reasoning banners from reasoning stream content."""
+    normalized = text.lstrip()
+    for marker in _REASONING_PREFIX_MARKERS:
+        if normalized.startswith(marker):
+            return normalized[len(marker) :].lstrip()
+    return normalized
+
+
+def is_thinking_status_message(message: str) -> bool:
+    """Return True for generic thinking-status messages that should use thinking UI."""
+    normalized = message.strip()
+    for prefix in _THINKING_STATUS_PREFIXES:
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix) :].strip()
+            break
+
+    lowered = normalized.lower()
+    return lowered in {"thinking", "thinking...", "thinking…"}
+
+
+def format_tool_display_name(name: str) -> str:
+    """Format a canonical tool identifier for lower-camel display in the UI.
+
+    This keeps protocol and registry names unchanged while making renderer output
+    easier to scan for humans.
+
+    Examples:
+        "code_search" -> "codeSearch"
+        "git-status" -> "gitStatus"
+        "CodeSearch" -> "codeSearch"
+    """
+    normalized = str(name).strip()
+    if not normalized:
+        return "unknown"
+
+    if _TOOL_NAME_SEPARATOR_PATTERN.search(normalized):
+        parts = [part for part in _TOOL_NAME_SEPARATOR_PATTERN.split(normalized) if part]
+        if not parts:
+            return normalized
+        first = parts[0].lower()
+        rest = [part[:1].upper() + part[1:] for part in parts[1:]]
+        return first + "".join(rest)
+
+    if normalized.isupper():
+        return normalized.lower()
+
+    if normalized[:1].isupper():
+        return normalized[:1].lower() + normalized[1:]
+
+    return normalized
 
 
 def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:
@@ -38,6 +180,16 @@ def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:
             part = f"{k}={v}"
         elif v is None:
             continue
+        elif isinstance(v, list):
+            # Summarize list args meaningfully (e.g. edit's ops=[{type,path,...}])
+            if v and isinstance(v[0], dict):
+                first = v[0]
+                op_type = first.get("type", "")
+                op_path = first.get("path", "")
+                summary = f"{op_type}:{op_path}" if op_type and op_path else str(len(v))
+                part = f"{k}=[{summary}]" if len(v) == 1 else f"{k}=[{summary} +{len(v)-1}]"
+            else:
+                part = f"{k}=[{len(v)}]"
         else:
             part = f"{k}=..."
         if total_len + len(part) > max_width and parts:
@@ -46,6 +198,17 @@ def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:
         parts.append(part)
         total_len += len(part) + 2
     return ", ".join(parts)
+
+
+def format_duration(elapsed: float) -> str:
+    """Format elapsed seconds for compact CLI display."""
+    if elapsed <= 0:
+        return "0ms"
+    if elapsed < 1:
+        return f"{elapsed * 1000:.0f}ms"
+    if elapsed < 10:
+        return f"{elapsed:.1f}s"
+    return f"{elapsed:.0f}s"
 
 
 def render_file_preview(console: Console, path: str, content: str) -> None:
@@ -84,12 +247,22 @@ def render_edit_preview(console: Console, path: str, diff: str) -> None:
 
 
 def render_thinking_indicator(console: Console) -> None:
-    """Render the thinking start indicator.
+    """Render the thinking start indicator with enhanced visual emphasis.
 
     Args:
         console: Rich Console to render to
     """
-    console.print("[dim italic]💭 Thinking...[/]")
+    from victor.config.theme_settings import get_theme_settings
+
+    theme_settings = get_theme_settings()
+
+    # Use high contrast colors if enabled
+    if theme_settings.high_contrast:
+        console.rule("[bold cyan]Reasoning[/]", style="bold", align="left")
+        console.print("[bold cyan]◌[/] [bold]Thinking[/]")
+    else:
+        console.rule("[dim cyan]Reasoning[/]", style="dim", align="left")
+        console.print("[cyan]◌[/] [dim italic]Thinking[/]")
 
 
 def render_thinking_text(console: Console, text: str) -> None:
@@ -99,5 +272,183 @@ def render_thinking_text(console: Console, text: str) -> None:
         console: Rich Console to render to
         text: Thinking text to display
     """
-    styled = Text(text, style="dim italic")
+    styled = Text(text, style="italic color(246)")
     console.print(styled, end="")
+
+
+def render_content_badge(console: Console, content_type: str, icon: str = "") -> None:
+    """Render a small badge for content type identification.
+
+    Args:
+        console: Rich Console to render to
+        content_type: Type of content (thinking, tool, response, error)
+        icon: Optional icon to display
+    """
+    from victor.config.theme_settings import get_theme_settings
+
+    theme_settings = get_theme_settings()
+
+    # Use brighter colors for high contrast mode
+    if theme_settings.high_contrast:
+        badges = {
+            "thinking": ("[bold cyan]◌[/]", "[bold cyan]THINKING[/]"),
+            "tool": ("[bold blue]⟳[/]", "[bold blue]TOOL[/]"),
+            "response": ("[bold green]→[/]", "[bold green]RESPONSE[/]"),
+            "error": ("[bold red]✗[/]", "[bold red]ERROR[/]"),
+        }
+    else:
+        badges = {
+            "thinking": ("[cyan]◌[/]", "[dim]THINKING[/]"),
+            "tool": ("[blue]⟳[/]", "[dim]TOOL[/]"),
+            "response": ("[green]→[/]", "[dim]RESPONSE[/]"),
+            "error": ("[red]✗[/]", "[dim]ERROR[/]"),
+        }
+
+    prefix, label = badges.get(content_type, ("•", content_type.upper()))
+    console.print(f"{prefix} {label}")
+
+
+def render_status_message(console: Console, message: str) -> None:
+    """Render a compact status line with lightweight semantic styling."""
+    from victor.config.theme_settings import get_theme_settings
+
+    theme_settings = get_theme_settings()
+
+    normalized = message.strip()
+    lowered = normalized.lower()
+
+    # Use high contrast styling if enabled
+    if theme_settings.high_contrast:
+        if normalized.startswith("⚠") or "warning" in lowered or "failed" in lowered:
+            prefix = "[bold yellow]![/]"
+            body_style = "bold yellow"
+            normalized = normalized.removeprefix("⚠️").removeprefix("⚠").strip()
+        elif "thinking" in lowered:
+            prefix = "[bold cyan]◌[/]"
+            body_style = "bold cyan"
+        else:
+            prefix = "[bold blue]•[/]"
+            body_style = "bold"
+    else:
+        if normalized.startswith("⚠") or "warning" in lowered or "failed" in lowered:
+            prefix = "[yellow]![/]"
+            body_style = "yellow"
+            normalized = normalized.removeprefix("⚠️").removeprefix("⚠").strip()
+        elif "thinking" in lowered:
+            prefix = "[cyan]◌[/]"
+            body_style = "dim italic"
+        else:
+            prefix = "[blue]•[/]"
+            body_style = "dim"
+
+    console.print(f"{prefix} [{body_style}]{normalized}[/]")
+
+
+def render_tool_preview(
+    console: Console,
+    preview_text: str,
+    *,
+    total_lines: int,
+    preview_lines: int,
+    hotkey: str,
+    contains_rich_markup: bool = False,
+) -> None:
+    """Render compact preview lines with an expandable gutter.
+
+    Args:
+        console: Rich Console instance
+        preview_text: Text to render (may contain Rich markup)
+        total_lines: Total number of lines in the full output
+        preview_lines: Number of lines shown in this preview
+        hotkey: Hotkey string for expanding the preview
+        contains_rich_markup: If True, preview_text contains Rich markup and should
+                             be rendered directly. If False, wrap with [dim] tags.
+    """
+    for line in preview_text.split("\n"):
+        if line:
+            if contains_rich_markup:
+                # Line already contains Rich markup (e.g., formatted diffs)
+                # Just add the gutter prefix without wrapping the whole line
+                console.print(f"[dim]│ [/]{line}")
+            else:
+                # Plain text - wrap with dim for subtle preview
+                console.print(f"[dim]│ {line}[/]")
+
+    if total_lines > preview_lines:
+        remaining = total_lines - preview_lines
+        suffix = "s" if remaining != 1 else ""
+        console.print(
+            f"[dim italic]└ {remaining} more line{suffix} • {hotkey} at prompt or /expand[/]"
+        )
+
+
+# Tools whose names map to valid Pygments lexer identifiers.
+_SYNTAX_TOOL_WHITELIST: frozenset[str] = frozenset(
+    {
+        "python",
+        "javascript",
+        "typescript",
+        "json",
+        "yaml",
+        "bash",
+        "shell",
+        "sql",
+        "html",
+        "css",
+        "xml",
+        "markdown",
+        "toml",
+        "go",
+        "rust",
+        "java",
+        "cpp",
+        "c",
+    }
+)
+
+
+def expand_tool_output(
+    console: Console,
+    tool_name: str,
+    content: str,
+    *,
+    pause_fn=None,
+    resume_fn=None,
+    max_chars: int = 10000,
+) -> None:
+    """Render full tool output in a syntax-highlighted panel.
+
+    Shared implementation used by both FormatterRenderer and LiveDisplayRenderer.
+
+    Args:
+        console: Rich Console to render to
+        tool_name: Name of the tool (used for panel title)
+        content: Full tool output text
+        pause_fn: Optional callable to pause the renderer before printing
+        resume_fn: Optional callable to resume the renderer after printing
+        max_chars: Truncate content beyond this many characters
+    """
+    if pause_fn is not None:
+        pause_fn()
+
+    if len(content) > max_chars:
+        console.print(f"[dim yellow]⚠ Output is {len(content)} chars, showing first {max_chars}[/]")
+        content = content[:max_chars]
+
+    # Derive a lexer only from the whitelisted set; fall back to plain text.
+    last_segment = tool_name.split("_")[-1] if "_" in tool_name else tool_name
+    lexer = last_segment if last_segment in _SYNTAX_TOOL_WHITELIST else "text"
+    display_name = format_tool_display_name(tool_name)
+
+    try:
+        syntax = Syntax(content, lexer, theme="monokai", line_numbers=True, word_wrap=True)
+        console.print(
+            Panel(syntax, title=f"[bold]{display_name}[/] - Full Output", border_style="blue")
+        )
+    except Exception:
+        console.print(
+            Panel(content, title=f"[bold]{display_name}[/] - Full Output", border_style="blue")
+        )
+
+    if resume_fn is not None:
+        resume_fn()

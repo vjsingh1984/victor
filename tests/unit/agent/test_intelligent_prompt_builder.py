@@ -367,6 +367,35 @@ class TestIntelligentPromptBuilder:
 
         assert "MODE" in prompt or "Build" in prompt
 
+    def test_internal_guidance_uses_canonical_tool_names(self, temp_learning_store):
+        """Prompt hints should expose canonical core tool names."""
+        builder = IntelligentPromptBuilder(
+            provider_name="ollama",
+            model="qwen2.5:32b",
+            profile_name="test",
+            learning_store=temp_learning_store,
+        )
+
+        context = PromptContext(
+            task="Inspect the repo",
+            task_type="search",
+            profile_name="test",
+            provider="ollama",
+            model="qwen2.5:32b",
+            available_tools=["list_directory", "read_file", "execute_bash"],
+        )
+
+        task_hint = builder._get_task_hint("search")
+        guidance = builder._get_tool_guidance(context, PromptStrategy.STRUCTURED)
+
+        assert "code_search/ls" in task_hint
+        assert "list_directory" not in task_hint
+        assert "ls/read" in guidance
+        assert "Available tools: ls, read, shell" in guidance
+        assert "list_directory" not in guidance
+        assert "read_file" not in guidance
+        assert "execute_bash" not in guidance
+
     def test_record_feedback_updates_metrics(self, temp_learning_store):
         """Recording feedback should update profile metrics."""
         builder = IntelligentPromptBuilder(
@@ -576,3 +605,29 @@ class TestPromptGeneration:
         )
 
         assert "Previous:" in prompt or "CONTINUATION" in prompt
+
+    def test_tool_guidance_canonicalizes_available_tools(self, temp_learning_store):
+        """Tool guidance should expose canonical internal tool names."""
+        builder = IntelligentPromptBuilder(
+            provider_name="ollama",
+            model="qwen2.5:32b",
+            profile_name="test",
+            learning_store=temp_learning_store,
+        )
+
+        context = PromptContext(
+            task="Search the codebase",
+            task_type="search",
+            profile_name="test",
+            provider="ollama",
+            model="qwen2.5:32b",
+            available_tools=["read_file", "list_directory", "write_file", "shell"],
+            recommended_tool_budget=4,
+        )
+
+        guidance = builder._get_tool_guidance(context, PromptStrategy.STRUCTURED)
+
+        assert "Use ls/read to inspect code" in guidance
+        assert "Available tools: ls, read, shell, write" in guidance
+        assert "read_file" not in guidance
+        assert "list_directory" not in guidance

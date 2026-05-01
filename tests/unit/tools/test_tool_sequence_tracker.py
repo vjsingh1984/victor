@@ -87,8 +87,8 @@ class TestToolSequenceTrackerInit:
         tracker = ToolSequenceTracker()
 
         # Check a known pattern
-        assert "read_file" in tracker._transitions
-        assert "edit_files" in tracker._transitions["read_file"]
+        assert "read" in tracker._transitions
+        assert "edit" in tracker._transitions["read"]
 
 
 class TestRecordExecution:
@@ -100,7 +100,7 @@ class TestRecordExecution:
         tracker.record_execution("read_file")
 
         assert len(tracker._history) == 1
-        assert tracker._history[0] == "read_file"
+        assert tracker._history[0] == "read"
 
     def test_record_multiple_executions(self):
         """Test recording multiple tool executions."""
@@ -110,7 +110,7 @@ class TestRecordExecution:
         tracker.record_execution("run_tests")
 
         assert len(tracker._history) == 3
-        assert tracker._history == ["read_file", "edit_files", "run_tests"]
+        assert tracker._history == ["read", "edit", "test"]
 
     def test_transition_updated(self):
         """Test that transitions are updated on execution."""
@@ -121,7 +121,7 @@ class TestRecordExecution:
         tracker.record_execution("edit_files")
 
         # Transition should be recorded
-        assert tracker._transitions["read_file"]["edit_files"].count == 1
+        assert tracker._transitions["read"]["edit"].count == 1
 
     def test_history_trimmed(self):
         """Test that history is trimmed at max_history."""
@@ -141,11 +141,11 @@ class TestRecordExecution:
 
         tracker.record_execution("read_file")
         tracker.record_execution("edit_files", success=True)
-        assert tracker._transitions["read_file"]["edit_files"].success_rate == 1.0
+        assert tracker._transitions["read"]["edit"].success_rate == 1.0
 
         tracker.record_execution("edit_files", success=False)
         # With learning_rate=1.0, it should be 0.0
-        assert tracker._transitions["edit_files"]["edit_files"].success_rate == 0.0
+        assert tracker._transitions["edit"]["edit"].success_rate == 0.0
 
 
 class TestGetNextSuggestions:
@@ -166,9 +166,9 @@ class TestGetNextSuggestions:
         suggestions = tracker.get_next_suggestions(top_k=3)
 
         assert len(suggestions) > 0
-        # edit_files should be suggested after read_file
+        # edit should be suggested after read
         tool_names = [s[0] for s in suggestions]
-        assert "edit_files" in tool_names
+        assert "edit" in tool_names
 
     def test_top_k_limit(self):
         """Test that top_k limits results."""
@@ -187,7 +187,7 @@ class TestGetNextSuggestions:
         suggestions = tracker.get_next_suggestions(top_k=10, exclude_tools={"edit_files"})
 
         tool_names = [s[0] for s in suggestions]
-        assert "edit_files" not in tool_names
+        assert "edit" not in tool_names
 
     def test_confidence_ordering(self):
         """Test that suggestions are ordered by confidence."""
@@ -211,7 +211,14 @@ class TestGetNextSuggestions:
 
         # run_tests should be boosted due to workflow pattern
         tool_names = [s[0] for s in suggestions]
-        assert "run_tests" in tool_names
+        assert "test" in tool_names
+
+    def test_alias_inputs_normalize_to_canonical_suggestions(self):
+        """Legacy aliases should feed canonical tracker state."""
+        tracker = ToolSequenceTracker()
+        tracker.record_execution("read_file")
+        suggestions = tracker.get_next_suggestions(top_k=3)
+        assert any(tool == "edit" for tool, _ in suggestions)
 
 
 class TestApplyConfidenceBoost:
@@ -430,15 +437,15 @@ class TestIntegration:
         # Simulate a typical editing workflow
         tracker.record_execution("code_search")
         suggestions = tracker.get_next_suggestions(top_k=3)
-        assert any(s[0] == "read_file" for s in suggestions)
+        assert any(s[0] == "read" for s in suggestions)
 
         tracker.record_execution("read_file")
         suggestions = tracker.get_next_suggestions(top_k=3)
-        assert any(s[0] == "edit_files" for s in suggestions)
+        assert any(s[0] == "edit" for s in suggestions)
 
         tracker.record_execution("edit_files")
         suggestions = tracker.get_next_suggestions(top_k=3)
-        assert any(s[0] == "run_tests" for s in suggestions)
+        assert any(s[0] == "test" for s in suggestions)
 
         tracker.record_execution("run_tests")
         suggestions = tracker.get_next_suggestions(top_k=3)

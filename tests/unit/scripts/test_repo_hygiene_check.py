@@ -55,7 +55,9 @@ def test_workflow_check_flags_missing_top_level_on(tmp_path: Path) -> None:
     )
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -67,7 +69,9 @@ def test_vertical_extras_require_real_package_dependencies(tmp_path: Path) -> No
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -93,7 +97,9 @@ def test_legacy_noop_vertical_extras_are_rejected(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -120,7 +126,9 @@ def test_self_referential_ci_extra_is_rejected(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -143,11 +151,15 @@ ci = ["victor-ai[dev]", "pytest-split>=0.8"]
     assert any("must not self-reference victor-ai" in finding.message for finding in findings)
 
 
-def test_primary_vertical_contract_docs_reject_legacy_entry_point_guidance(tmp_path: Path) -> None:
+def test_primary_vertical_contract_docs_reject_legacy_entry_point_guidance(
+    tmp_path: Path,
+) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -184,7 +196,9 @@ def test_primary_vertical_contract_docs_reject_legacy_victor_verticals_examples(
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -220,7 +234,9 @@ def test_primary_vertical_contract_docs_reject_nested_victor_plugins_groups(
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -236,11 +252,15 @@ tool = "my_package.plugin:plugin"
     assert any("nested victor.plugins.* groups" in finding.message for finding in findings)
 
 
-def test_primary_vertical_contract_docs_reject_framework_shim_examples(tmp_path: Path) -> None:
+def test_primary_vertical_contract_docs_reject_framework_shim_examples(
+    tmp_path: Path,
+) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -275,7 +295,9 @@ def test_primary_vertical_contract_docs_reject_core_register_vertical_imports(
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -302,7 +324,9 @@ def test_primary_vertical_contract_docs_reject_framework_extensions_definition_i
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -327,7 +351,9 @@ def test_primary_vertical_contract_docs_reject_legacy_entry_point_lookup_example
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -350,7 +376,9 @@ def test_primary_vertical_contract_docs_reject_runtime_vertical_authoring_exampl
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -377,7 +405,9 @@ def test_banned_repo_url_is_flagged(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -394,7 +424,9 @@ def test_uppercase_roadmap_markdown_link_is_flagged(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(tmp_path, "README.md", "[Roadmap](ROADMAP.md)\n")
 
@@ -417,7 +449,9 @@ def test_legacy_monolithic_protocol_module_is_flagged(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(tmp_path, "victor/agent/protocols.py", "class Legacy: ...\n")
 
@@ -429,14 +463,20 @@ def test_legacy_monolithic_protocol_module_is_flagged(tmp_path: Path) -> None:
 def test_makefile_lint_gate_rejects_advisory_mypy(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
-    write_file(tmp_path, ".github/workflows/security.yml", "name: Security\non: push\njobs: {}\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs: {}\n",
+    )
     write_file(
         tmp_path,
         "Makefile",
         "lint:\n\truff check victor tests\n\tmypy victor --ignore-missing-imports || true\n",
     )
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -452,10 +492,16 @@ def test_makefile_lint_gate_rejects_advisory_mypy(tmp_path: Path) -> None:
 def test_security_baseline_requires_blocking_trivy_path(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
-    write_file(tmp_path, ".github/workflows/security.yml", "name: Security\non: push\njobs: {}\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs: {}\n",
+    )
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -478,7 +524,9 @@ def test_security_baseline_requires_blocking_pip_audit_path(tmp_path: Path) -> N
     write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -501,7 +549,9 @@ def test_security_baseline_requires_blocking_bandit_high_path(tmp_path: Path) ->
     write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -514,7 +564,9 @@ def test_security_baseline_requires_blocking_bandit_high_path(tmp_path: Path) ->
     assert any("blocking Bandit step" in finding.message for finding in findings)
 
 
-def test_security_baseline_accepts_shell_based_blocking_pip_audit(tmp_path: Path) -> None:
+def test_security_baseline_accepts_shell_based_blocking_pip_audit(
+    tmp_path: Path,
+) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(
         tmp_path,
@@ -528,7 +580,9 @@ def test_security_baseline_accepts_shell_based_blocking_pip_audit(tmp_path: Path
     )
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -541,17 +595,25 @@ def test_security_baseline_accepts_shell_based_blocking_pip_audit(tmp_path: Path
     assert not any("blocking pip-audit step" in finding.message for finding in findings)
 
 
-def test_security_baseline_requires_ignore_unfixed_for_blocking_trivy_path(tmp_path: Path) -> None:
+def test_security_baseline_requires_ignore_unfixed_for_blocking_trivy_path(
+    tmp_path: Path,
+) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(
         tmp_path,
         ".github/workflows/ci-fast.yml",
         "name: CI\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@master\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n",
     )
-    write_file(tmp_path, ".github/workflows/security.yml", "name: Security\non: push\njobs: {}\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs: {}\n",
+    )
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
         tmp_path,
@@ -571,10 +633,16 @@ def test_security_baseline_requires_threshold_docs(tmp_path: Path) -> None:
         ".github/workflows/ci-fast.yml",
         "name: CI\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@master\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n",
     )
-    write_file(tmp_path, ".github/workflows/security.yml", "name: Security\non: push\njobs: {}\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs: {}\n",
+    )
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(tmp_path, "SECURITY.md", "## Current CI Enforcement Baseline\n")
 
@@ -583,26 +651,301 @@ def test_security_baseline_requires_threshold_docs(tmp_path: Path) -> None:
     assert any("Current Thresholds section" in finding.message for finding in findings)
 
 
-def test_security_baseline_requires_blocking_and_advisory_summary_docs(tmp_path: Path) -> None:
+def test_security_baseline_requires_blocking_and_advisory_summary_docs(
+    tmp_path: Path,
+) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(
         tmp_path,
         ".github/workflows/ci-fast.yml",
         "name: CI\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@master\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n",
     )
-    write_file(tmp_path, ".github/workflows/security.yml", "name: Security\non: push\njobs: {}\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs: {}\n",
+    )
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+        tmp_path,
+        "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md",
+        "Archived planning document\n",
     )
     write_file(
-        tmp_path, "SECURITY.md", "## Current CI Enforcement Baseline\n### Current Thresholds\n"
+        tmp_path,
+        "SECURITY.md",
+        "## Current CI Enforcement Baseline\n### Current Thresholds\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any("Blocking today" in finding.message for finding in findings)
     assert any("Advisory today" in finding.message for finding in findings)
+
+
+def test_deprecation_contract_requires_warning_and_docs(
+    tmp_path: Path,
+) -> None:
+    write_file(
+        tmp_path,
+        "victor/framework/workflows/nodes.py",
+        """
+_DEPRECATED_ALIAS_MAP = {"TeamNode": object}
+
+def __getattr__(name):
+    warnings.warn(
+        "TeamNode is deprecated; use TeamStep instead. "
+        "It will be removed in a future release.",
+        DeprecationWarning,
+    )
+        """.strip() + "\n",
+    )
+    write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\n")
+    write_file(tmp_path, "docs/development/deprecation-inventory-2026-03-03.md", "")
+    write_file(tmp_path, "docs/architecture/migration.md", "")
+
+    findings = repo_hygiene_check.check_deprecation_contract(
+        tmp_path, repo_hygiene_check.TEAM_NODE_DEPRECATION_CONTRACT
+    )
+
+    assert any("target removal version" in finding.message for finding in findings)
+    assert any("target removal date" in finding.message for finding in findings)
+    assert any("migration guide" in finding.message for finding in findings)
+    assert any("inventory entry is missing" in finding.message for finding in findings)
+    assert any("changelog entry is missing" in finding.message for finding in findings)
+
+
+def test_deprecation_contract_accepts_complete_teamnode_contract(
+    tmp_path: Path,
+) -> None:
+    contract = repo_hygiene_check.TEAM_NODE_DEPRECATION_CONTRACT
+    warning_text = (
+        "TeamNode is deprecated; use TeamStep instead. "
+        "This compatibility alias remains supported through v0.9.0 (2027-03-31) "
+        "and will be removed after that milestone. "
+        "See docs/architecture/migration.md for migration guidance."
+    )
+    for rel_path in contract.runtime_files:
+        write_file(
+            tmp_path,
+            rel_path.as_posix(),
+            warning_text + "\n",
+        )
+    write_file(
+        tmp_path,
+        "docs/development/deprecation-inventory-2026-03-03.md",
+        """
+| `TeamNode*` workflow compatibility aliases | source | `TeamStep*` workflow names | Architecture Lead | `v0.9.0` | `2027-03-31` |
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "CHANGELOG.md",
+        """
+## [Unreleased] (develop)
+
+### Deprecated
+- **`TeamNode*` workflow compatibility aliases**
+  - To be removed in: `v0.9.0`
+  - Target removal date: `2027-03-31`
+  - Replacement: `TeamStep*` workflow names
+  - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/architecture/migration.md",
+        """
+Legacy `TeamNode*` workflow names are deprecated.
+Use `TeamStep*` names during the migration window.
+Removal target: `v0.9.0` (`2027-03-31`).
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
+
+
+def test_public_shim_contracts_register_workflowgraph_alias() -> None:
+    labels = {contract.label for contract in repo_hygiene_check.PUBLIC_SHIM_DEPRECATION_CONTRACTS}
+
+    assert "FrameworkShim compatibility surface" in labels
+    assert "TeamNode*" in labels
+    assert "WorkflowGraph alias from victor.workflows.graph" in labels
+
+
+def test_deprecation_contract_accepts_complete_workflowgraph_contract(
+    tmp_path: Path,
+) -> None:
+    contract = repo_hygiene_check.WORKFLOW_GRAPH_ALIAS_DEPRECATION_CONTRACT
+    warning_text = (
+        "WorkflowGraph from victor.workflows.graph is deprecated. "
+        "Use BasicWorkflowGraph for the simple graph container or "
+        "victor.workflows.graph_dsl.WorkflowGraph for the typed workflow DSL. "
+        "This warning-backed alias remains supported through v0.8.0 (2026-12-31). "
+        "See docs/architecture/migration.md for migration guidance."
+    )
+    for rel_path in contract.runtime_files:
+        write_file(
+            tmp_path,
+            rel_path.as_posix(),
+            warning_text + "\n",
+        )
+    write_file(
+        tmp_path,
+        "docs/development/deprecation-inventory-2026-03-03.md",
+        """
+| `WorkflowGraph` alias from `victor.workflows.graph` | source | `BasicWorkflowGraph` or `victor.workflows.graph_dsl.WorkflowGraph` | Architecture Lead | `v0.8.0` | `2026-12-31` |
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "CHANGELOG.md",
+        """
+## [Unreleased] (develop)
+
+### Deprecated
+- **`WorkflowGraph` alias from `victor.workflows.graph`**
+  - To be removed in: `v0.8.0`
+  - Target removal date: `2026-12-31`
+  - Replacement: `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL
+  - Compatibility shim status: warning-backed alias remains supported through `v0.8.0`
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/architecture/migration.md",
+        """
+Legacy `WorkflowGraph` import from `victor.workflows.graph` is deprecated.
+Use `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL.
+Removal target: `v0.8.0` (`2026-12-31`).
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
+
+
+def test_deprecation_contract_accepts_complete_frameworkshim_contract(
+    tmp_path: Path,
+) -> None:
+    contract = repo_hygiene_check.FRAMEWORK_SHIM_DEPRECATION_CONTRACT
+    warning_text = (
+        "FrameworkShim is deprecated. Use Agent.create() from the Framework API instead. "
+        "Internal surface layers should compose AgentFactory / AgentCreationFactory. "
+        "This warning-backed compatibility shim remains supported through v1.0.0 "
+        "(2027-06-30). See docs/architecture/migration.md for migration guidance."
+    )
+    compat_export_text = (
+        "victor.framework.FrameworkShim is deprecated. "
+        "Use Agent.create() from the Framework API instead. "
+        "This warning-backed compatibility export remains supported through v1.0.0 "
+        "(2027-06-30). See docs/architecture/migration.md for migration guidance."
+    )
+    for rel_path in contract.runtime_files:
+        text = compat_export_text if rel_path.name == "__init__.py" else warning_text
+        write_file(tmp_path, rel_path.as_posix(), text + "\n")
+    write_file(
+        tmp_path,
+        "docs/development/deprecation-inventory-2026-03-03.md",
+        """
+| `FrameworkShim` compatibility surface | `victor/framework/shim.py`, `victor/framework/__init__.py` | `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition | Architecture Lead | `v1.0.0` | `2027-06-30` |
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "CHANGELOG.md",
+        """
+## [Unreleased] (develop)
+
+### Deprecated
+- **`FrameworkShim` compatibility surface**
+  - To be removed in: `v1.0.0`
+  - Target removal date: `2027-06-30`
+  - Replacement: `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition
+  - Compatibility shim status: warning-backed shim remains supported through `v1.0.0`
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/architecture/migration.md",
+        """
+Legacy `FrameworkShim` usage is deprecated.
+Use `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition.
+Removal target: `v1.0.0` (`2027-06-30`).
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
+
+
+def test_deprecation_contract_supports_non_teamnode_shims(tmp_path: Path) -> None:
+    contract = repo_hygiene_check.DeprecationContract(
+        label="LegacyFoo",
+        runtime_files=(Path("victor/foo/shim.py"),),
+        activation_needles=("LegacyFoo",),
+        runtime_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="v1.2.0",
+                missing_message="deprecation warning must publish the target removal version",
+            ),
+            repo_hygiene_check.TextRequirement(
+                needle="2027-06-30",
+                missing_message="deprecation warning must publish the target removal date",
+            ),
+            repo_hygiene_check.TextRequirement(
+                needle="docs/migration/foo.md",
+                missing_message="deprecation warning must point at the migration guide",
+            ),
+        ),
+        inventory_path=Path("docs/development/foo-inventory.md"),
+        inventory_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="LegacyFoo",
+                missing_message="deprecation inventory entry is missing the shim family name",
+            ),
+        ),
+        changelog_path=Path("CHANGELOG.md"),
+        changelog_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="## [Unreleased]",
+                missing_message="deprecation changelog entry is missing the Unreleased section",
+            ),
+            repo_hygiene_check.TextRequirement(
+                needle="LegacyFoo",
+                missing_message="deprecation changelog entry is missing the shim family name",
+            ),
+        ),
+        migration_path=Path("docs/migration/foo.md"),
+        migration_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="LegacyFoo",
+                missing_message="migration guidance is missing the shim family name",
+            ),
+        ),
+    )
+    write_file(
+        tmp_path,
+        "victor/foo/shim.py",
+        """
+warnings.warn(
+    "LegacyFoo is deprecated. Supported through v1.2.0 (2027-06-30). "
+    "See docs/migration/foo.md for migration guidance.",
+    DeprecationWarning,
+)
+        """.strip() + "\n",
+    )
+    write_file(tmp_path, "docs/development/foo-inventory.md", "LegacyFoo\n")
+    write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\nLegacyFoo\n")
+    write_file(tmp_path, "docs/migration/foo.md", "LegacyFoo\n")
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
 
 
 def test_current_repo_passes_hygiene_checks() -> None:

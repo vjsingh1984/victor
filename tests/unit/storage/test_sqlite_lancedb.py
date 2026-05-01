@@ -29,12 +29,54 @@ class TestInit:
         s = SqliteLanceDBStore(repo_root=tmp_path, persist_directory=custom)
         assert s.persist_directory == custom
 
+    @pytest.mark.asyncio
+    async def test_initialize_uses_custom_project_db_path(self, tmp_path):
+        custom = tmp_path / "custom_dir"
+        store = SqliteLanceDBStore(repo_root=tmp_path, persist_directory=custom)
+
+        fake_graph_store = MagicMock()
+        fake_graph_store.initialize = AsyncMock()
+
+        class _FakeEmbeddingModel:
+            async def initialize(self):
+                return None
+
+        class _FakeFactory:
+            def create_model(self, *_args, **_kwargs):
+                return _FakeEmbeddingModel()
+
+        class _FakeRegistry:
+            def get(self, *_args, **_kwargs):
+                return _FakeFactory()
+
+        with (
+            patch(
+                "victor.storage.graph.sqlite_store.SqliteGraphStore", return_value=fake_graph_store
+            ) as mock_graph_store,
+            patch(
+                "victor.core.capability_registry.CapabilityRegistry.get_instance",
+                return_value=_FakeRegistry(),
+            ),
+            patch.object(store, "_init_vector_store", AsyncMock()),
+        ):
+            await store.initialize()
+
+        graph_path_arg = mock_graph_store.call_args.args[0]
+        assert Path(graph_path_arg) == custom / "project.db"
+        fake_graph_store.initialize.assert_awaited_once()
+
 
 class TestUnifiedIdHelpers:
     def test_make_symbol_id(self, store):
         sid = store.make_symbol_id("src/foo.py", "MyClass")
         assert "src/foo.py" in sid
         assert "MyClass" in sid
+
+    def test_make_symbol_id_preserves_qualified_symbol_names(self, store):
+        sid = store.make_symbol_id("src/foo.py", "MyClass.run")
+        parsed = store.parse_id(sid)
+        assert parsed.path == "src/foo.py"
+        assert parsed.name == "MyClass.run"
 
     def test_make_file_id(self, store):
         fid = store.make_file_id("src/foo.py")
@@ -95,3 +137,59 @@ class TestCombineScores:
             graph_weight=0.3,
         )
         assert score == 0.0
+
+
+class TestGraphQueries:
+    @pytest.mark.asyncio
+    async def test_get_callers_uses_incoming_multi_hop_traversal(self, store):
+        store._initialized = True
+        store.get_symbol = AsyncMock(
+            side_effect=[
+                MagicMock(unified_id="b"),
+                MagicMock(unified_id="c"),
+            ]
+        )
+        store._graph_store = MagicMock()
+        store._graph_store.get_neighbors = AsyncMock(
+            return_value=[
+                MagicMock(src="b", dst="target", type="CALLS"),
+                MagicMock(src="c", dst="b", type="CALLS"),
+            ]
+        )
+
+        callers = await store.get_callers("target", max_depth=2)
+
+        store._graph_store.get_neighbors.assert_awaited_once_with(
+            "target",
+            edge_types=["CALLS"],
+            direction="in",
+            max_depth=2,
+        )
+        assert [caller.unified_id for caller in callers] == ["b", "c"]
+
+    @pytest.mark.asyncio
+    async def test_get_callees_uses_outgoing_multi_hop_traversal(self, store):
+        store._initialized = True
+        store.get_symbol = AsyncMock(
+            side_effect=[
+                MagicMock(unified_id="b"),
+                MagicMock(unified_id="c"),
+            ]
+        )
+        store._graph_store = MagicMock()
+        store._graph_store.get_neighbors = AsyncMock(
+            return_value=[
+                MagicMock(src="target", dst="b", type="CALLS"),
+                MagicMock(src="b", dst="c", type="CALLS"),
+            ]
+        )
+
+        callees = await store.get_callees("target", max_depth=2)
+
+        store._graph_store.get_neighbors.assert_awaited_once_with(
+            "target",
+            edge_types=["CALLS"],
+            direction="out",
+            max_depth=2,
+        )
+        assert [callee.unified_id for callee in callees] == ["b", "c"]

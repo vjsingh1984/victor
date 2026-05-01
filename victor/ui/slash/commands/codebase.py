@@ -17,12 +17,13 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Awaitable, Callable, cast
 
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from victor.core.utils.coding_support import load_codebase_analyzer_attr
+from victor.core.utils.capability_loader import load_codebase_analyzer_attr
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -211,9 +212,11 @@ class InitCommand(BaseSlashCommand):
 
         try:
             if deep or use_learn:
+                # Pass agent for orchestrator reuse (logging, events, GEPA)
                 new_content = await generate_enhanced_init_md(
                     use_llm=deep,
                     include_conversations=use_learn or deep,
+                    agent=ctx.agent,
                 )
             elif use_index:
                 new_content = await generate_victor_md_from_index()
@@ -283,10 +286,8 @@ class InitCommand(BaseSlashCommand):
             return existing + "\n\n" + "\n".join(new_lines)
         return existing
 
-    def _create_symlinks(self, target: "Path", ctx: CommandContext) -> None:
+    def _create_symlinks(self, target: Path, ctx: CommandContext) -> None:
         """Create symlinks for other tools (CLAUDE.md, etc.)."""
-        from pathlib import Path
-
         aliases = ["CLAUDE.md", "CURSOR.md"]
         for alias in aliases:
             alias_path = target.parent.parent / alias

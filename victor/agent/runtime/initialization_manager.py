@@ -64,7 +64,7 @@ class InitializationResult:
 class InitializationPhaseManager:
     """Manages orchestrator runtime initialization phases.
 
-    Wraps the 8 _initialize_* methods on the orchestrator to provide
+    Wraps the 9 _initialize_* methods on the orchestrator to provide
     structured timing, error reporting, component tracking, fail-fast
     for critical phases, and dependency-based skipping.
 
@@ -83,8 +83,9 @@ class InitializationPhaseManager:
         4. memory_runtime — memory manager and embedding store
         5. resilience_runtime — recovery handler and integration
         6. coordination_runtime — recovery/chunk/planner/task coordinators
-        7. interaction_runtime — chat/tool/session coordinators (CRITICAL)
+        7. interaction_runtime — canonical interaction services plus compatibility shims (CRITICAL)
         8. services — DI service layer delegation (Strangler Fig)
+        9. credit_runtime — credit assignment tracking (opt-in)
 
         Raises:
             InitializationError: If a critical phase fails.
@@ -150,9 +151,8 @@ class InitializationPhaseManager:
                 "interaction_runtime",
                 orchestrator._initialize_interaction_runtime,
                 [
-                    "chat_coordinator",
-                    "tool_coordinator",
-                    "session_coordinator",
+                    "chat_service",
+                    "session_service",
                 ],
                 True,  # critical
                 ["provider_runtime", "coordination_runtime"],
@@ -167,6 +167,13 @@ class InitializationPhaseManager:
                     "context_service",
                 ],
                 False,
+                ["interaction_runtime"],
+            ),
+            (
+                "credit_runtime",
+                orchestrator._initialize_credit_runtime,
+                ["credit_tracking_service"],
+                False,  # non-critical
                 ["interaction_runtime"],
             ),
         ]

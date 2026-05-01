@@ -280,7 +280,8 @@ class NativeWorkflowGraphCompiler:
             ]
 
         logger.debug(
-            "Compiling parsed workflow '%s' via native StateGraph backend", parsed.workflow_name
+            "Compiling parsed workflow '%s' via native StateGraph backend",
+            parsed.workflow_name,
         )
         return graph.compile(
             checkpointer=self._build_checkpointer(),
@@ -376,7 +377,8 @@ class LegacyWorkflowGraphCompiler:
         """Compile a parsed workflow definition into an executable graph."""
         compiler = self._compiler_factory()
         logger.debug(
-            "Compiling parsed workflow '%s' via legacy graph backend", parsed.workflow_name
+            "Compiling parsed workflow '%s' via legacy graph backend",
+            parsed.workflow_name,
         )
         return compiler.compile(parsed.workflow)
 
@@ -389,8 +391,55 @@ class LegacyWorkflowGraphCompiler:
         )
 
 
+class LegacyWorkflowDslCompiler:
+    """Compiler adapter for WorkflowGraph DSL via the legacy graph compiler backend."""
+
+    def __init__(
+        self,
+        *,
+        runner_registry: Optional[Any] = None,
+        validate_before_compile: bool = True,
+        preserve_state_type: bool = False,
+        emitter: Optional[Any] = None,
+        enable_observability: bool = False,
+        compiler_factory: Optional[Callable[[], Any]] = None,
+    ):
+        self._runner_registry = runner_registry
+        self._validate_before_compile = validate_before_compile
+        self._preserve_state_type = preserve_state_type
+        self._emitter = emitter
+        self._enable_observability = enable_observability
+        self._compiler_factory = compiler_factory or self._create_legacy_compiler
+        self._compiler: Optional[Any] = None
+
+    def compile(self, graph: Any, name: Optional[str] = None) -> "CompiledGraphProtocol":
+        """Compile a WorkflowGraph DSL object through the legacy backend."""
+        compiler = self._get_compiler()
+        return compiler.compile(graph, name)
+
+    def _get_compiler(self) -> Any:
+        if self._compiler is None:
+            self._compiler = self._compiler_factory()
+        return self._compiler
+
+    def _create_legacy_compiler(self) -> Any:
+        from victor.workflows.graph_compiler import CompilerConfig, WorkflowGraphCompiler
+
+        return WorkflowGraphCompiler(
+            CompilerConfig(
+                use_node_runners=self._runner_registry is not None,
+                runner_registry=self._runner_registry,
+                validate_before_compile=self._validate_before_compile,
+                preserve_state_type=self._preserve_state_type,
+                emitter=self._emitter,
+                enable_observability=self._enable_observability,
+            )
+        )
+
+
 __all__ = [
     "create_condition_router",
+    "LegacyWorkflowDslCompiler",
     "LegacyWorkflowGraphCompiler",
     "NativeWorkflowGraphCompiler",
     "ParsedWorkflowDefinition",

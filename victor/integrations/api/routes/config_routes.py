@@ -152,4 +152,31 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 {"error": "Internal server error", "capabilities": {}}, status_code=500
             )
 
+    @router.get("/capabilities/recommend")
+    async def get_capability_recommendations(
+        task_type: str = Query(..., description="Task type or short task label"),
+        complexity: str = Query(..., description="Task complexity, e.g. low, medium, high"),
+        mode: str = Query("build", description="Mode policy to apply"),
+        vertical: Optional[str] = Query(None, description="Filter by vertical"),
+    ) -> JSONResponse:
+        """Recommend teams/workflows from shared framework capability catalogs."""
+        try:
+            from victor.ui.commands.capabilities import get_capability_discovery
+
+            discovery = get_capability_discovery()
+            payload = discovery.recommend_for_task(
+                task_type=task_type,
+                complexity=complexity,
+                mode=mode,
+                vertical=vertical,
+            )
+            return JSONResponse(payload)
+
+        except Exception:
+            logger.exception("Capability recommendation error")
+            return JSONResponse(
+                {"error": "Internal server error", "recommendations": []},
+                status_code=500,
+            )
+
     return router

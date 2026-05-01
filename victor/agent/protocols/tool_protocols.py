@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage
+    from victor.agent.conversation.state_machine import ConversationStage
     from victor.agent.tool_pipeline import ToolCallResult
     from victor.tools.base import CostTier
 
@@ -35,6 +35,7 @@ __all__ = [
     "ToolRegistrarProtocol",
     "ToolSequenceTrackerProtocol",
     "ToolOutputFormatterProtocol",
+    "ToolCallTrackerProtocol",
     "ToolDeduplicationTrackerProtocol",
     "ToolDependencyGraphProtocol",
     "ToolPluginRegistryProtocol",
@@ -357,10 +358,14 @@ class ToolOutputFormatterProtocol(Protocol):
 
 
 @runtime_checkable
-class ToolDeduplicationTrackerProtocol(Protocol):
-    """Protocol for tool call deduplication tracking.
+class ToolCallTrackerProtocol(Protocol):
+    """Protocol for tool call tracking.
 
     Tracks recent tool calls to detect and prevent redundant operations.
+
+    This is DISTINCT from victor.tools.deduplication/, which handles tool
+    DEFINITION deduplication (resolving naming conflicts between native,
+    LangChain, and MCP tools). This protocol tracks RUNTIME tool CALLS.
     """
 
     def add_call(self, tool_name: str, args: Dict[str, Any]) -> None:
@@ -401,6 +406,10 @@ class ToolDeduplicationTrackerProtocol(Protocol):
         ...
 
 
+# Backward compatibility alias
+ToolDeduplicationTrackerProtocol = ToolCallTrackerProtocol
+
+
 @runtime_checkable
 class ToolDependencyGraphProtocol(Protocol):
     """Protocol for tool dependency graph.
@@ -436,6 +445,29 @@ class ToolDependencyGraphProtocol(Protocol):
 
         Returns:
             Ordered list respecting dependencies
+        """
+        ...
+
+    def record_transition(self, from_tool: str, to_tool: str, task_type: str) -> None:
+        """Record a tool→tool transition for trajectory learning.
+
+        Args:
+            from_tool: Tool that just executed
+            to_tool: Tool that executed next
+            task_type: Task type context for the transition
+        """
+        ...
+
+    def predict_next(self, current_tool: str, task_type: str, top_k: int = 3) -> List[tuple]:
+        """Predict the most likely next tools from transition history.
+
+        Args:
+            current_tool: Tool that just ran
+            task_type: Current task type
+            top_k: Maximum number of predictions to return
+
+        Returns:
+            List of (tool_name, probability) tuples sorted by probability desc
         """
         ...
 

@@ -16,9 +16,22 @@
 
 import logging
 import os
+import sys
 from pathlib import Path
 
 import pytest
+
+# Pre-import victor.agent submodules that tests import dynamically (e.g. inside
+# setup_method or test bodies). The tests/unit/agent/ directory mirrors the
+# victor/agent/ layout and has its own __init__.py; if Python sees tests/unit/ in
+# sys.path before victor/ is resolved it can bind 'agent' to the wrong package,
+# causing "cannot import name X from 'agent'" errors. Importing these modules here
+# at conftest load-time (before any test runs) ensures sys.modules is populated
+# with the correct victor.agent.* entries and subsequent in-body imports hit the
+# cache instead of doing a fresh lookup against the stale sys.path.
+import victor.agent.presentation  # noqa: F401 — populates sys.modules early
+import victor.agent.safety  # noqa: F401 — populates sys.modules early
+import victor.agent.background_agent  # noqa: F401 — populates sys.modules early
 
 _UNIT_TEST_REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -152,13 +165,21 @@ def reset_service_container():
     yield
     import sys
 
-    if "victor.core.bootstrap" in sys.modules:
+    # Reset via container module directly (not bootstrap which may not be imported)
+    if "victor.core.container" in sys.modules:
+        try:
+            from victor.core.container import reset_container
+
+            reset_container()
+        except ImportError:
+            pass  # Module not loaded, nothing to reset
+    elif "victor.core.bootstrap" in sys.modules:
         try:
             from victor.core.bootstrap import reset_container
 
             reset_container()
         except ImportError:
-            pass  # Module not loaded, nothing to reset
+            pass
 
 
 @pytest.fixture(autouse=True)
@@ -182,6 +203,62 @@ def reset_plugin_registry():
 
 
 @pytest.fixture(autouse=True)
+def reset_capability_registry():
+    """Reset CapabilityRegistry between tests to prevent capability leakage.
+
+    The CapabilityRegistry singleton caches registered capabilities.
+    Without reset, tests that register an EditorProtocol (via vertical
+    loading) pollute the registry for file_editor_tool tests.
+    """
+    yield
+    import sys
+
+    if "victor.core.capability_registry" in sys.modules:
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+
+            instance = CapabilityRegistry.get_instance()
+            if hasattr(instance, "_capabilities"):
+                instance._capabilities.clear()
+            if hasattr(instance, "_enhanced"):
+                instance._enhanced.clear()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_vertical_registry():
+    """Save and restore VerticalRegistry between tests.
+
+    Full snapshot/restore prevents both pollution (new keys leaking) and
+    degradation (prior tests deleting built-in entries).
+    """
+    import sys
+
+    saved = None
+    if "victor.core.verticals.base" in sys.modules:
+        try:
+            from victor.core.verticals.base import VerticalRegistry
+
+            saved = dict(VerticalRegistry._registry)
+        except (ImportError, AttributeError):
+            pass
+    yield
+    if "victor.core.verticals.base" in sys.modules:
+        try:
+            from victor.core.verticals.base import VerticalRegistry
+
+            if saved is not None:
+                VerticalRegistry._registry.clear()
+                VerticalRegistry._registry.update(saved)
+            else:
+                # Module loaded during test — remove everything it added
+                VerticalRegistry._registry.clear()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
 def reset_feature_flags():
     """Reset FeatureFlagManager singleton between tests."""
     yield
@@ -196,6 +273,49 @@ def reset_feature_flags():
                 type(mgr)._instance = None
         except (ImportError, AttributeError):
             pass
+
+
+@pytest.fixture
+def isolated_project_victor_dir(tmp_path) -> Path:
+    """Provide an isolated project-local .victor directory for unit tests."""
+    temp_victor = tmp_path / ".victor"
+    temp_victor.mkdir(exist_ok=True)
+    return temp_victor
+
+
+@pytest.fixture(autouse=True)
+def isolate_project_victor_storage(isolated_project_victor_dir):
+    """Redirect unit-test project-local persistence into a temp .victor directory.
+
+    Without this, code paths that rely on get_project_paths() can write to the
+    real repo .victor/ directory during tests. That leaks session data into the
+    shared project database and chat history files.
+
+    Patch both project_victor_dir and project_db so history files and database
+    traffic stay inside the test sandbox while other project-path behavior keeps
+    using the normal cwd-based project root.
+    """
+    from unittest.mock import PropertyMock, patch
+
+    from victor.config.settings import ProjectPaths
+
+    temp_project_db = isolated_project_victor_dir / "project.db"
+
+    with (
+        patch.object(
+            ProjectPaths,
+            "project_victor_dir",
+            new_callable=PropertyMock,
+            return_value=isolated_project_victor_dir,
+        ),
+        patch.object(
+            ProjectPaths,
+            "project_db",
+            new_callable=PropertyMock,
+            return_value=temp_project_db,
+        ),
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -371,3 +491,27 @@ def cleanup_dangling_asyncio_tasks():
                 task.cancel()
     except RuntimeError:
         pass  # No event loop
+
+
+@pytest.fixture(autouse=True, scope="session")
+def set_test_mode():
+    """Set TEST_MODE environment variable to redirect test telemetry.
+
+    This fixture runs once per test session and sets TEST_MODE to prevent
+    MagicMock events and test telemetry from polluting the global usage.jsonl
+    file. Test events will be redirected to /tmp/victor_test_telemetry/test_usage.jsonl
+    instead.
+
+    Priority: P1 - Prevents MagicMock leakage in global logs (HIGH criticality)
+    """
+    import os
+
+    original = os.environ.get("TEST_MODE")
+    os.environ["TEST_MODE"] = "1"
+
+    yield
+
+    if original is not None:
+        os.environ["TEST_MODE"] = original
+    else:
+        os.environ.pop("TEST_MODE", None)

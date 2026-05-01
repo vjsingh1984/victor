@@ -1,10 +1,16 @@
 """Tests for session ledger persistence and merge functionality."""
 
+import sqlite3
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from victor.agent.message_history import MessageHistory
+from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
 from victor.agent.session_ledger import SessionLedger, LedgerEntry
+from victor.core.database import reset_project_database
 
 
 @pytest.fixture
@@ -95,3 +101,152 @@ class TestLedgerPersistence:
 
         sig = inspect.signature(SQLiteSessionPersistence.save_session)
         assert "session_ledger" in sig.parameters
+
+
+@pytest.fixture
+def temp_project_db_path(tmp_path: Path):
+    """Provide an isolated project DB path for SQLite session tests."""
+    db_path = tmp_path / "project.db"
+    yield db_path
+    reset_project_database(db_path)
+
+
+class TestSQLiteSessionPersistenceCompatibility:
+    def test_default_constructor_uses_canonical_project_db_path(self, tmp_path: Path):
+        """Default constructor should honor the canonical ProjectPaths.project_db property."""
+        db_path = tmp_path / "isolated-project.db"
+
+        with patch(
+            "victor.config.settings.get_project_paths",
+            return_value=SimpleNamespace(project_db=db_path),
+        ):
+            persistence = SQLiteSessionPersistence()
+
+        try:
+            assert persistence._db_path == db_path
+        finally:
+            reset_project_database(db_path)
+
+    def test_schema_compatibility_adds_legacy_session_columns(self, temp_project_db_path: Path):
+        """Compatibility shim should backfill columns older sessions tables may lack."""
+        with sqlite3.connect(temp_project_db_path) as conn:
+            conn.execute("CREATE TABLE sessions (session_id TEXT PRIMARY KEY)")
+            conn.execute("CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, role TEXT)")
+
+        persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
+
+        session_columns = persistence._table_columns("sessions")
+        assert {
+            "created_at",
+            "last_activity",
+            "project_path",
+            "provider",
+            "model",
+            "profile",
+            "metadata",
+        } <= session_columns
+
+    def test_sqlite_roundtrip_preserves_preview_sidecar(self, temp_project_db_path: Path):
+        """Deprecated SQLite adapter should preserve replay-only preview messages."""
+        persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
+        conversation = MessageHistory()
+        conversation.add_user_message("Show app.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: app.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+            },
+        )
+
+        session_id = persistence.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+            session_id="myproj-preview01",
+            title="Preview Session",
+        )
+        loaded = persistence.load_session(session_id)
+
+        assert loaded is not None
+        assert loaded["conversation"]["preview_messages"] == [
+            {
+                "role": "system",
+                "content": "FILE PREVIEW: app.py",
+                "metadata": {
+                    "preview_kind": "file_preview",
+                    "preview_path": "app.py",
+                    "preview_language": "python",
+                    "preview_body": "print('hello')\n",
+                },
+                "after_message_index": 2,
+            }
+        ]
+
+    def test_legacy_loader_can_resume_canonical_conversation_store_sessions(
+        self, temp_project_db_path: Path
+    ):
+        """Legacy session loader should reconstruct canonical ConversationStore sessions."""
+        from victor.agent.conversation.store import ConversationStore
+        from victor.agent.conversation.types import MessageRole
+
+        store = ConversationStore(db_path=temp_project_db_path)
+        session = store.create_session(
+            session_id="myproj-canonical01",
+            provider="anthropic",
+            model="claude-sonnet-4-20250514",
+            profile="default",
+        )
+        store.add_message(session.session_id, MessageRole.USER, "Show app.py")
+        store.add_message(
+            session.session_id, MessageRole.ASSISTANT, "Here is the current file preview."
+        )
+        store.add_message(
+            session.session_id,
+            MessageRole.SYSTEM,
+            "FILE PREVIEW: app.py",
+            metadata={
+                "interactive_preview": True,
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+                "after_message_index": 2,
+            },
+        )
+
+        persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
+        loaded = persistence.load_session(session.session_id)
+        sessions = persistence.list_sessions()
+        listed = next(s for s in sessions if s["session_id"] == session.session_id)
+
+        assert loaded is not None
+        assert loaded["metadata"]["provider"] == "anthropic"
+        assert loaded["metadata"]["title"] == "Show app.py"
+        messages = loaded["conversation"]["messages"]
+        assert len(messages) == 2
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Show app.py"
+        assert messages[0]["created_at"]
+        assert messages[1]["role"] == "assistant"
+        assert messages[1]["content"] == "Here is the current file preview."
+        assert messages[1]["created_at"]
+
+        preview_messages = loaded["conversation"]["preview_messages"]
+        assert len(preview_messages) == 1
+        preview = preview_messages[0]
+        assert preview["role"] == "system"
+        assert preview["content"] == "FILE PREVIEW: app.py"
+        assert preview["after_message_index"] == 2
+        assert preview["metadata"]["preview_kind"] == "file_preview"
+        assert preview["metadata"]["preview_path"] == "app.py"
+        assert preview["metadata"]["preview_language"] == "python"
+        assert preview["metadata"]["preview_body"] == "print('hello')\n"
+        assert listed["provider"] == "anthropic"
+        assert listed["title"] == "Show app.py"
+        assert listed["preview_count"] == 1

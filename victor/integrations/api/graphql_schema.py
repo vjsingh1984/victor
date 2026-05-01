@@ -189,7 +189,7 @@ def _make_query(server: VictorFastAPIServer) -> type:
         @strawberry.field
         async def tools(self) -> list[ToolInfoType]:
             try:
-                from victor.tools.base import ToolRegistry
+                from victor.tools.registry import ToolRegistry
 
                 registry = ToolRegistry()
                 result = []

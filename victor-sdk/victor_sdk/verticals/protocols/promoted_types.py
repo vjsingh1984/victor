@@ -2,10 +2,15 @@
 
 These types were originally defined in victor.core.vertical_types and
 victor.security.safety.types. They are promoted here so that external
-verticals can use SDK protocols without importing from victor.core.*.
+verticals can use SDK protocols without importing from victor.core.*
 
 All types in this module are pure data structures with ZERO runtime
 dependencies on the victor package.
+
+NOTE: StageValidationResult and ValidationError are duplicated from
+victor.core.verticals.protocols.stages. This duplication is INTENTIONAL
+and NECESSARY to avoid circular imports between victor.core and victor_sdk.
+When updating either definition, please update BOTH to maintain consistency.
 """
 
 from __future__ import annotations
@@ -93,12 +98,22 @@ class TaskTypeHintData:
         hint: Prompt hint text to include in system prompt
         tool_budget: Recommended tool budget for this task type
         priority_tools: Tools to prioritize for this task
+        token_budget: Token budget for responses (optimization hint)
+        context_budget: Context window budget for this task
+        skip_planning: Skip planning phase for this task type
+        skip_evaluation: Skip evaluation phase for this task type
+        temperature_override: LLM temperature for this task type; None = provider default
     """
 
     task_type: str
     hint: str
     tool_budget: Optional[int] = None
     priority_tools: List[str] = field(default_factory=list)
+    token_budget: Optional[int] = None
+    context_budget: Optional[int] = None
+    skip_planning: bool = False
+    skip_evaluation: bool = False
+    temperature_override: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the hint to the legacy serializable mapping."""
@@ -108,6 +123,11 @@ class TaskTypeHintData:
             "hint": self.hint,
             "tool_budget": self.tool_budget,
             "priority_tools": self.priority_tools.copy(),
+            "token_budget": self.token_budget,
+            "context_budget": self.context_budget,
+            "skip_planning": self.skip_planning,
+            "skip_evaluation": self.skip_evaluation,
+            "temperature_override": self.temperature_override,
         }
 
 
@@ -184,9 +204,16 @@ class ToolSelectionResult:
 # Stage Contract Types (promoted from victor.core.verticals.protocols.stages)
 # =============================================================================
 
+# NOTE: These definitions are duplicated from victor.core.verticals.protocols.stages
+# to maintain SDK independence. When updating, update BOTH files.
+
 
 class ValidationError(Enum):
-    """Types of validation errors for stage definitions."""
+    """Types of validation errors for stage definitions.
+
+    NOTE: Duplicated from victor.core.verticals.protocols.stages
+    to avoid circular imports. Keep both definitions in sync.
+    """
 
     MISSING_REQUIRED_STAGE = "missing_required_stage"
     INVALID_TRANSITION = "invalid_transition"
@@ -206,6 +233,9 @@ class StageValidationResult:
         errors: List of validation errors
         warnings: List of validation warnings
         details: Additional validation details
+
+    NOTE: Duplicated from victor.core.verticals.protocols.stages
+    to avoid circular imports. Keep both definitions in sync.
     """
 
     is_valid: bool
@@ -232,6 +262,7 @@ class StageValidationResult:
         }
 
 
+# Type aliases for backward compatibility
 SafetyPattern = SafetyPatternData
 TaskTypeHint = TaskTypeHintData
 

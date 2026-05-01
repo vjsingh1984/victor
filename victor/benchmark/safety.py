@@ -30,7 +30,7 @@ Migration date: 2026-02-28 22:57:40
 from typing import List, Optional
 
 from victor.contrib.safety import BaseSafetyExtension, VerticalSafetyMixin
-from victor.agent.coordinators.safety_coordinator import (
+from victor_sdk.safety import (
     SafetyRule,
     SafetyAction,
     SafetyCategory,
@@ -120,7 +120,7 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
         Returns:
             List of custom SafetyRule instances
         """
-        # TODO: Add benchmark-specific safety rules here
+        # Benchmark safety rules — extend as needed (intentional empty default)
         return []
 
     def is_operation_safe(

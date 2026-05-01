@@ -85,7 +85,15 @@ class TestAgentCapability:
         from victor.framework.agent_protocols import AgentCapability
 
         # Verify we have all expected capabilities
-        expected = {"read", "write", "execute", "search", "communicate", "delegate", "approve"}
+        expected = {
+            "read",
+            "write",
+            "execute",
+            "search",
+            "communicate",
+            "delegate",
+            "approve",
+        }
         actual = {cap.value for cap in AgentCapability}
         assert actual == expected
 

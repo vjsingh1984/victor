@@ -34,7 +34,7 @@ from victor_sdk.core.types import (
     validate_definition_version,
     normalize_workflow_metadata,
 )
-from victor_sdk.core.plugins import PluginContext, VictorPlugin
+from victor_sdk.core.plugins import PluginContext, VictorPlugin  # noqa: F401
 from victor_sdk.core.exceptions import (
     VerticalException,
     VerticalConfigurationError,

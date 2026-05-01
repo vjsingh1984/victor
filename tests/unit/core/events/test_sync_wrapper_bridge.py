@@ -15,7 +15,11 @@ class TestSyncEventWrapperBridge:
         event = MessagingEvent(topic="tool.start", data={"tool": "read_file"})
 
         with (
-            patch.object(sync_wrapper_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(
+                sync_wrapper_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
+            ),
             patch.object(sync_wrapper_module, "run_sync", return_value=True) as mock_run_sync,
             patch.object(sync_wrapper_module, "run_sync_in_thread") as mock_run_sync_in_thread,
         ):

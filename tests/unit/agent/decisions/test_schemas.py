@@ -28,7 +28,7 @@ class TestDecisionType:
         assert DecisionType.CONTINUATION_ACTION.value == "continuation_action"
 
     def test_decision_type_count(self):
-        assert len(DecisionType) == 10
+        assert len(DecisionType) == 14  # includes COMPACTION added for context management
 
 
 class TestTaskCompletionDecision:
@@ -118,7 +118,17 @@ class TestContinuationDecision:
     """Tests for ContinuationDecision schema."""
 
     def test_valid_actions(self):
-        for action in ("finish", "prompt_tool_call", "request_summary", "return_to_user"):
+        for action in (
+            "continue_asking_input",
+            "continue_with_synthesis_hint",
+            "execute_extracted_tool",
+            "finish",
+            "force_tool_execution",
+            "prompt_tool_call",
+            "request_completion",
+            "request_summary",
+            "return_to_user",
+        ):
             d = ContinuationDecision(action=action, reason="test reason")
             assert d.action == action
 

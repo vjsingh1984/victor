@@ -14,58 +14,28 @@
 
 """Unified execution context for all workflow runtimes.
 
-MIGRATION NOTICE: This module is deprecated for state management.
-
-For new code, use the canonical state management system:
-    - victor.state.WorkflowStateManager - Single workflow scope state
-    - victor.state.get_global_manager() - Unified access to all scopes
-
-This module is kept for backward compatibility and type definitions only.
-
----
-
-Legacy Documentation:
-
-This module provides a single, unified state type for workflow execution,
-consolidating the previously fragmented state types:
-
-- WorkflowContext (dataclass in executor.py) - used by WorkflowExecutor
-- WorkflowState (TypedDict in runtime_types.py) - used by StateGraphExecutor
-- WorkflowState (TypedDict in adapters.py) - used by workflow adapters
-
-The ExecutionContext TypedDict is designed to be compatible with all runtimes
-while providing a consistent interface for state management.
-
-Example:
-    # Create execution context
-    ctx: ExecutionContext = {
-        "data": {"input": "test"},
-        "_workflow_id": "wf-123",
-        "_current_node": "start",
-    }
-
-    # Access data
-    input_val = ctx.get("data", {}).get("input")
-
-    # Update state
-    ctx["_current_node"] = "process"
-    ctx["_node_results"] = {"start": {"success": True}}
+This module now uses Pydantic models for type-safe state management,
+replacing the legacy TypedDict-based approach.
 
 Migration Example:
-    # OLD (deprecated):
+    # OLD (TypedDict - deprecated):
     from victor.workflows.context import ExecutionContext, create_execution_context
     ctx = create_execution_context({"input": "test"})
 
-    # NEW (recommended):
-    from victor.state import WorkflowStateManager, StateScope
-    mgr = WorkflowStateManager()
-    await mgr.set("input", "test")  # Workflow scope
-    value = await mgr.get("input")
+    # NEW (Pydantic - recommended):
+    from victor.workflows.models import WorkflowExecutionContextModel
+    from victor.workflows.models.adapters import WorkflowExecutionContextAdapter
+    ctx = WorkflowExecutionContextAdapter.create_initial(
+        workflow_name="my_workflow",
+        initial_data={"input": "test"}
+    )
 
-    # OR for unified access across all scopes:
-    from victor.state import get_global_manager
-    state = get_global_manager()
-    await state.set("input", "test", scope=StateScope.WORKFLOW)
+    # Access is the same
+    input_val = ctx.data["input"]
+
+    # Update state
+    ctx.current_node = "process"
+    ctx.add_node_result("start", {"success": True})
 """
 
 from __future__ import annotations
@@ -81,156 +51,167 @@ from typing import (
     Dict,
     List,
     Optional,
-    TypedDict,
     Union,
 )
 
 from victor.core.async_utils import run_sync
-from victor.workflows.runtime_types import create_initial_workflow_state
-
-if TYPE_CHECKING:
-    from victor.workflows.executor import NodeResult, TemporalContext, WorkflowContext
+from victor.workflows.models import WorkflowExecutionContextModel
+from victor.workflows.models.adapters import WorkflowExecutionContextAdapter
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Unified Execution Context (TypedDict)
-# =============================================================================
+@dataclass
+class TemporalContext:
+    """Point-in-time context for backtesting and historical analysis."""
+
+    as_of_date: Optional[str] = None
+    lookback_periods: int = 0
+    period_type: str = "quarters"
+    include_end_date: bool = True
+
+    def get_date_range(self) -> tuple[str, str]:
+        """Calculate start and end dates based on lookback."""
+        from datetime import datetime, timedelta
+
+        if not self.as_of_date:
+            end_date = datetime.now()
+        else:
+            end_date = datetime.fromisoformat(self.as_of_date)
+
+        if self.period_type == "days":
+            delta = timedelta(days=self.lookback_periods)
+        elif self.period_type == "weeks":
+            delta = timedelta(weeks=self.lookback_periods)
+        elif self.period_type == "months":
+            delta = timedelta(days=self.lookback_periods * 30)
+        elif self.period_type == "quarters":
+            delta = timedelta(days=self.lookback_periods * 91)
+        elif self.period_type == "years":
+            delta = timedelta(days=self.lookback_periods * 365)
+        else:
+            delta = timedelta(days=0)
+
+        start_date = end_date - delta
+        return (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+
+    def is_valid_for_date(self, data_date: str) -> bool:
+        if not self.as_of_date:
+            return True
+        from datetime import datetime
+
+        data_dt = datetime.fromisoformat(data_date)
+        as_of_dt = datetime.fromisoformat(self.as_of_date)
+        if self.include_end_date:
+            return data_dt <= as_of_dt
+        return data_dt < as_of_dt
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "as_of_date": self.as_of_date,
+            "lookback_periods": self.lookback_periods,
+            "period_type": self.period_type,
+            "include_end_date": self.include_end_date,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TemporalContext":
+        return cls(
+            as_of_date=data.get("as_of_date"),
+            lookback_periods=data.get("lookback_periods", 0),
+            period_type=data.get("period_type", "quarters"),
+            include_end_date=data.get("include_end_date", True),
+        )
 
 
-class ExecutionContext(TypedDict, total=False):
-    """Unified execution context for all workflow runtimes.
+@dataclass
+class WorkflowContext:
+    """Execution context for a workflow run.
 
-    This TypedDict consolidates the state models from:
-    - WorkflowContext (executor.py) - dataclass for WorkflowExecutor
-    - WorkflowState (runtime_types.py) - TypedDict for StateGraphExecutor
-    - WorkflowState (adapters.py) - TypedDict for workflow adapters
-
-    All execution metadata uses underscore prefix to avoid conflicts with
-    user data keys.
-
-    Attributes:
-        # Core data (user-defined workflow data)
-        data: Shared context data dictionary
-        messages: Conversation messages (for agent workflows)
-
-        # Execution metadata (system-managed)
-        _workflow_id: Unique workflow execution ID
-        _workflow_name: Name of the workflow being executed
-        _current_node: Currently executing node ID
-        _node_results: Results from each executed node
-        _error: Error message if execution failed
-
-        # Iteration tracking (for loop detection)
-        _iteration: Current iteration count
-        _visited_nodes: List of visited node IDs
-
-        # Parallel execution
-        _parallel_results: Results from parallel node execution
-
-        # Human-in-the-loop
-        _hitl_pending: Whether waiting for human input
-        _hitl_response: Human response data
-
-        # Temporal context (for backtesting)
-        _as_of_date: Point-in-time date for temporal queries
-        _lookback_periods: Number of periods to look back
-        _include_end_date: Whether to include end date in ranges
-
-        # Completion tracking
-        _is_complete: Whether workflow has completed
-        _success: Whether workflow completed successfully
+    Maintains shared state across workflow nodes and provides utilities
+    for accessing and updating context data.
     """
 
-    # Core data
-    data: Dict[str, Any]
-    messages: List[Dict[str, Any]]
+    data: Dict[str, Any] = field(default_factory=dict)
+    node_results: Dict[str, NodeResult] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    temporal: Optional[TemporalContext] = None
 
-    # Execution metadata
-    _workflow_id: str
-    _workflow_name: str
-    _current_node: str
-    _node_results: Dict[str, Any]
-    _error: Optional[str]
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.data.get(key, default)
 
-    # Iteration tracking
-    _iteration: int
-    _visited_nodes: List[str]
+    def set(self, key: str, value: Any) -> None:
+        self.data[key] = value
 
-    # Parallel execution
-    _parallel_results: Dict[str, Any]
+    def update(self, values: Dict[str, Any]) -> None:
+        self.data.update(values)
 
-    # Human-in-the-loop
-    _hitl_pending: bool
-    _hitl_response: Optional[Dict[str, Any]]
+    def get_result(self, node_id: str) -> Optional[NodeResult]:
+        return self.node_results.get(node_id)
 
-    # Temporal context
-    _as_of_date: Optional[str]
-    _lookback_periods: Optional[int]
-    _include_end_date: bool
+    def add_result(self, result: NodeResult) -> None:
+        self.node_results[result.node_id] = result
 
-    # Completion tracking
-    _is_complete: bool
-    _success: bool
+    def has_failures(self) -> bool:
+        return any(r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values())
+
+    def get_outputs(self) -> Dict[str, Any]:
+        return {
+            node_id: result.output
+            for node_id, result in self.node_results.items()
+            if result.success
+        }
+
+    def get_error(self) -> Optional[str]:
+        """Get the first error message from failed nodes."""
+        for result in self.node_results.values():
+            if result.status == ExecutorNodeStatus.FAILED and result.error:
+                return result.error
+        return None
+
+
+@dataclass
+class WorkflowResult:
+    """Result from executing a complete workflow."""
+
+    workflow_name: str
+    success: bool
+    context: WorkflowContext
+    total_duration: float = 0.0
+    total_tool_calls: int = 0
+    error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "workflow_name": self.workflow_name,
+            "success": self.success,
+            "total_duration": self.total_duration,
+            "total_tool_calls": self.total_tool_calls,
+            "error": self.error,
+            "outputs": self.context.get_outputs(),
+            "node_results": {nid: r.to_dict() for nid, r in self.context.node_results.items()},
+        }
+
+    def get_output(self, node_id: str) -> Optional[Any]:
+        result = self.context.get_result(node_id)
+        return result.output if result else None
 
 
 # =============================================================================
-# Context Factory Functions
+# Type Aliases for Backward Compatibility
 # =============================================================================
 
-
-def _build_execution_context(
-    *,
-    initial_data: Optional[Dict[str, Any]] = None,
-    messages: Optional[List[Dict[str, Any]]] = None,
-    workflow_id: Optional[str] = None,
-    workflow_name: str = "",
-    current_node: str = "",
-    node_results: Optional[Dict[str, Any]] = None,
-    error: Optional[str] = None,
-    iteration: int = 0,
-    visited_nodes: Optional[List[str]] = None,
-    parallel_results: Optional[Dict[str, Any]] = None,
-    hitl_pending: bool = False,
-    hitl_response: Optional[Dict[str, Any]] = None,
-    as_of_date: Optional[str] = None,
-    lookback_periods: Optional[int] = None,
-    include_end_date: bool = True,
-    is_complete: bool = False,
-    success: bool = False,
-) -> ExecutionContext:
-    """Build ExecutionContext values on top of the shared compiled-state defaults."""
-    runtime_state = create_initial_workflow_state(
-        workflow_id=workflow_id,
-        workflow_name=workflow_name,
-        current_node=current_node,
-    )
-    runtime_state["_node_results"] = dict(node_results or {})
-    runtime_state["_error"] = error
-    runtime_state["_iteration"] = iteration
-    runtime_state["_parallel_results"] = dict(parallel_results or {})
-    runtime_state["_hitl_pending"] = hitl_pending
-    runtime_state["_hitl_response"] = hitl_response
-
-    return {
-        "data": dict(initial_data or {}),
-        "messages": list(messages or []),
-        **runtime_state,
-        "_visited_nodes": list(visited_nodes or []),
-        "_as_of_date": as_of_date,
-        "_lookback_periods": lookback_periods,
-        "_include_end_date": include_end_date,
-        "_is_complete": is_complete,
-        "_success": success,
-    }
+# Type alias for backward compatibility
+ExecutionContext = WorkflowExecutionContextModel
+# =============================================================================
 
 
 def create_execution_context(
     initial_data: Optional[Dict[str, Any]] = None,
     workflow_id: Optional[str] = None,
     workflow_name: Optional[str] = None,
-) -> ExecutionContext:
+) -> WorkflowExecutionContextModel:
     """Create a new ExecutionContext with sensible defaults.
 
     Args:
@@ -239,7 +220,7 @@ def create_execution_context(
         workflow_name: Optional workflow name
 
     Returns:
-        New ExecutionContext with defaults set
+        New WorkflowExecutionContextModel with defaults set
 
     Example:
         ctx = create_execution_context(
@@ -247,10 +228,10 @@ def create_execution_context(
             workflow_name="my_workflow",
         )
     """
-    return _build_execution_context(
-        initial_data=initial_data,
-        workflow_id=workflow_id or str(uuid.uuid4()),
+    return WorkflowExecutionContextAdapter.create_initial(
+        workflow_id=workflow_id,
         workflow_name=workflow_name or "",
+        initial_data=initial_data,
     )
 
 
@@ -316,8 +297,8 @@ class ExecutionContextWrapper:
         except Exception:
             pass
 
-        # Fall back to direct state access
-        return self.state.get("data", {}).get(key, default)
+        # Fall back to direct state access (Pydantic model)
+        return getattr(self.state, "data", {}).get(key, default)
 
     def set(self, key: str, value: Any) -> None:
         """Set a context value in data.
@@ -333,10 +314,11 @@ class ExecutionContextWrapper:
         except Exception:
             pass
 
-        # Update state dict
-        if "data" not in self.state:
-            self.state["data"] = {}
-        self.state["data"][key] = value
+        # Update state (Pydantic model)
+        if not hasattr(self.state, "data"):
+            # Pydantic models have data as a field
+            object.__setattr__(self.state, "data", {})
+        self.state.data[key] = value
 
     def update(self, values: Dict[str, Any]) -> None:
         """Update multiple context values in data.
@@ -352,24 +334,22 @@ class ExecutionContextWrapper:
         except Exception:
             pass
 
-        # Update state dict
-        if "data" not in self.state:
-            self.state["data"] = {}
-        self.state["data"].update(values)
+        # Update state (Pydantic model)
+        if not hasattr(self.state, "data"):
+            object.__setattr__(self.state, "data", {})
+        self.state.data.update(values)
 
     def get_result(self, node_id: str) -> Optional[Dict[str, Any]]:
         """Get result for a specific node."""
-        return self.state.get("_node_results", {}).get(node_id)
+        return getattr(self.state, "node_results", {}).get(node_id)
 
     def add_result(self, node_id: str, result: Dict[str, Any]) -> None:
         """Add a node result."""
-        if "_node_results" not in self.state:
-            self.state["_node_results"] = {}
-        self.state["_node_results"][node_id] = result
+        self.state.node_results[node_id] = result
 
     def has_failures(self) -> bool:
         """Check if any nodes failed."""
-        results = self.state.get("_node_results", {})
+        results = getattr(self.state, "node_results", {})
         return any(
             r.get("status") == "failed" or not r.get("success", True)
             for r in results.values()
@@ -378,7 +358,7 @@ class ExecutionContextWrapper:
 
     def get_outputs(self) -> Dict[str, Any]:
         """Get all successful node outputs."""
-        results = self.state.get("_node_results", {})
+        results = getattr(self.state, "node_results", {})
         return {
             node_id: result.get("output")
             for node_id, result in results.items()
@@ -390,37 +370,37 @@ class ExecutionContextWrapper:
     @property
     def workflow_id(self) -> str:
         """Get the workflow ID."""
-        return self.state.get("_workflow_id", "")
+        return getattr(self.state, "workflow_id", "")
 
     @property
     def current_node(self) -> str:
         """Get the current node."""
-        return self.state.get("_current_node", "")
+        return getattr(self.state, "current_node", "")
 
     @current_node.setter
     def current_node(self, value: str) -> None:
         """Set the current node."""
-        self.state["_current_node"] = value
+        self.state.current_node = value
 
     @property
     def is_complete(self) -> bool:
         """Check if workflow is complete."""
-        return self.state.get("_is_complete", False)
+        return getattr(self.state, "is_complete", False)
 
     @is_complete.setter
     def is_complete(self, value: bool) -> None:
         """Set completion status."""
-        self.state["_is_complete"] = value
+        self.state.is_complete = value
 
     @property
     def error(self) -> Optional[str]:
         """Get error message."""
-        return self.state.get("_error")
+        return getattr(self.state, "error", None)
 
     @error.setter
     def error(self, value: Optional[str]) -> None:
         """Set error message."""
-        self.state["_error"] = value
+        self.state.error = value
 
 
 # =============================================================================
@@ -428,17 +408,15 @@ class ExecutionContextWrapper:
 # =============================================================================
 
 
-def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
+def from_workflow_context(ctx: WorkflowContext) -> WorkflowExecutionContextModel:
     """Convert legacy WorkflowContext to ExecutionContext.
 
     Args:
         ctx: Legacy WorkflowContext dataclass
 
     Returns:
-        ExecutionContext with data migrated from WorkflowContext
+        WorkflowExecutionContextModel with data migrated from WorkflowContext
     """
-    from victor.workflows.executor import WorkflowContext
-
     # Convert node results to dict format
     node_results: Dict[str, Any] = {}
     for node_id, result in ctx.node_results.items():
@@ -463,40 +441,42 @@ def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
         lookback_periods = ctx.temporal.lookback_periods
         include_end_date = ctx.temporal.include_end_date
 
-    return _build_execution_context(
-        initial_data=ctx.data,
-        workflow_id=ctx.metadata.get("workflow_id", str(uuid.uuid4())),
+    # Create Pydantic model
+    model = WorkflowExecutionContextAdapter.create_initial(
+        workflow_id=ctx.metadata.get("workflow_id"),
         workflow_name=ctx.metadata.get("workflow_name", ""),
         current_node=ctx.metadata.get("current_node", ""),
-        node_results=node_results,
-        iteration=ctx.metadata.get("iteration", 0),
-        visited_nodes=list(ctx.node_results.keys()),
-        as_of_date=as_of_date,
-        lookback_periods=lookback_periods,
-        include_end_date=include_end_date,
-        success=not ctx.has_failures(),
+        initial_data=ctx.data,
     )
 
+    # Set additional fields
+    model.node_results = node_results
+    model.iteration = ctx.metadata.get("iteration", 0)
+    model.as_of_date = as_of_date
+    model.lookback_periods = lookback_periods
+    model.include_end_date = include_end_date
+    model.is_complete = True
+    model.success = not ctx.has_failures()
 
-def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
+    # Set visited nodes from node results
+    for node_id in ctx.node_results.keys():
+        model.visit_node(node_id)
+
+    return model
+
+
+def to_workflow_context(ctx: WorkflowExecutionContextModel) -> WorkflowContext:
     """Convert ExecutionContext to legacy WorkflowContext.
 
     Args:
-        ctx: ExecutionContext TypedDict
+        ctx: WorkflowExecutionContextModel
 
     Returns:
         WorkflowContext dataclass for use with legacy code
     """
-    from victor.workflows.executor import (
-        WorkflowContext,
-        NodeResult,
-        ExecutorNodeStatus,
-        TemporalContext,
-    )
-
     # Convert node results from dict to NodeResult
     node_results: Dict[str, NodeResult] = {}
-    for node_id, result in ctx.get("_node_results", {}).items():
+    for node_id, result in ctx.node_results.items():
         if isinstance(result, dict):
             # Map status string to enum
             status_str = result.get("status", "completed")
@@ -520,37 +500,37 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
 
     # Build temporal context if present
     temporal = None
-    if ctx.get("_as_of_date"):
+    if ctx.as_of_date:
         temporal = TemporalContext(
-            as_of_date=ctx.get("_as_of_date"),
-            lookback_periods=ctx.get("_lookback_periods"),
-            include_end_date=ctx.get("_include_end_date", True),
+            as_of_date=ctx.as_of_date,
+            lookback_periods=ctx.lookback_periods,
+            include_end_date=ctx.include_end_date,
         )
 
     # Build metadata
     metadata = {
-        "workflow_id": ctx.get("_workflow_id", ""),
-        "workflow_name": ctx.get("_workflow_name", ""),
-        "current_node": ctx.get("_current_node", ""),
-        "iteration": ctx.get("_iteration", 0),
+        "workflow_id": ctx.workflow_id,
+        "workflow_name": ctx.workflow_name,
+        "current_node": ctx.current_node,
+        "iteration": ctx.iteration,
     }
 
     return WorkflowContext(
-        data=ctx.get("data", {}).copy(),
+        data=ctx.data.copy(),
         node_results=node_results,
         metadata=metadata,
         temporal=temporal,
     )
 
 
-def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
+def from_compiler_workflow_state(state: Dict[str, Any]) -> WorkflowExecutionContextModel:
     """Convert compiled runtime WorkflowState to ExecutionContext.
 
     Args:
         state: WorkflowState dict from compiled workflow runtime
 
     Returns:
-        ExecutionContext with data migrated
+        WorkflowExecutionContextModel with data migrated
     """
     # Extract system fields and user data
     system_keys = {
@@ -568,87 +548,89 @@ def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     # User data is everything not in system keys
     user_data = {k: v for k, v in state.items() if k not in system_keys}
 
-    return _build_execution_context(
-        initial_data=user_data,
-        workflow_id=state.get("_workflow_id", str(uuid.uuid4())),
+    model = WorkflowExecutionContextAdapter.create_initial(
+        workflow_id=state.get("_workflow_id"),
         workflow_name=state.get("_workflow_name", ""),
-        current_node=state.get("_current_node", ""),
-        node_results=state.get("_node_results", {}),
-        error=state.get("_error"),
-        iteration=state.get("_iteration", 0),
-        visited_nodes=list(state.get("_node_results", {}).keys()),
-        parallel_results=state.get("_parallel_results", {}),
-        hitl_pending=state.get("_hitl_pending", False),
-        hitl_response=state.get("_hitl_response"),
-        success=state.get("_error") is None,
+        initial_data=user_data,
     )
 
+    # Set additional fields
+    if state.get("_current_node"):
+        model.current_node = state.get("_current_node", "")
+    if state.get("_node_results"):
+        model.node_results = state.get("_node_results", {})
+    if state.get("_error"):
+        model.error = state.get("_error")
+    if state.get("_iteration"):
+        model.iteration = state.get("_iteration", 0)
+    if state.get("_parallel_results"):
+        model.parallel_results = state.get("_parallel_results", {})
+    if state.get("_hitl_pending"):
+        model.hitl_pending = state.get("_hitl_pending", False)
+    if state.get("_hitl_response"):
+        model.hitl_response = state.get("_hitl_response")
 
-def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
+    # Populate visited_nodes from node_results keys
+    if state.get("_node_results"):
+        for node_id in state.get("_node_results", {}).keys():
+            model.visit_node(node_id)
+
+    return model
+
+
+def to_compiler_workflow_state(ctx: WorkflowExecutionContextModel) -> Dict[str, Any]:
     """Convert ExecutionContext to compiled runtime WorkflowState format.
 
     Args:
-        ctx: ExecutionContext
+        ctx: WorkflowExecutionContextModel
 
     Returns:
         Dict compatible with compiled runtime WorkflowState
     """
-    # Start with user data
-    state: Dict[str, Any] = ctx.get("data", {}).copy()
+    # Get the base dict from the model
+    state = ctx.to_dict()
 
-    # Add system fields
-    state["_workflow_id"] = ctx.get("_workflow_id", "")
-    state["_workflow_name"] = ctx.get("_workflow_name", "")
-    state["_current_node"] = ctx.get("_current_node", "")
-    state["_node_results"] = ctx.get("_node_results", {})
-    state["_error"] = ctx.get("_error")
-    state["_iteration"] = ctx.get("_iteration", 0)
-    state["_parallel_results"] = ctx.get("_parallel_results", {})
-    state["_hitl_pending"] = ctx.get("_hitl_pending", False)
-    state["_hitl_response"] = ctx.get("_hitl_response")
+    # Merge user data to top level (for backward compatibility)
+    if "data" in state and state["data"]:
+        state.update(state["data"])
+        del state["data"]
 
     return state
 
 
-def from_adapter_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
+def from_adapter_workflow_state(state: Dict[str, Any]) -> WorkflowExecutionContextModel:
     """Convert adapters.py WorkflowState to ExecutionContext.
 
     Args:
         state: WorkflowState dict from adapters.py
 
     Returns:
-        ExecutionContext with data migrated
+        WorkflowExecutionContextModel with data migrated
     """
-    return _build_execution_context(
-        initial_data=state.get("context", {}),
-        messages=state.get("messages", []),
+    return WorkflowExecutionContextAdapter.create_initial(
         workflow_id=str(uuid.uuid4()),
         current_node=state.get("current_node", ""),
-        node_results=state.get("results", {}),
-        error=state.get("error"),
-        visited_nodes=state.get("visited_nodes", []),
-        is_complete=state.get("is_complete", False),
-        success=state.get("error") is None,
+        initial_data=state.get("context", {}),
     )
 
 
-def to_adapter_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
+def to_adapter_workflow_state(ctx: WorkflowExecutionContextModel) -> Dict[str, Any]:
     """Convert ExecutionContext to adapters.py WorkflowState format.
 
     Args:
-        ctx: ExecutionContext
+        ctx: WorkflowExecutionContextModel
 
     Returns:
         Dict compatible with adapters.py WorkflowState
     """
     return {
-        "context": ctx.get("data", {}),
-        "messages": ctx.get("messages", []),
-        "current_node": ctx.get("_current_node", ""),
-        "visited_nodes": ctx.get("_visited_nodes", []),
-        "results": ctx.get("_node_results", {}),
-        "error": ctx.get("_error"),
-        "is_complete": ctx.get("_is_complete", False),
+        "context": ctx.data,
+        "messages": ctx.messages,
+        "current_node": ctx.current_node,
+        "visited_nodes": ctx.visited_nodes,
+        "results": ctx.node_results,
+        "error": ctx.error,
+        "is_complete": ctx.is_complete,
     }
 
 
@@ -657,6 +639,10 @@ def to_adapter_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
 # =============================================================================
 
 __all__ = [
+    # Canonical workflow runtime types
+    "TemporalContext",
+    "WorkflowContext",
+    "WorkflowResult",
     # Core type
     "ExecutionContext",
     # Factory

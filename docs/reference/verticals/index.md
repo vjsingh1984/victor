@@ -208,13 +208,8 @@ victor chat --observability "Your prompt"
 victor chat --no-observability "Quick question"
 ```
 
-### Legacy Mode
-
-To bypass the FrameworkShim and use the legacy code path:
-
-```bash
-victor chat --legacy "Your prompt"
-```
+Victor chat now always uses the canonical framework client path. There is no separate
+legacy CLI mode.
 
 ## Using Verticals in Python
 

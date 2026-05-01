@@ -14,6 +14,8 @@
 
 """Tests for framework comparison module."""
 
+import json
+
 import pytest
 from victor.evaluation.benchmarks.framework_comparison import (
     Framework,
@@ -24,8 +26,11 @@ from victor.evaluation.benchmarks.framework_comparison import (
     FRAMEWORK_CAPABILITIES,
     PUBLISHED_RESULTS,
     compute_metrics_from_result,
+    compute_metrics_from_saved_result,
     create_comparison_report,
+    create_comparison_report_from_saved_result,
     get_published_result,
+    load_framework_result_from_file,
 )
 from victor.evaluation.protocol import (
     BenchmarkType,
@@ -349,3 +354,130 @@ class TestCreateComparisonReport:
         )
         assert len(report.results) == 1
         assert report.results[0].framework == Framework.VICTOR
+
+
+class TestSavedResultIngestion:
+    """Tests for loading saved benchmark result artifacts."""
+
+    def test_load_framework_result_from_run_output(self, tmp_path):
+        """CLI run output should round-trip into a FrameworkResult."""
+        path = tmp_path / "guide_result.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "test-model",
+                    "timestamp": "2026-04-25T12:00:00",
+                    "dataset_metadata": {"source_name": "GUIDE Consortium"},
+                    "metrics": {
+                        "total_tasks": 2,
+                        "passed": 1,
+                        "failed": 1,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 0.5,
+                        "duration_seconds": 10.0,
+                        "total_tokens": 200,
+                        "total_tool_calls": 6,
+                    },
+                    "task_results": [
+                        {
+                            "task_id": "guide-1",
+                            "status": "passed",
+                            "tests_passed": 1,
+                            "tests_total": 1,
+                            "duration": 4.0,
+                            "tool_calls": 4,
+                        },
+                        {
+                            "task_id": "guide-2",
+                            "status": "failed",
+                            "tests_passed": 0,
+                            "tests_total": 1,
+                            "duration": 6.0,
+                            "tool_calls": 2,
+                        },
+                    ],
+                }
+            )
+        )
+
+        result = load_framework_result_from_file(path)
+
+        assert result.framework == Framework.VICTOR
+        assert result.benchmark == BenchmarkType.GUIDE
+        assert result.metrics.pass_rate == 0.5
+        assert result.metrics.tokens_per_task == 100.0
+        assert result.metrics.tool_calls_per_task == 3.0
+        assert result.config["source"] == "GUIDE Consortium"
+
+    def test_load_framework_result_from_harness_output(self, tmp_path):
+        """Harness-saved result JSON should also be ingestible."""
+        path = tmp_path / "swe_result.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "config": {
+                        "benchmark": "swe_bench",
+                        "model": "claude-3-sonnet",
+                        "dataset_metadata": {"source_name": "Harness Fixture"},
+                    },
+                    "summary": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 1.0,
+                        "duration_seconds": 2.5,
+                        "total_tokens": 50,
+                        "total_tool_calls": 1,
+                    },
+                    "tasks": [
+                        {
+                            "task_id": "swe-1",
+                            "status": "passed",
+                            "tests_passed": 2,
+                            "tests_total": 2,
+                            "duration_seconds": 2.5,
+                            "tool_calls": 1,
+                            "completion_score": 0.8,
+                            "code_quality": {"overall_score": 75.0},
+                        }
+                    ],
+                }
+            )
+        )
+
+        result = load_framework_result_from_file(path)
+
+        assert result.benchmark == BenchmarkType.SWE_BENCH
+        assert result.metrics.test_pass_rate == 1.0
+        assert result.metrics.partial_completion == 0.8
+        assert result.metrics.code_quality_score == 75.0
+
+    def test_create_report_from_saved_result_includes_published(self, tmp_path):
+        """Saved Victor artifacts should plug into published comparisons."""
+        path = tmp_path / "swe_result.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "benchmark": "swe-bench",
+                    "model": "claude-3-sonnet",
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 1.0,
+                    },
+                    "task_results": [{"task_id": "swe-1", "status": "passed"}],
+                }
+            )
+        )
+
+        report = create_comparison_report_from_saved_result(path)
+
+        assert any(result.framework == Framework.VICTOR for result in report.results)
+        assert any(result.framework == Framework.AIDER for result in report.results)

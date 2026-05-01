@@ -35,6 +35,8 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 
+from victor.config.settings import get_project_paths
+
 
 class Severity(Enum):
     """Severity level for diagnostic issues."""
@@ -59,9 +61,18 @@ class DiagnosticCheck:
 class DoctorChecks:
     """Diagnostic checks for Victor."""
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, fix: bool = False):
         self.verbose = verbose
+        self.fix = fix
         self.checks: List[DiagnosticCheck] = []
+
+    @staticmethod
+    def _get_effective_config_dir() -> Path:
+        """Resolve the effective Victor config directory."""
+        victor_config = os.getenv("VICTOR_CONFIG_DIR")
+        if victor_config:
+            return Path(victor_config)
+        return get_project_paths().global_victor_dir
 
     def add_check(
         self,
@@ -223,11 +234,99 @@ class DoctorChecks:
                 message=f"Could not check Ollama status: {e}",
             )
 
+    def check_default_model(self) -> None:
+        """Check if default model is available in Ollama."""
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+
+            # Only check if Ollama is the default provider
+            if settings.provider.default_provider.lower() != "ollama":
+                self.add_check(
+                    name="Default Model",
+                    severity=Severity.INFO,
+                    message=f"Default provider is {settings.provider.default_provider} (skipping Ollama model check)",
+                )
+                return
+
+            default_model = settings.provider.default_model
+
+            # Check if Ollama is running
+            result = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            if result.returncode != 0:
+                self.add_check(
+                    name="Default Model",
+                    severity=Severity.WARNING,
+                    message=f"Cannot check model '{default_model}' - Ollama not running",
+                    suggestion="Start Ollama: 'ollama serve'",
+                )
+                return
+
+            # Parse available models
+            models = result.stdout.strip().split("\n")[1:]  # Skip header
+            available_models = [line.split()[0] for line in models if line.strip()]
+
+            # Check if default model is available
+            if default_model in available_models:
+                self.add_check(
+                    name="Default Model",
+                    severity=Severity.SUCCESS,
+                    message=f"Default model '{default_model}' is available",
+                )
+            else:
+                # Model not found
+                if available_models:
+                    model_list = ", ".join(available_models[:5])
+                    if len(available_models) > 5:
+                        model_list += f", ... ({len(available_models)} total)"
+                    self.add_check(
+                        name="Default Model",
+                        severity=Severity.WARNING,
+                        message=f"Default model '{default_model}' is not installed",
+                        suggestion=f"Available: {model_list}\n"
+                        f"Pull default: 'ollama pull {default_model}'\n"
+                        f"Or change default in: ~/.victor/profiles.yaml",
+                    )
+                else:
+                    self.add_check(
+                        name="Default Model",
+                        severity=Severity.WARNING,
+                        message=f"Default model '{default_model}' is not installed (no models found)",
+                        suggestion=f"Pull default: 'ollama pull {default_model}'",
+                    )
+
+        except ImportError:
+            self.add_check(
+                name="Default Model",
+                severity=Severity.INFO,
+                message="Could not import settings to check default model",
+            )
+        except subprocess.TimeoutExpired:
+            self.add_check(
+                name="Default Model",
+                severity=Severity.WARNING,
+                message="Ollama command timed out",
+                suggestion="Check if Ollama is running: 'ollama serve'",
+            )
+        except Exception as e:
+            self.add_check(
+                name="Default Model",
+                severity=Severity.INFO,
+                message=f"Could not check default model: {e}",
+            )
+
     def check_config_directory(self) -> None:
         """Check Victor configuration directory."""
         victor_config = os.getenv("VICTOR_CONFIG_DIR")
+        config_path = self._get_effective_config_dir()
         if victor_config:
-            config_path = Path(victor_config)
             if config_path.exists():
                 self.add_check(
                     name="Configuration Directory",
@@ -243,12 +342,11 @@ class DoctorChecks:
                 )
         else:
             # Check default location
-            default_config = Path.home() / ".victor"
-            if default_config.exists():
+            if config_path.exists():
                 self.add_check(
                     name="Configuration Directory",
                     severity=Severity.SUCCESS,
-                    message=f"Using default config directory: {default_config}",
+                    message=f"Using default config directory: {config_path}",
                 )
             else:
                 self.add_check(
@@ -304,7 +402,7 @@ class DoctorChecks:
             # Check tool selection cache
             if (
                 hasattr(settings, "tool_selection_cache_enabled")
-                and settings.tool_selection_cache_enabled
+                and settings.tools.tool_selection_cache_enabled
             ):
                 self.add_check(
                     name="Performance: Tool Cache",
@@ -354,11 +452,67 @@ class DoctorChecks:
         self.check_dependencies()
         self.check_api_keys()
         self.check_local_providers()
+        self.check_default_model()  # Phase 6: Check model existence
         self.check_config_directory()
         self.check_performance_settings()
         self.check_file_permissions()
 
         return self.checks
+
+    def fix_issues(self) -> List[str]:
+        """Attempt to automatically fix common issues.
+
+        Returns:
+            List of fix descriptions that were applied
+        """
+        fixes_applied = []
+
+        for check in self.checks:
+            if check.severity == Severity.SUCCESS:
+                continue
+            if check.severity == Severity.INFO and check.name != "Configuration Directory":
+                continue
+
+            # Attempt fixes for specific checks
+            if check.name == "Configuration Directory" and (
+                "does not exist" in check.message.lower()
+                or "no configuration directory" in check.message.lower()
+            ):
+                # Create config directory if it doesn't exist
+                try:
+                    config_dir = self._get_effective_config_dir()
+                    config_dir.mkdir(parents=True, exist_ok=True)
+                    (config_dir / "config.yaml").write_text("# Victor configuration\n")
+                    fixes_applied.append(f"Created config directory: {config_dir}")
+                except Exception as e:
+                    self.checks.append(
+                        DiagnosticCheck(
+                            name="Configuration Directory Fix",
+                            severity=Severity.ERROR,
+                            message=f"Failed to create config directory: {e}",
+                            suggestion=f"Create directory manually: mkdir -p {config_dir}",
+                            passed=False,
+                        )
+                    )
+
+            elif check.name == "performance_settings" and "disabled" in check.message.lower():
+                # Enable performance settings
+                try:
+                    import subprocess
+
+                    result = subprocess.run(
+                        ["victor", "config", "set", "cache_optimization", "true"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if result.returncode == 0:
+                        fixes_applied.append("Enabled cache optimization")
+                except Exception:
+                    # Silently skip if config set command doesn't work
+                    pass
+
+        return fixes_applied
 
     def print_results(self) -> int:
         """Print diagnostic results to console.
@@ -417,7 +571,7 @@ class DoctorChecks:
             console.print("\n[green]✓ Your system is ready to use Victor![/]")
             return 0
         elif errors > 0:
-            console.print("\n[red]✗ Found {errors} error(s) that should be fixed[/]")
+            console.print(f"\n[red]✗ Found {errors} error(s) that should be fixed[/]")
             console.print(
                 "[yellow]Run 'victor config validate' for detailed configuration validation[/]"
             )
@@ -441,10 +595,34 @@ def run_doctor(verbose: bool = False, fix: bool = False) -> int:
     Returns:
         Exit code (0 for success, 1 for errors)
     """
-    doctor = DoctorChecks(verbose=verbose)
+    from rich.console import Console
+
+    console = Console()
+
+    doctor = DoctorChecks(verbose=verbose, fix=fix)
 
     try:
+        # Run initial checks
         doctor.run_all_checks()
+
+        # Attempt fixes if requested
+        if fix:
+            console.print("\n[yellow]🔧 Attempting to fix issues...[/]\n")
+            fixes_applied = doctor.fix_issues()
+
+            if fixes_applied:
+                console.print(f"[green]✓ Applied {len(fixes_applied)} fix(es):[/]")
+                for fix_desc in fixes_applied:
+                    console.print(f"  • {fix_desc}")
+                console.print("")
+
+                # Re-run checks to verify fixes
+                console.print("[cyan]Re-running diagnostics to verify fixes...[/]\n")
+                doctor.checks.clear()  # Clear previous checks
+                doctor.run_all_checks()
+            else:
+                console.print("[yellow]⚠ No auto-fixes available for detected issues[/]\n")
+
         return doctor.print_results()
     except Exception as e:
         print(f"[red]✗ Doctor command failed:[/] {e}")

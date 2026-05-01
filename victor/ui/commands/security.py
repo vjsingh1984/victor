@@ -245,7 +245,9 @@ def _status():
 
     # Home security
     table.add_row(
-        "Home Validation", "[green]✓ Secure[/]", sec_status["home_security"]["secure_home"]
+        "Home Validation",
+        "[green]✓ Secure[/]",
+        sec_status["home_security"]["secure_home"],
     )
 
     # Keyring

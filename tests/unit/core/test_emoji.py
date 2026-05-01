@@ -150,7 +150,7 @@ class TestGetIcon:
     def test_get_icon_respects_settings_enabled(self):
         """Test that get_icon respects use_emojis=True setting."""
         mock_settings = MagicMock()
-        mock_settings.use_emojis = True
+        mock_settings.ui.use_emojis = True
 
         with patch("victor.ui.emoji._get_settings", return_value=mock_settings):
             reset_settings_cache()
@@ -160,7 +160,7 @@ class TestGetIcon:
     def test_get_icon_respects_settings_disabled(self):
         """Test that get_icon respects use_emojis=False setting."""
         mock_settings = MagicMock()
-        mock_settings.use_emojis = False
+        mock_settings.ui.use_emojis = False
 
         with patch("victor.ui.emoji._get_settings", return_value=mock_settings):
             reset_settings_cache()
@@ -248,7 +248,7 @@ class TestIsEmojiEnabled:
     def test_is_emoji_enabled_from_settings_true(self):
         """Test emoji enabled from settings."""
         mock_settings = MagicMock()
-        mock_settings.use_emojis = True
+        mock_settings.ui.use_emojis = True
 
         import victor.ui.emoji
 
@@ -259,7 +259,7 @@ class TestIsEmojiEnabled:
     def test_is_emoji_enabled_from_settings_false(self):
         """Test emoji disabled from settings."""
         mock_settings = MagicMock()
-        mock_settings.use_emojis = False
+        mock_settings.ui.use_emojis = False
 
         import victor.ui.emoji
 

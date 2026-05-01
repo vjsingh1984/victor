@@ -21,16 +21,21 @@ standardized benchmarks like SWE-bench, HumanEval, etc.
 """
 
 import asyncio
+import json
 import logging
 import os
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 from victor.evaluation.protocol import (
+    BenchmarkFailureCategory,
+    ConfidenceAssessment,
+    FailureDiagnosis,
     BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
@@ -38,8 +43,226 @@ from victor.evaluation.protocol import (
     TaskResult,
     TaskStatus,
 )
+from victor.evaluation.experiment_analyzer import analyze_evaluation_result
+from victor.evaluation.experiment_memory import ExperimentMemoryRecord, ExperimentMemoryStore
+from victor.evaluation.runtime_feedback import (
+    build_runtime_evaluation_feedback_payload,
+    derive_runtime_evaluation_feedback,
+)
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthEmitterRegistry,
+)
+from victor.evaluation.services import (
+    materialize_validated_session_truth_service,
+    ValidatedSessionTruthServiceProtocol,
+)
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PromptCandidateEvaluationSpec:
+    """One exact prompt candidate to evaluate in isolation."""
+
+    section_name: str
+    prompt_candidate_hash: str
+    provider: Optional[str] = None
+    label: Optional[str] = None
+
+    def resolved_label(self, default_provider: Optional[str] = None) -> str:
+        """Return a stable human-readable label for reports and logs."""
+        provider = (self.provider or default_provider or "").strip() or "default"
+        return self.label or f"{self.section_name}:{provider}:{self.prompt_candidate_hash}"
+
+
+@dataclass(frozen=True)
+class PromptCandidateEvaluationRun:
+    """One executed candidate-bound evaluation run."""
+
+    spec: PromptCandidateEvaluationSpec
+    config: EvaluationConfig
+    result: EvaluationResult
+    label: str
+
+
+@dataclass
+class PromptCandidateEvaluationSuiteResult:
+    """Collected results from evaluating multiple prompt candidates separately."""
+
+    base_config: EvaluationConfig
+    runs: list[PromptCandidateEvaluationRun]
+
+    def best_run(self) -> Optional[PromptCandidateEvaluationRun]:
+        """Return the strongest run by pass rate, then task count, then shortest duration."""
+        if not self.runs:
+            return None
+        return max(
+            self.runs,
+            key=lambda run: (
+                run.result.pass_rate,
+                run.result.total_tasks,
+                -run.result.duration_seconds,
+            ),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the suite summary for reporting or persistence."""
+        best = self.best_run()
+        return {
+            "benchmark": self.base_config.benchmark.value,
+            "model": self.base_config.model,
+            "provider": self.base_config.provider,
+            "best_label": best.label if best is not None else None,
+            "runs": [
+                {
+                    "label": run.label,
+                    "provider": run.config.provider,
+                    "prompt_candidate_hash": run.config.prompt_candidate_hash,
+                    "section_name": run.config.prompt_section_name,
+                    "metrics": run.result.get_metrics(),
+                }
+                for run in self.runs
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "PromptCandidateEvaluationSuiteResult":
+        """Reconstruct a suite result from a saved suite artifact payload."""
+        if not isinstance(payload, dict):
+            raise ValueError("suite payload must be a dictionary")
+
+        config_payload = payload.get("config")
+        config_dict = dict(config_payload) if isinstance(config_payload, dict) else {}
+        config_dict.setdefault("benchmark", payload.get("benchmark"))
+        config_dict.setdefault("model", payload.get("model"))
+        config_dict.setdefault("provider", payload.get("provider"))
+        config_dict.setdefault(
+            "prompt_section_name",
+            payload.get("prompt_section_name") or payload.get("section_name"),
+        )
+        base_config = evaluation_config_from_artifact_config(config_dict)
+
+        runs: list[PromptCandidateEvaluationRun] = []
+        for run_payload in payload.get("runs", []) or []:
+            if not isinstance(run_payload, dict):
+                continue
+
+            provider = str(run_payload.get("provider") or base_config.provider or "") or None
+            section_name = str(
+                run_payload.get("section_name")
+                or run_payload.get("prompt_section_name")
+                or base_config.prompt_section_name
+                or ""
+            )
+            prompt_candidate_hash = str(run_payload.get("prompt_candidate_hash") or "")
+            run_config = replace(
+                base_config,
+                provider=provider,
+                prompt_candidate_hash=prompt_candidate_hash or None,
+                prompt_section_name=section_name or None,
+            )
+            spec = PromptCandidateEvaluationSpec(
+                section_name=section_name,
+                prompt_candidate_hash=prompt_candidate_hash,
+                provider=provider,
+                label=(
+                    str(run_payload.get("label")) if run_payload.get("label") is not None else None
+                ),
+            )
+            task_results = [
+                task_result_from_artifact(task_payload)
+                for task_payload in run_payload.get("task_results", []) or []
+                if isinstance(task_payload, dict)
+            ]
+            result = EvaluationResult(config=run_config, task_results=task_results)
+            label = (
+                str(run_payload.get("label"))
+                if run_payload.get("label") is not None
+                else spec.resolved_label(run_config.provider)
+            )
+            runs.append(
+                PromptCandidateEvaluationRun(
+                    spec=spec,
+                    config=run_config,
+                    result=result,
+                    label=label,
+                )
+            )
+
+        return cls(base_config=base_config, runs=runs)
+
+
+def evaluation_config_from_artifact_config(payload: dict[str, Any]) -> EvaluationConfig:
+    """Reconstruct evaluation config from a saved artifact config payload."""
+    benchmark_value = str(payload.get("benchmark") or BenchmarkType.CUSTOM.value)
+    return EvaluationConfig(
+        benchmark=BenchmarkType(benchmark_value),
+        model=str(payload.get("model") or "unknown"),
+        provider=(str(payload.get("provider")) if payload.get("provider") is not None else None),
+        prompt_candidate_hash=(
+            str(payload.get("prompt_candidate_hash"))
+            if payload.get("prompt_candidate_hash") is not None
+            else None
+        ),
+        prompt_section_name=(
+            str(payload.get("prompt_section_name") or payload.get("section_name"))
+            if (payload.get("prompt_section_name") or payload.get("section_name")) is not None
+            else None
+        ),
+        max_tasks=payload.get("max_tasks"),
+        timeout_per_task=int(payload.get("timeout_per_task", 300) or 300),
+        parallel_tasks=int(payload.get("parallel_tasks", 1) or 1),
+        max_turns=int(payload.get("max_turns", 10) or 10),
+        dataset_metadata=dict(payload.get("dataset_metadata") or {}),
+    )
+
+
+def task_result_from_artifact(payload: dict[str, Any]) -> TaskResult:
+    """Reconstruct a task result from a saved suite artifact entry."""
+    failure_category_value = payload.get("failure_category")
+    failure_category = (
+        BenchmarkFailureCategory(str(failure_category_value)) if failure_category_value else None
+    )
+    tests_passed = int(payload.get("tests_passed", 0) or 0)
+    tests_total = int(payload.get("tests_total", 0) or 0)
+    return TaskResult(
+        task_id=str(payload.get("task_id") or "unknown-task"),
+        status=TaskStatus(str(payload.get("status") or TaskStatus.ERROR.value)),
+        tests_passed=tests_passed,
+        tests_failed=max(tests_total - tests_passed, 0),
+        tests_total=tests_total,
+        duration_seconds=float(
+            payload.get("duration_seconds", payload.get("duration", 0.0)) or 0.0
+        ),
+        tool_calls=int(payload.get("tool_calls", 0) or 0),
+        code_search_calls=int(payload.get("code_search_calls", 0) or 0),
+        graph_calls=int(payload.get("graph_calls", 0) or 0),
+        failure_category=failure_category,
+        failure_details=dict(payload.get("failure_details") or {}),
+    )
+
+
+def load_prompt_candidate_evaluation_suite(
+    path: str | Path,
+) -> PromptCandidateEvaluationSuiteResult:
+    """Load a saved prompt-candidate suite artifact from disk."""
+    payload = json.loads(Path(path).read_text())
+    if not isinstance(payload, dict):
+        raise ValueError("suite artifact must contain a JSON object")
+    return PromptCandidateEvaluationSuiteResult.from_dict(payload)
+
+
+def bind_prompt_candidate_evaluation_config(
+    base_config: EvaluationConfig,
+    spec: PromptCandidateEvaluationSpec,
+) -> EvaluationConfig:
+    """Create a candidate-bound config from a benchmark base config."""
+    return replace(
+        base_config,
+        provider=(spec.provider or base_config.provider),
+        prompt_candidate_hash=spec.prompt_candidate_hash,
+        prompt_section_name=spec.section_name,
+    )
 
 
 @runtime_checkable
@@ -164,14 +387,22 @@ class TaskEnvironment:
         if self.task.repo:
             await self._clone_repo()
 
+        target_dir = (
+            self._temp_dir / "repo" if (self._temp_dir / "repo").exists() else self._temp_dir
+        )
+
+        # Seed arbitrary workspace files before writing canonical solution/test entrypoints.
+        if self.task.seed_files:
+            self._write_seed_files(target_dir, self.task.seed_files)
+
         # Write context code
         if self.task.context_code:
-            code_file = self._temp_dir / "solution.py"
+            code_file = target_dir / "solution.py"
             code_file.write_text(self.task.context_code)
 
         # Write test code
         if self.task.test_code:
-            test_file = self._temp_dir / "test_solution.py"
+            test_file = target_dir / "test_solution.py"
             test_file.write_text(self.task.test_code)
 
         return self._temp_dir
@@ -214,7 +445,14 @@ class TaskEnvironment:
             # Checkout specific commit if provided
             if self.task.base_commit and repo_dir.exists():
                 # Fetch the specific commit if not available
-                fetch_cmd = ["git", "fetch", "--depth", "1", "origin", self.task.base_commit]
+                fetch_cmd = [
+                    "git",
+                    "fetch",
+                    "--depth",
+                    "1",
+                    "origin",
+                    self.task.base_commit,
+                ]
                 result = await asyncio.create_subprocess_exec(
                     *fetch_cmd,
                     cwd=repo_dir,
@@ -239,6 +477,18 @@ class TaskEnvironment:
 
         except Exception as e:
             logger.warning(f"Failed to clone repo: {e}")
+
+    def _write_seed_files(self, base_dir: Path, files: dict[str, str]) -> None:
+        """Write manifest-provided seed files into the task workspace."""
+        base_dir = base_dir.resolve()
+        for rel_path, content in files.items():
+            target = (base_dir / rel_path).resolve()
+            try:
+                target.relative_to(base_dir)
+            except ValueError as exc:
+                raise ValueError(f"Unsafe seed file path: {rel_path}") from exc
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content)
 
     async def apply_patch(self, patch: str) -> bool:
         """Apply a patch to the repository.
@@ -430,14 +680,21 @@ class EvaluationHarness:
         self,
         runners: Optional[dict[BenchmarkType, BaseBenchmarkRunner]] = None,
         checkpoint_dir: Optional[Path] = None,
+        validated_session_truth_service: Optional[ValidatedSessionTruthServiceProtocol] = None,
+        **legacy_kwargs: Any,
     ):
         """Initialize the harness.
 
         Args:
             runners: Dict mapping benchmark types to runners
             checkpoint_dir: Directory for checkpoint files (defaults to ~/.victor/checkpoints)
+            validated_session_truth_service: Service for validated session-truth orchestration
         """
         self._runners = runners or {}
+        self._validated_session_truth_service = materialize_validated_session_truth_service(
+            service=validated_session_truth_service,
+            legacy_kwargs=legacy_kwargs,
+        )
         try:
             from victor.config.secure_paths import get_victor_dir
 
@@ -447,8 +704,22 @@ class EvaluationHarness:
         except ImportError:
             self._results_dir = Path.home() / ".victor" / "evaluations"
             self._checkpoint_dir = checkpoint_dir or Path.home() / ".victor" / "checkpoints"
-        self._results_dir.mkdir(parents=True, exist_ok=True)
-        self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self._results_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.warning(
+                "Failed to prepare evaluation results directory %s: %s",
+                self._results_dir,
+                exc,
+            )
+        try:
+            self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.warning(
+                "Failed to prepare evaluation checkpoint directory %s: %s",
+                self._checkpoint_dir,
+                exc,
+            )
 
     def register_runner(self, runner: BaseBenchmarkRunner) -> None:
         """Register a benchmark runner.
@@ -478,6 +749,12 @@ class EvaluationHarness:
 
         # Build unique ID from config
         config_str = f"{config.benchmark.value}_{config.model}_{config.max_tasks}"
+        if config.provider:
+            config_str += f"_{config.provider}"
+        if config.prompt_section_name:
+            config_str += f"_{config.prompt_section_name}"
+        if config.prompt_candidate_hash:
+            config_str += f"_{config.prompt_candidate_hash}"
         if config.task_ids:
             config_str += "_" + "_".join(sorted(config.task_ids))
         checkpoint_id = hashlib.md5(config_str.encode()).hexdigest()[:12]
@@ -496,14 +773,7 @@ class EvaluationHarness:
         import json
 
         checkpoint_data = {
-            "config": {
-                "benchmark": config.benchmark.value,
-                "model": config.model,
-                "max_tasks": config.max_tasks,
-                "timeout_per_task": config.timeout_per_task,
-                "max_turns": config.max_turns,
-                "parallel_tasks": config.parallel_tasks,
-            },
+            "config": config.to_artifact_config(),
             "start_time": start_time.isoformat(),
             "completed_task_ids": [r.task_id for r in completed_results],
             "remaining_task_ids": remaining_task_ids,
@@ -520,8 +790,19 @@ class EvaluationHarness:
                     "tokens_output": r.tokens_output,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
                     "error_message": r.error_message,
+                    "failure_category": (r.failure_category.value if r.failure_category else None),
+                    "failure_details": r.failure_details,
+                    "metadata": r.metadata,
+                    "failure_diagnosis": (
+                        r.get_failure_diagnosis().to_dict()
+                        if r.get_failure_diagnosis() is not None
+                        else None
+                    ),
+                    "confidence_assessment": r.get_confidence_assessment().to_dict(),
                     "generated_code": r.generated_code,
                 }
                 for r in completed_results
@@ -530,9 +811,14 @@ class EvaluationHarness:
 
         # Atomic write with temp file
         temp_path = checkpoint_path.with_suffix(".tmp")
-        with open(temp_path, "w") as f:
-            json.dump(checkpoint_data, f, indent=2)
-        temp_path.rename(checkpoint_path)
+        try:
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(temp_path, "w") as f:
+                json.dump(checkpoint_data, f, indent=2)
+            temp_path.rename(checkpoint_path)
+        except OSError as exc:
+            logger.warning("Failed to save checkpoint %s: %s", checkpoint_path, exc)
+            return
 
         logger.debug(f"Checkpoint saved: {len(completed_results)} tasks completed")
 
@@ -569,8 +855,27 @@ class EvaluationHarness:
                     tokens_output=r.get("tokens_output", 0),
                     tool_calls=r.get("tool_calls", 0),
                     turns=r.get("turns", 0),
+                    code_search_calls=r.get("code_search_calls", 0),
+                    graph_calls=r.get("graph_calls", 0),
                     completion_score=r.get("completion_score"),
                     error_message=r.get("error_message"),
+                    failure_category=(
+                        BenchmarkFailureCategory(r["failure_category"])
+                        if r.get("failure_category")
+                        else None
+                    ),
+                    failure_details=r.get("failure_details", {}),
+                    metadata=r.get("metadata", {}),
+                    failure_diagnosis=(
+                        FailureDiagnosis.from_dict(r["failure_diagnosis"])
+                        if r.get("failure_diagnosis")
+                        else None
+                    ),
+                    confidence_assessment=(
+                        ConfidenceAssessment.from_dict(r["confidence_assessment"])
+                        if r.get("confidence_assessment")
+                        else None
+                    ),
                     generated_code=r.get("generated_code"),
                 )
                 completed_results.append(result)
@@ -591,9 +896,12 @@ class EvaluationHarness:
 
     def _clear_checkpoint(self, checkpoint_path: Path) -> None:
         """Remove checkpoint file after successful completion."""
-        if checkpoint_path.exists():
-            checkpoint_path.unlink()
-            logger.debug("Checkpoint cleared")
+        try:
+            if checkpoint_path.exists():
+                checkpoint_path.unlink()
+                logger.debug("Checkpoint cleared")
+        except OSError as exc:
+            logger.warning("Failed to clear checkpoint %s: %s", checkpoint_path, exc)
 
     async def run_evaluation(
         self,
@@ -714,6 +1022,43 @@ class EvaluationHarness:
 
         return result
 
+    async def run_prompt_candidate_evaluation_suite(
+        self,
+        *,
+        base_config: EvaluationConfig,
+        candidate_specs: list[PromptCandidateEvaluationSpec],
+        agent_callback_factory: Callable[[PromptCandidateEvaluationSpec, EvaluationConfig], Any],
+        progress_callback: Optional[Any] = None,
+        retry_callback: Optional[Any] = None,
+        resume: bool = False,
+    ) -> PromptCandidateEvaluationSuiteResult:
+        """Run one benchmark evaluation per bound prompt candidate.
+
+        Each candidate gets its own `EvaluationConfig`, which keeps checkpoints,
+        saved artifacts, and reported metrics attributable to one exact prompt
+        section/candidate pair.
+        """
+        runs: list[PromptCandidateEvaluationRun] = []
+        for spec in candidate_specs:
+            config = bind_prompt_candidate_evaluation_config(base_config, spec)
+            callback = agent_callback_factory(spec, config)
+            result = await self.run_evaluation(
+                config=config,
+                agent_callback=callback,
+                progress_callback=progress_callback,
+                retry_callback=retry_callback,
+                resume=resume,
+            )
+            runs.append(
+                PromptCandidateEvaluationRun(
+                    spec=spec,
+                    config=config,
+                    result=result,
+                    label=spec.resolved_label(config.provider),
+                )
+            )
+        return PromptCandidateEvaluationSuiteResult(base_config=base_config, runs=runs)
+
     async def _run_sequential(
         self,
         tasks: list[BenchmarkTask],
@@ -739,7 +1084,12 @@ class EvaluationHarness:
 
             try:
                 task_result = await self._run_single_task(
-                    task, runner, agent_callback, config, retry_callback, metrics_collector
+                    task,
+                    runner,
+                    agent_callback,
+                    config,
+                    retry_callback,
+                    metrics_collector,
                 )
                 results.append(task_result)
                 all_results.append(task_result)
@@ -768,6 +1118,7 @@ class EvaluationHarness:
                     task_id=task.task_id,
                     status=TaskStatus.ERROR,
                     error_message=str(e),
+                    failure_category=BenchmarkFailureCategory.EXECUTION_ERROR,
                 )
                 results.append(error_result)
                 all_results.append(error_result)
@@ -816,13 +1167,19 @@ class EvaluationHarness:
             async with semaphore:
                 try:
                     result = await self._run_single_task(
-                        task, runner, agent_callback, config, retry_callback, metrics_collector
+                        task,
+                        runner,
+                        agent_callback,
+                        config,
+                        retry_callback,
+                        metrics_collector,
                     )
                 except Exception as e:
                     result = TaskResult(
                         task_id=task.task_id,
                         status=TaskStatus.ERROR,
                         error_message=str(e),
+                        failure_category=BenchmarkFailureCategory.EXECUTION_ERROR,
                     )
 
                 # Save checkpoint and call progress callback with lock
@@ -889,6 +1246,7 @@ class EvaluationHarness:
             except asyncio.TimeoutError:
                 task_result.status = TaskStatus.TIMEOUT
                 task_result.error_message = "Agent timeout"
+                task_result.failure_category = BenchmarkFailureCategory.TIMEOUT
                 # Check if callback stored partial data before cancellation
                 partial_data = getattr(agent_callback, "_partial_data", None)
                 if partial_data:
@@ -897,6 +1255,18 @@ class EvaluationHarness:
                     task_result.tokens_used = partial_data.get("tokens_used", 0)
                     task_result.tool_calls = partial_data.get("tool_calls", 0)
                     task_result.turns = partial_data.get("turns", 0)
+                    task_result.code_search_calls = partial_data.get("code_search_calls", 0)
+                    task_result.graph_calls = partial_data.get("graph_calls", 0)
+                    task_result.metadata = dict(partial_data.get("metadata", {}) or {})
+                    topology_events = partial_data.get("topology_events")
+                    if topology_events:
+                        task_result.metadata["topology_events"] = list(topology_events)
+                    planning_events = partial_data.get("planning_events")
+                    if planning_events:
+                        task_result.metadata["planning_events"] = list(planning_events)
+                    degradation_events = partial_data.get("degradation_events")
+                    if degradation_events:
+                        task_result.metadata["degradation_events"] = list(degradation_events)
                     task_result.generated_code = partial_data.get("code", "")
                     logger.info(
                         f"Task timed out - partial metrics recovered: "
@@ -916,6 +1286,18 @@ class EvaluationHarness:
                 task_result.tokens_used = agent_output.get("tokens_used", 0)
                 task_result.tool_calls = agent_output.get("tool_calls", 0)
                 task_result.turns = agent_output.get("turns", 0)
+                task_result.code_search_calls = agent_output.get("code_search_calls", 0)
+                task_result.graph_calls = agent_output.get("graph_calls", 0)
+                task_result.metadata = dict(agent_output.get("metadata", {}) or {})
+                topology_events = agent_output.get("topology_events")
+                if topology_events:
+                    task_result.metadata["topology_events"] = list(topology_events)
+                planning_events = agent_output.get("planning_events")
+                if planning_events:
+                    task_result.metadata["planning_events"] = list(planning_events)
+                degradation_events = agent_output.get("degradation_events")
+                if degradation_events:
+                    task_result.metadata["degradation_events"] = list(degradation_events)
                 agent_output = agent_output.get("code", "")
 
             # Self-correction loop (if enabled)
@@ -951,11 +1333,22 @@ class EvaluationHarness:
 
                 # Merge results
                 task_result.status = eval_result.status
+                task_result.generated_patch = eval_result.generated_patch
                 task_result.tests_passed = eval_result.tests_passed
                 task_result.tests_failed = eval_result.tests_failed
                 task_result.tests_total = eval_result.tests_total
                 task_result.stdout = eval_result.stdout
                 task_result.stderr = eval_result.stderr
+                task_result.error_message = eval_result.error_message
+                task_result.traceback = eval_result.traceback
+                task_result.failure_category = eval_result.failure_category
+                task_result.failure_details = dict(eval_result.failure_details)
+                task_result.metadata = {
+                    **task_result.metadata,
+                    **dict(eval_result.metadata),
+                }
+                task_result.failure_diagnosis = eval_result.get_failure_diagnosis()
+                task_result.confidence_assessment = eval_result.get_confidence_assessment()
 
                 # Calculate completion score
                 task_result.completion_score = task_result.calculate_completion_score()
@@ -963,6 +1356,7 @@ class EvaluationHarness:
         except Exception as e:
             task_result.status = TaskStatus.ERROR
             task_result.error_message = str(e)
+            task_result.failure_category = BenchmarkFailureCategory.EXECUTION_ERROR
             import traceback
 
             task_result.traceback = traceback.format_exc()
@@ -1132,16 +1526,25 @@ class EvaluationHarness:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"eval_{result.config.benchmark.value}_{timestamp}.json"
         output_path = self._results_dir / filename
+        summary = result.get_metrics()
+        runtime_feedback = derive_runtime_evaluation_feedback(result)
+        runtime_feedback_payload = build_runtime_evaluation_feedback_payload(
+            runtime_feedback,
+            source_result_path=output_path,
+        )
+        experiment_memory = analyze_evaluation_result(
+            result,
+            summary=summary,
+            runtime_feedback=runtime_feedback_payload,
+            source_result_path=output_path,
+        )
 
         # Serialize result
         data = {
-            "config": {
-                "benchmark": result.config.benchmark.value,
-                "model": result.config.model,
-                "max_tasks": result.config.max_tasks,
-                "timeout_per_task": result.config.timeout_per_task,
-            },
-            "summary": result.get_metrics(),
+            "config": result.config.to_artifact_config(),
+            "summary": summary,
+            "runtime_evaluation_feedback": runtime_feedback_payload,
+            "experiment_memory": experiment_memory.to_dict(),
             "start_time": result.start_time.isoformat() if result.start_time else None,
             "end_time": result.end_time.isoformat() if result.end_time else None,
             "tasks": [
@@ -1156,7 +1559,18 @@ class EvaluationHarness:
                     "tokens_output": r.tokens_output,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
+                    "failure_category": (r.failure_category.value if r.failure_category else None),
+                    "failure_details": r.failure_details,
+                    "metadata": r.metadata,
+                    "failure_diagnosis": (
+                        r.get_failure_diagnosis().to_dict()
+                        if r.get_failure_diagnosis() is not None
+                        else None
+                    ),
+                    "confidence_assessment": r.get_confidence_assessment().to_dict(),
                     "code_quality": (
                         {
                             "syntax_valid": r.code_quality.syntax_valid,
@@ -1177,11 +1591,52 @@ class EvaluationHarness:
             ],
         }
 
-        with open(output_path, "w") as f:
-            json.dump(data, f, indent=2)
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError as exc:
+            logger.warning("Failed to save evaluation results to %s: %s", output_path, exc)
+            return output_path
+
+        self._persist_experiment_memory(experiment_memory)
+        try:
+            self._save_validated_session_feedbacks(
+                result,
+                source_result_path=output_path,
+                summary=summary,
+            )
+        except Exception as exc:
+            logger.warning("Validated session-truth persistence failed: %s", exc)
 
         logger.info(f"Results saved to: {output_path}")
         return output_path
+
+    def _persist_experiment_memory(self, record: ExperimentMemoryRecord) -> None:
+        """Append a reusable experiment-memory record for later retrieval."""
+        try:
+            store = ExperimentMemoryStore(
+                persist_path=self._results_dir / "experiment_memory.json",
+            )
+            store.record(record)
+        except Exception as exc:
+            logger.warning("Experiment-memory persistence failed: %s", exc)
+
+    def _save_validated_session_feedbacks(
+        self,
+        result: EvaluationResult,
+        *,
+        source_result_path: Path,
+        summary: Optional[dict[str, Any]] = None,
+    ) -> list[Path]:
+        """Persist per-task validated session-truth artifacts for supported workflows."""
+        return self._validated_session_truth_service.persist_evaluation_result(
+            result,
+            results_dir=self._results_dir,
+            source_result_path=source_result_path,
+            summary=summary,
+            refresh_when_empty=True,
+        )
 
     def load_results(self, path: Path) -> dict:
         """Load evaluation results from disk."""

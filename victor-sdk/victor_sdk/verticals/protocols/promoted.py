@@ -33,7 +33,6 @@ from victor_sdk.verticals.protocols.promoted_types import (
     ValidationError,
 )
 
-
 # =============================================================================
 # Tool Selection Strategy Protocol
 # =============================================================================
@@ -170,9 +169,7 @@ class MiddlewareProtocol(Protocol):
     """
 
     @abstractmethod
-    async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
         """Called before a tool is executed."""
         ...
 
@@ -479,9 +476,7 @@ class StageValidator:
                 f"Missing required stages: {sorted(missing)}",
             )
 
-    def _validate_stage_names(
-        self, stages: Dict[str, Any], result: StageValidationResult
-    ) -> None:
+    def _validate_stage_names(self, stages: Dict[str, Any], result: StageValidationResult) -> None:
         for sname in stages.keys():
             if any(sname.startswith(prefix) for prefix in StageContract.RESERVED_PREFIXES):
                 result.add_error(
@@ -489,9 +484,7 @@ class StageValidator:
                     f"Stage '{sname}' uses reserved prefix",
                 )
             if not sname.isupper():
-                result.add_warning(
-                    f"Stage '{sname}' should use UPPERCASE naming convention"
-                )
+                result.add_warning(f"Stage '{sname}' should use UPPERCASE naming convention")
 
     def _validate_stage_attributes(
         self, sname: str, stage_def: Any, result: StageValidationResult
@@ -507,12 +500,10 @@ class StageValidator:
                 ValidationError.INVALID_DESCRIPTION,
                 f"Stage '{sname}' missing 'name' attribute",
             )
+        description = stage_def.get("description")
         if "description" not in stage_def:
             result.add_warning(f"Stage '{sname}' missing 'description' attribute")
-        elif (
-            not isinstance(stage_def.get("description"), str)
-            or not stage_def.get("description").strip()
-        ):
+        elif not isinstance(description, str) or not description.strip():
             result.add_error(
                 ValidationError.INVALID_DESCRIPTION,
                 f"Stage '{sname}' has invalid 'description' (must be non-empty string)",
@@ -543,9 +534,7 @@ class StageValidator:
                 f"Terminal stage '{sname}' should not have next_stages",
             )
 
-    def _validate_transitions(
-        self, stages: Dict[str, Any], result: StageValidationResult
-    ) -> None:
+    def _validate_transitions(self, stages: Dict[str, Any], result: StageValidationResult) -> None:
         graph: Dict[str, Set[str]] = {}
         for sname, stage_def in stages.items():
             next_stages = stage_def.get("next_stages", set())
@@ -558,14 +547,13 @@ class StageValidator:
                 if to_stage not in stages:
                     result.add_error(
                         ValidationError.INVALID_TRANSITION,
-                        f"Invalid transition from '{from_stage}' to non-existent stage '{to_stage}'",
+                        f"Invalid transition from '{from_stage}' to "
+                        f"non-existent stage '{to_stage}'",
                     )
         for sname in stages:
             if sname not in StageContract.TERMINAL_STAGES:
                 if not graph.get(sname):
-                    result.add_warning(
-                        f"Non-terminal stage '{sname}' has no next_stages defined"
-                    )
+                    result.add_warning(f"Non-terminal stage '{sname}' has no next_stages defined")
 
     def _check_circular_transitions(
         self, graph: Dict[str, Set[str]], result: StageValidationResult
@@ -608,9 +596,7 @@ class StageContractMixin:
         """Validate stage definitions."""
         return self._stage_validator.validate(stages, stage_name)
 
-    def ensure_stage_contract(
-        self, stages: Dict[str, Any], stage_name: str = "default"
-    ) -> None:
+    def ensure_stage_contract(self, stages: Dict[str, Any], stage_name: str = "default") -> None:
         """Ensure stage definitions satisfy contract, raise if not."""
         result = self.validate_stages(stages, stage_name)
         if not result.is_valid:

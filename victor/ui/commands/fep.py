@@ -436,7 +436,7 @@ This PR proposes {metadata.title.lower()}.
         console.print(f"  2. Stage file: git add {fep_path}")
         console.print(f"  3. Commit: git commit -m '{pr_title}'")
         console.print(f"  4. Push: git push -u origin {branch_name}")
-        console.print(f"  5. Create PR on GitHub")
+        console.print("  5. Create PR on GitHub")
         raise typer.Exit(1)
 
 
@@ -564,7 +564,7 @@ def view_fep(
     # Find FEP file
     fep_files = list(feps_dir.glob(f"fep-{fep_number:04d}-*.md"))
     if not fep_files:
-        console.print(f"[bold red]Error:[/] FEP file not found")
+        console.print("[bold red]Error:[/] FEP file not found")
         raise typer.Exit(1)
 
     fep_file = fep_files[0]
@@ -599,7 +599,7 @@ def view_fep(
                 panel_content += f"\n{author_str}"
 
         if metadata.reviewers:
-            panel_content += f"\n\n[bold]Reviewers:[/]\n"
+            panel_content += "\n\n[bold]Reviewers:[/]\n"
             for reviewer in metadata.reviewers:
                 panel_content += f"  • {reviewer}"
 
@@ -685,7 +685,11 @@ def show_fep_stats() -> None:
 
     console.print()
     console.print(
-        Panel(f"[bold]Total FEPs:[/] {stats['total']}", title="FEP Statistics", border_style="cyan")
+        Panel(
+            f"[bold]Total FEPs:[/] {stats['total']}",
+            title="FEP Statistics",
+            border_style="cyan",
+        )
     )
     console.print()
 

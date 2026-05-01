@@ -18,6 +18,7 @@ Submodules:
 from __future__ import annotations
 
 import importlib
+import warnings
 from typing import Any
 
 # Map every exported name to its submodule
@@ -39,6 +40,7 @@ _MODULE_MEMBERS = {
         "ToolRegistrarProtocol",
         "ToolSequenceTrackerProtocol",
         "ToolOutputFormatterProtocol",
+        "ToolCallTrackerProtocol",
         "ToolDeduplicationTrackerProtocol",
         "ToolDependencyGraphProtocol",
         "ToolPluginRegistryProtocol",
@@ -63,10 +65,12 @@ _MODULE_MEMBERS = {
         "StreamingToolChunk",
         "StreamingToolAdapterProtocol",
         "StreamingControllerProtocol",
+        "StreamingCoordinatorProtocol",
         "StreamingRecoveryCoordinatorProtocol",
         "ChunkGeneratorProtocol",
         "StreamingHandlerProtocol",
         "StreamingMetricsCollectorProtocol",
+        "StreamingConfidenceMonitorProtocol",
     ],
     "provider_protocols": [
         "ProviderManagerProtocol",
@@ -86,6 +90,7 @@ _MODULE_MEMBERS = {
         "IToolCallClassifier",
     ],
     "coordination_protocols": [
+        "CoordinationAdvisorRuntimeProtocol",
         "ToolPlannerProtocol",
         "TaskCoordinatorProtocol",
         "ToolCoordinatorProtocol",
@@ -136,6 +141,9 @@ _MODULE_MEMBERS = {
         "IMultiplierCalculator",
         "IModeCompletionChecker",
     ],
+    "context_protocols": [
+        "ContextTemperatureClassifierProtocol",
+    ],
 }
 
 # Build the reverse map
@@ -145,12 +153,61 @@ for _mod, _names in _MODULE_MEMBERS.items():
 
 __all__ = list(_SUBMODULE_MAP.keys())
 
+_DEPRECATED_EXPORTS = {
+    "CoordinationAdvisorRuntimeProtocol": (
+        "victor.agent.protocols.CoordinationAdvisorRuntimeProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.CoordinationAdvisorRuntimeProtocol."
+    ),
+    "ToolCoordinatorProtocol": (
+        "victor.agent.protocols.ToolCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer ToolServiceProtocol."
+    ),
+    "ChunkGeneratorProtocol": (
+        "victor.agent.protocols.ChunkGeneratorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.ChunkRuntimeProtocol."
+    ),
+    "ToolPlannerProtocol": (
+        "victor.agent.protocols.ToolPlannerProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.ToolPlanningRuntimeProtocol."
+    ),
+    "TaskCoordinatorProtocol": (
+        "victor.agent.protocols.TaskCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.TaskRuntimeProtocol."
+    ),
+    "StateCoordinatorProtocol": (
+        "victor.agent.protocols.StateCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.StateRuntimeProtocol."
+    ),
+    "PromptCoordinatorProtocol": (
+        "victor.agent.protocols.PromptCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.PromptRuntimeProtocol."
+    ),
+    "StreamingRecoveryCoordinatorProtocol": (
+        "victor.agent.protocols.StreamingRecoveryCoordinatorProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.StreamingRecoveryRuntimeProtocol."
+    ),
+    "RLCoordinatorProtocol": (
+        "victor.agent.protocols.RLCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.RLLearningRuntimeProtocol."
+    ),
+}
+
 
 def __getattr__(name: str) -> Any:
     """Lazy import: resolve protocol names on first access."""
     if name in _SUBMODULE_MAP:
         mod = importlib.import_module(f"victor.agent.protocols.{_SUBMODULE_MAP[name]}")
         value = getattr(mod, name)
+        if name in _DEPRECATED_EXPORTS:
+            warnings.warn(
+                _DEPRECATED_EXPORTS[name],
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return value
+
         # Cache on the module for subsequent access
         globals()[name] = value
         return value

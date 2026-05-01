@@ -35,7 +35,9 @@ class EnrichmentProvider(Protocol):
         """
         ...
 
-    def get_enrichment_functions(self) -> List[Callable[[Dict[str, Any]], Dict[str, Any]]]:
+    def get_enrichment_functions(
+        self,
+    ) -> List[Callable[[Dict[str, Any]], Dict[str, Any]]]:
         """Return list of enrichment functions.
 
         Returns:

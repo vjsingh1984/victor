@@ -39,7 +39,7 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 from victor.agent.stream_handler import StreamMetrics, StreamResult
 
 if TYPE_CHECKING:
-    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,8 @@ class StreamingSession:
             "metrics": (
                 {
                     "ttft": self.metrics.time_to_first_token if self.metrics else None,
-                    "total_duration": self.metrics.total_duration if self.metrics else None,
-                    "tokens_per_second": self.metrics.tokens_per_second if self.metrics else None,
+                    "total_duration": (self.metrics.total_duration if self.metrics else None),
+                    "tokens_per_second": (self.metrics.tokens_per_second if self.metrics else None),
                     "total_chunks": self.metrics.total_chunks if self.metrics else 0,
                 }
                 if self.metrics
@@ -316,7 +316,9 @@ class StreamingController:
     def _record_to_analytics_collector(self, session: StreamingSession) -> None:
         """Record session to analytics collector."""
         try:
-            from victor.analytics.streaming_metrics import StreamMetrics as AnalyticsMetrics
+            from victor.observability.analytics.streaming_metrics import (
+                StreamMetrics as AnalyticsMetrics,
+            )
 
             if not session.metrics:
                 return

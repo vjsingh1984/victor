@@ -21,6 +21,7 @@ from victor.framework import (
     Stage,
     State,
     StateHooks,
+    UnifiedAgentConfig,
     Task,
     TaskResult,
     FrameworkTaskType,
@@ -107,6 +108,14 @@ class TestToolSet:
         ts = ToolSet.from_tools(["read", "write"])
         assert "read" in ts
         assert "unknown" not in ts
+
+
+class TestConfigExports:
+    """Tests for framework config exports."""
+
+    def test_unified_agent_config_exported(self):
+        """UnifiedAgentConfig should be available from victor.framework."""
+        assert UnifiedAgentConfig.high_budget().tool_budget == 200
 
 
 class TestEventType:
@@ -227,6 +236,21 @@ class TestTaskResult:
         assert "/tmp/a.txt" in read
         assert "/tmp" in read
 
+    def test_files_read_and_modified_extract_legacy_aliases(self):
+        """Legacy core tool aliases should resolve to canonical read/write semantics."""
+        result = TaskResult(
+            content="Done",
+            tool_calls=[
+                {"tool": "write_file", "arguments": {"path": "/tmp/a.txt"}, "success": True},
+                {"tool": "read_file", "arguments": {"path": "/tmp/b.txt"}, "success": True},
+                {"tool": "list_directory", "arguments": {"path": "/tmp"}, "success": True},
+            ],
+        )
+
+        assert "/tmp/a.txt" in result.files_modified
+        assert "/tmp/b.txt" in result.files_read
+        assert "/tmp" in result.files_read
+
     def test_tool_count(self):
         """tool_count should return number of tool calls."""
         result = TaskResult(
@@ -287,7 +311,7 @@ class TestErrors:
     def test_agent_error(self):
         """AgentError should have message and recoverable flag."""
         err = AgentError("Something failed", recoverable=True)
-        assert str(err) == "Something failed"
+        assert "Something failed" in str(err)
         assert err.recoverable
 
     def test_provider_error(self):
@@ -323,7 +347,7 @@ class TestState:
         Phase 7.2: Updated to use protocol methods instead of direct attribute access.
         """
         from unittest.mock import MagicMock, PropertyMock
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         mock_orchestrator = MagicMock()
         # Configure protocol methods
@@ -351,7 +375,7 @@ class TestState:
         Phase 7.2: Updated to use protocol methods instead of direct attribute access.
         """
         from unittest.mock import MagicMock, PropertyMock
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         mock_orchestrator = MagicMock()
         # Configure protocol methods

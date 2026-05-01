@@ -176,15 +176,27 @@ from victor.tools.base import AccessMode, DangerLevel, Priority
 
 
 def _create_file_editor(backup_dir: str):
-    """Create a FileEditor instance via capability registry."""
+    """Create a FileEditor instance via capability registry.
+
+    The registry may return:
+    - A class (FileEditor) → instantiate with backup_dir
+    - A _LazyCapabilityProxy → resolves to class or instance
+    - An already-instantiated FileEditor → use directly
+    """
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import EditorProtocol
 
     registry = CapabilityRegistry.get_instance()
-    factory = registry.get(EditorProtocol)
-    if factory is not None and registry.is_enhanced(EditorProtocol):
-        # The enhanced provider is a callable factory (the FileEditor class)
-        return factory(backup_dir=backup_dir)
+    provider = registry.get(EditorProtocol)
+    if provider is not None and registry.is_enhanced(EditorProtocol):
+        # If it's a class, instantiate it
+        if isinstance(provider, type):
+            return provider(backup_dir=backup_dir)
+        # Already an instance — reset any stale transaction state
+        # FileEditor uses current_transaction (Optional[EditTransaction]), not _in_transaction
+        if hasattr(provider, "current_transaction"):
+            provider.current_transaction = None
+        return provider
     return None
 
 
@@ -206,11 +218,20 @@ from victor.tools.filesystem import enforce_sandbox_path
     access_mode=AccessMode.WRITE,  # Creates/modifies/deletes files
     danger_level=DangerLevel.LOW,  # Changes are undoable via transaction system
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["ops"],  # Different operations indicate progress, not loops
+    signature_params=["ops"],  # Different operations indicate progress, not loops
     stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "action"],  # Task types for classification-aware selection
     execution_category="write",  # Cannot run in parallel with conflicting ops
-    keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
+    keywords=[
+        "edit",
+        "modify",
+        "replace",
+        "create",
+        "delete",
+        "rename",
+        "file",
+        "text",
+    ],
     # Examples help LLMs understand correct parameter format
     examples=[
         'edit(ops=[{"type": "replace", "path": "config.py", "old_str": "DEBUG = True", "new_str": "DEBUG = False"}])',
@@ -250,6 +271,8 @@ async def edit(
     Args:
         ops: REQUIRED! List of operations. Each op must have 'type' and 'path'.
              Example: [{"type": "replace", "path": "f.py", "old_str": "x", "new_str": "y"}]
+             Prefer passing a structured list/object. JSON strings are accepted
+             as a compatibility fallback for weaker tool-calling models.
         preview: Show diff without applying (default: False)
         commit: Auto-apply changes (default: True)
         desc: Change description for tracking
@@ -344,15 +367,8 @@ async def edit(
         try:
             ops = json.loads(ops)
         except json.JSONDecodeError as exc:
-            # Try to provide helpful error message and recovery hints
-            error_context = ""
-
             # Detect control character issues (common with embedded newlines)
             if "control character" in str(exc).lower():
-                error_context = (
-                    "\n\nHINT: JSON strings cannot contain raw newlines or tabs. "
-                    "Use \\n for newlines and \\t for tabs within string values."
-                )
                 # Try to fix by escaping control characters in strings
                 try:
                     fixed = _fix_json_control_chars(ops)
@@ -364,23 +380,31 @@ async def edit(
                     pass  # Recovery failed, use original error
 
             if isinstance(ops, str):  # Still a string = parsing failed
-                # Detect delimiter issues
-                if "delimiter" in str(exc).lower():
-                    error_context = "\n\nHINT: Check for missing commas between array elements or object properties."
-                # Detect structure issues
-                elif "Expecting" in str(exc):
-                    error_context = (
-                        "\n\nHINT: Check JSON structure - ensure arrays use [], objects use {}, "
-                        "and strings are quoted."
-                    )
+                # Build a targeted correction prompt showing the error location
+                error_pos = getattr(exc, "pos", 0) or 0
+                snippet_start = max(0, error_pos - 40)
+                snippet_end = min(len(ops), error_pos + 40)
+                error_snippet = ops[snippet_start:snippet_end]
+                pointer = " " * min(40, error_pos - snippet_start) + "^"
 
-                example = (
-                    "\n\nCorrect format example:\n"
-                    '[{"type": "replace", "path": "file.py", "old_str": "x=1", "new_str": "x=2"}]'
+                correction_prompt = (
+                    f"Your edit JSON has a syntax error at position {error_pos}:\n"
+                    f"  ...{error_snippet}...\n"
+                    f"  {pointer} {exc.msg if hasattr(exc, 'msg') else str(exc)}\n\n"
+                    f"Please call edit() again with corrected JSON. Common fixes:\n"
+                    f"- Escape newlines in strings: use \\n not actual newlines\n"
+                    f'- Escape quotes in strings: use \\" not bare quotes\n'
+                    f"- Ensure commas between array elements and object properties\n"
+                    f"- Ensure old_str matches the file content EXACTLY\n\n"
+                    f"Correct format:\n"
+                    f'edit(ops=[{{"type": "replace", "path": "file.py", '
+                    f'"old_str": "exact match", "new_str": "replacement"}}])'
                 )
+
                 return {
                     "success": False,
-                    "error": f"Invalid JSON for operations: {exc}{error_context}{example}",
+                    "error": correction_prompt,
+                    "retryable": True,
                 }
 
     if not ops:
@@ -400,7 +424,10 @@ async def edit(
 
         op_type = op.get("type")
         if not op_type:
-            return {"success": False, "error": f"Operation {i} missing required field: type"}
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: type",
+            }
 
         if op_type not in ["create", "modify", "delete", "rename", "replace"]:
             return {
@@ -409,7 +436,10 @@ async def edit(
             }
 
         if "path" not in op:
-            return {"success": False, "error": f"Operation {i} missing required field: path"}
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: path",
+            }
 
         # Validate type-specific requirements
         if op_type == "rename" and "new_path" not in op:
@@ -428,7 +458,7 @@ async def edit(
 
     # Initialize change tracker for undo/redo
     tracker = get_change_tracker()
-    tracker.begin_change_group("edit_files", desc or f"Edit {len(ops)} files")
+    tracker.begin_change_group("edit", desc or f"Edit {len(ops)} files")
 
     # Count operations by type
     by_type = {"create": 0, "modify": 0, "delete": 0, "rename": 0}
@@ -455,7 +485,7 @@ async def edit(
                     change_type=ChangeType.CREATE,
                     original_content=None,
                     new_content=content,
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "create", "path": path},
                 )
 
@@ -479,7 +509,7 @@ async def edit(
                     change_type=ChangeType.MODIFY,
                     original_content=original_content,
                     new_content=content,
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "modify", "path": path},
                 )
 
@@ -496,7 +526,7 @@ async def edit(
                     change_type=ChangeType.DELETE,
                     original_content=original_content,
                     new_content=None,
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "delete", "path": path},
                 )
 
@@ -510,7 +540,7 @@ async def edit(
                     file_path=str(new_file_path),
                     change_type=ChangeType.RENAME,
                     original_path=str(file_path),
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "rename", "path": path, "new_path": new_path},
                 )
 
@@ -540,6 +570,17 @@ async def edit(
                 # Read current content
                 original_content = file_path.read_text(encoding="utf-8")
 
+                # Reject no-op edits (old_str == new_str)
+                if old_str == new_str:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"No-op edit rejected: old_str and new_str are identical "
+                            f"for {path}. Provide a different new_str to make an "
+                            f"actual change."
+                        ),
+                    }
+
                 # Check if old_str exists in file
                 occurrences = original_content.count(old_str)
                 if occurrences == 0:
@@ -549,11 +590,26 @@ async def edit(
 
                     # Try to find similar content to help debug
                     hint = ""
+                    context_str = ""
                     if old_str_first_line in original_content:
                         hint = (
                             f" The first line '{old_str_first_line}' exists in file but "
                             f"subsequent lines don't match. Check line endings and indentation."
                         )
+                        # Show surrounding file content to help model retry
+                        file_lines = original_content.splitlines()
+                        for i, line in enumerate(file_lines):
+                            if old_str_first_line in line:
+                                start = max(0, i - 3)
+                                end = min(len(file_lines), i + 8)
+                                numbered = [
+                                    f"{start + j + 1}: {file_lines[start + j]}"
+                                    for j in range(end - start)
+                                ]
+                                context_str = "\n\nActual file content around match:\n" + "\n".join(
+                                    numbered
+                                )
+                                break
                     elif old_str.rstrip() in original_content:
                         hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
                     elif old_str.lstrip() in original_content:
@@ -564,7 +620,13 @@ async def edit(
                         "error": (
                             f"Replace operation failed: old_str not found in {path}.{hint} "
                             f"Make sure the string matches exactly including whitespace. "
-                            f"Searched for: {repr(old_str_preview)}"
+                            f"Searched for: {repr(old_str_preview)}{context_str}"
+                            + (
+                                "\n\nTo fix: Copy the EXACT text from the file content above "
+                                "as your old_str. Do NOT type it from memory."
+                                if context_str
+                                else ""
+                            )
                         ),
                     }
                 if occurrences > 1:
@@ -589,8 +651,12 @@ async def edit(
                     change_type=ChangeType.MODIFY,
                     original_content=original_content,
                     new_content=new_content,
-                    tool_name="edit_files",
-                    tool_args={"type": "replace", "path": path, "old_str": old_str[:50]},
+                    tool_name="edit",
+                    tool_args={
+                        "type": "replace",
+                        "path": path,
+                        "old_str": old_str[:50],
+                    },
                 )
 
     except Exception as e:
@@ -600,20 +666,69 @@ async def edit(
 
     operations_queued = len(ops)
 
-    # Handle preview mode
-    if preview:
-        import io
-        import sys
+    import io
+    import sys
 
-        # Capture preview output
+    def _capture_stdout(fn):
+        """Call fn() while capturing any stdout it writes; return captured text."""
         old_stdout = sys.stdout
-        sys.stdout = captured_output = io.StringIO()
-
+        sys.stdout = buf = io.StringIO()
         try:
-            editor.preview_diff(context_lines=ctx)
-            preview_text = captured_output.getvalue()
+            fn()
         finally:
             sys.stdout = old_stdout
+        return buf.getvalue()
+
+    def _format_diff_for_console(preview_text: str) -> str:
+        """Format diff output for Rich console with syntax highlighting.
+
+        Converts unified diff format to Rich-compatible markdown with
+        proper syntax highlighting for additions/deletions.
+
+        Args:
+            preview_text: Raw unified diff output from FileEditor
+
+        Returns:
+            Formatted diff string with Rich markup
+        """
+        if not preview_text:
+            return ""
+
+        lines = preview_text.splitlines()
+        formatted_lines = []
+
+        for line in lines:
+            # Unified diff markers
+            if line.startswith("---") or line.startswith("+++"):
+                # File paths - show in cyan
+                formatted_lines.append(f"[cyan]{line}[/]")
+            elif line.startswith("@@"):
+                # Line numbers - show in dim
+                formatted_lines.append(f"[dim]{line}[/]")
+            elif line.startswith("+"):
+                # Additions - show in green
+                formatted_lines.append(f"[green]{line}[/]")
+            elif line.startswith("-"):
+                # Deletions - show in red
+                formatted_lines.append(f"[red]{line}[/]")
+            elif line.startswith(" "):
+                # Context lines - show in dim
+                formatted_lines.append(f"[dim]{line}[/]")
+            else:
+                # Other lines (headers, etc.)
+                formatted_lines.append(line)
+
+        return "\n".join(formatted_lines)
+
+    # Always capture diff for preview (after successful operations)
+    # This ensures the preview shows actual changes, not just requested changes
+    diff_output = None
+    formatted_diff = None
+
+    # Handle preview mode
+    if preview:
+        preview_text = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
+        formatted_diff = _format_diff_for_console(preview_text)
 
         if not commit:
             editor.abort()
@@ -623,18 +738,33 @@ async def edit(
                 "operations_applied": 0,
                 "by_type": by_type,
                 "preview_output": preview_text,
+                "diff": preview_text,  # Raw diff for programmatic use
+                "diff_formatted": formatted_diff,  # Rich-formatted diff for console
                 "message": f"Preview generated for {operations_queued} operations (not applied)",
             }
         else:
-            # Preview but still commit
-            success = editor.commit(dry_run=False)
+            # Preview but still commit (suppress FileEditor's commit stdout)
+            _capture_stdout(lambda: None)  # discard; real commit captured below
+            success_ref = [False]
+
+            def _do_commit():
+                success_ref[0] = editor.commit(dry_run=False)
+
+            _capture_stdout(_do_commit)
+            success = success_ref[0]
             if success:
+                # FileEditor clears its transaction on commit, so preserve the
+                # already-computed preview diff as the authoritative change view.
+                diff_output = preview_text
+                formatted_diff = _format_diff_for_console(diff_output)
                 return {
                     "success": True,
                     "operations_queued": operations_queued,
                     "operations_applied": operations_queued,
                     "by_type": by_type,
                     "preview_output": preview_text,
+                    "diff": diff_output,  # Raw diff for programmatic use
+                    "diff_formatted": formatted_diff,  # Rich-formatted diff for console
                     "message": f"Applied {operations_queued} operations successfully",
                 }
             else:
@@ -643,13 +773,24 @@ async def edit(
                     "error": "Failed to commit changes. Transaction rolled back.",
                 }
 
-    # Handle commit
+    # Handle commit (suppress FileEditor's transaction stdout — Victor formats its own output)
     if commit:
-        success = editor.commit(dry_run=False)
+        # FileEditor clears current_transaction during commit(), so capture the
+        # diff while the transaction is still active.
+        diff_output = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
+        formatted_diff = _format_diff_for_console(diff_output) if diff_output else None
+        success_ref = [False]
+
+        def _do_commit():
+            success_ref[0] = editor.commit(dry_run=False)
+
+        _capture_stdout(_do_commit)
+        success = success_ref[0]
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
-            return {
+
+            result = {
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,
@@ -657,10 +798,21 @@ async def edit(
                 "message": f"Successfully applied {operations_queued} operations. Use /undo to revert.",
                 "transaction_id": transaction_id,
             }
+
+            # Include diff if available (for preview renderer)
+            if diff_output:
+                result["diff"] = diff_output
+            if formatted_diff:
+                result["diff_formatted"] = formatted_diff
+
+            return result
         else:
             # Clear change group on failure
             tracker._current_group = None
-            return {"success": False, "error": "Failed to commit changes. Transaction rolled back."}
+            return {
+                "success": False,
+                "error": "Failed to commit changes. Transaction rolled back.",
+            }
     else:
         # Queue only, don't commit
         editor.abort()  # Abort to clean up, since we're not committing

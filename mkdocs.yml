@@ -187,5 +187,6 @@ nav:
       - development/index.md
       - Setup: development/setup.md
       - Code Style: development/code-style.md
+      - Exception Handling: development/exception-handling.md
       - Testing: development/testing.md
       - PR Workflow: development/PR_WORKFLOW.md

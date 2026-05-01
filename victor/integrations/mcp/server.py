@@ -41,7 +41,8 @@ from victor.integrations.mcp.protocol import (
     MCPTool,
     MCPToolCallResult,
 )
-from victor.tools.base import BaseTool, ToolRegistry
+from victor.tools.base import BaseTool
+from victor.tools.registry import ToolRegistry
 
 
 class MCPServer:
@@ -642,7 +643,8 @@ async def run_mcp_server_stdio() -> None:
     import sys
 
     from victor.config.settings import Settings
-    from victor.tools.base import BaseTool, ToolRegistry
+    from victor.tools.base import BaseTool
+    from victor.tools.registry import ToolRegistry
 
     # Initialize settings
     Settings()
@@ -695,5 +697,10 @@ async def run_mcp_server_stdio() -> None:
     await server.start_stdio_server()
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point for MCP server."""
     run_sync(run_mcp_server_stdio())
+
+
+if __name__ == "__main__":
+    main()

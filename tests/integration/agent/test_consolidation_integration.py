@@ -165,60 +165,66 @@ class TestCoordinatorIntegration:
 
     def test_tool_coordinator_protocol_importable(self):
         """Test ToolCoordinatorProtocol can be imported."""
-        from victor.agent.protocols import ToolCoordinatorProtocol
+        with pytest.warns(
+            DeprecationWarning,
+            match="ToolCoordinatorProtocol is deprecated compatibility surface",
+        ):
+            from victor.agent.protocols import ToolCoordinatorProtocol
 
         assert ToolCoordinatorProtocol is not None
 
     def test_state_coordinator_protocol_importable(self):
         """Test StateCoordinatorProtocol can be imported."""
-        from victor.agent.protocols import StateCoordinatorProtocol
+        with pytest.warns(
+            DeprecationWarning,
+            match="StateCoordinatorProtocol is deprecated compatibility surface",
+        ):
+            from victor.agent.protocols import StateCoordinatorProtocol
 
         assert StateCoordinatorProtocol is not None
 
     def test_prompt_coordinator_protocol_importable(self):
         """Test PromptCoordinatorProtocol can be imported."""
-        from victor.agent.protocols import PromptCoordinatorProtocol
+        with pytest.warns(
+            DeprecationWarning,
+            match="PromptCoordinatorProtocol is deprecated compatibility surface",
+        ):
+            from victor.agent.protocols import PromptCoordinatorProtocol
 
         assert PromptCoordinatorProtocol is not None
 
-    def test_tool_coordinator_importable(self):
-        """Test ToolCoordinator can be imported."""
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+    def test_state_runtime_adapter_importable(self):
+        """Test StateRuntimeAdapter can be imported from services."""
+        from victor.agent.services.state_runtime import StateRuntimeAdapter
 
-        assert ToolCoordinator is not None
+        assert StateRuntimeAdapter is not None
 
-    def test_state_coordinator_importable(self):
-        """Test StateCoordinator can be imported."""
-        from victor.agent.state_coordinator import StateCoordinator
+    def test_prompt_runtime_adapter_importable(self):
+        """Test PromptRuntimeAdapter can be imported from services."""
+        from victor.agent.services.prompt_runtime import PromptRuntimeAdapter
 
-        assert StateCoordinator is not None
+        assert PromptRuntimeAdapter is not None
 
-    def test_prompt_coordinator_importable(self):
-        """Test PromptCoordinator can be imported."""
-        from victor.agent.prompt_coordinator import PromptCoordinator
+    def test_prompt_runtime_config_importable(self):
+        """Test PromptRuntimeConfig can be imported from services."""
+        from victor.agent.services.prompt_runtime import PromptRuntimeConfig
 
-        assert PromptCoordinator is not None
-
-    def test_tool_coordinator_config_importable(self):
-        """Test ToolCoordinatorConfig can be imported."""
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinatorConfig
-
-        config = ToolCoordinatorConfig()
-        assert config.default_budget > 0
-
-    def test_state_coordinator_config_importable(self):
-        """Test StateCoordinatorConfig can be imported."""
-        from victor.agent.state_coordinator import StateCoordinatorConfig
-
-        config = StateCoordinatorConfig()
-        assert config.enable_auto_transitions is True
-
-    def test_prompt_coordinator_config_importable(self):
-        """Test PromptCoordinatorConfig can be imported."""
-        from victor.agent.prompt_coordinator import PromptCoordinatorConfig
-
-        config = PromptCoordinatorConfig()
+        config = PromptRuntimeConfig()
         assert config.enable_task_hints is True
+
+    def test_deleted_state_compat_module_not_importable(self):
+        """Test deleted state_compat module is not importable."""
+        import pytest
+
+        with pytest.raises(ImportError, match="state_compat"):
+            from victor.agent.services import state_compat  # noqa: F401
+
+    def test_deleted_prompt_compat_module_not_importable(self):
+        """Test deleted prompt_compat module is not importable."""
+        import pytest
+
+        with pytest.raises(ImportError, match="prompt_compat"):
+            from victor.agent.services import prompt_compat  # noqa: F401
 
 
 class TestQueryEnhancementIntegration:
@@ -410,7 +416,7 @@ class TestConversationStateIntegration:
 
     def test_conversation_stage_available(self):
         """Test ConversationStage enum is available."""
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         assert ConversationStage is not None
         # Check some stages exist
@@ -420,13 +426,13 @@ class TestConversationStateIntegration:
 
     def test_conversation_state_available(self):
         """Test ConversationState is available."""
-        from victor.agent.conversation_state import ConversationState
+        from victor.agent.conversation.state_machine import ConversationState
 
         assert ConversationState is not None
 
     def test_stage_order_available(self):
         """Test STAGE_ORDER is available."""
-        from victor.agent.conversation_state import STAGE_ORDER
+        from victor.agent.conversation.state_machine import STAGE_ORDER
 
         assert STAGE_ORDER is not None
         assert len(STAGE_ORDER) > 0
@@ -492,43 +498,72 @@ class TestEndToEndIntegration:
         assert result is not None
         assert result.original == "Find all fn definitions"
 
-    def test_coordinators_can_be_instantiated(self):
-        """Test that coordinators can be instantiated with minimal config."""
-        from victor.agent.prompt_coordinator import (
-            PromptCoordinator,
-            PromptCoordinatorConfig,
+    def test_runtime_adapters_can_be_instantiated(self):
+        """Test that canonical runtime adapters can be instantiated.
+
+        The canonical adapters are:
+        - StateRuntimeAdapter: Wraps ConversationController + ConversationStateMachine
+        - PromptRuntimeAdapter: Wraps PromptBuilder with runtime configuration
+
+        Note: Deprecated compatibility shims (StateCoordinator, PromptCoordinator)
+        still exist for backward compatibility but emit deprecation warnings.
+        """
+        from unittest.mock import MagicMock
+
+        from victor.agent.services.prompt_runtime import (
+            PromptRuntimeAdapter,
+            PromptRuntimeConfig,
         )
-        from victor.agent.state_coordinator import (
-            StateCoordinator,
-            StateCoordinatorConfig,
-        )
-        from victor.agent.coordinators.tool_coordinator import (
-            ToolCoordinator,
-            ToolCoordinatorConfig,
-        )
+        from victor.agent.services.state_runtime import StateRuntimeAdapter
         from victor.framework import PromptBuilder
 
-        # Tool coordinator
-        tool_config = ToolCoordinatorConfig(default_budget=25)
-        tool_coord = ToolCoordinator(
-            tool_pipeline=None,  # Optional dependency
-            tool_registry=None,  # Optional dependency
-            config=tool_config,
+        # StateRuntimeAdapter (canonical implementation)
+        mock_controller = MagicMock()
+        state_adapter = StateRuntimeAdapter(
+            conversation_controller=mock_controller,
         )
-        assert tool_coord.get_remaining_budget() == 25
+        assert state_adapter is not None
 
-        # State coordinator
-        state_config = StateCoordinatorConfig()
-        state_coord = StateCoordinator(
-            conversation_controller=None,  # Optional dependency
-            config=state_config,
-        )
-        assert state_coord is not None
-
-        # Prompt coordinator
-        prompt_config = PromptCoordinatorConfig()
-        prompt_coord = PromptCoordinator(
+        # PromptRuntimeAdapter (canonical implementation)
+        prompt_config = PromptRuntimeConfig()
+        prompt_adapter = PromptRuntimeAdapter(
             prompt_builder=PromptBuilder(),
             config=prompt_config,
         )
-        assert prompt_coord is not None
+        assert prompt_adapter is not None
+
+    def test_deleted_compat_modules_not_importable(self):
+        """Test that deleted compat modules are not importable."""
+        import pytest
+
+        # state_compat module should not be importable
+        with pytest.raises(ImportError, match="state_compat"):
+            from victor.agent.services import state_compat  # noqa: F401
+
+        # prompt_compat module should not be importable
+        with pytest.raises(ImportError, match="prompt_compat"):
+            from victor.agent.services import prompt_compat  # noqa: F401
+
+    def test_canonical_runtime_imports_work(self):
+        """Test that canonical runtime imports work correctly."""
+        from unittest.mock import MagicMock
+        from victor.framework import PromptBuilder
+
+        # StateRuntimeAdapter should work
+        from victor.agent.services.state_runtime import StateRuntimeAdapter
+
+        adapter = StateRuntimeAdapter(conversation_controller=MagicMock())
+        assert adapter is not None
+
+        # PromptRuntimeAdapter should work
+        from victor.agent.services.prompt_runtime import (
+            PromptRuntimeAdapter,
+            PromptRuntimeConfig,
+        )
+
+        prompt_config = PromptRuntimeConfig()
+        prompt_adapter = PromptRuntimeAdapter(
+            prompt_builder=PromptBuilder(),
+            config=prompt_config,
+        )
+        assert prompt_adapter is not None

@@ -297,7 +297,7 @@ TASK_HINT_EDIT = """
 """.strip()
 
 TASK_HINT_SEARCH = """
-[SEARCH] Use code_search/list_directory. Summarize after 2-4 calls.
+[SEARCH] Use code_search/ls. Summarize after 2-4 calls.
 """.strip()
 
 TASK_HINT_ACTION = """
@@ -358,8 +358,8 @@ CRITICAL RULES (MUST FOLLOW):
 - Only call tools when you need NEW information
 
 TOOL EFFICIENCY:
-- list_directory first to understand structure
-- read_file ONCE per file, remember contents
+- ls first to understand structure
+- read ONCE per file, remember contents
 - Use semantic_code_search for specific symbols
 - Use graph(mode="callers"|"callees"|"trace") for call-graph questions instead of inferring traversal manually
 - Stop tool calls when you have enough info (usually 3-5 calls)
@@ -367,8 +367,8 @@ TOOL EFFICIENCY:
 
 XAI_GROK_GUIDANCE = """
 EFFECTIVE TOOL USAGE:
-- Use list_directory to understand project structure first
-- Use read_file to examine specific files (one read per file)
+- Use ls to understand project structure first
+- Use read to examine specific files (one read per file)
 - Use semantic_code_search for finding specific code patterns
 - Use graph(mode="callers"|"callees"|"trace") for call-graph and execution-flow questions
 - Parallel tool calls are allowed for independent operations

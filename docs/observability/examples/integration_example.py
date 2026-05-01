@@ -94,9 +94,7 @@ class ObservableProcessor(MetricSource):
 
         # Calculate success rate
         total_items = items_processed + items_failed
-        success_rate = (
-            items_processed / total_items if total_items > 0 else 1.0
-        )
+        success_rate = items_processed / total_items if total_items > 0 else 1.0
 
         metrics = [
             CounterMetric(

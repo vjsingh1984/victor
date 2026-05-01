@@ -12,17 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Default stage definitions for verticals.
+"""Default stage definitions for external verticals.
 
-Re-exports ``get_default_stages`` from the canonical location in
-``victor.framework.stage_manager`` so external verticals can import via::
+Returns SDK stage-definition contracts derived from the framework runtime
+defaults so external verticals can import via::
 
     from victor.framework.defaults import get_default_stages
 """
 
 from __future__ import annotations
 
-from victor.framework.stage_manager import get_default_stages
+from typing import Dict
+
+from victor.framework.stage_manager import (
+    get_default_stages as _get_runtime_default_stages,
+    to_sdk_stage_definition,
+)
+from victor_sdk import StageDefinition
+
+
+def get_default_stages() -> Dict[str, StageDefinition]:
+    """Return SDK stage definitions derived from framework runtime defaults."""
+
+    return {
+        stage_name: to_sdk_stage_definition(stage_name, stage_definition)
+        for stage_name, stage_definition in _get_runtime_default_stages().items()
+    }
+
 
 __all__ = [
     "get_default_stages",

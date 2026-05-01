@@ -52,13 +52,23 @@ Example (YAML):
             goal: "Analyze data patterns"
 """
 
+import warnings
+from typing import Any
+
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.base import BaseWorkflow
+from victor.workflows.context import (
+    TemporalContext,
+    WorkflowContext,
+    WorkflowResult,
+)
 from victor.workflows.definition import (
     WorkflowNodeType,
     WorkflowNode,
     AgentNode,
     ConditionNode,
     ParallelNode,
+    TeamStepWorkflow,
     TransformNode,
     WorkflowDefinition,
     WorkflowBuilder,
@@ -70,13 +80,7 @@ from victor.workflows.registry import (
     WorkflowRegistry,
     get_global_registry,
 )
-from victor.workflows.executor import (
-    ExecutorNodeStatus,
-    NodeResult,
-    WorkflowContext,
-    WorkflowResult,
-    WorkflowExecutor,
-)
+from victor.workflows.unified_executor import WorkflowExecutor
 from victor.workflows.protocols import (
     RetryPolicy,
     IWorkflowNode,
@@ -145,12 +149,11 @@ from victor.workflows.definition import (
     ComputeOnlyConstraints,
     FullAccessConstraints,
 )
-from victor.workflows.executor import (
+from victor.workflows.compute_registry import (
     ComputeHandler,
-    TemporalContext,
-    register_compute_handler,
     get_compute_handler,
     list_compute_handlers,
+    register_compute_handler,
 )
 from victor.workflows.isolation import (
     SandboxType,
@@ -365,6 +368,8 @@ __all__ = [
     "ConditionNode",
     "ParallelNode",
     "TransformNode",
+    "TeamStepWorkflow",
+    "TeamNodeWorkflow",
     # Constraints
     "TaskConstraints",
     "ConstraintsProtocol",
@@ -612,3 +617,29 @@ __all__ = [
     "UnifiedWorkflowCompiler",
     "create_unified_compiler",
 ]
+
+_DEPRECATED_ALIAS_MAP = {
+    "TeamNodeWorkflow": TeamStepWorkflow,
+}
+_TEAM_NODE_REMOVAL_VERSION = "v0.9.0"
+_TEAM_NODE_REMOVAL_DATE = "2027-03-31"
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_ALIAS_MAP:
+        warnings.warn(
+            f"{name} is deprecated; use "
+            f"{_DEPRECATED_ALIAS_MAP[name].__name__} instead. "
+            f"This compatibility alias remains supported through "
+            f"{_TEAM_NODE_REMOVAL_VERSION} ({_TEAM_NODE_REMOVAL_DATE}) and "
+            "will be removed after that milestone. "
+            "See docs/architecture/migration.md for migration guidance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED_ALIAS_MAP[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_DEPRECATED_ALIAS_MAP))

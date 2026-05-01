@@ -27,6 +27,7 @@ from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeH
 
 # Task-type-specific prompt hints for benchmark tasks
 # These guide the model's approach based on detected task type
+# Enhanced with token budgets and skip flags for optimization (arXiv:2604.04979, arXiv:2604.01681)
 BENCHMARK_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
     "swe_bench_issue": TaskTypeHint(
         task_type="swe_bench_issue",
@@ -51,6 +52,11 @@ You are evaluated on:
 - Efficiency: Did you find and fix the bug quickly?""",
         tool_budget=20,
         priority_tools=["read", "code_search", "edit", "test", "git"],
+        token_budget=2000,
+        context_budget=4000,
+        skip_planning=False,
+        skip_evaluation=False,
+        temperature_override=0.1,  # Precise bug analysis
     ),
     "code_generation": TaskTypeHint(
         task_type="code_generation",
@@ -74,6 +80,11 @@ You are evaluated on:
 - Efficiency: Does your code run within time limits?""",
         tool_budget=5,
         priority_tools=["write", "read", "shell"],
+        token_budget=800,
+        context_budget=2000,
+        skip_planning=True,
+        skip_evaluation=True,
+        temperature_override=0.2,  # Low variance for correct code
     ),
     "function_completion": TaskTypeHint(
         task_type="function_completion",
@@ -95,6 +106,10 @@ You are evaluated on:
 - Completeness: Does it handle all required cases?""",
         tool_budget=3,
         priority_tools=["read", "edit", "test"],
+        token_budget=600,  # Function bodies are concise
+        context_budget=1500,  # Only need function context
+        skip_planning=True,  # Direct implementation
+        skip_evaluation=False,  # Need to verify with tests
     ),
     "bug_fixing": TaskTypeHint(
         task_type="bug_fixing",
@@ -117,6 +132,10 @@ You are evaluated on:
 - Minimality: Did you make the smallest necessary change?""",
         tool_budget=8,
         priority_tools=["read", "edit", "test", "shell"],
+        token_budget=1000,  # Need space for explanation
+        context_budget=3000,  # Need context to understand bug
+        skip_planning=False,  # Debugging needs planning
+        skip_evaluation=False,  # Must verify fix works
     ),
     "code_review": TaskTypeHint(
         task_type="code_review",
@@ -140,6 +159,10 @@ You are evaluated on:
 - Actionability: Is your feedback specific and helpful?""",
         tool_budget=15,
         priority_tools=["read", "grep", "code_search"],
+        token_budget=1500,  # Reviews can be detailed
+        context_budget=3500,  # Need full code context
+        skip_planning=True,  # Direct analysis
+        skip_evaluation=True,  # No verification needed
     ),
     "test_generation": TaskTypeHint(
         task_type="test_generation",
@@ -164,6 +187,10 @@ You are evaluated on:
 - Effectiveness: Do tests catch real bugs?""",
         tool_budget=12,
         priority_tools=["read", "write", "test", "shell"],
+        token_budget=1200,  # Test code can be lengthy
+        context_budget=2500,  # Need code context
+        skip_planning=True,  # Direct test writing
+        skip_evaluation=False,  # Must run tests
     ),
     "passk_sampling": TaskTypeHint(
         task_type="passk_sampling",
@@ -191,6 +218,10 @@ You are evaluated on:
 - Quality: Are all solutions well-written?""",
         tool_budget=50,
         priority_tools=["read", "write", "test", "shell"],
+        token_budget=3000,  # Multiple solutions need space
+        context_budget=2000,  # Standard context
+        skip_planning=False,  # Need planning for diverse solutions
+        skip_evaluation=False,  # Must test each candidate
     ),
     "benchmark_analysis": TaskTypeHint(
         task_type="benchmark_analysis",
@@ -214,6 +245,10 @@ You are evaluated on:
 - Actionability: Are your recommendations useful?""",
         tool_budget=10,
         priority_tools=["read", "grep", "shell"],
+        token_budget=1000,  # Analysis requires detail
+        context_budget=3000,  # Need data context
+        skip_planning=True,  # Direct analysis
+        skip_evaluation=True,  # No verification needed
     ),
 }
 

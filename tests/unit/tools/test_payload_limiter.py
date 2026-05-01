@@ -78,7 +78,10 @@ class TestProviderPayloadLimiter:
             MockToolDefinition(
                 name="test_tool",
                 description="A test tool for testing",
-                parameters={"type": "object", "properties": {"arg1": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"arg1": {"type": "string"}},
+                },
             )
         ]
 
@@ -195,6 +198,62 @@ class TestProviderPayloadLimiter:
         assert len(tool_msg.content) < len(large_tool_result)
         assert "[truncated]" in tool_msg.content
 
+    def test_dictionary_compression_deduplicates_repeated_tool_results(self):
+        """Repeated tool payloads should collapse to a shared dictionary reference."""
+        limiter = ProviderPayloadLimiter(
+            provider_name="test",
+            max_payload_bytes=9000,
+            safety_margin=1.0,
+            enable_dictionary_compression=True,
+        )
+        repeated_tool_result = "\n".join(f"line {i}: repeated payload content" for i in range(220))
+        messages = [
+            MockMessage(role="user", content="Analyze the duplicated tool outputs"),
+            MockMessage(role="tool", content=repeated_tool_result, tool_call_id="tc_1"),
+            MockMessage(role="tool", content=repeated_tool_result, tool_call_id="tc_2"),
+        ]
+
+        estimate = limiter.estimate_size(messages, None)
+        assert estimate.exceeds_limit
+
+        result = limiter.truncate_if_needed(
+            messages, None, strategy=TruncationStrategy.TRUNCATE_TOOL_RESULTS
+        )
+
+        assert result.truncated is True
+        assert result.strategy_used == TruncationStrategy.DICTIONARY_COMPRESS
+        assert result.compression_applied is True
+        assert result.compression_entries == 1
+        tool_messages = [m for m in result.messages if m.role == "tool"]
+        assert "[dictionary-ref:" in tool_messages[1].content
+        assert "[truncated]" not in tool_messages[0].content
+
+    def test_dictionary_compression_is_opt_in(self):
+        """Without the flag, the limiter should fall back to normal truncation."""
+        limiter = ProviderPayloadLimiter(
+            provider_name="test",
+            max_payload_bytes=4500,
+            safety_margin=1.0,
+            enable_dictionary_compression=False,
+        )
+        repeated_tool_result = "x" * 5000
+        messages = [
+            MockMessage(role="user", content="Analyze the duplicated tool outputs"),
+            MockMessage(role="tool", content=repeated_tool_result, tool_call_id="tc_1"),
+            MockMessage(role="tool", content=repeated_tool_result, tool_call_id="tc_2"),
+        ]
+
+        result = limiter.truncate_if_needed(
+            messages, None, strategy=TruncationStrategy.TRUNCATE_TOOL_RESULTS
+        )
+
+        assert result.strategy_used == TruncationStrategy.TRUNCATE_TOOL_RESULTS
+        assert result.compression_applied is False
+        assert result.compression_entries == 0
+        tool_messages = [m for m in result.messages if m.role == "tool"]
+        assert all("[dictionary-ref:" not in m.content for m in tool_messages)
+        assert all("[truncated]" in m.content for m in tool_messages)
+
     def test_reduce_tools_strategy(self):
         """Test reducing number of tools reduces tool count."""
         # Create a limiter with a limit that will be exceeded
@@ -215,7 +274,10 @@ class TestProviderPayloadLimiter:
             MockToolDefinition(
                 name=f"tool_{i}",
                 description="This is a test tool with a longer description " * 3,
-                parameters={"type": "object", "properties": {"arg": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"arg": {"type": "string"}},
+                },
             )
             for i in range(20)
         ]

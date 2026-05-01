@@ -15,6 +15,8 @@
 """Tests for configuration profiles."""
 
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 import pytest
 
 from victor.config.profiles import (
@@ -33,6 +35,8 @@ from victor.config.profiles import (
     generate_profile_yaml,
     _detect_provider,
     _detect_model_for_provider,
+    install_profile,
+    get_current_profile,
 )
 
 
@@ -82,7 +86,7 @@ class TestProfiles:
     def test_list_profiles(self):
         """Listing profiles returns all profiles."""
         profiles = list_profiles()
-        assert len(profiles) == 5
+        assert len(profiles) == 6
         assert all(isinstance(p, ProfileTemplate) for p in profiles)
 
     def test_get_profile_by_name(self):
@@ -195,3 +199,29 @@ class TestSpecializedProfiles:
         assert RESEARCH_PROFILE.name == "research"
         assert RESEARCH_PROFILE.settings["default_max_tokens"] == 16384
         assert RESEARCH_PROFILE.settings["default_temperature"] == 0.8  # Higher temp for creativity
+
+
+class TestProfileConfigDirectoryResolution:
+    """Tests for default config directory resolution."""
+
+    def test_install_profile_uses_global_victor_dir_by_default(self, tmp_path):
+        """install_profile should use centralized global Victor dir when config_dir is omitted."""
+        global_dir = tmp_path / ".victor"
+        fake_paths = SimpleNamespace(global_victor_dir=global_dir)
+
+        with patch("victor.config.settings.get_project_paths", return_value=fake_paths):
+            profiles_path = install_profile(BASIC_PROFILE)
+
+        assert profiles_path == global_dir / "profiles.yaml"
+        assert profiles_path.exists()
+
+    def test_get_current_profile_uses_global_victor_dir_by_default(self, tmp_path):
+        """get_current_profile should read from centralized global Victor dir by default."""
+        global_dir = tmp_path / ".victor"
+        fake_paths = SimpleNamespace(global_victor_dir=global_dir)
+
+        with patch("victor.config.settings.get_project_paths", return_value=fake_paths):
+            install_profile(BASIC_PROFILE)
+            current = get_current_profile()
+
+        assert current == "basic"

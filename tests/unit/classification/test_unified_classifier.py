@@ -23,19 +23,23 @@ Tests cover:
 - Edge cases and backward compatibility
 """
 
+from unittest.mock import MagicMock
+
 import pytest
+from victor.agent.decisions.schemas import DecisionType, TaskCategoryType, TaskTypeDecision
+from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.agent.unified_classifier import (
-    UnifiedTaskClassifier,
     ClassificationResult,
     ClassifierTaskType,
     KeywordMatch,
+    UnifiedTaskClassifier,
     _is_keyword_negated,
     _find_keywords_with_positions,
     _calculate_category_score,
-    get_unified_classifier,
-    classify_task,
     ACTION_KEYWORDS,
     ANALYSIS_KEYWORDS,
+    classify_task,
+    get_unified_classifier,
 )
 
 
@@ -247,6 +251,30 @@ class TestUnifiedTaskClassifier:
         # Generation gets low budget
         result = classifier.classify("Generate a simple function")
         assert result.recommended_tool_budget <= 20
+
+    def test_runtime_intelligence_upgrades_low_confidence_classification(self):
+        """RuntimeIntelligenceService should own low-confidence task-type decisions."""
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.TASK_TYPE_CLASSIFICATION,
+            result=TaskTypeDecision(
+                task_type=TaskCategoryType.ANALYSIS,
+                confidence=0.92,
+                deliverables=[],
+            ),
+            source="llm",
+            confidence=0.92,
+        )
+        classifier = UnifiedTaskClassifier(
+            enable_semantic=False,
+            runtime_intelligence=runtime_intelligence,
+        )
+
+        result = classifier.classify("Maybe look at something", use_cache=False)
+
+        assert result.task_type == ClassifierTaskType.ANALYSIS
+        assert result.source == "llm"
+        runtime_intelligence.decide_sync.assert_called_once()
 
 
 class TestContextualClassification:

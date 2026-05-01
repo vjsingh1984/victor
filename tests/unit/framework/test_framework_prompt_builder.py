@@ -154,6 +154,18 @@ class TestPromptBuilder:
 
         assert first_idx < middle_idx < last_idx
 
+    def test_build_document_renders_same_as_build(self):
+        """Canonical prompt document should be the single rendering source."""
+        builder = PromptBuilder()
+        builder.add_section("identity", "I am an assistant.", priority=10)
+        builder.add_tool_hints({"read": "Read files"})
+        builder.add_safety_rules(["Be careful"])
+        builder.add_context("Working on code")
+
+        document = builder.build_document()
+
+        assert document.render() == builder.build()
+
     def test_ensure_section_adds_missing(self):
         """Ensure section helper adds fallback content."""
         builder = PromptBuilder()

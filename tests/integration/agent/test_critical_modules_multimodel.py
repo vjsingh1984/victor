@@ -81,7 +81,9 @@ MODEL_FAMILIES = {
         description="DeepSeek coder and reasoning models",
     ),
     "gpt_oss": ModelFamily(
-        name="gpt_oss", models=["gpt-oss:20b"], description="GPT-OSS open source GPT-like models"
+        name="gpt_oss",
+        models=["gpt-oss:20b"],
+        description="GPT-OSS open source GPT-like models",
     ),
     "devstral": ModelFamily(
         name="devstral",
@@ -287,7 +289,10 @@ class TestChatCompletionMultiModel:
             try:
                 response = await provider.chat(
                     messages=[
-                        Message(role="user", content="What is 2+2? Reply with just the number.")
+                        Message(
+                            role="user",
+                            content="What is 2+2? Reply with just the number.",
+                        )
                     ],
                     model=model,
                     max_tokens=10,
@@ -310,7 +315,10 @@ class TestChatCompletionMultiModel:
         # Try multiple options from each family
         family_options = [
             ["llama3.1:8b", "llama3:8b", "llama2:7b"],  # Llama family
-            ["mistral:latest", "mistral:7b"],  # Mistral family (more common than gpt-oss)
+            [
+                "mistral:latest",
+                "mistral:7b",
+            ],  # Mistral family (more common than gpt-oss)
         ]
 
         available = await get_available_models()

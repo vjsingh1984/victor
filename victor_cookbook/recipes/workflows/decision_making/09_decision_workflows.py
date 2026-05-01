@@ -117,16 +117,13 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create()
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"topic": topic}
-        )
+        result = await agent.run_workflow(workflow_path, input={"topic": topic})
         return result.content
     finally:
         os.unlink(workflow_path)
@@ -226,26 +223,20 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create()
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"decision": decision}
-        )
+        result = await agent.run_workflow(workflow_path, input={"decision": decision})
         return result.content
     finally:
         os.unlink(workflow_path)
 
 
 async def multi_criteria_decision_workflow(
-    decision: str,
-    options: list[str],
-    criteria: list[str],
-    weights: list[float]
+    decision: str, options: list[str], criteria: list[str], weights: list[float]
 ):
     """Multi-criteria decision analysis workflow."""
     import tempfile
@@ -332,16 +323,13 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create()
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"decision": decision}
-        )
+        result = await agent.run_workflow(workflow_path, input={"decision": decision})
         return result.content
     finally:
         os.unlink(workflow_path)
@@ -466,16 +454,13 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create()
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"project": project}
-        )
+        result = await agent.run_workflow(workflow_path, input={"project": project})
         return result.content
     finally:
         os.unlink(workflow_path)
@@ -591,16 +576,13 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create()
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"problem": problem}
-        )
+        result = await agent.run_workflow(workflow_path, input={"problem": problem})
         return result.content
     finally:
         os.unlink(workflow_path)
@@ -617,4 +599,5 @@ async def demo_decision_workflows():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_decision_workflows())

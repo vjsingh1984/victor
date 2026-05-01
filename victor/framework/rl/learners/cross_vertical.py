@@ -51,6 +51,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -523,6 +524,247 @@ class CrossVerticalLearner(BaseLearner):
             Quality score as reward (0.0-1.0)
         """
         return outcome.quality_score
+
+    # ------------------------------------------------------------------
+    # Priority 4 Phase 3: Transfer Learning — pattern export / import
+    # ------------------------------------------------------------------
+
+    def export_patterns(
+        self, repo_id: Optional[str] = None, min_confidence: float = 0.5
+    ) -> Dict[str, Any]:
+        """Serialize learned cross-vertical patterns for cross-project transfer.
+
+        Exports only patterns above min_confidence so that noise from sparse
+        data is not transferred to other projects.
+
+        Args:
+            repo_id: Scope export to a specific repo (None = all)
+            min_confidence: Minimum pattern confidence to include
+
+        Returns:
+            Dict ready for json.dumps, importable via import_patterns()
+        """
+        # Source 1: dynamically discovered patterns from rl_outcome
+        try:
+            discovered = self.get_shared_patterns(min_confidence=min_confidence)
+        except Exception as e:
+            logger.debug("cross_vertical: export_patterns — get_shared_patterns failed: %s", e)
+            discovered = []
+
+        # Source 2: explicitly stored patterns in rl_pattern table (includes imports)
+        stored: List[SharedPattern] = []
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                f"""
+                SELECT task_type, pattern_name, avg_quality, confidence,
+                       source_verticals, recommended_mode, recommendation, sample_count
+                FROM {Tables.RL_PATTERN}
+                WHERE confidence >= ?
+                """,
+                (min_confidence,),
+            )
+            for row in cursor.fetchall():
+                rd = dict(row)
+                try:
+                    src_verts = json.loads(rd.get("source_verticals") or "[]")
+                except (json.JSONDecodeError, TypeError):
+                    src_verts = []
+                stored.append(
+                    SharedPattern(
+                        task_type=rd["task_type"],
+                        pattern_name=rd.get("pattern_name", "stored"),
+                        avg_quality=rd["avg_quality"],
+                        confidence=rd["confidence"],
+                        source_verticals=src_verts,
+                        recommended_mode=rd.get("recommended_mode"),
+                        recommendation=rd.get("recommendation", ""),
+                        sample_count=rd.get("sample_count", 0),
+                    )
+                )
+        except Exception as e:
+            logger.debug("cross_vertical: export_patterns — rl_pattern query failed: %s", e)
+
+        # Merge, deduplicating by (task_type, pattern_name)
+        seen: set = set()
+        patterns: List[SharedPattern] = []
+        for p in discovered + stored:
+            key = (p.task_type, p.pattern_name)
+            if key not in seen:
+                seen.add(key)
+                patterns.append(p)
+
+        exported = []
+        for p in patterns:
+            exported.append(
+                {
+                    "task_type": p.task_type,
+                    "pattern_name": p.pattern_name,
+                    "avg_quality": p.avg_quality,
+                    "confidence": p.confidence,
+                    "source_verticals": p.source_verticals,
+                    "recommended_mode": p.recommended_mode,
+                    "recommendation": p.recommendation,
+                    "sample_count": p.sample_count,
+                }
+            )
+
+        return {
+            "schema_version": 1,
+            "exported_at": datetime.now().isoformat(),
+            "source_repo_id": repo_id,
+            "pattern_count": len(exported),
+            "patterns": exported,
+        }
+
+    def import_patterns(
+        self,
+        data: Dict[str, Any],
+        source_repo_id: Optional[str] = None,
+        confidence_decay: float = 0.8,
+    ) -> int:
+        """Load patterns exported from another project into this learner's DB.
+
+        Applies confidence_decay so imported patterns have lower weight than
+        locally-learned ones; they serve as warm-start priors, not ground truth.
+
+        Args:
+            data: Dict returned by export_patterns() (must have "patterns" key)
+            source_repo_id: Identifier of the source project (for provenance)
+            confidence_decay: Multiply imported confidence by this factor (default 0.8)
+
+        Returns:
+            Number of patterns imported
+        """
+        if data.get("schema_version") != 1:
+            logger.warning("cross_vertical: unknown export schema version, skipping import")
+            return 0
+
+        patterns = data.get("patterns", [])
+        if not patterns:
+            return 0
+
+        cursor = self.db.cursor()
+        imported = 0
+        now = datetime.now().isoformat()
+
+        for p in patterns:
+            try:
+                pattern_id = (
+                    f"imported_{source_repo_id or 'ext'}_{p['task_type']}_{p['pattern_name']}"
+                )
+                decayed_confidence = p["confidence"] * confidence_decay
+                source_verticals = p.get("source_verticals", [])
+
+                cursor.execute(
+                    f"""
+                    INSERT OR IGNORE INTO {Tables.RL_PATTERN}
+                    (pattern_id, task_type, pattern_name, avg_quality, confidence,
+                     source_verticals, recommended_mode, recommendation,
+                     sample_count, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pattern_id,
+                        p["task_type"],
+                        p.get("pattern_name", "imported"),
+                        p["avg_quality"],
+                        decayed_confidence,
+                        json.dumps(source_verticals),
+                        p.get("recommended_mode"),
+                        p.get("recommendation", ""),
+                        int(p.get("sample_count", 0) * confidence_decay),
+                        now,
+                        now,
+                    ),
+                )
+                if cursor.rowcount > 0:
+                    imported += 1
+            except Exception as e:
+                logger.debug("cross_vertical: import failed for pattern %s: %s", p, e)
+
+        self.db.commit()
+        logger.info(
+            "cross_vertical: imported %d/%d patterns from %s",
+            imported,
+            len(patterns),
+            source_repo_id or "external",
+        )
+        return imported
+
+    def adapt_patterns(
+        self,
+        source_vertical: str,
+        target_vertical: str,
+        min_confidence: float = 0.6,
+    ) -> List[RLRecommendation]:
+        """Generate adaptation recommendations for target_vertical based on source_vertical.
+
+        Queries patterns learned in source_vertical and re-emits them as
+        recommendations for target_vertical with a confidence penalty for
+        the domain shift.
+
+        Args:
+            source_vertical: Vertical to transfer from
+            target_vertical: Vertical to transfer to
+            min_confidence: Minimum source pattern confidence
+
+        Returns:
+            List of RLRecommendations adapted for target_vertical
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                f"""
+                SELECT task_type, AVG(quality_score) as avg_quality, COUNT(*) as cnt
+                FROM {Tables.RL_OUTCOME}
+                WHERE vertical = ?
+                  AND quality_score IS NOT NULL
+                GROUP BY task_type
+                HAVING cnt >= ?
+                """,
+                (source_vertical, self._min_samples),
+            )
+            rows = cursor.fetchall()
+        except Exception as e:
+            logger.debug("cross_vertical: adapt_patterns query failed: %s", e)
+            return []
+
+        recommendations = []
+        for row in rows:
+            row_dict = dict(row)
+            task_type = row_dict["task_type"]
+            avg_quality = row_dict["avg_quality"]
+            cnt = row_dict["cnt"]
+
+            confidence = min(0.75, cnt / (cnt + 20))  # Bayesian shrinkage
+            if confidence < min_confidence:
+                continue
+
+            # Apply domain-shift penalty
+            adapted_confidence = confidence * 0.85
+
+            recommendations.append(
+                RLRecommendation(
+                    value=avg_quality,
+                    confidence=adapted_confidence,
+                    reason=(
+                        f"Adapted from {source_vertical} → {target_vertical}: "
+                        f"avg quality {avg_quality:.2f} on {cnt} outcomes"
+                    ),
+                    sample_size=cnt,
+                    is_baseline=False,
+                    metadata={
+                        "transfer_type": "domain_adaptation",
+                        "source_vertical": source_vertical,
+                        "target_vertical": target_vertical,
+                        "task_type": task_type,
+                        "confidence_decay": 0.85,
+                    },
+                )
+            )
+
+        return recommendations
 
 
 __all__ = [

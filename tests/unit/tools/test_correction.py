@@ -109,7 +109,9 @@ class TestCodeValidationResult:
     def test_failure_factory(self):
         """Test failure factory method."""
         result = CodeValidationResult.failure(
-            ["Error 1", "Error 2"], Language.PYTHON, syntax_error="SyntaxError: invalid syntax"
+            ["Error 1", "Error 2"],
+            Language.PYTHON,
+            syntax_error="SyntaxError: invalid syntax",
         )
         assert result.valid is False
         assert result.language == Language.PYTHON
@@ -519,7 +521,9 @@ class TestRetryPromptBuilder:
     def test_build_retry_prompt(self):
         """Test building a retry prompt."""
         feedback = CorrectionFeedback(
-            has_issues=True, language=Language.PYTHON, syntax_feedback="Line 5 has syntax error"
+            has_issues=True,
+            language=Language.PYTHON,
+            syntax_feedback="Line 5 has syntax error",
         )
         prompt = self.builder.build(
             original_prompt="Write a function",
@@ -628,7 +632,10 @@ class TestSelfCorrector:
             has_issues=True, language=Language.PYTHON, syntax_feedback="Error on line 5"
         )
         prompt = corrector.build_retry_prompt(
-            original_prompt="Write code", previous_code="def foo()", feedback=feedback, iteration=1
+            original_prompt="Write code",
+            previous_code="def foo()",
+            feedback=feedback,
+            iteration=1,
         )
         assert "Write code" in prompt
         assert "def foo()" in prompt

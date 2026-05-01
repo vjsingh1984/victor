@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib.metadata
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Type, Callable
+from typing import Any, Callable, Dict, List, Optional, Type, cast
 
 from victor_sdk.core.plugins import VictorPlugin
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
@@ -114,6 +114,15 @@ class ProtocolRegistry:
     CAPABILITIES_GROUP = "victor.sdk.capabilities"
     VALIDATORS_GROUP = "victor.sdk.validators"
 
+    _KNOWN_GROUPS = frozenset(
+        {
+            VERTICALS_GROUP,
+            SDK_PROTOCOLS_GROUP,
+            CAPABILITIES_GROUP,
+            VALIDATORS_GROUP,
+        }
+    )
+
     def __init__(self, strict: bool = False) -> None:
         """Initialize the registry.
 
@@ -135,7 +144,7 @@ class ProtocolRegistry:
         self._enrichment_providers: List[EnrichmentProvider] = []
 
         self._capability_providers: Dict[str, Any] = {}
-        self._validators: Dict[str, Callable] = {}
+        self._validators: Dict[str, Callable[..., Any]] = {}
         self._verticals: Dict[str, Type[Any]] = {}
 
         # Metadata tracking
@@ -144,6 +153,10 @@ class ProtocolRegistry:
 
     def load_from_entry_points(self, *, reload: bool = False) -> DiscoveryStats:
         """Load all protocol implementations from installed packages.
+
+        Uses a single-pass scan of all entry points, then partitions by
+        group in-memory. This avoids 4 separate importlib.metadata.entry_points()
+        calls (one per group), reducing cold-start latency.
 
         Args:
             reload: If True, reload even if already loaded.
@@ -154,146 +167,161 @@ class ProtocolRegistry:
         if reload:
             self.clear()
 
-        # Load verticals
-        self._load_verticals()
+        grouped = self._scan_all_entry_points()
 
-        # Load protocol implementations
-        self._load_protocols()
-
-        # Load capability providers
-        self._load_capabilities()
-
-        # Load validators
-        self._load_validators()
+        self._load_verticals(grouped.get(self.VERTICALS_GROUP, []))
+        self._load_protocols(grouped.get(self.SDK_PROTOCOLS_GROUP, []))
+        self._load_capabilities(grouped.get(self.CAPABILITIES_GROUP, []))
+        self._load_validators(grouped.get(self.VALIDATORS_GROUP, []))
 
         return self._discovery_stats
 
-    def _load_verticals(self) -> None:
-        """Load verticals from victor.plugins entry point group."""
+    def _scan_all_entry_points(self) -> Dict[str, List[Any]]:
+        """Single-pass scan of all entry points, partitioned by group.
+
+        Calls importlib.metadata.entry_points() once without a group
+        filter, then partitions results into a dict keyed by group name.
+        Only groups in _KNOWN_GROUPS are retained.
+
+        Handles both Python 3.9 dict format and Python 3.12+ flat list.
+        """
         try:
-            for ep in importlib.metadata.entry_points(group=self.VERTICALS_GROUP):
-                try:
-                    candidate = ep.load()
-                    for vertical_name, vertical_class in collect_verticals_from_candidate(
-                        candidate
-                    ).items():
-                        self._verticals[vertical_name] = vertical_class
-                        self._discovery_stats.total_verticals += 1
-                        self._track_metadata(
-                            name=vertical_name,
-                            entry_point=ep,
-                            protocol_type="vertical",
-                        )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "vertical", e)
+            all_eps = importlib.metadata.entry_points()
         except Exception:
-            logger.debug("No victor.plugins entry points found")
+            logger.debug("entry_points() scan failed")
+            return {}
 
-    def _load_protocols(self) -> None:
-        """Load protocol implementations from victor.sdk.protocols group."""
-        try:
-            for ep in importlib.metadata.entry_points(group=self.SDK_PROTOCOLS_GROUP):
-                try:
-                    provider_class_or_instance = ep.load()
+        grouped: Dict[str, List[Any]] = {g: [] for g in self._KNOWN_GROUPS}
 
-                    # Try to instantiate if it's a class
-                    if isinstance(provider_class_or_instance, type):
-                        try:
-                            instance = provider_class_or_instance()
-                        except Exception as e:
-                            self._handle_load_error(ep.name, "protocol", e)
-                            continue
-                    else:
-                        instance = provider_class_or_instance
+        if isinstance(all_eps, dict):
+            # Python 3.9: entry_points() returns dict[str, list[EntryPoint]]
+            for group_name, eps in all_eps.items():
+                if group_name in self._KNOWN_GROUPS:
+                    grouped[group_name].extend(eps)
+        else:
+            # Python 3.10+: entry_points() returns SelectableGroups / list
+            for ep in all_eps:
+                group = getattr(ep, "group", None)
+                if group in self._KNOWN_GROUPS:
+                    grouped[group].append(ep)
 
-                    # Register based on protocol type
-                    registered = False
-                    if isinstance(instance, ToolProvider):
-                        self._tool_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, SafetyProvider):
-                        self._safety_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, WorkflowProvider):
-                        self._workflow_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, PromptProvider):
-                        self._prompt_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, TeamProvider):
-                        self._team_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, MiddlewareProvider):
-                        self._middleware_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, ModeConfigProvider):
-                        self._mode_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, RLProvider):
-                        self._rl_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, EnrichmentProvider):
-                        self._enrichment_providers.append(instance)
-                        registered = True
+        return grouped
 
-                    if registered:
-                        self._discovery_stats.total_protocols += 1
-                        self._track_metadata(
-                            name=ep.name,
-                            entry_point=ep,
-                            protocol_type="protocol",
-                        )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "protocol", e)
-        except Exception:
-            logger.debug("No victor.sdk.protocols entry points found")
+    def _load_verticals(self, entry_points_list: List[Any]) -> None:
+        """Load verticals from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                candidate = ep.load()
+                for (
+                    vertical_name,
+                    vertical_class,
+                ) in collect_verticals_from_candidate(candidate).items():
+                    self._verticals[vertical_name] = vertical_class
+                    self._discovery_stats.total_verticals += 1
+                    self._track_metadata(
+                        name=vertical_name,
+                        entry_point=ep,
+                        protocol_type="vertical",
+                    )
+            except Exception as e:
+                self._handle_load_error(ep.name, "vertical", e)
 
-    def _load_capabilities(self) -> None:
-        """Load capability providers from victor.sdk.capabilities group."""
-        try:
-            for ep in importlib.metadata.entry_points(group=self.CAPABILITIES_GROUP):
-                try:
-                    capability_class_or_instance = ep.load()
+    def _load_protocols(self, entry_points_list: List[Any]) -> None:
+        """Load protocol implementations from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                provider_class_or_instance = ep.load()
 
-                    # Try to instantiate if it's a class
-                    if isinstance(capability_class_or_instance, type):
-                        try:
-                            instance = capability_class_or_instance()
-                        except Exception as e:
-                            self._handle_load_error(ep.name, "capability", e)
-                            continue
-                    else:
-                        instance = capability_class_or_instance
+                # Try to instantiate if it's a class
+                if isinstance(provider_class_or_instance, type):
+                    try:
+                        instance = provider_class_or_instance()
+                    except Exception as e:
+                        self._handle_load_error(ep.name, "protocol", e)
+                        continue
+                else:
+                    instance = provider_class_or_instance
 
-                    self._capability_providers[ep.name] = instance
-                    self._discovery_stats.total_capabilities += 1
+                # Register based on protocol type
+                registered = False
+                if isinstance(instance, ToolProvider):
+                    self._tool_providers.append(instance)
+                    registered = True
+                if isinstance(instance, SafetyProvider):
+                    self._safety_providers.append(instance)
+                    registered = True
+                if isinstance(instance, WorkflowProvider):
+                    self._workflow_providers.append(instance)
+                    registered = True
+                if isinstance(instance, PromptProvider):
+                    self._prompt_providers.append(instance)
+                    registered = True
+                if isinstance(instance, TeamProvider):
+                    self._team_providers.append(instance)
+                    registered = True
+                if isinstance(instance, MiddlewareProvider):
+                    self._middleware_providers.append(instance)
+                    registered = True
+                if isinstance(instance, ModeConfigProvider):
+                    self._mode_providers.append(instance)
+                    registered = True
+                if isinstance(instance, RLProvider):
+                    self._rl_providers.append(instance)
+                    registered = True
+                if isinstance(instance, EnrichmentProvider):
+                    self._enrichment_providers.append(instance)
+                    registered = True
+
+                if registered:
+                    self._discovery_stats.total_protocols += 1
                     self._track_metadata(
                         name=ep.name,
                         entry_point=ep,
-                        protocol_type="capability",
+                        protocol_type="protocol",
                     )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "capability", e)
-        except Exception:
-            logger.debug("No victor.sdk.capabilities entry points found")
+            except Exception as e:
+                self._handle_load_error(ep.name, "protocol", e)
 
-    def _load_validators(self) -> None:
-        """Load validators from victor.sdk.validators group."""
-        try:
-            for ep in importlib.metadata.entry_points(group=self.VALIDATORS_GROUP):
-                try:
-                    validator = ep.load()
-                    self._validators[ep.name] = validator
-                    self._discovery_stats.total_validators += 1
-                    self._track_metadata(
-                        name=ep.name,
-                        entry_point=ep,
-                        protocol_type="validator",
-                    )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "validator", e)
-        except Exception:
-            logger.debug("No victor.sdk.validators entry points found")
+    def _load_capabilities(self, entry_points_list: List[Any]) -> None:
+        """Load capability providers from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                capability_class_or_instance = ep.load()
+
+                # Try to instantiate if it's a class
+                if isinstance(capability_class_or_instance, type):
+                    try:
+                        instance = capability_class_or_instance()
+                    except Exception as e:
+                        self._handle_load_error(ep.name, "capability", e)
+                        continue
+                else:
+                    instance = capability_class_or_instance
+
+                self._capability_providers[ep.name] = instance
+                self._discovery_stats.total_capabilities += 1
+                self._track_metadata(
+                    name=ep.name,
+                    entry_point=ep,
+                    protocol_type="capability",
+                )
+            except Exception as e:
+                self._handle_load_error(ep.name, "capability", e)
+
+    def _load_validators(self, entry_points_list: List[Any]) -> None:
+        """Load validators from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                validator = ep.load()
+                self._validators[ep.name] = validator
+                self._discovery_stats.total_validators += 1
+                self._track_metadata(
+                    name=ep.name,
+                    entry_point=ep,
+                    protocol_type="validator",
+                )
+            except Exception as e:
+                self._handle_load_error(ep.name, "validator", e)
 
     def _track_metadata(self, name: str, entry_point: Any, protocol_type: str) -> None:
         """Track metadata for a discovered protocol.
@@ -404,11 +432,11 @@ class ProtocolRegistry:
         """Get all capability providers."""
         return self._capability_providers.copy()
 
-    def get_validator(self, name: str) -> Optional[Callable]:
+    def get_validator(self, name: str) -> Optional[Callable[..., Any]]:
         """Get a specific validator by name."""
         return self._validators.get(name)
 
-    def get_validators(self) -> Dict[str, Callable]:
+    def get_validators(self) -> Dict[str, Callable[..., Any]]:
         """Get all validators."""
         return self._validators.copy()
 
@@ -431,9 +459,8 @@ class ProtocolRegistry:
             Dictionary of protocol metadata.
         """
         if name:
-            return (
-                {name: self._protocol_metadata.get(name)} if name in self._protocol_metadata else {}
-            )
+            metadata = self._protocol_metadata.get(name)
+            return {name: metadata} if name in self._protocol_metadata and metadata is not None else {}
         return self._protocol_metadata.copy()
 
     def get_discovery_stats(self) -> DiscoveryStats:
@@ -536,14 +563,43 @@ class _CollectingPluginContext:
     ) -> None:
         return None
 
+    def register_category(
+        self,
+        name: str,
+        tools: set[str],
+        *,
+        description: str | None = None,
+    ) -> None:
+        return None
+
+    def extend_category(self, name: str, tools: set[str]) -> None:
+        return None
+
     def get_service(self, service_type: type[Any]) -> None:
+        return None
+
+    def get_provider_registry(self) -> None:
+        return None
+
+    def get_graph_store(self) -> None:
+        return None
+
+    def get_vector_store(self) -> None:
+        return None
+
+    def get_embedding_service(self) -> None:
+        return None
+
+    def get_memory_coordinator(self) -> None:
         return None
 
     def get_settings(self) -> None:
         return None
 
 
-def collect_verticals_from_candidate(candidate: Any) -> Dict[str, Type[SdkVerticalBase]]:
+def collect_verticals_from_candidate(
+    candidate: Any,
+) -> Dict[str, Type[SdkVerticalBase]]:
     """Collect SDK vertical classes from a direct vertical or VictorPlugin candidate.
 
     This helper is the definition-layer contract parser shared by SDK discovery,
@@ -610,18 +666,19 @@ def discover_protocols(
         return {f"team_{i}": p for i, p in enumerate(registry.get_team_providers())}
     else:
         # Return all protocols as a flat dict
-        all_protocols = {}
+        # Build dict directly to avoid list type inference issues
+        result: Dict[str, Any] = {}
         for i, p in enumerate(registry.get_tool_providers()):
-            all_protocols[f"tool_{i}"] = p
-        for i, p in enumerate(registry.get_safety_providers()):
-            all_protocols[f"safety_{i}"] = p
-        for i, p in enumerate(registry.get_workflow_providers()):
-            all_protocols[f"workflow_{i}"] = p
-        for i, p in enumerate(registry.get_prompt_providers()):
-            all_protocols[f"prompt_{i}"] = p
-        for i, p in enumerate(registry.get_team_providers()):
-            all_protocols[f"team_{i}"] = p
-        return all_protocols
+            result[f"tool_{i}"] = p
+        for i, p in enumerate(registry.get_safety_providers()):  # type: ignore
+            result[f"safety_{i}"] = p
+        for i, p in enumerate(registry.get_workflow_providers()):  # type: ignore
+            result[f"workflow_{i}"] = p
+        for i, p in enumerate(registry.get_prompt_providers()):  # type: ignore
+            result[f"prompt_{i}"] = p
+        for i, p in enumerate(registry.get_team_providers()):  # type: ignore
+            result[f"team_{i}"] = p
+        return result
 
 
 def get_discovery_summary() -> str:
@@ -636,9 +693,9 @@ def get_discovery_summary() -> str:
 
     lines = [
         "=== Victor SDK Protocol Discovery Summary ===",
-        f"",
+        "",
         f"Statistics: {stats}",
-        f"",
+        "",
         f"Verticals ({stats.total_verticals}):",
     ]
 
@@ -647,15 +704,8 @@ def get_discovery_summary() -> str:
         source = meta.source_package if meta else "unknown"
         lines.append(f"  - {name} (from {source})")
 
-    lines.append(f"")
+    lines.append("")
     lines.append(f"Protocols ({stats.total_protocols}):")
-
-    # Count by type
-    type_counts = {}
-    for meta in metadata.values():
-        if meta.protocol_type == "protocol":
-            # This is a bit messy - let's just count the actual providers
-            pass
 
     # Just list the provider counts
     lines.append(f"  - Tool providers: {len(registry.get_tool_providers())}")
@@ -664,7 +714,7 @@ def get_discovery_summary() -> str:
     lines.append(f"  - Prompt providers: {len(registry.get_prompt_providers())}")
     lines.append(f"  - Team providers: {len(registry.get_team_providers())}")
 
-    lines.append(f"")
+    lines.append("")
     lines.append(f"Capabilities ({stats.total_capabilities}):")
 
     for name in sorted(registry.list_capability_names()):
@@ -672,18 +722,19 @@ def get_discovery_summary() -> str:
         source = meta.source_package if meta else "unknown"
         lines.append(f"  - {name} (from {source})")
 
-    lines.append(f"")
+    lines.append("")
     lines.append(f"Validators ({stats.total_validators}):")
 
     for name in sorted(registry.list_validator_names()):
         lines.append(f"  - {name}")
 
     if stats.failed_loads > 0:
-        lines.append(f"")
+        lines.append("")
         lines.append(f"Failed Loads ({stats.failed_loads}):")
         for name in registry.get_failed_loads():
-            meta = metadata.get(name, {})
-            lines.append(f"  - {name}: {meta.load_error if meta else 'unknown error'}")
+            meta = metadata.get(name)
+            load_error = meta.load_error if meta and hasattr(meta, "load_error") else "unknown error"
+            lines.append(f"  - {name}: {load_error}")
 
     return "\n".join(lines)
 

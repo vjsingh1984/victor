@@ -207,13 +207,14 @@ class TestAnthropicAdapterEdgeCases:
     """Edge case tests for AnthropicToolCallingAdapter."""
 
     def test_parse_invalid_tool_name(self):
-        """Test parsing with invalid tool name."""
+        """Test parsing with invalid tool name keeps it for error response."""
         adapter = AnthropicToolCallingAdapter(model="claude-3-sonnet")
-        # Empty name should be skipped silently
+        # Empty name kept with id so pipeline generates error response
         raw_tool_calls = [{"id": "call_123", "name": "", "arguments": {"arg": "value"}}]
         result = adapter.parse_tool_calls("", raw_tool_calls)
-        # Invalid names are skipped silently
-        assert len(result.tool_calls) == 0
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].id == "call_123"
+        assert result.tool_calls[0].arguments == {}  # args cleared
 
     def test_parse_dict_arguments(self):
         """Test parsing tool calls with dict arguments."""
@@ -376,7 +377,10 @@ class TestBedrockAdapter:
             ToolDefinition(
                 name="test_tool",
                 description="A test tool",
-                parameters={"type": "object", "properties": {"arg": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"arg": {"type": "string"}},
+                },
             )
         ]
         result = adapter.convert_tools(tools)
@@ -439,11 +443,15 @@ class TestBedrockAdapterEdgeCases:
         assert result.tool_calls[1].name == "func2"
 
     def test_bedrock_parse_invalid_tool_name(self):
-        """Test parsing with invalid tool name."""
+        """Test parsing with invalid tool name keeps it for error response."""
         adapter = BedrockToolCallingAdapter(model="anthropic.claude-3-sonnet")
         raw_tool_calls = [{"id": "call_123", "name": "", "arguments": {"arg": "value"}}]
         result = adapter.parse_tool_calls("", raw_tool_calls)
-        assert len(result.tool_calls) == 0
+        # Invalid names are kept with their id so the pipeline generates
+        # an error response (OpenAI spec: every tool_calls[].id needs a role=tool)
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].id == "call_123"
+        assert result.tool_calls[0].arguments == {}  # args cleared
         assert result.warnings and len(result.warnings) > 0
 
     def test_bedrock_parse_string_arguments_fallback(self):
@@ -590,11 +598,13 @@ class TestAzureOpenAIAdapterEdgeCases:
         assert result.tool_calls[1].name == "func2"
 
     def test_azure_parse_invalid_tool_name(self):
-        """Test parsing with invalid tool name."""
+        """Test parsing with invalid tool name keeps it for error response."""
         adapter = AzureOpenAIToolCallingAdapter(model="gpt-4o")
         raw_tool_calls = [{"id": "call_123", "name": "", "arguments": "{}"}]
         result = adapter.parse_tool_calls("", raw_tool_calls)
-        assert len(result.tool_calls) == 0
+        # Invalid names kept with id for pipeline error response (OpenAI spec)
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].id == "call_123"
         assert result.warnings and len(result.warnings) > 0
 
     def test_azure_parse_invalid_json_arguments(self):

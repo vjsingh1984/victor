@@ -53,7 +53,9 @@ def demo(
 
     result = asyncio.run(agent.run(prompts[example]))
 
-    console.print(Panel(result.content, title="[bold green]Response[/bold green]", expand=False))
+    console.print(
+        Panel(result.content, title="[bold green]Response[/bold green]", expand=False)
+    )
 
 
 @app.command()
@@ -63,11 +65,13 @@ def interactive(
 ):
     """Start an interactive session."""
 
-    console.print(Panel(
-        "[bold blue]Victor Playground - Interactive Mode[/bold blue]\n"
-        "Type your messages below. Press Ctrl+D to exit.",
-        title="Welcome"
-    ))
+    console.print(
+        Panel(
+            "[bold blue]Victor Playground - Interactive Mode[/bold blue]\n"
+            "Type your messages below. Press Ctrl+D to exit.",
+            title="Welcome",
+        )
+    )
 
     agent = Agent.create(provider=provider, tools=tools)
 

@@ -41,6 +41,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from victor.core.async_utils import run_sync
+from victor.experiments.ab_testing.paths import get_default_ab_test_db_path
 
 ab_app = typer.Typer(
     name="ab",
@@ -384,7 +385,7 @@ def _list_experiments(status_filter: Optional[str]) -> None:
     import sqlite3
     from datetime import datetime
 
-    storage_path = Path("~/.victor/ab_tests.db").expanduser()
+    storage_path = get_default_ab_test_db_path()
     if not storage_path.exists():
         console.print("[yellow]No experiments found[/]")
         raise typer.Exit(0)

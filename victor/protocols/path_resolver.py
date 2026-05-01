@@ -47,7 +47,16 @@ import os
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Protocol, Set, Tuple, runtime_checkable
+from typing import (
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    runtime_checkable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -570,7 +579,7 @@ class PathResolver(IPathResolver):
         if result.is_directory:
             raise IsADirectoryError(
                 f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents."
+                f"Suggestion: Use ls(path='{path}') to explore its contents."
             )
 
         return result
@@ -593,7 +602,7 @@ class PathResolver(IPathResolver):
         if result.is_file:
             raise NotADirectoryError(
                 f"Path is not a directory: {path}\n"
-                f"Suggestion: Use read_file(path='{path}') to read file contents."
+                f"Suggestion: Use read(path='{path}') to read file contents."
             )
 
         return result
@@ -610,6 +619,12 @@ class PathResolver(IPathResolver):
         Returns:
             List of similar existing paths
         """
+        suggestions: List[str] = []
+
+        # Prefer package/module entry files when the requested module path is
+        # actually backed by a same-named directory (e.g. foo.py -> foo/base.py).
+        suggestions.extend(self._suggest_package_entry_paths(path, limit=limit))
+
         # Build known paths if not cached
         if self._known_paths is None:
             self._known_paths = self._scan_directory_names()
@@ -638,7 +653,57 @@ class PathResolver(IPathResolver):
             )
             matches = list(dict.fromkeys(full_matches + matches))[:limit]
 
-        return matches
+        suggestions.extend(matches)
+        return list(dict.fromkeys(suggestions))[:limit]
+
+    def _suggest_package_entry_paths(self, path: str, limit: int = 5) -> List[str]:
+        """Suggest package entry files for missing module-style paths.
+
+        This improves recoveries such as `registry.py` where the actual source
+        lives in a sibling package directory like `registry/base.py`.
+        """
+        requested = Path(path).expanduser()
+        if requested.suffix != ".py":
+            return []
+
+        package_dir = requested.with_suffix("")
+        if not package_dir.is_absolute():
+            package_dir = self.cwd / package_dir
+
+        try:
+            package_dir = package_dir.resolve()
+        except (OSError, RuntimeError):
+            return []
+
+        if not package_dir.is_dir():
+            return []
+
+        preferred_names = ("base.py", "__init__.py")
+        suggestions: List[str] = []
+
+        for name in preferred_names:
+            candidate = package_dir / name
+            if candidate.is_file():
+                suggestions.append(self._to_relative_display_path(candidate))
+
+        other_candidates = sorted(
+            candidate
+            for candidate in package_dir.iterdir()
+            if candidate.is_file()
+            and candidate.suffix == ".py"
+            and candidate.name not in preferred_names
+        )
+        suggestions.extend(
+            self._to_relative_display_path(candidate) for candidate in other_candidates
+        )
+        return suggestions[:limit]
+
+    def _to_relative_display_path(self, path: Path) -> str:
+        """Format a path relative to cwd when possible for tool suggestions."""
+        try:
+            return str(path.relative_to(self.cwd))
+        except ValueError:
+            return str(path)
 
     def _scan_directory_names(self, max_depth: int = 3) -> Set[str]:
         """Scan directory for file/directory names.

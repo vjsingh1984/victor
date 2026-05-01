@@ -16,11 +16,15 @@
 
 Provides concrete implementations of the workflow compiler
 that can be registered in the DI container.
+
+.. note::
+    The deprecated ``WorkflowCompiler`` has been removed.
+    Use ``victor.workflows.unified_compiler.UnifiedWorkflowCompiler`` instead.
 """
 
-from victor.workflows.compiler.unified_compiler import WorkflowCompiler
 from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
 from victor.workflows.compiler.boundary import (
+    LegacyWorkflowDslCompiler,
     LegacyWorkflowGraphCompiler,
     NativeWorkflowGraphCompiler,
     ParsedWorkflowDefinition,
@@ -30,10 +34,10 @@ from victor.workflows.compiler.boundary import (
 )
 
 __all__ = [
+    "LegacyWorkflowDslCompiler",
     "LegacyWorkflowGraphCompiler",
     "NativeWorkflowGraphCompiler",
     "ParsedWorkflowDefinition",
-    "WorkflowCompiler",
     "WorkflowCompilerImpl",
     "WorkflowCompilationRequest",
     "WorkflowDefinitionValidator",

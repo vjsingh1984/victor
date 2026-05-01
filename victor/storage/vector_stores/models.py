@@ -135,18 +135,28 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Import here to avoid circular imports
         from victor.storage.embeddings.service import EmbeddingService
+        import logging
 
-        print(f"🤖 Loading sentence-transformer model: {self.config.model_name}")
+        logger = logging.getLogger(__name__)
 
         # Use shared EmbeddingService singleton for memory efficiency
         # This shares the model with IntentClassifier and SemanticToolSelector
         self._embedding_service = EmbeddingService.get_instance(model_name=self.config.model_name)
 
+        # Only log if this is the first time loading this model
+        if not self._embedding_service._initialized:
+            logger.info(f"Loading sentence-transformer model: {self.config.model_name}")
+
         # Ensure model is loaded (lazy loading)
         self._embedding_service._ensure_model_loaded()
 
         self._initialized = True
-        print(f"✅ Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}")
+
+        # Only log success once per model
+        if self._embedding_service._initialized:
+            logger.info(
+                f"Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}"
+            )
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text."""
@@ -385,7 +395,8 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         # Verify model is available by testing with a small prompt
         try:
             response = await self.client.post(
-                "/api/embeddings", json={"model": self.config.model_name, "prompt": "test"}
+                "/api/embeddings",
+                json={"model": self.config.model_name, "prompt": "test"},
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -422,7 +433,8 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
 
         try:
             response = await self.client.post(
-                "/api/embeddings", json={"model": self.config.model_name, "prompt": text}
+                "/api/embeddings",
+                json={"model": self.config.model_name, "prompt": text},
             )
             response.raise_for_status()
             result = response.json()

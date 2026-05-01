@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.subagents.protocols import RoleToolProvider
     from victor.providers.base import StreamChunk
+    from victor.workflows.definition import ConstraintsProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ ROLE_DEFAULT_BUDGETS: Dict[SubAgentRole, int] = {
     SubAgentRole.TESTER: 20,
 }
 
-# Default context limits for each role
+# Default context limits for each role (chars, used when provider context unknown)
 ROLE_DEFAULT_CONTEXT: Dict[SubAgentRole, int] = {
     SubAgentRole.RESEARCHER: 50000,
     SubAgentRole.PLANNER: 30000,
@@ -128,6 +129,60 @@ ROLE_DEFAULT_CONTEXT: Dict[SubAgentRole, int] = {
     SubAgentRole.REVIEWER: 40000,
     SubAgentRole.TESTER: 50000,
 }
+
+# Role context fractions — percentage of model's context window per role
+ROLE_CONTEXT_FRACTIONS: Dict[SubAgentRole, float] = {
+    SubAgentRole.RESEARCHER: 0.25,
+    SubAgentRole.PLANNER: 0.15,
+    SubAgentRole.EXECUTOR: 0.50,
+    SubAgentRole.REVIEWER: 0.20,
+    SubAgentRole.TESTER: 0.25,
+}
+
+
+def get_context_for_role(
+    role: SubAgentRole,
+    provider: str = "ollama",
+    model: Optional[str] = None,
+) -> int:
+    """Calculate context limit for a subagent role based on provider capabilities.
+
+    Queries provider_context_limits.yaml for the model's actual context window,
+    then allocates a fraction based on role. Falls back to ROLE_DEFAULT_CONTEXT
+    if provider limits are unavailable.
+
+    Args:
+        role: SubAgent role
+        provider: Provider name (e.g., "ollama", "deepseek", "anthropic")
+        model: Optional model name for model-specific limits
+
+    Returns:
+        Context limit in characters
+    """
+    try:
+        from victor.config.config_loaders import get_provider_limits
+
+        limits = get_provider_limits(provider, model)
+        model_context_tokens = limits.effective_context
+        model_context_chars = model_context_tokens * 4  # ~4 chars/token
+
+        fraction = ROLE_CONTEXT_FRACTIONS.get(role, 0.25)
+        scaled = int(model_context_chars * fraction)
+
+        # Cap at 200K chars to prevent memory issues
+        result = min(scaled, 200000)
+
+        logger.debug(
+            "Context for %s: %d chars (model=%d tokens, fraction=%.0f%%)",
+            role.value,
+            result,
+            model_context_tokens,
+            fraction * 100,
+        )
+        return result
+
+    except Exception:
+        return ROLE_DEFAULT_CONTEXT.get(role, 50000)
 
 
 @dataclass
@@ -236,6 +291,7 @@ class SubAgentOrchestrator:
         can_spawn_subagents: bool = False,
         timeout_seconds: int = 300,
         disable_embeddings: bool = False,
+        constraints: Optional["ConstraintsProtocol"] = None,
     ) -> SubAgentResult:
         """Spawn a sub-agent to execute a task.
 
@@ -251,6 +307,7 @@ class SubAgentOrchestrator:
             can_spawn_subagents: Whether sub-agent can spawn children
             timeout_seconds: Maximum execution time
             disable_embeddings: Disable codebase embeddings (workflow service mode)
+            constraints: Optional task constraints for write policy activation
 
         Returns:
             SubAgentResult with execution outcome
@@ -263,6 +320,17 @@ class SubAgentOrchestrator:
             if result.success:
                 print(result.summary)
         """
+        # Activate constraints if provided
+        if constraints:
+            from victor.agent.constraint_activation_service import get_constraint_activator
+
+            activator = get_constraint_activator()
+            result = activator.activate_constraints(constraints, self._vertical)
+            if not result.success:
+                logger.warning(f"SubAgent constraint activation failed: {result.error}")
+            else:
+                logger.debug(f"SubAgent constraints activated for role: {role.value}")
+
         # Apply role-specific defaults using the role provider (OCP-compliant)
         role_name = role.value if hasattr(role, "value") else str(role)
 
@@ -273,9 +341,13 @@ class SubAgentOrchestrator:
             effective_tools = self._role_provider.get_tools_for_role(role_name, self._vertical)
 
         effective_budget = tool_budget or self._role_provider.get_budget_for_role(role_name)
-        effective_context = context_limit or self._role_provider.get_context_limit_for_role(
-            role_name
-        )
+        if context_limit:
+            effective_context = context_limit
+        else:
+            # Try provider-aware context sizing first, fallback to role defaults
+            provider_name = getattr(self._context, "provider_name", "ollama")
+            model_name = getattr(self._context, "model", None)
+            effective_context = get_context_for_role(role, provider_name, model_name)
 
         # Create configuration
         config = SubAgentConfig(
@@ -312,6 +384,13 @@ class SubAgentOrchestrator:
             )
         finally:
             self.active_subagents.discard(subagent)
+            # Deactivate constraints after spawn completes
+            if constraints:
+                from victor.agent.constraint_activation_service import get_constraint_activator
+
+                activator = get_constraint_activator()
+                activator.deactivate_constraints()
+                logger.debug(f"SubAgent constraints deactivated for role: {role.value}")
 
     async def fan_out(
         self,
@@ -496,7 +575,10 @@ class SubAgentOrchestrator:
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
-            logger.error(f"{role.value} sub-agent stream spawn failed: {error_msg}", exc_info=True)
+            logger.error(
+                f"{role.value} sub-agent stream spawn failed: {error_msg}",
+                exc_info=True,
+            )
             yield StreamChunk(
                 content="",
                 is_final=True,

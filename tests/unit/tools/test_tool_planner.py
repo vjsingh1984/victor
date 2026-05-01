@@ -21,7 +21,7 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from typing import List, Any
 
-from victor.agent.tool_planner import ToolPlanner
+from victor.agent.services.tool_planning_runtime import ToolPlanner
 from victor.config.settings import Settings
 
 
@@ -166,23 +166,81 @@ class TestIntentFiltering:
         """Test filtering with READ_ONLY intent."""
         from victor.agent.action_authorizer import ActionIntent
 
-        # Create mocks with name attribute properly set
+        # Use canonical tool names from WRITE_TOOLS (not aliases)
         tool1 = Mock()
-        tool1.name = "read_file"
+        tool1.name = "read"
         tool2 = Mock()
-        tool2.name = "write_file"
+        tool2.name = "write"
         tool3 = Mock()
-        tool3.name = "edit_files"
+        tool3.name = "edit"
         tools = [tool1, tool2, tool3]
 
         result = tool_planner.filter_tools_by_intent(tools, ActionIntent.READ_ONLY)
 
-        # write and edit tools should be filtered out
+        # write and edit tools should be filtered out (they're in WRITE_TOOLS)
         assert len(result) < len(tools)
         tool_names = [t.name for t in result]
-        assert "read_file" in tool_names
-        assert "write_file" not in tool_names
-        assert "edit_files" not in tool_names
+        assert "read" in tool_names
+        assert "write" not in tool_names
+        assert "edit" not in tool_names
+
+    def test_filter_tools_read_only_intent_keeps_shell_for_explicit_sqlite_request(
+        self, tool_planner
+    ):
+        """Explicit readonly shell/SQLite requests should preserve shell availability."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        read_tool = Mock()
+        read_tool.name = "read"
+        shell_tool = Mock()
+        shell_tool.name = "shell"
+        write_tool = Mock()
+        write_tool.name = "write"
+
+        result = tool_planner.filter_tools_by_intent(
+            [read_tool, shell_tool, write_tool],
+            ActionIntent.READ_ONLY,
+            user_message="use shell tool with sqlite commands to review generations",
+        )
+
+        tool_names = [t.name for t in result]
+        assert "read" in tool_names
+        assert "shell" in tool_names
+        assert "write" not in tool_names
+
+    def test_filter_tools_display_only_intent_keeps_shell_for_sqllite_db_review(self, tool_planner):
+        """Observed typo variants like 'sqllite db' should still preserve shell."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        shell_tool = Mock()
+        shell_tool.name = "shell"
+        read_tool = Mock()
+        read_tool.name = "read"
+
+        result = tool_planner.filter_tools_by_intent(
+            [read_tool, shell_tool],
+            ActionIntent.DISPLAY_ONLY,
+            user_message="also review the sqllite db for evolved prompts",
+        )
+
+        tool_names = [t.name for t in result]
+        assert "read" in tool_names
+        assert "shell" in tool_names
+
+    def test_filter_tools_read_only_intent_does_not_rewrite_unknown_shell_variant(
+        self, tool_planner
+    ):
+        """Unknown shell variants should pass through unchanged."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        result = tool_planner.filter_tools_by_intent(
+            [{"name": "shell_readonly"}],
+            ActionIntent.READ_ONLY,
+            user_message="use shell tool with sqlite commands to inspect the database",
+        )
+
+        assert len(result) == 1
+        assert result[0]["name"] == "shell_readonly"
 
     def test_filter_tools_write_allowed_intent(self, tool_planner):
         """Test filtering with WRITE_ALLOWED intent."""
@@ -208,18 +266,18 @@ class TestIntentFiltering:
         from victor.agent.action_authorizer import ActionIntent
 
         tools = [
-            {"name": "read_file"},
-            {"name": "write_file"},
-            {"name": "list_directory"},
+            {"name": "read"},
+            {"name": "write"},
+            {"name": "ls"},
         ]
 
         result = tool_planner.filter_tools_by_intent(tools, ActionIntent.DISPLAY_ONLY)
 
-        # write_file should be filtered out
+        # write should be filtered out (in WRITE_TOOLS)
         assert len(result) < len(tools)
         tool_names = [t["name"] for t in result]
-        assert "read_file" in tool_names
-        assert "write_file" not in tool_names
+        assert "read" in tool_names
+        assert "write" not in tool_names
 
     def test_filter_tools_empty_list(self, tool_planner):
         """Test filtering with empty tools list."""

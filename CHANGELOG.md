@@ -29,6 +29,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Victor-devops: 3 forbidden imports migrated to `victor.framework.extensions`
 - 32 documentation files reconciled (provider count 22→24, tool count 33→34)
 - Heavyweight dependencies (`sentence-transformers`, `lancedb`, `pyarrow`) moved to `[embeddings]` extra
+- `victor chat` no longer exposes `--legacy`; the canonical framework client path is now the only chat path
+
+### Deprecated
+- **`FrameworkShim` compatibility surface**
+  - Deprecated in: `Unreleased` on `2026-04-30`
+  - To be removed in: `v1.0.0`
+  - Target removal date: `2027-06-30`
+  - Replacement: `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition
+  - Migration path: `docs/architecture/migration.md`
+  - Compatibility shim status: warning-backed shim remains supported through `v1.0.0`
+- **`TeamNode*` workflow compatibility aliases** (`TeamNode`, `TeamNodeConfig`, `TeamNodeWorkflow`, `TeamNodeExecutor`)
+  - Deprecated in: `Unreleased` on `2026-04-30`
+  - To be removed in: `v0.9.0`
+  - Target removal date: `2027-03-31`
+  - Replacement: `TeamStep*` workflow names
+  - Migration path: `docs/architecture/migration.md`
+  - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
+- **`WorkflowGraph` alias from `victor.workflows.graph`**
+  - Deprecated in: `Unreleased` on `2026-04-30`
+  - To be removed in: `v0.8.0`
+  - Target removal date: `2026-12-31`
+  - Replacement: `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL
+  - Migration path: `docs/architecture/migration.md`
+  - Compatibility shim status: warning-backed alias remains supported through `v0.8.0`
 
 ### Fixed
 - Bare `except:` in `experiments.py` → `except (ValueError, TypeError)`

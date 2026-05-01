@@ -39,8 +39,7 @@ async def demo_code_review():
 
     # Create sample code with issues
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        f.write(
-            """
+        f.write("""
 import os
 import random
 
@@ -89,8 +88,7 @@ class MyClass:
     # Missing docstring (documentation issue)
     def method_without_docs(self):
         return "No documentation"
-"""
-        )
+""")
         test_file = f.name
 
     print("\n1️⃣ Review single file for all issues...")
@@ -183,8 +181,7 @@ async def demo_scanner():
 
         # Create file with secrets
         secrets_file = tmpdir_path / "config.py"
-        secrets_file.write_text(
-            """
+        secrets_file.write_text("""
 # Configuration with exposed secrets
 AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
 AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
@@ -193,20 +190,17 @@ DATABASE_URL = "postgresql://user:password123@localhost/db"
 
 # Google API key
 GOOGLE_API_KEY = "XXXXX"
-"""
-        )
+""")
 
         # Create requirements.txt with potentially vulnerable packages
         req_file = tmpdir_path / "requirements.txt"
-        req_file.write_text(
-            """
+        req_file.write_text("""
 requests==2.25.0
 flask==2.0.0
 django==3.2.0
 pillow==8.0.0
 pyyaml==5.4
-"""
-        )
+""")
 
         # Create .env file (dangerous file)
         env_file = tmpdir_path / ".env"

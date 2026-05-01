@@ -41,6 +41,24 @@ from victor.framework.search.hybrid import (
     HybridSearchResult,
     create_hybrid_search_engine,
 )
+from victor.framework.search.code_search_quality import (
+    CodeSearchQualityConfig,
+    enrich_code_search_results,
+    infer_code_search_chunking_strategy,
+    rerank_code_search_results,
+)
+from victor.framework.search.codebase_embedding_bridge import (
+    CODEBASE_INDEX_MANIFEST_NAME,
+    DEFAULT_CODEBASE_CHUNKING_STRATEGY,
+    DEFAULT_CODEBASE_CHUNK_OVERLAP,
+    DEFAULT_CODEBASE_CHUNK_SIZE,
+    STRUCTURAL_CODEBASE_VECTOR_STORE,
+    build_codebase_index_manifest,
+    enable_structural_codebase_embeddings,
+    has_compatible_codebase_index_manifest,
+    has_persisted_codebase_index_data,
+    write_codebase_index_manifest,
+)
 from victor.framework.search.query_expansion import (
     QueryExpander,
     QueryExpansionConfig,
@@ -48,16 +66,33 @@ from victor.framework.search.query_expansion import (
     QueryExpanderProtocol,
     create_query_expander,
 )
+from victor.framework.search.skeleton import extract_skeleton
 
 __all__ = [
     # Hybrid search
     "HybridSearchEngine",
     "HybridSearchResult",
     "create_hybrid_search_engine",
+    "CodeSearchQualityConfig",
+    "enrich_code_search_results",
+    "infer_code_search_chunking_strategy",
+    "rerank_code_search_results",
+    "CODEBASE_INDEX_MANIFEST_NAME",
+    "DEFAULT_CODEBASE_CHUNKING_STRATEGY",
+    "DEFAULT_CODEBASE_CHUNK_OVERLAP",
+    "DEFAULT_CODEBASE_CHUNK_SIZE",
+    "STRUCTURAL_CODEBASE_VECTOR_STORE",
+    "build_codebase_index_manifest",
+    "enable_structural_codebase_embeddings",
+    "has_compatible_codebase_index_manifest",
+    "has_persisted_codebase_index_data",
+    "write_codebase_index_manifest",
     # Query expansion
     "QueryExpander",
     "QueryExpansionConfig",
     "ExpandedQuery",
     "QueryExpanderProtocol",
     "create_query_expander",
+    # Skeleton extraction
+    "extract_skeleton",
 ]

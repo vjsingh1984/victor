@@ -590,7 +590,11 @@ class TestConditionalEdgeRouting:
             return ctx
 
         # Build workflow with proper structure using ConditionNode directly
-        from victor.workflows.definition import ConditionNode, TransformNode, WorkflowDefinition
+        from victor.workflows.definition import (
+            ConditionNode,
+            TransformNode,
+            WorkflowDefinition,
+        )
 
         workflow = WorkflowDefinition(
             name="complex_condition_workflow",

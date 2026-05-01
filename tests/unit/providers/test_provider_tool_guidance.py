@@ -187,6 +187,18 @@ class TestOllamaToolGuidance:
         """Ollama should have lower exploration depth."""
         assert ollama_strategy.get_max_exploration_depth("complex") <= 10
 
+    def test_ollama_guidance_canonicalizes_available_tool_preview(self, ollama_strategy):
+        """Model-facing tool previews should use canonical core tool names."""
+        prompt = ollama_strategy.get_guidance_prompt(
+            task_type="analysis",
+            available_tools=["list_directory", "read_file", "execute_bash", "read"],
+        )
+
+        assert "list_directory" not in prompt
+        assert "read_file" not in prompt
+        assert "execute_bash" not in prompt
+        assert "Available tools: ls, read, shell" in prompt
+
 
 class TestAnthropicToolGuidance:
     """Tests for Anthropic (Claude) tool guidance strategy."""
@@ -224,6 +236,10 @@ class TestOpenAIToolGuidance:
             task_type="analysis", available_tools=["read", "grep", "ls"]
         )
         assert len(prompt) < 200
+
+    def test_openai_alias_boost_matches_canonical(self, openai_strategy):
+        """Legacy tool aliases should resolve to the canonical boost class."""
+        assert openai_strategy.get_tool_boost("read_file") == openai_strategy.get_tool_boost("read")
 
 
 class TestToolGuidanceRegistry:
@@ -332,6 +348,16 @@ class TestConsolidationDetection:
             {"tool": "read", "args": {"path": "main.py"}},
             {"tool": "symbol", "args": {"file_path": "main.py", "symbol_name": "foo"}},
             {"tool": "read", "args": {"path": "main.py", "offset": 100}},
+        ]
+        assert deepseek_strategy.should_consolidate_calls(tool_history) is True
+
+    def test_detect_legacy_aliases_as_redundant(self, deepseek_strategy):
+        """Legacy aliases should normalize before redundancy checks."""
+        tool_history = [
+            {"tool": "list_directory", "args": {"path": "."}},
+            {"tool": "ls", "args": {"path": "./src"}},
+            {"tool": "list_directory", "args": {"path": "./tests"}},
+            {"tool": "ls", "args": {"path": "./docs"}},
         ]
         assert deepseek_strategy.should_consolidate_calls(tool_history) is True
 

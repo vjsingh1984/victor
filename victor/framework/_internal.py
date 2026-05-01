@@ -25,6 +25,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
+from victor.agent.config import FrameworkCompatibleAgentConfig, normalize_agent_config
 from victor.framework.event_registry import EventTarget, get_event_registry
 from victor.framework.events import (
     AgentExecutionEvent,
@@ -33,6 +34,7 @@ from victor.framework.events import (
     stream_end_event,
     stream_start_event,
 )
+from victor.framework.task import DirectResponseOutputState
 from victor.framework.tools import ToolSet
 from victor.framework.protocols import ObservabilityPortProtocol
 
@@ -43,7 +45,6 @@ from victor.framework.capability_runtime import (
 )
 
 if TYPE_CHECKING:
-    from victor.framework.config import AgentConfig
     from victor.core.verticals.base import VerticalBase
 
 
@@ -57,7 +58,7 @@ async def create_orchestrator_from_options(
     airgapped: bool,
     profile: Optional[str],
     workspace: Optional[str],
-    config: Optional["AgentConfig"],
+    config: Optional[FrameworkCompatibleAgentConfig],
     system_prompt: Optional[str] = None,
     enable_observability: bool = True,
     session_id: Optional[str] = None,
@@ -101,6 +102,8 @@ async def create_orchestrator_from_options(
     # Load settings
     settings = load_settings()
 
+    config = normalize_agent_config(config)
+
     # Apply config overrides
     if config:
         for key, value in config.to_settings_dict().items():
@@ -109,7 +112,7 @@ async def create_orchestrator_from_options(
 
     # Apply airgapped mode
     if airgapped:
-        settings.airgapped_mode = True
+        settings.security.airgapped_mode = True
 
     if getattr(settings, "framework_private_fallback_strict_mode", False):
         os.environ.setdefault("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")
@@ -131,7 +134,7 @@ async def create_orchestrator_from_options(
     # Create OrchestratorFactory with provider
     provider_class = ProviderRegistry.get(provider)
     provider_instance = provider_class(
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -139,7 +142,7 @@ async def create_orchestrator_from_options(
     factory = OrchestratorFactory(
         settings=settings,
         provider=provider_instance,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
         profile_name=profile or "default",
@@ -151,7 +154,7 @@ async def create_orchestrator_from_options(
     agent = await factory.create_agent(
         mode="foreground",
         provider=provider,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         tools=tools,
         airgapped=airgapped,
         vertical=vertical,
@@ -217,6 +220,16 @@ def setup_observability_integration(
 
     # Wire into orchestrator
     integration.wire_orchestrator(orchestrator)
+
+    # Wire provider resilience notifications to the same bus so dashboard
+    # and other subscribers see fallback events.  Follows the same pattern
+    # as CircuitBreakerRegistry.wire_observability().
+    try:
+        from victor.providers.resilience import ResilientProvider
+
+        ResilientProvider.wire_observability(integration.event_bus)
+    except Exception:
+        pass  # Non-critical — resilience works without observability
 
     # Ensure reference is stored through public observability ports.
     if isinstance(orchestrator, ObservabilityPortProtocol):
@@ -309,6 +322,8 @@ def configure_tools(
 async def stream_with_events(
     orchestrator: Any,
     prompt: str,
+    *,
+    response_prompt: Optional[str] = None,
 ) -> AsyncIterator[AgentExecutionEvent]:
     """Stream orchestrator response as framework AgentExecutionEvents.
 
@@ -317,12 +332,14 @@ async def stream_with_events(
 
     Args:
         orchestrator: AgentOrchestrator instance
-        prompt: User prompt
+        prompt: Prompt sent to the runtime
+        response_prompt: Original user prompt for output normalization
 
     Yields:
         AgentExecutionEvent objects representing agent actions
     """
     registry = get_event_registry()
+    output_state = DirectResponseOutputState(response_prompt or prompt)
 
     # Emit stream start
     yield stream_start_event()
@@ -341,7 +358,10 @@ async def stream_with_events(
                     metadata=chunk_metadata,
                 )
 
-            content = getattr(chunk, "content", "")
+            content = output_state.consume_stream_content(
+                getattr(chunk, "content", ""),
+                metadata=chunk_metadata,
+            )
             if content:
                 yield registry.from_external(
                     {"content": content},
@@ -391,6 +411,15 @@ async def stream_with_events(
                     EventTarget.STREAM_CHUNK,
                     metadata=chunk_metadata,
                 )
+
+        final_content, final_metadata = output_state.flush_stream_content()
+        if final_content:
+            yield registry.from_external(
+                {"content": final_content},
+                "content",
+                EventTarget.STREAM_CHUNK,
+                metadata=final_metadata,
+            )
 
         # Emit stream end
         yield stream_end_event(success=True)

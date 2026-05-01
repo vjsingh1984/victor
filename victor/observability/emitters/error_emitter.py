@@ -30,9 +30,11 @@ Migration Notes:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
+import time
 import traceback
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from victor.observability.emitters.base import IErrorEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
@@ -69,6 +71,12 @@ class ErrorEventEmitter(IErrorEventEmitter):
         self._sync_wrapper: Optional[SyncEventWrapper] = None
         self._enabled = True
 
+        # Warning deduplication state
+        self._warning_dedup: Dict[str, Dict[str, Any]] = {}
+        self._dedup_enabled = True
+        self._dedup_window = 300  # 5 minutes
+        self._max_suppressed = 10  # Max duplicates before forcing emission
+
     def _get_bus(self) -> Optional[ObservabilityBus]:
         """Get ObservabilityBus instance.
 
@@ -100,6 +108,57 @@ class ErrorEventEmitter(IErrorEventEmitter):
             return self._sync_wrapper
 
         return None
+
+    def _should_suppress_warning(self, warning: str) -> Tuple[bool, Optional[str]]:
+        """Check if warning should be suppressed due to recent duplicates.
+
+        Args:
+            warning: Warning message to check
+
+        Returns:
+            Tuple of (should_suppress, message_suffix)
+        """
+        if not self._dedup_enabled:
+            return False, None
+
+        warning_hash = hashlib.md5(warning.encode()).hexdigest()
+        now = time.time()
+
+        if warning_hash in self._warning_dedup:
+            entry = self._warning_dedup[warning_hash]
+
+            # Check if dedup window expired
+            if now - entry["first_seen"] > self._dedup_window:
+                # Reset counter, allow this one
+                entry["count"] = 1
+                entry["first_seen"] = now
+                return False, None
+
+            # Increment counter
+            entry["count"] += 1
+            entry["last_seen"] = now
+
+            # Force emit after max_suppressed
+            if entry["count"] >= self._max_suppressed:
+                count = entry["count"]
+                self._warning_dedup.pop(warning_hash)  # Reset
+                suffix = f" (repeated {count} times in last {int(now - entry['first_seen'])}s)"
+                return False, suffix
+
+            # Suppress this duplicate
+            return (
+                True,
+                f" ({entry['count']} times suppressed, last seen {int(now - entry['first_seen'])}s ago)",
+            )
+
+        else:
+            # First time seeing this warning
+            self._warning_dedup[warning_hash] = {
+                "count": 1,
+                "first_seen": now,
+                "last_seen": now,
+            }
+            return False, None
 
     async def emit_async(
         self,
@@ -150,6 +209,22 @@ class ErrorEventEmitter(IErrorEventEmitter):
         try:
             from victor.core.events.emit_helper import emit_event_sync
 
+            # Apply deduplication to warnings
+            if topic == "warning.raised" and self._dedup_enabled:
+                warning_msg = data.get("warning", "")
+                should_suppress, suffix = self._should_suppress_warning(warning_msg)
+
+                if should_suppress:
+                    logger.debug(f"Suppressed duplicate warning: {warning_msg[:100]}")
+                    return
+
+                if suffix:
+                    data = data.copy()  # Don't modify original
+                    data["warning"] = warning_msg + suffix
+                    data["suppressed_count"] = self._warning_dedup.get(
+                        hashlib.md5(warning_msg.encode()).hexdigest(), {}
+                    ).get("count", 1)
+
             bus = self._get_bus()
             if bus:
                 emit_event_sync(
@@ -189,7 +264,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
                 "error_type": type(error).__name__,
                 "recoverable": recoverable,
                 "context": context or {},
-                "traceback": traceback_str[-2000:] if traceback_str else None,  # Last 2000 chars
+                "traceback": (traceback_str[-2000:] if traceback_str else None),  # Last 2000 chars
                 **metadata,
             },
         )
@@ -219,7 +294,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
                 "error_type": type(error).__name__,
                 "recoverable": recoverable,
                 "context": context or {},
-                "traceback": traceback_str[-2000:] if traceback_str else None,  # Last 2000 chars
+                "traceback": (traceback_str[-2000:] if traceback_str else None),  # Last 2000 chars
                 **metadata,
             },
         )
@@ -239,3 +314,21 @@ class ErrorEventEmitter(IErrorEventEmitter):
             True if enabled, False otherwise
         """
         return self._enabled
+
+    def cleanup_expired_warnings(self) -> None:
+        """Clean up expired warning dedup entries.
+
+        Removes entries that haven't been seen within the dedup window.
+        Call this periodically to prevent unbounded memory growth.
+        """
+        now = time.time()
+        expired = [
+            h
+            for h, entry in self._warning_dedup.items()
+            if now - entry["last_seen"] > self._dedup_window
+        ]
+        for h in expired:
+            del self._warning_dedup[h]
+
+        if expired:
+            logger.debug(f"Cleaned up {len(expired)} expired warning dedup entries")

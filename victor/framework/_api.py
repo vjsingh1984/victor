@@ -6,12 +6,12 @@ for maintainability.
 """
 
 from victor.framework.agent import Agent, ChatSession
-from victor.framework.config import AgentConfig
+from victor.framework.config import AgentConfig, UnifiedAgentConfig
 from victor.framework.protocols import (
     ChunkType,
     ConversationStateProtocol,
+    FrameworkOrchestratorProtocol,
     MessagesProtocol,
-    OrchestratorProtocol,
     OrchestratorStreamChunk,
     ProviderProtocol,
     StreamingProtocol,
@@ -19,11 +19,15 @@ from victor.framework.protocols import (
     ToolsProtocol,
     verify_protocol_conformance,
 )
-from victor.framework.errors import (
+
+# Backward compatibility alias
+OrchestratorProtocol = FrameworkOrchestratorProtocol
+from victor.core.errors import (
     AgentError,
     BudgetExhaustedError,
     CancellationError,
     ConfigurationError,
+    EdgeResolutionError,
     ProviderError,
     StateTransitionError,
     ToolError,
@@ -45,10 +49,16 @@ from victor.framework.events import (
 )
 from victor.framework.state import Stage, State, StateHooks, StateObserver
 from victor.framework.task import FrameworkTaskType, Task, TaskResult
-from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
+from victor.framework.decorators import agent, task as task_decorator, AgentCallable, TaskDefinition
+from victor.core.verticals import get_vertical, list_verticals
 
 PUBLIC_API_NAMES = [
+    # Decorator API
+    "agent",
+    "task_decorator",
+    "AgentCallable",
+    "TaskDefinition",
     # Core classes (the 5 concepts)
     "Agent",
     "Task",
@@ -69,7 +79,8 @@ PUBLIC_API_NAMES = [
     "StateHooks",
     "StateObserver",
     # Protocols
-    "OrchestratorProtocol",
+    "FrameworkOrchestratorProtocol",
+    "OrchestratorProtocol",  # Backward compatibility alias
     "ConversationStateProtocol",
     "ProviderProtocol",
     "ToolsProtocol",
@@ -93,9 +104,9 @@ PUBLIC_API_NAMES = [
     "progress_event",
     "milestone_event",
     # Config
-    "AgentConfig",
-    # Shim
-    "FrameworkShim",
+    "UnifiedAgentConfig",
+    "AgentConfig",  # Deprecated compatibility surface
+    # Vertical helpers
     "get_vertical",
     "list_verticals",
     # Errors

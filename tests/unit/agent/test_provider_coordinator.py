@@ -25,7 +25,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.provider_coordinator import (
+from victor.agent.provider.coordinator import (
     ProviderCoordinator,
     ProviderCoordinatorConfig,
     RateLimitInfo,
@@ -246,6 +246,25 @@ class TestProviderCoordinator:
         callback.assert_called_once_with(mock_state)
 
     @pytest.mark.asyncio
+    async def test_switch_provider_async_delegates_to_bound_service(self, coordinator):
+        """When bound, coordinator delegates provider switches to ProviderService."""
+        service = MagicMock()
+        service.switch_provider = AsyncMock()
+        service.get_current_provider_info.return_value = MagicMock(
+            provider_name="openai",
+            model_name="gpt-4.1",
+            supports_streaming=True,
+            supports_tool_calling=True,
+            max_tokens=200000,
+        )
+        coordinator.bind_provider_service(service)
+
+        result = await coordinator.switch_provider_async("openai", "gpt-4.1")
+
+        assert result is True
+        service.switch_provider.assert_awaited_once_with("openai", "gpt-4.1")
+
+    @pytest.mark.asyncio
     async def test_switch_provider_sync_returns_false_in_async_context(
         self, coordinator, mock_manager
     ):
@@ -306,6 +325,20 @@ class TestProviderCoordinator:
 
         mock_manager.start_health_monitoring.assert_called_once()
         assert coordinator._is_monitoring is True
+
+    @pytest.mark.asyncio
+    async def test_start_health_monitoring_delegates_to_bound_service(
+        self, coordinator, mock_manager
+    ):
+        """When bound, coordinator delegates health monitoring to ProviderService."""
+        service = MagicMock()
+        service.start_health_monitoring = AsyncMock()
+        coordinator.bind_provider_service(service)
+
+        await coordinator.start_health_monitoring()
+
+        service.start_health_monitoring.assert_awaited_once()
+        mock_manager.start_health_monitoring.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_start_health_monitoring_already_running(self, coordinator, mock_manager):
@@ -396,7 +429,7 @@ class TestProviderCoordinator:
             yield "success"
 
         # Patch sleep to avoid actual waiting
-        with patch("victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock):
+        with patch("victor.agent.provider.coordinator.asyncio.sleep", new_callable=AsyncMock):
             chunks = []
             async for chunk in coordinator.stream_with_rate_limit_retry(mock_stream):
                 chunks.append(chunk)
@@ -415,7 +448,7 @@ class TestProviderCoordinator:
                 yield "never"
             raise Exception("Rate limit exceeded. 429 Too Many Requests")
 
-        with patch("victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock):
+        with patch("victor.agent.provider.coordinator.asyncio.sleep", new_callable=AsyncMock):
             with pytest.raises(Exception, match="Rate limit"):
                 async for _ in coordinator.stream_with_rate_limit_retry(mock_stream):
                     pass

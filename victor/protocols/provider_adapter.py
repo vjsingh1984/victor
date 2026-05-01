@@ -42,7 +42,15 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, Tuple, List, Optional, Any, runtime_checkable, TYPE_CHECKING
+from typing import (
+    Protocol,
+    Tuple,
+    List,
+    Optional,
+    Any,
+    runtime_checkable,
+    TYPE_CHECKING,
+)
 from enum import Enum
 
 if TYPE_CHECKING:

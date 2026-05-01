@@ -42,13 +42,21 @@ class PIIScrubber:
     # Patterns for common PII
     PATTERNS: List[tuple[str, Pattern, str]] = [
         # Email addresses
-        ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
+        (
+            "email",
+            re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+            "[EMAIL]",
+        ),
         # API keys (common formats)
         ("api_key", re.compile(r"\b(sk-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(xai-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(AIza[a-zA-Z0-9_-]{35})\b"), "[API_KEY]"),
         # Bearer tokens
-        ("token", re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I), "[BEARER_TOKEN]"),
+        (
+            "token",
+            re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I),
+            "[BEARER_TOKEN]",
+        ),
         # Home directory paths
         ("path", re.compile(r"/Users/[a-zA-Z0-9_-]+"), "/Users/[USER]"),
         ("path", re.compile(r"/home/[a-zA-Z0-9_-]+"), "/home/[USER]"),
@@ -311,6 +319,7 @@ class EnhancedUsageLogger:
         max_log_size: int = 10 * 1024 * 1024,  # 10 MB
         backup_count: int = 5,
         compress_rotated: bool = True,
+        sampling_filter: Optional[Any] = None,
     ):
         """Initialize enhanced usage logger.
 
@@ -323,11 +332,15 @@ class EnhancedUsageLogger:
             max_log_size: Maximum log file size before rotation
             backup_count: Number of backup files to keep
             compress_rotated: Whether to compress rotated files
+            sampling_filter: Optional SemanticSamplingFilter for noise reduction.
         """
         self._enabled = enabled
         self._log_file = Path(log_file).expanduser()
         self.session_id = str(uuid.uuid4())
         self._lock = threading.Lock()
+        self._sampling_filter = sampling_filter
+        # Backward compat: UsageLogger used self._logger
+        self._logger = logger
 
         # Initialize components
         self._scrubber = PIIScrubber() if scrub_pii else None
@@ -360,6 +373,42 @@ class EnhancedUsageLogger:
         """Returns True if logging is enabled."""
         return self._enabled
 
+    def _sanitize_log_data(self, data: Any) -> Any:
+        """Sanitize log data to remove non-serializable objects.
+
+        Args:
+            data: Data to sanitize (can be dict, list, or primitive)
+
+        Returns:
+            Sanitized data safe for JSON serialization
+        """
+        import inspect
+        from types import CoroutineType, MappingProxyType
+
+        if isinstance(data, dict) or isinstance(data, MappingProxyType):
+            # Handle both dict and mappingproxy (read-only dict wrapper)
+            return {k: self._sanitize_log_data(v) for k, v in dict(data).items()}
+        elif isinstance(data, (list, tuple)):
+            return [self._sanitize_log_data(item) for item in data]
+        elif isinstance(data, set):
+            # Sets can't be directly JSON serialized, convert to list
+            return [self._sanitize_log_data(item) for item in data]
+        elif isinstance(data, CoroutineType):
+            # Coroutines can't be serialized, return a placeholder
+            return "<coroutine>"
+        elif inspect.isgenerator(data):
+            # Generators can't be serialized
+            return "<generator>"
+        elif inspect.isasyncgen(data):
+            # Async generators can't be serialized
+            return "<async_generator>"
+        elif hasattr(data, "__dict__"):
+            # For objects, try to serialize their dict representation
+            return self._sanitize_log_data(data.__dict__)
+        else:
+            # Primitives and JSON-serializable types
+            return data
+
     def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Log a usage event.
 
@@ -370,6 +419,10 @@ class EnhancedUsageLogger:
         if not self._enabled:
             return
 
+        # Semantic sampling: drop noise events before disk I/O
+        if self._sampling_filter and not self._sampling_filter.should_emit(event_type, data):
+            return
+
         # Check for rotation
         self._rotator.rotate()
 
@@ -377,11 +430,14 @@ class EnhancedUsageLogger:
         if self._scrubber:
             data = self._scrubber.scrub_dict(data)
 
+        # Sanitize data to remove non-serializable objects (coroutines, generators, etc.)
+        sanitized_data = self._sanitize_log_data(data)
+
         log_entry = {
             "session_id": self.session_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "event_type": event_type,
-            "data": data,
+            "data": sanitized_data,
         }
 
         try:
@@ -490,10 +546,5 @@ def create_usage_logger(
     Returns:
         Logger instance
     """
-    if enhanced:
-        return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)
-
-    # Fall back to basic logger
-    from victor.observability.analytics.logger import UsageLogger
-
-    return UsageLogger(log_file=log_file, enabled=enabled)
+    # EnhancedUsageLogger is the canonical implementation (UsageLogger is now an alias)
+    return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)

@@ -62,18 +62,29 @@ class ContextLimits:
         chars_per_token_estimate: Approximate characters per token for estimation
 
     **Design Notes:**
-    - overflow_threshold (0.75) provides headroom before hitting model limits
-    - proactive_compaction_threshold (0.70) triggers compaction early for token efficiency
-    - compaction_target (0.45) reduces to 45% to allow for conversation growth
+    - max_context_chars reflects modern 200K-token models (200K tokens × 3.5 chars = 700K chars).
+      Previous value (200K chars = 50K tokens) was calibrated for 64K-token-era models and
+      triggered compaction at ~35K tokens on 200K-token models — far too conservative.
+    - overflow_threshold (0.85) triggers at ~170K tokens on a 200K model, leaving 30K headroom.
+    - proactive_compaction_threshold (0.75) triggers at ~150K tokens — conservative to avoid
+      overflows due to inaccurate token estimation (different parts of system use 3.0-4.0).
+    - warning_threshold (0.65) warns at ~130K tokens, giving user advance notice.
+    - compaction_target (0.45) compacts down to ~90K tokens — room for continued growth.
+    - chars_per_token_estimate (3.5) is the standardized middle-ground value. All modules
+      should use this for consistency (previously used 3.0, 3.5, and 4.0 in different places).
     """
 
-    overflow_threshold: float = 0.75  # Reduced from 0.8
-    warning_threshold: float = 0.65  # Reduced from 0.7
-    proactive_compaction_threshold: float = 0.70  # Reduced from 0.90 - trigger earlier
-    critical_threshold: float = 0.90  # Reduced from 0.95
-    compaction_target: float = 0.45  # Reduced from 0.5 - compact more aggressively
-    max_context_chars: int = 200000
-    chars_per_token_estimate: int = 4
+    overflow_threshold: float = 0.85
+    warning_threshold: float = 0.65
+    proactive_compaction_threshold: float = (
+        0.75  # Reduced from 0.85 to avoid overflows due to token estimation inaccuracy
+    )
+    critical_threshold: float = 0.95
+    compaction_target: float = 0.45
+    # 200K tokens × 3.5 chars/token. Modern models (ZAI, Claude, GPT-4o) support 128K–200K tokens.
+    # Override via VICTOR_MAX_CONTEXT_CHARS env var or profiles.yaml if using a smaller model.
+    max_context_chars: int = 700000
+    chars_per_token_estimate: int = 3  # Standardized to ~3.5 (using int for compatibility)
 
 
 @dataclass(frozen=True)
@@ -150,6 +161,8 @@ class CompactionConfig:
         output_reserve_pct: % of context to reserve for output generation (0.0-1.0)
         parallel_read_target_files: Target number of parallel file reads to optimize for
         chars_per_token: Approximate characters per token for calculations
+        enable_fast_pruning: Enable fast pruning before LLM compaction (P1: OpenDev finding)
+        enable_proactive: Enable proactive compaction at threshold (not just overflow)
 
     **Design Notes:**
     - min_messages_after_compact (6) preserves enough context for coherent conversation
@@ -158,6 +171,8 @@ class CompactionConfig:
     - tool_result_max_chars (5120) allows ~12-15 parallel reads within 32K usable tokens
     - output_reserve_pct (0.5) reserves half the context for model output
     - parallel_read_target_files (12) optimizes for common read patterns
+    - enable_fast_pruning (True) reduces LLM compaction cost by 30-40%
+    - chars_per_token (3.5) standardized across all modules (was 3.0, inconsistent)
     """
 
     min_messages_after_compact: int = 6  # Reduced from 8
@@ -167,7 +182,29 @@ class CompactionConfig:
     tool_result_max_lines: int = 150  # Reduced from 230 (~35% reduction)
     output_reserve_pct: float = 0.5
     parallel_read_target_files: int = 12  # Increased from 10
-    chars_per_token: float = 3.0
+    chars_per_token: float = 3.5  # Standardized from 3.0 (matches ContextLimits)
+    # P1 FIX: Fast pruning before LLM compaction (OpenDev finding)
+    enable_fast_pruning: bool = True
+    enable_proactive: bool = False
+
+
+# Task-specific compaction configurations
+# Research tasks need more context preservation than other tasks
+TASK_COMPACTION_CONFIGS: Dict[str, CompactionConfig] = {
+    "research": CompactionConfig(
+        min_messages_after_compact=100,  # Keep 100+ messages (vs 6 default)
+        tool_result_retention_weight=3.0,  # High priority on tool results (vs 1.2)
+        recent_message_weight=1.5,  # Lower priority on recency (vs 2.0)
+        tool_result_max_chars=10240,  # Allow larger tool results (vs 5120)
+        tool_result_max_lines=300,  # Allow more lines (vs 150)
+        output_reserve_pct=0.4,  # Reserve less for output, more for context
+        parallel_read_target_files=20,  # Optimize for more parallel reads
+        chars_per_token=3.0,
+    ),
+    # Add other task types as needed
+    # "coding": CompactionConfig(...),
+    # "analysis": CompactionConfig(...),
+}
 
 
 @dataclass(frozen=True)
@@ -331,6 +368,33 @@ class SessionLedgerConfig:
 
 
 @dataclass(frozen=True)
+class SummarizationConfig:
+    """Turn-based summarization compaction configuration.
+
+    When conversation exceeds trigger_turn_count, oldest turns are
+    summarized into a single compact message using a fast edge model.
+    Original messages remain in SQLite for audit but are removed from
+    the active context window.
+
+    Attributes:
+        enabled: Whether summarization compaction is active
+        trigger_turn_count: Summarize after this many turns in the conversation
+        max_turns_to_summarize: Number of oldest turns to summarize at once
+        summary_max_tokens: Maximum tokens for the summary output
+        summary_timeout_seconds: Timeout for the edge model summarization call
+    """
+
+    enabled: bool = True
+    trigger_turn_count: int = 15
+    max_turns_to_summarize: int = 10
+    summary_max_tokens: int = 400
+    summary_timeout_seconds: float = 8.0
+
+
+SUMMARIZATION_CONFIG = SummarizationConfig()
+
+
+@dataclass(frozen=True)
 class DeduplicationConfig:
     """Configuration for tool result deduplication.
 
@@ -343,7 +407,19 @@ class DeduplicationConfig:
 
     enabled: bool = True
     stub_template: str = "[Previously read: {path} -- {lines} lines]"
-    dedup_tool_names: tuple = ("read", "cat", "read_file")
+    dedup_tool_names: tuple = (
+        "read",
+        "cat",
+        "read_file",
+        "head",
+        "tail",  # File reads
+        "ls",
+        "glob",
+        "find",  # Directory listings
+        "code_search",
+        "grep",
+        "search",  # Search results
+    )
     min_content_chars_to_dedup: int = 500
 
 

@@ -53,12 +53,12 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
-from victor.agent.conversation_controller import (
+from victor.agent.conversation.controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,
 )
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.agent.conversation import (
     MessageStore,
     ContextOverflowHandler,
@@ -67,7 +67,7 @@ from victor.agent.conversation import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_memory import ConversationStore, ConversationSession
+    from victor.agent.conversation.store import ConversationStore, ConversationSession
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
     from victor.config.settings import Settings
     from victor.storage.embeddings.service import EmbeddingService
@@ -238,6 +238,14 @@ class ConversationManager:
         )
         self._session_id = self._session.session_id
         logger.info(f"Created new session: {self._session_id}")
+
+        # Ensure .victor/ subdirs exist including .victor/analysis/ for checkpoints
+        try:
+            from victor.config.settings import ProjectPaths
+
+            ProjectPaths().ensure_project_dirs()
+        except Exception:
+            pass
 
     # =========================================================================
     # MESSAGE MANAGEMENT
@@ -580,7 +588,9 @@ class ConversationManager:
             return True
 
         try:
-            from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
+            from victor.agent.conversation_embedding_store import (
+                ConversationEmbeddingStore,
+            )
 
             # Get or create embedding service
             if self._embedding_service is None:
@@ -661,7 +671,9 @@ class ConversationManager:
                             "message_id": result.message_id,
                             "session_id": result.session_id,
                             "similarity": result.similarity,
-                            "timestamp": result.timestamp.isoformat() if result.timestamp else None,
+                            "timestamp": (
+                                result.timestamp.isoformat() if result.timestamp else None
+                            ),
                         }
                     )
                 return enriched
@@ -759,7 +771,7 @@ def create_conversation_manager(
     store = None
     if enable_persistence:
         try:
-            from victor.agent.conversation_memory import ConversationStore
+            from victor.agent.conversation.store import ConversationStore
 
             store = ConversationStore()
         except Exception as e:

@@ -51,12 +51,46 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Enums for Account Configuration
+# =============================================================================
+
+
+class AuthenticationMethod(str, Enum):
+    """Authentication method for provider access.
+
+    Determines how to authenticate with the provider:
+    - API_KEY: API key authentication
+    - OAUTH: OAuth 2.0 flow
+    - NONE: No authentication required
+    """
+
+    API_KEY = "api_key"  # API key authentication
+    OAUTH = "oauth"  # OAuth 2.0 flow
+    NONE = "none"  # No authentication
+
+
+class CredentialSource(str, Enum):
+    """Source for credentials.
+
+    Determines where credentials are stored/retrieved:
+    - KEYRING: System keyring (most secure)
+    - ENV: Environment variable (for CI/CD)
+    - FILE: Config file (least secure, not recommended for API keys)
+    """
+
+    KEYRING = "keyring"  # System keyring
+    ENV = "env"  # Environment variable
+    FILE = "file"  # Config file
 
 
 # =============================================================================
@@ -79,8 +113,8 @@ class AuthConfig:
     - file: ~/.victor/config.yaml (least secure, not recommended for API keys)
     """
 
-    method: Literal["api_key", "oauth", "none"] = "api_key"
-    source: Literal["env", "keyring", "file"] = "keyring"
+    method: AuthenticationMethod = AuthenticationMethod.API_KEY
+    source: CredentialSource = CredentialSource.KEYRING
     value: Optional[str] = None  # For client_id or explicit keys
 
     def is_secure(self) -> bool:

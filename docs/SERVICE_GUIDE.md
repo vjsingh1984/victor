@@ -2,7 +2,8 @@
 
 **Target Audience**: Victor framework contributors
 **Purpose**: Guide for creating new services following SOLID principles
-**Status**: Phases 1-7 Complete (Settings Stratification + Service Delegation)
+**Status**: Phases 1-7 Complete (Settings Stratification + Service Deputation)
+**Note**: Service layer is now **mandatory** — all services are automatically initialized
 
 ## Table of Contents
 
@@ -653,21 +654,20 @@ class ResilientService(ResilientServiceProtocol):
         raise MaxRetriesExceededError()
 ```
 
-## Orchestrator Dual Delegation Pattern
+## Orchestrator Service Delegation Pattern
 
-When the `USE_SERVICE_LAYER` feature flag is enabled, the orchestrator delegates to service adapters instead of coordinators. This is the **Strangler Fig pattern** — gradually replacing coordinator calls with service calls.
+The orchestrator now **always** delegates to service adapters instead of coordinators. This is the completed **Strangler Fig pattern** — coordinator calls have been fully replaced with service calls.
 
 ### How It Works
 
 ```python
 # In AgentOrchestrator._initialize_services():
-# Resolves services from DI container when USE_SERVICE_LAYER flag is enabled
+# Services are always resolved from DI container (mandatory)
 
 # In each delegated method:
 async def chat(self, user_message: str) -> CompletionResponse:
-    if self._use_service_layer and self._chat_service:
-        return await self._chat_service.chat(user_message)
-    return await self._chat_coordinator.chat(user_message)
+    # Services are mandatory - no feature flag check needed
+    return await self._chat_service.chat(user_message)
 ```
 
 ### Delegated Methods (12 total)
@@ -687,15 +687,7 @@ async def chat(self, user_message: str) -> CompletionResponse:
 | **Session** | `get_recent_sessions()` | `SessionServiceAdapter` |
 | **Session** | `get_session_stats()` | `SessionServiceAdapter` |
 
-### Enabling
-
-```bash
-export VICTOR_USE_SERVICE_LAYER=true
-```
-
-Or in `~/.victor/features.yaml`:
-
-```yaml
+> **Note**: The `USE_SERVICE_LAYER` feature flag has been removed. Services are now **mandatory** and automatically initialized.
 feature_flags:
   use_service_layer: true
 ```

@@ -23,43 +23,60 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
 
+from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
+from victor.agent.coordinators.factory_support import (
+    create_coordination_advisor_runtime as build_coordination_advisor_runtime,
+    create_coordination_state_passed_coordinator as build_coordination_state_passed_coordinator,
+    create_exploration_coordinator as build_exploration_coordinator,
+    create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
+    create_prompt_runtime_support as build_prompt_runtime_support,
+    create_safety_state_passed_coordinator as build_safety_state_passed_coordinator,
+    create_system_prompt_coordinator as build_system_prompt_coordinator,
+    create_system_prompt_state_passed_coordinator as build_system_prompt_state_passed_coordinator,
+)
+
 if TYPE_CHECKING:
+    from pathlib import Path
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.recovery import RecoveryHandler
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
     from victor.agent.middleware_chain import MiddlewareChain
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.task_completion import TaskCompletionDetector
     from victor.agent.read_cache import ReadResultCache
     from victor.agent.time_aware_executor import TimeAwareExecutor
     from victor.agent.thinking_detector import ThinkingPatternDetector
     from victor.agent.resource_manager import ResourceManager
     from victor.agent.budget_manager import ModeCompletionCriteria
-    from victor.agent.context_assembler import TurnBoundaryContextAssembler
+    from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.session_ledger import SessionLedger
-    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.observability.integration import ObservabilityIntegration
     from victor.storage.embeddings.intent_classifier import IntentClassifier
+    from victor.protocols.coordination import CoordinationAdvisorProtocol
     from victor.agent.protocols.infrastructure_protocols import (
         SafetyCheckerProtocol,
         AutoCommitterProtocol,
-        ReminderManagerProtocol,
         CodeExecutionManagerProtocol,
         WorkflowRegistryProtocol,
     )
-    from victor.agent.protocols.coordination_protocols import TaskCoordinatorProtocol
-    from victor.agent.protocols.streaming_protocols import (
-        StreamingRecoveryCoordinatorProtocol as StreamingRecoveryCoordinatorProto,
-        ChunkGeneratorProtocol as ChunkGeneratorProto,
+    from victor.agent.services.protocols import (
+        ChunkRuntimeProtocol as ChunkGeneratorProto,
+        ReminderManagerProtocol,
+        RLLearningRuntimeProtocol as RLCoordinatorProtocol,
+        StreamingRecoveryRuntimeProtocol as StreamingRecoveryCoordinatorProto,
+        TaskRuntimeProtocol as TaskCoordinatorProtocol,
     )
-    from victor.agent.protocols.infrastructure_protocols import RLCoordinatorProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +91,142 @@ class CoordinationBuildersMixin:
         - self.provider_name: Optional[str]
         - self.container: DI container
     """
+
+    def create_exploration_coordinator(self) -> Any:
+        """Create the canonical read-only exploration runtime."""
+        coordinator = build_exploration_coordinator()
+        logger.debug("ExplorationCoordinator created")
+        return coordinator
+
+    def _get_runtime_intelligence_service(self) -> Any:
+        """Get or create the canonical runtime-intelligence service for factory-built components."""
+        runtime_intelligence = getattr(self, "_runtime_intelligence_service", None)
+        if runtime_intelligence is not None:
+            return runtime_intelligence
+
+        try:
+            from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+
+            runtime_intelligence = RuntimeIntelligenceService.from_container(self.container)
+        except Exception as exc:
+            logger.debug("Could not create runtime intelligence service: %s", exc)
+            runtime_intelligence = None
+
+        self._runtime_intelligence_service = runtime_intelligence
+        return runtime_intelligence
+
+    def create_exploration_state_passed_coordinator(
+        self,
+        project_root: Optional["Path"] = None,
+        max_results: int = 5,
+    ) -> Any:
+        """Create the state-passed exploration wrapper."""
+        coordinator = build_exploration_state_passed_coordinator(
+            settings=self.settings,
+            project_root=project_root,
+            max_results=max_results,
+        )
+        logger.debug("ExplorationStatePassedCoordinator created")
+        return coordinator
+
+    def create_system_prompt_coordinator(
+        self,
+        *,
+        prompt_builder: Any = None,
+        get_context_window: Optional[Callable[[], int]] = None,
+        provider_name: str = "",
+        model_name: str = "",
+        get_tools: Optional[Callable[[], Optional[Any]]] = None,
+        get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
+        task_analyzer: Optional[Any] = None,
+        session_id: str = "",
+    ) -> Any:
+        """Create the compatibility system prompt runtime."""
+        coordinator = build_system_prompt_coordinator(
+            container=self.container,
+            prompt_builder=prompt_builder,
+            get_context_window=get_context_window,
+            provider_name=provider_name,
+            model_name=model_name,
+            get_tools=get_tools,
+            get_mode_controller=get_mode_controller,
+            task_analyzer=task_analyzer,
+            session_id=session_id,
+        )
+        logger.debug("SystemPromptCoordinator created")
+        return coordinator
+
+    def create_prompt_runtime_support(
+        self,
+        *,
+        prompt_builder: Any = None,
+        get_context_window: Optional[Callable[[], int]] = None,
+        provider_name: str = "",
+        model_name: str = "",
+        get_tools: Optional[Callable[[], Optional[Any]]] = None,
+        get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
+        task_analyzer: Optional[Any] = None,
+        session_id: str = "",
+    ) -> Any:
+        """Create the canonical internal prompt runtime support surface."""
+        runtime = build_prompt_runtime_support(
+            container=self.container,
+            prompt_builder=prompt_builder,
+            get_context_window=get_context_window,
+            provider_name=provider_name,
+            model_name=model_name,
+            get_tools=get_tools,
+            get_mode_controller=get_mode_controller,
+            task_analyzer=task_analyzer,
+            session_id=session_id,
+        )
+        logger.debug("PromptRuntimeSupport created")
+        return runtime
+
+    def create_system_prompt_state_passed_coordinator(
+        self,
+        task_analyzer: Optional[Any] = None,
+    ) -> Any:
+        """Create the canonical state-passed system prompt coordinator."""
+        coordinator = build_system_prompt_state_passed_coordinator(
+            container=self.container,
+            task_analyzer=task_analyzer,
+        )
+        logger.debug("SystemPromptStatePassedCoordinator created")
+        return coordinator
+
+    def create_safety_state_passed_coordinator(self) -> Any:
+        """Create the canonical state-passed safety wrapper."""
+        coordinator = build_safety_state_passed_coordinator()
+        logger.debug("SafetyStatePassedCoordinator created")
+        return coordinator
+
+    def create_coordination_advisor_runtime(self) -> Any:
+        """Create the canonical service-owned coordination runtime."""
+        from victor.agent.services.protocols import CoordinationAdvisorRuntimeProtocol
+
+        try:
+            runtime = self.container.get(CoordinationAdvisorRuntimeProtocol)
+        except Exception:
+            runtime = build_coordination_advisor_runtime()
+        logger.debug("CoordinationAdvisorRuntime created")
+        return runtime
+
+    def create_coordination_state_passed_coordinator(
+        self,
+        *,
+        coordination_runtime: Any,
+        coordination_advisor: Optional[Any] = None,
+        vertical_context: Optional[Any] = None,
+    ) -> Any:
+        """Create the canonical state-passed coordination wrapper."""
+        coordinator = build_coordination_state_passed_coordinator(
+            coordination_runtime=coordination_runtime,
+            coordination_advisor=coordination_advisor,
+            vertical_context=vertical_context,
+        )
+        logger.debug("CoordinationStatePassedCoordinator created")
+        return coordinator
 
     def create_recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Create recovery handler (from DI container)."""
@@ -107,9 +260,9 @@ class CoordinationBuildersMixin:
         Returns:
             StreamingRecoveryCoordinator instance for recovery coordination
         """
-        from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
+        from victor.agent.services.protocols import StreamingRecoveryRuntimeProtocol
 
-        recovery_coordinator = self.container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = self.container.get(StreamingRecoveryRuntimeProtocol)
         logger.debug("StreamingRecoveryCoordinator created via DI")
         return recovery_coordinator
 
@@ -119,9 +272,9 @@ class CoordinationBuildersMixin:
         Returns:
             ChunkGenerator instance for chunk generation
         """
-        from victor.agent.protocols import ChunkGeneratorProtocol
+        from victor.agent.services.protocols import ChunkRuntimeProtocol
 
-        chunk_generator = self.container.get(ChunkGeneratorProtocol)
+        chunk_generator = self.container.get(ChunkRuntimeProtocol)
         logger.debug("ChunkGenerator created via DI")
         return chunk_generator
 
@@ -157,7 +310,7 @@ class CoordinationBuildersMixin:
             truncation_strategy_str, TruncationStrategy.SMART
         )
 
-        provider_name = getattr(self.settings, "provider", "").lower()
+        provider_name = str(getattr(self.settings, "provider", "")).lower()
         local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
         provider_type = "local" if any(p in provider_name for p in local_providers) else "cloud"
 
@@ -175,6 +328,7 @@ class CoordinationBuildersMixin:
             enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
             pruning_learner=pruning_learner,
             provider_type=provider_type,
+            runtime_intelligence=self._get_runtime_intelligence_service(),
         )
 
         rl_status = "with RL learner" if pruning_learner else "without RL learner"
@@ -184,7 +338,9 @@ class CoordinationBuildersMixin:
         )
         return compactor
 
-    def create_middleware_chain(self) -> Tuple[Optional["MiddlewareChain"], Optional[Any]]:
+    def create_middleware_chain(
+        self,
+    ) -> Tuple[Optional["MiddlewareChain"], Optional[Any]]:
         """Create middleware chain with vertical extensions.
 
         Returns:
@@ -320,9 +476,9 @@ class CoordinationBuildersMixin:
             return None
 
         try:
-            from victor.agent.protocols import RLCoordinatorProtocol
+            from victor.agent.services.protocols import RLLearningRuntimeProtocol
 
-            coordinator = self.container.get(RLCoordinatorProtocol)
+            coordinator = self.container.get(RLLearningRuntimeProtocol)
             logger.info("RL: Coordinator initialized with unified database")
             return coordinator
         except Exception as e:
@@ -342,7 +498,7 @@ class CoordinationBuildersMixin:
         Returns:
             ReminderManager instance
         """
-        from victor.agent.protocols import ReminderManagerProtocol
+        from victor.agent.services.protocols import ReminderManagerProtocol
 
         with self.container.create_scope() as scope:
             reminder_manager = scope.get(ReminderManagerProtocol)
@@ -356,9 +512,9 @@ class CoordinationBuildersMixin:
         Returns:
             TaskCoordinator instance for task coordination
         """
-        from victor.agent.protocols import TaskCoordinatorProtocol
+        from victor.agent.services.protocols import TaskRuntimeProtocol
 
-        task_coordinator = self.container.get(TaskCoordinatorProtocol)
+        task_coordinator = self.container.get(TaskRuntimeProtocol)
         logger.debug("TaskCoordinator created via DI")
         return task_coordinator
 
@@ -374,25 +530,25 @@ class CoordinationBuildersMixin:
         logger.debug("IntentClassifier singleton retrieved")
         return classifier
 
-    def create_mode_workflow_team_coordinator(
+    def create_coordination_advisor(
         self,
         vertical_context: Any,
-    ) -> "ModeWorkflowTeamCoordinator":
-        """Create ModeWorkflowTeamCoordinator for intelligent task coordination.
+    ) -> "CoordinationAdvisorProtocol":
+        """Create the canonical coordination advisor for task/team/workflow routing.
 
         Args:
             vertical_context: VerticalContext with team specs and workflows
 
         Returns:
-            ModeWorkflowTeamCoordinator instance
+            Framework-native coordination advisor
         """
-        from victor.agent.mode_workflow_team_coordinator import create_coordinator
+        from victor.framework.coordination_runtime import create_vertical_coordination_advisor
 
         team_learner = None
         try:
-            from victor.agent.protocols import RLCoordinatorProtocol
+            from victor.agent.services.protocols import RLLearningRuntimeProtocol
 
-            rl_coordinator = self.container.get_optional(RLCoordinatorProtocol)
+            rl_coordinator = self.container.get_optional(RLLearningRuntimeProtocol)
             if rl_coordinator:
                 team_learner = rl_coordinator.get_learner("team_composition")
         except Exception as e:
@@ -400,14 +556,31 @@ class CoordinationBuildersMixin:
 
         selection_strategy = getattr(self.settings, "team_selection_strategy", "hybrid")
 
-        coordinator = create_coordinator(
+        advisor = create_vertical_coordination_advisor(
             vertical_context=vertical_context,
             team_learner=team_learner,
             selection_strategy=selection_strategy,
         )
 
-        logger.debug(f"ModeWorkflowTeamCoordinator created with strategy={selection_strategy}")
-        return coordinator
+        logger.debug("Coordination advisor created with strategy=%s", selection_strategy)
+        return advisor
+
+    def create_mode_workflow_team_coordinator(
+        self,
+        vertical_context: Any,
+    ) -> "CoordinationAdvisorProtocol":
+        """Deprecated compatibility wrapper over the canonical coordination advisor."""
+        warnings.warn(
+            "OrchestratorFactory.create_mode_workflow_team_coordinator(...) is deprecated. "
+            "Use create_coordination_advisor(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
+
+        return ModeWorkflowTeamCoordinator(
+            advisor=self.create_coordination_advisor(vertical_context),
+        )
 
     def setup_subagent_orchestration(self) -> tuple[Optional[Any], bool]:
         """Setup sub-agent orchestration with lazy initialization.
@@ -425,7 +598,7 @@ class CoordinationBuildersMixin:
         Returns:
             Tuple of (use_semantic_selection, embedding_preload_task_placeholder)
         """
-        use_semantic = getattr(self.settings, "use_semantic_tool_selection", False)
+        use_semantic = is_semantic_tool_selection_enabled(self.settings, default=False)
         logger.debug(f"Semantic selection setup: enabled={use_semantic}")
         return (use_semantic, None)
 
@@ -464,7 +637,9 @@ class CoordinationBuildersMixin:
         """
         from victor.agent.task_completion import create_task_completion_detector
 
-        detector = create_task_completion_detector()
+        detector = create_task_completion_detector(
+            runtime_intelligence=self._get_runtime_intelligence_service()
+        )
         logger.debug("TaskCompletionDetector created")
         return detector
 
@@ -520,6 +695,7 @@ class CoordinationBuildersMixin:
         detector = create_thinking_detector(
             repetition_threshold=repetition_threshold,
             similarity_threshold=similarity_threshold,
+            runtime_intelligence=self._get_runtime_intelligence_service(),
         )
         logger.debug(
             f"ThinkingPatternDetector created "
@@ -560,17 +736,23 @@ class CoordinationBuildersMixin:
 
         Args:
             ledger: SessionLedger instance
-            controller: ConversationController (used for score_fn extraction)
+            controller: ConversationController (for semantic retrieval)
         """
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.scoring import score_messages, CONTROLLER_WEIGHTS
+        from victor.agent.conversation.types import ConversationMessage
 
-        score_fn = None
-        if controller is not None:
-            score_fn = getattr(controller, "_score_messages", None)
+        def _canonical_score_fn(messages, current_query=None):
+            """Bridge provider Messages to canonical scorer."""
+            conv_msgs = [ConversationMessage.from_provider_message(m) for m in messages]
+            scored = score_messages(conv_msgs, current_query, weights=CONTROLLER_WEIGHTS)
+            # Map back to original Message objects
+            conv_to_orig = {id(cm): msg for cm, msg in zip(conv_msgs, messages)}
+            return [(conv_to_orig[id(cm)], s) for cm, s in scored]
 
         assembler = TurnBoundaryContextAssembler(
             session_ledger=ledger,
-            score_fn=score_fn,
+            score_fn=_canonical_score_fn,
             conversation_controller=controller,
         )
         logger.debug("TurnBoundaryContextAssembler created")

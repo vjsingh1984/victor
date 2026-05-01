@@ -349,7 +349,7 @@ class HuggingFaceProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                            tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                             stop_reason="stop",
                             is_final=True,
                         )

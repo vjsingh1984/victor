@@ -23,8 +23,10 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
 
+from victor.ui.json_utils import create_json_option, print_json_data
+
 capabilities_app = typer.Typer(
-    name="capabilities",
+    name="capability",
     help="Discover Victor's capabilities: tools, verticals, personas, teams, and more.",
 )
 
@@ -41,6 +43,7 @@ class CapabilityManifest:
     personas: List[str] = field(default_factory=list)
     teams: List[str] = field(default_factory=list)
     chains: List[str] = field(default_factory=list)
+    workflows: List[str] = field(default_factory=list)
     handlers: List[str] = field(default_factory=list)
     task_types: List[str] = field(default_factory=list)
     providers: List[str] = field(default_factory=list)
@@ -55,6 +58,7 @@ class CapabilityManifest:
             "personas": self.personas,
             "teams": self.teams,
             "chains": self.chains,
+            "workflows": self.workflows,
             "handlers": self.handlers,
             "task_types": self.task_types,
             "providers": self.providers,
@@ -65,6 +69,7 @@ class CapabilityManifest:
                 "total_personas": len(self.personas),
                 "total_teams": len(self.teams),
                 "total_chains": len(self.chains),
+                "total_workflows": len(self.workflows),
                 "total_providers": len(self.providers),
             },
         }
@@ -102,6 +107,9 @@ class CapabilityDiscovery:
         # Discover chains/workflows
         manifest.chains = self._discover_chains()
 
+        # Discover workflows from provider registry
+        manifest.workflows = self._discover_workflows()
+
         # Discover handlers
         manifest.handlers = self._discover_handlers()
 
@@ -121,6 +129,13 @@ class CapabilityDiscovery:
         result: Dict[str, Any] = {"vertical": vertical}
 
         try:
+            from victor.framework.team_runtime import resolve_registered_coordination_catalogs
+
+            coordination_catalog = resolve_registered_coordination_catalogs().get(vertical)
+        except Exception:
+            coordination_catalog = None
+
+        try:
             from victor.framework.persona_registry import get_persona_registry
 
             registry = get_persona_registry()
@@ -137,11 +152,14 @@ class CapabilityDiscovery:
             result["chains"] = []
 
         try:
-            from victor.framework.team_registry import get_team_registry
+            result["workflows"] = (
+                coordination_catalog.list_workflow_names() if coordination_catalog else []
+            )
+        except Exception:
+            result["workflows"] = []
 
-            registry = get_team_registry()
-            teams_data = registry.find_by_vertical(vertical)
-            result["teams"] = list(teams_data.keys()) if teams_data else []
+        try:
+            result["teams"] = coordination_catalog.list_team_names() if coordination_catalog else []
         except Exception:
             result["teams"] = []
 
@@ -162,6 +180,35 @@ class CapabilityDiscovery:
             result["task_types"] = []
 
         return result
+
+    def recommend_for_task(
+        self,
+        *,
+        task_type: str,
+        complexity: str,
+        mode: str = "build",
+        vertical: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Recommend teams/workflows using the shared framework coordination surface."""
+        from victor.framework.coordination_runtime import (
+            build_registered_coordination_suggestions,
+            serialize_catalog_coordination_suggestions,
+        )
+
+        recommendations = build_registered_coordination_suggestions(
+            task_type=task_type,
+            complexity=complexity,
+            mode=mode,
+            vertical=vertical,
+        )
+        return {
+            "task_type": task_type,
+            "complexity": complexity,
+            "mode": mode,
+            "vertical": vertical,
+            "count": len(recommendations),
+            "recommendations": serialize_catalog_coordination_suggestions(recommendations),
+        }
 
     def _discover_tools(self) -> List[str]:
         """Discover all registered tools."""
@@ -213,10 +260,9 @@ class CapabilityDiscovery:
     def _discover_teams(self) -> List[str]:
         """Discover all registered team specs."""
         try:
-            from victor.framework.team_registry import get_team_registry
+            from victor.framework.team_runtime import list_registered_team_names
 
-            registry = get_team_registry()
-            return registry.list_teams()
+            return list_registered_team_names()
         except Exception:
             return []
 
@@ -227,6 +273,15 @@ class CapabilityDiscovery:
 
             registry = get_chain_registry()
             return registry.list_chains()
+        except Exception:
+            return []
+
+    def _discover_workflows(self) -> List[str]:
+        """Discover all workflow specs from the shared framework catalog surface."""
+        try:
+            from victor.framework.team_runtime import list_registered_workflow_names
+
+            return list_registered_workflow_names()
         except Exception:
             return []
 
@@ -289,9 +344,7 @@ def capabilities_main(
     vertical: Optional[str] = typer.Option(
         None, "--vertical", "-v", help="Filter by vertical (e.g., coding, devops)"
     ),
-    json_output: bool = typer.Option(
-        False, "--json", "-j", help="Output as JSON for programmatic use"
-    ),
+    json_output: bool = create_json_option(),
 ) -> None:
     """Discover all Victor capabilities.
 
@@ -308,17 +361,13 @@ def capabilities_main(
     if vertical:
         manifest = discovery.discover_by_vertical(vertical)
         if json_output:
-            import json
-
-            console.print(json.dumps(manifest, indent=2))
+            print_json_data(manifest)
         else:
             _display_vertical_capabilities(vertical, manifest)
     else:
         manifest = discovery.discover_all()
         if json_output:
-            import json
-
-            console.print(json.dumps(manifest.to_dict(), indent=2))
+            print_json_data(manifest.to_dict())
         else:
             _display_full_capabilities(manifest)
 
@@ -373,9 +422,14 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
         ", ".join(manifest.teams[:3]) + ("..." if len(manifest.teams) > 3 else ""),
     )
     summary_table.add_row(
-        "Chains/Workflows",
+        "Chains",
         str(len(manifest.chains)),
         ", ".join(manifest.chains[:3]) + ("..." if len(manifest.chains) > 3 else ""),
+    )
+    summary_table.add_row(
+        "Workflows",
+        str(len(manifest.workflows)),
+        ", ".join(manifest.workflows[:3]) + ("..." if len(manifest.workflows) > 3 else ""),
     )
     summary_table.add_row(
         "Task Types",
@@ -401,6 +455,7 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     console.print("  [cyan]victor capabilities tools[/cyan]      - List all tools")
     console.print("  [cyan]victor capabilities verticals[/cyan]  - List all verticals")
     console.print("  [cyan]victor capabilities providers[/cyan]  - List all providers")
+    console.print("  [cyan]victor capabilities workflows[/cyan]  - List all workflows")
     console.print("  [cyan]victor capabilities --vertical coding[/cyan] - Filter by vertical")
     console.print()
 
@@ -431,24 +486,67 @@ def _display_vertical_capabilities(vertical: str, manifest: Dict[str, Any]) -> N
     console.print()
 
 
+def _display_coordination_recommendations(
+    *,
+    task_type: str,
+    complexity: str,
+    mode: str,
+    vertical: Optional[str],
+    recommendations: List[Dict[str, Any]],
+) -> None:
+    """Display shared coordination recommendations in rich format."""
+    console.print()
+    title = "[bold cyan]Coordination Recommendations[/bold cyan]\n"
+    title += f"[dim]{task_type} / {complexity} / {mode}[/dim]"
+    if vertical:
+        title += f"\n[dim]vertical={vertical}[/dim]"
+    console.print(Panel.fit(title, border_style="cyan"))
+    console.print()
+
+    if not recommendations:
+        scope = f" for {vertical}" if vertical else ""
+        console.print(f"[yellow]No coordination recommendations found{scope}.[/yellow]")
+        console.print()
+        return
+
+    table = Table(show_header=True, title="Recommended Coordination Paths")
+    table.add_column("Vertical", style="cyan")
+    table.add_column("Action", style="green")
+    table.add_column("Primary Team")
+    table.add_column("Primary Workflow")
+    table.add_column("Default Workflow", style="dim")
+
+    for recommendation in recommendations:
+        primary_team = recommendation.get("primary_team") or {}
+        primary_workflow = recommendation.get("primary_workflow") or {}
+        table.add_row(
+            recommendation.get("vertical", "-"),
+            recommendation.get("action", "none"),
+            primary_team.get("team_name", "-"),
+            primary_workflow.get("workflow_name", "-"),
+            recommendation.get("default_workflow") or "-",
+        )
+
+    console.print(table)
+    console.print()
+
+
 @capabilities_app.command("tools")
 def list_tools(
     category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available tools."""
     discovery = get_capability_discovery()
     manifest = discovery.discover_all()
 
     if json_output:
-        import json
-
         data = {
             "tools": manifest.tools,
             "categories": manifest.tool_categories,
             "total": len(manifest.tools),
         }
-        console.print(json.dumps(data, indent=2))
+        print_json_data(data)
         return
 
     console.print()
@@ -469,18 +567,46 @@ def list_tools(
     console.print()
 
 
+@capabilities_app.command("recommend")
+def recommend_coordination(
+    task_type: str = typer.Argument(..., help="Task type or short task label"),
+    complexity: str = typer.Argument(..., help="Task complexity, e.g. low, medium, high"),
+    mode: str = typer.Option("build", "--mode", "-m", help="Mode policy to apply"),
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
+    json_output: bool = create_json_option(),
+) -> None:
+    """Recommend teams and workflows using shared framework coordination logic."""
+    discovery = get_capability_discovery()
+    payload = discovery.recommend_for_task(
+        task_type=task_type,
+        complexity=complexity,
+        mode=mode,
+        vertical=vertical,
+    )
+
+    if json_output:
+        print_json_data(payload)
+        return
+
+    _display_coordination_recommendations(
+        task_type=task_type,
+        complexity=complexity,
+        mode=mode,
+        vertical=vertical,
+        recommendations=payload["recommendations"],
+    )
+
+
 @capabilities_app.command("verticals")
 def list_verticals(
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available verticals."""
     discovery = get_capability_discovery()
     manifest = discovery.discover_all()
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"verticals": manifest.verticals}, indent=2))
+        print_json_data({"verticals": manifest.verticals})
         return
 
     console.print()
@@ -496,16 +622,14 @@ def list_verticals(
 
 @capabilities_app.command("providers")
 def list_providers(
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available LLM providers."""
     discovery = get_capability_discovery()
     manifest = discovery.discover_all()
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"providers": manifest.providers}, indent=2))
+        print_json_data({"providers": manifest.providers})
         return
 
     console.print()
@@ -522,7 +646,7 @@ def list_providers(
 @capabilities_app.command("teams")
 def list_teams(
     vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available team configurations."""
     discovery = get_capability_discovery()
@@ -535,9 +659,7 @@ def list_teams(
         teams = manifest.teams
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"teams": teams, "vertical": vertical}, indent=2))
+        print_json_data({"teams": teams, "vertical": vertical})
         return
 
     console.print()
@@ -558,7 +680,7 @@ def list_teams(
 @capabilities_app.command("personas")
 def list_personas(
     vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+    json_output: bool = create_json_option(),
 ) -> None:
     """List all available personas."""
     discovery = get_capability_discovery()
@@ -571,9 +693,7 @@ def list_personas(
         personas = manifest.personas
 
     if json_output:
-        import json
-
-        console.print(json.dumps({"personas": personas, "vertical": vertical}, indent=2))
+        print_json_data({"personas": personas, "vertical": vertical})
         return
 
     console.print()
@@ -588,4 +708,38 @@ def list_personas(
         console.print(f"  [cyan]{p}[/cyan]")
     console.print()
     console.print(f"[dim]Total: {len(personas)} personas[/dim]")
+    console.print()
+
+
+@capabilities_app.command("workflows")
+def list_workflows(
+    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
+    json_output: bool = create_json_option(),
+) -> None:
+    """List all available workflow specs from provider registry."""
+    discovery = get_capability_discovery()
+
+    if vertical:
+        data = discovery.discover_by_vertical(vertical)
+        workflows = data.get("workflows", [])
+    else:
+        manifest = discovery.discover_all()
+        workflows = manifest.workflows
+
+    if json_output:
+        print_json_data({"workflows": workflows, "vertical": vertical})
+        return
+
+    console.print()
+    title = "[bold cyan]Available Workflows"
+    if vertical:
+        title += f" ({vertical})"
+    title += "[/bold cyan]"
+    console.print(Panel.fit(title, border_style="cyan"))
+    console.print()
+
+    for w in sorted(workflows):
+        console.print(f"  [cyan]{w}[/cyan]")
+    console.print()
+    console.print(f"[dim]Total: {len(workflows)} workflows[/dim]")
     console.print()

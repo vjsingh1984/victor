@@ -56,7 +56,8 @@ class TestArgumentNormalizerInit:
         normalizer = ArgumentNormalizer()
         assert normalizer.provider_name == "unknown"
         assert normalizer.config == {}
-        assert normalizer.parameter_aliases == {}
+        # parameter_aliases may be loaded from YAML config at init
+        assert isinstance(normalizer.parameter_aliases, dict)
 
     def test_init_with_provider_name(self):
         """Test initialization with provider name."""
@@ -70,10 +71,11 @@ class TestArgumentNormalizerInit:
         assert normalizer.config == config
 
     def test_init_with_parameter_aliases(self):
-        """Test initialization with parameter aliases."""
+        """Test initialization with parameter aliases merges with defaults."""
         config = {"parameter_aliases": {"read": {"line_start": "offset"}}}
         normalizer = ArgumentNormalizer(config=config)
-        assert normalizer.parameter_aliases == {"read": {"line_start": "offset"}}
+        assert "read" in normalizer.parameter_aliases
+        assert normalizer.parameter_aliases["read"]["line_start"] == "offset"
 
     def test_initial_stats(self):
         """Test initial stats are zeroed."""
@@ -131,6 +133,14 @@ class TestNormalizeParameterAliases:
         assert result == {"path": "test.py", "offset": 10, "max_lines": 100}
         assert was_aliased is True
 
+    def test_edit_operations_alias_applied(self):
+        """Canonical edit should accept the legacy operations key."""
+        normalizer = ArgumentNormalizer()
+        args = {"operations": []}
+        result, was_aliased = normalizer.normalize_parameter_aliases(args, "edit")
+        assert result == {"ops": []}
+        assert was_aliased is True
+
 
 class TestNormalizeArgumentsDirectPath:
     """Tests for normalize_arguments - direct valid JSON path."""
@@ -166,6 +176,22 @@ class TestNormalizeArgumentsDirectPath:
         assert normalizer.stats["total_calls"] == 1
         assert normalizer.stats["normalizations"]["direct"] == 1
 
+    def test_write_content_preserves_json_like_string(self):
+        """Write content should remain a raw string even if it looks like JSON."""
+        normalizer = ArgumentNormalizer()
+        args = {"path": "config.json", "content": '{"enabled": false, "count": 3}\n'}
+        result, strategy = normalizer.normalize_arguments(args, "write")
+        assert result == args
+        assert strategy == NormalizationStrategy.DIRECT
+
+    def test_shell_cmd_with_heredoc_preserved(self):
+        """Shell heredoc commands should survive normalization unchanged."""
+        normalizer = ArgumentNormalizer()
+        cmd = "python - <<'PY'\nprint('hello')\nPY"
+        result, strategy = normalizer.normalize_arguments({"cmd": cmd}, "shell")
+        assert result["cmd"] == cmd
+        assert strategy == NormalizationStrategy.DIRECT
+
 
 class TestNormalizeArgumentsAST:
     """Tests for normalize_arguments - AST normalization path."""
@@ -176,8 +202,9 @@ class TestNormalizeArgumentsAST:
         args = {"operations": "[{'type': 'modify', 'path': 'test.py'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
         assert strategy == NormalizationStrategy.PYTHON_AST
-        # The result should be valid JSON
-        assert "type" in result["operations"]
+        # The result should be a parsed Python list
+        assert isinstance(result["ops"], list)
+        assert "type" in result["ops"][0]
 
     def test_python_syntax_dict_normalized(self):
         """Test Python syntax dict is normalized to JSON."""
@@ -209,6 +236,37 @@ class TestNormalizeArgumentsAST:
         result, strategy = normalizer.normalize_arguments(args, "process")
         assert strategy == NormalizationStrategy.PYTHON_AST
 
+    def test_edit_ops_python_syntax_normalized_for_canonical_tool(self):
+        """Canonical edit should normalize Python-syntax ops payloads."""
+        normalizer = ArgumentNormalizer()
+        args = {"ops": "[{'type': 'create', 'path': 'test.txt', 'content': 'hi'}]"}
+        result, strategy = normalizer.normalize_arguments(args, "edit")
+        assert strategy == NormalizationStrategy.PYTHON_AST
+        assert isinstance(result["ops"], list)
+        assert result["ops"][0]["type"] == "create"
+
+    def test_edit_value_envelope_with_wrapped_dict_payload(self):
+        """Canonical edit should recover dict payloads wrapped in a generic value key."""
+        normalizer = ArgumentNormalizer()
+        args = {
+            "value": {
+                "ops": [{"type": "create", "path": "test.txt", "content": "hi"}],
+            }
+        }
+        result, strategy = normalizer.normalize_arguments(args, "edit")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert isinstance(result["ops"], list)
+        assert result["ops"][0]["path"] == "test.txt"
+
+    def test_edit_value_envelope_with_raw_newline_json_string(self):
+        """Canonical edit should recover wrapped JSON strings with raw newlines."""
+        normalizer = ArgumentNormalizer()
+        args = {"value": ('{"ops":[{"type":"create","path":"test.txt","content":"line1\nline2"}]}')}
+        result, strategy = normalizer.normalize_arguments(args, "edit")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert isinstance(result["ops"], list)
+        assert result["ops"][0]["content"] == "line1\nline2"
+
 
 class TestNormalizeArgumentsRegex:
     """Tests for normalize_arguments - regex normalization path."""
@@ -238,7 +296,10 @@ class TestNormalizeArgumentsManualRepair:
         args = {"operations": "[{'type': 'modify'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
         # Should be normalized via AST or manual repair
-        assert strategy in (NormalizationStrategy.PYTHON_AST, NormalizationStrategy.MANUAL_REPAIR)
+        assert strategy in (
+            NormalizationStrategy.PYTHON_AST,
+            NormalizationStrategy.MANUAL_REPAIR,
+        )
 
 
 class TestNormalizeArgumentsFailure:
@@ -309,14 +370,14 @@ class TestNormalizeViaAST:
         normalizer = ArgumentNormalizer()
         args = {"data": "['a', 'b', 'c']"}
         result = normalizer._normalize_via_ast(args)
-        assert result["data"] == '["a", "b", "c"]'
+        assert result["data"] == ["a", "b", "c"]
 
     def test_string_with_python_dict(self):
         """Test string with Python dict syntax."""
         normalizer = ArgumentNormalizer()
         args = {"data": "{'key': 'value'}"}
         result = normalizer._normalize_via_ast(args)
-        assert result["data"] == '{"key": "value"}'
+        assert result["data"] == {"key": "value"}
 
     def test_non_json_string_unchanged(self):
         """Test non-JSON string is unchanged."""
@@ -407,8 +468,9 @@ class TestRepairEditFilesArgs:
         normalizer = ArgumentNormalizer()
         args = {"operations": "[{'type': 'modify', 'path': 'test.py'}]"}
         result = normalizer._repair_edit_files_args(args)
-        # Should be valid JSON string now
-        assert "type" in result["operations"]
+        # _repair_edit_files_args converts Python syntax to a JSON string
+        assert isinstance(result["operations"], str)
+        assert '"type"' in result["operations"]
 
     def test_non_string_operations_unchanged(self):
         """Test non-string operations are unchanged."""
@@ -516,8 +578,8 @@ class TestIntegration:
         assert strategy != NormalizationStrategy.FAILED
 
         # Result should be valid JSON
-        if isinstance(result["operations"], str):
-            parsed = json.loads(result["operations"])
+        if isinstance(result["ops"], str):
+            parsed = json.loads(result["ops"])
             assert parsed[0]["type"] == "modify"
 
     def test_gpt_oss_aliases(self):
@@ -622,8 +684,8 @@ class TestPreemptiveASTNormalization:
         result, strategy = normalizer.normalize_arguments(args, "test")
 
         assert strategy == NormalizationStrategy.PYTHON_AST
-        # Verify the result is valid JSON
-        assert json.loads(result["data"])[0]["key"] == "value"
+        # Result is a parsed Python object, not a JSON string
+        assert result["data"][0]["key"] == "value"
 
     def test_preemptive_ast_with_dict_string(self):
         """Test preemptive AST normalization for dict-like strings."""
@@ -784,6 +846,18 @@ class TestCoercePrimitiveTypes:
 
         assert result["line_start"] == 10
 
+    def test_shell_cmd_true_not_coerced(self):
+        """Shell commands are raw strings even when they look boolean-like."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._coerce_primitive_types({"cmd": "true"}, "shell")
+        assert result["cmd"] == "true"
+
+    def test_write_content_false_not_coerced(self):
+        """Write content is raw text even when it looks boolean-like."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._coerce_primitive_types({"content": "false"}, "write")
+        assert result["content"] == "false"
+
 
 class TestTryCoerceString:
     """Tests for _try_coerce_string method (lines 559-605)."""
@@ -860,9 +934,8 @@ class TestNormalizeViaASTExtended:
         args = {"data": "[{'a': {'b': [1, 2, {'c': 'd'}]}}]"}
         result = normalizer._normalize_via_ast(args)
 
-        # Should be valid JSON
-        parsed = json.loads(result["data"])
-        assert parsed[0]["a"]["b"][2]["c"] == "d"
+        # Result is a parsed Python object
+        assert result["data"][0]["a"]["b"][2]["c"] == "d"
 
     def test_primitive_value_in_json_like_string(self):
         """Test AST with primitive value evaluated from JSON-like string."""
@@ -871,8 +944,8 @@ class TestNormalizeViaASTExtended:
         args = {"val": "[42]"}  # List with single integer
         result = normalizer._normalize_via_ast(args)
 
-        # Should be normalized
-        assert result["val"] == "[42]"
+        # Should be converted to a Python list
+        assert result["val"] == [42]
 
     def test_mixed_types_in_structure(self):
         """Test AST with mixed types in structure."""
@@ -880,11 +953,11 @@ class TestNormalizeViaASTExtended:
         args = {"data": "[{'str': 'value', 'int': 42, 'float': 3.14, 'bool': True}]"}
         result = normalizer._normalize_via_ast(args)
 
-        parsed = json.loads(result["data"])
-        assert parsed[0]["str"] == "value"
-        assert parsed[0]["int"] == 42
-        assert parsed[0]["float"] == 3.14
-        assert parsed[0]["bool"] is True
+        # Result is a parsed Python object
+        assert result["data"][0]["str"] == "value"
+        assert result["data"][0]["int"] == 42
+        assert result["data"][0]["float"] == 3.14
+        assert result["data"][0]["bool"] is True
 
 
 class TestNormalizeViaRegexExtended:
@@ -1053,8 +1126,8 @@ class TestEdgeCases:
         result, strategy = normalizer.normalize_arguments(args, "test")
 
         assert strategy == NormalizationStrategy.PYTHON_AST
-        parsed = json.loads(result["data"])
-        assert parsed[0]["msg"] == "你好"
+        # Result is a parsed Python object
+        assert result["data"][0]["msg"] == "你好"
 
     def test_null_equivalent_values(self):
         """Test handling of null/none equivalent string values."""

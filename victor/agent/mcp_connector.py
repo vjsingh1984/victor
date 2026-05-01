@@ -40,7 +40,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,7 @@ class MCPConnectResult:
     servers_discovered: int = 0
     servers_connected: int = 0
     tools_registered: int = 0
+    tools_flattened: int = 0
     errors: List[str] = field(default_factory=list)
 
 
@@ -179,13 +180,22 @@ class MCPConnector:
             self._pending_tasks.append(task)
             return task
 
-    async def connect(self) -> MCPConnectResult:
+    async def connect(
+        self,
+        vertical_mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> MCPConnectResult:
         """Connect to MCP servers and register tools.
 
         This method:
         1. Discovers MCP servers from standard locations
-        2. Connects to discovered servers
-        3. Registers MCP bridge tools
+        2. Registers servers declared by the active vertical (McpProvider)
+        3. Connects to all discovered servers
+        4. Flattens MCP tools as first-class BaseTool instances
+
+        Args:
+            vertical_mcp_servers: Optional MCP servers declared by the vertical
+                via McpProvider.get_mcp_servers(). Merged with auto-discovered
+                servers.
 
         Returns:
             MCPConnectResult with connection statistics
@@ -193,8 +203,10 @@ class MCPConnector:
         result = MCPConnectResult()
 
         if not self._config.enabled and not getattr(self._settings, "use_mcp_tools", False):
-            logger.debug("MCP integration disabled")
-            return result
+            # Still connect if vertical declares MCP servers
+            if not vertical_mcp_servers:
+                logger.debug("MCP integration disabled")
+                return result
 
         mcp_command = getattr(self._settings, "mcp_command", None)
 
@@ -207,6 +219,24 @@ class MCPConnector:
                 self._mcp_registry = MCPRegistry.discover_servers()
             else:
                 self._mcp_registry = MCPRegistry()
+
+            # Register servers declared by the active vertical
+            if vertical_mcp_servers:
+                for name, config in vertical_mcp_servers.items():
+                    try:
+                        command = config.get("command", "")
+                        args = config.get("args", [])
+                        cmd = [command] + args if isinstance(command, str) else list(command)
+                        self._mcp_registry.register_server(
+                            MCPServerConfig(
+                                name=name,
+                                command=cmd,
+                                description=config.get("description", f"Vertical MCP: {name}"),
+                                auto_connect=True,
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to register vertical MCP server %s: %s", name, e)
 
             # Also register command from settings if specified
             if mcp_command:
@@ -238,7 +268,10 @@ class MCPConnector:
         return result
 
     async def _start_registry(self) -> int:
-        """Start MCP registry and connect to discovered servers.
+        """Start MCP registry, connect to servers, and flatten tools.
+
+        After connecting, projects MCP tools as first-class BaseTool
+        instances into the ToolRegistry via MCPToolProjector (Adapter Pattern).
 
         Returns:
             Number of servers connected
@@ -257,10 +290,55 @@ class MCPConnector:
                 if mcp_tools:
                     logger.info(f"MCPConnector: discovered {len(mcp_tools)} MCP tools")
 
+                # Flatten MCP tools as first-class BaseTool instances
+                self._flatten_mcp_tools()
+
             return connected
 
         except Exception as e:
             logger.warning(f"Failed to start MCP registry: {e}")
+            return 0
+
+    def _flatten_mcp_tools(self) -> int:
+        """Project MCP tools as first-class tools in the ToolRegistry.
+
+        Uses MCPToolProjector (Adapter Pattern) to create MCPAdapterTool
+        instances that wrap each MCP tool as a native BaseTool. The LLM
+        sees tool names like 'github_search' instead of 'mcp(name=...)'.
+
+        Returns:
+            Number of tools flattened and registered
+        """
+        if not self._mcp_registry:
+            return 0
+
+        try:
+            from victor.tools.mcp_adapter_tool import MCPToolProjector
+            from victor.tools.batch_registration import BatchRegistrar
+
+            adapter_tools = MCPToolProjector.project(self._mcp_registry)
+
+            # Use batch registration for performance (10-30 tools → single cache invalidation)
+            registrar = BatchRegistrar(self._registry)
+            result = registrar.register_batch(adapter_tools, fail_fast=False)
+
+            if result.failure_count > 0:
+                for tool_name, error_msg in result.failed:
+                    logger.debug("Failed to register MCP tool %s: %s", tool_name, error_msg)
+
+            registered = result.success_count
+            if registered > 0:
+                logger.info(
+                    f"MCPConnector: batch registered {registered}/{len(adapter_tools)} MCP tools"
+                )
+
+            return registered
+
+        except ImportError:
+            logger.debug("MCPToolProjector not available, using bridge tool only")
+            return 0
+        except Exception as e:
+            logger.warning(f"Failed to flatten MCP tools: {e}")
             return 0
 
     def _setup_legacy_client(self, mcp_command: Optional[str]) -> None:

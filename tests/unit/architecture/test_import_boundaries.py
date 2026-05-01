@@ -241,6 +241,150 @@ class TestCanonicalProtocolImports:
             pytest.fail("\n".join(errors))
 
 
+class TestPresentationBoundaries:
+    """Verify agent/core layers do not depend directly on UI emoji helpers."""
+
+    _ALLOWED_UI_EMOJI_IMPORTERS = {
+        Path("victor/agent/presentation/emoji_adapter.py"),
+    }
+
+    def test_agent_and_core_use_presentation_boundary_for_emoji(self) -> None:
+        roots = [Path("victor/agent"), Path("victor/core")]
+        errors = []
+
+        for root in roots:
+            if not root.exists():
+                continue
+            for py_file in root.rglob("*.py"):
+                if "__pycache__" in str(py_file):
+                    continue
+                rel_path = py_file.as_posix()
+                if Path(rel_path) in self._ALLOWED_UI_EMOJI_IMPORTERS:
+                    continue
+
+                lines = py_file.read_text(encoding="utf-8").splitlines()
+                for line_no, line in enumerate(lines, 1):
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        continue
+                    if stripped.startswith("from victor.ui.emoji import") or stripped.startswith(
+                        "import victor.ui.emoji"
+                    ):
+                        errors.append(
+                            f"{rel_path}:{line_no} imports victor.ui.emoji directly; "
+                            "use PresentationProtocol / EmojiPresentationAdapter boundary instead"
+                        )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
+    def test_no_test_imports_from_teams_protocols(self) -> None:
+        """Tests should also import team protocols from the canonical module."""
+        tests_path = Path("tests")
+        if not tests_path.exists():
+            pytest.skip("tests directory not found")
+
+        py_files = [f for f in tests_path.rglob("*.py") if "__pycache__" not in str(f)]
+
+        errors = []
+        for py_file in py_files:
+            # Allow this boundary test module to inspect the compatibility shim.
+            if py_file.as_posix().endswith("tests/unit/architecture/test_import_boundaries.py"):
+                continue
+
+            content = py_file.read_text()
+            if "from victor.teams.protocols import" in content:
+                lines = content.split("\n")
+                for i, line in enumerate(lines, 1):
+                    if "from victor.teams.protocols import" in line and not line.strip().startswith(
+                        "#"
+                    ):
+                        errors.append(
+                            f"{py_file.relative_to(tests_path)}:{i} "
+                            "imports from victor.teams.protocols, should use "
+                            "victor.protocols.team (canonical location)"
+                        )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
+
+class TestCanonicalTypeImports:
+    """Verify low-volume type shims stay out of internal imports."""
+
+    def test_core_types_from_canonical_location(self) -> None:
+        """victor.core.types should re-export from victor.core.vertical_types."""
+        import victor.core.types as core_types
+        import victor.core.vertical_types as canonical
+
+        if hasattr(core_types, "__all__"):
+            for name in core_types.__all__:
+                canonical_attr = getattr(canonical, name, None)
+                shim_attr = getattr(core_types, name, None)
+
+                assert (
+                    canonical_attr is shim_attr or shim_attr is None
+                ), f"{name} in victor.core.types should come from victor.core.vertical_types"
+
+    def test_no_direct_imports_from_core_types(self) -> None:
+        """Production code should not import the compatibility-only core type shim."""
+        victor_path = Path("victor")
+        if not victor_path.exists():
+            pytest.skip("victor directory not found")
+
+        py_files = [f for f in victor_path.rglob("*.py") if "__pycache__" not in str(f)]
+
+        errors = []
+        for py_file in py_files:
+            if py_file.as_posix().endswith("victor/core/types.py"):
+                continue
+
+            content = py_file.read_text()
+            lines = content.split("\n")
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if "from victor.core.types import" in line or "import victor.core.types" in line:
+                    errors.append(
+                        f"{py_file.relative_to(victor_path)}:{i} imports from "
+                        "victor.core.types, should use victor.core.vertical_types "
+                        "(canonical location)"
+                    )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
+    def test_no_test_imports_from_core_types(self) -> None:
+        """Tests should also import from victor.core.vertical_types directly."""
+        tests_path = Path("tests")
+        if not tests_path.exists():
+            pytest.skip("tests directory not found")
+
+        py_files = [f for f in tests_path.rglob("*.py") if "__pycache__" not in str(f)]
+
+        errors = []
+        for py_file in py_files:
+            if py_file.as_posix().endswith("tests/unit/architecture/test_import_boundaries.py"):
+                continue
+
+            content = py_file.read_text()
+            lines = content.split("\n")
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if "from victor.core.types import" in line or "import victor.core.types" in line:
+                    errors.append(
+                        f"{py_file.relative_to(tests_path)}:{i} imports from "
+                        "victor.core.types, should use victor.core.vertical_types "
+                        "(canonical location)"
+                    )
+
+        if errors:
+            pytest.fail("\n".join(errors))
+
+
 class TestNoCircularImports:
     """Verify there are no circular import chains.
 

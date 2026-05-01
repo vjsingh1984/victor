@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from typing import TYPE_CHECKING
 
 from victor.agent.debug_logger import TRACE
+from victor.core.constants import DEFAULT_VERTICAL
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.safety import SafetyChecker, get_safety_checker
@@ -49,15 +50,10 @@ from victor.core.retry import (
     RetryExecutor,
     tool_retry_strategy,
 )
-from victor.tools.base import (
-    AccessMode,
-    BaseTool,
-    Hook,
-    HookError,
-    ToolRegistry,
-    ToolResult,
-    ToolValidationResult,
-)
+from victor.tools.base import BaseTool, ToolResult, ToolValidationResult
+from victor.tools.enums import AccessMode
+from victor.tools.registry import Hook, HookError, ToolRegistry
+from victor.tools.tool_names import get_canonical_name
 
 # RL hook integration (lazy import to avoid circular dependencies)
 _rl_hooks = None
@@ -129,6 +125,11 @@ class ToolExecutionResult:
         normalization_strategy: Optional[NormalizationStrategy] = None,
         correlation_id: Optional[str] = None,
         error_info: Optional[ErrorInfo] = None,
+        # New fields for preview support
+        original_result: Optional[Any] = None,
+        preview_lines: int = 3,
+        was_pruned: bool = False,
+        pruning_info: Any = None,
     ):
         """Initialize tool execution result.
 
@@ -143,6 +144,10 @@ class ToolExecutionResult:
             normalization_strategy: Strategy used for argument normalization
             correlation_id: Unique ID for tracking this execution across logs
             error_info: Structured error information if execution failed
+            original_result: Unmodified tool output (before truncation)
+            preview_lines: Number of lines to show in user preview
+            was_pruned: Whether user preview was truncated (LLM always receives full output)
+            pruning_info: Pruning metadata for user preview (PruningInfo object)
         """
         self.tool_name = tool_name
         self.success = success
@@ -155,6 +160,11 @@ class ToolExecutionResult:
         self.correlation_id = correlation_id
         self.error_info = error_info
         self.truncation_info: Any = None
+        # New fields for preview support
+        self.original_result = original_result if original_result is not None else result
+        self.preview_lines = preview_lines
+        self.was_pruned = was_pruned
+        self.pruning_info = pruning_info
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization/logging.
@@ -288,6 +298,20 @@ class ToolExecutor:
         self._max_failed_signatures = 1000
         self._validation_failures: int = 0  # Track validation failures for metrics
         self._errors_by_category: Dict[str, int] = {}  # Track errors by category
+
+        # Session-scoped circuit breaker: tools that returned unavailable=True are
+        # never retried. Populated on first unavailable result; checked before dispatch.
+        self._session_disabled_tools: set[str] = set()
+
+        # Session-scoped path redirect cache: maps a hallucinated path to the
+        # PathResolver's first suggestion. Applied before dispatch to correct
+        # the model when it repeats a bad path across turns.
+        self._failed_path_redirects: Dict[str, str] = {}
+
+    @property
+    def session_disabled_tools(self) -> set[str]:
+        """Read-only view of tools disabled for this session (returned unavailable=True)."""
+        return frozenset(self._session_disabled_tools)  # type: ignore[return-value]
 
     def update_context(self, **kwargs: Any) -> None:
         """Update the shared context passed to tools."""
@@ -484,7 +508,9 @@ class ToolExecutor:
             - should_proceed: True if execution should continue
             - validation_result: ToolValidationResult or None if validation was skipped
         """
-        if self.validation_mode == ValidationMode.OFF:
+        effective_mode = self._get_effective_validation_mode(tool)
+
+        if effective_mode == ValidationMode.OFF:
             return True, None
 
         # First check for unknown/hallucinated arguments (provides clearer errors)
@@ -498,7 +524,7 @@ class ToolExecutor:
                 f"Valid parameters for '{tool.name}': {', '.join(sorted(valid_params)) or 'none'}"
             )
             self._validation_failures += 1
-            if self.validation_mode == ValidationMode.STRICT:
+            if effective_mode == ValidationMode.STRICT:
                 logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
                 return False, ToolValidationResult.failure([error_msg])
             else:
@@ -520,8 +546,12 @@ class ToolExecutor:
                 if len(validation.errors) > 3:
                     error_summary += f" (+{len(validation.errors) - 3} more)"
 
-                if self.validation_mode == ValidationMode.STRICT:
-                    logger.error("STRICT validation failed for '%s': %s", tool.name, error_summary)
+                if effective_mode == ValidationMode.STRICT:
+                    logger.error(
+                        "STRICT validation failed for '%s': %s",
+                        tool.name,
+                        error_summary,
+                    )
                     return False, validation
                 else:  # LENIENT
                     logger.warning(
@@ -537,12 +567,25 @@ class ToolExecutor:
             # Catch any exception during validation (RuntimeError, ValueError, etc)
             logger.warning("Validation error for '%s': %s", tool.name, str(e))
             # On validation system error, proceed in lenient mode, block in strict
-            if self.validation_mode == ValidationMode.STRICT:
+            if effective_mode == ValidationMode.STRICT:
                 return False, ToolValidationResult.failure([f"Validation system error: {e}"])
             return True, None
 
+    def _get_effective_validation_mode(self, tool: BaseTool) -> ValidationMode:
+        """Elevate validation for stateful tools even when global mode is lenient."""
+        if self.validation_mode != ValidationMode.LENIENT:
+            return self.validation_mode
+        access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
+        if access_mode in {AccessMode.WRITE, AccessMode.EXECUTE, AccessMode.MIXED}:
+            return ValidationMode.STRICT
+        return self.validation_mode
+
     def _complete_tool_call(
-        self, call_id: Optional[str], success: bool, result: Any = None, error: Optional[str] = None
+        self,
+        call_id: Optional[str],
+        success: bool,
+        result: Any = None,
+        error: Optional[str] = None,
     ) -> None:
         """Complete or fail a tool call in the tracer.
 
@@ -582,11 +625,31 @@ class ToolExecutor:
         Returns:
             ToolExecutionResult with execution outcome
         """
+        # Resolve aliases (e.g., "search" → "code_search") before lookup
+        from victor.tools.decorators import resolve_tool_name
+
+        tool_name = resolve_tool_name(tool_name)
+
+        # Issue 3: Circuit breaker — skip tools that are permanently unavailable.
+        if tool_name in self._session_disabled_tools:
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=(
+                    f"Tool '{tool_name}' is unavailable this session "
+                    "(a required dependency is not installed). "
+                    "Check package installation or use an alternative tool."
+                ),
+            )
+
         # Record tool call start for debugging
         call_id = None
         if self._tool_call_tracer:
             call_id = self._tool_call_tracer.record_call(
-                tool_name=tool_name, arguments=arguments, parent_span_id=parent_span_id or "unknown"
+                tool_name=tool_name,
+                arguments=arguments,
+                parent_span_id=parent_span_id or "unknown",
             )
         # Merge default context with call-specific context
         exec_context = {**self.context}
@@ -613,6 +676,17 @@ class ToolExecutor:
             strategy = None
         else:
             normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
+
+        # Issue 1: Path redirect — silently correct paths the model hallucinated
+        # in a prior turn and that PathResolver suggested an alternative for.
+        if self._failed_path_redirects:
+            for _path_key in ("path", "file_path", "filename", "root"):
+                _bad = str(normalized_args.get(_path_key, ""))
+                if _bad and _bad in self._failed_path_redirects:
+                    _fixed = self._failed_path_redirects[_bad]
+                    normalized_args = {**normalized_args, _path_key: _fixed}
+                    logger.info("Path redirect applied: '%s' → '%s'", _bad, _fixed)
+                    break
 
         # Code correction middleware - validate and fix code arguments
         if (
@@ -715,7 +789,7 @@ class ToolExecutor:
 
         # In LENIENT mode, coerce argument types to match schema to prevent
         # runtime TypeErrors (e.g., string "5" when int expected)
-        if self.validation_mode == ValidationMode.LENIENT:
+        if self._get_effective_validation_mode(tool) == ValidationMode.LENIENT:
             self._coerce_arg_types(tool, normalized_args)
 
         # Safety check for dangerous operations
@@ -737,7 +811,9 @@ class ToolExecutor:
         rbac_allowed, rbac_denial = self._check_rbac(tool, tool_name)
         if not rbac_allowed:
             logger.warning(
-                "Tool execution blocked by RBAC: %s for user %s", tool_name, self.current_user
+                "Tool execution blocked by RBAC: %s for user %s",
+                tool_name,
+                self.current_user,
             )
             result = ToolExecutionResult(
                 tool_name=tool_name,
@@ -760,6 +836,11 @@ class ToolExecutor:
         # Extract correlation ID from error_info if available
         correlation_id = error_info.correlation_id if error_info else None
 
+        is_unavailable_result = isinstance(result, dict) and result.get("unavailable")
+        if is_unavailable_result:
+            self._session_disabled_tools.add(tool_name)
+            logger.info("Tool '%s' session-disabled: returned unavailable=True", tool_name)
+
         if success:
             self._stats[tool_name]["successes"] += 1
 
@@ -770,6 +851,7 @@ class ToolExecutor:
             # Invalidate cache for tools that modify state (registry + fallback)
             if self.cache and self.is_cache_invalidating_tool(tool_name):
                 self._invalidate_cache_for_write_tool(tool_name, normalized_args)
+
         else:
             self._stats[tool_name]["failures"] += 1
             # Track failed signature to avoid retrying same failure
@@ -777,26 +859,61 @@ class ToolExecutor:
             if len(self._failed_signatures) < self._max_failed_signatures:
                 self._failed_signatures.add(sig)
 
+            # Issue 1: Record PathResolver suggestion for future path rewriting.
+            # Filesystem tools embed "Did you mean...\n  - /path" in FileNotFoundError.
+            if error and "Did you mean" in error:
+                import re as _re
+
+                for _path_key in ("path", "file_path", "filename", "root"):
+                    _bad = str(normalized_args.get(_path_key, ""))
+                    if _bad:
+                        _match = _re.search(r"-\s+(\S+)", error)
+                        if _match:
+                            self._failed_path_redirects[_bad] = _match.group(1)
+                            logger.info(
+                                "Path suggestion recorded: '%s' → '%s'",
+                                _bad,
+                                _match.group(1),
+                            )
+                        break
+
         # Emit RL event for tool execution (for learner activation)
         self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
 
         # Complete tool call in tracer
         self._complete_tool_call(call_id, success, result=result, error=error)
 
-        # Enforce output size bounds to prevent context window blowout
+        # Hard safety cap — only fires for extreme outliers (binary data, runaway output).
+        # Normal tool outputs (code files, grep, shell) stay well below 500 KB.
+        # LLM accuracy depends on receiving complete output; context budget management is
+        # handled upstream by TurnBoundaryContextAssembler, not here.
+        _HARD_OUTPUT_BYTE_LIMIT = 500_000
         truncation_info = None
-        if success and isinstance(result, str) and len(result) > 25600:
+        if success and isinstance(result, str) and len(result) > _HARD_OUTPUT_BYTE_LIMIT:
             from victor.tools.output_utils import truncate_by_lines
 
             result, truncation_info = truncate_by_lines(result)
             if truncation_info.was_truncated:
                 logger.warning(
-                    "Tool %s output truncated: %d→%d lines (%s)",
+                    "Tool %s output exceeded hard safety limit (%d bytes): %d→%d lines (%s)",
                     tool_name,
+                    _HARD_OUTPUT_BYTE_LIMIT,
                     truncation_info.total_lines,
                     truncation_info.lines_returned,
                     truncation_info.truncation_reason,
                 )
+                remaining = truncation_info.total_lines - truncation_info.lines_returned
+                result = (
+                    result
+                    + f"\n[OUTPUT TRUNCATED: {remaining} lines omitted (output exceeded 500 KB hard limit). "
+                    f"Use offset={truncation_info.lines_returned} to read remaining content.]"
+                )
+
+        # Store original_result for user preview regardless of later formatting-stage pruning.
+        # Pruning now happens in the tool-result post-processing path after structured outputs
+        # have been serialized for LLM injection, which avoids collapsing dict/list tool results
+        # into strings too early.
+        original_result = result if isinstance(result, str) else str(result)
 
         exec_result = ToolExecutionResult(
             tool_name=tool_name,
@@ -808,6 +925,11 @@ class ToolExecutor:
             normalization_strategy=strategy,
             correlation_id=correlation_id,
             error_info=error_info,
+            # New fields for preview support
+            original_result=original_result,
+            preview_lines=3,  # Will be overridden by formatter settings
+            was_pruned=False,
+            pruning_info=None,
         )
         exec_result.truncation_info = truncation_info
         return exec_result
@@ -913,7 +1035,7 @@ class ToolExecutor:
                 provider=provider,
                 model=model,
                 task_type=context.get("task_type", "general"),
-                vertical=context.get("vertical", "coding"),
+                vertical=context.get("vertical", DEFAULT_VERTICAL),
                 metadata={
                     "execution_time": execution_time,
                 },
@@ -960,8 +1082,9 @@ class ToolExecutor:
 
                 # Execute the tool — strip _exec_ctx if LLM hallucinated it in arguments
                 arguments.pop("_exec_ctx", None)
-                # Per-tool timeout: tools can declare timeout_seconds, default 30s
-                per_attempt_timeout = getattr(tool, "timeout_seconds", 30.0)
+                # Per-tool timeout: tools can declare timeout_seconds, default 60s
+                # Increased from 30 to 60 seconds for semantic search operations
+                per_attempt_timeout = getattr(tool, "timeout_seconds", 60.0)
                 result = await asyncio.wait_for(
                     tool.execute(_exec_ctx=context, **arguments),
                     timeout=per_attempt_timeout,
@@ -974,7 +1097,13 @@ class ToolExecutor:
                 if isinstance(result, ToolResult):
                     if result.success:
                         self.retry_strategy.on_success(retry_context)
-                        return result.output, True, None, retry_context.attempt - 1, None
+                        return (
+                            result.output,
+                            True,
+                            None,
+                            retry_context.attempt - 1,
+                            None,
+                        )
                     else:
                         # Don't retry if tool explicitly returned failure
                         error = result.error or "Tool returned failure"
@@ -988,7 +1117,13 @@ class ToolExecutor:
                             context={"tool": tool.name, "arguments": arguments},
                         )
                         self._track_error_category(error_info.category)
-                        return result.output, False, error, retry_context.attempt - 1, error_info
+                        return (
+                            result.output,
+                            False,
+                            error,
+                            retry_context.attempt - 1,
+                            error_info,
+                        )
                 else:
                     # Raw result (for tools that don't return ToolResult)
                     self.retry_strategy.on_success(retry_context)
@@ -1106,7 +1241,13 @@ class ToolExecutor:
                     error_msg = str(e)
                     if last_error_info.recovery_hint:
                         error_msg = f"{e}\nRecovery hint: {last_error_info.recovery_hint}"
-                    return None, False, error_msg, retry_context.attempt - 1, last_error_info
+                    return (
+                        None,
+                        False,
+                        error_msg,
+                        retry_context.attempt - 1,
+                        last_error_info,
+                    )
 
     def _track_error_category(self, category: ErrorCategory) -> None:
         """Track error occurrences by category for metrics.
@@ -1196,31 +1337,41 @@ class ToolExecutor:
         if not self.cache:
             return
 
+        canonical_tool_name = get_canonical_name(tool_name)
+
         # Extract paths from arguments based on tool type
         paths_to_invalidate: List[str] = []
 
-        if tool_name == "write_file":
-            if "path" in arguments:
-                paths_to_invalidate.append(arguments["path"])
-        elif tool_name == "edit_files":
-            # edit_files can have multiple file edits
-            if "edits" in arguments:
-                for edit in arguments.get("edits", []):
-                    if "path" in edit:
-                        paths_to_invalidate.append(edit["path"])
+        if canonical_tool_name == "write":
+            file_path = arguments.get("path") or arguments.get("file_path")
+            if file_path:
+                paths_to_invalidate.append(file_path)
+        elif canonical_tool_name == "edit":
+            ops = arguments.get("ops") or arguments.get("edits") or arguments.get("files")
+            if isinstance(ops, list):
+                for op in ops:
+                    if not isinstance(op, dict):
+                        continue
+                    path = op.get("path")
+                    new_path = op.get("new_path")
+                    if path:
+                        paths_to_invalidate.append(path)
+                    if new_path:
+                        paths_to_invalidate.append(new_path)
             elif "path" in arguments:
                 paths_to_invalidate.append(arguments["path"])
-        elif tool_name == "execute_bash":
+        elif canonical_tool_name == "shell":
             # Bash commands can modify anything - invalidate all file-related caches
-            self.cache.invalidate_by_tool("read_file")
-            self.cache.invalidate_by_tool("list_directory")
+            self.cache.invalidate_by_tool("read")
+            self.cache.invalidate_by_tool("ls")
             return
-        elif tool_name in ("git", "docker"):
+        elif canonical_tool_name in ("git", "docker"):
             # Git and docker operations can have wide-reaching effects
-            self.cache.invalidate_by_tool("read_file")
-            self.cache.invalidate_by_tool("list_directory")
+            self.cache.invalidate_by_tool("read")
+            self.cache.invalidate_by_tool("ls")
             self.cache.invalidate_by_tool("code_search")
             return
 
         if paths_to_invalidate:
-            self.cache.invalidate_paths(paths_to_invalidate)
+            unique_paths = list(dict.fromkeys(paths_to_invalidate))
+            self.cache.invalidate_paths(unique_paths)

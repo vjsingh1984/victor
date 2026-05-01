@@ -63,6 +63,45 @@ data: {"type":"token","content":" REST"}
 data: {"type":"end","request_id":"req-123"}
 ```
 
+### Capability Recommendations
+
+```bash
+curl "http://localhost:8080/api/v1/capabilities/recommend?task_type=feature&complexity=high&mode=build&vertical=coding"
+```
+
+**Response**:
+```json
+{
+  "task_type": "feature",
+  "complexity": "high",
+  "mode": "build",
+  "vertical": "coding",
+  "count": 1,
+  "recommendations": [
+    {
+      "vertical": "coding",
+      "action": "auto_spawn",
+      "primary_team": {
+        "team_name": "feature_team",
+        "confidence": 0.8,
+        "reason": "Task type 'feature' matches pattern 'feature'",
+        "formation": "parallel",
+        "suggested_budget": null,
+        "role_distribution": {},
+        "source": "hybrid-rule"
+      },
+      "primary_workflow": {
+        "workflow_name": "feature_implementation",
+        "confidence": 0.8,
+        "reason": "Task type 'feature' matches workflow pattern",
+        "trigger_condition": null,
+        "estimated_steps": null
+      }
+    }
+  ]
+}
+```
+
 ---
 
 ## Endpoints
@@ -162,6 +201,43 @@ data: {"type":"end","request_id":"req-123","timestamp":"2025-01-07T10:30:05Z"}
 - `tool_call`: Tool execution started
 - `tool_result`: Tool execution result
 - `end`: Stream ended
+
+### GET /api/v1/capabilities/recommend
+
+Recommend teams and workflows from the shared framework coordination catalogs.
+
+**Query Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `task_type` | string | Yes | Task type or short task label |
+| `complexity` | string | Yes | Complexity level such as `low`, `medium`, or `high` |
+| `mode` | string | No | Coordination mode. Defaults to `build` |
+| `vertical` | string | No | Restrict recommendations to one vertical |
+
+**Example**:
+```bash
+curl "http://localhost:8080/api/v1/capabilities/recommend?task_type=feature&complexity=high&mode=build"
+```
+
+**Response** (200 OK):
+```json
+{
+  "task_type": "feature",
+  "complexity": "high",
+  "mode": "build",
+  "vertical": null,
+  "count": 2,
+  "recommendations": [
+    {
+      "vertical": "coding",
+      "action": "auto_spawn",
+      "primary_team": {"team_name": "feature_team"},
+      "primary_workflow": {"workflow_name": "feature_implementation"}
+    }
+  ]
+}
+```
 
 ### POST /api/v1/conversations
 

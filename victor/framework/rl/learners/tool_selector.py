@@ -98,6 +98,11 @@ class ToolSelectorLearner(BaseLearner):
         self._tool_success_counts: Dict[str, int] = {}  # tool_name -> success count
         self._total_selections: int = 0
 
+        # Priority 4 Phase 2: lazy-loaded integration with existing components
+        # These are populated on first use to avoid circular imports at init time.
+        self._predictor: Optional[Any] = None  # ToolPredictor from Priority 3
+        self._analytics: Optional[Any] = None  # UsageAnalytics singleton
+
         # Load state from database
         self._load_state()
 
@@ -238,6 +243,10 @@ class ToolSelectorLearner(BaseLearner):
 
         # Persist to database
         self._save_to_db(tool_name, task_type, outcome, reward)
+
+        # Keep the Priority 3 sequence predictor in sync with the learned tool
+        # outcomes without replacing the learner's own Q-value update path.
+        self.feed_outcome_to_predictor(outcome)
 
         logger.debug(
             f"RL: Tool '{tool_name}' Q-value: {old_global_q:.3f} -> {new_global_q:.3f} "
@@ -398,24 +407,46 @@ class ToolSelectorLearner(BaseLearner):
     def _get_blended_q_value(self, tool_name: str, task_type: str) -> float:
         """Get blended Q-value (70% task-specific + 30% global).
 
+        Applies tool-specific exploration boosts if configured in settings.
+        Use this after significant tool improvements to accelerate relearning.
+
         Args:
             tool_name: Name of the tool
             task_type: Task type
 
         Returns:
-            Blended Q-value
+            Blended Q-value with exploration boost applied (if configured)
         """
         global_q = self._tool_q_values.get(tool_name, self.DEFAULT_Q_VALUE)
 
         if tool_name not in self._tool_task_q_values:
-            return global_q
+            base_q = global_q
+        else:
+            task_q = self._tool_task_q_values[tool_name].get(task_type)
+            if task_q is None:
+                base_q = global_q
+            else:
+                # Blend: 70% task-specific, 30% global
+                base_q = 0.7 * task_q + 0.3 * global_q
 
-        task_q = self._tool_task_q_values[tool_name].get(task_type)
-        if task_q is None:
-            return global_q
+        # Apply tool-specific exploration boost if configured
+        try:
+            from victor.config.settings import load_settings
 
-        # Blend: 70% task-specific, 30% global
-        return 0.7 * task_q + 0.3 * global_q
+            settings = load_settings()
+            boost = settings.tool_exploration_boosts.get(tool_name, 1.0)
+
+            if boost != 1.0:
+                logger.debug(
+                    f"[tool_selector] Applied {boost:.1f}x exploration boost for '{tool_name}' "
+                    f"(Q: {base_q:.3f} -> {base_q * boost:.3f})"
+                )
+                return min(1.0, base_q * boost)  # Cap at 1.0
+
+        except Exception as e:
+            logger.debug(f"[tool_selector] Failed to apply exploration boost: {e}")
+
+        return base_q
 
     def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward from implicit signals.
@@ -498,4 +529,137 @@ class ToolSelectorLearner(BaseLearner):
             "epsilon": self.epsilon,
             "learning_rate": self.learning_rate,
             "top_tools": self.get_tool_rankings(list(self._tool_q_values.keys())[:10], "default"),
+            "predictor_wired": self._predictor is not None,
+            "analytics_wired": self._analytics is not None,
         }
+
+    # ------------------------------------------------------------------
+    # Priority 4 Phase 2: ToolPredictor + UsageAnalytics integration
+    # ------------------------------------------------------------------
+
+    def _ensure_predictor(self) -> Optional[Any]:
+        """Lazy-load the existing Priority 3 ToolPredictor."""
+        if self._predictor is None:
+            try:
+                from victor.agent.planning.tool_predictor import ToolPredictor
+
+                self._predictor = ToolPredictor()
+            except Exception as e:
+                logger.debug("tool_selector: ToolPredictor unavailable: %s", e)
+        return self._predictor
+
+    def _ensure_analytics(self) -> Optional[Any]:
+        """Lazy-load the existing UsageAnalytics singleton."""
+        if self._analytics is None:
+            try:
+                from victor.agent.usage_analytics import UsageAnalytics
+
+                self._analytics = UsageAnalytics.get_instance()
+            except Exception as e:
+                logger.debug("tool_selector: UsageAnalytics unavailable: %s", e)
+        return self._analytics
+
+    def get_next_tool_prediction(
+        self,
+        task_description: str,
+        current_step: str = "exploration",
+        recent_tools: Optional[List[str]] = None,
+        task_type: str = "default",
+    ) -> Optional[str]:
+        """Predict the next best tool using the existing Priority 3 ToolPredictor.
+
+        Delegates entirely to ToolPredictor — does not reimplement prediction logic.
+
+        Args:
+            task_description: Description of the current task
+            current_step: Current workflow step
+            recent_tools: Tools used recently in this session
+            task_type: Task type for pattern matching
+
+        Returns:
+            Name of the predicted next tool, or None if predictor unavailable
+        """
+        predictor = self._ensure_predictor()
+        if predictor is None:
+            return None
+
+        try:
+            predictions = predictor.predict_tools(
+                task_description=task_description,
+                current_step=current_step,
+                recent_tools=recent_tools or [],
+                task_type=task_type,
+            )
+            return predictions[0].tool_name if predictions else None
+        except Exception as e:
+            logger.debug("tool_selector: prediction failed: %s", e)
+            return None
+
+    def feed_outcome_to_predictor(self, outcome: "RLOutcome") -> None:
+        """Feed a tool execution outcome back into the Priority 3 CooccurrenceTracker.
+
+        This closes the RL→Predictor feedback loop: outcomes recorded via
+        record_outcome() also update the co-occurrence patterns that
+        ToolPredictor uses for future sequence-based predictions.
+
+        Args:
+            outcome: Outcome containing tools_used list in metadata
+        """
+        predictor = self._ensure_predictor()
+        if predictor is None or not hasattr(predictor, "_cooccurrence_tracker"):
+            return
+
+        tracker = predictor._cooccurrence_tracker
+        if tracker is None:
+            return
+
+        tools_used = outcome.metadata.get("tools_used", [])
+        if not tools_used:
+            tool_name = outcome.metadata.get("tool_name")
+            if tool_name:
+                tools_used = [tool_name]
+
+        if tools_used:
+            try:
+                tracker.record_tool_sequence(
+                    tools=tools_used,
+                    task_type=outcome.task_type or "default",
+                    success=outcome.success,
+                )
+            except Exception as e:
+                logger.debug("tool_selector: cooccurrence feed failed: %s", e)
+
+    def get_analytics_enhanced_rankings(
+        self, available_tools: List[str], task_type: str
+    ) -> List[Tuple[str, float, float]]:
+        """Blend RL Q-values with UsageAnalytics success rates for richer rankings.
+
+        Applies a 80/20 blend: 80% RL Q-value (learned over sessions) +
+        20% analytics success rate (current session). Falls back to pure
+        Q-value ranking when analytics is unavailable.
+
+        Args:
+            available_tools: Tool names to rank
+            task_type: Current task type
+
+        Returns:
+            List of (tool_name, blended_score, confidence) sorted descending
+        """
+        base_rankings = self.get_tool_rankings(available_tools, task_type)
+        analytics = self._ensure_analytics()
+
+        if analytics is None:
+            return base_rankings
+
+        enhanced = []
+        for tool_name, q_value, confidence in base_rankings:
+            try:
+                insights = analytics.get_tool_insights(tool_name)
+                analytics_rate = insights.get("success_rate", q_value)
+                blended = 0.8 * q_value + 0.2 * analytics_rate
+            except Exception:
+                blended = q_value
+            enhanced.append((tool_name, blended, confidence))
+
+        enhanced.sort(key=lambda x: x[1], reverse=True)
+        return enhanced

@@ -18,6 +18,14 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.framework.rl import (
+    analyze_prompt_rollout_experiment,
+    analyze_prompt_rollout_experiment_async,
+    apply_prompt_rollout_recommendation,
+    apply_prompt_rollout_recommendation_async,
+    process_prompt_candidate_evaluation_suite,
+    process_prompt_candidate_evaluation_suite_async,
+    create_prompt_rollout_experiment,
+    create_prompt_rollout_experiment_async,
     LearnerType,
     LearnerStats,
     RLStats,
@@ -27,6 +35,7 @@ from victor.framework.rl import (
     create_outcome,
     record_tool_success,
     get_rl_coordinator,
+    get_rl_coordinator_async,
 )
 
 
@@ -394,8 +403,89 @@ class TestFrameworkExports:
 
         assert ExportedGetCoordinator is get_rl_coordinator
 
+    def test_get_rl_coordinator_async_exported(self):
+        """Test get_rl_coordinator_async is exported from framework."""
+        from victor.framework import get_rl_coordinator_async as ExportedGetCoordinatorAsync
+
+        assert ExportedGetCoordinatorAsync is get_rl_coordinator_async
+
     def test_create_outcome_exported(self):
         """Test create_outcome is exported from framework."""
         from victor.framework import create_outcome as ExportedCreateOutcome
 
         assert ExportedCreateOutcome is create_outcome
+
+    def test_create_prompt_rollout_experiment_exported(self):
+        """Test create_prompt_rollout_experiment is exported from framework."""
+        from victor.framework import (
+            create_prompt_rollout_experiment as ExportedCreatePromptRolloutExperiment,
+        )
+
+        assert ExportedCreatePromptRolloutExperiment is create_prompt_rollout_experiment
+
+    def test_create_prompt_rollout_experiment_async_exported(self):
+        """Test async prompt rollout helper is exported from framework."""
+        from victor.framework import (
+            create_prompt_rollout_experiment_async as ExportedCreatePromptRolloutExperimentAsync,
+        )
+
+        assert ExportedCreatePromptRolloutExperimentAsync is create_prompt_rollout_experiment_async
+
+    def test_analyze_prompt_rollout_experiment_exported(self):
+        """Test rollout analysis helper is exported from framework."""
+        from victor.framework import (
+            analyze_prompt_rollout_experiment as ExportedAnalyzePromptRolloutExperiment,
+        )
+
+        assert ExportedAnalyzePromptRolloutExperiment is analyze_prompt_rollout_experiment
+
+    def test_analyze_prompt_rollout_experiment_async_exported(self):
+        """Test async rollout analysis helper is exported from framework."""
+        from victor.framework import (
+            analyze_prompt_rollout_experiment_async as ExportedAnalyzePromptRolloutExperimentAsync,
+        )
+
+        assert (
+            ExportedAnalyzePromptRolloutExperimentAsync is analyze_prompt_rollout_experiment_async
+        )
+
+    def test_apply_prompt_rollout_recommendation_exported(self):
+        """Test rollout decision helper is exported from framework."""
+        from victor.framework import (
+            apply_prompt_rollout_recommendation as ExportedApplyPromptRolloutRecommendation,
+        )
+
+        assert ExportedApplyPromptRolloutRecommendation is apply_prompt_rollout_recommendation
+
+    def test_apply_prompt_rollout_recommendation_async_exported(self):
+        """Test async rollout decision helper is exported from framework."""
+        from victor.framework import (
+            apply_prompt_rollout_recommendation_async as ExportedApplyPromptRolloutRecommendationAsync,
+        )
+
+        assert (
+            ExportedApplyPromptRolloutRecommendationAsync
+            is apply_prompt_rollout_recommendation_async
+        )
+
+    def test_process_prompt_candidate_evaluation_suite_exported(self):
+        """Test suite workflow helper is exported from framework."""
+        from victor.framework import (
+            process_prompt_candidate_evaluation_suite as ExportedProcessPromptCandidateEvaluationSuite,
+        )
+
+        assert (
+            ExportedProcessPromptCandidateEvaluationSuite
+            is process_prompt_candidate_evaluation_suite
+        )
+
+    def test_process_prompt_candidate_evaluation_suite_async_exported(self):
+        """Test async suite workflow helper is exported from framework."""
+        from victor.framework import (
+            process_prompt_candidate_evaluation_suite_async as ExportedProcessPromptCandidateEvaluationSuiteAsync,
+        )
+
+        assert (
+            ExportedProcessPromptCandidateEvaluationSuiteAsync
+            is process_prompt_candidate_evaluation_suite_async
+        )

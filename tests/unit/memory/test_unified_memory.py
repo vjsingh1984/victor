@@ -33,6 +33,9 @@ from victor.storage.memory.unified import (
     MemoryType,
     MemoryResult,
     MemoryQuery,
+    MemoryEvolutionTrace,
+    MemoryTransferHint,
+    ProactiveMemoryHint,
     MemoryProviderProtocol,
     RankingStrategyProtocol,
     RelevanceRankingStrategy,
@@ -226,6 +229,321 @@ class TestMemoryQuery:
 
 
 # =============================================================================
+# Test Memory Evolution
+# =============================================================================
+
+
+class TestMemoryEvolution:
+    """Tests for shadow memory evolution and transfer hints."""
+
+    @pytest.mark.asyncio
+    async def test_records_successful_trace_when_enabled(self):
+        coordinator = create_memory_coordinator(enable_memory_evolution=True)
+        results = [
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Auth findings",
+                relevance=0.85,
+                id="msg_auth_1",
+            )
+        ]
+
+        stored = await coordinator.record_outcome(
+            query="authentication failure",
+            results=results,
+            success=True,
+            session_id="session-a",
+            metadata={"gaps": ["benchmarks"]},
+        )
+
+        assert stored is True
+        assert len(coordinator._evolution_traces) == 1
+        trace = coordinator._evolution_traces[0]
+        assert isinstance(trace, MemoryEvolutionTrace)
+        assert trace.query == "authentication failure"
+        assert trace.result_ids == ["msg_auth_1"]
+        assert trace.source_types == ["CONVERSATION"]
+        assert trace.metadata["gaps"] == ["benchmarks"]
+
+    @pytest.mark.asyncio
+    async def test_suggest_transfer_ignores_stale_trace(self):
+        coordinator = create_memory_coordinator(
+            enable_memory_evolution=True,
+            trace_ttl_hours=0.01,
+        )
+        results = [
+            MemoryResult(
+                source=MemoryType.ENTITY,
+                content="AuthService",
+                relevance=0.8,
+                id="ent_auth_1",
+            )
+        ]
+
+        await coordinator.record_outcome(
+            query="authentication failure",
+            results=results,
+            success=True,
+            session_id="session-a",
+        )
+        coordinator._evolution_traces[0].timestamp -= 3600
+
+        hints = coordinator.suggest_transfer("authentication retries", session_id="session-b")
+
+        assert hints == []
+
+    @pytest.mark.asyncio
+    async def test_suggest_transfer_blocks_cross_project_without_policy(self):
+        coordinator = create_memory_coordinator(enable_memory_evolution=True)
+        results = [
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Shared auth remediation notes",
+                relevance=0.83,
+                id="msg_auth_notes",
+            )
+        ]
+
+        await coordinator.record_outcome(
+            query="authentication failure remediation",
+            results=results,
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "vertical_name": "coding",
+            },
+        )
+
+        hints = coordinator.suggest_transfer(
+            "authentication remediation checklist",
+            session_id="session-b",
+            project_path="/repo-beta",
+            vertical_name="coding",
+        )
+
+        assert hints == []
+
+    @pytest.mark.asyncio
+    async def test_suggest_transfer_allows_shared_transfer_group_across_verticals(self):
+        coordinator = create_memory_coordinator(enable_memory_evolution=True)
+        results = [
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Shared auth remediation notes",
+                relevance=0.83,
+                id="msg_auth_notes",
+            )
+        ]
+
+        await coordinator.record_outcome(
+            query="authentication failure remediation",
+            results=results,
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "vertical_name": "coding",
+                "transfer_group": "victor-core",
+            },
+        )
+
+        hints = coordinator.suggest_transfer(
+            "authentication remediation checklist",
+            session_id="session-b",
+            project_path="/repo-beta",
+            vertical_name="research",
+            transfer_group="victor-core",
+            allow_cross_project=True,
+        )
+
+        assert len(hints) == 1
+        assert hints[0].cross_session is True
+        assert hints[0].metadata["transfer_scope"] == "cross_project_transfer_group"
+        assert hints[0].metadata["source_project_path"] == "/repo-alpha"
+        assert hints[0].metadata["source_vertical_name"] == "coding"
+
+    @pytest.mark.asyncio
+    async def test_search_all_boosts_results_with_transfer_hints(self):
+        coordinator = create_memory_coordinator(
+            enable_memory_evolution=True,
+            transfer_boost=0.12,
+        )
+        preferred_result = MemoryResult(
+            source=MemoryType.CONVERSATION,
+            content="authentication login workflow",
+            relevance=0.72,
+            id="msg_preferred",
+            timestamp=time.time(),
+        )
+        competitor_result = MemoryResult(
+            source=MemoryType.ENTITY,
+            content="authentication login service",
+            relevance=0.75,
+            id="ent_competitor",
+            timestamp=preferred_result.timestamp,
+        )
+
+        conversation_provider = MockMemoryProvider(
+            MemoryType.CONVERSATION,
+            [preferred_result],
+        )
+        entity_provider = MockMemoryProvider(
+            MemoryType.ENTITY,
+            [competitor_result],
+        )
+        coordinator.register_provider(conversation_provider)
+        coordinator.register_provider(entity_provider)
+
+        await coordinator.record_outcome(
+            query="authentication bug",
+            results=[preferred_result],
+            success=True,
+            session_id="session-a",
+        )
+
+        ranked = await coordinator.search_all(
+            "authentication login",
+            session_id="session-b",
+        )
+
+        assert ranked[0].id == "msg_preferred"
+        assert ranked[0].metadata["memory_transfer_boost"] > 0
+        assert coordinator.last_transfer_hints
+        assert isinstance(coordinator.last_transfer_hints[0], MemoryTransferHint)
+        assert coordinator.last_transfer_hints[0].cross_session is True
+
+    @pytest.mark.asyncio
+    async def test_search_all_skips_cross_project_transfer_without_policy(self):
+        coordinator = create_memory_coordinator(
+            enable_memory_evolution=True,
+            transfer_boost=0.12,
+        )
+        preferred_result = MemoryResult(
+            source=MemoryType.CONVERSATION,
+            content="authentication login workflow",
+            relevance=0.72,
+            id="msg_preferred",
+            timestamp=time.time(),
+        )
+        competitor_result = MemoryResult(
+            source=MemoryType.ENTITY,
+            content="authentication login service",
+            relevance=0.75,
+            id="ent_competitor",
+            timestamp=preferred_result.timestamp,
+        )
+
+        conversation_provider = MockMemoryProvider(
+            MemoryType.CONVERSATION,
+            [preferred_result],
+        )
+        entity_provider = MockMemoryProvider(
+            MemoryType.ENTITY,
+            [competitor_result],
+        )
+        coordinator.register_provider(conversation_provider)
+        coordinator.register_provider(entity_provider)
+
+        await coordinator.record_outcome(
+            query="authentication bug",
+            results=[preferred_result],
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "vertical_name": "coding",
+            },
+        )
+
+        ranked = await coordinator.search_all(
+            "authentication login",
+            session_id="session-b",
+            filters={
+                "project_path": "/repo-beta",
+                "vertical_name": "coding",
+            },
+        )
+
+        assert ranked[0].id == "ent_competitor"
+        assert coordinator.last_transfer_hints == []
+
+    @pytest.mark.asyncio
+    async def test_suggest_proactive_hints_uses_trace_metadata(self):
+        coordinator = create_memory_coordinator(enable_memory_evolution=True)
+        results = [
+            MemoryResult(
+                source=MemoryType.CONVERSATION,
+                content="Shared auth remediation notes",
+                relevance=0.83,
+                id="msg_auth_notes",
+            )
+        ]
+
+        await coordinator.record_outcome(
+            query="authentication failure remediation",
+            results=results,
+            success=True,
+            session_id="session-a",
+            metadata={
+                "project_path": "/repo-alpha",
+                "gaps": ["benchmarks"],
+                "next_steps": ["rerun auth middleware diagnostics"],
+            },
+        )
+
+        hints = coordinator.suggest_proactive_hints(
+            "authentication remediation checklist",
+            session_id="session-b",
+            project_path="/repo-alpha",
+        )
+
+        assert len(hints) == 1
+        assert isinstance(hints[0], ProactiveMemoryHint)
+        assert "benchmarks" in hints[0].hint
+        assert "rerun auth middleware diagnostics" in hints[0].hint
+        assert hints[0].matched_query == "authentication failure remediation"
+
+    @pytest.mark.asyncio
+    async def test_search_all_tracks_last_proactive_hints(self):
+        coordinator = create_memory_coordinator(
+            enable_memory_evolution=True,
+            transfer_boost=0.12,
+        )
+        preferred_result = MemoryResult(
+            source=MemoryType.CONVERSATION,
+            content="authentication login workflow",
+            relevance=0.72,
+            id="msg_preferred",
+            timestamp=time.time(),
+        )
+        conversation_provider = MockMemoryProvider(
+            MemoryType.CONVERSATION,
+            [preferred_result],
+        )
+        coordinator.register_provider(conversation_provider)
+
+        await coordinator.record_outcome(
+            query="authentication bug",
+            results=[preferred_result],
+            success=True,
+            session_id="session-a",
+            metadata={
+                "next_steps": ["inspect auth retry counters"],
+            },
+        )
+
+        await coordinator.search_all(
+            "authentication login",
+            session_id="session-b",
+        )
+
+        assert coordinator.last_proactive_hints
+        assert isinstance(coordinator.last_proactive_hints[0], ProactiveMemoryHint)
+        assert "inspect auth retry counters" in coordinator.last_proactive_hints[0].hint
+
+
+# =============================================================================
 # Test Ranking Strategies
 # =============================================================================
 
@@ -303,7 +621,10 @@ class TestRecencyRankingStrategy:
         strategy = RecencyRankingStrategy()
         results = [
             MemoryResult(
-                source=MemoryType.ENTITY, content="a", relevance=0.9, timestamp=time.time()
+                source=MemoryType.ENTITY,
+                content="a",
+                relevance=0.9,
+                timestamp=time.time(),
             ),
             MemoryResult(source=MemoryType.ENTITY, content="b", relevance=0.8, timestamp=None),
         ]

@@ -51,6 +51,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.framework.tool_naming import canonicalize_tool_list, validate_tool_names
+from victor_sdk.registries import set_default_team_registry
 
 logger = logging.getLogger(__name__)
 
@@ -470,6 +471,7 @@ def get_team_registry() -> TeamSpecRegistry:
             if _registry_instance is None:
                 _registry_instance = TeamSpecRegistry()
 
+    set_default_team_registry(_registry_instance)
     return _registry_instance
 
 

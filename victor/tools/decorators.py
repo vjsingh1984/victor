@@ -13,8 +13,11 @@
 # limitations under the License.
 
 
+import asyncio
+from enum import Enum
 import inspect
 import logging
+import types
 import warnings
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Set, Union, get_origin, get_args
@@ -127,7 +130,57 @@ def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
         return name
 
 
-def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
+def _enum_values_to_schema(enum_cls: type[Enum]) -> Dict[str, Any]:
+    """Convert an Enum class into a JSON Schema enum definition."""
+    values = [member.value for member in enum_cls]
+    if not values:
+        return {"type": "string"}
+
+    if all(isinstance(value, bool) for value in values):
+        schema_type = "boolean"
+    elif all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        schema_type = "integer"
+    elif all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
+        schema_type = "number"
+    else:
+        schema_type = "string"
+
+    return {"type": schema_type, "enum": values}
+
+
+def _resolve_annotation_string(annotation: str, globalns: Optional[Dict[str, Any]] = None) -> Any:
+    """Resolve a string annotation against the function globals when possible."""
+    namespace: Dict[str, Any] = {"__builtins__": __builtins__}
+    if globalns:
+        namespace.update(globalns)
+    try:
+        return eval(annotation, namespace, {})
+    except Exception:
+        return None
+
+
+def _sanitize_default_for_llm(value: Any) -> Any:
+    """Convert Python-specific default values into JSON-safe forms."""
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {key: _sanitize_default_for_llm(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize_default_for_llm(item) for item in value]
+    pathlike = getattr(value, "__fspath__", None)
+    if callable(pathlike):
+        try:
+            return pathlike()
+        except Exception:
+            return str(value)
+    return value
+
+
+def _get_json_schema_type(
+    annotation: Any,
+    *,
+    globalns: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Convert Python type annotation to JSON Schema type.
 
     Handles both runtime types (e.g., bool) and string annotations
@@ -147,15 +200,19 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
     if isinstance(annotation, str):
         annotation_str = annotation.strip()
 
+        resolved_annotation = _resolve_annotation_string(annotation_str, globalns)
+        if resolved_annotation is not None:
+            return _get_json_schema_type(resolved_annotation, globalns=globalns)
+
         # Handle Optional[X] as string
         if annotation_str.startswith("Optional[") and annotation_str.endswith("]"):
             inner = annotation_str[9:-1]  # Extract inner type
-            return _get_json_schema_type(inner)
+            return _get_json_schema_type(inner, globalns=globalns)
 
         # Handle List[X] as string
         if annotation_str.startswith("List[") and annotation_str.endswith("]"):
             inner = annotation_str[5:-1]
-            return {"type": "array", "items": _get_json_schema_type(inner)}
+            return {"type": "array", "items": _get_json_schema_type(inner, globalns=globalns)}
 
         # Handle Dict as string
         if annotation_str.startswith("Dict[") or annotation_str == "dict":
@@ -186,12 +243,15 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
     origin = get_origin(annotation)
     args = get_args(annotation)
 
-    if origin is Union:
+    if inspect.isclass(annotation) and issubclass(annotation, Enum):
+        return _enum_values_to_schema(annotation)
+
+    if origin in (Union, types.UnionType):
         # Check if it's Optional (Union with None)
         non_none_args = [a for a in args if a is not type(None)]
         if len(non_none_args) == 1:
             # It's Optional[X]
-            inner_schema = _get_json_schema_type(non_none_args[0])
+            inner_schema = _get_json_schema_type(non_none_args[0], globalns=globalns)
             return inner_schema  # JSON Schema handles nullable differently
         else:
             # Complex Union - default to string
@@ -199,7 +259,7 @@ def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
 
     if origin is list or annotation is list:
         if args:
-            items_schema = _get_json_schema_type(args[0])
+            items_schema = _get_json_schema_type(args[0], globalns=globalns)
             return {"type": "array", "items": items_schema}
         return {"type": "array", "items": {"type": "string"}}
 
@@ -241,12 +301,15 @@ def tool(
     mandatory_keywords: Optional[List[str]] = None,
     # NEW: Task types for classification-aware selection
     task_types: Optional[List[str]] = None,
-    # NEW: Progress parameters for loop detection
-    progress_params: Optional[List[str]] = None,
+    # NEW: Signature parameters for loop detection
+    signature_params: Optional[List[str]] = None,
     # NEW: Execution category for parallel execution
     execution_category: Optional[str] = None,
     # NEW: Availability check for optional tools requiring configuration
     availability_check: Optional[Callable[[], bool]] = None,
+    # Per-tool timeout override (seconds). Overrides pipeline's per_tool_timeout_seconds.
+    # None = use pipeline default (30s). Set higher for slow tools (code_search, web_search).
+    timeout: Optional[float] = None,
 ) -> Union[Callable, Callable[[Callable], Callable]]:
     """
     A decorator that converts a Python function into a Victor tool.
@@ -298,9 +361,11 @@ def tool(
         task_types: Task types this tool is relevant for. Valid types:
                    "analysis", "action", "generation", "search", "edit", "default".
                    Used for classification-aware tool selection.
-        progress_params: Parameters that indicate progress in loop detection.
-                        If these params change between calls, it's progress not a loop.
-                        E.g., ["path", "offset", "limit"] for read tool.
+        signature_params: Parameters to track in loop detection signatures.
+                         Only these parameters are included in the signature used for
+                         loop detection. Pagination parameters (offset, limit, k, etc.)
+                         should be excluded to allow reading results in chunks.
+                         E.g., ["path"] for read tool (excludes offset/limit for pagination).
         execution_category: Category for parallel execution. Valid values:
                            "read_only", "write", "compute", "network", "execute", "mixed".
                            Determines which tools can safely run concurrently.
@@ -351,9 +416,10 @@ def tool(
         "stages": stages,
         "mandatory_keywords": mandatory_keywords,
         "task_types": task_types,
-        "progress_params": progress_params,
+        "signature_params": signature_params,
         "execution_category": execution_category,
         "availability_check": availability_check,
+        "timeout": timeout,
     }
 
     # Capture selection/approval metadata parameters
@@ -368,24 +434,48 @@ def tool(
     _explicit_aliases = aliases or []
 
     def decorator(fn: Callable) -> Callable:
-        @wraps(fn)
-        def wrapper(*args, **kwargs) -> Any:
-            # This wrapper is what gets called if the decorated function is called directly
-            return fn(*args, **kwargs)
+        # CRITICAL FIX: Check if function is async and create appropriate wrapper
+        # If the wrapped function is async, the wrapper MUST be async to properly await it
+        if inspect.iscoroutinefunction(fn):
 
-        # Mark as tool for dynamic discovery
-        wrapper._is_tool = True  # type: ignore[attr-defined]
-        # We will attach a class to the wrapper that is the actual tool
-        wrapper.Tool = _create_tool_class(
-            fn,
-            cost_tier=cost_tier,
-            metadata_params=metadata_params,
-            selection_params=selection_params,
-            explicit_name=_explicit_name,
-            explicit_aliases=_explicit_aliases,
-        )
+            @wraps(fn)
+            async def async_wrapper(*args, **kwargs) -> Any:  # type: ignore[misc]
+                # This async wrapper properly awaits the underlying async function
+                return await fn(*args, **kwargs)
 
-        return wrapper
+            # Mark as tool for dynamic discovery
+            async_wrapper._is_tool = True  # type: ignore[attr-defined]
+            async_wrapper._tool_timeout = timeout  # type: ignore[attr-defined]
+            async_wrapper.Tool = _create_tool_class(
+                fn,
+                cost_tier=cost_tier,
+                metadata_params=metadata_params,
+                selection_params=selection_params,
+                explicit_name=_explicit_name,
+                explicit_aliases=_explicit_aliases,
+            )
+
+            return async_wrapper
+        else:
+
+            @wraps(fn)
+            def sync_wrapper(*args, **kwargs) -> Any:
+                # Sync wrapper for sync functions
+                return fn(*args, **kwargs)
+
+            # Mark as tool for dynamic discovery
+            sync_wrapper._is_tool = True  # type: ignore[attr-defined]
+            sync_wrapper._tool_timeout = timeout  # type: ignore[attr-defined]
+            sync_wrapper.Tool = _create_tool_class(
+                fn,
+                cost_tier=cost_tier,
+                metadata_params=metadata_params,
+                selection_params=selection_params,
+                explicit_name=_explicit_name,
+                explicit_aliases=_explicit_aliases,
+            )
+
+            return sync_wrapper
 
     # Support both @tool and @tool(cost_tier=...) syntax
     if func is not None:
@@ -460,6 +550,64 @@ def _create_tool_class(
 
     properties = {}
     required = []
+
+    def sanitize_schema_for_llm(schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove Python-specific annotations from JSON schema before sending to LLM.
+
+        LLMs get confused by Python-specific types like Path, tuple[str, ...], etc.
+        Convert these to standard JSON Schema types.
+
+        Args:
+            schema: Raw JSON schema with potential Python annotations
+
+        Returns:
+            Sanitized schema using only standard JSON Schema types
+        """
+        import hashlib
+
+        sanitized = schema.copy()
+
+        # Sanitize properties
+        if "properties" in sanitized:
+            for prop_name, prop_schema in sanitized["properties"].items():
+                # Remove example/default if they contain Python types
+                prop_schema.pop("example", None)
+                prop_schema.pop("default", None)
+
+                # Convert Python-specific types to JSON Schema types
+                prop_type = prop_schema.get("type", "string")
+
+                # Path -> string
+                if "Path" in str(prop_type) or (
+                    hasattr(prop_type, "__name__") and prop_type.__name__ == "Path"
+                ):
+                    prop_schema["type"] = "string"
+                    prop_schema["description"] = prop_schema.get("description", "") + " (file path)"
+
+                # tuple[T, ...] or list[T] -> array
+                if "tuple" in str(prop_type) or "list" in str(prop_type):
+                    prop_schema["type"] = "array"
+                    # Extract item type if possible
+                    if "items" in prop_schema:
+                        items_schema = prop_schema["items"]
+                        # Recursively sanitize items
+                        if isinstance(items_schema, dict):
+                            prop_schema["items"] = sanitize_schema_for_llm(
+                                {"type": "object", "properties": items_schema}
+                            )
+
+                # Remove Python-specific annotations
+                for key in list(prop_schema.keys()):
+                    if key.startswith("_") or key in ["python_type", "annotation"]:
+                        del prop_schema[key]
+
+        # Clean up required list
+        if "required" in sanitized:
+            # Remove 'self' from required parameters (LLM sometimes includes it)
+            sanitized["required"] = [r for r in sanitized["required"] if r != "self"]
+
+        return sanitized
+
     for name, param in sig.parameters.items():
         if name == "_exec_ctx":
             continue  # Framework-internal, not exposed to LLM
@@ -471,17 +619,20 @@ def _create_tool_class(
             continue
 
         # Use the enhanced type handler for proper JSON Schema generation
-        type_schema = _get_json_schema_type(param.annotation)
+        type_schema = _get_json_schema_type(param.annotation, globalns=func.__globals__)
 
-        # Merge type schema with description
-        properties[name] = {
+        # Merge type schema with description, then sanitize for LLM
+        raw_schema = {
             **type_schema,
             "description": param_docs.get(name, "No description."),
         }
 
+        # Sanitize to remove Python-specific annotations that confuse LLMs
+        properties[name] = sanitize_schema_for_llm(raw_schema)
+
         # Add default value if present (helps LLMs understand optional params)
         if param.default != inspect.Parameter.empty and param.default is not None:
-            properties[name]["default"] = param.default
+            properties[name]["default"] = _sanitize_default_for_llm(param.default)
 
         if param.default == inspect.Parameter.empty:
             required.append(name)
@@ -516,7 +667,7 @@ def _create_tool_class(
     # Extract new decorator-driven fields for semantic selection
     _mandatory_keywords = _metadata_params.get("mandatory_keywords") or []
     _task_types = _metadata_params.get("task_types") or []
-    _progress_params = _metadata_params.get("progress_params") or []
+    _signature_params = _metadata_params.get("signature_params") or []
     _availability_check = _metadata_params.get("availability_check")
 
     # Parse execution_category from string to enum
@@ -542,10 +693,13 @@ def _create_tool_class(
             use_cases=_metadata_params.get("use_cases") or [],
             examples=_metadata_params.get("examples") or [],
             priority_hints=_metadata_params.get("priority_hints") or [],
+            priority=_priority,
+            access_mode=_access_mode,
+            danger_level=_danger_level,
             stages=_stages,
             mandatory_keywords=_mandatory_keywords,
             task_types=_task_types,
-            progress_params=_progress_params,
+            signature_params=_signature_params,
             execution_category=_execution_category,
         )
 
@@ -569,7 +723,7 @@ def _create_tool_class(
             # New decorator-driven semantic selection fields
             self._mandatory_keywords = _mandatory_keywords
             self._task_types = _task_types
-            self._progress_params = _progress_params
+            self._signature_params = _signature_params
             self._execution_category = _execution_category or ExecutionCategory.READ_ONLY
             # Availability check for optional tools requiring configuration
             self._availability_check = _availability_check
@@ -656,14 +810,16 @@ def _create_tool_class(
             return self._task_types
 
         @property
-        def progress_params(self) -> List[str]:
-            """Return progress parameters for loop detection.
+        def signature_params(self) -> List[str]:
+            """Return signature parameters for loop detection.
 
-            These parameters indicate meaningful progress when changed between
-            tool calls. If these params differ, it's exploration not repetition.
-            E.g., ["path", "offset", "limit"] for read tool.
+            Only these parameters are included in the loop detection signature.
+            Pagination parameters (offset, limit, k, etc.) should be excluded
+            to allow reading results in chunks without triggering false loop detection.
+
+            E.g., ["path"] for read tool excludes offset/limit for pagination.
             """
-            return self._progress_params
+            return self._signature_params
 
         @property
         def execution_category(self) -> ExecutionCategory:
@@ -773,6 +929,14 @@ def _create_tool_class(
 
         async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
             try:
+                # DEBUG: Log tool execution start
+                import logging as _logging
+
+                _logger = _logging.getLogger(__name__)
+                _logger.debug(f"[TOOL_EXEC] 🔧 Executing {self._fn.__name__}")
+                _logger.debug(f"[TOOL_EXEC] Is coroutine: {inspect.iscoroutinefunction(self._fn)}")
+                _logger.debug(f"[TOOL_EXEC] Tool: {self.name}, Args: {list(kwargs.keys())}")
+
                 # Check if the target function wants the framework execution context
                 # Note: We use _exec_ctx to avoid collision with tool parameters named 'context'
                 sig = inspect.signature(self._fn)
@@ -780,26 +944,50 @@ def _create_tool_class(
                     kwargs["_exec_ctx"] = _exec_ctx
 
                 if inspect.iscoroutinefunction(self._fn):
+                    _logger.debug("[TOOL_EXEC] ⏳ Awaiting coroutine...")
                     result = await self._fn(**kwargs)
+                    _logger.debug(f"[TOOL_EXEC] ✓ Coroutine awaited, result type: {type(result)}")
                 else:
-                    result = self._fn(**kwargs)
+                    # Offload sync functions to a thread to avoid blocking
+                    # the event loop during CPU-bound or I/O-bound operations.
+                    _logger.debug("[TOOL_EXEC] 🔄 Running in thread...")
+                    result = await asyncio.to_thread(self._fn, **kwargs)
+                    _logger.debug(f"[TOOL_EXEC] ✓ Thread completed, result type: {type(result)}")
+
+                # CRITICAL: Check if result is a coroutine (should never happen)
+                if inspect.iscoroutine(result):
+                    _logger.error(f"[TOOL_EXEC] ❌ RESULT IS COROUTINE: {result}")
+                    _logger.error(f"[TOOL_EXEC] Tool: {self._fn.__name__}, Result: {repr(result)}")
+                    raise RuntimeError(
+                        f"Tool '{self.name}' returned coroutine object instead of result. "
+                        f"This indicates the tool function was not properly awaited."
+                    )
 
                 # Handle dict-based error returns for backwards compatibility
                 # Tools returning {"success": False, "error": "..."} should be converted
                 # to proper ToolResult failures. This bridges legacy patterns.
                 if isinstance(result, dict):
                     if result.get("success") is False and "error" in result:
+                        metadata = result.get("metadata")
+                        if not isinstance(metadata, dict):
+                            metadata = {}
+                        else:
+                            metadata = dict(metadata)
+                        for key, value in result.items():
+                            if key in {"success", "error", "output", "metadata"}:
+                                continue
+                            metadata.setdefault(key, value)
                         return ToolResult(
                             success=False,
-                            output=result.get("output"),
+                            output=result,
                             error=result.get("error"),
-                            metadata=result.get("metadata"),
+                            metadata=metadata or None,
                         )
                     # Some tools return {"error": "..."} without success field
                     if "error" in result and "success" not in result and len(result) <= 2:
                         return ToolResult(
                             success=False,
-                            output=None,
+                            output=result,
                             error=result.get("error"),
                         )
 

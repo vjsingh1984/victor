@@ -20,6 +20,7 @@ import os
 
 from victor.tools.database_tool import (
     database,
+    DatabaseConnection,
     DANGEROUS_PATTERNS,
     _connections,
     _DEFAULT_ALLOW_MODIFICATIONS,
@@ -45,7 +46,8 @@ class TestDatabaseConnect:
     @pytest.mark.asyncio
     async def test_connect_sqlite_memory(self):
         """Test SQLite in-memory connection."""
-        result = await database(action="connect", database=":memory:")
+        conn = DatabaseConnection(database=":memory:")
+        result = await database(action="connect", connection=conn)
         assert result["success"] is True
         assert "connection_id" in result
         assert "sqlite_" in result["connection_id"]
@@ -60,7 +62,8 @@ class TestDatabaseConnect:
             db_path = f.name
 
         try:
-            result = await database(action="connect", database=db_path, db_type="sqlite")
+            conn = DatabaseConnection(database=db_path, db_type="sqlite")
+            result = await database(action="connect", connection=conn)
             assert result["success"] is True
             if result["success"]:
                 await database(action="disconnect", connection_id=result["connection_id"])
@@ -70,14 +73,15 @@ class TestDatabaseConnect:
     @pytest.mark.asyncio
     async def test_connect_unsupported_type(self):
         """Test connection with unsupported database type."""
-        result = await database(action="connect", database="test", db_type="mongodb")
+        conn = DatabaseConnection(database="test", db_type="mongodb")
+        result = await database(action="connect", connection=conn)
         assert result["success"] is False
         assert "Unsupported database type" in result["error"]
 
     @pytest.mark.asyncio
     async def test_connect_missing_database(self):
         """Test connection with missing database parameter."""
-        result = await database(action="connect")
+        result = await database(action="connect", connection=None)
         assert result["success"] is False
         assert "Missing required parameter" in result["error"]
 
@@ -88,7 +92,8 @@ class TestDatabaseQuery:
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        result = await database(action="connect", database=":memory:")
+        conn = DatabaseConnection(database=":memory:")
+        result = await database(action="connect", connection=conn)
         conn_id = result["connection_id"]
 
         # Create test table
@@ -142,7 +147,10 @@ class TestDatabaseQuery:
     async def test_query_select_with_limit(self, sqlite_conn):
         """Test SELECT query with limit."""
         result = await database(
-            action="query", connection_id=sqlite_conn, sql="SELECT * FROM users", limit=1
+            action="query",
+            connection_id=sqlite_conn,
+            sql="SELECT * FROM users",
+            limit=1,
         )
         assert result["success"] is True
         assert result["count"] == 1
@@ -195,7 +203,8 @@ class TestDatabaseTables:
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        result = await database(action="connect", database=":memory:")
+        conn = DatabaseConnection(database=":memory:")
+        result = await database(action="connect", connection=conn)
         conn_id = result["connection_id"]
 
         # Create test tables
@@ -231,7 +240,8 @@ class TestDatabaseDescribe:
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        result = await database(action="connect", database=":memory:")
+        conn = DatabaseConnection(database=":memory:")
+        result = await database(action="connect", connection=conn)
         conn_id = result["connection_id"]
 
         _connections[conn_id].execute("""
@@ -284,7 +294,8 @@ class TestDatabaseSchema:
     @pytest.fixture
     async def sqlite_conn(self):
         """Create SQLite connection for testing."""
-        result = await database(action="connect", database=":memory:")
+        conn = DatabaseConnection(database=":memory:")
+        result = await database(action="connect", connection=conn)
         conn_id = result["connection_id"]
 
         _connections[conn_id].execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
@@ -333,7 +344,8 @@ class TestDatabaseDisconnect:
     @pytest.mark.asyncio
     async def test_disconnect_success(self):
         """Test successful disconnect."""
-        conn_result = await database(action="connect", database=":memory:")
+        conn = DatabaseConnection(database=":memory:")
+        conn_result = await database(action="connect", connection=conn)
         assert conn_result["success"] is True
         conn_id = conn_result["connection_id"]
 

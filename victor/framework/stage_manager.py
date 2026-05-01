@@ -73,10 +73,12 @@ from typing import (
 )
 
 from victor.core.shared_types import ConversationStage
-from victor.agent.conversation_state import (
+from victor.agent.conversation.state_machine import (
     ConversationStateMachine,
     STAGE_ORDER,
 )
+from victor_sdk import StageDefinition as SdkStageDefinition
+from victor_sdk import normalize_stage_definition as normalize_sdk_stage_definition
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
@@ -123,6 +125,92 @@ class StageDefinition:
         """Set defaults after initialization."""
         if not self.display_name:
             self.display_name = self.name.replace("_", " ").title()
+
+    def to_sdk_definition(self) -> SdkStageDefinition:
+        """Convert runtime stage metadata to the SDK definition contract."""
+        return SdkStageDefinition(
+            name=self.name,
+            description=self.description,
+            tools=set(self.tools),
+            keywords=list(self.keywords),
+            next_stages=set(self.can_transition_to or set()),
+            min_confidence=self.min_confidence,
+        )
+
+    @classmethod
+    def from_sdk_definition(
+        cls,
+        stage: SdkStageDefinition,
+        *,
+        display_name: str | None = None,
+        order: int = 0,
+    ) -> "StageDefinition":
+        """Create a runtime stage definition from an SDK stage definition."""
+        return cls(
+            name=stage.name,
+            display_name=display_name or stage.name.replace("_", " ").title(),
+            description=stage.description,
+            keywords=list(stage.keywords),
+            tools=set(stage.tools),
+            order=order,
+            can_transition_to=set(stage.next_stages) or None,
+            min_confidence=stage.min_confidence,
+        )
+
+
+StageDefinitionInput = StageDefinition | SdkStageDefinition | Dict[str, Any]
+
+
+def to_runtime_stage_definition(
+    stage_name: str,
+    stage: StageDefinitionInput,
+) -> StageDefinition:
+    """Normalize SDK/runtime stage declarations to the runtime stage model."""
+    if isinstance(stage, StageDefinition):
+        return stage
+
+    if isinstance(stage, dict):
+        return StageDefinition(
+            name=stage.get("name", stage_name),
+            display_name=stage.get("display_name", ""),
+            description=stage.get("description", ""),
+            keywords=list(stage.get("keywords", [])),
+            tools=set(stage.get("tools", [])),
+            order=int(stage.get("order", 0)),
+            can_transition_to=(
+                set(stage["can_transition_to"])
+                if stage.get("can_transition_to") is not None
+                else None
+            ),
+            min_confidence=float(stage.get("min_confidence", 0.5)),
+        )
+
+    normalized = normalize_sdk_stage_definition(stage_name, stage)
+    return StageDefinition.from_sdk_definition(
+        normalized,
+        display_name=getattr(stage, "display_name", None),
+        order=int(getattr(stage, "order", 0)),
+    )
+
+
+def to_sdk_stage_definition(
+    stage_name: str,
+    stage: StageDefinitionInput,
+) -> SdkStageDefinition:
+    """Normalize runtime/SDK stage declarations to the SDK definition model."""
+    if isinstance(stage, StageDefinition):
+        return stage.to_sdk_definition()
+    return normalize_sdk_stage_definition(stage_name, stage)
+
+
+def normalize_runtime_stage_definitions(
+    stages: Dict[str, StageDefinitionInput],
+) -> Dict[str, StageDefinition]:
+    """Normalize a stage-definition mapping to runtime stage definitions."""
+    return {
+        stage_name: to_runtime_stage_definition(stage_name, stage)
+        for stage_name, stage in stages.items()
+    }
 
 
 @dataclass
@@ -276,7 +364,7 @@ class StageManager:
     def __init__(
         self,
         config: Optional[StageManagerConfig] = None,
-        custom_stages: Optional[Dict[str, StageDefinition]] = None,
+        custom_stages: Optional[Dict[str, StageDefinitionInput]] = None,
         hooks: Optional["StateHookManager"] = None,
         event_bus: Optional["EventBus"] = None,
     ) -> None:
@@ -289,7 +377,7 @@ class StageManager:
             event_bus: Optional EventBus for event emission
         """
         self._config = config or StageManagerConfig()
-        self._custom_stages = custom_stages or {}
+        self._custom_stages = normalize_runtime_stage_definitions(custom_stages or {})
 
         # Create underlying state machine
         self._machine = ConversationStateMachine(
@@ -481,12 +569,13 @@ class StageManager:
     # Custom Stage Management
     # =========================================================================
 
-    def register_stage(self, definition: StageDefinition) -> None:
+    def register_stage(self, definition: StageDefinitionInput) -> None:
         """Register a custom stage definition.
 
         Args:
-            definition: Stage definition to register
+            definition: Runtime or SDK stage definition to register
         """
+        definition = to_runtime_stage_definition(getattr(definition, "name", ""), definition)
         self._custom_stages[definition.name] = definition
         self._custom_stage_tools[definition.name] = definition.tools
 
@@ -535,7 +624,7 @@ class StageManager:
     def from_dict(
         cls,
         data: Dict[str, Any],
-        custom_stages: Optional[Dict[str, StageDefinition]] = None,
+        custom_stages: Optional[Dict[str, StageDefinitionInput]] = None,
     ) -> "StageManager":
         """Restore stage manager from dictionary.
 
@@ -575,7 +664,7 @@ class StageManager:
 
 def create_stage_manager(
     config: Optional[StageManagerConfig] = None,
-    custom_stages: Optional[Dict[str, StageDefinition]] = None,
+    custom_stages: Optional[Dict[str, StageDefinitionInput]] = None,
     hooks: Optional["StateHookManager"] = None,
     event_bus: Optional["EventBus"] = None,
 ) -> StageManager:
@@ -647,7 +736,7 @@ def get_coding_stages() -> Dict[str, StageDefinition]:
             display_name="Execution",
             description="Making changes, running commands",
             keywords=["change", "modify", "create", "fix", "implement"],
-            tools={"write", "edit", "bash", "execute_code"},
+            tools={"write", "edit", "shell", "execute_code"},
             order=4,
         ),
         "verification": StageDefinition(
@@ -655,7 +744,7 @@ def get_coding_stages() -> Dict[str, StageDefinition]:
             display_name="Verification",
             description="Testing, validating changes",
             keywords=["test", "verify", "check", "validate", "run"],
-            tools={"bash", "read", "execute_code"},
+            tools={"shell", "read", "execute_code"},
             order=5,
         ),
         "completion": StageDefinition(
@@ -663,7 +752,7 @@ def get_coding_stages() -> Dict[str, StageDefinition]:
             display_name="Completion",
             description="Summarizing, wrapping up",
             keywords=["done", "finish", "complete", "summarize"],
-            tools={"bash"},
+            tools={"shell"},
             order=6,
         ),
     }
@@ -782,7 +871,7 @@ def get_default_stages() -> Dict[str, StageDefinition]:
 
     Provides a domain-neutral 7-stage pattern that any vertical can inherit
     and customize. Uses generic tool names (no domain-specific tools like
-    ``execute_code`` or ``bash``).
+    ``execute_code`` or ``shell``).
 
     Returns:
         Dictionary of stage definitions suitable for any vertical

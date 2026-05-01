@@ -23,10 +23,11 @@ Tests the prompt coordination functionality including:
 import pytest
 from unittest.mock import MagicMock
 
-from victor.agent.prompt_coordinator import (
-    PromptCoordinator,
-    PromptCoordinatorConfig,
-    TaskContext,
+# MIGRATION: Import from canonical prompt_runtime instead of deprecated prompt_compat
+from victor.agent.services.prompt_runtime import (
+    PromptRuntimeAdapter as PromptCoordinator,
+    PromptRuntimeConfig as PromptCoordinatorConfig,
+    PromptRuntimeContext as TaskContext,
     create_prompt_coordinator,
 )
 from victor.framework.prompt_builder import PromptBuilder

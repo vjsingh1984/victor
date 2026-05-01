@@ -18,32 +18,32 @@ task_types:
 
     # Tools required to complete this task type
     required_tools:
-      - edit_files
-      - read_file
+      - edit
+      - read
 
     # Tools recommended for each stage
     stage_tools:
       initial:
-        - list_directory
+        - ls
         - code_search
         - semantic_code_search
         - plan_files
       reading:
-        - read_file
+        - read
         - code_search
         - semantic_code_search
       executing:
-        - edit_files
-        - read_file
+        - edit
+        - read
       verifying:
-        - read_file
+        - read
         - run_tests
-        - execute_bash
+        - shell
 
     # Hints to show when forcing action
     force_action_hints:
-      after_target_read: "You have gathered enough information about the target file. Now use edit_files to make the requested change."
-      max_iterations: "You have done extensive exploration. Please use edit_files to make the change or explain what's blocking you."
+      after_target_read: "You have gathered enough information about the target file. Now use edit to make the requested change."
+      max_iterations: "You have done extensive exploration. Please use edit to make the change or explain what's blocking you."
 
   search:
     description: "Find/locate code or files"
@@ -52,23 +52,23 @@ task_types:
 
     required_tools:
       - code_search
-      - read_file
+      - read
 
     stage_tools:
       initial:
-        - list_directory
+        - ls
         - code_search
         - semantic_code_search
       reading:
-        - read_file
+        - read
         - code_search
         - semantic_code_search
-        - list_directory
+        - ls
       executing:
-        - read_file
+        - read
         - code_search
       verifying:
-        - read_file
+        - read
 
     force_action_hints:
       max_iterations: "You have done extensive exploration. Please summarize your findings and provide the answer."
@@ -79,27 +79,27 @@ task_types:
     force_action_after_target_read: false
 
     required_tools:
-      - write_file
+      - write
 
     stage_tools:
       initial:
-        - list_directory
-        - read_file
+        - ls
+        - read
         - plan_files
       reading:
-        - read_file
-        - list_directory
+        - read
+        - ls
       executing:
-        - write_file
-        - edit_files
-        - execute_bash
+        - write
+        - edit
+        - shell
       verifying:
-        - read_file
+        - read
         - run_tests
-        - execute_bash
+        - shell
 
     force_action_hints:
-      max_iterations: "You have gathered sufficient context. Please create the file using write_file."
+      max_iterations: "You have gathered sufficient context. Please create the file using write."
 
   analyze:
     description: "Count, measure, analyze code"
@@ -107,24 +107,24 @@ task_types:
     force_action_after_target_read: false
 
     required_tools:
-      - read_file
-      - execute_bash
+      - read
+      - shell
 
     stage_tools:
       initial:
-        - list_directory
+        - ls
         - code_search
         - semantic_code_search
       reading:
-        - read_file
+        - read
         - code_search
-        - list_directory
-        - execute_bash
+        - ls
+        - shell
       executing:
-        - execute_bash
+        - shell
         - execute_python_in_sandbox
       verifying:
-        - read_file
+        - read
 
     force_action_hints:
       max_iterations: "You have done extensive analysis. Please summarize your findings."
@@ -136,24 +136,24 @@ task_types:
     needs_tools: true  # Design tasks NEED tools to explore the codebase
 
     required_tools:
-      - list_directory
-      - read_file
+      - ls
+      - read
       - code_search
 
     stage_tools:
       initial:
-        - list_directory
+        - ls
         - code_search
         - semantic_code_search
-        - read_file
+        - read
         - get_project_overview
       reading:
-        - read_file
+        - read
         - code_search
-        - list_directory
+        - ls
       executing: []
       verifying:
-        - read_file
+        - read
 
     force_action_hints:
       max_iterations: "Please summarize the architecture and provide your recommendations."
@@ -164,26 +164,26 @@ task_types:
     force_action_after_target_read: false
 
     required_tools:
-      - read_file
-      - list_directory
+      - read
+      - ls
 
     stage_tools:
       initial:
-        - list_directory
+        - ls
         - code_search
         - semantic_code_search
-        - read_file
+        - read
         - plan_files
       reading:
-        - read_file
+        - read
         - code_search
-        - list_directory
+        - ls
       executing:
-        - edit_files
-        - write_file
-        - execute_bash
+        - edit
+        - write
+        - shell
       verifying:
-        - read_file
+        - read
         - run_tests
 
     force_action_hints:
@@ -200,10 +200,10 @@ stage_progression:
   # Tools that trigger stage transitions
   stage_triggers:
     reading:
-      - read_file
+      - read
     executing:
-      - edit_files
-      - write_file
+      - edit
+      - write
     verifying:
       - run_tests
 
@@ -212,25 +212,25 @@ milestones:
   target_identified:
     description: "Found the file/entity to work on"
     triggers:
-      - list_directory
+      - ls
       - code_search
 
   target_read:
     description: "Read the target file"
     triggers:
-      - read_file
+      - read
 
   change_made:
-    description: "Used edit_files or write_file"
+    description: "Used edit or write"
     triggers:
-      - edit_files
-      - write_file
+      - edit
+      - write
 
   change_verified:
     description: "Verified the change (tests/read)"
     triggers:
       - run_tests
-      - execute_bash  # When running tests
+      - shell  # When running tests
 
   search_complete:
     description: "Found requested items"
@@ -243,14 +243,14 @@ milestones:
 tool_priorities:
   # Core tools always available
   core:
-    - read_file
-    - list_directory
-    - execute_bash
+    - read
+    - ls
+    - shell
 
   # Action tools for making changes
   action:
-    - edit_files
-    - write_file
+    - edit
+    - write
 
   # Search tools for exploration
   search:

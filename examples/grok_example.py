@@ -50,7 +50,8 @@ async def main():
     await agent.reset()
 
     response = await agent.run(
-        "Explain the differences between REST and GraphQL APIs. " "Give a code example for each."
+        "Explain the differences between REST and GraphQL APIs. "
+        "Give a code example for each."
     )
     print(f"Grok: {response.content}")
 
@@ -86,10 +87,14 @@ async def main():
     response1 = await agent.run(
         "I'm getting a 'list index out of range' error in Python. What could cause this?"
     )
-    print("User: I'm getting a 'list index out of range' error in Python. What could cause this?")
+    print(
+        "User: I'm getting a 'list index out of range' error in Python. What could cause this?"
+    )
     print(f"Grok: {response1.content[:200]}...")
 
-    response2 = await agent.run("The error happens when I do: result = my_list[len(my_list)]")
+    response2 = await agent.run(
+        "The error happens when I do: result = my_list[len(my_list)]"
+    )
     print("\nUser: The error happens when I do: result = my_list[len(my_list)]")
     print(f"Grok: {response2.content}")
 

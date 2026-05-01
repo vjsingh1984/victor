@@ -33,12 +33,18 @@ Key Differences from victor.workflows:
 
 Example:
     from victor.framework.graph import StateGraph, Node, Edge, END
+    from pydantic import BaseModel, Field
+    from typing import List, Optional
 
-    # Define typed state
-    class AgentState(TypedDict):
-        messages: list[str]
-        task: str
-        result: Optional[str]
+    # Define typed state (Pydantic RECOMMENDED for type safety)
+    class AgentState(BaseModel):
+        messages: List[str] = Field(default_factory=list)
+        task: str = Field(default="")
+        result: Optional[str] = None
+
+        # Dict-like interface for StateGraph compatibility
+        class Config:
+            arbitrary_types_allowed = True
 
     # Create graph
     graph = StateGraph(AgentState)
@@ -63,6 +69,9 @@ Example:
     # Compile and run
     app = graph.compile()
     result = await app.invoke({"messages": [], "task": "Fix bug"})
+
+Note: TypedDict is still supported for backward compatibility, but Pydantic models
+are recommended for better validation and error messages in production code.
 """
 
 from __future__ import annotations
@@ -94,6 +103,9 @@ from typing import (
     runtime_checkable,
 )
 
+# Pydantic for type-safe state models (recommended over TypedDict)
+from pydantic import BaseModel, Field, ConfigDict
+
 logger = logging.getLogger(__name__)
 
 # Import focused configs for ISP compliance
@@ -104,6 +116,7 @@ from victor.framework.config import (
     InterruptConfig,
     PerformanceConfig,
     ObservabilityConfig,
+    ValidationConfig,
 )
 
 # Type variables for generic state
@@ -113,6 +126,277 @@ T = TypeVar("T")
 # Sentinel for end of graph
 END = "__end__"
 START = "__start__"
+
+
+# Example state models for developers (Pydantic recommended over TypedDict)
+class AgentStateModel(BaseModel):
+    """Example Pydantic state model for agent workflows.
+
+    This is a RECOMMENDED pattern for type-safe state management in StateGraph.
+    Use Pydantic models instead of TypedDict for better validation and error messages.
+
+    Example:
+        from victor.framework.graph import StateGraph, AgentStateModel
+
+        graph = StateGraph(AgentStateModel)
+        graph.add_node("agent", agent_handler)
+        result = await graph.invoke({"task": "Analyze data"})
+    """
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+    )
+
+    messages: List[str] = Field(default_factory=list, description="Conversation messages")
+    task: str = Field(default="", description="Current task being processed")
+    result: Optional[str] = Field(default=None, description="Task result")
+
+    # Dict-like interface for StateGraph compatibility
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value by key (dict-like interface)."""
+        return getattr(self, key, default)
+
+    def keys(self) -> List[str]:
+        """Return list of keys (dict-like interface)."""
+        return ["messages", "task", "result"]
+
+    def values(self) -> List[Any]:
+        """Return list of values (dict-like interface)."""
+        return [self.messages, self.task, self.result]
+
+    def items(self) -> List[Tuple[str, Any]]:
+        """Return list of (key, value) tuples (dict-like interface)."""
+        return [("messages", self.messages), ("task", self.task), ("result", self.result)]
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item by key (dict-like subscript access)."""
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item by key (dict-like subscript access)."""
+        setattr(self, key, value)
+
+
+class StateValidationError(Exception):
+    """Raised when state validation fails."""
+
+    def __init__(self, errors: List[str], state: Dict[str, Any]):
+        self.errors = errors
+        self.state = state
+        message = f"State validation failed with {len(errors)} error(s):\n" + "\n".join(
+            f"  - {e}" for e in errors
+        )
+        super().__init__(message)
+
+
+class StateValidator:
+    """Validates state objects against their schema.
+
+    Supports both Pydantic models and TypedDict for backward compatibility.
+    Provides clear error messages for invalid state.
+
+    Example:
+        validator = StateValidator(AgentState, strict=True)
+        errors = validator.validate({"messages": [], "task": "test"})
+        if errors:
+            raise StateValidationError(errors, state)
+    """
+
+    def __init__(self, schema: Optional[Type], strict: bool = False):
+        """Initialize state validator.
+
+        Args:
+            schema: Optional type schema for validation (Pydantic model or TypedDict)
+            strict: If True, raise immediately on validation errors
+        """
+        self._schema = schema
+        self._strict = strict
+        self._is_pydantic = self._check_pydantic()
+        self._is_typeddict = self._check_typeddict()
+
+    def _check_pydantic(self) -> bool:
+        """Check if schema is a Pydantic BaseModel."""
+        if self._schema is None:
+            return False
+        try:
+            from pydantic import BaseModel
+
+            return isinstance(self._schema, type) and issubclass(self._schema, BaseModel)
+        except (ImportError, TypeError):
+            return False
+
+    def _check_typeddict(self) -> bool:
+        """Check if schema is a TypedDict."""
+        if self._schema is None:
+            return False
+        try:
+            from typing_extensions import TypedDict
+
+            # Check for TypedDict-specific attributes
+            if hasattr(self._schema, "__required_keys__"):
+                return True
+            # Fallback to issubclass check
+            return isinstance(self._schema, type) and issubclass(self._schema, TypedDict)
+        except (ImportError, TypeError):
+            return False
+
+    def validate(self, state: Dict[str, Any]) -> List[str]:
+        """Validate state against schema.
+
+        Args:
+            state: State dictionary to validate
+
+        Returns:
+            List of error messages (empty if valid)
+        """
+        if self._schema is None:
+            return []
+
+        # Pydantic model validation
+        if self._is_pydantic:
+            return self._validate_pydantic(state)
+
+        # TypedDict validation (basic)
+        if self._is_typeddict:
+            return self._validate_typeddict(state)
+
+        # Unknown schema type
+        return []
+
+    def _validate_pydantic(self, state: Dict[str, Any]) -> List[str]:
+        """Validate using Pydantic model.
+
+        Args:
+            state: State dictionary to validate
+
+        Returns:
+            List of error messages
+        """
+        try:
+            from pydantic import ValidationError
+
+            self._schema.model_validate(state)
+            return []
+        except ValidationError as e:
+            # Format Pydantic errors into readable messages
+            errors = []
+            for error in e.errors():
+                loc = " -> ".join(str(x) for x in error["loc"])
+                msg = error["msg"]
+                errors.append(f"{loc}: {msg}")
+            return errors
+        except Exception as e:
+            return [f"Validation error: {str(e)}"]
+
+    def _validate_typeddict(self, state: Dict[str, Any]) -> List[str]:
+        """Basic validation for TypedDict.
+
+        Args:
+            state: State dictionary to validate
+
+        Returns:
+            List of error messages
+        """
+        try:
+            from typing_extensions import TypedDict, get_type_hints
+            import inspect
+
+            errors = []
+
+            # Get required and optional fields
+            hints = get_type_hints(self._schema)
+            if hasattr(self._schema, "__required_keys__"):
+                required = self._schema.__required_keys__
+                optional = set(hints.keys()) - required
+            else:
+                required = set(hints.keys())
+                optional = set()
+
+            # Check required fields
+            for key in required:
+                if key not in state:
+                    errors.append(f"Missing required field: '{key}'")
+
+            # Type checking for present fields (including optional)
+            for key, value in state.items():
+                if key not in hints:
+                    errors.append(f"Unexpected field: '{key}'")
+                    continue
+
+                expected_type = hints[key]
+                if not self._check_type(value, expected_type):
+                    errors.append(
+                        f"Type mismatch for '{key}': expected {expected_type}, got {type(value).__name__}"
+                    )
+
+            # Validate optional field types when present
+            for key in optional:
+                if key in state:
+                    expected_type = hints[key]
+                    if not self._check_type(state[key], expected_type):
+                        errors.append(
+                            f"Type mismatch for optional field '{key}': expected {expected_type}, got {type(state[key]).__name__}"
+                        )
+
+            return errors
+        except Exception as e:
+            # TypedDict validation failed, return error
+            return [f"TypedDict validation error: {str(e)}"]
+
+    def _check_type(self, value: Any, expected_type: Type) -> bool:
+        """Check if value matches expected type.
+
+        Args:
+            value: Value to check
+            expected_type: Expected type
+
+        Returns:
+            True if type matches
+        """
+        import typing
+        from typing import get_origin, get_args
+
+        # Handle generic types (List, Dict, Optional, etc.)
+        origin = get_origin(expected_type)
+
+        if origin is not None:
+            # List[T]
+            if origin is list:
+                if not isinstance(value, list):
+                    return False
+                if get_args(expected_type):
+                    item_type = get_args(expected_type)[0]
+                    return all(self._check_type(item, item_type) for item in value)
+                return True
+
+            # Dict[K, V]
+            if origin is dict:
+                if not isinstance(value, dict):
+                    return False
+                if get_args(expected_type):
+                    key_type, value_type = get_args(expected_type)
+                    return all(
+                        self._check_type(k, key_type) and self._check_type(v, value_type)
+                        for k, v in value.items()
+                    )
+                return True
+
+            # Optional[T] or Union[T, None]
+            if origin is typing.Union:
+                args = get_args(expected_type)
+                if len(args) == 2 and type(None) in args:
+                    # Optional[T]
+                    other_type = args[0] if args[1] is type(None) else args[1]
+                    return value is None or self._check_type(value, other_type)
+                return any(self._check_type(value, arg) for arg in args)
+
+        # Direct type check
+        try:
+            return isinstance(value, expected_type)
+        except TypeError:
+            # Type annotation isn't a runtime type (e.g., NewType, TypeVar)
+            return True
 
 
 class CopyOnWriteState(Generic[StateType]):
@@ -524,6 +808,44 @@ class ConditionFunctionProtocol(Protocol[StateType]):
 
 
 @dataclass
+class Send:
+    """Directive for dynamic fan-out / parallel execution.
+
+    A conditional edge function can return a ``List[Send]`` instead of
+    a plain branch name.  Each ``Send`` specifies a target node and
+    the state it should receive.  The graph executes all sends in
+    parallel via ``asyncio.gather`` and merges the results using the
+    configured state merger.
+
+    Attributes:
+        node: Target node ID to execute
+        state: State dictionary to pass to the target node
+    """
+
+    node: str
+    state: Dict[str, Any]
+
+
+def default_state_merger(
+    base_state: Dict[str, Any],
+    branch_states: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Merge parallel branch results by sequential dict.update.
+
+    Args:
+        base_state: The state before the fan-out
+        branch_states: List of state dicts returned by each branch
+
+    Returns:
+        Merged state dictionary
+    """
+    merged = dict(base_state)
+    for bs in branch_states:
+        merged.update(bs)
+    return merged
+
+
+@dataclass
 class Edge:
     """Represents an edge between nodes.
 
@@ -537,16 +859,16 @@ class Edge:
     source: str
     target: Union[str, Dict[str, str]]
     edge_type: EdgeType = EdgeType.NORMAL
-    condition: Optional[Callable[[Any], str]] = None
+    condition: Optional[Callable[[Any], Union[str, List[Send]]]] = None
 
-    def get_target(self, state: Any) -> Optional[str]:
+    def get_target(self, state: Any) -> Union[str, List[Send], None]:
         """Get target node based on state.
 
         Args:
             state: Current state
 
         Returns:
-            Target node ID or None
+            Target node ID, a list of Send directives, or None
         """
         if self.edge_type == EdgeType.NORMAL:
             return self.target if isinstance(self.target, str) else None
@@ -554,9 +876,16 @@ class Edge:
         if self.condition is None:
             return None
 
-        branch = self.condition(state)
+        result = self.condition(state)
+
+        # Dynamic fan-out: condition returned a list of Send directives
+        if isinstance(result, list) and result and isinstance(result[0], Send):
+            return result
+
+        # Classic conditional: condition returned a branch name string
+        branch = result
         if isinstance(self.target, dict):
-            return self.target.get(branch)
+            return self.target.get(branch)  # type: ignore[arg-type]
         return None
 
 
@@ -587,6 +916,92 @@ class Node:
         if asyncio.iscoroutine(result):
             return await result
         return result
+
+
+# Maximum subgraph nesting depth to prevent unbounded recursion.
+# Each invoke() in a SubgraphNode increments the depth counter
+# stored in the state under this key.
+_SUBGRAPH_DEPTH_KEY = "__subgraph_depth__"
+_MAX_SUBGRAPH_DEPTH = 10
+
+
+@dataclass
+class SubgraphNode:
+    """A node that wraps a compiled subgraph for modular composition.
+
+    Enables graph-of-graphs nesting where a node in an outer graph
+    delegates execution to an inner CompiledGraph.  Optional
+    ``input_mapper`` / ``output_mapper`` callables transform state
+    keys between the parent and child graphs.
+
+    Safety: A ``_SUBGRAPH_DEPTH_KEY`` counter in state prevents
+    unbounded recursion. Exceeding ``_MAX_SUBGRAPH_DEPTH`` (10)
+    raises ``RecursionError``.
+
+    Attributes:
+        id: Unique node identifier
+        compiled_graph: The inner compiled graph to execute
+        input_mapper: Optional state transform before subgraph
+        output_mapper: Optional state transform after subgraph
+        metadata: Additional node metadata
+    """
+
+    id: str
+    compiled_graph: "CompiledGraph"
+    input_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    output_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    async def execute(self, state: Any) -> Any:
+        """Execute the inner compiled graph.
+
+        Args:
+            state: Current parent state (dict-like)
+
+        Returns:
+            Updated state after subgraph execution
+
+        Raises:
+            RecursionError: If subgraph nesting exceeds max depth
+            RuntimeError: If inner graph execution fails
+        """
+        # Extract plain dict from COW wrapper
+        if isinstance(state, CopyOnWriteState):
+            input_state = state.to_dict()
+        elif isinstance(state, dict):
+            input_state = dict(state)
+        else:
+            input_state = state
+
+        # Recursion depth guard
+        depth = input_state.get(_SUBGRAPH_DEPTH_KEY, 0)
+        if depth >= _MAX_SUBGRAPH_DEPTH:
+            raise RecursionError(
+                f"Subgraph nesting depth {depth} exceeds "
+                f"maximum ({_MAX_SUBGRAPH_DEPTH}). "
+                f"Check for self-referencing subgraphs."
+            )
+        input_state[_SUBGRAPH_DEPTH_KEY] = depth + 1
+
+        if self.input_mapper:
+            input_state = self.input_mapper(input_state)
+
+        result = await self.compiled_graph.invoke(input_state)
+
+        if not result.success:
+            raise RuntimeError(f"Subgraph '{self.id}' failed: {result.error}")
+
+        output_state = result.state
+
+        # Restore parent depth (don't leak counter upward)
+        output_state.pop(_SUBGRAPH_DEPTH_KEY, None)
+        if depth > 0:
+            output_state[_SUBGRAPH_DEPTH_KEY] = depth
+
+        if self.output_mapper:
+            output_state = self.output_mapper(output_state)
+
+        return output_state
 
 
 @dataclass
@@ -1226,6 +1641,17 @@ class CompiledGraph(Generic[StateType]):
         self._config = config or GraphConfig()
         self._strict_edges = strict_edges
         self._debug_hook: Optional[Any] = None  # DebugHook for debugging
+        self._state_merger: Callable[[Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]] = (
+            default_state_merger
+        )
+
+        # Initialize state validator
+        validation_config = self._config.validation
+        self._validator: Optional[StateValidator] = None
+        if validation_config.enabled and state_schema is not None:
+            self._validator = StateValidator(schema=state_schema, strict=validation_config.strict)
+        else:
+            self._validator = None
 
     def set_debug_hook(self, hook: Optional[Any]) -> None:
         """Set debug hook for execution.
@@ -1265,7 +1691,7 @@ class CompiledGraph(Generic[StateType]):
             from victor.config.settings import load_settings
 
             settings = load_settings()
-            return settings.stategraph_copy_on_write_enabled
+            return settings.workflow.stategraph_copy_on_write_enabled
         except Exception:
             # Default to True if settings can't be loaded
             return True
@@ -1311,6 +1737,7 @@ class CompiledGraph(Generic[StateType]):
         config: Optional[GraphConfig] = None,
         thread_id: Optional[str] = None,
         debug_hook: Optional[Any] = None,
+        start_node: Optional[str] = None,
     ) -> GraphExecutionResult[StateType]:
         """Execute the graph (SRP: Orchestrates focused helpers).
 
@@ -1328,11 +1755,27 @@ class CompiledGraph(Generic[StateType]):
             config: Override execution config
             thread_id: Thread ID for checkpointing
             debug_hook: Optional DebugHook for debugging
+            start_node: Optional node to start execution from (overrides
+                entry point and checkpoint).  Used by ``replay_from()``.
 
         Returns:
             GraphExecutionResult with final state
         """
         exec_config = config or self._config
+
+        # Validate input state if enabled
+        if exec_config.validation.enabled and self._state_schema is not None:
+            # Use existing validator or create temporary one
+            validator = self._validator or StateValidator(
+                schema=self._state_schema, strict=exec_config.validation.strict
+            )
+            state_dict = input_state if isinstance(input_state, dict) else dict(input_state)
+            errors = validator.validate(state_dict)
+            if errors:
+                if exec_config.validation.strict:
+                    raise StateValidationError(errors, state_dict)
+                elif exec_config.validation.log_errors:
+                    logger.warning(f"State validation failed on entry: {errors}")
         thread_id = thread_id or uuid.uuid4().hex
         use_cow = self._should_use_cow(exec_config)
         graph_id = exec_config.observability.graph_id or thread_id
@@ -1365,6 +1808,10 @@ class CompiledGraph(Generic[StateType]):
             input_state=input_state,
             entry_point=self._entry_point,
         )
+
+        # Explicit start_node overrides both checkpoint and entry point
+        if start_node is not None:
+            current_node = start_node
 
         # Start timeout tracking and emit graph started event
         timeout_manager.start()
@@ -1435,6 +1882,29 @@ class CompiledGraph(Generic[StateType]):
                         node_history=node_history,
                     )
 
+                # Validate state after node execution if enabled
+                if exec_config.validation.enabled and self._state_schema is not None:
+                    # Use existing validator or create temporary one
+                    validator = self._validator or StateValidator(
+                        schema=self._state_schema, strict=exec_config.validation.strict
+                    )
+                    state_dict = state if isinstance(state, dict) else dict(state)
+                    errors = validator.validate(state_dict)
+                    if errors:
+                        if exec_config.validation.strict:
+                            return GraphExecutionResult(
+                                state=state,
+                                success=False,
+                                error=f"State validation failed after node '{current_node}': {errors}",
+                                iterations=iteration_controller.iterations,
+                                duration=timeout_manager.get_elapsed(),
+                                node_history=node_history,
+                            )
+                        elif exec_config.validation.log_errors:
+                            logger.warning(
+                                f"State validation failed after node '{current_node}': {errors}"
+                            )
+
                 # Track execution
                 logger.debug(f"Executed node: {current_node}")
                 node_history.append(current_node)
@@ -1460,8 +1930,23 @@ class CompiledGraph(Generic[StateType]):
                         node_history=node_history,
                     )
 
-                # Get next node
-                current_node = self._get_next_node(current_node, state)
+                # Get next node (may be a string or List[Send])
+                next_target = self._get_next_node(current_node, state)
+
+                if isinstance(next_target, list):
+                    # Fan-out: execute all Send branches in parallel
+                    state = await self._execute_parallel(
+                        sends=next_target,
+                        node_executor=node_executor,
+                        timeout_manager=timeout_manager,
+                        base_state=state,
+                    )
+                    for send in next_target:
+                        node_history.append(f"send:{send.node}")
+                    # After fan-out, there is no single next node; end graph
+                    current_node = END
+                else:
+                    current_node = next_target
 
             # Emit RL event for successful completion
             self._emit_graph_completed_event(
@@ -1517,7 +2002,7 @@ class CompiledGraph(Generic[StateType]):
                 node_history=node_history,
             )
 
-    def _get_next_node(self, current_node: str, state: Any) -> str:
+    def _get_next_node(self, current_node: str, state: Any) -> Union[str, List[Send]]:
         """Determine next node based on edges and state.
 
         Args:
@@ -1525,7 +2010,7 @@ class CompiledGraph(Generic[StateType]):
             state: Current state
 
         Returns:
-            Next node ID or END
+            Next node ID, a list of Send directives, or END
         """
         edges = self._edges.get(current_node, [])
         if not edges:
@@ -1538,7 +2023,7 @@ class CompiledGraph(Generic[StateType]):
 
         # No conditional edge matched
         if self._strict_edges:
-            from victor.framework.errors import EdgeResolutionError
+            from victor.core.errors import EdgeResolutionError
 
             raise EdgeResolutionError(
                 f"No conditional edge from '{current_node}' matched the "
@@ -1550,6 +2035,41 @@ class CompiledGraph(Generic[StateType]):
             return edges[0].target if isinstance(edges[0].target, str) else END
 
         return END
+
+    async def _execute_parallel(
+        self,
+        sends: List[Send],
+        node_executor: "NodeExecutor",
+        timeout_manager: "TimeoutManager",
+        base_state: Any,
+    ) -> Any:
+        """Execute parallel fan-out branches and merge results.
+
+        Args:
+            sends: List of Send directives
+            node_executor: Executor for individual nodes
+            timeout_manager: Timeout manager
+            base_state: State before the fan-out
+
+        Returns:
+            Merged state after all branches complete
+        """
+
+        async def _run_branch(send: Send) -> Dict[str, Any]:
+            branch_state = copy.deepcopy(send.state)
+            success, error, result_state = await node_executor.execute(
+                node_id=send.node,
+                state=branch_state,
+                timeout_manager=timeout_manager,
+            )
+            if not success:
+                logger.warning("Parallel branch %s failed: %s", send.node, error)
+            return result_state if isinstance(result_state, dict) else dict(result_state)
+
+        branch_results = await asyncio.gather(*[_run_branch(s) for s in sends])
+
+        base = base_state if isinstance(base_state, dict) else dict(base_state)
+        return self._state_merger(base, list(branch_results))
 
     async def _save_checkpoint(
         self,
@@ -1675,6 +2195,74 @@ class CompiledGraph(Generic[StateType]):
             "entry_point": self._entry_point,
         }
 
+    # -----------------------------------------------------------------
+    # State History & Replay (LangGraph parity)
+    # -----------------------------------------------------------------
+
+    async def get_state_history(
+        self,
+        thread_id: str,
+    ) -> List[WorkflowCheckpoint]:
+        """Return all checkpoints for a thread, ordered chronologically.
+
+        Requires a checkpointer to be configured on the graph config.
+
+        Args:
+            thread_id: Thread identifier
+
+        Returns:
+            List of WorkflowCheckpoint instances (empty if no checkpointer)
+        """
+        checkpointer = self._config.checkpoint.checkpointer
+        if checkpointer is None:
+            return []
+        return await checkpointer.list(thread_id)
+
+    async def replay_from(
+        self,
+        thread_id: str,
+        checkpoint_id: str,
+        *,
+        config: Optional[GraphConfig] = None,
+    ) -> GraphExecutionResult[StateType]:
+        """Load a checkpoint and replay the graph from its node.
+
+        A new thread id is generated to avoid polluting existing history.
+
+        Args:
+            thread_id: Original thread id that owns the checkpoint
+            checkpoint_id: The specific checkpoint to replay from
+            config: Optional execution config override
+
+        Returns:
+            GraphExecutionResult from the replayed execution
+
+        Raises:
+            ValueError: If no checkpointer is configured or the
+                checkpoint is not found
+        """
+        checkpointer = self._config.checkpoint.checkpointer
+        if checkpointer is None:
+            raise ValueError("Cannot replay without a checkpointer configured on the graph.")
+
+        all_checkpoints = await checkpointer.list(thread_id)
+        target = None
+        for cp in all_checkpoints:
+            if cp.checkpoint_id == checkpoint_id:
+                target = cp
+                break
+
+        if target is None:
+            raise ValueError(f"Checkpoint '{checkpoint_id}' not found for thread '{thread_id}'.")
+
+        replay_thread = f"replay_{uuid.uuid4().hex}"
+        return await self.invoke(
+            input_state=target.state,
+            config=config,
+            thread_id=replay_thread,
+            start_node=target.node_id,
+        )
+
 
 class StateGraph(Generic[StateType]):
     """StateGraph builder for creating stateful workflows.
@@ -1714,6 +2302,9 @@ class StateGraph(Generic[StateType]):
         self._nodes: Dict[str, Node] = {}
         self._edges: Dict[str, List[Edge]] = {}
         self._entry_point: Optional[str] = None
+        self._state_merger: Optional[
+            Callable[[Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]]
+        ] = None
 
     def add_node(
         self,
@@ -1792,6 +2383,67 @@ class StateGraph(Generic[StateType]):
         logger.debug(f"Added conditional edge: {source} -> {list(branches.values())}")
         return self
 
+    def add_subgraph(
+        self,
+        node_id: str,
+        compiled_graph: "CompiledGraph",
+        *,
+        input_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        output_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        **metadata: Any,
+    ) -> "StateGraph[StateType]":
+        """Add a subgraph node for modular graph-of-graphs composition.
+
+        The inner ``compiled_graph`` is invoked via
+        :meth:`CompiledGraph.invoke` when this node executes.
+
+        Args:
+            node_id: Unique node identifier
+            compiled_graph: A pre-compiled graph to run as a subgraph
+            input_mapper: Optional function to map parent state to subgraph input
+            output_mapper: Optional function to map subgraph output back to parent
+            **metadata: Additional metadata
+
+        Returns:
+            Self for chaining
+
+        Raises:
+            ValueError: If node already exists
+        """
+        if node_id in self._nodes:
+            raise ValueError(f"Node '{node_id}' already exists")
+
+        subgraph_node = SubgraphNode(
+            id=node_id,
+            compiled_graph=compiled_graph,
+            input_mapper=input_mapper,
+            output_mapper=output_mapper,
+            metadata=metadata,
+        )
+        # SubgraphNode has the same execute() signature as Node,
+        # so NodeExecutor handles it uniformly.
+        self._nodes[node_id] = subgraph_node  # type: ignore[assignment]
+        logger.debug(f"Added subgraph node: {node_id}")
+        return self
+
+    def add_state_merger(
+        self,
+        func: Callable[[Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]],
+    ) -> "StateGraph[StateType]":
+        """Set a custom state merger for fan-out / parallel branches.
+
+        The merger receives the base state and a list of branch result
+        states and must return the merged state.
+
+        Args:
+            func: Merger function ``(base_state, branch_states) -> merged``
+
+        Returns:
+            Self for chaining
+        """
+        self._state_merger = func
+        return self
+
     def set_entry_point(self, node_id: str) -> "StateGraph[StateType]":
         """Set the entry point node.
 
@@ -1850,7 +2502,7 @@ class StateGraph(Generic[StateType]):
             **config_kwargs,
         )
 
-        return CompiledGraph(
+        compiled = CompiledGraph(
             nodes=self._nodes.copy(),
             edges={k: list(v) for k, v in self._edges.items()},
             entry_point=self._entry_point,
@@ -1858,6 +2510,9 @@ class StateGraph(Generic[StateType]):
             config=config,
             strict_edges=strict_edges,
         )
+        if self._state_merger is not None:
+            compiled._state_merger = self._state_merger
+        return compiled
 
     def _validate(self) -> List[str]:
         """Validate graph structure.
@@ -2114,6 +2769,19 @@ class StateGraph(Generic[StateType]):
                 metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
                 graph.add_node(node_id, create_compute_placeholder(node_def), **metadata)
 
+            elif node_type == "subgraph":
+                # Subgraph node - look up compiled graph in node_registry
+                subgraph_key = node_def.get("graph")
+                if not subgraph_key:
+                    raise ValueError(f"Subgraph node '{node_id}' must specify 'graph' key")
+                if subgraph_key not in node_registry:
+                    raise ValueError(
+                        f"Subgraph '{subgraph_key}' not found in node_registry. "
+                        f"Available: {list(node_registry.keys())}"
+                    )
+                inner_graph = node_registry[subgraph_key]
+                graph.add_subgraph(node_id, inner_graph)
+
             else:
                 raise TypeError(f"Unsupported node type: {node_type}")
 
@@ -2194,8 +2862,14 @@ __all__ = [
     "Edge",
     "EdgeType",
     "FrameworkNodeStatus",
+    # Subgraph composition
+    "SubgraphNode",
+    # Fan-out / parallel execution
+    "Send",
+    "default_state_merger",
     # State management
     "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
+    "AgentStateModel",  # Example Pydantic state model (recommended over TypedDict)
     # Execution
     "GraphExecutionResult",
     "GraphConfig",

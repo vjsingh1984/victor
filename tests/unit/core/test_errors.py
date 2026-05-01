@@ -259,7 +259,9 @@ class TestToolValidationError:
     def test_with_invalid_args(self):
         """Test validation error with invalid args."""
         error = ToolValidationError(
-            "Invalid arguments", tool_name="read_file", invalid_args=["path", "encoding"]
+            "Invalid arguments",
+            tool_name="read_file",
+            invalid_args=["path", "encoding"],
         )
         assert error.category == ErrorCategory.TOOL_VALIDATION
         assert error.invalid_args == ["path", "encoding"]

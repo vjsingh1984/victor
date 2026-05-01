@@ -13,12 +13,13 @@ from rich.prompt import Confirm
 from pathlib import Path
 import time
 
-from victor.agent.orchestrator import AgentOrchestrator
+# ✅ PROPER: No AgentOrchestrator import (use Any type instead)
 from victor.agent.safety import (
     ConfirmationRequest,
     OperationalRiskLevel,
     set_confirmation_callback,
 )
+from victor.config.settings import get_project_paths
 
 from victor.core.container import get_container
 
@@ -34,12 +35,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 console = Console()
 
-# Global reference for signal handler cleanup
-_current_agent: Optional[AgentOrchestrator] = None
+# Global reference for signal handler cleanup (use Any instead of AgentOrchestrator)
+_current_agent: Optional[Any] = None
 
-# Default log file location
-DEFAULT_LOG_DIR = Path.home() / ".victor" / "logs"
-DEFAULT_LOG_FILE = DEFAULT_LOG_DIR / "victor.log"
+
+def _get_default_log_dir() -> Path:
+    """Resolve the default CLI log directory through centralized Victor paths."""
+    return get_project_paths().global_victor_dir / "logs"
+
+
+def _get_default_log_file() -> Path:
+    """Resolve the default CLI log file through centralized Victor paths."""
+    return _get_default_log_dir() / "victor.log"
 
 
 def configure_logging_from_config(
@@ -141,6 +148,7 @@ def setup_logging(
     stream: Optional[Any] = None,
     session_id: Optional[str] = None,
     repo_path: Optional[str] = None,
+    cli_debug_modules: Optional[str] = None,
 ) -> "LoggingConfig":
     """Convenience function to load config and configure logging in one call.
 
@@ -167,6 +175,8 @@ def setup_logging(
     config = get_logging_config(
         command=command,
         cli_console_level=cli_log_level,
+        cli_file_level=cli_log_level,  # CLI flag controls both console and file
+        cli_debug_modules=cli_debug_modules,
     )
     configure_logging_from_config(
         config,
@@ -239,7 +249,7 @@ def configure_logging(
     # File handler (INFO by default) with rotation
     if file_logging:
         try:
-            log_path = log_file or DEFAULT_LOG_FILE
+            log_path = log_file or _get_default_log_file()
             log_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Use RotatingFileHandler to prevent unbounded growth
@@ -294,8 +304,12 @@ def flush_logging() -> None:
         handler.flush()
 
 
-async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
-    """Perform graceful shutdown of the agent."""
+async def graceful_shutdown(agent: Optional[Any]) -> None:
+    """Perform graceful shutdown of the agent.
+
+    Args:
+        agent: Agent instance (any type - duck typing used for runtime access)
+    """
     if agent is None:
         return
     try:
@@ -352,6 +366,34 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
                 )
     except Exception as e:
         logger.debug(f"RL feedback recording skipped: {e}")
+
+    # Record session outcome for prompt optimizer (lightweight — no LLM call).
+    # This updates posteriors for the active GEPA candidate so it learns
+    # from every chat session, not just benchmarks.
+    try:
+        from victor.framework.rl.base import RLOutcome
+
+        coordinator = get_rl_coordinator()
+        prompt_learner = coordinator.get_learner("prompt_optimizer")
+        if prompt_learner and agent.provider:
+            session_metrics = {}
+            if hasattr(agent, "get_session_metrics"):
+                session_metrics = agent.get_session_metrics() or {}
+            tool_calls = session_metrics.get("tool_calls", 0)
+            if tool_calls > 0:  # Only record if tools were used
+                outcome = RLOutcome(
+                    provider=agent.provider.name,
+                    model=getattr(agent.provider, "model", "unknown"),
+                    task_type="chat",
+                    success=True,
+                    quality_score=min(1.0, 0.5 + tool_calls * 0.05),
+                    metadata={"prompt_section": "ASI_TOOL_EFFECTIVENESS_GUIDANCE"},
+                )
+                prompt_learner.record_outcome(outcome)
+                logger.debug("Prompt optimizer: recorded chat session outcome")
+    except Exception as e:
+        logger.debug(f"Prompt optimizer feedback skipped: {e}")
+
     try:
         shutdown_results = await agent.graceful_shutdown()
         logger.debug(f"Graceful shutdown results: {shutdown_results}")
@@ -440,10 +482,23 @@ async def preload_semantic_index(
         if cache_entry and not force:
             console_obj.print("[dim]✓ Semantic index already loaded[/]")
             return True
-        console_obj.print("[dim]⏳ Building semantic code index (one-time)...[/]")
-        start_time = time.time()
-        index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
-        elapsed = time.time() - start_time
+
+        # Show progress during indexing (can take 20-30s)
+        from rich.console import Console as RichConsole
+
+        if isinstance(console_obj, RichConsole):
+            with console_obj.status(
+                "[bold green]Building semantic code index (one-time)...[/]", spinner="dots"
+            ) as status:
+                status.update("Indexing files...")
+                start_time = time.time()
+                index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
+                elapsed = time.time() - start_time
+        else:
+            console_obj.print("[dim]⏳ Building semantic code index (one-time)...[/]")
+            start_time = time.time()
+            index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
+            elapsed = time.time() - start_time
 
         # Get graph stats if available
         graph_stats = ""

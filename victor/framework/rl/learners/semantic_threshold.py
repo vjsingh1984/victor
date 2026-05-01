@@ -99,6 +99,17 @@ class SemanticThresholdLearner(BaseLearner):
         Args:
             outcome: Outcome with semantic search data
         """
+        # Check RL mode — skip writes in "none" mode
+        try:
+            from victor.config.settings import load_settings
+
+            rl_mode = getattr(load_settings(), "rl_mode", "selective")
+        except Exception:
+            rl_mode = "selective"
+
+        if rl_mode == "none":
+            return
+
         # Extract metadata
         embedding_model = outcome.metadata.get("embedding_model", "unknown")
         tool_name = outcome.metadata.get("tool_name", "code_search")
@@ -165,6 +176,19 @@ class SemanticThresholdLearner(BaseLearner):
         # Update recommendation if enough data
         if stats["total_searches"] >= 5:
             self._update_threshold(stats)
+
+        # Dirty-check: skip write ONLY when recommendation exists and is unchanged
+        # Always write when building up data (recommendation = None means not enough data)
+        if rl_mode == "selective" and row:
+            prev_stats = dict(zip(column_names, row))
+            prev_rec = prev_stats.get("recommended_threshold")
+            new_rec = stats.get("recommended_threshold")
+            if prev_rec is not None and new_rec is not None and abs(new_rec - prev_rec) < 0.01:
+                logger.debug(
+                    "RL: semantic_threshold recommendation unchanged for %s, skipping",
+                    context_key,
+                )
+                return
 
         # Upsert to database
         cursor.execute(
@@ -263,7 +287,7 @@ class SemanticThresholdLearner(BaseLearner):
         if abs(recommended - current) < 0.01:
             return
 
-        logger.info(
+        logger.debug(
             f"RL: Updated semantic_threshold for {stats['context_key']}: "
             f"{current:.2f} → {recommended:.2f} "
             f"(zero_rate={zero_rate:.1%}, low_quality_rate={low_quality_rate:.1%})"

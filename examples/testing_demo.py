@@ -165,7 +165,9 @@ async def demo_run_specific_file(temp_dir: Path):
 
     if "error" not in result:
         summary = result.get("summary", {})
-        print(f"\n📊 Results: {summary.get('passed', 0)} passed, {summary.get('failed', 0)} failed")
+        print(
+            f"\n📊 Results: {summary.get('passed', 0)} passed, {summary.get('failed', 0)} failed"
+        )
 
 
 async def demo_run_with_args(temp_dir: Path):

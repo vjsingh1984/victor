@@ -522,7 +522,10 @@ class TestQueryEnhancementPipeline:
     def test_pipeline_repr(self):
         """Test pipeline string representation."""
         config = QueryEnhancementConfig(
-            techniques=[EnhancementTechnique.REWRITE, EnhancementTechnique.ENTITY_EXPAND]
+            techniques=[
+                EnhancementTechnique.REWRITE,
+                EnhancementTechnique.ENTITY_EXPAND,
+            ]
         )
         pipeline = QueryEnhancementPipeline(config=config)
         repr_str = repr(pipeline)

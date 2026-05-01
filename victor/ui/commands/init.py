@@ -3,94 +3,362 @@ import re
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from pathlib import Path
-from typing import Awaitable, Callable, List, Mapping, Optional, cast
+from typing import Any, Awaitable, Callable, List, Mapping, Optional, cast
 import yaml
 
-from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
+from victor.config.settings import (
+    get_project_paths,
+    VICTOR_CONTEXT_FILE,
+    VICTOR_DIR_NAME,
+)
 from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
-from victor.core.utils.coding_support import load_codebase_analyzer_attr
+from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
+from victor.core.utils.capability_loader import load_codebase_analyzer_attr
+from victor.tools.common import latest_mtime
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
 
 
-async def _generate_enhanced_init_content_async(
+async def _generate_init_content_async(
     *,
-    use_llm: bool,
-    include_conversations: bool,
-    on_progress,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
+    mode: str,
+    use_llm: bool = False,
+    include_conversations: bool = False,
+    on_progress: Optional[Callable] = None,
+    force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    graph_context: Optional[dict] = None,
 ) -> str:
-    generate_enhanced_init_md = cast(
-        Callable[..., Awaitable[str]],
-        load_codebase_analyzer_attr("generate_enhanced_init_md"),
-    )
+    """Unified async content generator for all init analysis modes.
 
-    return await generate_enhanced_init_md(
-        use_llm=use_llm,
-        include_conversations=include_conversations,
-        on_progress=on_progress,
-        force=force,
-        include_dirs=include_dirs,
-        exclude_dirs=exclude_dirs,
-    )
+    Args:
+        mode: One of "enhanced" (LLM/learn), "index" (symbol store), "quick" (regex).
+        use_llm: Whether to use LLM for deep analysis (enhanced mode).
+        include_conversations: Include conversation history insights (enhanced mode).
+        on_progress: Progress callback.
+        force: Force reindex/regeneration.
+        include_dirs: Directories to include in analysis.
+        exclude_dirs: Directories to exclude from analysis.
+        provider: Override LLM provider (e.g., "anthropic", "openai"). Enhanced mode only.
+        model: Override LLM model (e.g., "claude-sonnet-4-20250514"). Enhanced mode only.
+        graph_context: Optional graph statistics (CCG, patterns) for LLM synthesis.
+
+    Returns:
+        Generated init.md content string.
+    """
+    if mode == "enhanced":
+        generate_enhanced_init_md = cast(
+            Callable[..., Awaitable[str]],
+            load_codebase_analyzer_attr("generate_enhanced_init_md"),
+        )
+
+        # Build agent with provider/model override if specified
+        agent = None
+        if provider and use_llm:
+            agent = await _create_init_agent(provider, model)
+
+        # Try to pass graph_context if the function supports it
+        # (victor-coding package may not have this parameter yet)
+        try:
+            import inspect
+
+            sig = inspect.signature(generate_enhanced_init_md)
+            if "graph_context" in sig.parameters:
+                return await generate_enhanced_init_md(
+                    use_llm=use_llm,
+                    include_conversations=include_conversations,
+                    on_progress=on_progress,
+                    force=force,
+                    include_dirs=include_dirs,
+                    exclude_dirs=exclude_dirs,
+                    agent=agent,
+                    graph_context=graph_context,
+                )
+            else:
+                # victor-coding doesn't support graph_context yet, skip it
+                return await generate_enhanced_init_md(
+                    use_llm=use_llm,
+                    include_conversations=include_conversations,
+                    on_progress=on_progress,
+                    force=force,
+                    include_dirs=include_dirs,
+                    exclude_dirs=exclude_dirs,
+                    agent=agent,
+                )
+        except TypeError:
+            # Fallback if signature check fails
+            return await generate_enhanced_init_md(
+                use_llm=use_llm,
+                include_conversations=include_conversations,
+                on_progress=on_progress,
+                force=force,
+                include_dirs=include_dirs,
+                exclude_dirs=exclude_dirs,
+                agent=agent,
+            )
+    elif mode == "index":
+        generate_victor_md_from_index = cast(
+            Callable[..., Awaitable[str]],
+            load_codebase_analyzer_attr("generate_victor_md_from_index"),
+        )
+        return await generate_victor_md_from_index(
+            force=force,
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+        )
+    else:
+        # "quick" mode — sync regex-based, no LLM
+        generate_smart_victor_md = cast(
+            Callable[..., str],
+            load_codebase_analyzer_attr("generate_smart_victor_md"),
+        )
+        return generate_smart_victor_md(
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+        )
 
 
-def _generate_enhanced_init_content(
+def _generate_init_content(
     *,
-    use_llm: bool,
-    include_conversations: bool,
-    on_progress,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
+    mode: str,
+    use_llm: bool = False,
+    include_conversations: bool = False,
+    on_progress: Optional[Callable] = None,
+    force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    graph_context: Optional[dict] = None,
 ) -> str:
+    """Sync wrapper for _generate_init_content_async."""
+    if mode == "quick":
+        # Quick mode is sync — no need for run_sync
+        generate_smart_victor_md = cast(
+            Callable[..., str],
+            load_codebase_analyzer_attr("generate_smart_victor_md"),
+        )
+        return generate_smart_victor_md(
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+        )
     return run_sync(
-        _generate_enhanced_init_content_async(
+        _generate_init_content_async(
+            mode=mode,
             use_llm=use_llm,
             include_conversations=include_conversations,
             on_progress=on_progress,
             force=force,
             include_dirs=include_dirs,
             exclude_dirs=exclude_dirs,
+            provider=provider,
+            model=model,
+            graph_context=graph_context,
         )
     )
 
 
-async def _generate_index_init_content_async(
-    *,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
-) -> str:
-    generate_victor_md_from_index = cast(
-        Callable[..., Awaitable[str]],
-        load_codebase_analyzer_attr("generate_victor_md_from_index"),
-    )
+async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
+    """Create an Agent for init synthesis using the framework client seam.
 
-    return await generate_victor_md_from_index(
-        force=force,
-        include_dirs=include_dirs,
-        exclude_dirs=exclude_dirs,
-    )
+    Uses the framework client factory with SessionConfig for proper service-layer alignment.
+    Supports both profile names (e.g., "zai-coding") and bare provider names (e.g., "ollama").
 
+    Args:
+        provider: Profile name (e.g., "zai-coding") or bare provider name.
+        model: Optional model override.
 
-def _generate_index_init_content(
-    *,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
-) -> str:
-    return run_sync(
-        _generate_index_init_content_async(
-            force=force,
-            include_dirs=include_dirs,
-            exclude_dirs=exclude_dirs,
+    Returns:
+        Agent instance with an initialized provider.
+
+    Architecture:
+        This function follows the service-oriented architecture pattern:
+        - Uses the framework client seam (not Agent.create directly)
+        - Passes configuration via SessionConfig (immutable)
+        - VictorClient initialization stays framework-owned
+        - Services are accessed through ServiceAccessor (not orchestrator directly)
+    """
+    from victor.config.settings import load_settings
+
+    # ✅ PROPER: Use the framework client factory with SessionConfig
+    from victor.framework.session_config import SessionConfig
+    from victor.framework.session_runner import create_victor_client
+
+    settings = load_settings()
+    profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+
+    # Check if provider is a profile name
+    if provider in profiles:
+        # Profile path: use agent_profile in SessionConfig
+        config = SessionConfig(
+            agent_profile=provider,  # Profile name (e.g., "zai-coding")
         )
-    )
+        client = create_victor_client(config)
+        agent = await client.initialize()
+        return agent
+
+    # Bare provider name: pass through SessionConfig, resolved by Agent.create
+    config = SessionConfig()  # Default config (no agent_profile)
+    client = create_victor_client(config)
+
+    # For bare provider names, we need to pass provider/model to Agent.create
+    # VictorClient doesn't support direct provider override, so we use Agent.create
+    # This is acceptable because it's still within the framework layer (not UI layer)
+    from victor.framework.agent import Agent
+
+    kwargs: dict = {"provider": provider, "temperature": 0.3}
+    if model:
+        kwargs["model"] = model
+    return await Agent.create(**kwargs)
+
+
+async def _gather_graph_context(root: Path) -> Optional[dict]:
+    """Gather graph statistics for synthesis prompt.
+
+    Focus on universal patterns that generalize across projects:
+    - CCG: Control flow, data dependencies, control dependencies
+    - Generic patterns: Decorator, Registry, Protocol (not Victor-specific)
+    """
+    try:
+        from victor.storage.graph import create_graph_store
+        from victor.storage.graph.edge_types import EdgeType
+
+        graph_store = create_graph_store("sqlite", project_path=root)
+        await graph_store.initialize()
+
+        # Get all edges
+        all_edges = await graph_store.get_all_edges()
+
+        # CCG breakdown (universal - applies to any codebase)
+        cfg_edges = [e for e in all_edges if EdgeType.is_cfg_edge(e.type)]
+        cdg_edges = [e for e in all_edges if EdgeType.is_cdg_edge(e.type)]
+        ddg_edges = [e for e in all_edges if EdgeType.is_ddg_edge(e.type)]
+
+        # Generic pattern detection (not Victor-specific)
+        decorator_edges = [e for e in all_edges if e.type == "DECORATES"]
+        protocol_edges = [e for e in all_edges if e.type == "IMPLEMENTS"]
+        registry_edges = [e for e in all_edges if e.type == "REGISTERS"]
+
+        # Detect other common patterns
+        inheritance_edges = [e for e in all_edges if e.type == "INHERITS"]
+        calls_edges = [e for e in all_edges if e.type == "CALLS"]
+        # Calculate complexity metrics
+        total_nodes = len(await graph_store.get_all_nodes())
+        total_edges = len(all_edges)
+        ccg_coverage = len(cfg_edges) + len(cdg_edges) + len(ddg_edges)
+
+        return {
+            "project_path": str(root),
+            "has_ccg": ccg_coverage > 0,
+            "has_synthetic_edges": len(decorator_edges) + len(protocol_edges) + len(registry_edges)
+            > 0,
+            "stats": {
+                "total_nodes": total_nodes,
+                "total_edges": total_edges,
+                "ccg_edges": ccg_coverage,
+                "cfg_edges": len(cfg_edges),
+                "cdg_edges": len(cdg_edges),
+                "ddg_edges": len(ddg_edges),
+            },
+            "patterns": {
+                "decorator": len(decorator_edges),
+                "protocol": len(protocol_edges),
+                "registry": len(registry_edges),
+                "inheritance": len(inheritance_edges),
+                "calls": len(calls_edges),
+            },
+            "complexity": {
+                "ccg_ratio": ccg_coverage / total_edges if total_edges > 0 else 0,
+                "avg_branching": total_edges / total_nodes if total_nodes > 0 else 0,
+            },
+        }
+    except Exception as exc:
+        console.print(f"[dim]  Failed to gather graph context: {exc}[/]")
+        return None
+
+
+def _format_graph_context_for_prompt(graph_context: dict) -> str:
+    """Format graph context for LLM synthesis prompt.
+
+    Uses generic pattern terminology that applies to any project:
+    - "Decorator pattern" not "@tool decorator"
+    - "Registry pattern" not "tool registry"
+    - "Protocol/Interface" not "Victor protocol"
+    """
+    if not graph_context:
+        return ""
+
+    stats = graph_context.get("stats", {})
+    patterns = graph_context.get("patterns", {})
+    complexity = graph_context.get("complexity", {})
+
+    sections = []
+
+    # CCG section (universal - applies to any codebase)
+    if graph_context.get("has_ccg", False):
+        ccg_ratio = complexity.get("ccg_ratio", 0) * 100
+        sections.append(f"""
+## Code Structure Analysis
+
+This project has been analyzed with Code Context Graph (CCG) providing:
+- **Control Flow Graph (CFG)**: {stats.get('cfg_edges', 0)} edges showing execution paths
+- **Control Dependence Graph (CDG)**: {stats.get('cdg_edges', 0)} edges showing decision dependencies
+- **Data Dependence Graph (DDG)**: {stats.get('ddg_edges', 0)} edges showing data flow
+
+CCG Coverage: {ccg_ratio:.1f}% of graph edges have statement-level granularity.
+
+When analyzing, leverage these to:
+- Identify control flow complexity hotspots (deep nesting, complex branching)
+- Trace data dependencies and side effects
+- Understand decision points and their impact
+""")
+
+    # Generic design patterns (not Victor-specific)
+    pattern_sections = []
+
+    if patterns.get("decorator", 0) > 0:
+        pattern_sections.append(f"""
+- **Decorator Pattern**: {patterns['decorator']} decorated symbols detected.
+  Analyze how decorators modify behavior and cross-cutting concerns.
+""")
+
+    if patterns.get("protocol", 0) > 0:
+        pattern_sections.append(f"""
+- **Protocol/Interface Pattern**: {patterns['protocol']} implementation relationships.
+  Map abstraction hierarchies and contract implementations.
+""")
+
+    if patterns.get("registry", 0) > 0:
+        pattern_sections.append(f"""
+- **Registry/Plugin Pattern**: {patterns['registry']} registration relationships.
+  Identify extensibility points and plugin architecture.
+""")
+
+    if patterns.get("inheritance", 0) > 0:
+        pattern_sections.append(f"""
+- **Inheritance Pattern**: {patterns['inheritance']} inheritance relationships.
+  Analyze class hierarchies and method overrides.
+""")
+
+    if pattern_sections:
+        sections.append(f"""
+## Design Pattern Analysis
+
+The following design patterns have been detected in the codebase:
+{''.join(pattern_sections)}
+
+Use these patterns to:
+- Understand the architectural approach
+- Identify extensibility mechanisms
+- Map abstraction layers and contracts
+""")
+
+    return "\n".join(sections)
 
 
 def _ensure_profile_preset(
@@ -179,7 +447,10 @@ def init(
         False, "--force", "-f", help="Overwrite existing init.md completely"
     ),
     learn: bool = typer.Option(
-        True, "--learn/--no-learn", "-L", help="Include conversation history insights (default: on)"
+        True,
+        "--learn/--no-learn",
+        "-L",
+        help="Include conversation history insights (default: on)",
     ),
     index: bool = typer.Option(
         False, "--index", "-i", help="Use SQLite symbol store only (no LLM)"
@@ -190,6 +461,11 @@ def init(
     quick: bool = typer.Option(
         False, "--quick", "-q", help="Fast regex-only analysis (no LLM, no indexing)"
     ),
+    ccg: bool = typer.Option(
+        True,
+        "--ccg/--no-ccg",
+        help="Enable Code Context Graph for statement-level analysis (default: on)",
+    ),
     symlinks: bool = typer.Option(
         False, "--symlinks", "-l", help="Create CLAUDE.md and other tool aliases"
     ),
@@ -197,17 +473,57 @@ def init(
         False, "--config", "-c", help="Only setup global config, skip project analysis"
     ),
     interactive: bool = typer.Option(
-        True, "--interactive/--no-interactive", "-I", help="Use interactive wizard for scoping"
+        True,
+        "--interactive/--no-interactive",
+        "-I",
+        help="Use interactive wizard for scoping",
     ),
     local: bool = typer.Option(False, "--local", help="Add a local profile preset (Ollama)"),
     airgapped: bool = typer.Option(
         False, "--airgapped", help="Enable air-gapped mode for this repo"
     ),
     wizard: bool = typer.Option(
-        False, "--wizard", "-w", help="Run interactive setup wizard for first-time users"
+        False,
+        "--wizard",
+        "-w",
+        help="Run interactive setup wizard for first-time users",
+    ),
+    provider: Optional[str] = typer.Option(
+        None,
+        "--provider",
+        "-p",
+        help="Override LLM provider for deep analysis (e.g., anthropic, openai, ollama).",
+        case_sensitive=False,
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        "-m",
+        help="Override LLM model for deep analysis (e.g., claude-sonnet-4-20250514).",
+    ),
+    log_level: Optional[str] = typer.Option(
+        None,
+        "--log-level",
+        help="Log level: DEBUG, INFO, WARNING, ERROR (default: WARNING).",
+        case_sensitive=False,
     ),
 ) -> None:
     """Initialize project context and configuration."""
+    from victor.ui.commands.utils import setup_logging
+
+    if log_level is not None:
+        log_level = log_level.upper()
+        valid_levels = ["DEBUG", "INFO", "WARNING", "WARN", "ERROR", "CRITICAL"]
+        if log_level not in valid_levels:
+            console.print(
+                f"[red]Invalid log level '{log_level}'. Valid: {', '.join(valid_levels)}[/]"
+            )
+            raise typer.Exit(1)
+        if log_level == "WARN":
+            log_level = "WARNING"
+
+    setup_logging(command="init", cli_log_level=log_level)
+
     # If wizard mode is requested, run the onboarding wizard instead
     if wizard:
         from victor.ui.commands.onboarding import run_onboarding
@@ -336,6 +652,12 @@ providers:
                 )
                 console.print("  [cyan]victor init --index[/]    Multi-language symbol indexing")
                 console.print("  [cyan]victor init --deep[/]     LLM-powered deep analysis")
+                console.print(
+                    "  [cyan]victor init --no-ccg[/]   Disable Code Context Graph (faster)"
+                )
+                console.print(
+                    "  [cyan]victor init --ccg[/]      Enable Code Context Graph (default)"
+                )
                 return
 
         # Handle --quick flag (overrides everything)
@@ -343,9 +665,18 @@ providers:
             deep = False
             learn = False
             index = False
+            ccg = False
 
         include_dirs: List[str] = []
         exclude_dirs: List[str] = []
+
+        # When --force is used, skip interactive prompts and use "." (current dir)
+        if force and interactive:
+            interactive = False
+            include_dirs = [str(Path.cwd())]
+            console.print(
+                "[dim]Using current directory (.) for analysis (--force skips prompts)[/]"
+            )
 
         if interactive and not quick:
             console.print("\n[bold]Interactive Project Scoping[/]")
@@ -417,13 +748,37 @@ providers:
             )
             exclude_dirs = [d.strip() for d in exclude_str.split(",")]
 
-        # Determine analysis mode and print status
+        # Determine analysis mode
+        if quick:
+            mode = "quick"
+        elif index:
+            mode = "index"
+        elif deep or learn or ccg:
+            mode = "enhanced"
+        else:
+            mode = "enhanced"  # Default
+
+        # Print status (include provider override if specified)
+        provider_note = ""
+        if provider and mode == "enhanced" and deep:
+            provider_note = f" via {provider}"
+            if model:
+                provider_note += f"/{model}"
+
+        ccg_note = " + CCG" if ccg and mode not in ("quick", "index") else ""
+
         if deep and learn:
-            console.print("[dim]Comprehensive analysis: Index → Learn → LLM (default)...[/]")
+            console.print(
+                f"[dim]Comprehensive analysis: Index → Learn → LLM{provider_note}{ccg_note} (default)...[/]"
+            )
         elif deep:
-            console.print("[dim]Analysis: Index → LLM (no conversation insights)...[/]")
+            console.print(
+                f"[dim]Analysis: Index → LLM{provider_note}{ccg_note} (no conversation insights)...[/]"
+            )
         elif learn:
-            console.print("[dim]Analysis: Index → Learn (no LLM)...[/]")
+            console.print(f"[dim]Analysis: Index → Learn{ccg_note} (no LLM)...[/]")
+        elif ccg:
+            console.print("[dim]Analysis: Index + CCG (no LLM, no conversation)...[/]")
         elif index:
             console.print("[dim]Analysis: Index only (no LLM, no conversation)...[/]")
         else:
@@ -434,49 +789,107 @@ providers:
             def on_progress(stage: str, msg: str) -> None:
                 console.print(f"[dim]  {msg}[/]")
 
-            if deep or learn:
-                try:
-                    new_content = _generate_enhanced_init_content(
-                        use_llm=deep,
-                        include_conversations=learn,
-                        on_progress=on_progress,
-                        force=force,
-                        include_dirs=include_dirs or None,
-                        exclude_dirs=exclude_dirs or None,
-                    )
-                except ImportError:
-                    console.print(
-                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-                    )
-                    return
-            elif index:
-                try:
-                    console.print("[dim]  Building symbol index...[/]")
-                    new_content = _generate_index_init_content(
-                        force=force,
-                        include_dirs=include_dirs or None,
-                        exclude_dirs=exclude_dirs or None,
-                    )
-                except ImportError:
-                    console.print(
-                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-                    )
-                    return
-            else:
-                try:
-                    generate_smart_victor_md = cast(
-                        Callable[..., str],
-                        load_codebase_analyzer_attr("generate_smart_victor_md"),
-                    )
-                except ImportError:
-                    console.print(
-                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-                    )
-                    return
+            project_root = Path.cwd()
+            project_latest_mtime = latest_mtime(project_root)
 
-                new_content = generate_smart_victor_md(
-                    include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None
+            # Build graph data BEFORE LLM synthesis so the LLM can leverage it.
+            # Order: incremental graph/CCG refresh → synthetic edge enrichment → LLM synthesis
+
+            # 1. CCG indexing (if enabled and not in quick/index mode)
+            if ccg and mode not in ("quick", "index"):
+                try:
+                    from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+                    from victor.storage.graph import create_graph_store
+
+                    ccg_mode = "rebuilding" if force else "updating incrementally"
+                    console.print(f"[dim]  {ccg_mode.title()} Code Context Graph...[/]")
+                    import asyncio
+
+                    async def _build_ccg_index():
+                        graph_store = create_graph_store("sqlite", project_path=project_root)
+                        config = GraphIndexConfig(
+                            root_path=project_root,
+                            enable_ccg=True,
+                            enable_embeddings=False,  # Skip embeddings for faster init
+                            incremental=not force,  # force=True wipes clean, force=False is incremental
+                        )
+                        pipeline = GraphIndexingPipeline(graph_store, config)
+                        return await pipeline.index_repository()
+
+                    stats = asyncio.run(_build_ccg_index())
+
+                    # Get total database stats for context
+                    db_stats = asyncio.run(graph_store.stats())
+
+                    if stats.files_processed or stats.files_deleted:
+                        console.print(
+                            f"[green]✓[/] CCG index updated "
+                            f"({stats.files_processed} changed, {stats.files_deleted} deleted, "
+                            f"{stats.files_unchanged} unchanged)"
+                        )
+                        console.print(
+                            f"[dim]    → {stats.nodes_created:,} nodes, {stats.edges_created:,} edges created[/]"
+                        )
+                        console.print(
+                            f"[dim]    → {db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges in database[/]"
+                        )
+                    else:
+                        console.print(
+                            f"[green]✓[/] CCG graph already current "
+                            f"({stats.files_unchanged} unchanged files reused)"
+                        )
+                        console.print(
+                            f"[dim]    → {db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges[/]"
+                        )
+                except ImportError:
+                    console.print(
+                        "[yellow]![/] CCG requires graph dependencies. Run: pip install 'victor-ai[graph]'"
+                    )
+                except Exception as exc:
+                    console.print(f"[yellow]![/] CCG indexing skipped: {exc}")
+
+            # 2. Synthetic edge enrichment (IMPLEMENTS, DECORATES, REGISTERS)
+            try:
+                stats = ensure_project_graph_enriched(
+                    project_root,
+                    latest_mtime=project_latest_mtime,
                 )
+                if stats.total_edges:
+                    console.print(
+                        "[dim]  Enriched graph with synthetic architecture edges "
+                        f"(implements={stats.implements_edges}, "
+                        f"decorates={stats.decorates_edges}, "
+                        f"registers={stats.registers_edges})[/]"
+                    )
+            except Exception as exc:
+                console.print(f"[yellow]![/] Graph enrichment skipped: {exc}")
+
+            # 3. Gather graph context for LLM synthesis (only when using LLM)
+            graph_ctx = None
+            if deep:  # Only gather for LLM synthesis
+                import asyncio
+
+                graph_ctx = asyncio.run(_gather_graph_context(project_root))
+                if graph_ctx:
+                    console.print("[dim]  Gathered graph context for LLM synthesis[/]")
+
+            # 4. LLM synthesis (now has access to synthetic edges, CCG data, and graph context)
+            try:
+                new_content = _generate_init_content(
+                    mode=mode,
+                    use_llm=deep,
+                    include_conversations=learn,
+                    on_progress=on_progress,
+                    force=force,
+                    include_dirs=include_dirs or None,
+                    exclude_dirs=exclude_dirs or None,
+                    provider=provider,
+                    model=model,
+                    graph_context=graph_ctx,
+                )
+            except ImportError:
+                console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
+                return
 
             if update and existing_content:
                 from victor.ui.slash.commands.codebase import InitCommand

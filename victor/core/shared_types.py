@@ -61,6 +61,43 @@ class ConversationStage(str, Enum):
     COMPLETION = "completion"
 
 
+class TaskPhase(str, Enum):
+    """High-level phases of task execution for context management.
+
+    Maps 7 ConversationStages to 4 broader TaskPhases for more efficient
+    context management. Each phase has different context needs:
+
+    EXPLORATION: Keep diverse file coverage (40-60% of conversation)
+    PLANNING: Focus on task-relevant messages (10-20% of conversation)
+    EXECUTION: Prioritize recent context with tool results (20-30% of conversation)
+    REVIEW: Full context with comprehensive history (10-15% of conversation)
+
+    This is the canonical source for task phases.
+    Uses string values for serialization compatibility.
+    """
+
+    EXPLORATION = "exploration"
+    PLANNING = "planning"
+    EXECUTION = "execution"
+    REVIEW = "review"
+
+
+# Stage-to-phase mapping (7 stages → 4 phases)
+STAGE_TO_PHASE_MAP: Dict[ConversationStage, TaskPhase] = {
+    # EXPLORATION: INITIAL, READING, ANALYSIS (40-60% of conversation)
+    ConversationStage.INITIAL: TaskPhase.EXPLORATION,
+    ConversationStage.READING: TaskPhase.EXPLORATION,
+    ConversationStage.ANALYSIS: TaskPhase.EXPLORATION,
+    # PLANNING: PLANNING (10-20% of conversation)
+    ConversationStage.PLANNING: TaskPhase.PLANNING,
+    # EXECUTION: EXECUTION (20-30% of conversation)
+    ConversationStage.EXECUTION: TaskPhase.EXECUTION,
+    # REVIEW: VERIFICATION, COMPLETION (10-15% of conversation)
+    ConversationStage.VERIFICATION: TaskPhase.REVIEW,
+    ConversationStage.COMPLETION: TaskPhase.REVIEW,
+}
+
+
 # =============================================================================
 # SubAgentRole — canonical location (was victor.agent.subagents.base)
 # =============================================================================

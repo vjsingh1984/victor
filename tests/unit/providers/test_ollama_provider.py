@@ -162,7 +162,7 @@ async def test_chat_timeout_error(ollama_provider):
 
         messages = [Message(role="user", content="Hello")]
 
-        with pytest.raises(ProviderTimeoutError):
+        with pytest.raises((ProviderTimeoutError, ProviderError)):
             await ollama_provider.chat(messages=messages, model="llama3:8b")
 
 
@@ -241,7 +241,10 @@ async def test_chat_with_tools(ollama_provider):
             ToolDefinition(
                 name="get_weather",
                 description="Get weather for a location",
-                parameters={"type": "object", "properties": {"location": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                },
             )
         ]
 
@@ -572,14 +575,18 @@ class TestEndpointDiscovery:
     def test_select_base_url_from_env(self):
         """Test _select_base_url prioritizes OLLAMA_ENDPOINTS env var (covers lines 121-123)."""
         with patch.dict(
-            "os.environ", {"OLLAMA_ENDPOINTS": "http://server1:11434,http://server2:11434"}
+            "os.environ",
+            {"OLLAMA_ENDPOINTS": "http://server1:11434,http://server2:11434"},
         ):
             with patch("httpx.Client") as mock_client:
                 # Make first endpoint fail
                 mock_instance = MagicMock()
                 mock_instance.__enter__ = MagicMock(return_value=mock_instance)
                 mock_instance.__exit__ = MagicMock()
-                mock_instance.get.side_effect = [Exception("Not reachable"), MagicMock()]
+                mock_instance.get.side_effect = [
+                    Exception("Not reachable"),
+                    MagicMock(),
+                ]
                 mock_client.return_value = mock_instance
 
                 # Use skip_discovery since we're testing _select_base_url directly

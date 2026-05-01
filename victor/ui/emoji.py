@@ -64,7 +64,7 @@ def is_emoji_enabled() -> bool:
     settings = _get_settings()
     if settings is None:
         return True  # Default to enabled if settings unavailable
-    return settings.use_emojis
+    return settings.ui.use_emojis
 
 
 @dataclass(frozen=True)

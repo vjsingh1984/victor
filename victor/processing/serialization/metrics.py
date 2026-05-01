@@ -32,7 +32,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 
 if TYPE_CHECKING:
-    from victor.processing.serialization.adaptive import SerializationContext, SerializationMetrics
+    from victor.processing.serialization.adaptive import (
+        SerializationContext,
+        SerializationMetrics,
+    )
     from victor.processing.serialization.strategy import DataCharacteristics
 
 logger = logging.getLogger(__name__)
@@ -385,7 +388,7 @@ def record_serialization_metrics(
             characteristics.structure_type.value if characteristics else "unknown"
         ),
         array_length=characteristics.array_length if characteristics else 0,
-        has_nested_objects=characteristics.has_nested_objects if characteristics else False,
+        has_nested_objects=(characteristics.has_nested_objects if characteristics else False),
         analysis_time_ms=metrics.analysis_time_ms,
         encoding_time_ms=metrics.encoding_time_ms,
     )

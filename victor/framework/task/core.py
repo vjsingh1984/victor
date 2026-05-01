@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 
 class FrameworkTaskType(Enum):
     """Framework-level task types for agent operation.
@@ -139,8 +141,8 @@ class TaskResult:
         """
         modified = []
         for call in self.tool_calls:
-            tool = call.get("tool", call.get("tool_name", ""))
-            if tool in ("write", "edit", "file_edit", "write_file") and call.get("success", True):
+            tool = canonicalize_core_tool_name(call.get("tool", call.get("tool_name", "")))
+            if tool in ("write", "edit", "file_edit") and call.get("success", True):
                 path = call.get("arguments", {}).get("path") or call.get("arguments", {}).get(
                     "file_path"
                 )
@@ -157,8 +159,8 @@ class TaskResult:
         """
         read = []
         for call in self.tool_calls:
-            tool = call.get("tool", call.get("tool_name", ""))
-            if tool in ("read", "read_file", "ls", "list_directory") and call.get("success", True):
+            tool = canonicalize_core_tool_name(call.get("tool", call.get("tool_name", "")))
+            if tool in ("read", "ls") and call.get("success", True):
                 path = call.get("arguments", {}).get("path") or call.get("arguments", {}).get(
                     "file_path"
                 )

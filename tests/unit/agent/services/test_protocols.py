@@ -22,11 +22,35 @@ import pytest
 
 from victor.agent.services.protocols import (
     ChatServiceProtocol,
+    ChunkRuntimeProtocol,
     ToolServiceProtocol,
     ContextServiceProtocol,
+    IntentClassifierProtocol,
+    PromptRuntimeProtocol,
     ProviderServiceProtocol,
+    RLLearningRuntimeProtocol,
     RecoveryServiceProtocol,
+    ReminderManagerProtocol,
+    ResponseSanitizerProtocol,
     SessionServiceProtocol,
+    StreamingChunkRuntimeProtocol,
+    StreamingConfidenceMonitorProtocol,
+    StreamingConversationStateProtocol,
+    StreamingExecutionRuntimeProtocol,
+    StreamingHandlerProtocol,
+    StreamingIntentClassifierRuntimeProtocol,
+    StreamingMessageAdderProtocol,
+    StreamingMetricsCollectorProtocol,
+    StreamingProviderRuntimeProtocol,
+    StreamingReminderRuntimeProtocol,
+    StreamingRLRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+    StreamingTrackerRuntimeProtocol,
+    StateRuntimeProtocol,
+    StreamingRecoveryRuntimeProtocol,
+    TaskRuntimeProtocol,
+    ToolExecutionRecoveryRuntimeProtocol,
+    ToolPlanningRuntimeProtocol,
 )
 
 
@@ -57,9 +81,234 @@ class TestProtocolDefinitions:
         """Test SessionServiceProtocol is defined."""
         assert SessionServiceProtocol is not None
 
+    def test_runtime_alias_protocols_exist(self):
+        """Service-owned runtime protocol aliases should be importable."""
+        assert ChunkRuntimeProtocol is not None
+        assert ToolPlanningRuntimeProtocol is not None
+        assert TaskRuntimeProtocol is not None
+        assert StateRuntimeProtocol is not None
+        assert PromptRuntimeProtocol is not None
+        assert StreamingRecoveryRuntimeProtocol is not None
+        assert RLLearningRuntimeProtocol is not None
+
+    def test_runtime_infrastructure_protocols_exist(self):
+        """Service-hosted runtime infrastructure protocols should be importable."""
+        assert IntentClassifierProtocol is not None
+        assert ReminderManagerProtocol is not None
+        assert ResponseSanitizerProtocol is not None
+        assert StreamingHandlerProtocol is not None
+        assert StreamingMetricsCollectorProtocol is not None
+        assert StreamingConfidenceMonitorProtocol is not None
+
+    def test_streaming_runtime_support_protocols_exist(self):
+        """Service-owned streaming helper protocols should be importable."""
+        assert StreamingChunkRuntimeProtocol is not None
+        assert StreamingConversationStateProtocol is not None
+        assert StreamingExecutionRuntimeProtocol is not None
+        assert StreamingIntentClassifierRuntimeProtocol is not None
+        assert StreamingMessageAdderProtocol is not None
+        assert StreamingProviderRuntimeProtocol is not None
+        assert StreamingReminderRuntimeProtocol is not None
+        assert StreamingRLRuntimeProtocol is not None
+        assert StreamingSanitizerRuntimeProtocol is not None
+        assert StreamingTrackerRuntimeProtocol is not None
+        assert ToolExecutionRecoveryRuntimeProtocol is not None
+
+    def test_runtime_alias_protocols_match_legacy_protocol_identity(self):
+        """Alias protocols should preserve identity with compatibility imports."""
+        with pytest.warns(DeprecationWarning, match="ChunkGeneratorProtocol is deprecated"):
+            from victor.agent.protocols import ChunkGeneratorProtocol
+
+        with pytest.warns(DeprecationWarning, match="ToolPlannerProtocol is deprecated"):
+            from victor.agent.protocols import ToolPlannerProtocol
+
+        with pytest.warns(DeprecationWarning, match="TaskCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import TaskCoordinatorProtocol
+
+        with pytest.warns(DeprecationWarning, match="StateCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import StateCoordinatorProtocol
+
+        with pytest.warns(DeprecationWarning, match="PromptCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import PromptCoordinatorProtocol
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="StreamingRecoveryCoordinatorProtocol is deprecated",
+        ):
+            from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
+
+        with pytest.warns(DeprecationWarning, match="RLCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import RLCoordinatorProtocol
+
+        assert ChunkRuntimeProtocol is ChunkGeneratorProtocol
+        assert ToolPlanningRuntimeProtocol is ToolPlannerProtocol
+        assert TaskRuntimeProtocol is TaskCoordinatorProtocol
+        assert StateRuntimeProtocol is StateCoordinatorProtocol
+        assert PromptRuntimeProtocol is PromptCoordinatorProtocol
+        assert StreamingRecoveryRuntimeProtocol is StreamingRecoveryCoordinatorProtocol
+        assert RLLearningRuntimeProtocol is RLCoordinatorProtocol
+
+    def test_runtime_infrastructure_protocols_match_legacy_protocol_identity(self):
+        """Service-hosted runtime infrastructure protocols should preserve identity."""
+        from victor.agent.protocols import (
+            IntentClassifierProtocol as LegacyIntentClassifierProtocol,
+            ReminderManagerProtocol as LegacyReminderManagerProtocol,
+            ResponseSanitizerProtocol as LegacyResponseSanitizerProtocol,
+            StreamingConfidenceMonitorProtocol as LegacyStreamingConfidenceMonitorProtocol,
+            StreamingHandlerProtocol as LegacyStreamingHandlerProtocol,
+            StreamingMetricsCollectorProtocol as LegacyStreamingMetricsCollectorProtocol,
+        )
+
+        assert IntentClassifierProtocol is LegacyIntentClassifierProtocol
+        assert ReminderManagerProtocol is LegacyReminderManagerProtocol
+        assert ResponseSanitizerProtocol is LegacyResponseSanitizerProtocol
+        assert StreamingHandlerProtocol is LegacyStreamingHandlerProtocol
+        assert StreamingMetricsCollectorProtocol is LegacyStreamingMetricsCollectorProtocol
+        assert StreamingConfidenceMonitorProtocol is LegacyStreamingConfidenceMonitorProtocol
+
+    def test_streaming_runtime_support_aliases_match_canonical_identity(self):
+        """Streaming support aliases should preserve identity where canonical hosts exist."""
+        from victor.agent.protocols.analysis_protocols import IntentClassifierProtocol
+        from victor.agent.protocols.infrastructure_protocols import (
+            RLCoordinatorProtocol,
+            ReminderManagerProtocol,
+            ResponseSanitizerProtocol,
+        )
+        from victor.agent.protocols.streaming_protocols import ChunkGeneratorProtocol
+        from victor.core.protocols import ProviderProtocol
+
+        assert StreamingChunkRuntimeProtocol is ChunkRuntimeProtocol
+        assert StreamingChunkRuntimeProtocol is ChunkGeneratorProtocol
+        assert StreamingIntentClassifierRuntimeProtocol is IntentClassifierProtocol
+        assert StreamingReminderRuntimeProtocol is ReminderManagerProtocol
+        assert StreamingRLRuntimeProtocol is RLLearningRuntimeProtocol
+        assert StreamingRLRuntimeProtocol is RLCoordinatorProtocol
+        assert StreamingSanitizerRuntimeProtocol is ResponseSanitizerProtocol
+        assert StreamingProviderRuntimeProtocol is ProviderProtocol
+
 
 class TestProtocolImplementation:
     """Test that protocols can be implemented by concrete classes."""
+
+    def test_rl_runtime_protocol_requires_prompt_rollout_methods(self):
+        """RL runtime protocol should require prompt rollout support."""
+
+        class LegacyOnlyRLRuntime:
+            def record_outcome(self, learner_name: str, outcome, vertical: str = "coding") -> None:
+                return None
+
+            def get_recommendation(
+                self,
+                learner_name: str,
+                provider: str,
+                model: str,
+                task_type: str,
+            ):
+                return None
+
+            def export_metrics(self):
+                return {}
+
+            def close(self) -> None:
+                return None
+
+        class RolloutCapableRLRuntime(LegacyOnlyRLRuntime):
+            def create_prompt_rollout_experiment(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                control_hash: str | None = None,
+                traffic_split: float = 0.1,
+                min_samples_per_variant: int = 50,
+            ):
+                return "prompt_exp_123"
+
+            async def create_prompt_rollout_experiment_async(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                control_hash: str | None = None,
+                traffic_split: float = 0.1,
+                min_samples_per_variant: int = 50,
+            ):
+                return "prompt_exp_123"
+
+            def analyze_prompt_rollout_experiment(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+            ):
+                return {"auto_action": "rollout"}
+
+            async def analyze_prompt_rollout_experiment_async(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+            ):
+                return {"auto_action": "rollout"}
+
+            def apply_prompt_rollout_recommendation(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                dry_run: bool = False,
+            ):
+                return {"action": "rollout", "applied": not dry_run}
+
+            async def apply_prompt_rollout_recommendation_async(
+                self,
+                *,
+                section_name: str,
+                provider: str,
+                treatment_hash: str,
+                dry_run: bool = False,
+            ):
+                return {"action": "rollout", "applied": not dry_run}
+
+            def process_prompt_candidate_evaluation_suite(
+                self,
+                suite,
+                *,
+                min_pass_rate: float = 0.5,
+                promote_best: bool = False,
+                create_rollout: bool = False,
+                rollout_control_hash: str | None = None,
+                rollout_traffic_split: float = 0.1,
+                rollout_min_samples_per_variant: int = 100,
+                analyze_rollout: bool = False,
+                apply_rollout_decision: bool = False,
+                rollout_decision_dry_run: bool = False,
+            ):
+                return {"prompt_optimizer_sync": {"decisions": []}}
+
+            async def process_prompt_candidate_evaluation_suite_async(
+                self,
+                suite,
+                *,
+                min_pass_rate: float = 0.5,
+                promote_best: bool = False,
+                create_rollout: bool = False,
+                rollout_control_hash: str | None = None,
+                rollout_traffic_split: float = 0.1,
+                rollout_min_samples_per_variant: int = 100,
+                analyze_rollout: bool = False,
+                apply_rollout_decision: bool = False,
+                rollout_decision_dry_run: bool = False,
+            ):
+                return {"prompt_optimizer_sync": {"decisions": []}}
+
+        assert not isinstance(LegacyOnlyRLRuntime(), RLLearningRuntimeProtocol)
+        assert isinstance(RolloutCapableRLRuntime(), RLLearningRuntimeProtocol)
 
     def test_chat_service_protocol_implementation(self):
         """Test that a class can implement ChatServiceProtocol."""
@@ -81,6 +330,19 @@ class TestProtocolImplementation:
                 from victor.providers.base import StreamChunk
 
                 yield StreamChunk(content=f"Chunk for: {user_message}")
+
+            async def chat_with_planning(self, user_message: str, use_planning=None):
+                return await self.chat(user_message, use_planning=use_planning)
+
+            async def handle_context_and_iteration_limits(
+                self,
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            ):
+                return False, None
 
             def reset_conversation(self) -> None:
                 self.reset_count += 1
@@ -138,6 +400,69 @@ class TestProtocolImplementation:
 
             def reset_tool_budget(self):
                 self.budget = 100
+
+            def process_tool_results(self, pipeline_result, ctx):
+                return []
+
+            def get_available_tools(self):
+                return {"tool1", "tool2"}
+
+            def get_enabled_tools(self):
+                return {"tool1", "tool2"}
+
+            def set_enabled_tools(self, tools):
+                self.enabled_tools = set(tools)
+
+            def is_tool_enabled(self, tool_name):
+                return tool_name in {"tool1", "tool2"}
+
+            def resolve_tool_alias(self, tool_name):
+                return tool_name
+
+            def parse_and_validate_tool_calls(self, tool_calls, full_content, tool_adapter):
+                return tool_calls, full_content
+
+            async def execute_tool_with_retry(self, tool_name, tool_args, context, **kwargs):
+                result = await self.execute_tool(tool_name, tool_args)
+                return result, True, None
+
+            def normalize_tool_arguments(self, tool_args, tool_name):
+                return tool_args, "direct"
+
+            def build_tool_access_context(self):
+                return {"tools": self.get_enabled_tools()}
+
+            def validate_tool_call(self, tool_call, sanitizer, is_tool_enabled_fn=None):
+                return {"valid": True, "tool_call": tool_call}
+
+            def normalize_arguments_full(
+                self,
+                tool_name,
+                original_name,
+                raw_args,
+                argument_normalizer,
+                tool_adapter,
+                failed_signatures=None,
+            ):
+                return {"args": raw_args, "tool_name": tool_name}
+
+            def on_tool_complete(
+                self,
+                result,
+                metrics_collector=None,
+                *,
+                read_files_session=None,
+                required_files=None,
+                required_outputs=None,
+                nudge_sent_flag=None,
+                add_message=None,
+                observability=None,
+                iteration_count=0,
+                tool_name=None,
+                elapsed=0.0,
+                session_id=None,
+            ):
+                return None
 
             def is_healthy(self):
                 return self.budget > 0
@@ -256,6 +581,9 @@ class TestProtocolImplementation:
                 if model:
                     self.current.model_name = model
 
+            async def switch_model(self, model):
+                self.current.model_name = model
+
             def get_current_provider_info(self):
                 return self.current
 
@@ -268,11 +596,23 @@ class TestProtocolImplementation:
             async def get_provider_capabilities(self, provider=None):
                 return {"streaming": True, "tools": True}
 
+            async def start_health_monitoring(self):
+                return None
+
+            async def stop_health_monitoring(self):
+                return None
+
             def get_current_provider(self):
                 return self  # Mock provider
 
             async def test_provider(self, provider, model=None):
                 return provider in self.get_available_providers()
+
+            def get_rate_limit_wait_time(self, error):
+                return 1.0
+
+            def get_rate_limit_stats(self):
+                return {"rate_limits_hit": 0}
 
             def is_healthy(self):
                 return self.current is not None
@@ -329,6 +669,46 @@ class TestProtocolImplementation:
 
             def can_retry(self, error, attempt_count):
                 return attempt_count < 3
+
+            def should_attempt_recovery(self, error_type, consecutive_failures=0):
+                return error_type != "auth" and consecutive_failures < 3
+
+            async def handle_recovery_with_integration(
+                self,
+                ctx,
+                full_content,
+                tool_calls,
+                mentioned_tools=None,
+                message_adder=None,
+            ):
+                return type("MockRecoveryAction", (), {"action": "continue"})()
+
+            def apply_recovery_action(self, recovery_action, ctx, message_adder=None):
+                return None
+
+            def check_natural_completion(self, ctx, has_tool_calls, content_length):
+                return None
+
+            def handle_empty_response(self, ctx):
+                return None, False
+
+            def get_recovery_fallback_message(self, ctx):
+                return "fallback"
+
+            def check_tool_budget(self, ctx, warning_threshold=250):
+                return None
+
+            def truncate_tool_calls(self, ctx, tool_calls, max_calls):
+                return tool_calls[:max_calls], len(tool_calls) > max_calls
+
+            def filter_blocked_tool_calls(self, ctx, tool_calls):
+                return tool_calls, [], 0
+
+            def check_blocked_threshold(self, ctx, all_blocked):
+                return None
+
+            def check_force_action(self, ctx):
+                return False, None
 
             def get_recovery_metrics(self):
                 return self.metrics.copy()
@@ -415,6 +795,28 @@ class TestProtocolImplementation:
                     return {"message_count": session.message_count}
                 return {}
 
+            def recover_session(self, session_id):
+                self.current_id = session_id if session_id in self.sessions else None
+                return self.current_id is not None
+
+            async def maybe_auto_checkpoint(self):
+                return None
+
+            async def save_checkpoint(self, description=None, tags=None):
+                return "checkpoint-1"
+
+            async def restore_checkpoint(self, checkpoint_id):
+                return checkpoint_id == "checkpoint-1"
+
+            def get_memory_context(self, max_tokens=None, messages=None):
+                return messages or []
+
+            def get_recent_sessions(self, limit=10):
+                return [{"session_id": sid} for sid in list(self.sessions)[:limit]]
+
+            def get_session_stats(self):
+                return {"session_id": self.current_id}
+
             def is_healthy(self):
                 return True
 
@@ -488,6 +890,19 @@ class TestProtocolCompliance:
 
                 return chunks()
 
+            async def chat_with_planning(self, user_message, use_planning=None):
+                return await self.chat(user_message, use_planning=use_planning)
+
+            async def handle_context_and_iteration_limits(
+                self,
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            ):
+                return False, None
+
             def reset_conversation(self):
                 pass
 
@@ -522,6 +937,69 @@ class TestProtocolCompliance:
             def reset_tool_budget(self):
                 pass
 
+            def process_tool_results(self, pipeline_result, ctx):
+                return []
+
+            def get_available_tools(self):
+                return set()
+
+            def get_enabled_tools(self):
+                return set()
+
+            def set_enabled_tools(self, tools):
+                pass
+
+            def is_tool_enabled(self, tool_name):
+                return True
+
+            def resolve_tool_alias(self, tool_name):
+                return tool_name
+
+            def parse_and_validate_tool_calls(self, tool_calls, full_content, tool_adapter):
+                return tool_calls, full_content
+
+            async def execute_tool_with_retry(self, tool_name, tool_args, context, **kwargs):
+                result = await self.execute_tool(tool_name, tool_args)
+                return result, True, None
+
+            def normalize_tool_arguments(self, tool_args, tool_name):
+                return tool_args, "direct"
+
+            def build_tool_access_context(self):
+                return {}
+
+            def validate_tool_call(self, tool_call, sanitizer, is_tool_enabled_fn=None):
+                return {"valid": True}
+
+            def normalize_arguments_full(
+                self,
+                tool_name,
+                original_name,
+                raw_args,
+                argument_normalizer,
+                tool_adapter,
+                failed_signatures=None,
+            ):
+                return {"args": raw_args}
+
+            def on_tool_complete(
+                self,
+                result,
+                metrics_collector=None,
+                *,
+                read_files_session=None,
+                required_files=None,
+                required_outputs=None,
+                nudge_sent_flag=None,
+                add_message=None,
+                observability=None,
+                iteration_count=0,
+                tool_name=None,
+                elapsed=0.0,
+                session_id=None,
+            ):
+                return None
+
         service = MultiService()
         assert isinstance(service, ChatServiceProtocol)
         assert isinstance(service, ToolServiceProtocol)
@@ -540,6 +1018,19 @@ class TestProtocolTypeChecking:
             async def stream_chat(self, user_message, **kwargs):
                 pass
 
+            async def chat_with_planning(self, user_message, use_planning=None):
+                pass
+
+            async def handle_context_and_iteration_limits(
+                self,
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            ):
+                return False, None
+
             def reset_conversation(self):
                 pass
 
@@ -555,5 +1046,7 @@ class TestProtocolTypeChecking:
         # but we can verify the protocol has the expected structure
         assert hasattr(ChatServiceProtocol, "chat")
         assert hasattr(ChatServiceProtocol, "stream_chat")
+        assert hasattr(ChatServiceProtocol, "chat_with_planning")
+        assert hasattr(ChatServiceProtocol, "handle_context_and_iteration_limits")
         assert hasattr(ChatServiceProtocol, "reset_conversation")
         assert hasattr(ChatServiceProtocol, "is_healthy")

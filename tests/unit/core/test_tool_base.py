@@ -67,7 +67,10 @@ class TestToolResult:
     def test_tool_result_failure(self):
         """Test failed ToolResult."""
         result = ToolResult(
-            success=False, output=None, error="Test error", metadata={"exception": "ValueError"}
+            success=False,
+            output=None,
+            error="Test error",
+            metadata={"exception": "ValueError"},
         )
 
         assert result.success is False

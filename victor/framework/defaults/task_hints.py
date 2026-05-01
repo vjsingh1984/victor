@@ -36,26 +36,26 @@ from victor.framework.task_types import TaskCategory
 # ---------------------------------------------------------------------------
 
 MODIFICATION_STAGE_TOOLS: Dict[str, List[str]] = {
-    "initial": ["list_directory", "code_search"],
-    "reading": ["read_file", "code_search"],
-    "executing": ["edit_files", "write_file"],
-    "verifying": ["read_file", "run_tests"],
+    "initial": ["ls", "code_search"],
+    "reading": ["read", "code_search"],
+    "executing": ["edit", "write"],
+    "verifying": ["read", "test"],
 }
 """Stage tools for tasks that change files (edit, create, refactor)."""
 
 ANALYSIS_STAGE_TOOLS: Dict[str, List[str]] = {
-    "initial": ["list_directory", "code_search", "read_file"],
-    "reading": ["read_file", "code_search", "list_directory"],
-    "executing": ["read_file"],
-    "verifying": ["read_file"],
+    "initial": ["ls", "code_search", "read"],
+    "reading": ["read", "code_search", "ls"],
+    "executing": ["read"],
+    "verifying": ["read"],
 }
 """Stage tools for tasks that read/explore code (analyze, search, review)."""
 
 EXECUTION_STAGE_TOOLS: Dict[str, List[str]] = {
-    "initial": ["list_directory", "code_search"],
-    "reading": ["read_file", "code_search", "execute_bash"],
-    "executing": ["execute_bash", "edit_files"],
-    "verifying": ["read_file", "run_tests"],
+    "initial": ["ls", "code_search"],
+    "reading": ["read", "code_search", "shell"],
+    "executing": ["shell", "edit"],
+    "verifying": ["read", "test"],
 }
 """Stage tools for tasks that run commands/processes (test, build, deploy)."""
 

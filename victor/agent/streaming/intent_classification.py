@@ -17,7 +17,7 @@
 This module provides the IntentClassificationHandler class which encapsulates
 the intent classification and continuation action determination logic that
 previously lived inside ``ChatCoordinator._stream_chat_impl`` and is now
-orchestrated by ``StreamingChatPipeline``.
+orchestrated by ``StreamingChatExecutor``.
 
 The handler manages:
 - Content yielding when no tool calls
@@ -59,11 +59,23 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
     Set,
     TYPE_CHECKING,
 )
 
+from victor.agent.continuation_contract import ContinuationDirective
+from victor.agent.continuation_strategy import (
+    ContinuationActionType,
+    coerce_continuation_action,
+)
+from victor.agent.services.protocols.streaming_runtime import (
+    StreamingChunkRuntimeProtocol,
+    StreamingConversationStateProtocol,
+    StreamingIntentClassifierRuntimeProtocol,
+    StreamingRLRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+    StreamingTrackerRuntimeProtocol,
+)
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
 
@@ -72,50 +84,6 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# Protocols for Dependencies
-# =============================================================================
-
-
-class IntentClassifierProtocol(Protocol):
-    """Protocol for intent classification."""
-
-    def classify_intent_sync(self, text: str) -> Any: ...
-
-
-class UnifiedTrackerProtocol(Protocol):
-    """Protocol for unified task tracking."""
-
-    def check_response_loop(self, content: str) -> bool: ...
-
-    @property
-    def config(self) -> Dict[str, Any]: ...
-
-
-class ConversationStateProtocol(Protocol):
-    """Protocol for conversation state access."""
-
-    def get_state_summary(self) -> Dict[str, Any]: ...
-
-
-class SanitizerProtocol(Protocol):
-    """Protocol for content sanitization."""
-
-    def sanitize(self, content: str) -> str: ...
-
-
-class ChunkGeneratorProtocol(Protocol):
-    """Protocol for chunk generation."""
-
-    def generate_content_chunk(self, content: str, is_final: bool = False) -> StreamChunk: ...
-
-
-class RLCoordinatorProtocol(Protocol):
-    """Protocol for RL coordinator."""
-
-    pass  # Used as opaque dependency
 
 
 # =============================================================================
@@ -136,10 +104,38 @@ class IntentClassificationResult:
     """
 
     chunks: List[StreamChunk] = field(default_factory=list)
-    action_result: Dict[str, Any] = field(default_factory=dict)
-    action: str = "finish"
+    action_result: ContinuationDirective = field(
+        default_factory=lambda: ContinuationDirective.from_legacy(
+            action=ContinuationActionType.FINISH,
+            reason="default_finish",
+        )
+    )
+    action: ContinuationActionType = ContinuationActionType.FINISH
     state_updates: Dict[str, Any] = field(default_factory=dict)
     content_cleared: bool = False
+
+    def __post_init__(self) -> None:
+        """Coerce legacy stub payloads into the typed continuation contract."""
+
+        self.action = coerce_continuation_action(self.action)
+        if not isinstance(self.action_result, ContinuationDirective):
+            legacy_payload = (
+                dict(self.action_result) if isinstance(self.action_result, dict) else {}
+            )
+            self.action_result = ContinuationDirective.from_legacy(
+                action=legacy_payload.get("action", self.action),
+                reason=legacy_payload.get("reason", "legacy_action_result"),
+                message=legacy_payload.get("message"),
+                updates=legacy_payload.get("updates"),
+                extracted_call=legacy_payload.get("extracted_call"),
+                mentioned_tools=legacy_payload.get("mentioned_tools"),
+                set_final_summary_requested=bool(
+                    legacy_payload.get("set_final_summary_requested", False)
+                ),
+                set_max_prompts_summary_requested=bool(
+                    legacy_payload.get("set_max_prompts_summary_requested", False)
+                ),
+            )
 
     def add_chunk(self, chunk: StreamChunk) -> None:
         """Add a chunk to yield."""
@@ -203,16 +199,17 @@ class IntentClassificationHandler:
 
     def __init__(
         self,
-        intent_classifier: IntentClassifierProtocol,
-        unified_tracker: UnifiedTrackerProtocol,
-        sanitizer: SanitizerProtocol,
-        chunk_generator: ChunkGeneratorProtocol,
+        intent_classifier: StreamingIntentClassifierRuntimeProtocol,
+        unified_tracker: StreamingTrackerRuntimeProtocol,
+        sanitizer: StreamingSanitizerRuntimeProtocol,
+        chunk_generator: StreamingChunkRuntimeProtocol,
         settings: "Settings",
-        rl_coordinator: Optional[RLCoordinatorProtocol] = None,
-        conversation_state: Optional[ConversationStateProtocol] = None,
+        rl_coordinator: Optional[StreamingRLRuntimeProtocol] = None,
+        conversation_state: Optional[StreamingConversationStateProtocol] = None,
         provider_name: str = "",
         model: str = "",
         tool_budget: int = 20,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize the intent classification handler.
 
@@ -227,6 +224,7 @@ class IntentClassificationHandler:
             provider_name: Name of the LLM provider.
             model: Model name.
             tool_budget: Tool call budget.
+            runtime_intelligence: Optional canonical runtime-intelligence service.
         """
         self._intent_classifier = intent_classifier
         self._unified_tracker = unified_tracker
@@ -238,6 +236,7 @@ class IntentClassificationHandler:
         self._provider_name = provider_name
         self._model = model
         self._tool_budget = tool_budget
+        self._runtime_intelligence = runtime_intelligence
 
         # Intent cache for reducing embedding calls
         self._intent_cache: Dict[int, Any] = {}
@@ -267,11 +266,15 @@ class IntentClassificationHandler:
             IntentClassificationResult with chunks, action_result, and updates.
         """
         result = IntentClassificationResult()
+        tool_format_confusion = False
 
         # Step 1: Yield content to UI
         content_for_intent = full_content or ""
         if full_content:
             sanitized = self._sanitizer.sanitize(full_content)
+            detect_confusion = getattr(self._sanitizer, "has_tool_format_confusion", None)
+            if callable(detect_confusion):
+                tool_format_confusion = bool(detect_confusion(full_content))
             if sanitized:
                 logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
                 result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
@@ -280,6 +283,25 @@ class IntentClassificationHandler:
                     f"Total accumulated content: {stream_ctx.total_accumulated_chars} chars"
                 )
                 result.content_cleared = True
+
+        if tool_format_confusion:
+            logger.warning(
+                "Detected malformed tool-style plaintext in model response; "
+                "finishing early to prevent a continuation loop"
+            )
+            result.add_chunk(
+                self._chunk_generator.generate_content_chunk(
+                    "\n\n[Model emitted malformed tool-style text instead of valid tool "
+                    "calls. Stopping to prevent a loop. Try rerunning or switching provider.]",
+                    is_final=True,
+                )
+            )
+            result.action_result = ContinuationDirective.from_legacy(
+                action=ContinuationActionType.FINISH,
+                reason="Malformed tool-style plaintext detected instead of valid tool calls",
+            )
+            result.action = ContinuationActionType.FINISH
+            return result
 
         # Step 2: Extract intent text (last 500 chars for pattern matching)
         intent_text = content_for_intent
@@ -293,7 +315,7 @@ class IntentClassificationHandler:
         is_repeated_response = self._unified_tracker.check_response_loop(full_content or "")
 
         # Step 5: Build task completion signals
-        task_completion_signals = self._build_task_completion_signals(tracking_state)
+        task_completion_signals = self._build_task_completion_signals(tracking_state, stream_ctx)
 
         # Step 6: Determine continuation action
         action_result = self._determine_action(
@@ -310,10 +332,9 @@ class IntentClassificationHandler:
         self._apply_state_updates(action_result, result)
 
         # Step 8: Determine final action with overrides
-        action = action_result.get("action", "finish")
+        action = coerce_continuation_action(action_result.get("action"))
         action = self._apply_action_overrides(action, is_repeated_response, tracking_state)
-
-        result.action_result = action_result
+        result.action_result = action_result.with_action(action)
         result.action = action
 
         return result
@@ -342,8 +363,18 @@ class IntentClassificationHandler:
 
         return intent_result
 
-    def _build_task_completion_signals(self, tracking_state: TrackingState) -> Dict[str, Any]:
-        """Build task completion signals for early termination detection."""
+    def _build_task_completion_signals(
+        self, tracking_state: TrackingState, stream_ctx: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Build task completion signals for early termination detection.
+
+        Args:
+            tracking_state: Current tracking state
+            stream_ctx: Optional streaming context for iteration count
+
+        Returns:
+            Dictionary with task completion signals
+        """
         # Get cycle count from conversation state
         cycle_count = 0
         if self._conversation_state:
@@ -359,6 +390,35 @@ class IntentClassificationHandler:
             except Exception:
                 pass  # Don't fail on state access errors
 
+        # AGENTIC LOOP FIX: Include current iteration for loop detection
+        current_iteration = 0
+        if stream_ctx and hasattr(stream_ctx, "total_iterations"):
+            current_iteration = stream_ctx.total_iterations
+
+        explicit_database_query_requested = False
+        executed_tool_names: Set[str] = set()
+        database_query_satisfied = False
+        direct_response_requested = False
+        original_user_message = ""
+        if stream_ctx:
+            try:
+                from victor.agent.action_authorizer import has_explicit_readonly_shell_request
+                from victor.framework.task.direct_response import classify_direct_response_prompt
+
+                original_user_message = getattr(stream_ctx, "user_message", "") or ""
+                explicit_database_query_requested = has_explicit_readonly_shell_request(
+                    original_user_message
+                )
+                direct_response_requested = classify_direct_response_prompt(
+                    original_user_message
+                ).is_direct_response
+            except Exception:
+                explicit_database_query_requested = False
+                direct_response_requested = False
+
+            executed_tool_names = set(getattr(stream_ctx, "executed_tool_names", set()) or set())
+            database_query_satisfied = bool(executed_tool_names & {"shell", "db", "database"})
+
         return {
             "required_files": tracking_state.required_files,
             "read_files": tracking_state.read_files_session,
@@ -370,7 +430,27 @@ class IntentClassificationHandler:
             "cycle_count": cycle_count,
             "synthesis_nudge_count": tracking_state.synthesis_nudge_count,
             "cumulative_prompt_interventions": tracking_state.cumulative_prompt_interventions,
+            "current_iteration": current_iteration,  # NEW: For algorithmic loop detection
+            "original_user_message": original_user_message,
+            "executed_tool_names": executed_tool_names,
+            "explicit_database_query_requested": explicit_database_query_requested,
+            "database_query_satisfied": database_query_satisfied,
+            "is_qa_task": bool(getattr(stream_ctx, "is_qa_task", False)) if stream_ctx else False,
+            "direct_response_requested": direct_response_requested,
         }
+
+    def _resolve_one_shot_mode(self) -> bool:
+        """Resolve one-shot mode from the canonical nested settings group.
+
+        The headless/automation flags now live under ``settings.automation``.
+        Keep a flat fallback for compatibility with older test doubles or
+        transitional callers.
+        """
+        automation = getattr(self._settings, "automation", None)
+        nested_value = getattr(automation, "one_shot_mode", None)
+        if nested_value is not None:
+            return bool(nested_value)
+        return bool(getattr(self._settings, "one_shot_mode", False))
 
     def _determine_action(
         self,
@@ -385,8 +465,8 @@ class IntentClassificationHandler:
         """Determine continuation action using ContinuationStrategy."""
         from victor.agent.continuation_strategy import ContinuationStrategy
 
-        one_shot_mode = getattr(self._settings, "one_shot_mode", False)
-        strategy = ContinuationStrategy()
+        one_shot_mode = self._resolve_one_shot_mode()
+        strategy = ContinuationStrategy(runtime_intelligence=self._runtime_intelligence)
 
         return strategy.determine_continuation_action(
             intent_result=intent_result,
@@ -406,13 +486,16 @@ class IntentClassificationHandler:
             tool_budget=self._tool_budget,
             unified_tracker_config=self._unified_tracker.config,
             task_completion_signals=task_completion_signals,
+            # P1 FIX: Compaction continuation bonus parameters
+            compaction_occurred=getattr(stream_ctx, "compaction_occurred", False),
+            compaction_messages_removed=getattr(stream_ctx, "compaction_message_removed_count", 0),
         )
 
     def _apply_state_updates(
-        self, action_result: Dict[str, Any], result: IntentClassificationResult
+        self, action_result: ContinuationDirective, result: IntentClassificationResult
     ) -> None:
         """Apply state updates from action result."""
-        updates = action_result.get("updates", {})
+        updates = action_result.state_patch.to_updates_dict()
 
         if "continuation_prompts" in updates:
             result.state_updates["continuation_prompts"] = updates["continuation_prompts"]
@@ -421,24 +504,27 @@ class IntentClassificationHandler:
         if "synthesis_nudge_count" in updates:
             result.state_updates["synthesis_nudge_count"] = updates["synthesis_nudge_count"]
 
-        if action_result.get("set_final_summary_requested"):
+        if action_result.state_patch.final_summary_requested:
             result.state_updates["final_summary_requested"] = True
-        if action_result.get("set_max_prompts_summary_requested"):
+        if action_result.state_patch.max_prompts_summary_requested:
             result.state_updates["max_prompts_summary_requested"] = True
 
     def _apply_action_overrides(
         self,
-        action: str,
+        action: ContinuationActionType,
         is_repeated_response: bool,
         tracking_state: TrackingState,
-    ) -> str:
+    ) -> ContinuationActionType:
         """Apply action overrides based on conditions."""
         # Override: Repeated response detected
-        if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
+        if is_repeated_response and action in (
+            ContinuationActionType.PROMPT_TOOL_CALL,
+            ContinuationActionType.REQUEST_SUMMARY,
+        ):
             logger.info(
                 "Continuation action: finish - " "Overriding to finish due to repeated response"
             )
-            return "finish"
+            return ContinuationActionType.FINISH
 
         # Override: Force finalize from grounding failure
         if tracking_state.force_finalize:
@@ -446,7 +532,7 @@ class IntentClassificationHandler:
                 "Continuation action: finish - "
                 "Overriding to finish due to grounding failure limit"
             )
-            return "finish"
+            return ContinuationActionType.FINISH
 
         return action
 
@@ -467,6 +553,12 @@ def create_intent_classification_handler(
     Returns:
         Configured IntentClassificationHandler.
     """
+    runtime_intelligence = getattr(
+        getattr(orchestrator, "__dict__", {}),
+        "get",
+        lambda *_args, **_kwargs: None,
+    )("_runtime_intelligence")
+
     return IntentClassificationHandler(
         intent_classifier=orchestrator.intent_classifier,
         unified_tracker=orchestrator.unified_tracker,
@@ -478,6 +570,7 @@ def create_intent_classification_handler(
         provider_name=orchestrator.provider.name,
         model=orchestrator.model,
         tool_budget=orchestrator.tool_budget,
+        runtime_intelligence=runtime_intelligence,
     )
 
 

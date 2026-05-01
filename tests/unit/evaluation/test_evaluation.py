@@ -17,10 +17,20 @@
 import pytest
 
 from victor.evaluation import (
+    BenchmarkFailureCategory,
+    BenchmarkType,
     CodeQualityMetrics,
+    EvaluationConfig,
+    EvaluationResult,
     TaskResult,
     TaskStatus,
+    aggregate_planning_feedback,
+    aggregate_team_feedback,
+    extract_planning_events,
+    extract_team_feedback_artifacts,
     pass_at_k,
+    summarize_planning_feedback,
+    summarize_team_feedback,
 )
 from victor.evaluation.code_quality import CodeQualityAnalyzer
 from victor.evaluation.pass_at_k import (
@@ -30,6 +40,8 @@ from victor.evaluation.pass_at_k import (
     generate_report,
 )
 from victor.evaluation.analyzers import AnalyzerRegistry
+from victor.evaluation.protocol import FailureStage
+from victor.evaluation.protocol import ConfidenceBucket
 
 
 class TestPassAtK:
@@ -71,6 +83,20 @@ class TestPassAtK:
         # Low success rate scenario
         result = pass_at_k(n=100, c=5, k=1)
         assert result == pytest.approx(0.05, abs=0.01)
+
+
+def test_public_api_exports_planning_feedback_helpers():
+    """The package-level evaluation API should expose planning feedback helpers."""
+    assert callable(extract_planning_events)
+    assert callable(summarize_planning_feedback)
+    assert callable(aggregate_planning_feedback)
+
+
+def test_public_api_exports_team_feedback_helpers():
+    """The package-level evaluation API should expose team feedback helpers."""
+    assert callable(extract_team_feedback_artifacts)
+    assert callable(summarize_team_feedback)
+    assert callable(aggregate_team_feedback)
 
     def test_combinations(self):
         """Test combinations calculation."""
@@ -263,6 +289,386 @@ class TestTaskResult:
 
         score = result.calculate_completion_score()
         assert 0.5 < score < 1.0  # Should have good score
+
+    def test_code_intelligence_usage_flags(self):
+        """TaskResult should expose code-search/graph usage flags."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.PASSED,
+            code_search_calls=2,
+            graph_calls=1,
+        )
+
+        assert result.code_intelligence_calls == 3
+        assert result.used_code_search is True
+        assert result.used_graph is True
+        assert result.used_code_intelligence is True
+
+    def test_get_failure_diagnosis_derives_hierarchical_taxonomy(self):
+        """Structured diagnosis should infer stage and subtype from failure details."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.FAILED,
+            failure_category=BenchmarkFailureCategory.TASK_COMPLETION,
+            failure_details={
+                "missing_actions": ["click"],
+                "missing_answer_phrases": ["settings page"],
+            },
+        )
+
+        diagnosis = result.get_failure_diagnosis()
+
+        assert diagnosis is not None
+        assert diagnosis.stage == FailureStage.ACTION
+        assert diagnosis.subtype == "missing_required_actions"
+        assert diagnosis.path == "action.task_completion.missing_required_actions"
+
+    def test_get_confidence_assessment_high_for_supported_pass(self):
+        """Successful results with strong evidence should report high confidence."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.PASSED,
+            tests_passed=4,
+            tests_total=4,
+            completion_score=1.0,
+        )
+
+        assessment = result.get_confidence_assessment()
+
+        assert assessment.confidence_score > 0.95
+        assert assessment.bucket == ConfidenceBucket.HIGH
+        assert assessment.truth_aligned is True
+
+    def test_get_confidence_assessment_penalizes_unsupported_claim_failures(self):
+        """Unsupported-claim failures should remain low confidence even with high coverage."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.FAILED,
+            completion_score=1.0,
+            failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+            failure_details={
+                "claim_coverage": 1.0,
+                "citation_coverage": 1.0,
+                "forbidden_claim_hits": ["invented claim"],
+            },
+        )
+
+        assessment = result.get_confidence_assessment()
+
+        assert assessment.evidence_score == pytest.approx(1.0)
+        assert assessment.confidence_score < 0.3
+        assert assessment.bucket == ConfidenceBucket.LOW
+        assert assessment.truth_aligned is True
+
+
+class TestEvaluationResult:
+    """Tests for EvaluationResult aggregate metrics."""
+
+    def test_get_metrics_includes_code_intelligence_usage(self):
+        """Aggregate metrics should include code-search/graph usage counts and coverage."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.HUMAN_EVAL,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    tool_calls=5,
+                    code_search_calls=2,
+                    graph_calls=1,
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    tool_calls=1,
+                    code_search_calls=0,
+                    graph_calls=0,
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["total_tool_calls"] == 6
+        assert metrics["total_code_search_calls"] == 2
+        assert metrics["total_graph_calls"] == 1
+        assert metrics["total_code_intelligence_calls"] == 3
+        assert metrics["tasks_using_code_search"] == 1
+        assert metrics["tasks_using_graph"] == 1
+        assert metrics["tasks_using_code_intelligence"] == 1
+        assert metrics["code_intelligence_task_coverage"] == pytest.approx(0.5)
+
+    def test_get_metrics_includes_failure_taxonomy_breakdown(self):
+        """Aggregate metrics should count failure stages and taxonomy paths."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.FAILED,
+                    failure_category=BenchmarkFailureCategory.TASK_COMPLETION,
+                    failure_details={"missing_actions": ["click"]},
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+                    failure_details={"forbidden_claim_hits": ["invented claim"]},
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["failure_categories"] == {
+            "task_completion": 1,
+            "unsupported_claim": 1,
+        }
+        assert metrics["failure_stages"] == {
+            "action": 1,
+            "grounding": 1,
+        }
+        assert metrics["failure_taxonomy"] == {
+            "action.task_completion.missing_required_actions": 1,
+            "grounding.unsupported_claim.forbidden_claim": 1,
+        }
+
+    def test_get_metrics_includes_confidence_calibration_summary(self):
+        """Aggregate metrics should summarize confidence buckets and alignment."""
+        passed = TaskResult(
+            task_id="task-1",
+            status=TaskStatus.PASSED,
+            tests_passed=2,
+            tests_total=2,
+            completion_score=1.0,
+        )
+        failed = TaskResult(
+            task_id="task-2",
+            status=TaskStatus.FAILED,
+            completion_score=1.0,
+            failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+            failure_details={
+                "claim_coverage": 1.0,
+                "citation_coverage": 1.0,
+                "forbidden_claim_hits": ["invented claim"],
+            },
+        )
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.DR3_EVAL,
+                model="test-model",
+            ),
+            task_results=[passed, failed],
+        )
+
+        metrics = result.get_metrics()
+
+        expected_average = (
+            passed.get_confidence_assessment().confidence_score
+            + failed.get_confidence_assessment().confidence_score
+        ) / 2
+        assert metrics["avg_confidence_score"] == pytest.approx(expected_average)
+        assert metrics["confidence_buckets"] == {
+            "high": 1,
+            "low": 1,
+        }
+        assert metrics["truth_alignment_rate"] == pytest.approx(1.0)
+
+    def test_get_metrics_includes_topology_feedback_summary(self):
+        """Aggregate metrics should expose topology coverage, mix, and reward."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    completion_score=1.0,
+                    tool_calls=4,
+                    turns=2,
+                    metadata={
+                        "topology_events": [
+                            {
+                                "action": "single_agent",
+                                "topology": "single_agent",
+                                "execution_mode": "single_agent",
+                                "provider": "openai",
+                                "confidence": 0.76,
+                            }
+                        ]
+                    },
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    completion_score=0.25,
+                    tool_calls=7,
+                    turns=4,
+                    metadata={
+                        "topology_events": [
+                            {
+                                "action": "team_plan",
+                                "topology": "team",
+                                "execution_mode": "team_execution",
+                                "formation": "parallel",
+                                "provider": "anthropic",
+                                "confidence": 0.86,
+                                "fallback_action": "escalate_model",
+                            }
+                        ]
+                    },
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["tasks_with_topology_feedback"] == 2
+        assert metrics["topology_feedback_coverage"] == pytest.approx(1.0)
+        assert metrics["topology_actions"] == {"single_agent": 1, "team_plan": 1}
+        assert metrics["topology_kinds"] == {"single_agent": 1, "team": 1}
+        assert metrics["topology_execution_modes"] == {
+            "single_agent": 1,
+            "team_execution": 1,
+        }
+        assert 0.0 <= metrics["avg_topology_reward"] <= 1.0
+        assert metrics["topology_fallback_rate"] > 0.0
+
+    def test_get_metrics_includes_planning_feedback_summary(self):
+        """Aggregate metrics should expose planning policy coverage and deltas."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.FAILED,
+                    completion_score=0.2,
+                    metadata={
+                        "planning_events": [
+                            {
+                                "selection_policy": "heuristic_fast_path",
+                                "used_llm_planning": False,
+                                "task_type": "action",
+                            }
+                        ]
+                    },
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.PASSED,
+                    completion_score=0.9,
+                    metadata={
+                        "planning_events": [
+                            {
+                                "selection_policy": "experiment_forced_slow_path",
+                                "used_llm_planning": True,
+                                "task_type": "action",
+                                "force_reason": "experiment_constraints: tests_pass",
+                                "constraint_tags": ["tests_pass"],
+                                "experiment_support": 0.4,
+                            }
+                        ]
+                    },
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["tasks_with_planning_feedback"] == 2
+        assert metrics["planning_feedback_coverage"] == pytest.approx(1.0)
+        assert metrics["planning_policy_counts"] == {
+            "heuristic_fast_path": 1,
+            "experiment_forced_slow_path": 1,
+        }
+        assert metrics["planning_force_reasons"] == {"experiment_constraints: tests_pass": 1}
+        assert metrics["planning_used_llm_rate"] == pytest.approx(0.5)
+        assert metrics["planning_forced_slow_path_completion_delta"] == pytest.approx(0.7)
+
+    def test_get_metrics_includes_team_feedback_summary(self):
+        """Aggregate metrics should expose team/worktree coverage and merge risk."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.CUSTOM,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    metadata={
+                        "worktree_plan": {
+                            "formation": "parallel",
+                            "assignments": [
+                                {"member_id": "planner", "claimed_paths": ["src/auth"]},
+                                {"member_id": "tester", "claimed_paths": ["tests/auth"]},
+                            ],
+                        },
+                        "worktree_session": {
+                            "materialized": True,
+                            "assignments": [
+                                {"member_id": "planner", "materialized": True},
+                                {"member_id": "tester", "materialized": True},
+                            ],
+                        },
+                        "merge_analysis": {
+                            "risk_level": "low",
+                            "conflict_count": 0,
+                            "member_changed_files": {
+                                "planner": ["src/auth/service.py"],
+                                "tester": ["tests/auth/test_service.py"],
+                            },
+                        },
+                    },
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    metadata={
+                        "worktree_plan": {
+                            "formation": "parallel",
+                            "assignments": [
+                                {"member_id": "planner", "claimed_paths": ["src/auth"]},
+                                {"member_id": "reviewer", "claimed_paths": ["src/auth"]},
+                            ],
+                        },
+                        "merge_analysis": {
+                            "risk_level": "high",
+                            "conflict_count": 1,
+                            "overlapping_files": [{"path": "src/auth/service.py"}],
+                            "member_changed_files": {
+                                "planner": ["src/auth/service.py"],
+                                "reviewer": ["src/auth/service.py"],
+                            },
+                            "readonly_violations": {"reviewer": ["docs/guide.md"]},
+                        },
+                        "worktree_cleanup": {"removed": [], "errors": ["cleanup failed"]},
+                    },
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["tasks_with_team_feedback"] == 2
+        assert metrics["team_feedback_coverage"] == pytest.approx(1.0)
+        assert metrics["team_formations"] == {"parallel": 2}
+        assert metrics["team_merge_risk_levels"] == {"low": 1, "high": 1}
+        assert metrics["team_worktree_materialized_count"] == 1
+        assert metrics["team_high_risk_task_count"] == 1
+        assert metrics["team_merge_conflict_count"] == 1
+        assert metrics["team_readonly_violation_count"] == 1
+        assert metrics["team_cleanup_error_task_count"] == 1
 
 
 class TestPassAtKResult:

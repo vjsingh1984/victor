@@ -26,7 +26,7 @@ domain (SRP compliance).
 Architecture:
     WorkflowEngine (Facade)
     ├── YAMLWorkflowCoordinator     # execute_yaml(), stream_yaml()
-    ├── GraphExecutionCoordinator   # execute_graph(), stream_graph()
+    ├── GraphTurnExecutor   # execute_graph(), stream_graph()
     ├── HITLCoordinator             # execute_with_hitl()
     └── CacheCoordinator            # enable_caching(), clear_cache()
 
@@ -83,26 +83,26 @@ if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph, StateGraph
     from victor.framework.coordinators import (
         YAMLWorkflowCoordinator,
-        GraphExecutionCoordinator,
+        GraphTurnExecutor,
         HITLCoordinator,
         CacheCoordinator,
     )
-    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
+    from victor.framework.coordinators.protocols import IStreamingExecutor, IWorkflowExecutor
+    from victor.workflows.context import WorkflowResult
     from victor.workflows.streaming import WorkflowStreamChunk
-    from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.hitl import HITLHandler, HITLExecutor
     from victor.workflows.cache import WorkflowCacheManager
     from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.graph_dsl import WorkflowGraph
     from victor.workflows.node_runners import NodeRunnerRegistry
-    from victor.workflows.graph_compiler import (
-        WorkflowGraphCompiler,
-        WorkflowDefinitionCompiler,
-        CompilerConfig,
-    )
     from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 logger = logging.getLogger(__name__)
+
+from victor.workflows.runtime_executor_factory import (
+    create_legacy_streaming_workflow_executor,
+    create_legacy_workflow_executor,
+)
 
 StateType = TypeVar("StateType", bound=Dict[str, Any])
 
@@ -270,18 +270,14 @@ class WorkflowEngine:
 
         # Lazy-loaded coordinators (SRP split)
         self._yaml_coordinator: Optional["YAMLWorkflowCoordinator"] = None
-        self._graph_coordinator: Optional["GraphExecutionCoordinator"] = None
+        self._graph_coordinator: Optional["GraphTurnExecutor"] = None
         self._hitl_coordinator: Optional["HITLCoordinator"] = None
         self._cache_coordinator: Optional["CacheCoordinator"] = None
 
         # Lazy-loaded executors (for backward compatibility)
-        self._executor: Optional["WorkflowExecutor"] = None
-        self._streaming_executor: Optional["StreamingWorkflowExecutor"] = None
+        self._executor: Optional["IWorkflowExecutor"] = None
+        self._streaming_executor: Optional["IStreamingExecutor"] = None
         self._hitl_executor: Optional["HITLExecutor"] = None
-
-        # Lazy-loaded compilers
-        self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
-        self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
 
         # Lazy-loaded unified compiler for consistent compilation and caching
         self._unified_compiler: Optional["UnifiedWorkflowCompiler"] = None
@@ -438,7 +434,7 @@ class WorkflowEngine:
     ) -> WorkflowExecutionResult:
         """Execute a compiled StateGraph.
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant execution
+        Delegates to GraphTurnExecutor for SRP-compliant execution
         with LSP-compliant polymorphic result handling.
 
         Args:
@@ -545,7 +541,7 @@ class WorkflowEngine:
     ) -> WorkflowExecutionResult:
         """Execute a WorkflowGraph via CompiledGraph (unified execution path).
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant execution.
+        Delegates to GraphTurnExecutor for SRP-compliant execution.
         This method compiles a WorkflowGraph to CompiledGraph and executes
         it through the single CompiledGraph.invoke() engine, providing a
         unified execution path for all workflow types.
@@ -589,7 +585,7 @@ class WorkflowEngine:
     ) -> WorkflowExecutionResult:
         """Execute a WorkflowDefinition via CompiledGraph (unified execution path).
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant execution.
+        Delegates to GraphTurnExecutor for SRP-compliant execution.
         This method compiles a WorkflowDefinition to CompiledGraph and executes
         it through the single CompiledGraph.invoke() engine.
 
@@ -615,9 +611,6 @@ class WorkflowEngine:
             registry: NodeRunnerRegistry with configured runners.
         """
         self._runner_registry = registry
-        # Reset compilers to use new registry
-        self._graph_compiler = None
-        self._definition_compiler = None
         # Reset unified compiler to use new registry
         if self._unified_compiler is not None:
             self._unified_compiler.set_runner_registry(registry)
@@ -720,7 +713,7 @@ class WorkflowEngine:
     ) -> AsyncIterator[WorkflowEvent]:
         """Stream events from StateGraph execution.
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant streaming.
+        Delegates to GraphTurnExecutor for SRP-compliant streaming.
 
         Args:
             graph: Compiled StateGraph to execute.
@@ -872,14 +865,12 @@ class WorkflowEngine:
             self._yaml_coordinator = YAMLWorkflowCoordinator()
         return self._yaml_coordinator
 
-    def _get_graph_coordinator(self) -> "GraphExecutionCoordinator":
+    def _get_graph_coordinator(self) -> "GraphTurnExecutor":
         """Get or create graph execution coordinator."""
         if self._graph_coordinator is None:
-            from victor.framework.coordinators import GraphExecutionCoordinator
+            from victor.framework.coordinators import GraphTurnExecutor
 
-            self._graph_coordinator = GraphExecutionCoordinator(
-                runner_registry=self._runner_registry
-            )
+            self._graph_coordinator = GraphTurnExecutor(runner_registry=self._runner_registry)
         return self._graph_coordinator
 
     def _get_hitl_coordinator(self) -> "HITLCoordinator":
@@ -906,15 +897,15 @@ class WorkflowEngine:
     def _get_unified_compiler(self) -> "UnifiedWorkflowCompiler":
         """Get or create the unified compiler.
 
-        **Architecture Note**: WorkflowEngine uses UnifiedWorkflowCompiler (not the plugin API)
-        because it requires:
+        **Architecture Note**: UnifiedWorkflowCompiler is the canonical compiler API.
+        WorkflowEngine uses it for:
         - Two-level caching (definition + execution) for performance
         - Cache management APIs (clear_cache, get_cache_stats, invalidate_yaml)
         - Runner registry integration for custom node execution
         - Escape hatch integration (condition_registry, transform_registry)
 
-        The plugin API (create_compiler) provides a simpler facade for basic use cases
-        but doesn't support these advanced features needed by WorkflowEngine.
+        For DI-friendly compile-only usage without caching or execution,
+        see WorkflowCompiler in victor.workflows.compiler.
 
         Returns:
             UnifiedWorkflowCompiler instance with shared caches.
@@ -938,20 +929,16 @@ class WorkflowEngine:
     # Helpers (for backward compatibility)
     # =========================================================================
 
-    def _get_executor(self) -> "WorkflowExecutor":
+    def _get_executor(self) -> "IWorkflowExecutor":
         """Get or create workflow executor."""
         if self._executor is None:
-            from victor.workflows.executor import WorkflowExecutor
-
-            self._executor = WorkflowExecutor()
+            self._executor = create_legacy_workflow_executor()
         return self._executor
 
-    def _get_streaming_executor(self) -> "StreamingWorkflowExecutor":
+    def _get_streaming_executor(self) -> "IStreamingExecutor":
         """Get or create streaming executor."""
         if self._streaming_executor is None:
-            from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-
-            self._streaming_executor = StreamingWorkflowExecutor()
+            self._streaming_executor = create_legacy_streaming_workflow_executor()
         return self._streaming_executor
 
 

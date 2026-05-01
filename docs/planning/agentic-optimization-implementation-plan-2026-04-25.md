@@ -1,0 +1,165 @@
+# Agentic Optimization Implementation Plan
+
+Date: 2026-04-25
+
+Scope:
+- `victor/framework/rl/`
+- `victor/agent/`
+- `victor/framework/`
+- `victor-research` / `victor-rag` integration points when needed
+
+Goal:
+- Reuse the strong existing agentic stack and enhance it incrementally with TDD.
+- Prefer high-ROI improvements that close existing loops before building net-new systems.
+
+## Working Rules
+
+- Start with enhancements that build on existing mechanisms.
+- Use tests first for each implementation slice.
+- Keep each slice independently shippable.
+- Favor feature additions that degrade gracefully when data is absent.
+- Track each slice with `Not started`, `In progress`, `Done`, or `Deferred`.
+
+## Phase 1: Prompt Evolution Governance
+
+Objective:
+- Add benchmark-gated candidate lifecycle management on top of the existing GEPA / MiPRO / CoT prompt optimizer stack.
+
+Rationale:
+- Prompt evolution already exists.
+- Candidate promotion and rollback are not benchmark-disciplined.
+- This is high leverage and bounded enough for TDD.
+
+Planned slices:
+
+| Slice | Status | TDD plan | Notes |
+|---|---|---|---|
+| 1.1 Candidate benchmark metadata persistence | Done | Added failing unit tests for load/save of benchmark fields first | Reused existing `agent_prompt_candidate` table with additive columns |
+| 1.2 Benchmark result recording API | Done | Added failing unit tests for score/runs/pass state updates first | Running-average implementation landed |
+| 1.3 Promotion / active-candidate switching | Done | Added failing unit tests for promotion semantics first | Reused existing `is_active` column |
+| 1.4 Rollback to prior approved candidate | Done | Added failing unit tests for fallback behavior first | Deterministic approved-candidate fallback landed |
+| 1.5 Recommendation gating preference | Done | Added failing unit tests for active/approved candidates being preferred first | Backward-compatible fallback preserved when no benchmark data exists |
+
+Definition of done:
+- Unit coverage for each slice
+- No regression to current recommendation behavior when benchmark data is absent
+- Candidate state persists through DB reload
+
+## Phase 2: Search-First and Retrieval Repair
+
+Objective:
+- Strengthen `search-first` behavior and richer failure-aware retrieval repair.
+
+Planned slices:
+
+| Slice | Status | TDD plan | Notes |
+|---|---|---|---|
+| 2.1 Search-first coding fallback hints | Done | Added prompt-pipeline tests first | Prompt completeness guard now injects search-first guidance for symbol-scoped requests without file paths |
+| 2.2 Richer retrieval diagnosis classes | Done | Added workflow decision tests first | `victor-rag` now classifies repair gaps explicitly and routes repair vs revise vs clarify through a stable vocabulary |
+| 2.3 Utility-aware retrieval ranking | Done | Added retrieval-ranking tests first | Replaced the inline utility script with a named `victor-rag` transform that scores authority, diversity, and redundancy and reranks results boundedly |
+
+## Phase 3: Context Budget and Prompt Compression
+
+Objective:
+- Make context and prompt compression benchmark-aware, not heuristic-only.
+
+Planned slices:
+
+| Slice | Status | TDD plan | Notes |
+|---|---|---|---|
+| 3.1 Prompt-section measurement hooks | Done | Added allocator metrics tests first | `PromptSectionBudgetAllocator` now records observed token costs and can budget against measured section sizes when available |
+| 3.2 Dictionary compression for repeated tool/prompt boilerplate | Done | Added round-trip compression tests first | Added a lossless prompt dictionary compressor and wired it into `UnifiedPromptPipeline` for repeated per-turn guidance blocks |
+| 3.3 Safe default-on preview pruning for read-only tools | Done | Added tool-result processing and streaming renderer tests first | Read-only tool results now surface a pruned preview to users by default while preserving full formatted output for expansion/debug and full LLM context for execution |
+
+## Phase 4: Memory Evolution
+
+Objective:
+- Move from passive memory federation toward proactive and trace-aware memory improvement.
+
+Planned slices:
+
+| Slice | Status | TDD plan | Notes |
+|---|---|---|---|
+| 4.1 Dual-trace memory encoding | Done | Added store, controller, and adapter tests first | Conversation memory now persists semantic vs execution traces separately and can retrieve both buckets through the store/controller/adapter path |
+| 4.2 Memory transfer hooks across verticals | Done | Added policy / filter tests first | Unified memory transfer now accepts project / vertical / transfer-group context, blocks scoped cross-project reuse by default when project scope is known, and allows bounded opt-in reuse across matching transfer groups or verticals |
+| 4.3 Proactive memory hints | Done | Added next-turn hint generation tests first | Unified memory now derives bounded proactive hints from successful traces, tracks latest next-turn hints, and keeps them scoped through the same transfer policy used for cross-session reuse |
+
+## Phase 5: Benchmark Harnesses
+
+Objective:
+- Add realistic benchmark discipline for deep research, browser, and GUI workflows.
+
+Planned slices:
+
+| Slice | Status | TDD plan | Notes |
+|---|---|---|---|
+| 5.1 Deep-research benchmark adapter | Done | Added catalog + harness tests first | Added a dedicated DR3-style deep-research runner under `victor/evaluation/benchmarks`, with manifest loading plus claim/citation/unsupported-claim scoring integrated into the shared benchmark catalog |
+| 5.2 Browser / web-task benchmark adapter | Done | Added benchmark catalog + browser-runner tests first | Added a dedicated browser-task runner for `clawbench` / `guide` / `vlaa-gui`, updated the shared catalog and CLI routing, and evaluate action traces plus final-answer coverage through local manifests |
+| 5.3 Hierarchical failure taxonomy | Done | Added evaluator diagnosis + persistence tests first | Added a structured failure diagnosis layer on `TaskResult`, aggregate stage/path metrics in `EvaluationResult`, and persisted taxonomy output in the benchmark harness while preserving the existing flat failure-category contract |
+
+## Phase 6: Calibration and Confidence
+
+Objective:
+- Add truth-aligned confidence signals on the canonical benchmark evaluation path.
+
+Planned slices:
+
+| Slice | Status | TDD plan | Notes |
+|---|---|---|---|
+| 6.1 Truth-aligned confidence assessment | Done | Added task/evaluation/harness confidence tests first | `TaskResult` now derives confidence + uncertainty from objective evidence and failure taxonomy, and benchmark summaries persist confidence buckets plus truth-alignment rates |
+| 6.2 Clarification-aware runtime gating | Done | Added perception, streaming-runtime, and loop-evaluation tests first | `PerceptionIntegration` now flags underspecified action requests, the canonical streaming runtime exits early with a targeted clarification prompt before provider/tool execution, and `AgenticLoop` fails fast with clarification metadata instead of blind retry |
+| 6.3 Low-confidence retry budget | Done | Added loop-evaluation tests first | `AgenticLoop` now bounds repeated low-confidence retries on both enhanced and legacy evaluation paths, resets the budget when progress resumes, and emits structured exhaustion metadata when the retry budget is spent |
+
+## Immediate Execution Order
+
+1. Finish Phase 1 end-to-end.
+2. If tests are stable, start Phase 2 slice 2.1 or 2.2 depending on coupling.
+3. Leave benchmark harness work until the governance and runtime loops are stronger.
+
+## Tracking Log
+
+| Date | Update |
+|---|---|
+| 2026-04-25 | Plan created. Phase 1 selected as first implementation target. |
+| 2026-04-25 | Phase 1 completed via TDD: benchmark state persistence, benchmark result recording, promotion, rollback, and recommendation gating preference implemented in `PromptOptimizerLearner`. |
+| 2026-04-25 | Phase 2.1 completed via TDD: prompt completeness guard now emits search-first guidance for symbol-scoped requests without explicit file paths. |
+| 2026-04-25 | Phase 2.2 completed via TDD in `victor-rag`: retrieval gaps are now explicitly classified and repair policy routes between retrieval repair, answer revision, and clarification accordingly. |
+| 2026-04-25 | Phase 2.3 completed via TDD in `victor-rag`: retrieval utility scoring moved to a named escape hatch that emits richer metrics and applies bounded authority/diversity-aware reranking. |
+| 2026-04-25 | Phase 3.1 completed via TDD in `codingagent`: prompt section budgeting now records rolling token-cost measurements and uses them to improve future section selection under budget constraints. |
+| 2026-04-25 | Phase 3.2 completed via TDD in `codingagent`: repeated long guidance blocks can now be dictionary-compressed losslessly, and `UnifiedPromptPipeline` uses the compressor for repeated per-turn reminder content when it produces real savings. |
+| 2026-04-25 | Prompt architecture refactor inserted before Phase 3.3. Roadmap resume point remains Phase 3.3; details tracked in `docs/planning/prompt-canonical-architecture-refactor-2026-04-25.md`. |
+| 2026-04-25 | Phase 3.3 completed via TDD in `codingagent`: read-only tool results now default to pruned user previews while keeping full model-visible output intact and preserving full output for expansion/debug in streaming renderers. |
+| 2026-04-25 | Phase 5.3 completed via TDD in `codingagent`: benchmark results now derive and persist a hierarchical failure diagnosis with stage + subtype paths, and aggregate metrics report both flat categories and taxonomy breakdowns across DR3/browser/external benchmark adapters. |
+| 2026-04-25 | Phase 6.1 completed via TDD in `codingagent`: benchmark results now derive truth-aligned confidence/uncertainty from evidence plus failure taxonomy, and persisted reports include confidence buckets and alignment rates for calibration-aware triage. |
+| 2026-04-25 | Phase 6.2 completed via TDD in `codingagent`: underspecified low-confidence action requests now trigger targeted clarification from `PerceptionIntegration`, the streaming runtime returns that clarification before provider/tool execution, and `AgenticLoop` records clarification-required failure metadata instead of retrying blindly. |
+| 2026-04-25 | Phase 6.3 completed via TDD in `codingagent`: repeated low-confidence retries are now budgeted in `AgenticLoop`, including results returned by the enhanced completion evaluator, and the loop resets that budget on renewed progress while surfacing structured exhaustion metadata on failure. |
+| 2026-04-25 | Runtime-intelligence consolidation inserted before the next feature slice. The architecture and migration plan is tracked in `docs/planning/runtime-intelligence-consolidation-2026-04-25.md`, and the first implementation slice migrated `UnifiedPromptPipeline`, the streaming execution path now owned by `StreamingChatExecutor`/`ServiceStreamingRuntime`, `AgenticLoop`, and orchestrator/factory wiring onto a shared `RuntimeIntelligenceService` boundary. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 3.1 completed via TDD in `codingagent`: task completion, thinking-loop detection, continuation strategy, intent-classification handoff, and workflow factory construction now depend on `RuntimeIntelligenceService` instead of wiring low-level decision services directly on the active runtime path. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 3.2 completed via TDD in `codingagent`: error classification, unified task classification, and the `TaskAnalyzer`-owned classifier path now use `RuntimeIntelligenceService` as the canonical low-confidence decision boundary instead of direct decision-service wiring. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 3.3 completed via TDD in `codingagent`: `ContextCompactor` and its factory-owned construction path now route compaction decisions through `RuntimeIntelligenceService`, eliminating another active raw decision-service dependency from the canonical runtime path. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 3.4 completed via TDD in `codingagent`: `ConversationStateMachine` stage detection now prefers `RuntimeIntelligenceService`, and `OrchestratorServiceProvider` builds scoped state machines with that canonical runtime boundary attached. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 3.5 completed via TDD in `codingagent`: `ToolSelector` edge filtering now depends on `RuntimeIntelligenceService` instead of direct container wiring, and both the active factory path plus DI service-provider construction now attach the canonical runtime boundary. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 4.1 completed via TDD in `codingagent`: clarification policy is now normalized into a typed runtime-intelligence decision, and both the canonical streaming executor/runtime path and `AgenticLoop` consume the same canonical fallback prompt and reason handling. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 4.2 completed via TDD in `codingagent`: low-confidence retry-budget handling is now centralized in `RuntimeIntelligenceService`, and `AgenticLoop` delegates both raw confidence fallback and enhanced low-confidence retry gating through that canonical runtime policy. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 4.3 completed via TDD in `codingagent`: `EnhancedCompletionEvaluator` now emits the same canonical confidence policy vocabulary from `RuntimeIntelligenceService` as the live loop, while leaving retry-budget spending solely to the loop path. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.1 completed via TDD in `codingagent`: extracted a dedicated `RuntimeEvaluationPolicy` object, and migrated `PerceptionIntegration`, `RuntimeIntelligenceService`, the canonical streaming executor/runtime path, `AgenticLoop`, and `EnhancedCompletionEvaluator` to the same shared thresholds and wording model. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.2 completed via TDD in `codingagent`: calibrated completion weights, support penalties, progress thresholds, and enhanced evaluation wording now live in `RuntimeEvaluationPolicy`, `EnhancedCompletionEvaluator` delegates calibrated completion/result construction through that shared policy, and `AgenticLoop` now relies on the policy for completion-threshold configuration instead of a separate evaluator-only override. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.3 completed via TDD in `codingagent`: `RuntimeEvaluationPolicy` now supports immutable override overlays, and `RuntimeIntelligenceService` compatibility helpers merge explicit prompt/threshold overrides into the shared policy instead of silently dropping them when a policy instance is already supplied. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.4 completed via TDD in `codingagent`: added a reusable runtime-calibration feedback model, taught `ConfidenceCalibrator`, `LLMDecisionService`, and `TieredDecisionService` to export task-completion calibration feedback, and updated `RuntimeIntelligenceService.from_container(...)` to apply that feedback to the shared `RuntimeEvaluationPolicy` and aligned perception path automatically. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.5 completed via TDD in `codingagent`: `EvaluationHarness` now derives runtime-calibration feedback from persisted benchmark-truth metrics, saves a canonical `runtime_evaluation_feedback.json` artifact alongside evaluation results, and `RuntimeIntelligenceService` loads that offline feedback into the shared `RuntimeEvaluationPolicy` without overriding explicit live runtime config. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.6 completed via TDD in `codingagent`: runtime calibration now aggregates validated evaluation-truth artifacts across the results directory with recency/reliability weighting, `EvaluationHarness` persists normalized validated-truth payloads per run and refreshes the canonical aggregate, and heuristic-only runtime sources remain ineligible for persistence. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.7 completed via TDD in `codingagent`: added a canonical `RuntimeEvaluationFeedbackScope` schema plus typed validated session-truth payload builder, taught runtime aggregation to prefer project/model/task-adjacent evidence with centralized trust/freshness/reliability weighting, and threaded available provider/model scope into active prompt/runtime service construction paths. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.8 completed via TDD in `codingagent`: objective SWE-bench baseline validation now emits validated session-truth runtime feedback through the canonical subsystem, `EvaluationOrchestrator` persists those artifacts under its output `evaluations/` directory and refreshes the aggregate automatically, and only strong post-change test evidence is eligible to enter calibration. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.9 completed via TDD in `codingagent`: browser-task and deep-research post-hoc validators now emit validated session-truth runtime feedback through the same canonical subsystem, `EvaluationHarness` persists per-task `eval_session_*` artifacts for those workflows, and aggregate runtime calibration now mixes benchmark-truth plus non-coding validated session-truth evidence through one loader. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.10 completed via TDD in `codingagent`: extracted a registry-backed validated session-truth emitter subsystem, moved browser and deep-research routing out of `EvaluationHarness` and behind the canonical emitter contract, and kept runtime calibration logic centralized in `runtime_feedback.py`. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.11 completed via TDD in `codingagent`: generalized the emitter contract with a shared emission context, added the canonical SWE-bench emitter, and migrated `EvaluationOrchestrator` onto the same registry-backed validated session-truth path used by `EvaluationHarness`. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.12 completed via TDD in `codingagent`: extracted shared validated session-truth persistence and aggregate-refresh orchestration into one helper, and migrated both `EvaluationHarness` and `EvaluationOrchestrator` to the same canonical write path after emitter resolution. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.13 completed via TDD in `codingagent`: extracted a canonical validated session-truth service that owns emitter resolution, context assembly, and persistence orchestration, and migrated both `EvaluationHarness` and `EvaluationOrchestrator` to that service boundary while preserving registry injection as a compatibility fallback. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.14 completed via TDD in `codingagent`: centralized directory preparation and safe degradation behavior in `ValidatedSessionTruthService`, so emitter or persistence failures now skip session-truth capture without breaking the parent evaluation run. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.15 completed via TDD in `codingagent`: extracted an explicit, backward-compatible artifact naming policy for validated session-truth files and migrated all current emitters to that shared naming helper instead of open-coding filenames. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.16 completed via TDD in `codingagent`: made validated session-truth service construction canonical through a shared factory helper, and shifted `EvaluationHarness` and `EvaluationOrchestrator` constructors to be service-first while preserving the legacy registry keyword only as a compatibility shim. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.17 completed via TDD in `codingagent`: promoted validated session-truth service construction to a higher-level evaluation service entrypoint, exported that canonical DI path through `victor.evaluation`, and migrated `EvaluationHarness` plus `EvaluationOrchestrator` to depend on the evaluation-level factory instead of importing the concrete service factory directly. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.18 completed via TDD in `codingagent`: introduced `ValidatedSessionTruthServiceProtocol` on the evaluation service boundary and migrated `EvaluationHarness` plus `EvaluationOrchestrator` constructor typing to that contract, reducing runtime coupling to the concrete validated session-truth service implementation. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.19 completed via TDD in `codingagent`: extracted a shared `resolve_validated_session_truth_service(...)` helper for explicit-service preference plus default factory fallback, and migrated both `EvaluationHarness` and `EvaluationOrchestrator` to that single evaluation-level resolution path instead of duplicating constructor-side service selection logic. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.20 completed via TDD in `codingagent`: extracted `parse_validated_session_truth_legacy_kwargs(...)` on the evaluation service boundary and migrated both `EvaluationHarness` and `EvaluationOrchestrator` to share one compatibility parser for legacy registry wiring and unexpected-key validation. |
+| 2026-04-25 | Runtime-intelligence consolidation Phase 5.21 completed via TDD in `codingagent`: extracted `materialize_validated_session_truth_service(...)` on the evaluation service boundary and migrated both `EvaluationHarness` and `EvaluationOrchestrator` to a single constructor-side materialization helper, closing the remaining validated-session-truth wiring duplication in the runtime evaluation stack. |

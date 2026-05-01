@@ -15,7 +15,7 @@
 """Resilience patterns for robust distributed systems.
 
 This module implements enterprise-grade resilience patterns:
-- Circuit Breaker: Prevents cascading failures
+- Circuit Breaker: Prevents cascading failures (subclasses canonical from providers)
 - Retry with exponential backoff: Handles transient failures
 - Bulkhead: Isolates failures to prevent system-wide impact
 - Timeout: Prevents indefinite blocking
@@ -32,7 +32,7 @@ Example:
         Bulkhead,
     )
 
-    # Circuit breaker for external API
+    # Circuit breaker for external API (with metrics support)
     breaker = ObservableCircuitBreaker(
         failure_threshold=5,
         timeout_seconds=30.0,
@@ -65,15 +65,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, Generic, Optional, TypeVar, Union, TYPE_CHECKING
 
-# Import canonical types from circuit_breaker.py to avoid duplication
-from victor.providers.circuit_breaker import (
-    CircuitState as _CircuitState,
+# Import shared circuit-breaker types from core to avoid cross-layer coupling
+from victor.core.circuit_breaker import (
+    CircuitState,
     CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
     CircuitBreakerError,
 )
 
+# Import the canonical CircuitBreaker to subclass
+from victor.providers.circuit_breaker import CircuitBreaker as CanonicalCircuitBreaker
+
 if TYPE_CHECKING:
-    from victor.providers.circuit_breaker import CircuitState
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -200,311 +203,248 @@ def retry_with_backoff(
     retryable_exceptions: tuple = (Exception,),
     on_retry: Optional[Callable[[int, Exception, float], None]] = None,
 ) -> Callable[[F], F]:
-    """Decorator for retry with configurable backoff.
+    """Decorator for retry with configurable backoff (COMPATIBILITY WRAPPER).
 
-    Supports both sync and async functions.
+    .. deprecated::
+        This decorator is a compatibility wrapper around the canonical retry
+        implementation in victor.core.retry. For new code, use:
+
+        - `from victor.core.retry import with_retry` for async functions
+        - `from victor.core.retry import with_retry_sync` for sync functions
+        - `RetryExecutor` class for more control
+
+        This wrapper will be removed in version 0.10.0.
+
+    The canonical implementation provides:
+    - More robust error handling with RetryContext
+    - Better observability with hooks (on_retry, on_success, on_failure)
+    - Support for multiple backoff strategies (exponential, linear, fixed, none)
+    - Jitter to prevent thundering herd problems
+    - Exception type filtering (retryable/non-retryable)
 
     Args:
         max_retries: Maximum retry attempts.
         base_delay: Base delay between retries.
-        backoff_strategy: Strategy for calculating delays.
+        backoff_strategy: Strategy for calculating delays (ignored, uses canonical).
         retryable_exceptions: Exceptions that trigger retry.
-        on_retry: Callback called on each retry.
+        on_retry: Callback called on each retry (preserved for compatibility).
 
     Returns:
         Decorated function with retry behavior.
 
     Example:
+        # Old (deprecated):
         @retry_with_backoff(max_retries=3, base_delay=1.0)
         async def fetch_data():
             response = await client.get(url)
             return response.json()
+
+        # New (recommended):
+        from victor.core.retry import with_retry, ExponentialBackoffStrategy
+
+        strategy = ExponentialBackoffStrategy(max_attempts=4, base_delay=1.0)
+        executor = RetryExecutor(strategy)
+
+        @executor.execute_async
+        async def fetch_data():
+            response = await client.get(url)
+            return response.json()
     """
-    strategy = backoff_strategy or ExponentialBackoff()
+    # Import canonical retry implementation
+    from victor.core.retry import (
+        with_retry,
+        with_retry_sync,
+        ExponentialBackoffStrategy as CanonicalExponentialBackoffStrategy,
+        RetryExecutor,
+    )
+
+    # Map legacy parameters to canonical strategy
+    # Note: backoff_strategy parameter is ignored - canonical handles this internally
+    # Convert default (Exception,) to None to mean "retry all exceptions"
+    # The canonical implementation checks for exact type match, not subclass relationships
+    canonical_retryable = (
+        None
+        if retryable_exceptions == (Exception,)
+        else (set(retryable_exceptions) if retryable_exceptions else None)
+    )
+
+    strategy = CanonicalExponentialBackoffStrategy(
+        max_attempts=max_retries + 1,  # +1 because max_attempts includes initial
+        base_delay=base_delay,
+        max_delay=base_delay * 32,  # Cap at ~32x base
+        multiplier=2.0,
+        jitter=0.1,
+        retryable_exceptions=canonical_retryable,
+    )
+
+    # Create executor with strategy
+    executor = RetryExecutor(strategy)
 
     def decorator(func: F) -> F:
-        @functools.wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception: Optional[Exception] = None
+        # Preserve on_retry callback if provided
+        if on_retry:
+            strategy.on_retry = lambda ctx: (
+                on_retry(ctx.attempt, ctx.last_exception, strategy.get_delay(ctx))
+                if ctx.last_exception
+                else None
+            )
 
-            for attempt in range(max_retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except retryable_exceptions as e:
-                    last_exception = e
-
-                    if attempt == max_retries:
-                        logger.warning(
-                            f"Retry exhausted for {func.__name__} after "
-                            f"{max_retries + 1} attempts: {e}"
-                        )
-                        raise
-
-                    delay = strategy.calculate_delay(attempt, base_delay)
-
-                    if on_retry:
-                        on_retry(attempt + 1, e, delay)
-
-                    logger.debug(
-                        f"Retry {attempt + 1}/{max_retries} for {func.__name__}, "
-                        f"delay={delay:.2f}s: {e}"
-                    )
-
-                    await asyncio.sleep(delay)
-
-            raise last_exception  # type: ignore
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception: Optional[Exception] = None
-
-            for attempt in range(max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except retryable_exceptions as e:
-                    last_exception = e
-
-                    if attempt == max_retries:
-                        logger.warning(
-                            f"Retry exhausted for {func.__name__} after "
-                            f"{max_retries + 1} attempts: {e}"
-                        )
-                        raise
-
-                    delay = strategy.calculate_delay(attempt, base_delay)
-
-                    if on_retry:
-                        on_retry(attempt + 1, e, delay)
-
-                    logger.debug(
-                        f"Retry {attempt + 1}/{max_retries} for {func.__name__}, "
-                        f"delay={delay:.2f}s: {e}"
-                    )
-
-                    time.sleep(delay)
-
-            raise last_exception  # type: ignore
-
+        # Use canonical executor
         if asyncio.iscoroutinefunction(func):
+            # For async functions, wrap with executor
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                result = await executor.execute_async(func, *args, **kwargs)
+                # Extract result from RetryResult for backward compatibility
+                if result.success:
+                    return result.result  # type: ignore
+                else:
+                    if result.exception:
+                        raise result.exception
+                    raise RuntimeError("Retry execution failed with no exception")
+
+            # Preserve original function metadata
+            async_wrapper.__name__ = func.__name__
+            async_wrapper.__doc__ = func.__doc__
+            async_wrapper.__module__ = func.__module__
+            async_wrapper.__wrapped__ = func  # type: ignore
             return async_wrapper  # type: ignore
-        return sync_wrapper  # type: ignore
+        else:
+            # For sync functions, wrap with executor
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                result = executor.execute(func, *args, **kwargs)
+                # Extract result from RetryResult for backward compatibility
+                if result.success:
+                    return result.result  # type: ignore
+                else:
+                    if result.exception:
+                        raise result.exception
+                    raise RuntimeError("Retry execution failed with no exception")
+
+            # Preserve original function metadata
+            sync_wrapper.__name__ = func.__name__
+            sync_wrapper.__doc__ = func.__doc__
+            sync_wrapper.__module__ = func.__module__
+            sync_wrapper.__wrapped__ = func  # type: ignore
+            return sync_wrapper  # type: ignore
 
     return decorator
 
 
 # =============================================================================
-# Circuit Breaker (State Pattern)
+# Circuit Breaker (Observable Subclass)
 # =============================================================================
 
-# CircuitState, CircuitBreakerConfig, and CircuitBreakerError imported from
-# victor.providers.circuit_breaker (canonical source)
+# ObservableCircuitBreaker extends the canonical CircuitBreaker from
+# victor.providers.circuit_breaker with metrics collection support.
 
 
-class ObservableCircuitBreaker:
+class ObservableCircuitBreaker(CanonicalCircuitBreaker):
     """Circuit breaker with observability features for metrics and callbacks.
 
-    Renamed from CircuitBreaker to be semantically distinct:
-    - CircuitBreaker (victor.providers.circuit_breaker): Standalone with decorator/context manager
-    - MultiCircuitBreaker (victor.agent.resilience): Manages multiple named circuits
-    - ObservableCircuitBreaker (here): Metrics/callback focused with on_state_change
-    - ProviderCircuitBreaker (victor.providers.resilience): ResilientProvider workflow
+    Extends the canonical CircuitBreaker from victor.providers.circuit_breaker
+    with a get_metrics() method for observability integration.
+
+    This is the recommended circuit breaker for observability use cases.
+    For simple decorator/context manager usage, use CanonicalCircuitBreaker directly.
 
     States:
     - CLOSED: Normal operation, failures are counted
     - OPEN: Calls fail immediately, waiting for recovery timeout
     - HALF_OPEN: Limited calls allowed to test recovery
 
-    Thread-safe implementation using asyncio locks.
-
     Example:
-        breaker = ObservableCircuitBreaker(failure_threshold=5, timeout_seconds=30.0)
+        breaker = ObservableCircuitBreaker(failure_threshold=5, recovery_timeout=30.0)
 
         @breaker
         async def call_service():
             return await http_client.get(url)
 
-        # Or use as context manager
-        async with breaker:
-            await call_service()
+        # Get metrics for observability
+        metrics = breaker.get_metrics()
     """
 
     def __init__(
         self,
         failure_threshold: int = 5,
         success_threshold: int = 2,
-        timeout_seconds: float = 30.0,
+        recovery_timeout: float = 30.0,
         half_open_max_calls: int = 3,
         excluded_exceptions: tuple = (),
         name: Optional[str] = None,
         on_state_change: Optional[Callable[[CircuitState, CircuitState], None]] = None,
         *,
-        recovery_timeout: Optional[float] = None,  # Deprecated alias
+        timeout_seconds: Optional[float] = None,  # Canonical parameter name
     ) -> None:
-        """Initialize circuit breaker.
+        """Initialize observable circuit breaker.
 
         Args:
             failure_threshold: Failures before opening circuit.
             success_threshold: Successes in half-open to close.
-            timeout_seconds: Seconds before trying half-open (canonical name).
+            recovery_timeout: Seconds before trying half-open (canonical name).
             half_open_max_calls: Max concurrent calls in half-open.
             excluded_exceptions: Exceptions that don't count as failures.
-            name: Optional name for logging.
-            on_state_change: Callback for state transitions.
-            recovery_timeout: Deprecated alias for timeout_seconds.
+            name: Optional name for logging/metrics.
+            on_state_change: Callback for state transitions (old_state, new_state).
+            timeout_seconds: Alias for recovery_timeout (for compatibility).
         """
-        # Support deprecated recovery_timeout parameter
-        actual_timeout = recovery_timeout if recovery_timeout is not None else timeout_seconds
+        # Support both parameter names for compatibility
+        actual_timeout = timeout_seconds if timeout_seconds is not None else recovery_timeout
 
-        self._failure_threshold = failure_threshold
-        self._success_threshold = success_threshold
-        self._timeout_seconds = actual_timeout
-        self._half_open_max_calls = half_open_max_calls
-        self._excluded_exceptions = excluded_exceptions
-        self._name = name or "circuit_breaker"
-        self._on_state_change = on_state_change
+        # Wrap callback to match parent's 3-param signature (old, new, name)
+        # Parent expects (old_state, new_state, name), we provide (old_state, new_state)
+        wrapped_callback: Optional[Callable] = None
+        if on_state_change is not None:
 
-        self._state = _CircuitState.CLOSED
-        self._failure_count = 0
-        self._success_count = 0
-        self._last_failure_time: Optional[float] = None
-        self._half_open_calls = 0
-        self._lock = asyncio.Lock()
+            def wrapped_callback(old: CircuitState, new: CircuitState, cb_name: str) -> None:
+                on_state_change(old, new)  # type: ignore
 
-    @property
-    def state(self) -> CircuitState:
-        """Get current circuit state."""
-        return self._state
+        # Initialize parent canonical circuit breaker
+        super().__init__(
+            failure_threshold=failure_threshold,
+            recovery_timeout=actual_timeout,
+            half_open_max_calls=half_open_max_calls,
+            success_threshold=success_threshold,
+            excluded_exceptions=excluded_exceptions,
+            name=name or "observable_circuit_breaker",
+            on_state_change=wrapped_callback,
+        )
 
+    # Backward-compatible properties for accessing private attributes
     @property
     def failure_count(self) -> int:
         """Get current failure count."""
         return self._failure_count
 
     @property
-    def is_closed(self) -> bool:
-        """Check if circuit is closed (normal operation)."""
-        return self._state == _CircuitState.CLOSED
+    def success_count(self) -> int:
+        """Get current success count."""
+        return self._success_count
 
     @property
-    def is_open(self) -> bool:
-        """Check if circuit is open (failing fast)."""
-        return self._state == _CircuitState.OPEN
-
-    def _transition_to(self, new_state: CircuitState) -> None:
-        """Transition to new state with callback."""
-        old_state = self._state
-        if old_state != new_state:
-            self._state = new_state
-            logger.info(
-                f"Circuit breaker '{self._name}' state: {old_state.value} -> {new_state.value}"
-            )
-            if self._on_state_change:
-                self._on_state_change(old_state, new_state)
-
-    async def _check_state(self) -> bool:
-        """Check and potentially update state.
-
-        Returns:
-            True if call should proceed.
-        """
-        async with self._lock:
-            if self._state == _CircuitState.CLOSED:
-                return True
-
-            if self._state == _CircuitState.OPEN:
-                # Check if recovery timeout has passed
-                if self._last_failure_time:
-                    elapsed = time.time() - self._last_failure_time
-                    if elapsed >= self._timeout_seconds:
-                        self._transition_to(_CircuitState.HALF_OPEN)
-                        self._half_open_calls = 0
-                        self._success_count = 0
-                        return True
-                return False
-
-            if self._state == _CircuitState.HALF_OPEN:
-                if self._half_open_calls < self._half_open_max_calls:
-                    self._half_open_calls += 1
-                    return True
-                return False
-
-            return False
-
-    async def _record_success(self) -> None:
-        """Record successful call."""
-        async with self._lock:
-            if self._state == _CircuitState.HALF_OPEN:
-                self._success_count += 1
-                if self._success_count >= self._success_threshold:
-                    self._transition_to(_CircuitState.CLOSED)
-                    self._failure_count = 0
-
-    async def _record_failure(self, error: Exception) -> None:
-        """Record failed call."""
-        # Don't count excluded exceptions
-        if isinstance(error, self._excluded_exceptions):
-            return
-
-        async with self._lock:
-            self._failure_count += 1
-            self._last_failure_time = time.time()
-
-            if self._state == _CircuitState.CLOSED:
-                if self._failure_count >= self._failure_threshold:
-                    self._transition_to(_CircuitState.OPEN)
-
-            elif self._state == _CircuitState.HALF_OPEN:
-                self._transition_to(_CircuitState.OPEN)
-
-    async def __aenter__(self) -> "CircuitBreaker":
-        """Enter circuit breaker context."""
-        if not await self._check_state():
-            raise CircuitBreakerError(
-                f"Circuit breaker '{self._name}' is {self._state.value}",
-                state=self._state,
-                retry_after=self._timeout_seconds,
-            )
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Exit circuit breaker context."""
-        if exc_val is None:
-            await self._record_success()
-        elif exc_type is not None:
-            await self._record_failure(exc_val)
-
-    def __call__(self, func: F) -> F:
-        """Use circuit breaker as decorator."""
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            async with self:
-                return await func(*args, **kwargs)
-
-        return wrapper  # type: ignore
-
-    def reset(self) -> None:
-        """Reset circuit breaker to closed state."""
-        self._state = _CircuitState.CLOSED
-        self._failure_count = 0
-        self._success_count = 0
-        self._last_failure_time = None
-        self._half_open_calls = 0
+    def timeout_seconds(self) -> float:
+        """Get recovery timeout in seconds (backward compatible alias)."""
+        return self.recovery_timeout
 
     def get_metrics(self) -> Dict[str, Any]:
-        """Get circuit breaker metrics."""
+        """Get circuit breaker metrics for observability.
+
+        Returns:
+            Dict with current circuit breaker state and statistics.
+        """
         return {
-            "name": self._name,
+            "name": self.name,
             "state": self._state.value,
             "failure_count": self._failure_count,
             "success_count": self._success_count,
             "last_failure_time": self._last_failure_time,
-            "failure_threshold": self._failure_threshold,
-            "timeout_seconds": self._timeout_seconds,
+            "failure_threshold": self.failure_threshold,
+            "timeout_seconds": self.recovery_timeout,  # Backward compatible key
+            "recovery_timeout": self.recovery_timeout,
+            "half_open_calls": self._half_open_calls,
         }
 
 
-# Backward compatibility alias
+# Backward compatibility alias - exports ObservableCircuitBreaker as CircuitBreaker
 CircuitBreaker = ObservableCircuitBreaker
 
 
@@ -867,13 +807,9 @@ class ResiliencePolicy:
         """Execute with circuit breaker, retry, and timeout."""
 
         async def execute_once() -> Any:
-            # Circuit breaker check
+            # Circuit breaker check - raises CircuitBreakerError if blocked
             if self._circuit_breaker:
-                if not await self._circuit_breaker._check_state():
-                    raise CircuitBreakerError(
-                        f"Circuit breaker is {self._circuit_breaker.state.value}",
-                        self._circuit_breaker.state,
-                    )
+                await self._circuit_breaker._check_state()
 
             try:
                 # Apply timeout
@@ -884,14 +820,14 @@ class ResiliencePolicy:
 
                 # Record success
                 if self._circuit_breaker:
-                    await self._circuit_breaker._record_success()
+                    self._circuit_breaker._record_success()
 
                 return result
 
             except Exception as e:
                 # Record failure
                 if self._circuit_breaker:
-                    await self._circuit_breaker._record_failure(e)
+                    self._circuit_breaker._record_failure(e)
                 raise
 
         # Apply retry if configured

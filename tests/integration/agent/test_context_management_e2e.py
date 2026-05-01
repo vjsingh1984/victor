@@ -25,7 +25,7 @@ from victor.agent.compaction_summarizer import (
     KeywordCompactionSummarizer,
     LedgerAwareCompactionSummarizer,
 )
-from victor.agent.context_assembler import TurnBoundaryContextAssembler
+from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 from victor.agent.referential_intent_resolver import ReferentialIntentResolver
 from victor.agent.session_ledger import SessionLedger
 from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
@@ -161,10 +161,16 @@ class TestContextManagementPipeline:
         """Test that deduplication doesn't change message order or count."""
         deduplicator = ToolResultDeduplicator()
         messages = [
-            _msg("user", '<TOOL_OUTPUT tool="read" path="/a.py">' + "x" * 600 + "</TOOL_OUTPUT>"),
+            _msg(
+                "user",
+                '<TOOL_OUTPUT tool="read" path="/a.py">' + "x" * 600 + "</TOOL_OUTPUT>",
+            ),
             _msg("assistant", "I see the file"),
             _msg("user", "Now read it again"),
-            _msg("user", '<TOOL_OUTPUT tool="read" path="/a.py">' + "y" * 600 + "</TOOL_OUTPUT>"),
+            _msg(
+                "user",
+                '<TOOL_OUTPUT tool="read" path="/a.py">' + "y" * 600 + "</TOOL_OUTPUT>",
+            ),
         ]
         original_count = len(messages)
         original_roles = [m.role for m in messages]

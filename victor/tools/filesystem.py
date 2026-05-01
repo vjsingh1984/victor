@@ -14,13 +14,15 @@
 
 """Filesystem tools for reading, writing, and listing contents."""
 
+import asyncio
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Callable, Tuple
+from typing import List, Dict, Any, Optional, Callable, Tuple, Union
 
 import aiofiles
 
@@ -48,6 +50,63 @@ def reset_path_resolver() -> None:
     """Reset the path resolver (useful when cwd changes)."""
     global _path_resolver
     _path_resolver = None
+
+
+def _list_available_directories(base_path: Path, max_count: int = 10) -> List[str]:
+    """List available directories at the given path level.
+
+    Args:
+        base_path: Parent path to search
+        max_count: Maximum number of directories to return
+
+    Returns:
+        List of directory names
+    """
+    if not base_path.exists():
+        return []
+
+    try:
+        return [
+            d.name for d in sorted(base_path.iterdir()) if d.is_dir() and not d.name.startswith(".")
+        ][:max_count]
+    except PermissionError:
+        return []
+
+
+def _validate_directory_with_suggestions(path: Path) -> None:
+    """Validate directory exists, providing helpful suggestions if not.
+
+    Args:
+        path: Path to validate
+
+    Raises:
+        FileNotFoundError: With helpful suggestions if directory doesn't exist
+    """
+    if path.exists():
+        return
+
+    # Try to find similar directories
+    if path.parent.exists():
+        available = _list_available_directories(path.parent)
+        if available:
+            # Find directories with similar names
+            from difflib import get_close_matches
+
+            suggestions = get_close_matches(path.name, available, n=3, cutoff=0.6)
+            if suggestions:
+                raise FileNotFoundError(
+                    f"Directory not found: {path}\n\n"
+                    f"Did you mean one of these?\n  - "
+                    + "\n  - ".join(suggestions)
+                    + f"\n\nAvailable directories in {path.parent.name}:\n  - "
+                    + "\n  - ".join(available[:5])
+                )
+
+    # Fallback: general error
+    raise FileNotFoundError(
+        f"Directory not found: {path}\n\n"
+        f"Tip: Check the path is correct and the directory exists."
+    )
 
 
 # ============================================================================
@@ -147,19 +206,21 @@ class FileContentCacheStats:
 class FileContentCache:
     """Session-level cache for file contents.
 
-    Features:
+    NOTE: DISABLED by default (_cache_enabled=False).
+    The OS page cache is more efficient for this purpose - it keeps
+    recently accessed file pages in memory at the kernel level with
+    better memory management across the entire system.
+
+    This cache adds unnecessary memory pressure in the Python process
+    for minimal benefit. Re-enable only if profiling shows a proven
+    bottleneck in file I/O for repeated reads of the same files.
+
+    Features (when enabled):
     - Caches file contents keyed by normalized absolute path
     - Auto-invalidates when file modification time changes
     - Thread-safe operations
     - Memory-bounded with LRU eviction
     - Tracks hit/miss statistics
-
-    Usage:
-        cache = FileContentCache(max_entries=100, max_total_bytes=10_000_000)
-        content = cache.get("/path/to/file")  # Returns None on miss
-        cache.set("/path/to/file", content, mtime, size)
-        cache.invalidate("/path/to/file")  # On write
-        cache.clear()  # On session end
     """
 
     def __init__(
@@ -376,9 +437,10 @@ class FileContentCache:
 
 
 # Global file content cache instance (session-level)
-# This is shared across all filesystem tool invocations within a session
+# DISABLED by default - OS page cache is more efficient.
+# Can be re-enabled via settings if needed for specific use cases.
 _file_content_cache: Optional[FileContentCache] = None
-_cache_enabled: bool = True  # Can be disabled via settings
+_cache_enabled: bool = False  # Disabled - OS page cache handles this better
 
 
 # ============================================================================
@@ -423,25 +485,43 @@ def enforce_sandbox_path(file_path: Path) -> None:
         file_path: The resolved file path being written to
 
     Raises:
-        PermissionError: If path is outside sandbox in restricted mode
+        PermissionError: If path is outside the active write policy or sandbox
     """
+    from victor.tools.write_path_policy import get_active_write_policy
+
+    policy = get_active_write_policy()
+    if policy is not None:
+        if not policy.allows(file_path):
+            try:
+                from victor.agent.mode_controller import get_mode_controller
+
+                mode = get_mode_controller().current_mode.value.upper()
+            except Exception:
+                mode = "RESTRICTED"
+            raise PermissionError(
+                f"[{mode} MODE] Cannot write to '{file_path}'.\n"
+                f"Analysis-safe paths: .victor/analysis/, ./tmp/, ./docs/*.md, "
+                f"./ANALYSIS-*.md, ./CHECKPOINT-*.md, /tmp/**"
+            )
+        return  # Policy satisfied — skip legacy sandbox check
+
+    # Legacy sandbox path (no policy set — unchanged behavior)
     sandbox = get_sandbox_path()
 
     if sandbox is None:
-        # No sandbox restriction in effect
         return
 
-    # Ensure sandbox exists
     sandbox.mkdir(parents=True, exist_ok=True)
 
-    # Check if the path is within the sandbox
     try:
         file_path.resolve().relative_to(sandbox.resolve())
     except ValueError:
-        # Path is not within sandbox
-        from victor.agent.mode_controller import get_mode_controller
+        try:
+            from victor.agent.mode_controller import get_mode_controller
 
-        mode = get_mode_controller().current_mode.value.upper()
+            mode = get_mode_controller().current_mode.value.upper()
+        except Exception:
+            mode = "RESTRICTED"
         raise PermissionError(
             f"[{mode} MODE] Cannot write to '{file_path}'.\n"
             f"In {mode} mode, edits are restricted to the sandbox directory: {sandbox}\n"
@@ -725,7 +805,7 @@ MAGIC_SIGNATURES: List[Tuple[bytes, int, FileTypeInfo]] = [
             mime_type="application/x-sqlite3",
             description="SQLite database",
             extensions=(".db", ".sqlite", ".sqlite3"),
-            suggestion="Use `sqlite3 file.db '.tables'` to explore the database.",
+            suggestion="Use shell(cmd='sqlite3 file.db \".tables\"') to list tables, or database(action='connect', connection=DatabaseConnection(db_type='sqlite', database='file.db')) for structured access.",
         ),
     ),
     # Media
@@ -1079,8 +1159,15 @@ TEXT_EXTENSIONS = {
     access_mode=AccessMode.READONLY,  # Only reads files
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["path", "offset", "limit"],  # Params indicating exploration progress
-    stages=["reading", "initial", "analysis", "verification"],  # Conversation stages where relevant
+    signature_params=[
+        "path",
+    ],  # Only path matters for loop detection. offset/limit excluded to enable pagination - reading different chunks of same file is exploration, not a loop
+    stages=[
+        "reading",
+        "initial",
+        "analysis",
+        "verification",
+    ],  # Conversation stages where relevant
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1102,15 +1189,15 @@ TEXT_EXTENSIONS = {
         "reading source code files",
         "viewing configuration files",
         "examining text documents",
-        "searching within code files",
-        "looking at specific lines",
+        "pattern search within a single file (use code_search for multi-file)",
+        "viewing specific line ranges with offset/limit",
     ],
     examples=[
         "read the file src/main.py",
         "show me the contents of config.yaml",
         "what's in the README",
-        "search for 'def calculate' in utils.py",
         "show first 50 lines of main.py",
+        "search for 'def calculate' in utils.py (single file)",
     ],
     mandatory_keywords=[
         "read file",
@@ -1123,11 +1210,12 @@ TEXT_EXTENSIONS = {
         "what does",
     ],  # Force inclusion
     priority_hints=[
-        "TRUNCATION: 1500 lines/64KB. Always ends on complete lines.",
+        "TRUNCATION: 10000 lines/64KB. Always ends on complete lines.",
         "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
-        "Use search parameter for efficient grep-like targeted lookups",
+        "SINGLE-FILE SEARCH: Use search parameter for grep-like pattern search within one file",
+        "MULTI-FILE SEARCH: Use code_search(mode='text', query='pattern', path='.') for searching across multiple files",
         "Use ls first to check file sizes before reading",
     ],
 )
@@ -1144,30 +1232,54 @@ async def read(
 ) -> str:
     """Read text/code file. Binary files rejected.
 
+    Use this tool for READING FILE CONTENTS.
+    For listing directory contents, use ls(path='directory/') instead.
+
     TRUNCATION LIMITS:
-    - Maximum 1500 lines OR 64KB (whichever is reached first)
+    - Maximum 10000 lines OR 64KB (whichever is reached first)
     - Always truncates at complete line boundaries (never mid-line)
     - When truncated, includes: "[... N more lines. Use offset=X to continue ...]"
 
     PAGINATION (for large files):
     - Use offset/limit: read(path, offset=0, limit=200), then offset=200, etc.
     - Or let auto-truncation guide you with the offset value in output
-    - Use search param to find specific content without reading entire file
+
+    SEARCH OPTIONS:
+    - Single-file: Use search param for grep-like pattern search within one file
+    - Multi-file: Use code_search(mode='text', query='pattern', path='.') for searching across files
+    - Semantic: Use code_search(mode='semantic', query='concept') for conceptual search
 
     Args:
-        path: File path
+        path: File path (MUST be a file, NOT a directory)
         offset: Start line (0=beginning). Use for pagination of large files.
         limit: Max lines to read (0=auto, applies configured limits).
                Set explicit limit to override auto-truncation.
-        search: Grep pattern - efficient for finding specific content
-        ctx: Context lines around matches
-        regex: Pattern is regex
+        search: Grep pattern for single-file search (use code_search for multi-file)
+        ctx: Context lines around search matches
+        regex: Pattern is regex (default: False for literal match)
         line_start: Alias for offset (some models use this name)
         line_end: Alias for limit (some models use this name)
 
     Returns:
         File content with line numbers. If truncated, includes continuation hint
-        with exact offset to use for next read.
+        with exact offset to use for next read. If search param is used, returns
+        matching lines with context.
+
+    Examples:
+        # Read entire file (with auto-truncation)
+        read('src/main.py')
+
+        # Read with pagination
+        read('src/main.py', offset=0, limit=200)
+        read('src/main.py', offset=200, limit=200)
+
+        # Single-file pattern search
+        read('src/main.py', search='TODO', ctx=2)
+
+        # Multi-file search (use code_search instead)
+        code_search(mode='text', query='TODO', path='src/', k=10)
+
+    Note: If you need to list files in a directory, use ls(path='directory/') instead.
     """
     # Handle parameter aliases from models that use different names
     if line_start is not None and offset == 0:
@@ -1179,6 +1291,35 @@ async def read(
         else:
             limit = line_end
     file_path = Path(path).expanduser().resolve()
+
+    # Workspace guard: warn if path is outside the current project root.
+    # Returns helpful message so model self-corrects (doesn't raise).
+    # Disabled via VICTOR_DISABLE_WORKSPACE_GUARD=1 for testing.
+    if not os.environ.get("VICTOR_DISABLE_WORKSPACE_GUARD"):
+        try:
+            from victor.config.settings import get_project_paths
+
+            _project_root = Path(get_project_paths().project_root).resolve()
+            if not str(file_path).startswith(str(_project_root)):
+                return (
+                    f"Path '{path}' is outside the current workspace "
+                    f"({_project_root.name}). You are working in the "
+                    f"{_project_root.name} project. Use ls('.') to see files."
+                )
+        except Exception:
+            pass
+
+    # Early return for directory paths (handles "", ".", "src/", etc.)
+    if file_path.is_dir():
+        logger.info("Auto-converting read('%s') → ls('%s')", path, path)
+        try:
+            dir_result = await ls(path=str(file_path), depth=1)
+            return f"Note: '{path}' is a directory, showing contents:\n\n{dir_result}"
+        except Exception as e:
+            return (
+                f"'{path}' is a directory. Listing failed: {e}\n"
+                f"Use ls(path='{path}') to explore."
+            )
 
     if not file_path.exists():
         # Try PathResolver for intelligent path normalization and suggestions
@@ -1197,28 +1338,73 @@ async def read(
                 except ValueError:
                     path = str(result.resolved_path)
         except FileNotFoundError:
-            # PathResolver couldn't find the file - provide helpful suggestions
-            suggestions = resolver.suggest_similar(path, limit=5)
-            if suggestions:
-                suggestion_list = "\n  - ".join(suggestions[:5])
-                raise FileNotFoundError(
-                    f"File not found: {path}\n" f"Did you mean one of these?\n  - {suggestion_list}"
-                )
+            # Try fuzzy resolve — search for bare filename in project tree
+            basename = Path(path).name
+            if basename and basename != path:
+                # Already has directory prefix, don't fuzzy search
+                pass
             else:
-                raise FileNotFoundError(f"File not found: {path}")
+                try:
+                    cwd = Path.cwd()
+                    matches = [
+                        m
+                        for m in cwd.rglob(basename)
+                        if m.is_file() and ".victor" not in str(m) and ".git" not in str(m)
+                    ]
+                    if len(matches) == 1:
+                        file_path = matches[0]
+                        logger.info(f"Fuzzy resolved {path} → {file_path}")
+                        try:
+                            path = str(file_path.relative_to(cwd))
+                        except ValueError:
+                            path = str(file_path)
+                        # Skip to reading — file_path is now valid
+                        if file_path.exists():
+                            # Continue to the reading logic below
+                            pass
+                        else:
+                            raise FileNotFoundError(f"File not found: {path}")
+                    else:
+                        raise FileNotFoundError("multiple or none")
+                except (FileNotFoundError, OSError):
+                    pass  # Fall through to suggestions
+
+            # PathResolver couldn't find the file - provide helpful suggestions
+            if not file_path.exists():
+                suggestions = resolver.suggest_similar(path, limit=5)
+                if suggestions:
+                    suggestion_list = "\n  - ".join(suggestions[:5])
+                    raise FileNotFoundError(
+                        f"File not found: {path}\n"
+                        f"Did you mean one of these?\n  - {suggestion_list}"
+                    )
+                else:
+                    raise FileNotFoundError(f"File not found: {path}")
         except IsADirectoryError:
-            raise IsADirectoryError(
-                f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
-                f"or specify a file path within this directory."
-            )
+            # Auto-convert read(dir) → ls(dir)
+            logger.info(f"Auto-converting read('{path}') → ls('{path}')")
+            try:
+                dir_result = await ls(path=path, depth=1)
+                return f"Note: '{path}' is a directory, showing contents:\n\n" f"{dir_result}"
+            except Exception as e:
+                logger.warning("ls() fallback failed for directory '%s': %s", path, e)
+                return (
+                    f"'{path}' is a directory. Listing failed: {e}\n"
+                    f"Use ls(path='{path}') to explore."
+                )
     if not file_path.is_file():
         if file_path.is_dir():
-            raise IsADirectoryError(
-                f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
-                f"or specify a file path within this directory."
-            )
+            # Auto-convert read(dir) → ls(dir) instead of erroring
+            logger.info(f"Auto-converting read('{path}') → ls('{path}')")
+            try:
+                dir_result = await ls(path=path, depth=1)
+                return f"Note: '{path}' is a directory, showing contents:\n\n" f"{dir_result}"
+            except Exception as e:
+                logger.warning("ls() fallback failed for directory '%s': %s", path, e)
+                return (
+                    f"'{path}' is a directory. Listing failed: {e}\n"
+                    f"Use ls(path='{path}') to explore."
+                )
         raise IsADirectoryError(f"Path is not a file: {path}")
 
     # Binary file categories with helpful suggestions
@@ -1260,7 +1446,7 @@ async def read(
         # Databases - suggest querying
         "database": {
             "extensions": {".db", ".sqlite", ".sqlite3"},
-            "suggestion": "This is a database file. Use execute_bash with 'sqlite3' to query it, "
+            "suggestion": "This is a database file. Use shell with 'sqlite3' to query it, "
             "e.g., `sqlite3 file.db '.tables'` or `sqlite3 file.db 'SELECT * FROM table LIMIT 5'`.",
         },
         # Python bytecode/cache
@@ -1277,7 +1463,7 @@ async def read(
         # Archives
         "archive": {
             "extensions": {".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar", ".tgz"},
-            "suggestion": "This is an archive. Use execute_bash to list contents: "
+            "suggestion": "This is an archive. Use shell to list contents: "
             "`unzip -l file.zip`, `tar -tf file.tar.gz`, etc.",
         },
         # Compiled/binary
@@ -1390,7 +1576,7 @@ async def read(
         raise ValueError(
             f"Cannot read binary file: {path}\n"
             f"Type: coverage database\n"
-            f"Suggestion: This is a pytest-cov SQLite database. Use execute_bash with sqlite3 to query, "
+            f"Suggestion: This is a pytest-cov SQLite database. Use shell with sqlite3 to query, "
             f"or use 'coverage report' to see formatted coverage data."
         )
 
@@ -1481,16 +1667,23 @@ async def read(
             settings = get_settings()
 
             # Check for airgapped mode or local providers
-            if settings.airgapped_mode:
-                return 1500, 65536  # ~2000 lines, 32KB for local models (airgapped)
+            if settings.security.airgapped_mode:
+                return 10000, 65536  # ~10000 lines, 64KB for local models (airgapped)
 
             # Check provider name for local indicators
-            provider = getattr(settings, "provider", "").lower()
+            provider_obj = getattr(settings, "provider", None)
+            provider = (
+                provider_obj.default_provider
+                if hasattr(provider_obj, "default_provider")
+                else str(provider_obj or "")
+            ).lower()
             local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
             if any(p in provider for p in local_providers):
                 # Try to get model context size from capabilities
                 try:
-                    from victor.providers.model_capabilities import get_model_capabilities
+                    from victor.providers.model_capabilities import (
+                        get_model_capabilities,
+                    )
 
                     model = getattr(settings, "model", "")
                     caps = get_model_capabilities(model)
@@ -1501,24 +1694,34 @@ async def read(
                         max_tokens = context_window // 4  # Use 25% of context for file reads
                         # Estimate ~3 bytes per token (average), ~40 chars per line
                         max_lines = min(
-                            1500, max(100, max_tokens // 3)
+                            10000, max(100, max_tokens // 3)
                         )  # Ensure at least 100 lines
                         max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
                 except Exception as e:
                     logger.debug("Failed to compute context-aware truncation limits: %s", e)
-                return 1500, 65536  # Fallback for local models: 1500, 64KB
+                return 10000, 65536  # Fallback for local models: 10000 lines, 64KB
 
             # Cloud models get higher limits (large context windows)
             # Anthropic: 200K tokens, GPT-4: 128K tokens
             # 100KB ≈ 25K tokens at 4 bytes/token, reasonable for large context
-            return 1500, 65536  # ~2500 lines, 100KB for cloud models
+            return 10000, 65536  # ~10000 lines, 64KB for cloud models
         except Exception as e:
             # Default to cloud limits if settings unavailable
             logger.debug("Settings unavailable for truncation limits, using defaults: %s", e)
-            return 1500, 65536  # ~1500 lines, 64KB
+            return 10000, 65536  # ~10000 lines, 64KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
+
+    # Check file size and adapt limit if needed for large files
+    file_size = len(content.encode("utf-8"))
+    if limit == 0 and file_size > 500000:  # 500KB threshold
+        # For large files, use higher default limit
+        MAX_LINES = 50000
+        logger.info(
+            f"Large file detected ({file_size} bytes), "
+            f"increasing read limit to {MAX_LINES} lines"
+        )
 
     lines = content.split("\n")
     total_lines = len(lines)
@@ -1563,10 +1766,19 @@ async def read(
     if info.was_truncated:
         remaining = total_lines - actual_end_line
         if info.truncation_reason == "line_limit":
-            header_parts.append(
-                f"[TRUNCATED: Hit {effective_max_lines} line limit. "
-                f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
-            )
+            # Distinguish between user-requested limit and system limit
+            if limit > 0:
+                # User explicitly requested this limit
+                header_parts.append(
+                    f"[READ {actual_end_line - offset}/{total_lines} lines requested via limit={limit}. "
+                    f"{remaining} more lines available. Use offset={actual_end_line} to continue]"
+                )
+            else:
+                # System-imposed limit
+                header_parts.append(
+                    f"[TRUNCATED: Hit {effective_max_lines} line system limit. "
+                    f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
+                )
         elif info.truncation_reason == "byte_limit":
             header_parts.append(
                 f"[TRUNCATED: Hit {MAX_BYTES // 1024}KB byte limit at line {actual_end_line}. "
@@ -1583,9 +1795,13 @@ async def read(
     access_mode=AccessMode.WRITE,  # Creates/overwrites files
     danger_level=DangerLevel.LOW,  # Minor risk, easily undoable
     # Registry-driven metadata for tool selection and cache invalidation
-    progress_params=["path"],  # Same file = loop, regardless of content
+    signature_params=["path"],  # Same file = loop, regardless of content
     stages=["execution"],  # Conversation stages where relevant
-    task_types=["edit", "generation", "action"],  # Task types for classification-aware selection
+    task_types=[
+        "edit",
+        "generation",
+        "action",
+    ],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.WRITE,  # Cannot run in parallel with conflicting ops
     keywords=[
         "write",
@@ -1619,30 +1835,55 @@ async def read(
         "Automatically uses LSP validation/formatting when available for the language",
     ],
 )
-async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
-    """Write file. Creates parent dirs. Use edit_files for partial edits.
+async def write(
+    path: str,
+    content: str,
+    *,
+    validate: bool = False,
+    format_code: bool = False,
+    dry_run: bool = False,
+) -> Union[str, Dict[str, Any]]:
+    """Write file with optional LSP enhancement.
 
-    Automatically uses LSP (Language Server Protocol) enhancement when available:
+    Creates parent directories automatically. Use edit tool for partial edits.
+
+    **Simple Mode** (default):
+    Returns a success message string. LSP auto-applied for supported file types.
+
+    **Enhanced Mode** (when validate/format_code/dry_run used):
+    Returns detailed Dict with diagnostics, validation results, formatting info.
+
+    LSP Enhancement:
     - Validates code syntax before writing
     - Formats code using language-specific formatters
-    - Returns diagnostic information (errors, warnings)
+    - Returns diagnostic information (errors, warnings, hints)
 
     Supported languages: C/C++, Python, Rust, JavaScript/TypeScript, Go, Java, and 15+ more.
 
     Args:
         path: File path (creates dirs)
-        content: Full content (overwrites)
-        use_lsp: Enable LSP validation and formatting when available (default: True)
+        content: Full raw file content to write verbatim (overwrites)
+        validate: Validate with LSP before writing (default: False)
+        format_code: Format with language formatter (default: False)
+        dry_run: If True, validate/format without writing (default: False)
 
     Returns:
-        Success message with LSP enhancement information if applicable.
+        Simple mode: Success message string
+        Enhanced mode: Dict with success, path, formatted, validated, diagnostics, etc.
 
     Examples:
-        # Write with automatic LSP enhancement
+        # Simple mode (auto LSP for code files)
         await write("main.py", "def hello(): print('hi')")
 
-        # Write without LSP enhancement
-        await write("data.txt", "some data", use_lsp=False)
+        # Enhanced mode (detailed diagnostics)
+        result = await write("main.py", code, validate=True, format_code=True)
+        if result["validated"]:
+            print(f"Diagnostics: {result['diagnostics']}")
+
+        # Enhanced mode (dry run - validate without writing)
+        result = await write("main.py", code, validate=True, dry_run=True)
+        if result["summary"]["errors"] == 0:
+            await write("main.py", code)  # Actually write
 
     Note:
         In EXPLORE/PLAN modes, writes are restricted to .victor/sandbox/.
@@ -1659,8 +1900,68 @@ async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
     if file_path.exists() and file_path.is_dir():
         raise IsADirectoryError(f"Cannot write to directory: {path}")
 
-    # Try LSP-enhanced write first if requested
-    if use_lsp:
+    # Determine if enhanced mode is requested
+    enhanced_mode = validate or format_code or dry_run
+
+    # Enhanced mode: Return detailed Dict with diagnostics
+    if enhanced_mode:
+        from victor.tools.lsp_write_enhancer import write_with_lsp
+
+        try:
+            result = await write_with_lsp(
+                path=str(file_path),
+                content=content,
+                validate=validate,
+                format_code=format_code,
+                write=not dry_run,  # Only write if not dry_run
+            )
+
+            # Track change if actually written
+            if not dry_run and result.success:
+                tracker = get_change_tracker()
+                original_content = None
+                change_type = ChangeType.CREATE
+
+                if file_path.exists():
+                    change_type = ChangeType.MODIFY
+                    original_content = file_path.read_text()
+
+                tracker.begin_change_group("write_enhanced", f"Write to {path}")
+                tracker.record_change(
+                    file_path=str(file_path),
+                    change_type=change_type,
+                    original_content=original_content,
+                    new_content=result.written_content,
+                    tool_name="write",
+                    tool_args={
+                        "path": path,
+                        "validate": validate,
+                        "format_code": format_code,
+                        "dry_run": dry_run,
+                    },
+                )
+                tracker.commit_change_group()
+
+                # Invalidate file content cache
+                if is_file_cache_enabled():
+                    cache = get_file_content_cache()
+                    cache.invalidate(str(file_path))
+
+            return result.to_dict()
+
+        except Exception as e:
+            # If LSP enhancement fails in enhanced mode, re-raise with context
+            if enhanced_mode:
+                return {
+                    "success": False,
+                    "path": path,
+                    "error": f"LSP enhancement failed: {str(e)}",
+                    "validated": False,
+                    "formatted": False,
+                }
+
+    # Simple mode: Auto LSP for supported file types
+    if not enhanced_mode:
         # Check if language has LSP support by file extension
         lsp_supported_extensions = {
             # Programming languages
@@ -1726,6 +2027,31 @@ async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
                 )
 
                 if result.success:
+                    # Track the change
+                    tracker = get_change_tracker()
+                    original_content = None
+                    change_type = ChangeType.CREATE
+
+                    if file_path.exists():
+                        change_type = ChangeType.MODIFY
+                        original_content = file_path.read_text()
+
+                    tracker.begin_change_group("write_auto_lsp", f"Write to {path}")
+                    tracker.record_change(
+                        file_path=str(file_path),
+                        change_type=change_type,
+                        original_content=original_content,
+                        new_content=result.written_content,
+                        tool_name="write",
+                        tool_args={"path": path},
+                    )
+                    tracker.commit_change_group()
+
+                    # Invalidate file content cache
+                    if is_file_cache_enabled():
+                        cache = get_file_content_cache()
+                        cache.invalidate(str(file_path))
+
                     # Build success message with LSP info
                     action = "created" if result.original_content is None else "modified"
                     lsp_info = []
@@ -1751,7 +2077,7 @@ async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
                 # LSP enhancement failed, fall back to regular write
                 logger.debug(f"LSP enhancement failed, falling back to regular write: {lsp_error}")
 
-    # Regular write (fallback or when use_lsp=False)
+    # Regular write (fallback when LSP not available)
     # Track the change for undo/redo
     tracker = get_change_tracker()
     original_content = None
@@ -1766,14 +2092,14 @@ async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Record the change
-    tracker.begin_change_group("write_file", f"Write to {path}")
+    tracker.begin_change_group("write", f"Write to {path}")
     tracker.record_change(
         file_path=str(file_path),
         change_type=change_type,
         original_content=original_content,
         new_content=content,
-        tool_name="write_file",
-        tool_args={"path": path, "use_lsp": use_lsp},
+        tool_name="write",
+        tool_args={"path": path},
     )
 
     async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
@@ -1787,184 +2113,8 @@ async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
         cache.invalidate(str(file_path))
 
     action = "created" if change_type == ChangeType.CREATE else "modified"
-    lsp_suffix = " (LSP unavailable for this file type)" if use_lsp else ""
+    lsp_suffix = " (LSP unavailable for this file type)"
     return f"Successfully {action} {path} ({len(content)} characters){lsp_suffix}. Use /undo to revert."
-
-
-@tool(
-    category="filesystem",
-    priority=Priority.HIGH,
-    access_mode=AccessMode.WRITE,
-    danger_level=DangerLevel.LOW,
-    progress_params=["path"],
-    stages=["initial", "planning", "writing"],
-    task_types=["edit", "refactor", "create"],
-    execution_category=ExecutionCategory.WRITE,
-    keywords=[
-        "write",
-        "lsp",
-        "validate",
-        "format",
-        "diagnostics",
-        "type-check",
-        "syntax-check",
-    ],
-    use_cases=[
-        "writing code with LSP validation",
-        "formatting code with language formatters",
-        "checking code before writing",
-        "getting diagnostic feedback",
-    ],
-    examples=[
-        "write main.py with validation",
-        "create validated Python file",
-        "write formatted Rust code",
-        "check code before writing",
-    ],
-)
-async def write_lsp(
-    path: str,
-    content: str,
-    validate: bool = True,
-    format_code: bool = True,
-    dry_run: bool = False,
-) -> Dict[str, Any]:
-    """Write file with LSP validation and formatting.
-
-    Enhanced write operation that uses Language Server Protocol for:
-    - Syntax validation before writing
-    - Auto-formatting using language-specific formatters
-    - Diagnostic feedback (errors, warnings, hints)
-
-    Supported languages:
-        C/C++ (clangd, clang-format)
-        Python (pyright/pylsp, black)
-        Rust (rust-analyzer, rustfmt)
-        JavaScript/TypeScript (tsserver, prettier)
-        Go (gopls, gofmt)
-        And 15+ more languages
-
-    Args:
-        path: File path to write
-        content: Content to write
-        validate: Validate with LSP before writing (default: True)
-        format_code: Format with language formatter (default: True)
-        dry_run: If True, validate/format without writing (default: False)
-
-    Returns:
-        Dictionary with:
-            success: bool - Whether operation succeeded
-            path: str - File path
-            formatted: bool - Whether content was formatted
-            validated: bool - Whether content was validated
-            diagnostics: list - Diagnostic messages
-            formatter_used: str - Name of formatter used (if any)
-            summary: dict - Summary of diagnostics
-            written_content: str - Content that was/would be written
-            error: str - Error message if failed
-
-    Example:
-        result = await write_lsp("src/main.py", "def hello(): print('hi')")
-        if result["summary"]["errors"] > 0:
-            print("Errors found:", result["diagnostics"])
-
-    Note:
-        Falls back to regular write if LSP is not available for the language.
-        Requires language server to be installed (e.g., pyright, clangd, rust-analyzer).
-    """
-    from victor.agent.change_tracker import ChangeType, get_change_tracker
-    from victor.tools.lsp_write_enhancer import write_with_lsp
-
-    file_path = Path(path).expanduser().resolve()
-
-    # Enforce sandbox restrictions in EXPLORE/PLAN modes
-    enforce_sandbox_path(file_path)
-
-    if file_path.exists() and file_path.is_dir():
-        raise IsADirectoryError(f"Cannot write to directory: {path}")
-
-    # Track the change for undo/redo
-    tracker = get_change_tracker()
-    original_content = None
-    change_type = ChangeType.CREATE
-
-    if file_path.exists():
-        change_type = ChangeType.MODIFY
-        original_content = file_path.read_text()
-
-    # Use LSP enhancer
-    try:
-        result = await write_with_lsp(
-            path=str(file_path),
-            content=content,
-            validate=validate,
-            format_code=format_code,
-            write=not dry_run,  # Only write if not dry_run
-        )
-
-        # Track change if actually written
-        if not dry_run and result.success:
-            tracker.begin_change_group("write_lsp", f"Write to {path}")
-            tracker.record_change(
-                file_path=str(file_path),
-                change_type=change_type,
-                original_content=original_content,
-                new_content=result.written_content,
-                tool_name="write_lsp",
-                tool_args={"path": path, "validate": validate, "format_code": format_code},
-            )
-            tracker.commit_change_group()
-
-            # Invalidate file content cache
-            if is_file_cache_enabled():
-                cache = get_file_content_cache()
-                cache.invalidate(str(file_path))
-
-        return result.to_dict()
-
-    except Exception as e:
-        # If LSP enhancement fails, fall back to regular write
-        logger.warning(f"LSP enhancement failed, falling back to regular write: {e}")
-
-        if not dry_run:
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-
-            tracker.begin_change_group("write_file", f"Write to {path}")
-            tracker.record_change(
-                file_path=str(file_path),
-                change_type=change_type,
-                original_content=original_content,
-                new_content=content,
-                tool_name="write_file",
-                tool_args={"path": path},
-            )
-
-            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
-                await f.write(content)
-
-            tracker.commit_change_group()
-
-            if is_file_cache_enabled():
-                cache = get_file_content_cache()
-                cache.invalidate(str(file_path))
-
-        return {
-            "success": True,
-            "path": path,
-            "formatted": False,
-            "validated": False,
-            "diagnostics": [],
-            "formatter_used": None,
-            "summary": {
-                "total_diagnostics": 0,
-                "errors": 0,
-                "warnings": 0,
-                "info": 0,
-                "hints": 0,
-            },
-            "written_content": content,
-            "fallback": True,  # Indicate regular write was used
-        }
 
 
 @tool(
@@ -1973,8 +2123,17 @@ async def write_lsp(
     access_mode=AccessMode.READONLY,  # Only reads directory contents
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
-    stages=["initial", "planning", "reading", "analysis"],  # Conversation stages where relevant
+    signature_params=[
+        "path",
+        "depth",
+        "pattern",
+    ],  # Params indicating exploration progress
+    stages=[
+        "initial",
+        "planning",
+        "reading",
+        "analysis",
+    ],  # Conversation stages where relevant
     task_types=["search", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -2024,8 +2183,20 @@ async def ls(
 ) -> List[Dict[str, Any]]:
     """List directory contents with file sizes.
 
+    ⚠️ CRITICAL: This tool ONLY works on DIRECTORIES, not files.
+    If you need to read file contents, use read(path='file_path') instead.
+
+    Before calling ls():
+    1. Check if the path is a file or directory
+    2. If it's a file (e.g., victor/ui/cli.py), use read() instead
+    3. Only call ls() on directory paths (e.g., victor/ui/)
+
+    WRONG: ls(path='victor/ui/cli.py')  # This is a FILE
+    RIGHT: ls(path='victor/ui/')        # This is a DIRECTORY
+    RIGHT: read(path='victor/ui/cli.py') # Use read() for files
+
     Args:
-        path: Directory path
+        path: Directory path (MUST be a directory, NOT a file)
         recursive: All levels (ignores depth)
         depth: Levels to explore (default=2 for subdirectory visibility)
         pattern: Glob filter (*.py, test_*)
@@ -2066,17 +2237,122 @@ async def ls(
                 if suggestions:
                     suggestion_list = "\n  - ".join(suggestions[:5])
                     raise FileNotFoundError(
-                        f"Directory not found: {path}\n"
-                        f"Did you mean one of these?\n  - {suggestion_list}"
+                        f"❌ Directory not found: {path}\n"
+                        f"💡 Did you mean one of these?\n"
+                        f"  - {suggestion_list}\n"
+                        f"🔍 Use find(name='filename') to search for files"
                     )
                 else:
-                    raise FileNotFoundError(f"Directory not found: {path}")
+                    raise FileNotFoundError(
+                        f"❌ Directory not found: {path}\n"
+                        f"💡 Use find(name='filename') to search for files\n"
+                        f"💡 Use overview(path='.') to see project structure"
+                    )
             except NotADirectoryError:
                 raise NotADirectoryError(
-                    f"Path is not a directory: {path}\n"
-                    f"Suggestion: Use read_file(path='{path}') to read this file instead."
+                    f"❌ ERROR: The path '{path}' is a FILE, NOT a DIRECTORY.\n"
+                    f"🔧 CORRECT ACTION: Use read(path='{path}') instead of ls(path='{path}')\n"
+                    f"📖 EXAMPLE: To read this file, call: read(path='{path}')\n"
+                    f"💡 TIP: The ls() tool ONLY works on directories (e.g., ls(path='victor/ui/'))"
                 )
         if not dir_path.is_dir():
+            if dir_path.is_file():
+                # ls() on a file returns comprehensive filesystem metadata with content preview
+                logger.info(f"ls() called on file '{path}', returning file metadata with preview")
+                try:
+                    stat_info = dir_path.stat()
+                    import pwd
+                    import grp
+
+                    # Get ownership (fallback to numeric IDs if names unavailable)
+                    try:
+                        owner = pwd.getpwuid(stat_info.st_uid).pw_name
+                    except KeyError:
+                        owner = str(stat_info.st_uid)
+                    try:
+                        group = grp.getgrgid(stat_info.st_gid).gr_name
+                    except KeyError:
+                        group = str(stat_info.st_gid)
+
+                    # Get permissions in octal and symbolic form
+                    perms_octal = oct(stat_info.st_mode)[-3:]
+                    import stat as stat_module
+
+                    perms_symbolic = stat_module.filemode(stat_info.st_mode)
+
+                    # Get timestamps
+                    import datetime
+
+                    created = datetime.datetime.fromtimestamp(stat_info.st_ctime)
+                    modified = datetime.datetime.fromtimestamp(stat_info.st_mtime)
+                    accessed = datetime.datetime.fromtimestamp(stat_info.st_atime)
+
+                    # Try to get a content preview (first 500 chars or 10 lines, whichever is less)
+                    content_preview = None
+                    try:
+                        if stat_info.st_size < 100_000:  # Only preview files smaller than 100KB
+                            with open(dir_path, "r", encoding="utf-8", errors="ignore") as f:
+                                lines = []
+                                for i, line in enumerate(f):
+                                    if i >= 10:
+                                        break
+                                    lines.append(line.rstrip("\n"))
+                                preview_text = "\n".join(lines)
+                                if len(preview_text) > 500:
+                                    preview_text = preview_text[:500] + "..."
+                                content_preview = preview_text
+                    except Exception as preview_error:
+                        logger.debug(f"Failed to generate content preview: {preview_error}")
+
+                    # Build file metadata item
+                    item = {
+                        "name": dir_path.name,
+                        "path": str(dir_path),
+                        "type": "file",
+                        "depth": 0,
+                        "size": stat_info.st_size,
+                        "extension": dir_path.suffix.lower() if dir_path.suffix else "",
+                        # Permissions and ownership
+                        "permissions": perms_octal,
+                        "permissions_symbolic": perms_symbolic,
+                        "owner": owner,
+                        "group": group,
+                        # Timestamps
+                        "created": created.isoformat(),
+                        "modified": modified.isoformat(),
+                        "accessed": accessed.isoformat(),
+                        # Additional metadata
+                        "inode": stat_info.st_ino,
+                        "nlinks": stat_info.st_nlink,
+                        "auto_converted": True,
+                        "hint": f"Note: '{path}' is a file. Use read() to see full contents.",
+                    }
+
+                    # Add content preview if available
+                    if content_preview:
+                        item["content_preview"] = content_preview
+
+                    # Return in same format as directory listing
+                    cwd = str(Path.cwd())
+                    try:
+                        relative_target = str(dir_path.relative_to(Path.cwd()))
+                    except ValueError:
+                        relative_target = str(dir_path)
+
+                    return {
+                        "cwd": cwd,
+                        "target": relative_target if relative_target != "." else ".",
+                        "items": [item],
+                        "count": 1,
+                        "auto_converted_from_file": True,
+                    }
+                except Exception as e:
+                    # Fallback to error if metadata collection fails
+                    logger.warning(f"ls() file metadata collection failed: {e}")
+                    raise NotADirectoryError(
+                        f"Path is not a directory: {path}\n"
+                        f"Suggestion: Use read(path='{path}') to read this file instead."
+                    )
             raise NotADirectoryError(f"Path is not a directory: {path}")
 
         # Normalize limit (handle non-int input from model)
@@ -2346,36 +2622,147 @@ IMPORTANT_DOC_PATTERNS = [
 ]
 
 
+async def _get_directory_summaries(root: Path, directory_paths: List[str]) -> Dict[str, str]:
+    """Get summaries for directories based on symbol index.
+
+    Uses the project's SQLite symbol graph to identify key classes and functions
+    within each directory, providing a high-level view of its purpose.
+
+    Args:
+        root: Codebase root path
+        directory_paths: List of relative directory paths to summarize
+
+    Returns:
+        Dict mapping directory path to summary string
+    """
+    from victor.core.database import get_project_database
+
+    try:
+        # Use absolute path to resolve the correct project database
+        # This is safe to call even if the database is already open
+        project_db = get_project_database(root)
+        if not project_db.table_exists("graph_node"):
+            logger.debug("graph_node table does not exist yet (init still in progress)")
+            return {}
+
+        # Limit number of summaries to avoid excessive DB queries on large repos
+        max_summaries = 40
+        target_paths = directory_paths[:max_summaries]
+
+        summaries: Dict[str, str] = {}
+
+        for rel_path in target_paths:
+            # Normalize path for SQLite LIKE (use / even on Windows)
+            # We look for recursive matches (file LIKE 'rel_path/%')
+            db_path_prefix = rel_path.replace("\\", "/") + "/%"
+
+            # Query for top symbols (prioritizing classes then functions)
+            # This is a lightweight query that avoids full graph traversal
+            query = """
+                SELECT type, name
+                FROM graph_node
+                WHERE (file LIKE ? OR file = ?)
+                AND type IN ('class', 'function', 'interface', 'module')
+                ORDER BY CASE type
+                    WHEN 'class' THEN 1
+                    WHEN 'interface' THEN 2
+                    WHEN 'function' THEN 3
+                    ELSE 4
+                END
+                LIMIT 15
+            """
+            rows = project_db.query(query, (db_path_prefix, rel_path))
+
+            if not rows:
+                continue
+
+            # Group by type and build summary
+            by_type: Dict[str, List[str]] = {}
+            for row in rows:
+                t = row["type"]
+                if t not in by_type:
+                    by_type[t] = []
+                by_type[t].append(row["name"])
+
+            parts = []
+            if "class" in by_type:
+                classes = sorted(list(set(by_type["class"])))[:4]
+                parts.append(f"Classes: {', '.join(classes)}")
+            if "function" in by_type:
+                funcs = sorted(list(set(by_type["function"])))[:4]
+                parts.append(f"Funcs: {', '.join(funcs)}")
+
+            if parts:
+                summaries[rel_path] = " | ".join(parts)
+
+        return summaries
+    except Exception as e:
+        # ENHANCEMENT: Better error logging for debugging
+        error_msg = str(e) if str(e) else f"{type(e).__name__}"
+
+        # Log with context for debugging
+        logger.warning(
+            "Failed to get directory summaries from symbol graph: %s "
+            "(this is OK during init - will retry on next tool call)",
+            error_msg,
+        )
+
+        # Return partial results if available
+        return summaries if "summaries" in locals() else {}
+
+
 @tool(
     category="filesystem",
-    priority=Priority.HIGH,  # Useful for initial exploration
-    access_mode=AccessMode.READONLY,  # Only reads directory structure
-    danger_level=DangerLevel.SAFE,  # No side effects
-    # Registry-driven metadata for tool selection and loop detection
-    progress_params=["path", "max_depth"],  # Params indicating exploration progress
-    stages=["initial", "planning", "reading", "analysis"],  # Best used at start of conversation
-    task_types=["analysis", "search"],  # Task types for classification-aware selection
+    name="project_overview",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    # Registry-driven metadata for tool selection
+    signature_params=[
+        "path",
+        "max_depth",
+    ],  # Params indicating exploration progress
+    stages=[
+        "initial",
+        "exploration",
+        "analysis",
+    ],  # Conversation stages where relevant
+    task_types=["analysis", "exploration"],  # Task types for classification
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
         "overview",
-        "project",
-        "structure",
-        "explore",
         "summary",
-        "codebase",
+        "structure",
+        "directories",
+        "project",
         "architecture",
+        "layout",
+        "components",
+        "organization",
+        "tree",
     ],
     use_cases=[
-        "getting a project overview",
-        "understanding codebase structure",
-        "finding important files",
-        "initial exploration",
+        "getting initial project overview",
+        "understanding directory structure",
+        "identifying important files",
+        "project exploration",
+        "finding documentation files",
+        "discovering main components",
     ],
     examples=[
-        "show me the project overview",
-        "what's in this codebase",
-        "explore the project structure",
+        "give me a project overview",
+        "show me the directory structure",
+        "what are the main components",
+        "summarize the project layout",
+        "what does this codebase contain",
+        "how is this project organized",
     ],
+    mandatory_keywords=[
+        "project overview",
+        "directory structure",
+        "main components",
+        "codebase layout",
+    ],  # Force inclusion for these intents
 )
 async def overview(
     path: str = ".",
@@ -2403,8 +2790,9 @@ async def overview(
 
     try:
         root = Path(path).expanduser().resolve()
-        if not root.exists():
-            raise FileNotFoundError(f"Directory not found: {path}")
+        # Validate directory exists with helpful suggestions
+        _validate_directory_with_suggestions(root)
+
         if not root.is_dir():
             # GAP-14 FIX: If a file path is given, use its parent directory
             # This is a common model mistake - be helpful and auto-correct
@@ -2501,6 +2889,26 @@ async def overview(
 
         walk_tree(root, 1)
 
+        # Get summaries for directories from symbol index
+        # ENHANCEMENT: Add retry logic for init-time database locks
+        max_retries = 2
+        dir_summaries = {}
+
+        for attempt in range(max_retries):
+            dir_summaries = await _get_directory_summaries(root, [d["path"] for d in directories])
+
+            if dir_summaries:
+                break  # Success
+
+            if attempt < max_retries - 1:
+                logger.debug("Retry %d/%d for directory summaries", attempt + 1, max_retries)
+                await asyncio.sleep(0.5)  # Brief wait before retry
+
+        # Attach summaries to directories
+        for d in directories:
+            if d["path"] in dir_summaries:
+                d["summary"] = dir_summaries[d["path"]]
+
         # Sort important docs by importance then size
         importance_order = {"high": 0, "medium": 1}
         important_docs.sort(
@@ -2538,7 +2946,8 @@ async def overview(
             "largest_files": largest_files,
             "total_files_scanned": len(all_files),
             "hints": [
-                "Use read_file to examine important documentation first",
+                "Summary-First: Use directory summaries to identify relevant subsystems before deep diving.",
+                "Use read to examine important documentation first",
                 "Large files often indicate core modules",
                 "Check README.md and CLAUDE.md for project-specific guidance",
             ],

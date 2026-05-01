@@ -20,8 +20,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
+from victor.agent.services.tool_observability import ToolObservabilityHandler
 from victor.observability.request_correlation import request_correlation_id
+
+
+def test_tool_observability_handler_is_service_owned() -> None:
+    """ToolObservabilityHandler should be imported from services module."""
+    # Verify the handler is available from the services module
+    from victor.agent.services.tool_observability import ToolObservabilityHandler
+
+    assert ToolObservabilityHandler is not None
 
 
 @pytest.mark.asyncio
@@ -94,3 +102,33 @@ async def test_on_tool_complete_emits_request_correlation_id() -> None:
 
     assert bus.emit.await_args.kwargs["data"]["tool_id"] == "tool-0"
     assert bus.emit.await_args.kwargs["correlation_id"] == "chat_test_123"
+
+
+@pytest.mark.asyncio
+async def test_on_tool_complete_tracks_legacy_read_alias() -> None:
+    """Legacy read aliases should still populate read_files_session via canonicalization."""
+    handler = ToolObservabilityHandler(MagicMock())
+    metrics_collector = MagicMock()
+    bus = MagicMock()
+    bus.emit = AsyncMock()
+    read_files_session: set[str] = set()
+
+    result = SimpleNamespace(
+        tool_id="tool-8",
+        tool_name="read_file",
+        success=True,
+        result="file contents",
+        error=None,
+        arguments={"path": "/tmp/example.py"},
+        execution_time_ms=15.0,
+    )
+
+    with patch("victor.core.events.get_observability_bus", return_value=bus):
+        handler.on_tool_complete(
+            result,
+            metrics_collector,
+            read_files_session=read_files_session,
+        )
+        await asyncio.sleep(0)
+
+    assert "/tmp/example.py" in read_files_session

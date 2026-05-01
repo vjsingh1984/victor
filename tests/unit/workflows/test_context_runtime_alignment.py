@@ -24,14 +24,15 @@ def test_create_execution_context_uses_shared_runtime_defaults() -> None:
         workflow_name="example_workflow",
     )
 
-    assert ctx["data"] == {"input": "value"}
-    assert ctx["_workflow_id"] == "wf-123"
-    assert ctx["_workflow_name"] == "example_workflow"
-    assert ctx["_current_node"] == ""
-    assert ctx["_node_results"] == {}
-    assert ctx["_parallel_results"] == {}
-    assert ctx["_hitl_pending"] is False
-    assert ctx["_hitl_response"] is None
+    # Pydantic models use attribute access, not subscript
+    assert ctx.data == {"input": "value"}
+    assert ctx.workflow_id == "wf-123"
+    assert ctx.workflow_name == "example_workflow"
+    assert ctx.current_node == ""
+    assert ctx.node_results == {}
+    assert ctx.parallel_results == {}
+    assert ctx.hitl_pending is False
+    assert ctx.hitl_response is None
 
 
 def test_from_compiler_workflow_state_preserves_workflow_name() -> None:
@@ -48,15 +49,15 @@ def test_from_compiler_workflow_state_preserves_workflow_name() -> None:
         }
     )
 
-    assert ctx["data"] == {"input": "value"}
-    assert ctx["_workflow_id"] == "wf-123"
-    assert ctx["_workflow_name"] == "compiler_workflow"
-    assert ctx["_current_node"] == "step1"
-    assert ctx["_node_results"] == {"step1": {"success": True}}
-    assert ctx["_parallel_results"] == {"branch": {"done": True}}
-    assert ctx["_hitl_pending"] is True
-    assert ctx["_hitl_response"] == {"approved": True}
-    assert ctx["_visited_nodes"] == ["step1"]
+    assert ctx.data == {"input": "value"}
+    assert ctx.workflow_id == "wf-123"
+    assert ctx.workflow_name == "compiler_workflow"
+    assert ctx.current_node == "step1"
+    assert ctx.node_results == {"step1": {"success": True}}
+    assert ctx.parallel_results == {"branch": {"done": True}}
+    assert ctx.hitl_pending is True
+    assert ctx.hitl_response == {"approved": True}
+    assert ctx.visited_nodes == ["step1"]
 
 
 def test_to_compiler_workflow_state_includes_workflow_name() -> None:
@@ -65,7 +66,7 @@ def test_to_compiler_workflow_state_includes_workflow_name() -> None:
         workflow_id="wf-123",
         workflow_name="context_workflow",
     )
-    ctx["_current_node"] = "step1"
+    ctx.current_node = "step1"
 
     state = context_module.to_compiler_workflow_state(ctx)
 

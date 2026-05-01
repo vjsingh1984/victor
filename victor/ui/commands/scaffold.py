@@ -33,7 +33,12 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 
 try:
-    from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
+    from jinja2 import (
+        Environment,
+        FileSystemLoader,
+        TemplateNotFound,
+        select_autoescape,
+    )
 except ImportError:
     Environment = None  # type: ignore
     FileSystemLoader = None  # type: ignore
@@ -155,51 +160,26 @@ def check_existing_vertical(vertical_dir: Path, force: bool) -> bool:
     return True
 
 
-@scaffold_app.command("create")
-def new_vertical(
-    name: str = typer.Argument(
-        ...,
-        help="Name of the new vertical (e.g., 'security', 'analytics')",
-    ),
-    description: str = typer.Option(
-        None,
-        "--description",
-        "-d",
-        help="Description of the vertical's purpose",
-    ),
-    service_provider: bool = typer.Option(
-        False,
-        "--service-provider",
-        "-s",
-        help="Include service_provider.py for DI container registration",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="Overwrite existing files if vertical already exists",
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        "-n",
-        help="Show what would be created without actually creating files",
-    ),
+def scaffold_plugin(
+    name: str,
+    description: Optional[str] = None,
+    service_provider: bool = False,
+    force: bool = False,
+    dry_run: bool = False,
+    label: str = "plugin",
 ) -> None:
-    """Generate a new vertical structure from templates.
+    """Generate a new plugin/vertical structure from templates.
 
-    Creates a vertical directory with an SDK-first definition layer:
-    - __init__.py - Package initialization and assistant export
-    - assistant.py - Main vertical definition authored against victor-sdk
-    - safety.py - Optional runtime-side safety notes placeholder
-    - prompts.py - Optional serializable prompt metadata helper
-    - mode_config.py - Optional runtime-side mode metadata placeholder
-    - service_provider.py - DI container registration (optional runtime integration)
+    This is the core scaffold logic, callable from both ``victor plugin init``
+    and the deprecated ``victor vertical create``.
 
-    Examples:
-        victor vertical create security --description "Security analysis assistant"
-        victor vertical create analytics -d "Data analytics" --service-provider
-        victor vertical create ml --dry-run
+    Args:
+        name: Plugin name (lowercase, valid Python identifier).
+        description: One-line description of the plugin's purpose.
+        service_provider: Whether to include service_provider.py for DI registration.
+        force: Overwrite existing files if the directory already exists.
+        dry_run: Show what would be created without writing files.
+        label: User-facing noun for output messages ("plugin" or "vertical").
     """
     # Check for Jinja2
     if Environment is None:
@@ -230,7 +210,7 @@ def new_vertical(
         console.print(f"[red]Error: Template directory not found at {template_dir}[/]")
         raise typer.Exit(1)
 
-    # Check for existing vertical
+    # Check for existing directory
     if not dry_run and not check_existing_vertical(vertical_dir, force):
         raise typer.Exit(1)
 
@@ -270,7 +250,7 @@ def new_vertical(
     console.print()
     console.print(
         Panel(
-            f"[bold blue]Creating new vertical: {name}[/]\n" f"[dim]Description: {description}[/]",
+            f"[bold blue]Creating new {label}: {name}[/]\n" f"[dim]Description: {description}[/]",
             title="Victor Scaffold",
             border_style="blue",
         )
@@ -319,17 +299,17 @@ def new_vertical(
         console.print()
         console.print("[bold]Next steps:[/]")
         console.print(f"  1. Review and customize the files in victor/{name}/")
-        console.print(f"  2. Update tool and capability requirements in assistant.py")
+        console.print("  2. Update tool and capability requirements in assistant.py")
         console.print(
             f"  3. Verify {to_class_name(name)}Assistant.get_definition() works without runtime imports"
         )
         console.print(
-            f"  4. Use prompts.py, safety.py, and mode_config.py only for optional follow-on metadata"
+            "  4. Use prompts.py, safety.py, and mode_config.py only for optional follow-on metadata"
         )
         if service_provider:
-            console.print(f"  5. Wire any runtime-only integrations through service_provider.py")
+            console.print("  5. Wire any runtime-only integrations through service_provider.py")
         console.print()
-        console.print("[dim]To use your new vertical:[/]")
+        console.print(f"[dim]To use your new {label}:[/]")
         console.print(f"    from victor.{name} import {to_class_name(name)}Assistant")
         console.print()
     else:
@@ -338,6 +318,62 @@ def new_vertical(
             f"[yellow]Dry run complete. "
             f"Run without --dry-run to create {len(files_to_create)} files.[/]"
         )
+
+
+@scaffold_app.command("create")
+def new_vertical(
+    name: str = typer.Argument(
+        ...,
+        help="Name of the new vertical (e.g., 'security', 'analytics')",
+    ),
+    description: str = typer.Option(
+        None,
+        "--description",
+        "-d",
+        help="Description of the vertical's purpose",
+    ),
+    service_provider: bool = typer.Option(
+        False,
+        "--service-provider",
+        "-s",
+        help="Include service_provider.py for DI container registration",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Overwrite existing files if vertical already exists",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-n",
+        help="Show what would be created without actually creating files",
+    ),
+) -> None:
+    """Generate a new vertical structure from templates.
+
+    Creates a vertical directory with an SDK-first definition layer:
+    - __init__.py - Package initialization and assistant export
+    - assistant.py - Main vertical definition authored against victor-sdk
+    - safety.py - Optional runtime-side safety notes placeholder
+    - prompts.py - Optional serializable prompt metadata helper
+    - mode_config.py - Optional runtime-side mode metadata placeholder
+    - service_provider.py - DI container registration (optional runtime integration)
+
+    Examples:
+        victor vertical create security --description "Security analysis assistant"
+        victor vertical create analytics -d "Data analytics" --service-provider
+        victor vertical create ml --dry-run
+    """
+    scaffold_plugin(
+        name=name,
+        description=description,
+        service_provider=service_provider,
+        force=force,
+        dry_run=dry_run,
+        label="vertical",
+    )
 
 
 @scaffold_app.command("list")
@@ -366,4 +402,4 @@ def list_verticals() -> None:
         raise typer.Exit(1)
 
 
-__all__ = ["scaffold_app"]
+__all__ = ["scaffold_app", "scaffold_plugin"]

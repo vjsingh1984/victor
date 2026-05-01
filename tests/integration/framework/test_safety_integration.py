@@ -163,7 +163,10 @@ class TestSafetyIntegration:
         # Format: (operation, should_be_allowed)
         test_cases = [
             ("git push --force origin main", False),  # Coding - should be blocked
-            ("kubectl delete deployment -n production app", False),  # DevOps - should be blocked
+            (
+                "kubectl delete deployment -n production app",
+                False,
+            ),  # DevOps - should be blocked
             ("rag_delete --all", False),  # RAG - should be blocked
             ("cite fake-blog.blogspot.com", False),  # Research - should be blocked
             ("export data with SSN", False),  # DataAnalysis - should be blocked

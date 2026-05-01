@@ -94,7 +94,8 @@ class TestProviderErrorHandling:
     def test_provider_not_found_error(self, caplog):
         """Verify ProviderNotFoundError lists available providers."""
         error = ProviderNotFoundError(
-            provider="unknown_provider", available_providers=["anthropic", "openai", "google"]
+            provider="unknown_provider",
+            available_providers=["anthropic", "openai", "google"],
         )
 
         assert "unknown_provider" in str(error)
@@ -104,7 +105,9 @@ class TestProviderErrorHandling:
         """Verify ProviderInvalidResponseError captures response data."""
         response_data = {"status": "error", "code": 500}
         error = ProviderInvalidResponseError(
-            "Invalid response format", provider="test_provider", response_data=response_data
+            "Invalid response format",
+            provider="test_provider",
+            response_data=response_data,
         )
 
         assert "Invalid response format" in str(error)

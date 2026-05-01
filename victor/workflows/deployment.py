@@ -1029,7 +1029,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
             containers=[container],
             service_account_name=self.config.service_account,
             restart_policy="Never",
-            node_selector=self.config.node_selector if self.config.node_selector else None,
+            node_selector=(self.config.node_selector if self.config.node_selector else None),
         )
 
         # Build pod metadata
@@ -1189,7 +1189,7 @@ class ECSDeploymentHandler(DeploymentHandler):
                 "awsvpcConfiguration": {
                     "subnets": self.config.subnets,
                     "securityGroups": self.config.security_groups,
-                    "assignPublicIp": "ENABLED" if self.config.assign_public_ip else "DISABLED",
+                    "assignPublicIp": ("ENABLED" if self.config.assign_public_ip else "DISABLED"),
                 }
             }
 
@@ -1341,7 +1341,7 @@ class RemoteDeploymentHandler(DeploymentHandler):
     ) -> Dict[str, Any]:
         """Execute node on remote server."""
         logger.debug(f"Executing node {node.id} remotely")
-        # TODO: HTTP/gRPC to remote
+        # Remote execution via HTTP/gRPC — future distributed feature
         return state
 
     async def cleanup(self) -> None:

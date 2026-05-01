@@ -2,7 +2,10 @@
 
 from unittest.mock import patch, MagicMock
 
-from victor.framework.entry_point_loader import _cached_entry_points, clear_entry_point_loader_cache
+from victor.framework.entry_point_loader import (
+    _cached_entry_points,
+    clear_entry_point_loader_cache,
+)
 from victor.framework.entry_point_registry import UnifiedEntryPointRegistry
 
 

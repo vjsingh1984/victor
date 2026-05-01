@@ -79,29 +79,38 @@ class ProviderRuntimeComponents:
 
 def create_provider_runtime_components(
     *,
-    factory: Any,
     settings: Any,
     provider_manager: Any,
     pool: Optional[Any] = None,
+    get_provider_service: Optional[Callable[[], Any]] = None,
 ) -> ProviderRuntimeComponents:
     """Create lazy provider runtime components for orchestrator wiring."""
 
     def _build_provider_coordinator() -> Any:
-        from victor.agent.provider_coordinator import (
-            ProviderCoordinator,
+        from victor.agent.provider.coordinator import (
             ProviderCoordinatorConfig,
+            create_provider_coordinator,
         )
 
-        return ProviderCoordinator(
+        coord = create_provider_coordinator(
             provider_manager=provider_manager,
             config=ProviderCoordinatorConfig(
                 max_rate_limit_retries=getattr(settings, "max_rate_limit_retries", 3),
                 enable_health_monitoring=getattr(settings, "provider_health_checks", True),
             ),
         )
+        # Bind provider service lazily — called here rather than during _initialize_services
+        # so the LazyRuntimeProxy is never touched (and thus never initialized) at startup.
+        if get_provider_service is not None:
+            svc = get_provider_service()
+            if svc is not None:
+                coord.bind_provider_service(svc)
+        return coord
 
     def _build_provider_switch_coordinator() -> Any:
-        return factory.create_provider_switch_coordinator(
+        from victor.agent.provider.switch_coordinator import create_provider_switch_coordinator
+
+        return create_provider_switch_coordinator(
             provider_switcher=provider_manager._provider_switcher,
             health_monitor=provider_manager._health_monitor,
         )

@@ -267,7 +267,7 @@ def truncate_output(
 def truncate_by_lines(
     content: str,
     max_lines: int = 750,
-    max_bytes: int = 25600,  # 25KB
+    max_bytes: Optional[int] = None,
     start_line: int = 0,
 ) -> Tuple[str, "TruncationInfo"]:
     """Truncate content by line count and/or byte size.
@@ -283,7 +283,7 @@ def truncate_by_lines(
     Args:
         content: The text content to truncate
         max_lines: Maximum number of lines to include (default 512)
-        max_bytes: Maximum bytes to include (default 20KB)
+        max_bytes: Maximum bytes to include (None=use tool settings default)
         start_line: Starting line number (0-indexed, for offset support)
 
     Returns:
@@ -295,6 +295,20 @@ def truncate_by_lines(
         if info.was_truncated:
             print(f"Truncated at line {info.end_line}. Use offset={info.end_line} for more.")
     """
+    # Default byte limit if not specified
+    # Priority: use tool settings in unlimited mode, otherwise use 1MB safety default
+    if max_bytes is None:
+        if max_lines is None:
+            # True unlimited mode - use tool settings (higher limit for accuracy-first)
+            from victor.config.tool_settings import get_tool_settings
+
+            tool_settings = get_tool_settings()
+            # Convert MB to bytes
+            max_bytes = int(tool_settings.tool_output_byte_limit_mb * 1024 * 1024)
+        else:
+            # Line limit is set, but no byte limit - use 1MB safety default
+            max_bytes = 1024 * 1024  # 1MB safety default when line-limited
+
     lines = content.split("\n")
     total_lines = len(lines)
 

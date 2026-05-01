@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -46,6 +47,7 @@ from victor.config.profiles import (
     get_recommended_profile,
     install_profile,
 )
+from victor.config.settings import get_project_paths
 
 
 class OnboardingWizard:
@@ -58,7 +60,7 @@ class OnboardingWizard:
             console: Optional Rich console instance (creates default if None)
         """
         self.console = console or Console()
-        self.config_dir = Path.home() / ".victor"
+        self.config_dir = get_project_paths().global_victor_dir
         self.state: Dict[str, Any] = {
             "step": 0,
             "selected_profile": None,
@@ -76,7 +78,7 @@ class OnboardingWizard:
             Exit code (0 for success, 1 for cancellation/error)
         """
         try:
-            self.console.clear()
+            # Removed console.clear() - jarring UX, destroys user context
             self._show_welcome()
 
             if not self._confirm_start():
@@ -297,7 +299,14 @@ class OnboardingWizard:
         self.console.print("\n[bold cyan]Step 3/5: Provider Configuration[/]")
         self.console.print("─" * 50)
 
-        provider_options = ["ollama", "anthropic", "openai", "google", "lmstudio", "auto"]
+        provider_options = [
+            "ollama",
+            "anthropic",
+            "openai",
+            "google",
+            "lmstudio",
+            "auto",
+        ]
 
         # Default to auto or based on environment
         if self.state["has_cloud_keys"]:
@@ -334,7 +343,8 @@ class OnboardingWizard:
         models = self._get_models_for_provider(provider)
 
         if models:
-            default_model = models[0]["id"]
+            # Default to qwen3.5:27b-q4_K_M if available (first in list)
+            default_model = "qwen3.5:27b-q4_K_M"
             for i, model in enumerate(models[:5], 1):  # Show first 5
                 desc = model.get("description", "")
                 self.console.print(f"  {i}. [cyan]{model['id']}[/] - {desc}")
@@ -387,13 +397,19 @@ class OnboardingWizard:
         """
         models = {
             "ollama": [
+                {
+                    "id": "qwen3.5:27b-q4_K_M",
+                    "description": "MoE model, fast + knowledgeable (recommended)",
+                },
                 {"id": "qwen2.5-coder:7b", "description": "Coding-focused, 7B params"},
-                {"id": "qwen2.5-coder:14b", "description": "Coding-focused, 14B params"},
+                {
+                    "id": "qwen2.5-coder:14b",
+                    "description": "Coding-focused, 14B params",
+                },
                 {"id": "qwen2.5:7b", "description": "General purpose, 7B params"},
                 {"id": "llama3.2:3b", "description": "Fast, efficient, 3B params"},
             ],
             "anthropic": [
-                {"id": "claude-sonnet-4-5-20250514", "description": "Balanced, fast"},
                 {"id": "claude-3-5-sonnet-20241022", "description": "Powerful, newer"},
             ],
             "openai": [
@@ -406,6 +422,21 @@ class OnboardingWizard:
             ],
             "lmstudio": [
                 {"id": "local-model", "description": "Your loaded model"},
+            ],
+            "vllm": [
+                {"id": "local-model", "description": "Your loaded model"},
+            ],
+            "deepseek": [
+                {"id": "deepseek-chat", "description": "Fast, efficient"},
+            ],
+            "xai": [
+                {"id": "grok-beta", "description": "Fast, capable"},
+            ],
+            "zai": [
+                {"id": "glm-4.7", "description": "Fast, cost-effective"},
+            ],
+            "cohere": [
+                {"id": "command-r-plus", "description": "Command-optimized"},
             ],
         }
         return models.get(provider, [])
@@ -420,13 +451,13 @@ class OnboardingWizard:
             Default model identifier
         """
         defaults = {
-            "ollama": "qwen2.5-coder:7b",
+            "ollama": "qwen3.5:27b-q4_K_M",  # Fast MoE model
             "anthropic": "claude-sonnet-4-5-20250514",
             "openai": "gpt-4o",
             "google": "gemini-2.0-flash-exp",
             "lmstudio": "local-model",
         }
-        return defaults.get(provider, "qwen2.5-coder:7b")
+        return defaults.get(provider, "qwen3.5:27b-q4_K_M")
 
     def _apply_configuration(self) -> None:
         """Step 4: Apply configuration."""
@@ -451,6 +482,17 @@ class OnboardingWizard:
             )
             self.console.print("\n  [green]✓[/] Configuration saved to:")
             self.console.print(f"  [dim]{profiles_path}[/]")
+
+            # Create onboarding completion marker
+            marker_file = self.config_dir / ".onboarding_completed"
+            completed_at = datetime.now().isoformat()
+            marker_file.write_text(
+                f"# Onboarding completed successfully\n"
+                f"# Completed at: {completed_at}\n"
+                f"# Profile: {profile.name}\n"
+                f"# Provider: {provider}\n"
+                f"# Model: {model}\n"
+            )
 
         except Exception as e:
             self.console.print(f"\n  [red]✗[/] Failed to save configuration: {e}")
@@ -479,7 +521,7 @@ class OnboardingWizard:
             settings = load_settings()
             result = validate_configuration(settings)
 
-            if result.is_valid:
+            if result.is_valid():
                 self.console.print("  [green]✓[/] Configuration is valid!")
             else:
                 self.console.print("  [yellow]⚠[/] Configuration has warnings:")

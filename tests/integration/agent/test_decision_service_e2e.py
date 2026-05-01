@@ -239,12 +239,20 @@ class TestFullPipelineWithTaskCompletion:
         # Use direct service calls with unique contexts to consume budget
         await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "unique_a", "deliverable_count": 0, "signal_count": 0},
+            context={
+                "response_tail": "unique_a",
+                "deliverable_count": 0,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.1,
         )
         await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "unique_b", "deliverable_count": 0, "signal_count": 0},
+            context={
+                "response_tail": "unique_b",
+                "deliverable_count": 0,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.1,
         )
         assert service.budget_remaining == 0
@@ -252,7 +260,11 @@ class TestFullPipelineWithTaskCompletion:
         # Next call with new context should hit budget exhaustion
         result = await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "unique_c", "deliverable_count": 0, "signal_count": 0},
+            context={
+                "response_tail": "unique_c",
+                "deliverable_count": 0,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.1,
         )
         assert result.source == "budget_exhausted"
@@ -270,14 +282,22 @@ class TestFullPipelineWithTaskCompletion:
         asyncio.run(
             service.decide(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "a", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "a",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_confidence=0.1,
             )
         )
         asyncio.run(
             service.decide(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "b", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "b",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_confidence=0.1,
             )
         )

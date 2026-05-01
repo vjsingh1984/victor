@@ -758,8 +758,10 @@ class TestStepHandlerRegistryContract:
         ordered_names = [handler.name for handler in registry.get_ordered_handlers()]
 
         assert ordered_names == [
+            "compatibility",
             "capability_config",
             "tools",
+            "mcp",
             "tiered_config",
             "prompt",
             "config",

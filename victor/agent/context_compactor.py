@@ -49,11 +49,16 @@ from victor.config.orchestrator_constants import (
     CONTEXT_LIMITS,
     RL_LEARNER_CONFIG,
 )
+
+# Lazy import to avoid circular dependency
+AdaptiveCompactionThreshold = None
+from victor.core.shared_types import TaskPhase
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.framework.rl.learners.context_pruning import ContextPruningLearner
+    from victor.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +187,9 @@ class CompactorConfig:
         preserve_json_structure: Try to preserve JSON structure when truncating
         enable_proactive: Enable proactive (pre-overflow) compaction
         enable_tool_truncation: Enable automatic tool result truncation
+        enable_phase_aware: Enable phase-aware compaction thresholds
+        enable_fast_pruning: Enable fast pruning before LLM compaction (P1: OpenDev finding)
+        phase_thresholds: Phase-specific compaction thresholds (overrides proactive_threshold)
     """
 
     proactive_threshold: float = CONTEXT_LIMITS.proactive_compaction_threshold
@@ -196,6 +204,19 @@ class CompactorConfig:
     preserve_json_structure: bool = True
     enable_proactive: bool = True
     enable_tool_truncation: bool = True
+    enable_phase_aware: bool = True
+    enable_fast_pruning: bool = COMPACTION_CONFIG.enable_fast_pruning
+    # Phase-specific thresholds (75% conservative to avoid overflows due to token estimation inaccuracy)
+    # Reduced from 85-90% to 75% to provide safety buffer for inconsistent chars_per_token values
+    # across different modules (ContextLimits: 3.0, CompactionConfig: 3.5, ConversationStore: 4.0)
+    phase_thresholds: Dict[TaskPhase, float] = field(
+        default_factory=lambda: {
+            TaskPhase.EXPLORATION: 0.75,  # Reduced from 0.85 - safety buffer for token estimation
+            TaskPhase.PLANNING: 0.75,  # Reduced from 0.90 - avoid premature compaction
+            TaskPhase.EXECUTION: 0.75,  # Reduced from 0.85 - prioritize recent context
+            TaskPhase.REVIEW: 0.75,  # Reduced from 0.85 - full context for review
+        }
+    )
 
 
 @dataclass
@@ -290,6 +311,9 @@ class ContextCompactor:
         pruning_learner: Optional["ContextPruningLearner"] = None,
         provider_type: str = "cloud",
         event_bus: Optional[Any] = None,
+        decision_service: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
+        adaptive_threshold: Optional["AdaptiveCompactionThreshold"] = None,
     ):
         """Initialize the context compactor.
 
@@ -299,12 +323,17 @@ class ContextCompactor:
             pruning_learner: Optional RL learner for adaptive pruning decisions
             provider_type: Provider type for RL state (cloud, local)
             event_bus: Optional event bus for compaction events (ObservabilityBus)
+            decision_service: Optional TieredDecisionService for tier-based compaction routing
+            runtime_intelligence: Optional canonical runtime-intelligence service
+            adaptive_threshold: Optional adaptive threshold system for pattern-based thresholds
         """
         self.controller = controller
         self.config = config or CompactorConfig()
         self.pruning_learner = pruning_learner
         self.provider_type = provider_type
         self._event_bus = event_bus
+        self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
         self._last_compaction_turn: int = 0
         self._total_chars_freed: int = 0
         self._total_tokens_freed: int = 0
@@ -315,10 +344,183 @@ class ContextCompactor:
         self._last_rl_action: Optional[str] = None
         self._last_task_success: bool = True
 
+        # Adaptive threshold system
+        self._adaptive_threshold = adaptive_threshold
+        self._adaptive_enabled = adaptive_threshold is not None
+
         logger.debug(
             f"ContextCompactor initialized (threshold: {self.config.proactive_threshold:.0%}, "
-            f"rl_enabled: {self._rl_enabled})"
+            f"rl_enabled: {self._rl_enabled}, "
+            f"adaptive_enabled: {self._adaptive_enabled}, "
+            f"decision_service: {decision_service is not None or runtime_intelligence is not None})"
         )
+
+    def _has_decision_support(self) -> bool:
+        """Return whether compaction decisions can use the canonical runtime boundary."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Delegate bounded compaction decisions via runtime intelligence when available."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
+
+    # ========================================================================
+    # Tier-Based Provider Selection
+    # ========================================================================
+
+    def _get_provider_for_tier(self, tier: str) -> Optional["BaseProvider"]:
+        """Get a provider instance for the specified tier.
+
+        Args:
+            tier: One of 'edge', 'balanced', 'performance'
+
+        Returns:
+            Provider instance for the tier, or None if unavailable
+        """
+        try:
+            from victor.config.decision_settings import DecisionServiceSettings
+            from victor.providers.registry import ProviderRegistry
+
+            # Get tier spec from settings
+            settings = DecisionServiceSettings()
+            spec = getattr(settings, tier, None)
+            if spec is None:
+                logger.debug(f"No spec found for tier '{tier}'")
+                return None
+
+            # Build provider kwargs
+            provider_kwargs: Dict[str, Any] = {"timeout": spec.timeout_ms // 1000}
+
+            if spec.provider == "ollama":
+                provider_kwargs["base_url"] = "http://localhost:11434"
+            else:
+                try:
+                    from victor.config.api_keys import get_api_key
+
+                    api_key = get_api_key(spec.provider)
+                    if api_key:
+                        provider_kwargs["api_key"] = api_key
+                except Exception:
+                    pass
+
+            provider = ProviderRegistry.create(spec.provider, **provider_kwargs)
+            logger.debug(f"Created provider for tier '{tier}': {spec.provider}/{spec.model}")
+            return provider
+
+        except Exception as e:
+            logger.warning(f"Failed to create provider for tier '{tier}': {e}")
+            return None
+
+    def _get_default_provider(self) -> Optional["BaseProvider"]:
+        """Get the default provider from the orchestrator.
+
+        Returns:
+            The active provider from ProviderManager, or None if unavailable
+        """
+        try:
+            if self.controller and hasattr(self.controller, "_orchestrator"):
+                provider_manager = self.controller._orchestrator.provider_manager
+                return provider_manager.get_active_provider()
+        except Exception as e:
+            logger.debug(f"Failed to get default provider: {e}")
+        return None
+
+    def get_prompt_optimization_decision(
+        self,
+        current_query: Optional[str] = None,
+        recent_failures: Optional[List[str]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Get a system prompt optimization decision for dynamic prompts.
+
+        When system_prompt_strategy is 'dynamic', this method uses the decision
+        service to determine which prompt sections to include based on current
+        context and recent failures.
+
+        Args:
+            current_query: Current user query for context
+            recent_failures: Optional list of recent error messages for failure hints
+
+        Returns:
+            Dict with optimization decision, or None if decision service unavailable
+        """
+        if not self._has_decision_support():
+            return None
+
+        try:
+            from victor.agent.decisions.schemas import DecisionType
+
+            # Build context for optimization decision
+            context = {
+                "current_query": current_query or "",
+                "recent_failures": recent_failures or [],
+                "compaction_count": self._compaction_count,
+                "utilization": (
+                    self.controller.get_context_metrics().utilization if self.controller else 0.0
+                ),
+            }
+
+            # Use decision service for optimization
+            # Note: We'll use a simple heuristic for now since we don't have a dedicated
+            # SYSTEM_PROMPT_OPTIMIZATION decision type yet
+            # This can be extended later with a proper decision type
+
+            # Simple heuristic-based optimization
+            all_sections = [
+                "concise_mode",
+                "task_guidance",
+                "tool_constraint",
+                "completion",
+                "tool_guidance",
+                "few_shot_examples",
+            ]
+
+            # Include context reminder if we've compacted recently
+            add_context_reminder = self._compaction_count > 0
+
+            # Add failure hints if there are recent failures
+            add_failure_hints = bool(recent_failures)
+
+            # Adjust for complexity based on utilization
+            adjust_for_complexity = context["utilization"] > 0.7
+
+            # For dynamic mode, include all sections by default
+            # (can be refined later with edge model decision)
+            include_sections = all_sections
+
+            return {
+                "include_sections": include_sections,
+                "add_context_reminder": add_context_reminder,
+                "add_failure_hints": add_failure_hints,
+                "adjust_for_complexity": adjust_for_complexity,
+                "confidence": 0.8,
+                "reason": "Heuristic-based prompt optimization",
+            }
+
+        except Exception as e:
+            logger.debug(f"Prompt optimization decision failed: {e}")
+            return None
 
     # ========================================================================
     # Message Priority Assignment
@@ -388,30 +590,221 @@ class ContextCompactor:
     # Main Compaction Interface
     # ========================================================================
 
+    def _maybe_summarize_turns(self) -> Optional[CompactionAction]:
+        """Summarize old turns if conversation exceeds turn threshold.
+
+        Uses LLMCompactionSummarizer to produce a compact summary of the
+        oldest turns. This preserves intent and decisions better than simple
+        pruning. Summary replaces original messages in the active context.
+
+        Uses decision service for tier-based routing:
+        - Simple compaction (≤8 messages) → Edge tier (fast, free)
+        - Complex compaction (>8 messages) → Performance tier (high quality)
+        - Falls back to main LLM if decision service unavailable
+
+        Returns:
+            CompactionAction if summarization occurred, None otherwise.
+        """
+        from victor.config.orchestrator_constants import SUMMARIZATION_CONFIG
+        from victor.agent.llm_compaction_summarizer import LLMCompactionSummarizer
+        from victor.agent.decisions.schemas import DecisionType
+
+        if not SUMMARIZATION_CONFIG.enabled or self.controller is None:
+            return None
+
+        messages = self.controller.messages
+        # Count user messages as turn indicators
+        turn_count = sum(1 for m in messages if m.role == "user")
+        if turn_count <= SUMMARIZATION_CONFIG.trigger_turn_count:
+            return None
+
+        # Already summarized recently? Skip to avoid excessive LLM calls
+        if self._last_compaction_turn > 0:
+            turns_since_last = turn_count - self._last_compaction_turn
+            if turns_since_last < SUMMARIZATION_CONFIG.max_turns_to_summarize:
+                return None
+
+        # Find the oldest turns to summarize
+        turn_boundaries = [i for i, m in enumerate(messages) if m.role == "user"]
+        if len(turn_boundaries) <= SUMMARIZATION_CONFIG.trigger_turn_count:
+            return None
+
+        # Always preserve the root system prompt (index 0)
+        start_idx = 1 if messages and messages[0].role == "system" else 0
+        # Summarize up to N oldest turns
+        end_turn_idx = min(SUMMARIZATION_CONFIG.max_turns_to_summarize, len(turn_boundaries) - 3)
+        if end_turn_idx <= 0:
+            return None
+
+        end_msg_idx = turn_boundaries[end_turn_idx]
+        turns_to_summarize = messages[start_idx:end_msg_idx]
+
+        if not turns_to_summarize:
+            return None
+
+        # Determine complexity and select provider
+        provider = None
+        complexity = "complex" if len(turns_to_summarize) > 8 else "simple"
+        estimated_tokens = sum(self.estimate_message_tokens(m) for m in turns_to_summarize)
+
+        # Try decision service for tier-based routing
+        if self._has_decision_support():
+            try:
+                decision_result = self._decide_sync(
+                    DecisionType.COMPACTION,
+                    context={
+                        "message_count": len(turns_to_summarize),
+                        "estimated_tokens": estimated_tokens,
+                        "complexity": complexity,
+                    },
+                    heuristic_result=None,
+                )
+
+                if decision_result and decision_result.result:
+                    decision = decision_result.result
+                    recommended_tier = getattr(decision, "recommended_tier", None)
+                    if recommended_tier:
+                        provider = self._get_provider_for_tier(recommended_tier)
+                        logger.debug(
+                            f"Compaction decision: tier={recommended_tier}, "
+                            f"complexity={complexity}, messages={len(turns_to_summarize)}"
+                        )
+            except Exception as e:
+                logger.debug(f"Decision service failed, using fallback: {e}")
+
+        # Fallback to default provider if decision service didn't return one
+        if provider is None:
+            provider = self._get_default_provider()
+            if provider is None:
+                logger.debug("No provider available for summarization")
+                return None
+
+        # Attempt LLM-based summarization
+        summary_text = ""
+        try:
+            summarizer = LLMCompactionSummarizer(provider=provider)
+            summary_text = summarizer.summarize(turns_to_summarize)
+        except Exception as e:
+            logger.debug(f"LLM summarization failed, falling back to heuristic: {e}")
+            summary_text = self._heuristic_summarize(turns_to_summarize)
+
+        if not summary_text:
+            return None
+
+        # Wrap summary in a message
+        from victor.providers.base import Message
+
+        summary_msg = Message(
+            role="assistant",
+            content=f"[Context summary of {len(turns_to_summarize)} earlier messages]\n{summary_text}",
+        )
+
+        # Replace old turns with summary message
+        chars_before = sum(len(m.content) for m in turns_to_summarize)
+        del messages[start_idx:end_msg_idx]
+        messages.insert(start_idx, summary_msg)
+
+        chars_after = len(summary_msg.content)
+        chars_freed = chars_before - chars_after
+        self._last_compaction_turn = sum(1 for m in messages if m.role == "user")
+
+        logger.info(
+            "Summarized %d messages (%dK -> %dK chars, freed %dK, complexity=%s)",
+            len(turns_to_summarize),
+            chars_before // 1024,
+            chars_after // 1024,
+            chars_freed // 1024,
+            complexity,
+        )
+
+        return CompactionAction(
+            trigger=CompactionTrigger.THRESHOLD,
+            messages_removed=len(turns_to_summarize) - 1,
+            tokens_freed=self._estimate_tokens(chars_freed),
+            new_utilization=0.0,
+            details=[
+                f"LLM summarized {len(turns_to_summarize)} messages",
+                f"Freed ~{chars_freed // 4} tokens",
+                f"Complexity: {complexity}",
+            ],
+        )
+
+    def _heuristic_summarize(self, turns: List[Any]) -> str:
+        """Fallback heuristic summarization if LLM call fails."""
+        tool_names = set()
+        files_mentioned = set()
+        key_decisions = []
+        for msg in turns:
+            tool_name = getattr(msg, "tool_name", None)
+            if tool_name:
+                tool_names.add(tool_name)
+
+            # Extract file paths
+            import re
+
+            paths = re.findall(r"[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)", msg.content[:500])
+            files_mentioned.update(paths[:5])
+
+            # Extract decisions from assistant
+            if msg.role == "assistant" and len(msg.content) > 50:
+                first_line = msg.content.split("\n")[0][:150]
+                if first_line:
+                    key_decisions.append(first_line)
+
+        summary_parts = []
+        if tool_names:
+            summary_parts.append(f"Tools used: {', '.join(sorted(tool_names)[:10])}")
+        if files_mentioned:
+            summary_parts.append(f"Files touched: {', '.join(sorted(files_mentioned)[:8])}")
+        if key_decisions:
+            summary_parts.append("Key points:")
+            for d in key_decisions[:5]:
+                summary_parts.append(f"  - {d}")
+
+        return "\n".join(summary_parts) if summary_parts else "Prior history summarized."
+
     def check_and_compact(
         self,
         current_query: Optional[str] = None,
         force: bool = False,
         tool_call_count: int = 0,
         task_complexity: str = "medium",
+        phase: Optional[TaskPhase] = None,
     ) -> CompactionAction:
         """Check context utilization and compact if needed.
 
-        Proactively compacts when utilization exceeds threshold, rather
-        than waiting for overflow. Uses RL learner for adaptive pruning
-        when available.
+        Two-phase compaction:
+        1. Turn-based summarization (early, at turn threshold)
+        2. Utilization-based compaction (late, at phase-aware threshold)
+
+        Uses RL learner for adaptive pruning when available.
 
         Args:
             current_query: Current user query for semantic relevance
             force: Force compaction regardless of utilization
             tool_call_count: Number of tool calls made (for RL state)
             task_complexity: Task complexity level (for RL state)
+            phase: Current task phase for phase-aware thresholds
 
         Returns:
             CompactionAction describing what was done
         """
+        # Phase 1: Turn-based summarization (fires early, before utilization threshold)
+        if not force:
+            summary_action = self._maybe_summarize_turns()
+            if summary_action and summary_action.action_taken:
+                return summary_action
+
         metrics = self.controller.get_context_metrics()
         utilization = metrics.utilization
+
+        # Get messages for adaptive threshold calculation
+        messages = None
+        if self._adaptive_enabled:
+            try:
+                messages = self.controller.get_messages()
+            except Exception as e:
+                logger.debug(f"Could not get messages for adaptive threshold: {e}")
 
         # Get RL recommendation if learner is available
         rl_config = None
@@ -424,7 +817,7 @@ class ContextCompactor:
                     task_complexity=task_complexity,
                     provider_type=self.provider_type,
                 )
-                rl_action = recommendation.action
+                rl_action = recommendation.value
                 rl_config = recommendation.metadata.get("config", {})
                 self._last_rl_action = rl_action
                 logger.debug(
@@ -433,17 +826,24 @@ class ContextCompactor:
             except Exception as e:
                 logger.warning(f"RL recommendation failed: {e}")
 
-        # Get effective thresholds (RL config or defaults)
+        # Get base threshold (adaptive > phase-aware > default)
+        base_threshold = self._get_compaction_threshold(phase, messages)
+
+        # Get effective thresholds (RL config overrides phase-aware)
         effective_threshold = (
-            rl_config.get("compaction_threshold", self.config.proactive_threshold)
-            if rl_config
-            else self.config.proactive_threshold
+            rl_config.get("compaction_threshold", base_threshold) if rl_config else base_threshold
         )
         effective_min_messages = (
             rl_config.get("min_messages_keep", self.config.min_messages_after_compact)
             if rl_config
             else self.config.min_messages_after_compact
         )
+
+        # Log phase-aware threshold
+        if phase and self.config.enable_phase_aware:
+            logger.debug(
+                f"Phase-aware compaction: phase={phase.value}, threshold={effective_threshold:.0%}"
+            )
 
         # Determine trigger
         if force:
@@ -462,6 +862,40 @@ class ContextCompactor:
             f"Compaction triggered: {trigger.value} (utilization: {utilization:.1%}, "
             f"threshold: {effective_threshold:.0%})"
         )
+
+        # P1 FIX: Fast pruning before LLM compaction (OpenDev finding)
+        # Replace large tool results with [pruned] markers before expensive LLM compaction
+        # This reduces LLM compaction cost by 30-40%
+        if self.config.enable_fast_pruning:
+            try:
+                from victor.agent.fast_pruning import get_fast_pruner
+
+                fast_pruner = get_fast_pruner()
+                messages_before = self.controller.get_messages()
+
+                # Estimate if fast pruning would help
+                original_size, estimated_size = fast_pruner.estimate_size_reduction(
+                    messages_before, current_turn=len(messages_before)
+                )
+
+                # Only perform fast pruning if we'd save at least 20%
+                if original_size > 0 and (original_size - estimated_size) / original_size > 0.2:
+                    pruned_messages = fast_pruner.prune_old_tool_results(
+                        messages_before, current_turn=len(messages_before)
+                    )
+
+                    if fast_pruner.get_pruned_count() > 0:
+                        # Update controller messages with pruned version
+                        # This is done by replacing the message list
+                        from victor.agent.message_history import _TrackedList
+
+                        self.controller._history._messages = _TrackedList(pruned_messages)
+                        logger.info(
+                            f"[fast-pruning] Pruned {fast_pruner.get_pruned_count()} messages "
+                            f"before LLM compaction (saved {original_size - estimated_size} chars)"
+                        )
+            except Exception as e:
+                logger.debug(f"Fast pruning failed (continuing with LLM compaction): {e}")
 
         # Perform compaction
         chars_before = metrics.char_count
@@ -771,6 +1205,48 @@ class ContextCompactor:
         return f"{head}\n\n... [{truncated} lines truncated] ...\n\n{tail}"
 
     # ========================================================================
+    # Phase-Aware Compaction
+    # ========================================================================
+
+    def _get_compaction_threshold(
+        self,
+        phase: Optional[TaskPhase] = None,
+        messages: Optional[List[Any]] = None,
+    ) -> float:
+        """Get the compaction threshold for the current phase.
+
+        Priority order:
+        1. Adaptive threshold (if enabled and messages available)
+        2. Phase-aware threshold (if enabled and phase provided)
+        3. Default threshold from config
+
+        Args:
+            phase: Current task phase
+            messages: Optional list of messages for adaptive threshold calculation
+
+        Returns:
+            Compaction threshold (0.0-1.0)
+        """
+        # Try adaptive threshold first (if enabled and messages available)
+        if self._adaptive_enabled and messages:
+            try:
+                adaptive_threshold = self._adaptive_threshold.calculate_threshold(messages)
+                logger.debug(
+                    f"Using adaptive threshold: {adaptive_threshold:.0%} "
+                    f"(pattern: {self._adaptive_threshold.get_current_analysis().pattern.value if self._adaptive_threshold.get_current_analysis() else 'unknown'})"
+                )
+                return adaptive_threshold
+            except Exception as e:
+                logger.warning(f"Adaptive threshold calculation failed, falling back: {e}")
+
+        # Use phase-aware threshold if enabled and phase is provided
+        if self.config.enable_phase_aware and phase and phase in self.config.phase_thresholds:
+            return self.config.phase_thresholds[phase]
+
+        # Fall back to default threshold
+        return self.config.proactive_threshold
+
+    # ========================================================================
     # Token Estimation
     # ========================================================================
 
@@ -829,7 +1305,7 @@ class ContextCompactor:
         """
         metrics = self.controller.get_context_metrics()
 
-        return {
+        stats = {
             "current_utilization": metrics.utilization,
             "current_chars": metrics.char_count,
             "current_messages": metrics.message_count,
@@ -840,7 +1316,25 @@ class ContextCompactor:
             "proactive_threshold": self.config.proactive_threshold,
             "proactive_enabled": self.config.enable_proactive,
             "truncation_enabled": self.config.enable_tool_truncation,
+            "adaptive_enabled": self._adaptive_enabled,
         }
+
+        # Add adaptive threshold info if enabled
+        if self._adaptive_enabled and self._adaptive_threshold:
+            analysis = self._adaptive_threshold.get_current_analysis()
+            if analysis:
+                stats.update(
+                    {
+                        "adaptive_pattern": analysis.pattern.value,
+                        "adaptive_confidence": analysis.confidence,
+                        "adaptive_topic_coherence": analysis.topic_coherence,
+                        "adaptive_context_dependency": analysis.context_dependency,
+                        "adaptive_threshold": analysis.recommended_threshold,
+                        "adaptive_reasoning": analysis.reasoning,
+                    }
+                )
+
+        return stats
 
     def get_compaction_history(self) -> List[str]:
         """Get summaries of past compactions.
@@ -862,6 +1356,51 @@ class ContextCompactor:
         self._last_compaction_turn = 0
         logger.debug("Compactor statistics reset")
 
+    # ========================================================================
+    # Adaptive Threshold Management
+    # ========================================================================
+
+    def set_adaptive_threshold(self, adaptive_threshold: "AdaptiveCompactionThreshold") -> None:
+        """Set or update the adaptive threshold system.
+
+        Args:
+            adaptive_threshold: AdaptiveCompactionThreshold instance
+        """
+        global AdaptiveCompactionThreshold
+        if AdaptiveCompactionThreshold is None:
+            from victor.agent.adaptive_compaction import AdaptiveCompactionThreshold as ACT
+
+            AdaptiveCompactionThreshold = ACT
+
+        self._adaptive_threshold = adaptive_threshold
+        self._adaptive_enabled = True
+        logger.info("Adaptive threshold system enabled")
+
+    def disable_adaptive_threshold(self) -> None:
+        """Disable adaptive threshold and use static thresholds."""
+        self._adaptive_enabled = False
+        logger.info("Adaptive threshold system disabled")
+
+    def get_adaptive_analysis(self) -> Optional[Any]:
+        """Get the most recent adaptive threshold analysis.
+
+        Returns:
+            PatternAnalysis from adaptive system, or None if not enabled
+        """
+        if self._adaptive_enabled and self._adaptive_threshold:
+            return self._adaptive_threshold.get_current_analysis()
+        return None
+
+    def get_adaptive_threshold_history(self) -> List[Dict[str, Any]]:
+        """Get history of adaptive threshold calculations.
+
+        Returns:
+            List of dicts with timestamp, threshold, and pattern
+        """
+        if self._adaptive_enabled and self._adaptive_threshold:
+            return self._adaptive_threshold.get_threshold_history()
+        return []
+
     # =========================================================================
     # Async API
     # =========================================================================
@@ -882,6 +1421,9 @@ class ContextCompactor:
         self,
         current_query: Optional[str] = None,
         force: bool = False,
+        tool_call_count: int = 0,
+        task_complexity: str = "medium",
+        phase: Optional[TaskPhase] = None,
     ) -> CompactionAction:
         """Check and compact asynchronously.
 
@@ -890,14 +1432,33 @@ class ContextCompactor:
         Args:
             current_query: Current user query for relevance
             force: Force compaction
+            tool_call_count: Number of tool calls made (for RL state)
+            task_complexity: Task complexity level (for RL state)
+            phase: Current task phase for phase-aware thresholds
 
         Returns:
             CompactionAction describing what was done
         """
         import asyncio
 
+        if self._adaptive_enabled:
+            try:
+                self.controller.get_messages()
+            except Exception as e:
+                logger.debug(f"Could not get messages for adaptive threshold: {e}")
+
         self._ensure_async_state()
-        action = await asyncio.to_thread(self.check_and_compact, current_query, force)
+        import asyncio
+
+        self._ensure_async_state()
+        action = await asyncio.to_thread(
+            self.check_and_compact,
+            current_query,
+            force,
+            tool_call_count,
+            task_complexity,
+            phase,
+        )
 
         if action.action_taken:
             self._async_compactions += 1
@@ -1027,7 +1588,7 @@ class ContextCompactor:
 
 def create_context_compactor(
     controller: "ConversationController",
-    proactive_threshold: float = 0.90,
+    proactive_threshold: float = 0.50,  # Changed from 0.90 - balanced default
     min_messages_after_compact: int = 8,
     tool_result_max_chars: int = 8192,
     tool_result_max_lines: int = 200,
@@ -1037,6 +1598,7 @@ def create_context_compactor(
     enable_tool_truncation: bool = True,
     pruning_learner: Optional["ContextPruningLearner"] = None,
     provider_type: str = "cloud",
+    runtime_intelligence: Optional[Any] = None,
 ) -> ContextCompactor:
     """Factory function to create a configured ContextCompactor.
 
@@ -1052,6 +1614,7 @@ def create_context_compactor(
         enable_tool_truncation: Enable tool result truncation (default: True)
         pruning_learner: Optional RL learner for adaptive pruning decisions
         provider_type: Provider type for RL state (cloud, local)
+        runtime_intelligence: Optional canonical runtime-intelligence service
 
     Returns:
         Configured ContextCompactor instance
@@ -1071,4 +1634,5 @@ def create_context_compactor(
         config=config,
         pruning_learner=pruning_learner,
         provider_type=provider_type,
+        runtime_intelligence=runtime_intelligence,
     )

@@ -83,13 +83,11 @@ class ProviderInfo(Protocol):
 
 @runtime_checkable
 class ProviderServiceProtocol(Protocol):
-    """Protocol for provider management service.
+    """[CANONICAL] Protocol for provider management service.
 
-    Handles:
-    - Provider initialization and configuration
-    - Provider switching with validation
-    - Provider health checks
-    - Provider capability discovery
+    This protocol represents the target architecture for provider operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on provider-related operations.
@@ -139,6 +137,14 @@ class ProviderServiceProtocol(Protocol):
         Example:
             await provider_service.switch_provider('openai', 'gpt-4')
             # Now using OpenAI with GPT-4
+        """
+        ...
+
+    async def switch_model(self, model: str) -> None:
+        """Switch models on the current provider.
+
+        Args:
+            model: Target model name
         """
         ...
 
@@ -217,6 +223,14 @@ class ProviderServiceProtocol(Protocol):
         """
         ...
 
+    async def start_health_monitoring(self) -> None:
+        """Start background provider health monitoring."""
+        ...
+
+    async def stop_health_monitoring(self) -> None:
+        """Stop background provider health monitoring."""
+        ...
+
     def get_current_provider(self) -> "BaseProvider":
         """Get the current provider instance.
 
@@ -251,6 +265,14 @@ class ProviderServiceProtocol(Protocol):
             if await provider_service.test_provider('openai'):
                 await provider_service.switch_provider('openai')
         """
+        ...
+
+    def get_rate_limit_wait_time(self, error: Exception) -> float:
+        """Extract retry wait time from a provider rate-limit error."""
+        ...
+
+    def get_rate_limit_stats(self) -> Dict[str, Any]:
+        """Return accumulated provider rate-limit statistics."""
         ...
 
     def is_healthy(self) -> bool:

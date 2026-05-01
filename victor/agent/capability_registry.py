@@ -19,12 +19,12 @@ duck-typing with type-safe protocol conformance.
 
 Design Pattern: Mixin + Registry
 ================================
-- CapabilityRegistryMixin provides capability discovery methods
+- OrchestratorCapabilityMixin provides capability discovery methods
 - Capabilities are registered at initialization, not discovered at runtime
 - Invocation goes through the registry, not getattr
 
 Usage:
-    class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
+    class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         def __init__(self, ...):
             ...
             self._register_capabilities()  # At end of __init__
@@ -55,19 +55,20 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Capability Method Mappings — re-exported from framework layer
+# Capability Method Mappings — re-exported from core layer
 # =============================================================================
 
-# The canonical definitions live in victor.framework.capability_registry
-# to avoid framework → agent layering violations.
-from victor.framework.capability_registry import (  # noqa: F401
+# The canonical definitions live in victor.core.capability_registry.
+# Previously imported from framework to avoid layering violations, but
+# core is the correct location for this infrastructure.
+from victor.core.capability_registry import (  # noqa: F401
     CAPABILITY_METHOD_MAPPINGS,
     get_method_for_capability,
 )
 
 
-class CapabilityRegistryMixin:
-    """Mixin providing capability registry functionality.
+class OrchestratorCapabilityMixin:
+    """Mixin providing orchestrator capability registry functionality.
 
     Add this mixin to AgentOrchestrator to enable explicit capability
     discovery and invocation.
@@ -77,6 +78,8 @@ class CapabilityRegistryMixin:
     - Invoked via setter methods
     - Read via getter methods or attribute access
     - Dynamically loaded from plugins (Phase 4.4)
+
+    Note: Previously named CapabilityRegistryMixin - renamed for clarity.
     """
 
     def __init_capability_registry__(self) -> None:
@@ -313,6 +316,65 @@ class CapabilityRegistryMixin:
             getter_method=getattr(self, "get_vertical_context", None),
         )
 
+        # Stream/analytics capabilities
+        self._register_capability(
+            OrchestratorCapability(
+                name="usage_analytics",
+                capability_type=CapabilityType.WORKFLOW,
+                attribute="_usage_analytics",
+                description="Usage analytics tracker component",
+            ),
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="current_stream_context",
+                capability_type=CapabilityType.WORKFLOW,
+                attribute="_current_stream_context",
+                description="Current streaming context for token tracking",
+            ),
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="context_compactor",
+                capability_type=CapabilityType.WORKFLOW,
+                attribute="_context_compactor",
+                description="Context compactor for long conversation management",
+            ),
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="system_prompt_added",
+                capability_type=CapabilityType.PROMPT,
+                attribute="_system_added",
+                description="Whether system prompt has been added to conversation",
+            ),
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="runtime_intelligence_integration",
+                capability_type=CapabilityType.WORKFLOW,
+                getter="get_runtime_intelligence_integration",
+                description="Runtime-intelligence integration service",
+            ),
+            getter_method=self._get_runtime_intelligence_integration,
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="intelligent_pipeline",
+                capability_type=CapabilityType.WORKFLOW,
+                getter="get_runtime_intelligence_integration",
+                description="Deprecated runtime-intelligence compatibility alias",
+                deprecated=True,
+                deprecated_message="Use 'runtime_intelligence_integration' instead.",
+            ),
+            getter_method=self._get_runtime_intelligence_integration,
+        )
+
         # RL capabilities
         self._register_capability(
             OrchestratorCapability(
@@ -475,15 +537,7 @@ class CapabilityRegistryMixin:
                     actual_version=cap.version,
                 )
 
-        # Warn if invoking deprecated capability
-        if cap.deprecated:
-            import warnings
-
-            warnings.warn(
-                f"Capability '{name}' (v{cap.version}) is deprecated. " f"{cap.deprecated_message}",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        self._warn_if_deprecated(name, cap)
 
         if not cap.setter:
             raise TypeError(f"Capability '{name}' has no setter method")
@@ -515,6 +569,7 @@ class CapabilityRegistryMixin:
             raise KeyError(f"Capability '{name}' not found")
 
         cap = self._capabilities[name]
+        self._warn_if_deprecated(name, cap)
 
         # Try getter first
         if cap.getter:
@@ -624,12 +679,32 @@ class CapabilityRegistryMixin:
         else:
             self._rl_hooks = hooks
 
+    def _get_runtime_intelligence_integration(self) -> Any:
+        """Get the canonical runtime-intelligence integration surface."""
+        if hasattr(self, "runtime_intelligence_integration"):
+            return getattr(self, "runtime_intelligence_integration", None)
+        return getattr(self, "_runtime_intelligence_integration", None)
+
     def _set_team_specs(self, specs: Dict[str, Any]) -> None:
         """Set team specifications."""
         if hasattr(self, "_team_specs"):
             self._team_specs = specs
         else:
             self._team_specs = specs
+
+    def _warn_if_deprecated(self, name: str, capability: OrchestratorCapability) -> None:
+        """Emit a deprecation warning when a legacy capability is accessed."""
+        if not capability.deprecated:
+            return
+
+        import warnings
+
+        warnings.warn(
+            f"Capability '{name}' (v{capability.version}) is deprecated. "
+            f"{capability.deprecated_message}",
+            DeprecationWarning,
+            stacklevel=3,
+        )
 
     # =========================================================================
     # Dynamic Capability Loading (Phase 4.4)
@@ -785,4 +860,15 @@ class CapabilityRegistryMixin:
         return loader.apply_to(self, capability_names)
 
 
-__all__ = ["CapabilityRegistryMixin"]
+# =============================================================================
+# Backward compatibility aliases
+# =============================================================================
+
+# Alias for backward compatibility - was renamed for clarity
+CapabilityRegistryMixin = OrchestratorCapabilityMixin
+
+
+__all__ = [
+    "OrchestratorCapabilityMixin",
+    "CapabilityRegistryMixin",  # Backward compat alias
+]

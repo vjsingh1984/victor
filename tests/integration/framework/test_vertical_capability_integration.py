@@ -172,7 +172,7 @@ class TestResearchVerticalCapabilities:
         provider = ResearchWorkflowProvider()
         module_path = provider._get_capability_provider_module()
 
-        assert module_path == "victor.research.capabilities"
+        assert module_path == "victor_research.capabilities"
 
     def test_research_capability_provider_loading(self):
         """Test lazy loading of ResearchCapabilityProvider.
@@ -273,15 +273,15 @@ class TestResearchVerticalCapabilities:
         from the orchestrator.
         """
         get_source_verification = _load_vertical_attr(
-            "victor.research.capabilities",
+            "victor_research.capabilities",
             "get_source_verification",
         )
         get_citation_config = _load_vertical_attr(
-            "victor.research.capabilities",
+            "victor_research.capabilities",
             "get_citation_config",
         )
         get_research_quality = _load_vertical_attr(
-            "victor.research.capabilities",
+            "victor_research.capabilities",
             "get_research_quality",
         )
 
@@ -327,7 +327,7 @@ class TestDevOpsVerticalCapabilities:
         provider = DevOpsWorkflowProvider()
         module_path = provider._get_capability_provider_module()
 
-        assert module_path == "victor.devops.capabilities"
+        assert module_path == "victor_devops.capabilities"
 
     def test_devops_capability_provider_loading(self):
         """Test lazy loading of DevOpsCapabilityProvider."""
@@ -399,7 +399,7 @@ class TestDevOpsVerticalCapabilities:
     def test_devops_getter_methods(self):
         """Test DevOps capability getter methods."""
         get_container_settings = _load_vertical_attr(
-            "victor.devops.capabilities",
+            "victor_devops.capabilities",
             "get_container_settings",
         )
 
@@ -893,7 +893,7 @@ class TestCapabilityProviderErrorHandling:
         missing expected attributes.
         """
         ResearchCapabilityProvider = _load_vertical_attr(
-            "victor.research.capabilities",
+            "victor_research.capabilities",
             "ResearchCapabilityProvider",
         )
 
@@ -928,7 +928,7 @@ class TestCapabilityProviderLazyLoading:
 
         # Verify it's the right type
         ResearchCapabilityProvider = _load_vertical_attr(
-            "victor.research.capabilities",
+            "victor_research.capabilities",
             "ResearchCapabilityProvider",
         )
 
@@ -942,7 +942,7 @@ class TestCapabilityProviderLazyLoading:
         assert cap_provider is not None
 
         DevOpsCapabilityProvider = _load_vertical_attr(
-            "victor.devops.capabilities",
+            "victor_devops.capabilities",
             "DevOpsCapabilityProvider",
         )
 
@@ -990,9 +990,13 @@ class TestCapabilityMetadataConsistency:
     @pytest.mark.parametrize(
         "vertical,provider_class,expected_count",
         [
-            ("research", "victor.research.capabilities.ResearchCapabilityProvider", 5),
-            ("devops", "victor.devops.capabilities.DevOpsCapabilityProvider", 5),
-            ("dataanalysis", "victor.dataanalysis.capabilities.DataAnalysisCapabilityProvider", 5),
+            ("research", "victor_research.capabilities.ResearchCapabilityProvider", 5),
+            ("devops", "victor_devops.capabilities.DevOpsCapabilityProvider", 5),
+            (
+                "dataanalysis",
+                "victor.dataanalysis.capabilities.DataAnalysisCapabilityProvider",
+                5,
+            ),
             ("coding", "victor_coding.capabilities.CodingCapabilityProvider", 5),
             ("rag", "victor.rag.capabilities.RAGCapabilityProvider", 5),
         ],
@@ -1011,8 +1015,8 @@ class TestCapabilityMetadataConsistency:
     @pytest.mark.parametrize(
         "provider_class",
         [
-            "victor.research.capabilities.ResearchCapabilityProvider",
-            "victor.devops.capabilities.DevOpsCapabilityProvider",
+            "victor_research.capabilities.ResearchCapabilityProvider",
+            "victor_devops.capabilities.DevOpsCapabilityProvider",
             "victor.dataanalysis.capabilities.DataAnalysisCapabilityProvider",
             "victor_coding.capabilities.CodingCapabilityProvider",
             "victor.rag.capabilities.RAGCapabilityProvider",
@@ -1048,8 +1052,8 @@ class TestCapabilityMetadataConsistency:
         and get_capability_metadata() keys.
         """
         providers = [
-            ("victor.research.capabilities", "ResearchCapabilityProvider"),
-            ("victor.devops.capabilities", "DevOpsCapabilityProvider"),
+            ("victor_research.capabilities", "ResearchCapabilityProvider"),
+            ("victor_devops.capabilities", "DevOpsCapabilityProvider"),
             ("victor.dataanalysis.capabilities", "DataAnalysisCapabilityProvider"),
             ("victor_coding.capabilities", "CodingCapabilityProvider"),
             ("victor.rag.capabilities", "RAGCapabilityProvider"),
@@ -1079,11 +1083,11 @@ class TestCrossVerticalCapabilityIntegration:
         verticals applied without conflicts.
         """
         ResearchCapabilityProvider = _load_vertical_attr(
-            "victor.research.capabilities",
+            "victor_research.capabilities",
             "ResearchCapabilityProvider",
         )
         DevOpsCapabilityProvider = _load_vertical_attr(
-            "victor.devops.capabilities",
+            "victor_devops.capabilities",
             "DevOpsCapabilityProvider",
         )
         CodingCapabilityProvider = _load_vertical_attr(
@@ -1120,11 +1124,11 @@ class TestCrossVerticalCapabilityIntegration:
         correctly declare their dependencies in metadata.
         """
         ResearchCapabilityProvider = _load_vertical_attr(
-            "victor.research.capabilities",
+            "victor_research.capabilities",
             "ResearchCapabilityProvider",
         )
         DevOpsCapabilityProvider = _load_vertical_attr(
-            "victor.devops.capabilities",
+            "victor_devops.capabilities",
             "DevOpsCapabilityProvider",
         )
         RAGCapabilityProvider = _load_vertical_attr(
@@ -1200,11 +1204,11 @@ class TestServiceBackedCapabilityConfigFlow:
 
     def test_devops_service_backed_getter_flow(self):
         configure_container_settings = _load_vertical_attr(
-            "victor.devops.capabilities",
+            "victor_devops.capabilities",
             "configure_container_settings",
         )
         get_container_settings = _load_vertical_attr(
-            "victor.devops.capabilities",
+            "victor_devops.capabilities",
             "get_container_settings",
         )
 

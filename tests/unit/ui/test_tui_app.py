@@ -2,6 +2,8 @@
 
 import asyncio
 from contextlib import nullcontext
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from textual.messages import UpdateScroll
@@ -9,6 +11,7 @@ from textual.messages import UpdateScroll
 from victor.ui.tui.app import TUIConsoleAdapter, VictorTUI
 from victor.ui.tui.session import Message
 from victor.ui.tui.widgets import ToolCallWidget
+from victor.providers.base import Message as ProviderMessage
 from victor.providers.base import StreamChunk
 
 
@@ -82,6 +85,19 @@ def test_console_adapter_invokes_callback_after_log_update() -> None:
     assert observed_counts == [1]
 
 
+def test_console_adapter_preserves_leading_indentation() -> None:
+    """Indented console output should stay indented in the TUI log."""
+    log = MagicMock()
+    adapter = TUIConsoleAdapter(log)
+
+    adapter.print("  child\n    grandchild")
+
+    assert log.add_system_message.call_args_list == [
+        call("  child"),
+        call("    grandchild"),
+    ]
+
+
 def test_action_clear_clears_session_messages_and_agent_state() -> None:
     """Clear action should reset transcript state and session history consistently."""
     app = VictorTUI()
@@ -122,6 +138,26 @@ def test_render_message_replay_uses_history_path() -> None:
     app._conversation_log.add_user_message.assert_not_called()
     app._conversation_log.add_system_message.assert_not_called()
     app._conversation_log.add_error_message.assert_not_called()
+
+
+def test_render_message_replay_renders_preview_code_block() -> None:
+    """Replay should restore preview metadata as a separate code block."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+
+    app._render_message(
+        "system",
+        "File preview: /tmp/test.py",
+        replay=True,
+        metadata={"preview_body": "print('hello')", "preview_language": "py"},
+    )
+
+    app._conversation_log.add_history_message.assert_called_once_with(
+        "system",
+        "File preview: /tmp/test.py",
+    )
+    app._conversation_log.add_history_code_block.assert_called_once_with("print('hello')", "py")
+    app._conversation_log.add_code_block.assert_not_called()
 
 
 def test_replay_transcript_batches_and_reanchors_once() -> None:
@@ -233,7 +269,7 @@ def test_load_session_async_uses_async_replay_path() -> None:
 
     to_thread.assert_awaited_once_with(manager.load, "session-12345678")
     app._replay_transcript_async.assert_awaited_once_with(
-        [(msg.role, msg.content) for msg in session.messages],
+        session.messages,
         status_label="Loading session",
     )
     app._restore_agent_conversation.assert_called_once_with(session.messages)
@@ -249,7 +285,7 @@ def test_load_project_session_async_uses_to_thread() -> None:
     app.agent = None
 
     history = MagicMock()
-    history.messages = [MagicMock(role="assistant", content="a1")]
+    history.messages = [ProviderMessage(role="assistant", content="a1")]
     persistence = MagicMock()
     persistence.load_session = MagicMock()
 
@@ -258,19 +294,164 @@ def test_load_project_session_async_uses_to_thread() -> None:
             "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
             return_value=persistence,
         ),
-        patch("victor.agent.message_history.MessageHistory.from_dict", return_value=history),
+        patch(
+            "victor.agent.message_history.MessageHistory.from_dict",
+            return_value=history,
+        ),
         patch(
             "victor.ui.tui.app.asyncio.to_thread",
-            AsyncMock(return_value={"conversation": {"messages": []}, "metadata": {"title": "P"}}),
+            AsyncMock(
+                return_value={
+                    "conversation": {"messages": []},
+                    "metadata": {"title": "P"},
+                }
+            ),
         ) as to_thread,
     ):
         asyncio.run(app._load_project_session_async("project-session-1"))
 
     to_thread.assert_awaited_once_with(persistence.load_session, "project-session-1")
-    app._replay_transcript_async.assert_awaited_once_with(
-        [("assistant", "a1")],
-        status_label="Loading project session",
-    )
+    assert app._replay_transcript_async.await_count == 1
+    replay_messages = app._replay_transcript_async.await_args.args[0]
+    assert len(replay_messages) == 1
+    assert replay_messages[0].role == "assistant"
+    assert replay_messages[0].content == "a1"
+    assert replay_messages[0].metadata == {}
+    assert app._replay_transcript_async.await_args.kwargs == {
+        "status_label": "Loading project session"
+    }
+
+
+def test_load_project_session_async_replays_preview_sidecar_messages() -> None:
+    """Project async loader should merge persisted preview sidecar messages into replay."""
+    app = VictorTUI()
+    app._replay_transcript_async = AsyncMock()
+    app._add_system_message = MagicMock()
+    app._set_status = MagicMock()
+    app.agent = None
+
+    history = MagicMock()
+    history.messages = [ProviderMessage(role="assistant", content="done")]
+    persistence = MagicMock()
+    persistence.load_session = MagicMock()
+
+    with (
+        patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ),
+        patch(
+            "victor.agent.message_history.MessageHistory.from_dict",
+            return_value=history,
+        ),
+        patch(
+            "victor.ui.tui.app.asyncio.to_thread",
+            AsyncMock(
+                return_value={
+                    "conversation": {
+                        "messages": [],
+                        "preview_messages": [
+                            {
+                                "role": "system",
+                                "content": "File preview: /tmp/test.py",
+                                "metadata": {
+                                    "preview_body": "print('hello')",
+                                    "preview_kind": "file",
+                                    "preview_language": "py",
+                                    "preview_path": "/tmp/test.py",
+                                },
+                                "after_message_index": 1,
+                            }
+                        ],
+                    },
+                    "metadata": {"title": "P"},
+                }
+            ),
+        ),
+    ):
+        asyncio.run(app._load_project_session_async("project-session-1"))
+
+    assert app._replay_transcript_async.await_count == 1
+    replay_messages = app._replay_transcript_async.await_args.args[0]
+    assert [(msg.role, msg.content) for msg in replay_messages] == [
+        ("assistant", "done"),
+        ("system", "File preview: /tmp/test.py"),
+    ]
+    assert replay_messages[0].metadata == {}
+    assert replay_messages[1].metadata == {
+        "preview_body": "print('hello')",
+        "preview_kind": "file",
+        "preview_language": "py",
+        "preview_path": "/tmp/test.py",
+    }
+    assert app._replay_transcript_async.await_args.kwargs == {
+        "status_label": "Loading project session"
+    }
+
+
+def test_load_project_session_replays_preview_sidecar_messages() -> None:
+    """Sync project-session restore should merge preview sidecar messages into the TUI log."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._add_system_message = MagicMock()
+    app._add_error_message = MagicMock()
+    app.agent = None
+
+    history = MagicMock()
+    history.messages = [ProviderMessage(role="assistant", content="done")]
+    persistence = MagicMock()
+    persistence.load_session.return_value = {
+        "conversation": {
+            "messages": [],
+            "preview_messages": [
+                {
+                    "role": "system",
+                    "content": "File preview: /tmp/test.py",
+                    "metadata": {
+                        "preview_body": "print('hello')",
+                        "preview_kind": "file",
+                        "preview_language": "py",
+                        "preview_path": "/tmp/test.py",
+                    },
+                    "after_message_index": 1,
+                }
+            ],
+        },
+        "metadata": {"title": "P"},
+    }
+
+    with (
+        patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ),
+        patch(
+            "victor.agent.message_history.MessageHistory.from_dict",
+            return_value=history,
+        ),
+    ):
+        app._load_project_session("project-session-1")
+
+    assert app._conversation_log.clear.call_count == 1
+    assert app._conversation_log.add_assistant_message.call_args_list == [call("done")]
+    assert app._conversation_log.add_system_message.call_args_list == [
+        call("File preview: /tmp/test.py")
+    ]
+    assert app._conversation_log.add_code_block.call_args_list == [call("print('hello')", "py")]
+    assert [(msg.role, msg.content, msg.metadata) for msg in app._session_messages] == [
+        ("assistant", "done", {}),
+        (
+            "system",
+            "File preview: /tmp/test.py",
+            {
+                "preview_body": "print('hello')",
+                "preview_kind": "file",
+                "preview_language": "py",
+                "preview_path": "/tmp/test.py",
+            },
+        ),
+    ]
+    app._add_system_message.assert_called_once_with("Project session loaded: P (2 messages)")
 
 
 def test_load_session_uses_status_and_single_completion_message() -> None:
@@ -299,9 +480,7 @@ def test_load_session_uses_status_and_single_completion_message() -> None:
     )
     assert app._set_status.call_count == 2
     app._restore_agent_conversation.assert_called_once_with(session.messages)
-    app._replay_transcript.assert_called_once_with(
-        [(msg.role, msg.content) for msg in session.messages]
-    )
+    app._replay_transcript.assert_called_once_with(session.messages)
     app._add_system_message.assert_called_once_with("Session loaded: Replay Test (60 messages)")
 
 
@@ -343,6 +522,7 @@ def test_finish_tool_call_keeps_follow_up_widgets_visible_longer() -> None:
         "success",
         0.5,
         follow_up_suggestions=follow_ups,
+        output_preview=None,
     )
     app._schedule_tool_widget_cleanup.assert_called_once_with(
         widget,
@@ -406,7 +586,554 @@ def test_stream_response_handles_metadata_tool_results_with_follow_ups() -> None
         success=True,
         elapsed=0.5,
         follow_up_suggestions=follow_ups,
+        tool_name="code_search",
+        arguments={"query": "main entry point"},
+        output_preview=None,
     )
+
+
+def test_finish_tool_call_creates_widget_when_result_arrives_without_start() -> None:
+    """Result-only tool events should still create a visible tool widget in TUI."""
+    app = VictorTUI()
+    widget = MagicMock()
+    app._schedule_tool_widget_cleanup = MagicMock()
+    app._prune_tool_widgets = MagicMock()
+
+    def _show_tool_call(tool_name, arguments):
+        app._current_tool_widget = widget
+
+    app._show_tool_call = MagicMock(side_effect=_show_tool_call)
+
+    follow_ups = [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+
+    app._finish_tool_call(
+        success=True,
+        elapsed=0.5,
+        follow_up_suggestions=follow_ups,
+        tool_name="code_search",
+        arguments={"query": "main entry point"},
+        output_preview="line1\nline2\nline3",
+    )
+
+    app._show_tool_call.assert_called_once_with("code_search", {"query": "main entry point"})
+    widget.update_status.assert_called_once_with(
+        "success",
+        0.5,
+        follow_up_suggestions=follow_ups,
+        output_preview="line1\nline2\nline3",
+    )
+    app._schedule_tool_widget_cleanup.assert_called_once_with(widget, timeout=20.0)
+
+
+def test_stream_response_surfaces_tool_result_error_details() -> None:
+    """TUI should surface failed tool-result error text, not just a red widget."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._add_error_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "read",
+                    "success": False,
+                    "elapsed": 0.2,
+                    "arguments": {"path": "/tmp/test.py"},
+                    "error": "Permission denied",
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("trace main"))
+
+    app._add_error_message.assert_called_once_with("read: Permission denied")
+    app._finish_tool_call.assert_called_once_with(
+        success=False,
+        elapsed=0.2,
+        follow_up_suggestions=None,
+        tool_name="read",
+        arguments={"path": "/tmp/test.py"},
+        output_preview=None,
+    )
+
+
+def test_stream_response_surfaces_pruned_tool_notice() -> None:
+    """TUI should disclose when tool output was pruned before model submission."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "code_search",
+                    "success": True,
+                    "elapsed": 0.5,
+                    "arguments": {"query": "main"},
+                    "was_pruned": True,
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("trace main"))
+
+    app._add_system_message.assert_called_once_with(
+        "Tool output for code_search was pruned before sending to the model."
+    )
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.5,
+        follow_up_suggestions=None,
+        tool_name="code_search",
+        arguments={"query": "main"},
+        output_preview=None,
+    )
+
+
+def test_stream_response_respects_disabled_tool_pruning_notice() -> None:
+    """TUI should hide pruning notices when transparency display is disabled."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "code_search",
+                    "success": True,
+                    "elapsed": 0.5,
+                    "arguments": {"query": "main"},
+                    "was_pruned": True,
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    with patch(
+        "victor.config.tool_settings.get_tool_settings",
+        return_value=SimpleNamespace(tool_output_show_transparency=False),
+    ):
+        asyncio.run(app._stream_response("trace main"))
+
+    app._add_system_message.assert_not_called()
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.5,
+        follow_up_suggestions=None,
+        tool_name="code_search",
+        arguments={"query": "main"},
+        output_preview=None,
+    )
+
+
+def test_stream_response_forwards_tool_result_preview() -> None:
+    """TUI should forward tool-result payloads so widgets can show previews."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "read",
+                    "success": True,
+                    "elapsed": 0.2,
+                    "arguments": {"path": "/tmp/test.py"},
+                    "result": "line1\nline2\nline3\nline4",
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("preview"))
+
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.2,
+        follow_up_suggestions=None,
+        tool_name="read",
+        arguments={"path": "/tmp/test.py"},
+        output_preview="line1\nline2\nline3\n...",
+    )
+
+
+def test_stream_response_respects_disabled_tool_preview_setting() -> None:
+    """TUI should suppress tool previews when preview display is disabled."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "read",
+                    "success": True,
+                    "elapsed": 0.2,
+                    "arguments": {"path": "/tmp/test.py"},
+                    "result": "line1\nline2\nline3\nline4",
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    with patch(
+        "victor.config.tool_settings.get_tool_settings",
+        return_value=SimpleNamespace(
+            tool_output_preview_enabled=False,
+            tool_output_preview_lines=3,
+        ),
+    ):
+        asyncio.run(app._stream_response("preview"))
+
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.2,
+        follow_up_suggestions=None,
+        tool_name="read",
+        arguments={"path": "/tmp/test.py"},
+        output_preview=None,
+    )
+
+
+def test_stream_response_surfaces_file_preview_metadata() -> None:
+    """TUI should surface file preview metadata via the shared preview path."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={"path": "/tmp/test.py", "file_preview": "print('hello')"},
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("preview"))
+
+    app._add_system_message.assert_called_once_with(
+        "File preview: /tmp/test.py",
+        preview_body="print('hello')",
+        preview_kind="file",
+        preview_language="py",
+        preview_path="/tmp/test.py",
+    )
+
+
+def test_stream_response_surfaces_edit_preview_metadata() -> None:
+    """TUI should surface edit preview metadata via the shared preview path."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={"path": "/tmp/test.py", "edit_preview": "-old\n+new"},
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("preview"))
+
+    app._add_system_message.assert_called_once_with(
+        "Edit preview: /tmp/test.py",
+        preview_body="-old\n+new",
+        preview_kind="edit",
+        preview_language="diff",
+        preview_path="/tmp/test.py",
+    )
+
+
+def test_add_system_message_renders_live_preview_code_block_and_records_metadata() -> None:
+    """Live system previews should render as header plus code block and stay replayable."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._record_message = MagicMock()
+
+    app._add_system_message(
+        "File preview: /tmp/test.py",
+        preview_body="print('hello')",
+        preview_language="py",
+        preview_path="/tmp/test.py",
+    )
+
+    app._conversation_log.add_system_message.assert_called_once_with("File preview: /tmp/test.py")
+    app._conversation_log.add_code_block.assert_called_once_with("print('hello')", "py")
+    app._record_message.assert_called_once_with(
+        "system",
+        "File preview: /tmp/test.py",
+        preview_body="print('hello')",
+        preview_language="py",
+        preview_path="/tmp/test.py",
+    )
+
+
+def test_stream_response_normalizes_cumulative_content_snapshots() -> None:
+    """TUI streaming should not duplicate cumulative provider content."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="Hello", metadata=None)
+        yield StreamChunk(content="Hello world", metadata=None)
+        yield StreamChunk(content="Hello world", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._conversation_log.update_streaming.assert_any_call("Hello")
+    app._conversation_log.update_streaming.assert_any_call("Hello world")
+    app._record_message.assert_called_once_with("assistant", "Hello world")
+
+
+def test_stream_response_normalizes_cumulative_reasoning_snapshots() -> None:
+    """TUI thinking panel should receive full reasoning without duplicate prefixes."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"reasoning_content": "Plan"})
+        yield StreamChunk(content="", metadata={"reasoning_content": "Plan carefully"})
+        yield StreamChunk(content="Done", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._update_thinking.assert_has_calls([call("Plan"), call("Plan carefully")])
+    app._hide_thinking.assert_called_once()
+    app._record_message.assert_called_once_with("assistant", "Done")
+
+
+def test_stream_response_handles_reasoning_and_content_same_chunk() -> None:
+    """TUI streaming should render reasoning metadata and content from one chunk."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="Answer", metadata={"reasoning_content": "Thinking"})
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._update_thinking.assert_called_once_with("Thinking")
+    app._hide_thinking.assert_called_once()
+    app._conversation_log.update_streaming.assert_called_once_with("Answer")
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
+def test_stream_response_strips_provider_reasoning_prefix() -> None:
+    """TUI should not display provider-added thinking banners inside the panel."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"reasoning_content": "💭 Thinking...Plan"})
+        yield StreamChunk(content="Answer", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._update_thinking.assert_called_once_with("Plan")
+    app._hide_thinking.assert_called_once()
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
+def test_stream_response_maps_generic_thinking_status_to_panel() -> None:
+    """TUI should treat generic thinking statuses as thinking-panel transitions."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
+        yield StreamChunk(content="Answer", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._show_thinking.assert_called_once()
+    app._hide_thinking.assert_called_once()
+    app._conversation_log.update_streaming.assert_called_once_with("Answer")
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
+def test_stream_response_routes_non_thinking_status_to_status_bar() -> None:
+    """TUI should surface non-thinking status chunks in the status bar."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"status": "Starting..."})
+        yield StreamChunk(content="Answer", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._set_status.assert_any_call("Starting...", "streaming")
+    app._show_thinking.assert_not_called()
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
+def test_stream_response_handles_inline_thinking_markers() -> None:
+    """TUI should route inline thinking markers through the thinking panel."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="<think>", metadata=None)
+        yield StreamChunk(content="Analyzing...", metadata=None)
+        yield StreamChunk(content="</think>", metadata=None)
+        yield StreamChunk(content="Visible", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._show_thinking.assert_called_once()
+    app._update_thinking.assert_called_once_with("Analyzing...")
+    app._hide_thinking.assert_called_once()
+    app._conversation_log.update_streaming.assert_called_once_with("Visible")
+    app._record_message.assert_called_once_with("assistant", "Visible")
+
+
+def test_stream_response_aborts_excessive_inline_thinking() -> None:
+    """TUI should stop runaway inline-thinking streams and surface a warning."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="<think>", metadata=None)
+        yield StreamChunk(content="123456", metadata=None)
+        yield StreamChunk(content="Visible", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    with patch("victor.agent.response_sanitizer.StreamingContentFilter.MAX_THINKING_CONTENT", 5):
+        asyncio.run(app._stream_response("hello"))
+
+    app._show_thinking.assert_called_once()
+    app._hide_thinking.assert_called_once()
+    app._add_system_message.assert_called_once()
+    assert "Thinking content exceeded 5 chars" in app._add_system_message.call_args[0][0]
+    app._record_message.assert_not_called()
 
 
 def test_input_submit_ignored_while_processing_keeps_draft() -> None:
@@ -439,6 +1166,85 @@ def test_process_message_async_toggles_input_busy_state() -> None:
     app._input_widget.set_busy.assert_any_call(True)
     app._input_widget.set_busy.assert_any_call(False)
     app._input_widget.focus_input.assert_called_once()
+
+
+def test_on_mount_renders_startup_messages() -> None:
+    """TUI mount should replay queued startup notices as system messages."""
+    app = VictorTUI(
+        provider="test-provider",
+        model="test-model",
+        startup_messages=["Profile fallback active", "Resumed session: Demo"],
+    )
+    conversation_log = MagicMock()
+    input_widget = MagicMock()
+    thinking_widget = MagicMock()
+    status_bar = MagicMock()
+    jump_button = MagicMock()
+    app._set_status = MagicMock()
+    app._start_graph_watch_status_refresh = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    def _query_one(selector, *_args):
+        if selector == "#conversation-log":
+            return conversation_log
+        if selector == "#input-widget":
+            return input_widget
+        if selector == "#thinking-widget":
+            return thinking_widget
+        if selector == "#jump-to-bottom":
+            return jump_button
+        return status_bar
+
+    app.query_one = MagicMock(side_effect=_query_one)
+
+    app.on_mount()
+
+    assert conversation_log.add_system_message.call_args_list[:4] == [
+        call("Connected to test-provider/test-model"),
+        call("Type /help for commands, Ctrl+C to exit"),
+        call("Profile fallback active"),
+        call("Resumed session: Demo"),
+    ]
+    app._start_graph_watch_status_refresh.assert_called_once_with()
+    input_widget.focus_input.assert_called_once()
+
+
+def test_start_graph_watch_status_refresh_updates_and_schedules() -> None:
+    """Graph-watch refresh startup should prime the indicator and schedule polling."""
+    app = VictorTUI()
+    app._refresh_graph_watch_status = MagicMock()
+    app.set_interval = MagicMock(return_value="timer")
+
+    app._start_graph_watch_status_refresh()
+
+    app._refresh_graph_watch_status.assert_called_once_with()
+    app.set_interval.assert_called_once_with(
+        app._GRAPH_WATCH_STATUS_REFRESH_SECONDS,
+        app._refresh_graph_watch_status,
+    )
+    assert app._graph_watch_refresh_timer == "timer"
+
+
+def test_refresh_graph_watch_status_updates_status_bar_from_manifest() -> None:
+    """Graph-watch refresh should push compact health info into the status bar."""
+    app = VictorTUI()
+    app._status_bar = MagicMock()
+    manifest = {"running": True, "last_refresh": {"changed": 2, "deleted": 1, "unchanged": 7}}
+
+    with (
+        patch(
+            "victor.config.settings.get_project_paths",
+            return_value=SimpleNamespace(project_root=Path("/repo")),
+        ),
+        patch("victor.ui.commands.graph._read_graph_watch_manifest", return_value=manifest),
+        patch(
+            "victor.ui.commands.graph.summarize_graph_watch_health",
+            return_value=("Graph: ok c2 d1 u7", "active"),
+        ),
+    ):
+        app._refresh_graph_watch_status()
+
+    app._status_bar.update_graph_watch.assert_called_once_with("Graph: ok c2 d1 u7", state="active")
 
 
 def test_update_jump_button_label_with_unread_count() -> None:

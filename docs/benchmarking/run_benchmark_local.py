@@ -120,15 +120,15 @@ async def run_benchmark(
             continue
 
         task_def = TASK_REGISTRY[task_id]
-        print(f"[{task_id}] {task_def['name']} ({task_def['category']} / {task_def['complexity']})")
+        print(
+            f"[{task_id}] {task_def['name']} ({task_def['category']} / {task_def['complexity']})"
+        )
 
         for run_num in range(1, runs_per_task + 1):
             run_label = f"  Run {run_num}/{runs_per_task}" if runs_per_task > 1 else " "
             print(f"{run_label} ...", end="", flush=True)
 
-            result = await run_victor_task(
-                task_id, task_def, provider, model, run_num
-            )
+            result = await run_victor_task(task_id, task_def, provider, model, run_num)
             all_results.append(result)
 
             status = "OK" if result["success"] else "FAIL"
@@ -182,6 +182,44 @@ def save_results(summary: Dict[str, Any]) -> str:
     return str(filepath)
 
 
+def _setup_debug_logging() -> None:
+    """Configure logging so benchmark debug traces land in ~/.victor/logs/victor.log."""
+    import logging
+    from logging.handlers import RotatingFileHandler
+    from pathlib import Path
+
+    log_dir = Path.home() / ".victor" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "victor.log"
+
+    root = logging.getLogger("victor")
+    root.setLevel(logging.DEBUG)
+
+    # File handler — DEBUG level for full visibility
+    fh = RotatingFileHandler(str(log_file), maxBytes=10_485_760, backupCount=5)
+    fh.setLevel(logging.DEBUG)
+    fmt = logging.Formatter(
+        "%(asctime)s - benchmark - %(name)s - %(levelname)s - %(message)s"
+    )
+    fh.setFormatter(fmt)
+    root.addHandler(fh)
+
+    # Suppress noisy libraries
+    for lib in (
+        "httpx",
+        "httpcore",
+        "urllib3",
+        "asyncio",
+        "hpack",
+        "h2",
+        "anthropic",
+        "openai",
+        "sentence_transformers",
+        "transformers",
+    ):
+        logging.getLogger(lib).setLevel(logging.WARNING)
+
+
 async def main():
     import argparse
 
@@ -190,7 +228,12 @@ async def main():
     parser.add_argument("--provider", default="ollama", help="Provider name")
     parser.add_argument("--tasks", nargs="+", default=DEFAULT_TASKS, help="Task IDs")
     parser.add_argument("--runs", type=int, default=1, help="Runs per task")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
+
+    if args.debug:
+        _setup_debug_logging()
+        print("[DEBUG] Logging enabled → ~/.victor/logs/victor.log")
 
     summary = await run_benchmark(
         task_ids=args.tasks,
@@ -208,7 +251,9 @@ async def main():
     for r in summary["results"]:
         status = "OK" if r["success"] else "FAIL"
         dur = f"{r['duration_ms']/1000:.1f}s"
-        print(f"{r['task_id']:<6} {r['task_name']:<25} {status:<6} {dur:>10} {r['output_length']:>8}")
+        print(
+            f"{r['task_id']:<6} {r['task_name']:<25} {status:<6} {dur:>10} {r['output_length']:>8}"
+        )
 
 
 if __name__ == "__main__":

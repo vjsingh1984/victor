@@ -431,7 +431,62 @@ class BaseServiceProvider(ABC):
         handle: ServiceHandle,
         config: HealthCheckConfig,
     ) -> bool:
-        """Check gRPC health endpoint."""
-        # For now, just TCP check
-        # TODO: Implement proper gRPC health check
-        return await self._check_tcp(handle, config)
+        """Check gRPC health endpoint using standard gRPC health checking protocol.
+
+        The gRPC health checking v1 protocol defines a Check service that returns
+        the serving status of a service. This implementation uses the standard
+        health check request with empty payload.
+
+        Returns:
+            True if service is SERVING, False otherwise
+        """
+        # First check TCP connectivity
+        if not await self._check_tcp(handle, config):
+            return False
+
+        # Try gRPC health check if grpcio is available
+        try:
+            import grpc
+            from grpc_health.v1 import health, health_pb2, health_pb2_grpc
+
+            # Create channel to the health check endpoint
+            # Default health check port is usually the service port + 1 or same port
+            host = handle.config.get("health_check_host", handle.config.get("host", "localhost"))
+            port = handle.config.get("health_check_port", handle.config.get("port", 50051))
+
+            channel = grpc.aio.insecure_channel(f"{host}:{port}")
+            try:
+                # Create health check stub
+                health_stub = health_pb2_grpc.HealthStub(channel)
+
+                # Call Check with empty request (standard health check)
+                request = health_pb2.HealthCheckRequest(service="")
+                response = await asyncio.wait_for(
+                    health_stub.Check(request, timeout=config.timeout), timeout=config.timeout + 1
+                )
+
+                # Check response status
+                # SERVING = 1, NOT_SERVING = 2, SERVICE_UNKNOWN = 3
+                return response.status == health.HealthCheckResponse.SERVING
+
+            except asyncio.TimeoutError:
+                logger.warning(f"gRPC health check timeout for {handle.name}")
+                return False
+            except grpc.aio.AioRpcError as e:
+                # Service might not implement health check, fall back to TCP
+                if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                    logger.debug(f"gRPC health check not implemented for {handle.name}, using TCP")
+                    return True  # TCP already passed
+                logger.warning(f"gRPC health check failed for {handle.name}: {e.code()}")
+                return False
+            finally:
+                await channel.close()
+
+        except ImportError:
+            # grpcio-health-checking not available, use TCP only
+            logger.debug("grpcio-health-checking not available, using TCP check")
+            return True
+        except Exception as e:
+            logger.warning(f"gRPC health check error for {handle.name}: {e}")
+            # Fall back to TCP which already passed
+            return True

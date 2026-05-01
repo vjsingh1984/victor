@@ -64,6 +64,14 @@ class Language(Enum):
     UNKNOWN = "unknown"
 
 
+class TestExpectedStatus(str, Enum):
+    """Expected outcome for a test result."""
+
+    PASS = "pass"  # Test is expected to pass
+    FAIL = "fail"  # Test is expected to fail
+    NONE = ""  # No expectation (any outcome is acceptable)
+
+
 @dataclass
 class TestRunnerConfig:
     """Configuration for test runner execution."""
@@ -86,16 +94,16 @@ class TestResult:
     duration_ms: float = 0.0
     stdout: str = ""
     stderr: str = ""
-    expected_status: str = ""  # "fail", "pass", or empty
+    expected_status: TestExpectedStatus = TestExpectedStatus.NONE
     error_message: str = ""
     skip_reason: str = ""
 
     @property
     def is_expected(self) -> bool:
         """Check if test result matches expected status."""
-        if not self.expected_status:
+        if self.expected_status == TestExpectedStatus.NONE:
             return True
-        if self.expected_status == "fail":
+        if self.expected_status == TestExpectedStatus.FAIL:
             return not self.passed
         return self.passed
 

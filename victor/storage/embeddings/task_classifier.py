@@ -45,7 +45,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from victor.classification import TaskType, NudgeEngine, get_nudge_engine
-from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
+from victor.storage.embeddings.collections import (
+    CollectionItem,
+    StaticEmbeddingCollection,
+)
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 if TYPE_CHECKING:
@@ -368,6 +371,18 @@ ANALYZE_PHRASES = [
     "check for code smells",
     "assess the complexity",
     "analyze the structure",
+    # Structural/architecture analysis (abstract patterns)
+    "structural analysis",
+    "framework analysis",
+    "architecture analysis",
+    "code structure review",
+    "system architecture review",
+    "analyze the framework",
+    "review the framework",
+    "examine the architecture",
+    "assess the architecture",
+    "analyze system design",
+    "review system structure",
     # Comparison patterns
     "compare the implementations",
     "difference between",
@@ -1269,6 +1284,7 @@ class TaskTypeClassifier:
         cache_dir: Optional[Path] = None,
         embedding_service: Optional[EmbeddingService] = None,
         threshold: float = 0.35,
+        use_weighted_similarity: bool = True,
     ) -> "TaskTypeClassifier":
         """Get or create the singleton TaskTypeClassifier instance.
 
@@ -1276,6 +1292,8 @@ class TaskTypeClassifier:
             cache_dir: Directory for cache files (only used on first call)
             embedding_service: Shared embedding service (only used on first call)
             threshold: Minimum similarity threshold (only used on first call)
+            use_weighted_similarity: Use weighted cosine similarity with key term boosting
+                (only used on first call). Default: True for better task classification.
 
         Returns:
             The singleton TaskTypeClassifier instance
@@ -1287,6 +1305,7 @@ class TaskTypeClassifier:
                         cache_dir=cache_dir,
                         embedding_service=embedding_service,
                         threshold=threshold,
+                        use_weighted_similarity=use_weighted_similarity,
                     )
         return cls._instance
 
@@ -1303,6 +1322,7 @@ class TaskTypeClassifier:
         embedding_service: Optional[EmbeddingService] = None,
         threshold: float = 0.35,
         nudge_engine: Optional[NudgeEngine] = None,
+        use_weighted_similarity: bool = True,
     ):
         """Initialize task type classifier.
 
@@ -1311,12 +1331,15 @@ class TaskTypeClassifier:
             embedding_service: Shared embedding service
             threshold: Minimum similarity threshold for classification
             nudge_engine: Optional NudgeEngine for post-classification corrections (DIP)
+            use_weighted_similarity: Use weighted cosine similarity with key term boosting
+                for better task classification. Default: True.
         """
         from victor.config.settings import get_project_paths
 
         self.cache_dir = cache_dir or get_project_paths().global_embeddings_dir
         self.embedding_service = embedding_service or get_embedding_service()
         self.threshold = threshold
+        self.use_weighted_similarity = use_weighted_similarity
         # Use injected NudgeEngine or get singleton from classification module
         self._nudge_engine = nudge_engine or get_nudge_engine()
 
@@ -1365,6 +1388,9 @@ class TaskTypeClassifier:
             TaskType.GENERAL_QUERY: GENERAL_QUERY_PHRASES,
         }
 
+        # Merge additional phrases from vertical capabilities (OCP extension point)
+        self._merge_vertical_phrases()
+
         # Single unified collection for all task phrases (1 file instead of 9)
         self._collection = StaticEmbeddingCollection(
             name="task_classifier",
@@ -1373,6 +1399,49 @@ class TaskTypeClassifier:
         )
 
         self._initialized = False
+
+    def _merge_vertical_phrases(self) -> None:
+        """Merge additional phrases from vertical capabilities.
+
+        Queries the CapabilityRegistry for an enhanced TaskClassifierPhraseProtocol
+        and extends self._phrase_lists with any returned phrases. This allows
+        verticals to contribute domain-specific task classification examples
+        without modifying the core classifier.
+        """
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import (
+                TaskClassifierPhraseProtocol,
+            )
+
+            registry = CapabilityRegistry.get_instance()
+            contributor = registry.get(TaskClassifierPhraseProtocol)
+            if contributor is None or not registry.is_enhanced(TaskClassifierPhraseProtocol):
+                return
+
+            extra_phrases = contributor.get_classifier_phrases()
+            for task_type_value, phrases in extra_phrases.items():
+                try:
+                    task_type = TaskType(task_type_value)
+                except ValueError:
+                    logger.warning(
+                        "Unknown task type '%s' from vertical phrases, skipping",
+                        task_type_value,
+                    )
+                    continue
+                if task_type in self._phrase_lists:
+                    self._phrase_lists[task_type].extend(phrases)
+                else:
+                    self._phrase_lists[task_type] = list(phrases)
+
+            if extra_phrases:
+                logger.info(
+                    "Merged %d vertical phrases across %d task types",
+                    sum(len(v) for v in extra_phrases.values()),
+                    len(extra_phrases),
+                )
+        except Exception:
+            logger.debug("Failed to merge vertical phrases", exc_info=True)
 
     @property
     def is_initialized(self) -> bool:
@@ -1588,6 +1657,21 @@ class TaskTypeClassifier:
         Returns:
             TaskTypeResult with classified task type
         """
+        from victor.framework.task.direct_response import classify_direct_response_prompt
+
+        direct_response = classify_direct_response_prompt(prompt)
+        if direct_response.is_direct_response:
+            return TaskTypeResult(
+                task_type=TaskType.GENERAL_QUERY,
+                confidence=direct_response.confidence,
+                top_matches=[
+                    (f"direct_response:{direct_response.reason}", direct_response.confidence)
+                ],
+                has_file_context=False,
+                nudge_applied="direct_response",
+                preprocessed_prompt=prompt,
+            )
+
         if not self._initialized:
             self.initialize_sync()
 
@@ -1599,7 +1683,10 @@ class TaskTypeClassifier:
 
         # Step 2: Search unified collection and aggregate by task_type
         # Get top 20 results to ensure we see all task types
-        results = self._collection.search_sync(preprocessed, top_k=20)
+        # Use weighted similarity if enabled for better task classification
+        results = self._collection.search_sync(
+            preprocessed, top_k=20, use_weighted_similarity=self.use_weighted_similarity
+        )
 
         all_scores: Dict[TaskType, float] = {}
         all_matches: List[Tuple[str, float]] = []

@@ -63,9 +63,9 @@
 
 **Vertical → Framework:** `VerticalBase.get_extensions()` → `VerticalExtensions` dataclass (11 fields: middleware, safety, prompts, RL, teams, etc.) → consumed by orchestrator during `Agent.create(vertical=...)`
 
-**Framework → Orchestration:** `Agent.run()` → `stream_with_events()` → `AgentOrchestrator.stream_chat()` → `ChatCoordinator` → provider API + tool pipeline loop
+**Framework → Orchestration:** `Agent.run()` / `Agent.chat()` → `AgentOrchestrator.chat()` / `stream_chat()` → `ChatService` → `TurnExecutor.execute_agentic_loop()` / `ServiceStreamingRuntime` → provider API + tool pipeline loop
 
-**Tool Execution:** `ChatCoordinator` → `ToolCoordinator` → `ToolPipeline` → `ToolExecutor` → `BaseTool.execute()` → `ToolResult`
+**Tool Execution:** `ChatService` / `TurnExecutor` → `ToolPipeline` → `ToolExecutor` → `BaseTool.execute()` → `ToolResult`
 
 ---
 
@@ -89,7 +89,7 @@
 | Location | Issue | Fix |
 |----------|-------|-----|
 | `orchestrator.py` (3,940 LOC) | Thin facade after Phase 3B/3C extraction of 37 properties + callbacks + session state. 21 coordinators + 8 runtime boundaries. | Further extraction possible but diminishing returns; current LOC is acceptable |
-| `ChatCoordinator` (~1,800 LOC) | Manages both streaming and non-streaming chat plus recovery | Split into `StreamingChatCoordinator` and `SyncChatCoordinator` |
+| `ChatCoordinator` (~1,800 LOC, historical) | Legacy shim after extraction; canonical chat runtime is now service-first via `ChatService` and `ServiceStreamingRuntime` | Keep shim coverage minimal; prefer service/runtime surfaces |
 | `VerticalBase.get_config()` (template method) | Assembles tools + prompt + stages + hints + modes in one method | Already mitigated by composition with 3 providers; acceptable |
 
 ### OCP Violations
@@ -175,11 +175,11 @@ The 13 protocol modules in `victor/core/verticals/protocols/` (SafetyExtensionPr
 
 ## 6. Phased Roadmap to Best-in-Class
 
-### Phase 4 (Next): Orchestrator Finalization
-- Extract `_handle_tool_calls` (187 lines) into `ExecutionCoordinator`
-- Extract `_create_recovery_context` (42 lines, 6 callers across 3 files)
-- Split `ChatCoordinator` into sync/streaming variants
-- **Target:** Orchestrator < 3,800 LOC, all coordinators < 1,200 LOC each
+### Phase 4 (Updated 2026-04-27): Post-Migration Hardening
+- Canonical chat path is now service-first: `AgentOrchestrator` public entrypoints delegate to `ChatService`
+- `AgenticLoop` is the only loop owner; `TurnExecutor.execute_turn()` is the single-turn primitive
+- Deprecated chat coordinators remain shim-only and should not regain fallback runtime ownership
+- **Next target:** add architecture guardrails and continue shrinking dead compatibility surfaces
 
 ### Phase 5: Promote Generic Vertical Capabilities
 - Create `victor/framework/defaults/` with: `modes.py`, `stages.py`, `personas.py`, `safety_patterns.py`, `task_hints.py`

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.handlers import (
     HandlerError,
     HandlerErrorBoundary,
@@ -116,8 +117,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_success(self):
         """Should return handler result on success."""
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         node = MockComputeNode(id="test_node")
         context = MockContext({"input": "value"})
         registry = MagicMock()
@@ -144,8 +143,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_timeout_error(self):
         """Should handle asyncio.TimeoutError."""
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
-
         node = MockComputeNode(id="timeout_node")
         context = MockContext()
         registry = MagicMock()
@@ -169,8 +166,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_value_error(self):
         """Should handle ValueError as validation error."""
-        from victor.workflows.executor import ExecutorNodeStatus
-
         node = MockComputeNode(id="validation_node")
         context = MockContext()
         registry = MagicMock()
@@ -193,8 +188,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_key_error(self):
         """Should handle KeyError as missing_key error."""
-        from victor.workflows.executor import ExecutorNodeStatus
-
         node = MockComputeNode(id="key_node")
         context = MockContext()
         registry = MagicMock()
@@ -217,8 +210,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_type_error(self):
         """Should handle TypeError."""
-        from victor.workflows.executor import ExecutorNodeStatus
-
         node = MockComputeNode(id="type_node")
         context = MockContext()
         registry = MagicMock()
@@ -241,8 +232,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_generic_exception(self):
         """Should handle generic exceptions."""
-        from victor.workflows.executor import ExecutorNodeStatus
-
         node = MockComputeNode(id="generic_node")
         context = MockContext()
         registry = MagicMock()
@@ -265,8 +254,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_preserves_context(self):
         """Should snapshot context when preserve_context=True."""
-        from victor.workflows.executor import ExecutorNodeStatus
-
         node = MockComputeNode(id="context_node")
         context = MockContext({"input": "value", "number": 42})
         registry = MagicMock()
@@ -290,8 +277,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_no_context_preservation(self):
         """Should not snapshot when preserve_context=False."""
-        from victor.workflows.executor import ExecutorNodeStatus
-
         node = MockComputeNode(id="no_context_node")
         context = MockContext({"input": "value"})
         registry = MagicMock()
@@ -313,8 +298,6 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_duration_tracked(self):
         """Should track execution duration."""
-        from victor.workflows.executor import ExecutorNodeStatus
-
         node = MockComputeNode(id="duration_node")
         context = MockContext()
         registry = MagicMock()
@@ -342,7 +325,6 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_wraps_handler(self):
         """Decorator should wrap handler with error boundary."""
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         @with_error_boundary("decorated_handler")
         async def my_handler(node, context, tool_registry):
@@ -363,7 +345,6 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_catches_errors(self):
         """Decorator should catch and wrap errors."""
-        from victor.workflows.executor import ExecutorNodeStatus
 
         @with_error_boundary("failing_handler")
         async def failing_handler(node, context, tool_registry):
@@ -391,7 +372,6 @@ class TestWithErrorBoundaryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_timeout_handling(self):
         """Decorator should handle timeout errors."""
-        from victor.workflows.executor import ExecutorNodeStatus
 
         @with_error_boundary("timeout_decorated")
         async def timeout_handler(node, context, tool_registry):

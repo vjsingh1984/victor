@@ -20,6 +20,12 @@ This module centralizes tool selection configuration including:
 - Keyword-to-category mappings
 - Small model indicators for adaptive selection
 - ToolSelector class for unified tool selection logic
+
+Note: All tool selection automatically respects tool deduplication configured in
+ToolRegistry. When enable_tool_deduplication=True, duplicate tools from LangChain
+and MCP sources are automatically filtered out in favor of native tools with
+higher priority. Tool selection queries registry.list_tools(only_enabled=True),
+which only returns deduplicated tools.
 """
 
 from __future__ import annotations
@@ -30,8 +36,24 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
+from victor.core import get_container
 
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
+from victor.agent.tool_selection_assembler import (
+    SemanticToolSelectionAssembler,
+    SemanticToolSelectionAssemblyContext,
+)
+from victor.agent.tool_selection_cache import SemanticToolSelectionCacheAdapter
+from victor.agent.tool_selection_cache_key import SemanticToolSelectionCacheKeyBuilder
+from victor.agent.tool_selection_policy import (
+    StageToolSelectionContext,
+    ToolSelectionStagePolicy,
+)
+from victor.agent.tool_selection_postprocessor import (
+    ToolSelectionPostProcessContext,
+    ToolSelectionPostProcessor,
+)
+from victor.agent.tool_selection_recorder import ToolSelectionRecorder
 from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
@@ -45,18 +67,19 @@ try:
 except ImportError:
     pass
 
+from victor.core.verticals.protocols import (
+    ToolSelectionContext,
+    ToolSelectionResult,
+    ToolSelectionStrategyProtocol,
+)
+
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.task_tool_config_loader import TaskToolConfigLoader
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.vertical_context import VerticalContext
-    from victor.core.verticals.protocols import (
-        ToolSelectionContext,
-        ToolSelectionResult,
-        ToolSelectionStrategyProtocol,
-    )
     from victor.providers.base import ToolDefinition
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
     from victor.storage.cache.generic_result_cache import GenericResultCache
 
@@ -199,8 +222,23 @@ def get_category_to_tools_map(
 # The registry-based approach dynamically builds categories from @tool(keywords=[...])
 # decorators and is preferred. This static list is only used when registry is None.
 _FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
-    "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
-    "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},
+    "security": {
+        "security",
+        "vulnerability",
+        "scan",
+        "audit",
+        "cve",
+        "exploit",
+        "owasp",
+    },
+    "metrics": {
+        "metrics",
+        "complexity",
+        "coverage",
+        "analyze",
+        "statistics",
+        "cyclomatic",
+    },
     "testing": {"test", "unittest", "pytest", "spec", "coverage", "mock"},
     "git": {"git", "commit", "branch", "merge", "push", "pull", "rebase"},
     "docker": {"docker", "container", "dockerfile", "compose", "image"},
@@ -371,6 +409,154 @@ MIN_THRESHOLD: float = 0.10
 MAX_THRESHOLD: float = 0.40
 MIN_TOOLS: int = 5
 MAX_TOOLS: int = 15
+
+
+def tool_to_definition(
+    tool: Any,
+    level: SchemaLevel = SchemaLevel.FULL,
+) -> "ToolDefinition":
+    """Create a ToolDefinition from a BaseTool at the specified schema level.
+
+    Uses BaseTool.to_schema(level) for COMPACT/STUB truncation.
+    The schema_level is stored on the ToolDefinition for cache-aware ordering
+    but excluded from provider serialization.
+    """
+    from victor.providers.base import ToolDefinition
+
+    if level == SchemaLevel.FULL or not hasattr(tool, "to_schema"):
+        return ToolDefinition(
+            name=tool.name,
+            description=tool.description,
+            parameters=tool.parameters,
+            schema_level=level.value,
+        )
+
+    schema = tool.to_schema(level)
+    fn = schema.get("function", schema)
+    return ToolDefinition(
+        name=fn.get("name", tool.name),
+        description=fn.get("description", tool.description),
+        parameters=fn.get("parameters", tool.parameters),
+        schema_level=level.value,
+    )
+
+
+# Per-schema-level token cost estimates (aligned with tiered broadcasting)
+_SCHEMA_TOKEN_COST = {"full": 125, "compact": 70, "stub": 32}
+
+
+def _estimate_tool_tokens(tools: List["ToolDefinition"]) -> int:
+    """Estimate total token cost of tool schemas."""
+    total = 0
+    for t in tools:
+        level = getattr(t, "schema_level", None) or "full"
+        total += _SCHEMA_TOKEN_COST.get(level, 125)
+    return total
+
+
+def _enforce_token_budget(tools: List["ToolDefinition"], max_tokens: int) -> List["ToolDefinition"]:
+    """Enforce token budget by demoting or dropping tools.
+
+    Strategy (preserves mandatory FULL tools):
+    1. Demote COMPACT → STUB (cheapest demotion, ~38 tokens saved per tool)
+    2. Drop tail STUB tools until budget is met
+
+    Returns a new list; does not mutate the input.
+    """
+    est = _estimate_tool_tokens(tools)
+    if est <= max_tokens:
+        return tools
+
+    from victor.providers.base import ToolDefinition
+
+    # Work on a mutable copy
+    result = list(tools)
+
+    # Phase 1: Demote COMPACT → STUB (iterate in reverse = lowest priority first)
+    for i in range(len(result) - 1, -1, -1):
+        if est <= max_tokens:
+            break
+        level = getattr(result[i], "schema_level", None)
+        if level == "compact":
+            old_cost = _SCHEMA_TOKEN_COST["compact"]
+            new_cost = _SCHEMA_TOKEN_COST["stub"]
+            result[i] = ToolDefinition(
+                name=result[i].name,
+                description=result[i].description,
+                parameters=result[i].parameters,
+                schema_level="stub",
+            )
+            est -= old_cost - new_cost
+
+    # Phase 2: Drop tail STUB tools
+    while est > max_tokens and result:
+        level = getattr(result[-1], "schema_level", None)
+        if level == "full":
+            break  # Never drop mandatory FULL tools
+        dropped_cost = _SCHEMA_TOKEN_COST.get(level or "stub", 32)
+        result.pop()
+        est -= dropped_cost
+
+    if est != _estimate_tool_tokens(tools):
+        logger.info(
+            "Token budget enforced: %d→%d tokens (%d→%d tools)",
+            _estimate_tool_tokens(tools),
+            est,
+            len(tools),
+            len(result),
+        )
+    return result
+
+
+def promote_high_confidence_stubs(
+    tools: List["ToolDefinition"],
+    similarity_scores: Dict[str, float],
+    threshold: float = 0.8,
+) -> List["ToolDefinition"]:
+    """Promote STUB tools to COMPACT when semantic confidence is high.
+
+    When the semantic selector is highly confident a STUB tool is relevant
+    (similarity >= threshold), it deserves a richer schema so the LLM can
+    construct better tool calls.
+
+    Args:
+        tools: Selected tool definitions with schema_level set
+        similarity_scores: Map of tool_name → similarity score (0-1)
+        threshold: Minimum similarity to trigger promotion
+
+    Returns:
+        Tools with high-confidence STUBs promoted to COMPACT level.
+    """
+    if not similarity_scores:
+        return tools
+
+    from victor.providers.base import ToolDefinition
+
+    promoted = 0
+    result = []
+    for t in tools:
+        level = getattr(t, "schema_level", None)
+        score = similarity_scores.get(t.name, 0.0)
+        if level == "stub" and score >= threshold:
+            result.append(
+                ToolDefinition(
+                    name=t.name,
+                    description=t.description,
+                    parameters=t.parameters,
+                    schema_level="compact",
+                )
+            )
+            promoted += 1
+        else:
+            result.append(t)
+
+    if promoted:
+        logger.info(
+            "Schema promotion: %d STUB→COMPACT tools (threshold=%.2f)",
+            promoted,
+            threshold,
+        )
+    return result
 
 
 @dataclass
@@ -661,6 +847,7 @@ class ToolSelector(ModeAwareMixin):
         fallback_max_tools: int = 8,
         on_selection_recorded: Optional[Callable[[str, int], None]] = None,
         vertical_context: Optional["VerticalContext"] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize the tool selector.
 
@@ -675,6 +862,7 @@ class ToolSelector(ModeAwareMixin):
             fallback_max_tools: Max tools for fallback selection
             on_selection_recorded: Optional callback for recording selection stats
             vertical_context: Optional vertical context for vertical-specific tool selection
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self.tools = tools
         self.semantic_selector = semantic_selector
@@ -688,6 +876,7 @@ class ToolSelector(ModeAwareMixin):
 
         # Vertical context for vertical-specific tool selection (DIP)
         self._vertical_context: Optional["VerticalContext"] = vertical_context
+        self._runtime_intelligence = runtime_intelligence
 
         # Task tool config loader for YAML-based configuration
         self._task_config_loader: Optional["TaskToolConfigLoader"] = None
@@ -697,6 +886,15 @@ class ToolSelector(ModeAwareMixin):
 
         # Selection statistics
         self.stats = ToolSelectionStats()
+        self._stage_policy = ToolSelectionStagePolicy(fallback_max_tools=fallback_max_tools)
+        self._post_processor = ToolSelectionPostProcessor()
+        self._semantic_cache_adapter = SemanticToolSelectionCacheAdapter()
+        self._semantic_cache_key_builder = SemanticToolSelectionCacheKeyBuilder()
+        self._semantic_assembler = SemanticToolSelectionAssembler()
+        self._selection_recorder = ToolSelectionRecorder(
+            stats=self.stats,
+            on_selection_recorded=on_selection_recorded,
+        )
 
         # Tool selection result cache (for expensive semantic selection)
         self._tool_selection_cache: Optional["GenericResultCache"] = None
@@ -757,7 +955,7 @@ class ToolSelector(ModeAwareMixin):
 
             settings = get_settings()
 
-            if not settings.tool_selection_cache_enabled:
+            if not settings.cache.tool_selection_cache_enabled:
                 logger.debug("Tool selection cache disabled in settings")
                 self._tool_selection_cache_enabled = False
                 return None
@@ -765,7 +963,7 @@ class ToolSelector(ModeAwareMixin):
             # Initialize cache with tool selection TTL
             self._tool_selection_cache = GenericResultCache()
             self._tool_selection_cache_enabled = True
-            self._tool_selection_cache_ttl = settings.tool_selection_cache_ttl
+            self._tool_selection_cache_ttl = settings.cache.tool_selection_cache_ttl
 
             logger.debug(
                 f"Tool selection cache initialized with TTL={self._tool_selection_cache_ttl}s"
@@ -926,6 +1124,123 @@ class ToolSelector(ModeAwareMixin):
 
         return levels
 
+    def get_tools_with_levels_provider_optimized(
+        self,
+        user_message: str,
+        provider: Any,
+        vertical: Optional[str] = None,
+    ) -> Dict[str, SchemaLevel]:
+        """Return tools with schema levels optimized for provider capabilities.
+
+        This method implements provider-specific tool broadcasting optimization:
+        - Caching providers (cloud): FULL/COMPACT for 17 core tools, STUB for rest
+        - Local providers: STUB for 8 core tools + dynamic selection for others
+
+        Args:
+            user_message: The user's message for semantic matching
+            provider: Provider instance or name (str)
+            vertical: Optional vertical name (coding, devops, research, etc.)
+
+        Returns:
+            Dict mapping tool_name -> SchemaLevel
+        """
+        from victor.providers.detection import get_provider_category, ProviderCategory
+        from victor.tools.schema_level_mapper import SchemaLevelMapper
+
+        # Detect provider category
+        provider_category = get_provider_category(provider)
+        is_caching = provider_category == ProviderCategory.CACHING
+
+        # Initialize schema level mapper
+        mapper = SchemaLevelMapper()
+
+        # Get available tools from registry
+        all_tools = set(t.name for t in self.tools.list_tools(only_enabled=True))
+
+        levels: Dict[str, SchemaLevel] = {}
+
+        if is_caching:
+            # Caching provider strategy: Freeze 17 core tools in system prompt
+            # FULL schema (7 tools) + COMPACT schema (10 tools) + STUB for rest
+            full_tools = mapper.get_cloud_core_full_tools()
+            compact_tools = mapper.get_cloud_core_compact_tools()
+
+            # Assign FULL schema to core tools
+            for tool_name in full_tools:
+                if tool_name in all_tools:
+                    levels[tool_name] = SchemaLevel.FULL
+
+            # Assign COMPACT schema to secondary core tools
+            for tool_name in compact_tools:
+                if tool_name in all_tools and tool_name not in levels:
+                    levels[tool_name] = SchemaLevel.COMPACT
+
+            # Assign STUB schema to remaining tools
+            remaining_tools = all_tools - set(levels.keys())
+            for tool_name in remaining_tools:
+                levels[tool_name] = SchemaLevel.STUB
+
+            logger.debug(
+                f"Provider-optimized schema levels (caching provider): "
+                f"FULL={len([t for t, lvl in levels.items() if lvl == SchemaLevel.FULL])}, "
+                f"COMPACT={len([t for t, lvl in levels.items() if lvl == SchemaLevel.COMPACT])}, "
+                f"STUB={len([t for t, lvl in levels.items() if lvl == SchemaLevel.STUB])}"
+            )
+        else:
+            # Local provider strategy: 8 core tools + dynamic selection
+            # All tools use STUB schema to minimize prompt length
+            core_tools = mapper.get_local_core_stub_tools()
+
+            # Assign STUB schema to core tools
+            for tool_name in core_tools:
+                if tool_name in all_tools:
+                    levels[tool_name] = SchemaLevel.STUB
+
+            # Dynamic selection for additional tools (8-12 tools)
+            # Use semantic selection based on user message
+            remaining_tools = all_tools - set(levels.keys())
+
+            # Simple keyword matching for dynamic selection
+            message_lower = user_message.lower()
+            matched_tools = []
+
+            for tool_name in remaining_tools:
+                tool = None
+                for t in self.tools.list_tools():
+                    if t.name == tool_name:
+                        tool = t
+                        break
+
+                if tool:
+                    # Check keywords from metadata
+                    should_include = False
+                    if hasattr(tool, "metadata") and tool.metadata:
+                        keywords = getattr(tool.metadata, "keywords", []) or []
+                        if any(kw.lower() in message_lower for kw in keywords):
+                            should_include = True
+
+                    # Check tool description keywords
+                    if not should_include:
+                        desc_words = tool.description.lower().split()[:10]
+                        if any(word in message_lower for word in desc_words if len(word) > 4):
+                            should_include = True
+
+                    if should_include:
+                        matched_tools.append(tool_name)
+
+            # Limit to 8-12 dynamic tools
+            max_dynamic = 12
+            for tool_name in matched_tools[:max_dynamic]:
+                levels[tool_name] = SchemaLevel.STUB
+
+            logger.debug(
+                f"Provider-optimized schema levels (local provider): "
+                f"Core STUB={len([t for t, lvl in levels.items() if lvl == SchemaLevel.STUB])}, "
+                f"Total tools={len(levels)}"
+            )
+
+        return levels
+
     def get_tools_for_broadcast(
         self,
         user_message: str,
@@ -1076,7 +1391,7 @@ class ToolSelector(ModeAwareMixin):
                 return tools
 
         STAGE_PRESERVED_TOOLS: Set[str] = {
-            "shell_readonly",
+            "shell",
             "git",
         }
         preserved_tools.update(STAGE_PRESERVED_TOOLS)
@@ -1101,7 +1416,9 @@ class ToolSelector(ModeAwareMixin):
 
                 fallback.append(
                     ToolDefinition(
-                        name=tool.name, description=tool.description, parameters=tool.parameters
+                        name=tool.name,
+                        description=tool.description,
+                        parameters=tool.parameters,
                     )
                 )
         return self._apply_stage_limit(fallback, stage) if fallback else tools
@@ -1265,9 +1582,6 @@ class ToolSelector(ModeAwareMixin):
             return tools
 
         try:
-            # Import here to avoid circular imports
-            from victor.core.verticals.protocols import ToolSelectionContext
-
             # Get conversation stage if available
             stage = "exploration"
             if self.conversation_state:
@@ -1358,17 +1672,13 @@ class ToolSelector(ModeAwareMixin):
         all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
         selected: Dict[str, ToolDefinition] = {}
 
-        # Tier 1: Mandatory tools (always included)
+        # Tier 1: Mandatory tools (always included, FULL schema)
         for name in config.mandatory:
             if name in all_tools_map:
                 tool = all_tools_map[name]
-                selected[name] = ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters,
-                )
+                selected[name] = tool_to_definition(tool, SchemaLevel.FULL)
 
-        # Tier 2: Vertical core tools (always included for this vertical)
+        # Tier 2: Vertical core tools (always included, COMPACT schema)
         for name in config.vertical_core:
             if name in all_tools_map and name not in selected:
                 tool = all_tools_map[name]
@@ -1376,11 +1686,7 @@ class ToolSelector(ModeAwareMixin):
                 if is_analysis_task and config.readonly_only_for_analysis:
                     if not self._is_readonly_tool(name):
                         continue
-                selected[name] = ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters,
-                )
+                selected[name] = tool_to_definition(tool, SchemaLevel.COMPACT)
 
         # Tier 3: Stage-specific tools
         # Use config helper method that prefers registry metadata over static stage_tools
@@ -1397,13 +1703,9 @@ class ToolSelector(ModeAwareMixin):
                     if is_analysis_task and config.readonly_only_for_analysis:
                         if not self._is_readonly_tool(name):
                             continue
-                    selected[name] = ToolDefinition(
-                        name=tool.name,
-                        description=tool.description,
-                        parameters=tool.parameters,
-                    )
+                    selected[name] = tool_to_definition(tool, SchemaLevel.COMPACT)
 
-        # Tier 4: Semantic pool (selected based on query)
+        # Tier 4: Semantic pool (selected based on query, STUB schema)
         # Use config helper method that prefers registry metadata over static semantic_pool
         semantic_pool = (
             config.get_effective_semantic_pool()
@@ -1437,13 +1739,26 @@ class ToolSelector(ModeAwareMixin):
                             should_include = False
 
                     if should_include:
-                        selected[name] = ToolDefinition(
-                            name=tool.name,
-                            description=tool.description,
-                            parameters=tool.parameters,
-                        )
+                        selected[name] = tool_to_definition(tool, SchemaLevel.STUB)
 
         result = list(selected.values())
+
+        # --- Schema promotion: STUB→COMPACT for high-confidence matches ---
+        # Reuse semantic selector scores if available (parity with select_semantic path)
+        promotion_threshold = self.tool_selection_config.get("schema_promotion_threshold", 0.8)
+        if self.semantic_selector and promotion_threshold > 0:
+            scores = self.semantic_selector.get_last_selection_scores()
+            if scores:
+                result = promote_high_confidence_stubs(
+                    result, scores, threshold=promotion_threshold
+                )
+
+        # --- Token budget enforcement ---
+        # Demote COMPACT→STUB or drop tail STUBs when budget exceeded.
+        max_tokens = self.tool_selection_config.get("max_tool_schema_tokens", 0)
+        if max_tokens > 0:
+            result = _enforce_token_budget(result, max_tokens)
+
         logger.info(
             f"Tiered selection: {len(result)} tools "
             f"(mandatory={len(config.mandatory)}, "
@@ -1451,6 +1766,20 @@ class ToolSelector(ModeAwareMixin):
             f"stage={stage or 'None'}, "
             f"analysis={is_analysis_task}): "
             f"{', '.join(t.name for t in result)}"
+        )
+        # Token estimation per schema tier
+        full_n = sum(1 for t in result if getattr(t, "schema_level", None) == "full")
+        compact_n = sum(1 for t in result if getattr(t, "schema_level", None) == "compact")
+        stub_n = sum(1 for t in result if getattr(t, "schema_level", None) == "stub")
+        est_tokens = full_n * 125 + compact_n * 70 + stub_n * 32
+        baseline = len(result) * 125
+        logger.info(
+            "Tiered schema: FULL=%d COMPACT=%d STUB=%d " "est_tokens=%d (saved ~%d vs all-FULL)",
+            full_n,
+            compact_n,
+            stub_n,
+            est_tokens,
+            baseline - est_tokens,
         )
         self._record_selection("tiered", len(result))
         return result
@@ -1482,9 +1811,7 @@ class ToolSelector(ModeAwareMixin):
             method: Selection method used
             num_tools: Number of tools selected
         """
-        self.stats.record_selection(method, num_tools)
-        if self._on_selection_recorded:
-            self._on_selection_recorded(method, num_tools)
+        self._selection_recorder.record(method, num_tools)
 
     def get_adaptive_threshold(
         self, user_message: str, conversation_depth: int = 0
@@ -1600,6 +1927,169 @@ class ToolSelector(ModeAwareMixin):
         else:
             return self.select_keywords(user_message, planned_tools=planned_tools)
 
+    def _load_semantic_cached_selection(
+        self,
+        *,
+        user_message: str,
+        conversation_history: Optional[List[Dict[str, Any]]],
+        conversation_depth: int,
+        stage: Optional[ConversationStage],
+    ) -> Tuple[Optional[List["ToolDefinition"]], Optional[str], Optional[Any]]:
+        """Load cached semantic selection when cache is enabled.
+
+        Returns:
+            Tuple of (cached_tools, cache_key, cache_instance)
+        """
+        if not self._tool_selection_cache_enabled:
+            return None, None, None
+
+        cache = self._init_tool_selection_cache()
+        if cache is None:
+            return None, None, None
+
+        cache_key = self._semantic_cache_key_builder.build(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            conversation_depth=conversation_depth,
+            stage=stage,
+        )
+
+        try:
+            cached_tools = self._semantic_cache_adapter.load_cached_tools(cache, cache_key)
+            if cached_tools:
+                logger.debug(f"Tool selection cache HIT: {len(cached_tools)} tools")
+                return cached_tools, cache_key, cache
+        except Exception as e:
+            logger.warning(f"Failed to reconstruct cached tools: {e}")
+
+        return None, cache_key, cache
+
+    async def _ensure_semantic_embeddings_initialized(self) -> None:
+        """Initialize tool embeddings lazily on first semantic selection."""
+        if self._embeddings_initialized:
+            return
+
+        logger.info("Initializing tool embeddings (one-time operation)...")
+        await self.semantic_selector.initialize_tool_embeddings(self.tools)
+        self._embeddings_initialized = True
+
+    async def _build_semantic_candidates(
+        self,
+        *,
+        user_message: str,
+        conversation_history: Optional[List[Dict[str, Any]]],
+        conversation_depth: int,
+        planned_tools: Optional[List["ToolDefinition"]],
+    ) -> Tuple[List["ToolDefinition"], Optional[ConversationStage]]:
+        """Run semantic selection and assemble blended candidates."""
+        await self._ensure_semantic_embeddings_initialized()
+
+        threshold, max_tools = self.get_adaptive_threshold(user_message, conversation_depth)
+        tools = await self.semantic_selector.select_relevant_tools_with_context(
+            user_message=user_message,
+            tools=self.tools,
+            conversation_history=conversation_history,
+            max_tools=max_tools,
+            similarity_threshold=threshold,
+        )
+
+        tools = self._semantic_assembler.assemble(
+            tools,
+            keyword_tools=self.select_keywords(
+                user_message,
+                planned_tools=planned_tools,
+                _record=False,
+            ),
+            all_tools=self.tools.list_tools(),
+            context=SemanticToolSelectionAssemblyContext(
+                max_tools=max_tools,
+                include_web_tools=any(kw in user_message.lower() for kw in WEB_KEYWORDS),
+                web_tool_names=self._get_web_tools_cached(),
+            ),
+        )
+
+        stage = self.conversation_state.get_stage() if self.conversation_state else None
+        tools = self._filter_tools_for_stage(tools, stage)
+
+        logger.debug(
+            f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}"
+        )
+        return tools, stage
+
+    def _build_semantic_postprocess_context(
+        self,
+        *,
+        user_message: str,
+        stage: Optional[ConversationStage],
+    ) -> ToolSelectionPostProcessContext:
+        return ToolSelectionPostProcessContext(
+            user_message=user_message,
+            stage=stage,
+            fallback_max_tools=self.fallback_max_tools,
+            max_mcp_tools=self.tool_selection_config.get("max_mcp_tools_per_turn", 12),
+            schema_promotion_threshold=self.tool_selection_config.get(
+                "schema_promotion_threshold", 0.8
+            ),
+            max_schema_tokens=self.tool_selection_config.get("max_tool_schema_tokens", 0),
+        )
+
+    def _finalize_semantic_selection(
+        self,
+        *,
+        user_message: str,
+        tools: List["ToolDefinition"],
+        stage: Optional[ConversationStage],
+        cache: Optional[Any],
+        cache_key: Optional[str],
+    ) -> List["ToolDefinition"]:
+        """Apply fallback, post-processing, recording, persistence, and final filtering."""
+        is_fallback = False
+        if not tools:
+            logger.warning(
+                "Semantic selection returned 0 tools. "
+                "Using smart fallback: core tools + keyword matching."
+            )
+            tools = self._get_fallback_tools(user_message)
+            is_fallback = True
+
+        tools = self._post_processor.apply(
+            tools,
+            context=self._build_semantic_postprocess_context(
+                user_message=user_message,
+                stage=stage,
+            ),
+            should_use_edge_filter=self._should_use_edge_for_tools(),
+            apply_edge_filter=self._apply_edge_model_filter,
+            cap_mcp_tools=self._cap_mcp_tools,
+            selection_scores=(
+                self.semantic_selector.get_last_selection_scores()
+                if self.semantic_selector is not None
+                else None
+            ),
+            promote_schema_stubs=promote_high_confidence_stubs,
+            enforce_token_budget=_enforce_token_budget,
+        )
+
+        self._selection_recorder.record_result(
+            is_fallback=is_fallback,
+            num_tools=len(tools),
+        )
+        tools = self._apply_vertical_strategy(tools, user_message)
+
+        if cache_key and cache is not None and self._tool_selection_cache_enabled:
+            try:
+                if self._semantic_cache_adapter.store_cached_tools(
+                    cache,
+                    cache_key,
+                    tools,
+                    ttl=self._tool_selection_cache_ttl,
+                ):
+                    logger.debug(f"Tool selection cached: {len(tools)} tools")
+            except Exception as e:
+                logger.warning(f"Failed to cache tool selection: {e}")
+
+        return self._filter_by_enabled(tools)
+
     async def select_semantic(
         self,
         user_message: str,
@@ -1624,179 +2114,29 @@ class ToolSelector(ModeAwareMixin):
         if not self.semantic_selector:
             return self.select_keywords(user_message, planned_tools=planned_tools)
 
-        # Check cache for tool selection results
-        # Cache key depends on: message, conversation context, stage, depth
         stage = self.conversation_state.get_stage() if self.conversation_state else None
-        cache_key = None
-        if self._tool_selection_cache_enabled:
-            cache = self._init_tool_selection_cache()
-            if cache:
-                from victor.storage.cache.generic_result_cache import (
-                    _create_tool_selection_cache_key,
-                    ResultType,
-                )
-
-                cache_key = _create_tool_selection_cache_key(
-                    user_message=user_message,
-                    conversation_history=conversation_history,
-                    conversation_depth=conversation_depth,
-                    stage=stage.value if stage else None,
-                    use_semantic=True,
-                )
-
-                cached_result = cache.get(
-                    ResultType.TOOL_SELECTION,
-                    cache_key,
-                )
-                if cached_result is not None:
-                    # Reconstruct ToolDefinition objects from cached data
-                    try:
-                        tool_names = cached_result.get("tool_names", [])
-                        tool_descriptions = cached_result.get("tool_descriptions", {})
-                        tool_parameters = cached_result.get("tool_parameters", {})
-
-                        reconstructed_tools = []
-                        for name in tool_names:
-                            if name in tool_descriptions:
-                                reconstructed_tools.append(
-                                    ToolDefinition(
-                                        name=name,
-                                        description=tool_descriptions[name],
-                                        parameters=tool_parameters.get(name),
-                                    )
-                                )
-
-                        if reconstructed_tools:
-                            logger.debug(
-                                f"Tool selection cache HIT: {len(reconstructed_tools)} tools"
-                            )
-                            return reconstructed_tools
-                    except Exception as e:
-                        logger.warning(f"Failed to reconstruct cached tools: {e}")
-
-        # Initialize embeddings on first call
-        if not self._embeddings_initialized:
-            logger.info("Initializing tool embeddings (one-time operation)...")
-            await self.semantic_selector.initialize_tool_embeddings(self.tools)
-            self._embeddings_initialized = True
-
-        # Get adaptive threshold and max_tools
-        threshold, max_tools = self.get_adaptive_threshold(user_message, conversation_depth)
-
-        # Select tools with context awareness
-        tools = await self.semantic_selector.select_relevant_tools_with_context(
+        cached_tools, cache_key, cache = self._load_semantic_cached_selection(
             user_message=user_message,
-            tools=self.tools,
             conversation_history=conversation_history,
-            max_tools=max_tools,
-            similarity_threshold=threshold,
+            conversation_depth=conversation_depth,
+            stage=stage,
         )
+        if cached_tools:
+            return cached_tools
 
-        # Blend with keyword-selected tools (limited to prevent token explosion)
-        # Pass _record=False to avoid double-counting in metrics
-        keyword_tools = self.select_keywords(
-            user_message, planned_tools=planned_tools, _record=False
+        tools, stage = await self._build_semantic_candidates(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            conversation_depth=conversation_depth,
+            planned_tools=planned_tools,
         )
-        if keyword_tools:
-            existing = {t.name for t in tools}
-            new_keyword_tools = [t for t in keyword_tools if t.name not in existing]
-            # Limit keyword additions to prevent exceeding max_tools significantly
-            max_keyword_additions = max(3, max_tools - len(tools))
-            if len(new_keyword_tools) > max_keyword_additions:
-                logger.debug(
-                    f"Limiting keyword tools: {len(new_keyword_tools)} -> {max_keyword_additions}"
-                )
-                new_keyword_tools = new_keyword_tools[:max_keyword_additions]
-            tools.extend(new_keyword_tools)
-
-        # Ensure web tools if explicitly mentioned (dynamic discovery)
-        message_lower = user_message.lower()
-        if any(kw in message_lower for kw in WEB_KEYWORDS):
-            must_have = self._get_web_tools_cached()
-            existing = {t.name for t in tools}
-            for tool in self.tools.list_tools():
-                if tool.name in must_have and tool.name not in existing:
-                    tools.append(
-                        ToolDefinition(
-                            name=tool.name,
-                            description=tool.description,
-                            parameters=tool.parameters,
-                        )
-                    )
-
-        # Deduplicate
-        dedup: Dict[str, ToolDefinition] = {}
-        for t in tools:
-            dedup[t.name] = t
-        tools = list(dedup.values())
-
-        # Stage-aware filtering (keep read-only tools for exploration/analysis)
-        stage = self.conversation_state.get_stage() if self.conversation_state else None
-        tools = self._filter_tools_for_stage(tools, stage)
-
-        logger.debug(
-            f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}"
+        return self._finalize_semantic_selection(
+            user_message=user_message,
+            tools=tools,
+            stage=stage,
+            cache=cache,
+            cache_key=cache_key,
         )
-
-        # Smart fallback if 0 tools
-        is_fallback = False
-        if not tools:
-            logger.warning(
-                "Semantic selection returned 0 tools. "
-                "Using smart fallback: core tools + keyword matching."
-            )
-            tools = self._get_fallback_tools(user_message)
-            is_fallback = True
-
-        # Edge model tool filter — runs BEFORE the cap so it can reduce
-        # 15+ tools down to 5-6 targeted tools, saving token broadcast cost.
-        if len(tools) > 8:
-            tools = self._apply_edge_model_filter(tools, user_message, stage)
-
-        # Cap to fallback_max_tools to avoid broadcasting too many tools
-        if len(tools) > self.fallback_max_tools:
-            logger.debug(f"Capping tools from {len(tools)} to {self.fallback_max_tools}")
-            tools = tools[: self.fallback_max_tools]
-
-        # Record selection AFTER final cap to reflect actual tool count
-        if is_fallback:
-            self._record_selection("fallback", len(tools))
-        else:
-            self._record_selection("semantic", len(tools))
-
-        # Apply vertical-specific tool selection strategy (DIP/OCP)
-        # This allows verticals to prioritize/reorder tools based on domain knowledge
-        tools = self._apply_vertical_strategy(tools, user_message)
-
-        # Cache tool selection results for future lookups
-        if cache_key and self._tool_selection_cache_enabled:
-            cache = self._init_tool_selection_cache()
-            if cache:
-                try:
-                    from victor.storage.cache.generic_result_cache import ResultType
-
-                    # Serialize tool definitions for caching
-                    tool_names = [t.name for t in tools]
-                    tool_descriptions = {t.name: t.description for t in tools}
-                    tool_parameters = {t.name: t.parameters for t in tools}
-
-                    cache_data = {
-                        "tool_names": tool_names,
-                        "tool_descriptions": tool_descriptions,
-                        "tool_parameters": tool_parameters,
-                    }
-
-                    cache.set(
-                        ResultType.TOOL_SELECTION,
-                        cache_key,
-                        cache_data,
-                        ttl=self._tool_selection_cache_ttl,
-                    )
-                    logger.debug(f"Tool selection cached: {len(tools)} tools")
-                except Exception as e:
-                    logger.warning(f"Failed to cache tool selection: {e}")
-
-        return tools
 
     def select_keywords(
         self,
@@ -1821,6 +2161,21 @@ class ToolSelector(ModeAwareMixin):
 
         all_tools = list(self.tools.list_tools())
 
+        # Fallback to SharedToolRegistry if ToolRegistry is empty (registration delay)
+        if not all_tools:
+            from victor.agent.shared_tool_registry import SharedToolRegistry
+
+            shared_registry = SharedToolRegistry.get_instance()
+            shared_tools = shared_registry.get_all_tools_for_registration()
+            logger.debug(
+                f"ToolRegistry empty ({len(all_tools)} tools), "
+                f"using SharedToolRegistry ({len(shared_tools)} tools) as fallback"
+            )
+            # Convert shared tools to ToolDefinition format
+            for tool in shared_tools:
+                if hasattr(tool, "name"):
+                    all_tools.append(tool)
+
         # Start with planned tools if provided
         selected_tools: List[ToolDefinition] = list(planned_tools) if planned_tools else []
         existing_names = {t.name for t in selected_tools}
@@ -1828,7 +2183,7 @@ class ToolSelector(ModeAwareMixin):
         # If vertical has set enabled tools, use those directly
         # This allows verticals like "research" to specify web_search, web_fetch, etc.
         if self._enabled_tools:
-            logger.info(
+            logger.debug(
                 f"Using vertical enabled tools ({len(self._enabled_tools)}): "
                 f"{sorted(self._enabled_tools)}"
             )
@@ -1848,7 +2203,7 @@ class ToolSelector(ModeAwareMixin):
             selected_tools = self._filter_tools_for_stage(selected_tools, stage)
 
             tool_names = [t.name for t in selected_tools]
-            logger.info(
+            logger.debug(
                 f"Selected {len(selected_tools)} tools from vertical filter: "
                 f"{', '.join(tool_names)}"
             )
@@ -1909,7 +2264,21 @@ class ToolSelector(ModeAwareMixin):
 
         if _record:
             self._record_selection("keyword", len(selected_tools))
+
+        # Final gate: enforce enabled_tools restriction (framework-wide)
+        selected_tools = self._filter_by_enabled(selected_tools)
+
         return selected_tools
+
+    def _should_use_edge_for_tools(self) -> bool:
+        """Check if edge model should be used for tool filtering.
+
+        Uses the unified decision chain config. Only uses edge model
+        when "llm" is primary for tool_selection decisions.
+        """
+        from victor.agent.decisions.chain import is_llm_primary
+
+        return is_llm_primary("tool_selection")
 
     def _apply_edge_model_filter(
         self,
@@ -1923,16 +2292,8 @@ class ToolSelector(ModeAwareMixin):
         per cloud LLM request.
         """
         try:
-            from victor.core import get_container
-
-            container = get_container()
-
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
-
-            service = container.get(LLMDecisionServiceProtocol)
-            if service is None:
+            decider = self._get_tool_selection_decider()
+            if decider is None:
                 return tools
 
             from victor.agent.edge_model import select_tools_with_edge_model
@@ -1941,7 +2302,7 @@ class ToolSelector(ModeAwareMixin):
             stage_name = stage.value if stage else "initial"
 
             selected_names = select_tools_with_edge_model(
-                service=service,
+                service=decider,
                 user_message=user_message,
                 available_tools=tool_names,
                 stage=stage_name,
@@ -1962,6 +2323,21 @@ class ToolSelector(ModeAwareMixin):
             logger.debug(f"Edge tool filter unavailable: {e}")
 
         return tools
+
+    def _get_tool_selection_decider(self) -> Optional[Any]:
+        """Resolve the canonical decider for edge-model tool filtering."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence
+
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
+
+        container = get_container()
+        service = container.get(LLMDecisionServiceProtocol)
+        if service is None:
+            return None
+        return service
 
     def prioritize_by_stage(
         self,
@@ -1994,59 +2370,26 @@ class ToolSelector(ModeAwareMixin):
 
         logger.debug(f"Stage detection: {current_stage.name}, recommended tools: {stage_tools}")
 
-        # Core tools always included (stage-aware, read-only for explore/analysis)
-        core = self._get_stage_core_tools(current_stage)
-
-        # Web tools check (dynamic discovery)
-        web_tools = self._get_web_tools_cached() if needs_web_tools(user_message) else set()
-
-        # Combine stage-specific tools with core and web tools
-        keep = stage_tools | core | web_tools
-
-        # Always include vertical_core tools from tiered config (GAP-4 fix)
-        # These are essential tools for the vertical (e.g., docker for DevOps, web_search for Research)
         tiered_config = getattr(self, "_tiered_config", None)
-        if tiered_config:
-            keep.update(tiered_config.mandatory)
-            keep.update(tiered_config.vertical_core)
+        pruned = self._stage_policy.prioritize_by_stage(
+            tools,
+            context=StageToolSelectionContext(
+                current_stage=current_stage,
+                stage_tools=stage_tools,
+                core_tools=self._get_stage_core_tools(current_stage),
+                web_tools=self._get_web_tools_cached() if needs_web_tools(user_message) else set(),
+                mandatory_tools=set(getattr(tiered_config, "mandatory", set())),
+                vertical_core_tools=set(getattr(tiered_config, "vertical_core", set())),
+            ),
+            should_include_tool=self.conversation_state.should_include_tool,
+            get_tool_priority_boost=self.conversation_state.get_tool_priority_boost,
+        )
 
-        # Also get tools from adjacent stages for flexibility
-        for tool in tools:
-            if self.conversation_state.should_include_tool(tool.name):
-                keep.add(tool.name)
-
-        # Apply priority boost based on stage
-        boosted_tools: List[Tuple["ToolDefinition", float]] = []
-        for tool in tools:
-            boost = self.conversation_state.get_tool_priority_boost(tool.name)
-            if tool.name in keep or boost > 0:
-                boosted_tools.append((tool, boost))
-
-        # Sort by boost (descending) and filter
-        boosted_tools.sort(key=lambda x: x[1], reverse=True)
-        pruned = [t for t, _ in boosted_tools if t.name in keep]
-
-        if pruned:
-            logger.debug(
-                f"Stage-pruned tools ({current_stage.name}): "
-                f"{len(pruned)} tools kept from {len(tools)}"
-            )
-            return pruned
-
-        # Fallback to core tools (stage-aware) + vertical_core tools
-        core_fallback = self._get_stage_core_tools(current_stage)
-        # Also include vertical_core tools in fallback (GAP-4 fix)
-        if tiered_config:
-            core_fallback = core_fallback | tiered_config.mandatory | tiered_config.vertical_core
-        fallback_tools = [t for t in tools if t.name in core_fallback]
-
-        if fallback_tools:
-            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core+vertical tools")
-            return fallback_tools
-
-        # Last resort: return a small prefix
-        logger.warning(f"Stage pruning: last resort fallback to {self.fallback_max_tools} tools")
-        return tools[: self.fallback_max_tools]
+        logger.debug(
+            f"Stage-pruned tools ({current_stage.name}): "
+            f"{len(pruned)} tools kept from {len(tools)}"
+        )
+        return pruned
 
     def get_task_aware_tools(
         self,
@@ -2159,6 +2502,53 @@ class ToolSelector(ModeAwareMixin):
         logger.warning("Task-aware filtering removed all tools, keeping originals")
         return tools
 
+    def _cap_mcp_tools(self, tools: List["ToolDefinition"], max_mcp: int) -> List["ToolDefinition"]:
+        """Limit MCP tools in the selection to prevent crowding native tools.
+
+        MCP tools are identified by checking whether the underlying BaseTool
+        in the registry is an MCPAdapterTool instance.
+
+        Args:
+            tools: Current tool selection
+            max_mcp: Maximum MCP tools to keep
+
+        Returns:
+            Tools with MCP tools capped at max_mcp (native tools unaffected)
+        """
+        try:
+            from victor.tools.mcp_adapter_tool import MCPAdapterTool
+        except ImportError:
+            return tools
+
+        # Build set of MCP tool names from the registry
+        mcp_names: set = set()
+        for tool in self.tools.list_tools():
+            if isinstance(tool, MCPAdapterTool):
+                mcp_names.add(tool.name)
+
+        if not mcp_names:
+            return tools  # No MCP tools registered
+
+        # Partition into native and MCP
+        native = []
+        mcp = []
+        for t in tools:
+            if t.name in mcp_names:
+                mcp.append(t)
+            else:
+                native.append(t)
+
+        if len(mcp) <= max_mcp:
+            return tools  # Within limit
+
+        logger.info(
+            "MCP tool cap: %d→%d MCP tools (max_mcp_tools_per_turn=%d)",
+            len(mcp),
+            max_mcp,
+            max_mcp,
+        )
+        return native + mcp[:max_mcp]
+
     def _get_fallback_tools(self, user_message: str) -> List["ToolDefinition"]:
         """Get fallback tools when semantic selection returns 0 results.
 
@@ -2168,34 +2558,12 @@ class ToolSelector(ModeAwareMixin):
         Returns:
             List of core + keyword-selected tools
         """
-        from victor.providers.base import ToolDefinition
-
-        all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
-        tools: List[ToolDefinition] = []
-
         stage = self.conversation_state.get_stage() if self.conversation_state else None
-        # Add core tools first (dynamic discovery)
-        for tool_name in self._get_stage_core_tools(stage):
-            if tool_name in all_tools_map:
-                tool = all_tools_map[tool_name]
-                tools.append(
-                    ToolDefinition(
-                        name=tool.name,
-                        description=tool.description,
-                        parameters=tool.parameters,
-                    )
-                )
-
-        # Add keyword-selected tools (avoiding duplicates)
-        keyword_tools = self.select_keywords(user_message)
-        existing_names = {t.name for t in tools}
-        for keyword_tool in keyword_tools:
-            if keyword_tool.name not in existing_names:
-                tools.append(keyword_tool)
-
-        # Cap to fallback_max_tools to avoid broadcasting too many
-        if len(tools) > self.fallback_max_tools:
-            tools = tools[: self.fallback_max_tools]
+        tools = self._stage_policy.build_semantic_fallback_tools(
+            all_tools=self.tools.list_tools(),
+            core_tools=self._get_stage_core_tools(stage),
+            keyword_tools=self.select_keywords(user_message),
+        )
 
         logger.info(
             f"Smart fallback selected {len(tools)} tools: {', '.join(t.name for t in tools)}"
