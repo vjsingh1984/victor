@@ -16,7 +16,7 @@
 
 This module combines the previously duplicate _cmd_learning implementations
 into a single unified command that shows stats from both:
-1. The intelligent pipeline (AdaptiveModeController)
+1. The runtime-intelligence integration (AdaptiveModeController)
 2. The RL model selector (RLCoordinator)
 """
 
@@ -45,6 +45,14 @@ def _get_capability(agent, capability_name: str, default=None):
         pass
     # Fallback: direct attribute access
     return getattr(agent, capability_name, default)
+
+
+def _get_runtime_intelligence_integration(agent):
+    """Resolve the canonical runtime-intelligence integration surface."""
+    integration = _get_capability(agent, "runtime_intelligence_integration")
+    if integration is not None:
+        return integration
+    return _get_capability(agent, "intelligent_pipeline")
 
 
 @register_command
@@ -293,7 +301,7 @@ class SerializationCommand(BaseSlashCommand):
 
 @register_command
 class LearningCommand(BaseSlashCommand):
-    """Show RL/Q-learning stats from both intelligent pipeline and model selector.
+    """Show RL/Q-learning stats from runtime intelligence and the model selector.
 
     This is the unified command that combines stats from:
     1. AdaptiveModeController (mode transitions, exploration rate)
@@ -353,12 +361,9 @@ class LearningCommand(BaseSlashCommand):
 
         # Handle reset subcommand
         if subcommand == "reset":
-            # Reset runtime-intelligence pipeline
+            # Reset runtime-intelligence integration
             if ctx.agent:
-                integration = getattr(ctx.agent, "runtime_intelligence_integration", None)
-                if integration is None and hasattr(ctx.agent, "get_capability_value"):
-                    integration = ctx.agent.get_capability_value("intelligent_pipeline")
-
+                integration = _get_runtime_intelligence_integration(ctx.agent)
                 if integration:
                     if hasattr(integration, "reset_session"):
                         integration.reset_session()
@@ -438,10 +443,7 @@ class LearningCommand(BaseSlashCommand):
 
         # 1. Runtime-intelligence stats (mode controller)
         if ctx.agent:
-            integration = getattr(ctx.agent, "runtime_intelligence_integration", None)
-            if integration is None and hasattr(ctx.agent, "get_capability_value"):
-                integration = ctx.agent.get_capability_value("intelligent_pipeline")
-
+            integration = _get_runtime_intelligence_integration(ctx.agent)
             if integration:
                 if hasattr(integration, "get_stats"):
                     stats = integration.get_stats()
@@ -454,7 +456,7 @@ class LearningCommand(BaseSlashCommand):
                         stats = None
 
                 if stats:
-                    content += "[bold cyan]Intelligent Pipeline:[/]\n"
+                    content += "[bold cyan]Runtime-Intelligence:[/]\n"
                     content += f"  Session Duration: {stats.session_duration:.1f}s\n"
                     content += f"  Total Requests: {stats.total_requests}\n"
                     content += f"  Enhanced Requests: {stats.enhanced_requests}\n"

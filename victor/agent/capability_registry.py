@@ -353,6 +353,28 @@ class OrchestratorCapabilityMixin:
             ),
         )
 
+        self._register_capability(
+            OrchestratorCapability(
+                name="runtime_intelligence_integration",
+                capability_type=CapabilityType.WORKFLOW,
+                getter="get_runtime_intelligence_integration",
+                description="Runtime-intelligence integration service",
+            ),
+            getter_method=self._get_runtime_intelligence_integration,
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="intelligent_pipeline",
+                capability_type=CapabilityType.WORKFLOW,
+                getter="get_runtime_intelligence_integration",
+                description="Deprecated runtime-intelligence compatibility alias",
+                deprecated=True,
+                deprecated_message="Use 'runtime_intelligence_integration' instead.",
+            ),
+            getter_method=self._get_runtime_intelligence_integration,
+        )
+
         # RL capabilities
         self._register_capability(
             OrchestratorCapability(
@@ -515,15 +537,7 @@ class OrchestratorCapabilityMixin:
                     actual_version=cap.version,
                 )
 
-        # Warn if invoking deprecated capability
-        if cap.deprecated:
-            import warnings
-
-            warnings.warn(
-                f"Capability '{name}' (v{cap.version}) is deprecated. " f"{cap.deprecated_message}",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        self._warn_if_deprecated(name, cap)
 
         if not cap.setter:
             raise TypeError(f"Capability '{name}' has no setter method")
@@ -555,6 +569,7 @@ class OrchestratorCapabilityMixin:
             raise KeyError(f"Capability '{name}' not found")
 
         cap = self._capabilities[name]
+        self._warn_if_deprecated(name, cap)
 
         # Try getter first
         if cap.getter:
@@ -664,12 +679,32 @@ class OrchestratorCapabilityMixin:
         else:
             self._rl_hooks = hooks
 
+    def _get_runtime_intelligence_integration(self) -> Any:
+        """Get the canonical runtime-intelligence integration surface."""
+        if hasattr(self, "runtime_intelligence_integration"):
+            return getattr(self, "runtime_intelligence_integration", None)
+        return getattr(self, "_runtime_intelligence_integration", None)
+
     def _set_team_specs(self, specs: Dict[str, Any]) -> None:
         """Set team specifications."""
         if hasattr(self, "_team_specs"):
             self._team_specs = specs
         else:
             self._team_specs = specs
+
+    def _warn_if_deprecated(self, name: str, capability: OrchestratorCapability) -> None:
+        """Emit a deprecation warning when a legacy capability is accessed."""
+        if not capability.deprecated:
+            return
+
+        import warnings
+
+        warnings.warn(
+            f"Capability '{name}' (v{capability.version}) is deprecated. "
+            f"{capability.deprecated_message}",
+            DeprecationWarning,
+            stacklevel=3,
+        )
 
     # =========================================================================
     # Dynamic Capability Loading (Phase 4.4)

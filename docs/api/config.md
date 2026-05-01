@@ -66,8 +66,8 @@ print(settings.resilience.circuit_breaker_failure_threshold)  # 5
 print(settings.security.write_approval_mode)  # "risky_only"
 print(settings.search.codebase_vector_store)  # "lancedb"
 print(settings.events.event_backend_type)     # "in_memory"
-print(settings.pipeline.intelligent_pipeline_enabled)  # True
-# Legacy field name; this now gates the runtime-intelligence path used by the
+print(settings.pipeline.runtime_intelligence_enabled)  # True
+# Preferred canonical field name for the runtime-intelligence path used by the
 # streaming executor, evaluation, and recovery surfaces.
 ```
 

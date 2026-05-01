@@ -63,6 +63,12 @@ def _preview_path_summary(preview_messages: object, *, max_paths: int = 3) -> st
     return summary
 
 
+def _session_preview_count(session: object) -> int:
+    """Return a stable preview-message count for persisted session objects."""
+    preview_messages = getattr(session, "preview_messages", None)
+    return len(preview_messages) if isinstance(preview_messages, list) else 0
+
+
 @register_command
 class SaveCommand(BaseSlashCommand):
     """Save current conversation to a session file."""
@@ -284,6 +290,7 @@ class SessionsCommand(BaseSlashCommand):
             table.add_column("Model", style="yellow")
             table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Created", style="dim")
 
             for session in sessions:
@@ -302,6 +309,7 @@ class SessionsCommand(BaseSlashCommand):
                     session.model or "unknown",
                     session.provider or "unknown",
                     str(len(session.messages)),
+                    str(_session_preview_count(session)),
                     date_str,
                 )
 
@@ -360,6 +368,7 @@ class ResumeCommand(BaseSlashCommand):
             table.add_column("Title", style="white")
             table.add_column("Model", style="yellow")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Date", style="dim")
 
             for idx, session in enumerate(sessions, 1):
@@ -378,6 +387,7 @@ class ResumeCommand(BaseSlashCommand):
                     title,
                     session.model or "unknown",
                     str(len(session.messages)),
+                    str(_session_preview_count(session)),
                     date_str,
                 )
 
@@ -439,7 +449,7 @@ class ResumeCommand(BaseSlashCommand):
             # Restore ledger + execution state via SessionContextLinker
             from victor.agent.session_context_linker import SessionContextLinker
 
-            linker = SessionContextLinker(session_persistence=persistence)
+            linker = SessionContextLinker(session_persistence=store)
             resume_ctx = linker.build_resume_context(session_id)
 
             if resume_ctx.ledger and hasattr(ctx.agent, "session_ledger"):

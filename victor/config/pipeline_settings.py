@@ -1,4 +1,4 @@
-"""Intelligent agent pipeline, quality scoring, and recovery."""
+"""Runtime-intelligence settings, quality scoring, and recovery."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from victor.core.loop_thresholds import (
 
 
 class PipelineSettings(BaseModel):
-    """Intelligent agent pipeline, quality scoring, and recovery."""
+    """Runtime-intelligence settings, quality scoring, and recovery."""
 
     # =================================================================
     # Decision Chain Configuration

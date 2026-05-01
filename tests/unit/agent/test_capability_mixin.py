@@ -43,6 +43,7 @@ class MockOrchestrator(CapabilityRegistryMixin):
         self._middleware_chain = MockMiddlewareChain()
         self._safety_checker = MockSafetyChecker()
         self._sequence_tracker = MockSequenceTracker()
+        self._runtime_intelligence_integration = {"name": "runtime-intelligence"}
         self._vertical_context = None
         self._rl_hooks = None
         self._team_specs = None
@@ -75,6 +76,11 @@ class MockOrchestrator(CapabilityRegistryMixin):
     def apply_vertical_safety_patterns(self, patterns: list) -> None:
         """Apply safety patterns."""
         self._safety_checker.add_patterns(patterns)
+
+    @property
+    def runtime_intelligence_integration(self) -> Any:
+        """Expose the canonical runtime-intelligence integration surface."""
+        return self._runtime_intelligence_integration
 
 
 class MockPromptBuilder:
@@ -341,6 +347,8 @@ class TestCapabilityRegistryMixin:
         assert orchestrator.has_capability("enabled_tools")
         assert orchestrator.has_capability("prompt_builder")
         assert orchestrator.has_capability("vertical_context")
+        assert orchestrator.has_capability("runtime_intelligence_integration")
+        assert orchestrator.has_capability("intelligent_pipeline")
 
     def test_has_capability_returns_false_for_unknown(self, orchestrator):
         """Test has_capability returns False for unknown capabilities."""
@@ -416,6 +424,24 @@ class TestCapabilityRegistryMixin:
         value = orchestrator.get_capability_value("vertical_context")
 
         assert value == {"name": "coding"}
+
+    def test_get_capability_value_returns_runtime_intelligence_integration(self, orchestrator):
+        """Canonical runtime-intelligence capability should return the shared surface."""
+        value = orchestrator.get_capability_value("runtime_intelligence_integration")
+
+        assert value == {"name": "runtime-intelligence"}
+
+    def test_get_capability_value_warns_for_deprecated_runtime_intelligence_alias(
+        self, orchestrator
+    ):
+        """Deprecated capability alias should still work but emit a warning."""
+        with pytest.warns(
+            DeprecationWarning,
+            match="Use 'runtime_intelligence_integration' instead.",
+        ):
+            value = orchestrator.get_capability_value("intelligent_pipeline")
+
+        assert value == {"name": "runtime-intelligence"}
 
     def test_get_capability_value_raises_for_unknown(self, orchestrator):
         """Test get_capability_value raises for unknown capability."""
