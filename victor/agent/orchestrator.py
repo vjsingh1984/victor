@@ -599,6 +599,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def _initialize_interaction_runtime(self) -> None:
         """Initialize interaction runtime boundaries with canonical services first."""
         from victor.agent.runtime.interaction_runtime import create_interaction_runtime_components
+        from victor.runtime.context import resolve_runtime_services
 
         self._interaction_runtime = create_interaction_runtime_components(
             enabled_tools=getattr(self, "_enabled_tools", None),
@@ -620,12 +621,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             cost_tracker=self._session_cost_tracker,
             conversation_controller=self._conversation_controller,
             streaming_coordinator=self._streaming_controller,
-            provider_service=getattr(self, "_provider_service", None),
-            chat_service=getattr(self, "_chat_service", None),
-            context_service=getattr(self, "_context_service", None),
-            recovery_service=getattr(self, "_recovery_service", None),
-            tool_service=getattr(self, "_tool_service", None),
-            session_service=getattr(self, "_session_service", None),
+            runtime_services=resolve_runtime_services(self),
         )
         self._chat_service = self._interaction_runtime.chat_service
         self._tool_service = self._interaction_runtime.tool_service
@@ -691,46 +687,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             SessionServiceProtocol,
             ToolServiceProtocol,
         )
-        from victor.core.container import ServiceLifetime
+        from victor.runtime.context import register_runtime_services, resolve_runtime_services
 
-        # Preserve canonical runtime-backed service instances that were already
-        # created earlier in orchestrator initialization.
-        if getattr(self, "_provider_service", None) is not None:
-            self._container.register_or_replace(
-                ProviderServiceProtocol,
-                lambda c: self._provider_service,
-                ServiceLifetime.SINGLETON,
-            )
-        if getattr(self, "_chat_service", None) is not None:
-            self._container.register_or_replace(
-                ChatServiceProtocol,
-                lambda c: self._chat_service,
-                ServiceLifetime.SINGLETON,
-            )
-        if getattr(self, "_session_service", None) is not None:
-            self._container.register_or_replace(
-                SessionServiceProtocol,
-                lambda c: self._session_service,
-                ServiceLifetime.SINGLETON,
-            )
-        if getattr(self, "_tool_service", None) is not None:
-            self._container.register_or_replace(
-                ToolServiceProtocol,
-                lambda c: self._tool_service,
-                ServiceLifetime.SINGLETON,
-            )
-        if getattr(self, "_context_service", None) is not None:
-            self._container.register_or_replace(
-                ContextServiceProtocol,
-                lambda c: self._context_service,
-                ServiceLifetime.SINGLETON,
-            )
-        if getattr(self, "_recovery_service", None) is not None:
-            self._container.register_or_replace(
-                RecoveryServiceProtocol,
-                lambda c: self._recovery_service,
-                ServiceLifetime.SINGLETON,
-            )
+        register_runtime_services(self._container, resolve_runtime_services(self))
 
         # Register coordinators in container for service dependencies
         self._register_coordinators_for_services()

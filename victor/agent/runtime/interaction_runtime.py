@@ -7,14 +7,10 @@
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
-from typing import Any, Optional, TYPE_CHECKING, cast
+from typing import Any, Optional
 
-from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
-
-if TYPE_CHECKING:
-    from victor.agent.services.protocols.chat_runtime import ChatCompatRuntimeProtocol
+from victor.runtime.context import ResolvedRuntimeServices
 
 
 @dataclass(frozen=True)
@@ -49,24 +45,16 @@ def create_interaction_runtime_components(
     cost_tracker: Any,
     conversation_controller: Any,
     streaming_coordinator: Any,
-    provider_service: Optional[Any] = None,
-    chat_service: Optional[Any] = None,
-    context_service: Optional[Any] = None,
-    recovery_service: Optional[Any] = None,
-    tool_service: Optional[Any] = None,
-    session_service: Optional[Any] = None,
+    runtime_services: Optional[ResolvedRuntimeServices] = None,
 ) -> InteractionRuntimeComponents:
     """Create service-first interaction/runtime components for orchestrator wiring."""
     from victor.agent.services.chat_service import ChatService, ChatServiceConfig
-    from victor.agent.services.context_service import (
-        ContextService,
-        ContextServiceConfig,
-    )
     from victor.agent.services.recovery_service import RecoveryService
     from victor.agent.services.session_service import SessionService
     from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+    resolved_services = runtime_services or ResolvedRuntimeServices()
 
-    resolved_tool_service = tool_service
+    resolved_tool_service = resolved_services.tool
     if resolved_tool_service is None:
         resolved_tool_service = ToolService(
             config=ToolServiceConfig(default_tool_budget=tool_budget),
@@ -87,7 +75,7 @@ def create_interaction_runtime_components(
     if enabled_tools and hasattr(resolved_tool_service, "set_enabled_tools"):
         resolved_tool_service.set_enabled_tools(enabled_tools)
 
-    resolved_session_service = session_service
+    resolved_session_service = resolved_services.session
     if resolved_session_service is None:
         resolved_session_service = SessionService(
             session_state_manager=session_state_manager,
@@ -106,27 +94,26 @@ def create_interaction_runtime_components(
             memory_session_id=memory_session_id,
         )
 
-    resolved_context_service = context_service
+    resolved_context_service = resolved_services.context
     if resolved_context_service is None:
-        resolved_context_service = ContextService(
-            config=ContextServiceConfig(
-                max_tokens=100000,
-                overflow_threshold_percent=90.0,
-            )
+        from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
+        resolved_context_service = ContextServiceAdapter(
+            conversation_controller=conversation_controller,
         )
 
-    resolved_recovery_service = recovery_service
+    resolved_recovery_service = resolved_services.recovery
     if resolved_recovery_service is None:
         resolved_recovery_service = RecoveryService()
 
-    resolved_chat_service = chat_service
+    resolved_chat_service = resolved_services.chat
     if resolved_chat_service is None:
         resolved_chat_service = ChatService(
             config=ChatServiceConfig(
                 max_iterations=200,
                 stream_chunk_size=100,
             ),
-            provider_service=provider_service,
+            provider_service=resolved_services.provider,
             tool_service=resolved_tool_service,
             context_service=resolved_context_service,
             recovery_service=resolved_recovery_service,

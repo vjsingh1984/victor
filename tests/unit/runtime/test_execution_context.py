@@ -13,7 +13,9 @@ import pytest
 
 from victor.runtime.context import (
     ExecutionContext,
+    ResolvedRuntimeServices,
     ServiceAccessor,
+    register_runtime_services,
     resolve_execution_context,
     resolve_runtime_services,
 )
@@ -236,6 +238,32 @@ class TestExecutionContextIntegration:
 
     def test_resolve_runtime_services_prefers_execution_context_services(self):
         chat_service = MagicMock(name="chat_service")
+        tool_service = MagicMock(name="tool_service")
+        session_service = MagicMock(name="session_service")
+        context_service = MagicMock(name="context_service")
+        provider_service = MagicMock(name="provider_service")
+        recovery_service = MagicMock(name="recovery_service")
+        runtime_owner = MagicMock()
+        execution_context = MagicMock()
+        execution_context.services = MagicMock()
+        execution_context.services.chat = chat_service
+        execution_context.services.tool = tool_service
+        execution_context.services.session = session_service
+        execution_context.services.context = context_service
+        execution_context.services.provider = provider_service
+        execution_context.services.recovery = recovery_service
+
+        resolved = resolve_runtime_services(runtime_owner, execution_context)
+
+        assert resolved.chat is chat_service
+        assert resolved.tool is tool_service
+        assert resolved.session is session_service
+        assert resolved.context is context_service
+        assert resolved.provider is provider_service
+        assert resolved.recovery is recovery_service
+
+    def test_resolve_runtime_services_ignores_unbound_mock_attributes(self):
+        chat_service = MagicMock(name="chat_service")
         session_service = MagicMock(name="session_service")
         runtime_owner = MagicMock()
         execution_context = MagicMock()
@@ -247,37 +275,100 @@ class TestExecutionContextIntegration:
 
         assert resolved.chat is chat_service
         assert resolved.session is session_service
+        assert resolved.tool is None
+        assert resolved.context is None
+        assert resolved.provider is None
+        assert resolved.recovery is None
 
     def test_resolve_runtime_services_falls_back_to_context_container(self):
-        chat_service = MagicMock(name="chat_service")
-        session_service = MagicMock(name="session_service")
+        from victor.agent.services import protocols as service_protocols
+
+        services = {
+            service_protocols.ChatServiceProtocol: MagicMock(name="chat_service"),
+            service_protocols.ToolServiceProtocol: MagicMock(name="tool_service"),
+            service_protocols.SessionServiceProtocol: MagicMock(name="session_service"),
+            service_protocols.ContextServiceProtocol: MagicMock(name="context_service"),
+            service_protocols.ProviderServiceProtocol: MagicMock(name="provider_service"),
+            service_protocols.RecoveryServiceProtocol: MagicMock(name="recovery_service"),
+        }
         container = MagicMock()
-        container.get_optional.side_effect = [chat_service, session_service]
+        container.get_optional.side_effect = lambda protocol: services.get(protocol)
         runtime_owner = MagicMock()
         runtime_owner._chat_service = MagicMock(name="legacy_chat")
+        runtime_owner._tool_service = MagicMock(name="legacy_tool")
         runtime_owner._session_service = MagicMock(name="legacy_session")
+        runtime_owner._context_service = MagicMock(name="legacy_context")
+        runtime_owner._provider_service = MagicMock(name="legacy_provider")
+        runtime_owner._recovery_service = MagicMock(name="legacy_recovery")
         execution_context = MagicMock()
         execution_context.services = MagicMock()
         execution_context.services.chat = None
+        execution_context.services.tool = None
         execution_context.services.session = None
+        execution_context.services.context = None
+        execution_context.services.provider = None
+        execution_context.services.recovery = None
         execution_context.container = container
 
         resolved = resolve_runtime_services(runtime_owner, execution_context)
 
-        assert resolved.chat is chat_service
-        assert resolved.session is session_service
+        assert resolved.chat is services[service_protocols.ChatServiceProtocol]
+        assert resolved.tool is services[service_protocols.ToolServiceProtocol]
+        assert resolved.session is services[service_protocols.SessionServiceProtocol]
+        assert resolved.context is services[service_protocols.ContextServiceProtocol]
+        assert resolved.provider is services[service_protocols.ProviderServiceProtocol]
+        assert resolved.recovery is services[service_protocols.RecoveryServiceProtocol]
 
     def test_resolve_runtime_services_falls_back_to_runtime_owner_state(self):
         chat_service = MagicMock(name="chat_service")
+        tool_service = MagicMock(name="tool_service")
         session_service = MagicMock(name="session_service")
+        context_service = MagicMock(name="context_service")
+        provider_service = MagicMock(name="provider_service")
+        recovery_service = MagicMock(name="recovery_service")
         runtime_owner = MagicMock()
         runtime_owner._chat_service = chat_service
+        runtime_owner._tool_service = tool_service
         runtime_owner._session_service = session_service
+        runtime_owner._context_service = context_service
+        runtime_owner._provider_service = provider_service
+        runtime_owner._recovery_service = recovery_service
 
         resolved = resolve_runtime_services(runtime_owner)
 
         assert resolved.chat is chat_service
+        assert resolved.tool is tool_service
         assert resolved.session is session_service
+        assert resolved.context is context_service
+        assert resolved.provider is provider_service
+        assert resolved.recovery is recovery_service
+
+    def test_register_runtime_services_registers_all_non_none_services(self):
+        from victor.agent.services import protocols as service_protocols
+        from victor.core.container import ServiceContainer
+
+        container = ServiceContainer()
+        services = ResolvedRuntimeServices(
+            chat=MagicMock(name="chat_service"),
+            tool=MagicMock(name="tool_service"),
+            session=MagicMock(name="session_service"),
+            context=MagicMock(name="context_service"),
+            provider=MagicMock(name="provider_service"),
+            recovery=MagicMock(name="recovery_service"),
+        )
+
+        register_runtime_services(container, services)
+
+        assert container.get_optional(service_protocols.ChatServiceProtocol) is services.chat
+        assert container.get_optional(service_protocols.ToolServiceProtocol) is services.tool
+        assert container.get_optional(service_protocols.SessionServiceProtocol) is services.session
+        assert container.get_optional(service_protocols.ContextServiceProtocol) is services.context
+        assert (
+            container.get_optional(service_protocols.ProviderServiceProtocol) is services.provider
+        )
+        assert (
+            container.get_optional(service_protocols.RecoveryServiceProtocol) is services.recovery
+        )
 
     def test_create_with_real_container(self):
         from victor.core.container import ServiceContainer

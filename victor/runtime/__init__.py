@@ -7,6 +7,7 @@ from victor.runtime.context import (
     ResolvedRuntimeServices,
     RuntimeExecutionContext,
     ServiceAccessor,
+    register_runtime_services,
     resolve_execution_context,
     resolve_runtime_services,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "ExecutionContext",  # Backward compatibility alias
     "ResolvedRuntimeServices",
     "ServiceAccessor",
+    "register_runtime_services",
     "resolve_execution_context",
     "resolve_runtime_services",
     "resolve_chat_runtime",

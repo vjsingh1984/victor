@@ -68,6 +68,7 @@ def test_resolve_runtime_services_prefers_execution_context_services() -> None:
 
 def test_resolve_runtime_services_prefers_execution_context_container_over_legacy_attrs() -> None:
     from victor.framework.message_execution import resolve_runtime_services
+    from victor.agent.services import protocols as service_protocols
 
     orchestrator = _make_orchestrator()
     legacy_chat_service = MagicMock(name="legacy_chat_service")
@@ -75,10 +76,10 @@ def test_resolve_runtime_services_prefers_execution_context_container_over_legac
     runtime_chat_service = MagicMock(name="runtime_chat_service")
     runtime_session_service = MagicMock(name="runtime_session_service")
     container = MagicMock()
-    container.get_optional.side_effect = [
-        runtime_chat_service,
-        runtime_session_service,
-    ]
+    container.get_optional.side_effect = lambda protocol: {
+        service_protocols.ChatServiceProtocol: runtime_chat_service,
+        service_protocols.SessionServiceProtocol: runtime_session_service,
+    }.get(protocol)
     execution_context = SimpleNamespace(container=container)
     orchestrator._chat_service = legacy_chat_service
     orchestrator._session_service = legacy_session_service

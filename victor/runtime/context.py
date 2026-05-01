@@ -101,7 +101,58 @@ class ResolvedRuntimeServices:
     """Canonical runtime-owned view of resolved service instances."""
 
     chat: Any = None
+    tool: Any = None
     session: Any = None
+    context: Any = None
+    provider: Any = None
+    recovery: Any = None
+
+    def has_any(self) -> bool:
+        """Whether any service handle is populated."""
+        return any(
+            service is not None
+            for service in (
+                self.chat,
+                self.tool,
+                self.session,
+                self.context,
+                self.provider,
+                self.recovery,
+            )
+        )
+
+
+def _services_from_accessor(accessor: Any) -> ResolvedRuntimeServices:
+    """Build a resolved runtime service bundle from a typed accessor."""
+    def _service_attr(name: str) -> Any:
+        if isinstance(accessor, ServiceAccessor):
+            return getattr(accessor, name, None)
+
+        accessor_dict = getattr(accessor, "__dict__", {})
+        if name in accessor_dict or hasattr(type(accessor), name):
+            return getattr(accessor, name, None)
+        return None
+
+    return ResolvedRuntimeServices(
+        chat=_service_attr("chat"),
+        tool=_service_attr("tool"),
+        session=_service_attr("session"),
+        context=_service_attr("context"),
+        provider=_service_attr("provider"),
+        recovery=_service_attr("recovery"),
+    )
+
+
+def _services_from_runtime_state(runtime_state: Dict[str, Any]) -> ResolvedRuntimeServices:
+    """Build a resolved runtime service bundle from owner attributes."""
+    return ResolvedRuntimeServices(
+        chat=runtime_state.get("_chat_service"),
+        tool=runtime_state.get("_tool_service"),
+        session=runtime_state.get("_session_service"),
+        context=runtime_state.get("_context_service"),
+        provider=runtime_state.get("_provider_service"),
+        recovery=runtime_state.get("_recovery_service"),
+    )
 
 
 def resolve_execution_context(
@@ -120,17 +171,14 @@ def resolve_runtime_services(
     runtime_owner: Any,
     execution_context: Any = None,
 ) -> ResolvedRuntimeServices:
-    """Resolve canonical chat/session services from explicit runtime state."""
+    """Resolve the canonical runtime service bundle from explicit runtime state."""
     runtime_state = getattr(runtime_owner, "__dict__", {})
     runtime_context = resolve_execution_context(runtime_owner, execution_context)
 
     services = getattr(runtime_context, "services", None) if runtime_context is not None else None
     if services is not None:
-        resolved = ResolvedRuntimeServices(
-            chat=getattr(services, "chat", None),
-            session=getattr(services, "session", None),
-        )
-        if resolved.chat is not None or resolved.session is not None:
+        resolved = _services_from_accessor(services)
+        if resolved.has_any():
             return resolved
 
     context_container = (
@@ -138,27 +186,51 @@ def resolve_runtime_services(
     )
     if context_container is not None:
         accessor = ServiceAccessor(_container=context_container)
-        resolved = ResolvedRuntimeServices(
-            chat=getattr(accessor, "chat", None),
-            session=getattr(accessor, "session", None),
-        )
-        if resolved.chat is not None or resolved.session is not None:
+        resolved = _services_from_accessor(accessor)
+        if resolved.has_any():
             return resolved
 
-    chat_service = runtime_state.get("_chat_service")
-    session_service = runtime_state.get("_session_service")
-    if chat_service is not None or session_service is not None:
-        return ResolvedRuntimeServices(chat=chat_service, session=session_service)
+    resolved = _services_from_runtime_state(runtime_state)
+    if resolved.has_any():
+        return resolved
 
     container = runtime_state.get("_container")
     if container is not None:
         accessor = ServiceAccessor(_container=container)
-        return ResolvedRuntimeServices(
-            chat=getattr(accessor, "chat", None),
-            session=getattr(accessor, "session", None),
-        )
+        return _services_from_accessor(accessor)
 
     return ResolvedRuntimeServices()
+
+
+def register_runtime_services(container: Any, services: ResolvedRuntimeServices) -> None:
+    """Register the canonical runtime service bundle into the DI container."""
+    if container is None:
+        return
+
+    from victor.agent.services.protocols import (
+        ChatServiceProtocol,
+        ContextServiceProtocol,
+        ProviderServiceProtocol,
+        RecoveryServiceProtocol,
+        SessionServiceProtocol,
+        ToolServiceProtocol,
+    )
+    from victor.core.container import ServiceLifetime
+
+    for protocol, service in (
+        (ChatServiceProtocol, services.chat),
+        (ToolServiceProtocol, services.tool),
+        (SessionServiceProtocol, services.session),
+        (ContextServiceProtocol, services.context),
+        (ProviderServiceProtocol, services.provider),
+        (RecoveryServiceProtocol, services.recovery),
+    ):
+        if service is not None:
+            container.register_or_replace(
+                protocol,
+                lambda c, runtime_service=service: runtime_service,
+                ServiceLifetime.SINGLETON,
+            )
 
 
 @dataclass
