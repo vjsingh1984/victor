@@ -20,6 +20,7 @@ from rich.text import Text
 # ✅ PROPER: Import VictorClient and SessionConfig
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
+from victor.framework.session_runner import FrameworkSessionRunner
 from victor.config.settings import get_project_paths, load_settings
 from victor.core.async_utils import run_sync
 
@@ -149,6 +150,9 @@ def _build_session_config(
     planning_model: Optional[str],
     mode: Optional[str],
     show_reasoning: bool,
+    observability_logging: Optional[bool] = None,
+    auto_skill_enabled: Optional[bool] = None,
+    one_shot_mode: Optional[bool] = None,
     provider: Optional[str] = None,
     model: Optional[str] = None,
     endpoint: Optional[str] = None,
@@ -173,6 +177,9 @@ def _build_session_config(
         planning_model=planning_model,
         mode=mode,
         show_reasoning=show_reasoning,
+        observability_logging=observability_logging,
+        auto_skill_enabled=auto_skill_enabled,
+        one_shot_mode=one_shot_mode,
         provider=provider,
         model=model,
         endpoint=endpoint,
@@ -730,12 +737,6 @@ def chat(
         help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
         rich_help_panel="Expert Auth & Compatibility",
     ),
-    legacy_mode: bool = typer.Option(
-        False,
-        "--legacy",
-        help="Deprecated no-op. Victor always uses the canonical framework client path.",
-        rich_help_panel="Expert Auth & Compatibility",
-    ),
     tui: bool = typer.Option(
         False,
         "--tui/--no-tui",
@@ -848,12 +849,12 @@ Use `victor workflow` command instead for full workflow features.
 Use `victor sessions` command instead for session management.
 `--sessions`, `--sessionid`
 
-### Expert Options (9 options)
+### Expert Options (8 options)
 Advanced debugging and compatibility options:
 - **Logging**: `--observability`, `--log-events`
 - **Output**: `--show-reasoning`, `--renderer`
 - **Auth**: `--endpoint`, `--auth-mode`, `--coding-plan`
-- **Interface**: `--tui`, `--legacy`
+- **Interface**: `--tui`
 
 ## Examples
 
@@ -1047,6 +1048,9 @@ victor chat --sessionid abc123            # Resume session
                 planning_model=planning_model,
                 mode=mode,
                 show_reasoning=show_reasoning,
+                observability_logging=True if log_events else None,
+                auto_skill_enabled=auto_skill,
+                one_shot_mode=bool(actual_message),
                 provider=provider,
                 model=model,
                 endpoint=endpoint,
@@ -1071,21 +1075,7 @@ victor chat --sessionid abc123            # Resume session
         except Exception:
             pass  # Periodic cleanup is best-effort
 
-        # Apply CLI flags to settings
-        if log_events:
-            settings.observability.enable_observability_logging = True
-
         setup_safety_confirmation()
-
-        # Apply auto-skill CLI override to settings
-        if auto_skill is not None:
-            settings.skill_auto_select_enabled = auto_skill
-
-        if legacy_mode:
-            console.print(
-                "[yellow]Warning:[/] --legacy is deprecated and ignored. "
-                "Victor now always uses the canonical framework client path."
-            )
 
         if actual_message:
             runtime_override_kwargs = _collect_runtime_override_kwargs(
@@ -1239,7 +1229,6 @@ async def run_oneshot(
     if formatter is None:
         formatter = create_formatter()
 
-    settings.automation.one_shot_mode = True
     start_time = time.time()
     show_cli_chrome = _should_render_cli_chrome(formatter)
 
@@ -1261,7 +1250,14 @@ async def run_oneshot(
         mode=mode,
         show_reasoning=show_reasoning,
     )
-    config.apply_to_settings(settings)
+    session_runner = FrameworkSessionRunner(settings, config)
+    prepared_state = session_runner.prepare_state(
+        one_shot_mode=True,
+        stream=stream,
+        show_reasoning=show_reasoning,
+    )
+    config = prepared_state.config
+    show_reasoning = prepared_state.show_reasoning
 
     _configure_smart_routing(
         settings,
@@ -1299,20 +1295,6 @@ async def run_oneshot(
             )
         thinking = False
 
-    # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
-    if not show_reasoning:
-        try:
-            from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
-
-            caps = ModelCapabilityLoader().get_capabilities(
-                settings.provider.default_provider,
-                settings.provider.default_model,
-            )
-            if caps and caps.thinking_mode:
-                show_reasoning = True
-        except Exception:
-            pass
-
     agent = None
     # ✅ PROPER: No FrameworkShim needed (VictorClient handles framework features)
     # shim: Optional[FrameworkShim] = None  # REMOVED
@@ -1336,12 +1318,11 @@ async def run_oneshot(
             # Configuration validation (P1-6: Display configuration validation status)
             try:
                 from victor.config.validation import (
-                    validate_configuration,
                     format_validation_result,
                 )
 
                 status.update("Validating configuration...")
-                validation_result = validate_configuration(settings)
+                validation_result = session_runner.validate_configuration()
 
                 if not validation_result.is_valid():
                     # Configuration has errors - display and exit
@@ -1380,9 +1361,7 @@ async def run_oneshot(
                     console.print("[dim yellow]⚠ Configuration validation skipped[/]")
 
             # Validate default model existence (Phase 1 UX improvement)
-            from victor.config.settings import validate_default_model
-
-            model_valid, model_warning = validate_default_model(settings)
+            model_valid, model_warning = session_runner.validate_default_model()
             if not model_valid and model_warning:
                 if not show_cli_chrome:
                     formatter.error("Configuration warning", model_warning)
@@ -1404,8 +1383,7 @@ async def run_oneshot(
             # Step 2: Initialize VictorClient with SessionConfig
             status.update("Initializing VictorClient...")
             try:
-                # ✅ PROPER: Create VictorClient (AgentFactory is handled internally)
-                client = VictorClient(config)
+                client = session_runner.create_client(config)
             except ConfigurationError as e:
                 console.print(f"\n[red]✗[/] Configuration error: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
@@ -1443,8 +1421,10 @@ async def run_oneshot(
             # Step 3: Ensure VictorClient is initialized
             status.update("Creating agent...")
             try:
-                # ✅ PROPER: Use VictorClient public initialization instead of touching internals.
-                agent = await client.initialize()
+                agent = await session_runner.initialize_client(
+                    client,
+                    planning_model=planning_model,
+                )
             except ConfigurationError as e:
                 console.print(f"\n[red]✗[/] Configuration error during agent creation: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
@@ -1478,11 +1458,8 @@ async def run_oneshot(
             # Avoid mutating the runtime again here so the UI stays on framework surfaces.
 
             if mode:
-                from victor.agent.mode_controller import AgentMode, get_mode_controller
-
-                controller = get_mode_controller()
                 try:
-                    controller.switch_mode(AgentMode(mode))
+                    session_runner.apply_agent_mode(mode)
                 except Exception as e:
                     if show_cli_chrome:
                         console.print(f"\n[yellow]Warning:[/] Failed to set mode '{mode}': {e}")
@@ -1505,7 +1482,7 @@ async def run_oneshot(
             # Step 6: Start embedding preload
             status.update("Starting embedding preload...")
             try:
-                await client.start_embedding_preload()
+                await session_runner.start_embedding_preload(client)
             except Exception as e:
                 if show_cli_chrome:
                     console.print(f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}")
@@ -1514,7 +1491,7 @@ async def run_oneshot(
                     )
 
             # Planning mode requires non-streaming (plan generation → step execution → summary)
-            use_streaming = stream and not enable_planning
+            use_streaming = prepared_state.use_streaming
 
             # Display skill auto-selection feedback before response
             if show_cli_chrome:
@@ -1549,7 +1526,6 @@ async def run_oneshot(
                 buffered = BufferedRenderer(
                     show_reasoning=show_reasoning,
                     plain=formatter._plain if hasattr(formatter, "_plain") else False,
-                    user_message=message,
                 )
                 await stream_response(
                     client, message, buffered, suppress_thinking=not show_reasoning
@@ -1676,21 +1652,15 @@ async def run_interactive(
         mode=mode,
         show_reasoning=show_reasoning,
     )
-    config.apply_to_settings(settings)
-
-    # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
-    if not show_reasoning:
-        try:
-            from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
-
-            caps = ModelCapabilityLoader().get_capabilities(
-                settings.provider.default_provider,
-                settings.provider.default_model,
-            )
-            if caps and caps.thinking_mode:
-                show_reasoning = True
-        except Exception:
-            pass
+    session_runner = FrameworkSessionRunner(settings, config)
+    prepared_state = session_runner.prepare_state(
+        one_shot_mode=False,
+        stream=stream,
+        show_reasoning=show_reasoning,
+    )
+    config = prepared_state.config
+    show_reasoning = prepared_state.show_reasoning
+    stream = prepared_state.use_streaming
 
     agent = None
     client = None  # ✅ NEW: VictorClient (replaces orchestrator/shim)
@@ -1787,12 +1757,11 @@ async def run_interactive(
 
         # ✅ PROPER: Create VictorClient (replaces AgentFactory)
         try:
-            client = VictorClient(config)
-            agent = await client._ensure_initialized()
-
-            # Set planning model override if provided (for planning coordinator)
-            if planning_model:
-                agent._planning_model_override = planning_model
+            client = session_runner.create_client(config)
+            agent = await session_runner.initialize_client(
+                client,
+                planning_model=planning_model,
+            )
 
             # Resume session if requested
             if resume_session_id:
@@ -1908,11 +1877,8 @@ async def run_interactive(
             )
 
         if mode:
-            from victor.agent.mode_controller import AgentMode, get_mode_controller
-
-            controller = get_mode_controller()
             try:
-                controller.switch_mode(AgentMode(mode))
+                session_runner.apply_agent_mode(mode)
             except Exception:
                 pass
 
@@ -2697,7 +2663,7 @@ async def run_workflow_mode(
             # ✅ PROPER: Use VictorClient instead of FrameworkShim
             config = SessionConfig.from_cli_flags(agent_profile=profile)
             client = VictorClient(config)
-            orchestrator = await client._ensure_initialized()
+            orchestrator = await client.initialize()
 
         # Execute with StateGraphExecutor
         executor = StateGraphExecutor(

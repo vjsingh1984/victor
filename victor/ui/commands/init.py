@@ -199,7 +199,7 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
             agent_profile=provider,  # Profile name (e.g., "zai-coding")
         )
         client = VictorClient(config)
-        agent = await client._ensure_initialized()
+        agent = await client.initialize()
         return agent
 
     # Bare provider name: pass through SessionConfig, resolved by Agent.create

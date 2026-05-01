@@ -112,7 +112,7 @@ async def _list_tools_async(profile: str) -> None:
         # ✅ PROPER: Create VictorClient (replaces AgentFactory)
         config = SessionConfig()  # Default config for tools listing
         client = VictorClient(config)
-        agent = await client._ensure_initialized()
+        agent = await client.initialize()
 
         # Retrieve tools from the agent's ToolRegistry
         # list_tools(only_enabled=False) gets all registered tools, regardless of current enable/disable status

@@ -141,6 +141,42 @@ class TestUILayerArchitecturalBoundaries:
                 "Violations:\n" + "\n".join(f"  - {v['file']}: {v['import']}" for v in violations)
             )
 
+    def test_ui_layer_must_not_call_private_victor_client_methods(self, ui_layer_files):
+        """UI layer MUST NOT reach into VictorClient private helpers."""
+        violations = []
+
+        for file_path in ui_layer_files:
+            if "test_" in file_path.name or "__tests__" in str(file_path):
+                continue
+
+            try:
+                with open(file_path, "r") as f:
+                    for lineno, line in enumerate(f, start=1):
+                        if "._ensure_initialized(" in line:
+                            violations.append(
+                                {
+                                    "file": str(
+                                        file_path.relative_to(
+                                            Path(__file__).parent.parent.parent.parent
+                                        )
+                                    ),
+                                    "line": lineno,
+                                    "content": line.strip(),
+                                }
+                            )
+            except Exception:
+                pass
+
+        if violations:
+            pytest.fail(
+                "UI layer must NOT call private VictorClient methods.\n"
+                "Use VictorClient.initialize() or other public surfaces instead.\n\n"
+                "Violations:\n"
+                + "\n".join(
+                    f"  - {v['file']}:{v['line']}: {v['content']}" for v in violations
+                )
+            )
+
 
 class TestVictorClientArchitecturalBoundaries:
     """Test that VictorClient follows architectural patterns."""

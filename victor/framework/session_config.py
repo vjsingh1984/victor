@@ -241,6 +241,9 @@ class SessionConfig:
     planning_model: Optional[str] = None
     mode: Optional[str] = None
     show_reasoning: bool = False
+    observability_logging: Optional[bool] = None
+    auto_skill_enabled: Optional[bool] = None
+    one_shot_mode: Optional[bool] = None
 
     # Composed sub-configs (for structured access)
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
@@ -280,6 +283,9 @@ class SessionConfig:
         planning_model: Optional[str] = None,
         mode: Optional[str] = None,
         show_reasoning: bool = False,
+        observability_logging: Optional[bool] = None,
+        auto_skill_enabled: Optional[bool] = None,
+        one_shot_mode: Optional[bool] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         endpoint: Optional[str] = None,
@@ -309,6 +315,9 @@ class SessionConfig:
             planning_model: Override model for planning.
             mode: Agent mode (build/plan/explore).
             show_reasoning: Show LLM reasoning.
+            observability_logging: Enable event/observability logging for this session.
+            auto_skill_enabled: Override skill auto-selection for this session.
+            one_shot_mode: Override headless one-shot execution mode.
             provider: Override provider for this session.
             model: Override model for this session.
             endpoint: Override endpoint for local providers.
@@ -336,6 +345,9 @@ class SessionConfig:
             planning_model=planning_model,
             mode=mode,
             show_reasoning=show_reasoning,
+            observability_logging=observability_logging,
+            auto_skill_enabled=auto_skill_enabled,
+            one_shot_mode=one_shot_mode,
             compaction=CompactionConfig(
                 threshold=compaction_threshold,
                 adaptive=adaptive_threshold,
@@ -393,6 +405,39 @@ class SessionConfig:
                     "tool_output_pruning_safe_only",
                     self.tool_output.pruning_safe_only,
                 )
+
+        observability_settings = getattr(settings, "observability", None)
+        if self.observability_logging is not None:
+            if observability_settings is not None and hasattr(
+                observability_settings, "enable_observability_logging"
+            ):
+                object.__setattr__(
+                    observability_settings,
+                    "enable_observability_logging",
+                    self.observability_logging,
+                )
+            if hasattr(settings, "enable_observability_logging"):
+                object.__setattr__(
+                    settings,
+                    "enable_observability_logging",
+                    self.observability_logging,
+                )
+
+        if self.auto_skill_enabled is not None and hasattr(
+            settings, "skill_auto_select_enabled"
+        ):
+            object.__setattr__(
+                settings,
+                "skill_auto_select_enabled",
+                self.auto_skill_enabled,
+            )
+
+        if self.one_shot_mode is not None:
+            automation = getattr(settings, "automation", None)
+            if automation is not None and hasattr(automation, "one_shot_mode"):
+                object.__setattr__(automation, "one_shot_mode", self.one_shot_mode)
+            if hasattr(settings, "one_shot_mode"):
+                object.__setattr__(settings, "one_shot_mode", self.one_shot_mode)
 
         provider_override = self.provider_override
         provider_settings = getattr(settings, "provider", None)

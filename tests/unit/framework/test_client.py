@@ -73,6 +73,9 @@ def test_session_config_normalizes_provider_override_and_applies_endpoint() -> N
         provider="OLLAMA",
         endpoint="http://localhost:11434",
         provider_timeout=180,
+        observability_logging=True,
+        auto_skill_enabled=False,
+        one_shot_mode=True,
     )
     settings = SimpleNamespace(
         provider=SimpleNamespace(
@@ -86,6 +89,11 @@ def test_session_config_normalizes_provider_override_and_applies_endpoint() -> N
             tool_output_pruning_enabled=False,
             tool_output_pruning_safe_only=True,
         ),
+        observability=SimpleNamespace(enable_observability_logging=False),
+        automation=SimpleNamespace(one_shot_mode=False),
+        enable_observability_logging=False,
+        skill_auto_select_enabled=True,
+        one_shot_mode=False,
     )
 
     config.apply_to_settings(settings)
@@ -97,6 +105,11 @@ def test_session_config_normalizes_provider_override_and_applies_endpoint() -> N
     assert settings.provider.default_model == "qwen2.5-coder:7b"
     assert settings.provider.ollama_base_url == "http://localhost:11434"
     assert settings.provider.timeout == 180
+    assert settings.observability.enable_observability_logging is True
+    assert settings.enable_observability_logging is True
+    assert settings.skill_auto_select_enabled is False
+    assert settings.automation.one_shot_mode is True
+    assert settings.one_shot_mode is True
 
 
 def test_session_config_rejects_endpoint_for_cloud_provider() -> None:

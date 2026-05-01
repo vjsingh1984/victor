@@ -376,7 +376,7 @@ def run_skill(
         )
 
         client = VictorClient(config)
-        agent = await client._ensure_initialized()
+        agent = await client.initialize()
 
         # Inject skill prompt into the agent's system prompt
         if hasattr(agent, "_system_prompt"):
