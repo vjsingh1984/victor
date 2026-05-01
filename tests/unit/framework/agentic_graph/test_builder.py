@@ -145,6 +145,38 @@ class TestAgenticLoopGraphExecutor:
 
         assert len(iterations) >= 1
 
+    @pytest.mark.asyncio
+    async def test_executor_runs_prompt_node_before_turn_execution(self):
+        """Prompt node should feed system prompt into act-stage runtime overrides."""
+        mock_prompt_orchestrator = MagicMock()
+        mock_prompt_orchestrator.build_system_prompt.return_value = "Framework prompt"
+        mock_context = MagicMock()
+        mock_context.metadata = {"prompt_orchestrator": mock_prompt_orchestrator}
+
+        executor = AgenticLoopGraphExecutor(
+            execution_context=mock_context,
+            max_iterations=1,
+        )
+        executor.turn_executor = AsyncMock()
+        executor.turn_executor.execute_turn = AsyncMock(
+            return_value=MagicMock(
+                response="Done",
+                tool_results=[],
+            )
+        )
+
+        await executor.run(
+            "Build prompt-aware response",
+            context={"provider": "anthropic", "model": "claude-sonnet"},
+        )
+
+        runtime_overrides = executor.turn_executor.execute_turn.await_args.kwargs[
+            "runtime_context_overrides"
+        ]
+        assert runtime_overrides["system_prompt"] == "Framework prompt"
+        assert "prompt" in executor.get_execution_stats()["graph_nodes"]
+        mock_prompt_orchestrator.build_system_prompt.assert_called_once()
+
 
 class TestLoopResult:
     """Tests for LoopResult model."""

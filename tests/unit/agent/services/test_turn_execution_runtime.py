@@ -593,6 +593,37 @@ async def test_execute_turn_injects_recovery_guidance_for_blocked_tool_batches()
 
 
 @pytest.mark.asyncio
+async def test_execute_turn_applies_and_restores_system_prompt_override():
+    executor = _make_executor()
+    executor._provider_context.provider = SimpleNamespace(
+        supports_tools=MagicMock(return_value=False)
+    )
+    executor._provider_context.thinking = False
+    executor._tool_context.tool_calls_used = 0
+    executor._tool_context.tool_budget = 8
+    executor._chat_context.conversation.system_prompt = "Base prompt"
+    executor._chat_context.conversation._system_added = True
+    executor._chat_context.set_system_prompt = MagicMock()
+    executor._check_context_compaction = AsyncMock()
+    executor._execute_model_turn = AsyncMock(
+        return_value=CompletionResponse(
+            content="Done",
+            role="assistant",
+            tool_calls=[],
+        )
+    )
+
+    await executor.execute_turn(
+        user_message="respond with runtime prompt",
+        runtime_context_overrides={"system_prompt": "Runtime prompt"},
+    )
+
+    assert executor._chat_context.set_system_prompt.call_args_list[0].args == ("Runtime prompt",)
+    assert executor._chat_context.set_system_prompt.call_args_list[-1].args == ("Base prompt",)
+    assert executor._chat_context.conversation._system_added is True
+
+
+@pytest.mark.asyncio
 async def test_execute_turn_deduplicates_repeated_recovery_guidance():
     executor = _make_executor()
     executor._provider_context.provider = SimpleNamespace(

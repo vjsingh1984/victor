@@ -2561,9 +2561,11 @@ class AgenticLoop:
             _AgenticLoopGraphExecutor = _Executor
 
         try:
+            execution_context = self._resolve_stategraph_execution_context()
+
             # Create StateGraph executor
             graph_executor = _AgenticLoopGraphExecutor(
-                execution_context=self.orchestrator,  # Pass orchestrator as context
+                execution_context=execution_context,
                 max_iterations=self.max_iterations,
                 enable_fulfillment=self.enable_fulfillment_check,
                 enable_adaptive_iterations=self.enable_adaptive_iterations,
@@ -2615,3 +2617,27 @@ class AgenticLoop:
                     "executor_type": "stategraph",
                 },
             )
+
+    def _resolve_stategraph_execution_context(self) -> Any:
+        """Resolve the explicit execution context for StateGraph execution."""
+        execution_context = getattr(self.orchestrator, "_execution_context", None)
+        if execution_context is None:
+            return self.orchestrator
+
+        try:
+            from victor.runtime.context import RuntimeExecutionContext
+
+            if not isinstance(execution_context, RuntimeExecutionContext):
+                return execution_context
+        except Exception:
+            return execution_context
+
+        prompt_orchestrator = getattr(self.orchestrator, "_prompt_orchestrator", None)
+        if prompt_orchestrator is None:
+            from victor.agent.prompt_orchestrator import get_prompt_orchestrator
+
+            prompt_orchestrator = get_prompt_orchestrator()
+
+        if execution_context.metadata.get("prompt_orchestrator") is prompt_orchestrator:
+            return execution_context
+        return execution_context.with_metadata(prompt_orchestrator=prompt_orchestrator)

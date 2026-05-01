@@ -25,7 +25,7 @@ Graph Structure:
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from victor.framework.graph import StateGraph, END
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
@@ -44,6 +44,21 @@ def create_agentic_loop_graph(
     max_iterations: int = 10,
     enable_fulfillment: bool = True,
     enable_adaptive_iterations: bool = True,
+    *,
+    include_prompt_node: bool = False,
+    prompt_node: Optional[Callable[[Any], Any]] = None,
+    runtime_intelligence: Optional[Any] = None,
+    runtime_intelligence_resolver: Optional[Callable[[], Any]] = None,
+    planning_coordinator: Optional[Any] = None,
+    planning_coordinator_resolver: Optional[Callable[[], Any]] = None,
+    use_llm_planning: bool = False,
+    use_llm_planning_resolver: Optional[Callable[[], bool]] = None,
+    turn_executor: Optional[Any] = None,
+    turn_executor_resolver: Optional[Callable[[], Any]] = None,
+    evaluator: Optional[Any] = None,
+    evaluator_resolver: Optional[Callable[[], Any]] = None,
+    fulfillment_detector: Optional[Any] = None,
+    fulfillment_detector_resolver: Optional[Callable[[], Any]] = None,
 ) -> StateGraph:
     """Create a StateGraph that implements the agentic loop.
 
@@ -70,15 +85,29 @@ def create_agentic_loop_graph(
         "max_iterations": max_iterations,
         "enable_fulfillment": enable_fulfillment,
         "enable_adaptive_iterations": enable_adaptive_iterations,
+        "include_prompt_node": include_prompt_node,
     }
+
+    resolved_prompt_node = prompt_node
+    if include_prompt_node and resolved_prompt_node is None:
+        from victor.framework.agentic_graph.service_nodes import prompt_service_node
+
+        resolved_prompt_node = prompt_service_node
 
     # Add nodes
     # Note: We use lambda functions to inject configuration into nodes
+    if include_prompt_node and resolved_prompt_node is not None:
+        graph.add_node("prompt", resolved_prompt_node)
+
     graph.add_node(
         "perceive",
         lambda state: perceive_node(
             state,
-            runtime_intelligence=None,  # Will be injected by executor
+            runtime_intelligence=(
+                runtime_intelligence_resolver()
+                if runtime_intelligence_resolver is not None
+                else runtime_intelligence
+            ),
         ),
     )
 
@@ -86,8 +115,16 @@ def create_agentic_loop_graph(
         "plan",
         lambda state: plan_node(
             state,
-            planning_coordinator=None,  # Will be injected by executor
-            use_llm_planning=False,  # Default to fast path
+            planning_coordinator=(
+                planning_coordinator_resolver()
+                if planning_coordinator_resolver is not None
+                else planning_coordinator
+            ),
+            use_llm_planning=(
+                use_llm_planning_resolver()
+                if use_llm_planning_resolver is not None
+                else use_llm_planning
+            ),
         ),
     )
 
@@ -95,7 +132,9 @@ def create_agentic_loop_graph(
         "act",
         lambda state: act_node(
             state,
-            turn_executor=None,  # Will be injected by executor
+            turn_executor=(
+                turn_executor_resolver() if turn_executor_resolver is not None else turn_executor
+            ),
         ),
     )
 
@@ -103,16 +142,22 @@ def create_agentic_loop_graph(
         "evaluate",
         lambda state: evaluate_node(
             state,
-            evaluator=None,  # Will be injected by executor
-            fulfillment_detector=None,  # Will be injected by executor
+            evaluator=(evaluator_resolver() if evaluator_resolver is not None else evaluator),
+            fulfillment_detector=(
+                fulfillment_detector_resolver()
+                if fulfillment_detector_resolver is not None
+                else fulfillment_detector
+            ),
             enable_fulfillment_check=enable_fulfillment,
         ),
     )
 
     # Set entry point
-    graph.set_entry_point("perceive")
+    graph.set_entry_point("prompt" if include_prompt_node else "perceive")
 
-    # Add sequential edges (PERCEIVE -> PLAN -> ACT -> EVALUATE)
+    # Add sequential edges (PROMPT -> PERCEIVE -> PLAN -> ACT -> EVALUATE)
+    if include_prompt_node and resolved_prompt_node is not None:
+        graph.add_edge("prompt", "perceive")
     graph.add_edge("perceive", "plan")
     graph.add_edge("plan", "act")
     graph.add_edge("act", "evaluate")

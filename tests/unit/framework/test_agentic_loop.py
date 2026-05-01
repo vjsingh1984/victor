@@ -34,6 +34,7 @@ from victor.framework.perception_integration import Perception
 from victor.framework.routing_policy import StructuredRoutingPolicy
 from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.framework.task.protocols import TaskComplexity
+from victor.runtime.context import RuntimeExecutionContext
 from victor.providers.base import CompletionResponse
 from victor.providers.performance_tracker import ProviderPerformanceTracker, RequestMetric
 from victor.teams.types import TeamFormation, TeamResult
@@ -220,6 +221,58 @@ class TestAgenticLoop:
 
         assert result.success is True
         runtime_intelligence.analyze_turn.assert_awaited_once()
+
+    async def test_run_with_stategraph_uses_runtime_execution_context(self):
+        """StateGraph path should pass RuntimeExecutionContext, not the host object."""
+        prompt_orchestrator = MagicMock()
+        execution_context = RuntimeExecutionContext(
+            session_id="session-123",
+            settings=SimpleNamespace(),
+            state=None,
+            container=MagicMock(),
+            services=MagicMock(),
+            metadata={},
+        )
+        orchestrator = MagicMock()
+        orchestrator._execution_context = execution_context
+        orchestrator._prompt_orchestrator = prompt_orchestrator
+
+        loop = self._make_loop(orchestrator=orchestrator, max_iterations=1)
+
+        captured: dict[str, object] = {}
+
+        class _FakeExecutor:
+            def __init__(self, execution_context, **kwargs):
+                captured["execution_context"] = execution_context
+                captured["kwargs"] = kwargs
+                self.turn_executor = None
+                self.runtime_intelligence = None
+                self.planning_coordinator = None
+                self.evaluator = None
+                self.fulfillment_detector = None
+
+            async def run(self, query, context=None):
+                return SimpleNamespace(
+                    success=True,
+                    iterations=1,
+                    termination_reason="complete",
+                    metadata={"final_state": {"query": query, **(context or {})}},
+                )
+
+        from victor.framework import agentic_loop as agentic_loop_module
+
+        original_executor = agentic_loop_module._AgenticLoopGraphExecutor
+        agentic_loop_module._AgenticLoopGraphExecutor = _FakeExecutor
+        try:
+            result = await loop._run_with_stategraph("Fix the bug", context={"project": "victor"})
+        finally:
+            agentic_loop_module._AgenticLoopGraphExecutor = original_executor
+
+        assert result.success is True
+        resolved_context = captured["execution_context"]
+        assert resolved_context is not orchestrator
+        assert resolved_context.session_id == "session-123"
+        assert resolved_context.metadata["prompt_orchestrator"] is prompt_orchestrator
 
     async def test_run_applies_topology_overrides_and_records_event(self, monkeypatch):
         perception = _make_perception()

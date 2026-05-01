@@ -1120,6 +1120,10 @@ class TurnExecutor:
             merged_context.update(overrides)
             orchestrator._runtime_tool_context_overrides = merged_context
 
+        system_prompt = overrides.get("system_prompt")
+        if isinstance(system_prompt, str) and system_prompt:
+            self._apply_system_prompt_override(system_prompt, snapshot)
+
         tool_budget = self._coerce_int_override(overrides.get("tool_budget"))
         if tool_budget is not None:
             self._apply_tool_budget_override(tool_budget, snapshot, orchestrator)
@@ -1156,6 +1160,9 @@ class TurnExecutor:
         else:
             self._chat_context._runtime_context_overrides = previous_chat_context
 
+        self._restore_tool_budget_override(snapshot, orchestrator)
+        self._restore_system_prompt_override(snapshot)
+
         settings = getattr(self._chat_context, "settings", None)
         previous_iterations = snapshot.get("chat_max_iterations", _MISSING)
         if settings is not None and previous_iterations is not _MISSING:
@@ -1164,7 +1171,79 @@ class TurnExecutor:
             except Exception:
                 pass
 
-        self._restore_tool_budget_override(snapshot, orchestrator)
+    def _apply_system_prompt_override(self, prompt: str, snapshot: Dict[str, Any]) -> None:
+        """Apply a temporary system prompt override for the current turn."""
+        conversation = getattr(self._chat_context, "conversation", None)
+        snapshot["conversation"] = conversation
+        snapshot["conversation_system_prompt"] = self._get_current_system_prompt(conversation)
+        snapshot["conversation_system_added"] = (
+            getattr(conversation, "_system_added", _MISSING) if conversation is not None else _MISSING
+        )
+
+        setter = getattr(self._chat_context, "set_system_prompt", None)
+        if callable(setter):
+            setter(prompt)
+        elif conversation is not None:
+            conversation_setter = getattr(conversation, "set_system_prompt", None)
+            if callable(conversation_setter):
+                conversation_setter(prompt)
+            else:
+                try:
+                    conversation.system_prompt = prompt
+                    if hasattr(conversation, "_system_added"):
+                        conversation._system_added = False
+                except Exception:
+                    return
+
+        ensure_prompt = getattr(conversation, "ensure_system_prompt", None)
+        if callable(ensure_prompt):
+            try:
+                ensure_prompt()
+            except Exception:
+                pass
+
+    def _restore_system_prompt_override(self, snapshot: Dict[str, Any]) -> None:
+        """Restore the previous system prompt after a runtime override."""
+        if "conversation_system_prompt" not in snapshot:
+            return
+
+        previous_prompt = snapshot.get("conversation_system_prompt", _MISSING)
+        conversation = snapshot.get("conversation")
+
+        if previous_prompt is not _MISSING:
+            setter = getattr(self._chat_context, "set_system_prompt", None)
+            if callable(setter):
+                setter(previous_prompt)
+            elif conversation is not None:
+                conversation_setter = getattr(conversation, "set_system_prompt", None)
+                if callable(conversation_setter):
+                    conversation_setter(previous_prompt)
+                else:
+                    try:
+                        conversation.system_prompt = previous_prompt
+                    except Exception:
+                        pass
+
+        previous_system_added = snapshot.get("conversation_system_added", _MISSING)
+        if conversation is not None and previous_system_added is not _MISSING:
+            try:
+                conversation._system_added = previous_system_added
+            except Exception:
+                pass
+
+    @staticmethod
+    def _get_current_system_prompt(conversation: Any) -> Any:
+        """Return the active conversation system prompt when available."""
+        if conversation is None:
+            return _MISSING
+
+        for attr_name in ("system_prompt", "_system_prompt"):
+            if hasattr(conversation, attr_name):
+                try:
+                    return getattr(conversation, attr_name)
+                except Exception:
+                    continue
+        return _MISSING
 
     def _apply_tool_budget_override(
         self,

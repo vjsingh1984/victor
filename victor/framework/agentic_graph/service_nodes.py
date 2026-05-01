@@ -408,6 +408,9 @@ async def prompt_service_node(
     prompt_orchestrator = _get_prompt_orchestrator(state)
     context = dict(state.context or {})
 
+    if context.get("system_prompt"):
+        return state
+
     provider = str(
         context.get("current_provider")
         or context.get("provider")

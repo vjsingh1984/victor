@@ -30,7 +30,7 @@ from victor.framework.agentic_graph.state import (
     should_continue_loop,
 )
 from victor.framework.agentic_graph.builder import create_agentic_loop_graph
-from victor.framework.agentic_graph.service_nodes import inject_execution_context
+from victor.framework.agentic_graph.service_nodes import inject_execution_context, prompt_service_node
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
@@ -136,20 +136,27 @@ class AgenticLoopGraphExecutor:
         self.enable_fulfillment = enable_fulfillment
         self.enable_adaptive_iterations = enable_adaptive_iterations
 
-        # Create and compile graph
-        self.graph = create_agentic_loop_graph(
-            max_iterations=max_iterations,
-            enable_fulfillment=enable_fulfillment,
-            enable_adaptive_iterations=enable_adaptive_iterations,
-        )
-        self.compiled: CompiledGraph = self.graph.compile()
-
         # Services (injected lazily or set externally)
         self.runtime_intelligence: Optional[Any] = None
         self.planning_coordinator: Optional[Any] = None
         self.turn_executor: Optional[Any] = None
         self.evaluator: Optional[Any] = None
         self.fulfillment_detector: Optional[Any] = None
+
+        # Create and compile graph
+        self.graph = create_agentic_loop_graph(
+            max_iterations=max_iterations,
+            enable_fulfillment=enable_fulfillment,
+            enable_adaptive_iterations=enable_adaptive_iterations,
+            include_prompt_node=True,
+            runtime_intelligence_resolver=lambda: self.runtime_intelligence,
+            planning_coordinator_resolver=lambda: self.planning_coordinator,
+            use_llm_planning_resolver=lambda: self.planning_coordinator is not None,
+            turn_executor_resolver=lambda: self.turn_executor,
+            evaluator_resolver=lambda: self.evaluator,
+            fulfillment_detector_resolver=lambda: self.fulfillment_detector,
+        )
+        self.compiled: CompiledGraph = self.graph.compile()
 
     async def run(
         self,
@@ -174,6 +181,7 @@ class AgenticLoopGraphExecutor:
 
         # Inject ExecutionContext for service access
         initial_state = inject_execution_context(initial_state, self.execution_context)
+        initial_state = await prompt_service_node(initial_state)
 
         try:
             # Execute graph
@@ -225,6 +233,7 @@ class AgenticLoopGraphExecutor:
 
         # Inject ExecutionContext for service access
         initial_state = inject_execution_context(initial_state, self.execution_context)
+        initial_state = await prompt_service_node(initial_state)
 
         try:
             # Stream graph execution
