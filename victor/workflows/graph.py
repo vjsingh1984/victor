@@ -582,15 +582,24 @@ class BasicWorkflowGraph:
 
 
 # Deprecation alias for backward compatibility
-import logging as _logging
+import warnings as _warnings
+
+_WORKFLOW_GRAPH_ALIAS_DEPRECATION_MESSAGE = (
+    "WorkflowGraph from victor.workflows.graph is deprecated. "
+    "Use BasicWorkflowGraph for the simple graph container or "
+    "victor.workflows.graph_dsl.WorkflowGraph for the typed workflow DSL. "
+    "This warning-backed alias remains supported through v0.8.0 (2026-12-31). "
+    "See docs/architecture/migration.md for migration guidance."
+)
 
 
 def __getattr__(name: str):
     """Provide deprecation warning for WorkflowGraph alias."""
     if name == "WorkflowGraph":
-        _logging.getLogger(__name__).warning(
-            "WorkflowGraph from victor.workflows.graph is deprecated. "
-            "Use BasicWorkflowGraph instead."
+        _warnings.warn(
+            _WORKFLOW_GRAPH_ALIAS_DEPRECATION_MESSAGE,
+            DeprecationWarning,
+            stacklevel=2,
         )
         return BasicWorkflowGraph
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

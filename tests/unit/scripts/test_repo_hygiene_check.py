@@ -683,6 +683,225 @@ def test_security_baseline_requires_blocking_and_advisory_summary_docs(
     assert any("Advisory today" in finding.message for finding in findings)
 
 
+def test_deprecation_contract_requires_warning_and_docs(
+    tmp_path: Path,
+) -> None:
+    write_file(
+        tmp_path,
+        "victor/framework/workflows/nodes.py",
+        """
+_DEPRECATED_ALIAS_MAP = {"TeamNode": object}
+
+def __getattr__(name):
+    warnings.warn(
+        "TeamNode is deprecated; use TeamStep instead. "
+        "It will be removed in a future release.",
+        DeprecationWarning,
+    )
+        """.strip()
+        + "\n",
+    )
+    write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\n")
+    write_file(tmp_path, "docs/development/deprecation-inventory-2026-03-03.md", "")
+    write_file(tmp_path, "docs/architecture/migration.md", "")
+
+    findings = repo_hygiene_check.check_deprecation_contract(
+        tmp_path, repo_hygiene_check.TEAM_NODE_DEPRECATION_CONTRACT
+    )
+
+    assert any("target removal version" in finding.message for finding in findings)
+    assert any("target removal date" in finding.message for finding in findings)
+    assert any("migration guide" in finding.message for finding in findings)
+    assert any("inventory entry is missing" in finding.message for finding in findings)
+    assert any("changelog entry is missing" in finding.message for finding in findings)
+
+
+def test_deprecation_contract_accepts_complete_teamnode_contract(
+    tmp_path: Path,
+) -> None:
+    contract = repo_hygiene_check.TEAM_NODE_DEPRECATION_CONTRACT
+    warning_text = (
+        "TeamNode is deprecated; use TeamStep instead. "
+        "This compatibility alias remains supported through v0.9.0 (2027-03-31) "
+        "and will be removed after that milestone. "
+        "See docs/architecture/migration.md for migration guidance."
+    )
+    for rel_path in contract.runtime_files:
+        write_file(
+            tmp_path,
+            rel_path.as_posix(),
+            warning_text + "\n",
+        )
+    write_file(
+        tmp_path,
+        "docs/development/deprecation-inventory-2026-03-03.md",
+        """
+| `TeamNode*` workflow compatibility aliases | source | `TeamStep*` workflow names | Architecture Lead | `v0.9.0` | `2027-03-31` |
+        """.strip()
+        + "\n",
+    )
+    write_file(
+        tmp_path,
+        "CHANGELOG.md",
+        """
+## [Unreleased] (develop)
+
+### Deprecated
+- **`TeamNode*` workflow compatibility aliases**
+  - To be removed in: `v0.9.0`
+  - Target removal date: `2027-03-31`
+  - Replacement: `TeamStep*` workflow names
+  - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
+        """.strip()
+        + "\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/architecture/migration.md",
+        """
+Legacy `TeamNode*` workflow names are deprecated.
+Use `TeamStep*` names during the migration window.
+Removal target: `v0.9.0` (`2027-03-31`).
+        """.strip()
+        + "\n",
+    )
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
+
+
+def test_public_shim_contracts_register_workflowgraph_alias() -> None:
+    labels = {
+        contract.label for contract in repo_hygiene_check.PUBLIC_SHIM_DEPRECATION_CONTRACTS
+    }
+
+    assert "TeamNode*" in labels
+    assert "WorkflowGraph alias from victor.workflows.graph" in labels
+
+
+def test_deprecation_contract_accepts_complete_workflowgraph_contract(
+    tmp_path: Path,
+) -> None:
+    contract = repo_hygiene_check.WORKFLOW_GRAPH_ALIAS_DEPRECATION_CONTRACT
+    warning_text = (
+        "WorkflowGraph from victor.workflows.graph is deprecated. "
+        "Use BasicWorkflowGraph for the simple graph container or "
+        "victor.workflows.graph_dsl.WorkflowGraph for the typed workflow DSL. "
+        "This warning-backed alias remains supported through v0.8.0 (2026-12-31). "
+        "See docs/architecture/migration.md for migration guidance."
+    )
+    for rel_path in contract.runtime_files:
+        write_file(
+            tmp_path,
+            rel_path.as_posix(),
+            warning_text + "\n",
+        )
+    write_file(
+        tmp_path,
+        "docs/development/deprecation-inventory-2026-03-03.md",
+        """
+| `WorkflowGraph` alias from `victor.workflows.graph` | source | `BasicWorkflowGraph` or `victor.workflows.graph_dsl.WorkflowGraph` | Architecture Lead | `v0.8.0` | `2026-12-31` |
+        """.strip()
+        + "\n",
+    )
+    write_file(
+        tmp_path,
+        "CHANGELOG.md",
+        """
+## [Unreleased] (develop)
+
+### Deprecated
+- **`WorkflowGraph` alias from `victor.workflows.graph`**
+  - To be removed in: `v0.8.0`
+  - Target removal date: `2026-12-31`
+  - Replacement: `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL
+  - Compatibility shim status: warning-backed alias remains supported through `v0.8.0`
+        """.strip()
+        + "\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/architecture/migration.md",
+        """
+Legacy `WorkflowGraph` import from `victor.workflows.graph` is deprecated.
+Use `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL.
+Removal target: `v0.8.0` (`2026-12-31`).
+        """.strip()
+        + "\n",
+    )
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
+
+
+def test_deprecation_contract_supports_non_teamnode_shims(tmp_path: Path) -> None:
+    contract = repo_hygiene_check.DeprecationContract(
+        label="LegacyFoo",
+        runtime_files=(Path("victor/foo/shim.py"),),
+        activation_needles=("LegacyFoo",),
+        runtime_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="v1.2.0",
+                missing_message="deprecation warning must publish the target removal version",
+            ),
+            repo_hygiene_check.TextRequirement(
+                needle="2027-06-30",
+                missing_message="deprecation warning must publish the target removal date",
+            ),
+            repo_hygiene_check.TextRequirement(
+                needle="docs/migration/foo.md",
+                missing_message="deprecation warning must point at the migration guide",
+            ),
+        ),
+        inventory_path=Path("docs/development/foo-inventory.md"),
+        inventory_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="LegacyFoo",
+                missing_message="deprecation inventory entry is missing the shim family name",
+            ),
+        ),
+        changelog_path=Path("CHANGELOG.md"),
+        changelog_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="## [Unreleased]",
+                missing_message="deprecation changelog entry is missing the Unreleased section",
+            ),
+            repo_hygiene_check.TextRequirement(
+                needle="LegacyFoo",
+                missing_message="deprecation changelog entry is missing the shim family name",
+            ),
+        ),
+        migration_path=Path("docs/migration/foo.md"),
+        migration_requirements=(
+            repo_hygiene_check.TextRequirement(
+                needle="LegacyFoo",
+                missing_message="migration guidance is missing the shim family name",
+            ),
+        ),
+    )
+    write_file(
+        tmp_path,
+        "victor/foo/shim.py",
+        """
+warnings.warn(
+    "LegacyFoo is deprecated. Supported through v1.2.0 (2027-06-30). "
+    "See docs/migration/foo.md for migration guidance.",
+    DeprecationWarning,
+)
+        """.strip()
+        + "\n",
+    )
+    write_file(tmp_path, "docs/development/foo-inventory.md", "LegacyFoo\n")
+    write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\nLegacyFoo\n")
+    write_file(tmp_path, "docs/migration/foo.md", "LegacyFoo\n")
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
+
+
 def test_current_repo_passes_hygiene_checks() -> None:
     findings = repo_hygiene_check.run_checks(Path.cwd())
 

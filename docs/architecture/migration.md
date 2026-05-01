@@ -153,6 +153,10 @@ The following will be deprecated in future releases:
 4. **Legacy `TeamNode*` workflow names**
    Use `TeamStep*` names during the deprecation window. Removal target:
    `v0.9.0` (`2027-03-31`).
+5. **Legacy `WorkflowGraph` import from `victor.workflows.graph`**
+   Use `BasicWorkflowGraph` for the simple container or
+   `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL. Removal
+   target: `v0.8.0` (`2026-12-31`).
 
 ## Performance
 

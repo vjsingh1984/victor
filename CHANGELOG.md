@@ -38,6 +38,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Replacement: `TeamStep*` workflow names
   - Migration path: `docs/architecture/migration.md`
   - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
+- **`WorkflowGraph` alias from `victor.workflows.graph`**
+  - Deprecated in: `Unreleased` on `2026-04-30`
+  - To be removed in: `v0.8.0`
+  - Target removal date: `2026-12-31`
+  - Replacement: `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL
+  - Migration path: `docs/architecture/migration.md`
+  - Compatibility shim status: warning-backed alias remains supported through `v0.8.0`
 
 ### Fixed
 - Bare `except:` in `experiments.py` → `except (ValueError, TypeError)`
