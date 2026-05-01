@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 
 __all__ = [
+    "CoordinationAdvisorRuntimeProtocol",
     "ToolPlannerProtocol",
     "TaskCoordinatorProtocol",
     "ToolCoordinatorProtocol",
@@ -26,6 +27,36 @@ __all__ = [
     "PromptCoordinatorProtocol",
     "UnifiedMemoryCoordinatorProtocol",
 ]
+
+
+@runtime_checkable
+class CoordinationAdvisorRuntimeProtocol(Protocol):
+    """Protocol for service-owned coordination recommendation runtime access."""
+
+    def suggest_for_task(
+        self,
+        *,
+        task_type: str,
+        complexity: str,
+        mode: str = "build",
+        runtime_subject: Optional[Any] = None,
+        coordination_advisor: Optional[Any] = None,
+        vertical_context: Optional[Any] = None,
+    ) -> Any:
+        """Build coordination suggestions using shared framework logic."""
+        ...
+
+    def serialize_suggestion(
+        self,
+        suggestion: Any,
+        *,
+        vertical: Optional[str] = None,
+        available_teams: Optional[tuple[str, ...]] = None,
+        available_workflows: Optional[tuple[str, ...]] = None,
+        default_workflow: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Serialize coordination suggestions for transport or state output."""
+        ...
 
 
 @runtime_checkable

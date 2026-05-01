@@ -20,6 +20,8 @@ The deprecated service-first coordinators (chat, tool, session) have been remove
 Preferred surfaces:
 - ``victor.agent.services`` for service-owned chat, tool, and session flows
 - ``victor.agent.coordinators.ExplorationStatePassedCoordinator`` for exploration
+- ``victor.agent.coordinators.CoordinationStatePassedCoordinator`` for
+  coordination recommendations
 - ``victor.agent.coordinators.SystemPromptStatePassedCoordinator`` for system prompts
 - ``victor.agent.coordinators.SafetyStatePassedCoordinator`` for safety
 
@@ -61,6 +63,9 @@ _SUBMODULE_MAP: dict[str, str] = {
 _MODULE_MEMBERS = {
     "exploration_state_passed": [
         "ExplorationStatePassedCoordinator",
+    ],
+    "coordination_state_passed": [
+        "CoordinationStatePassedCoordinator",
     ],
     # NOTE: tool_coordinator, tool_observability, tool_retry removed
     # These now import directly from victor.agent.services for backward compatibility

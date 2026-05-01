@@ -112,7 +112,6 @@ if TYPE_CHECKING:
     from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
     from victor.agent.provider_manager import ProviderManager
     from victor.agent.presentation.protocols import PresentationProtocol
-    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.tools.plugin_registry import ToolPluginRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
     from victor.storage.cache.tool_cache import ToolCache

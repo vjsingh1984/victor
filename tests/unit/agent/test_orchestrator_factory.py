@@ -354,12 +354,25 @@ class TestCreateRecoveryHandler:
 class TestCanonicalCoordinatorBuilders:
     """Tests for canonical coordination helper surfaces on OrchestratorFactory."""
 
-    def test_create_coordination_advisor_returns_wrapper(self, factory):
+    def test_create_coordination_advisor_runtime_prefers_service_protocol(
+        self, factory, mock_container
+    ):
+        from victor.agent.services.protocols import CoordinationAdvisorRuntimeProtocol
+
+        runtime = MagicMock(name="coordination_advisor_runtime")
+        mock_container.get = MagicMock(return_value=runtime)
+
+        result = factory.create_coordination_advisor_runtime()
+
+        assert result is runtime
+        mock_container.get.assert_called_once_with(CoordinationAdvisorRuntimeProtocol)
+
+    def test_create_coordination_advisor_returns_framework_advisor(self, factory):
         vertical_context = MagicMock(name="vertical_context")
         advisor = MagicMock(name="coordination_advisor")
 
         with patch(
-            "victor.agent.mode_workflow_team_coordinator.create_coordinator",
+            "victor.framework.coordination_runtime.create_vertical_coordination_advisor",
             return_value=advisor,
         ) as mock_create:
             result = factory.create_coordination_advisor(vertical_context)
@@ -371,19 +384,24 @@ class TestCanonicalCoordinatorBuilders:
             selection_strategy=getattr(factory.settings, "team_selection_strategy", "hybrid"),
         )
 
-    def test_create_mode_workflow_team_coordinator_forwards_to_coordination_advisor(self, factory):
+    def test_create_mode_workflow_team_coordinator_wraps_coordination_advisor(self, factory):
         vertical_context = MagicMock(name="vertical_context")
         advisor = MagicMock(name="coordination_advisor")
+        wrapper = MagicMock(name="mode_workflow_team_coordinator")
 
         with patch.object(
             factory,
             "create_coordination_advisor",
             return_value=advisor,
-        ) as mock_create:
+        ) as mock_create, patch(
+            "victor.agent.mode_workflow_team_coordinator.ModeWorkflowTeamCoordinator",
+            return_value=wrapper,
+        ) as mock_wrapper:
             result = factory.create_mode_workflow_team_coordinator(vertical_context)
 
-        assert result is advisor
+        assert result is wrapper
         mock_create.assert_called_once_with(vertical_context)
+        mock_wrapper.assert_called_once_with(advisor=advisor)
 
     def test_create_exploration_coordinator_returns_runtime(self, factory):
         coordinator = factory.create_exploration_coordinator()

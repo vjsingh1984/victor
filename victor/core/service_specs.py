@@ -52,6 +52,7 @@ from victor.agent.protocols import (
 )
 from victor.agent.services.protocols import (
     ChunkRuntimeProtocol,
+    CoordinationAdvisorRuntimeProtocol,
     IntentClassifierProtocol,
     PromptRuntimeProtocol,
     RLLearningRuntimeProtocol,
@@ -158,6 +159,7 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(ChunkRuntimeProtocol, "_create_chunk_generator"),
     ServiceSpec(ToolPlanningRuntimeProtocol, "_create_tool_planner"),
     ServiceSpec(TaskRuntimeProtocol, "_create_task_coordinator"),
+    ServiceSpec(CoordinationAdvisorRuntimeProtocol, "_create_coordination_advisor_runtime"),
     ServiceSpec(CompactionSummarizerProtocol, "_create_compaction_summarizer"),
     ServiceSpec(HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"),
     ServiceSpec(SessionContextLinkerProtocol, "_create_session_context_linker"),

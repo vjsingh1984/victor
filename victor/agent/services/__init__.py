@@ -40,6 +40,7 @@ Deprecated compatibility exports retained here:
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 from victor.agent.services.chunk_runtime import ChunkGenerator
+from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
 from victor.agent.services.context_service import ContextService, ContextServiceConfig
 from victor.agent.services.decision_service import (
     LLMDecisionService,
@@ -106,6 +107,7 @@ __all__ = [
     "ChatServiceConfig",
     "ServiceStreamingRuntime",
     "ChunkGenerator",
+    "CoordinationAdvisorRuntime",
     "ContextService",
     "ContextServiceConfig",
     "ExplorationCoordinator",

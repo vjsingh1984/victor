@@ -28,8 +28,8 @@ Architecture:
     ┌─────────────────────────────────────────────────────────────────┐
     │                    Coordination Layer                            │
     ├─────────────────────────────────────────────────────────────────┤
-    │  TaskAnalyzer  →  ModeWorkflowTeamCoordinator  →  Orchestrator  │
-    │       ↓                      ↓                         ↓         │
+    │  TaskAnalyzer  →  CoordinationAdvisorRuntime  →  Orchestrator   │
+    │       ↓                       ↓                        ↓         │
     │  TaskAnalysis         CoordinationSuggestion      Execution      │
     └─────────────────────────────────────────────────────────────────┘
 

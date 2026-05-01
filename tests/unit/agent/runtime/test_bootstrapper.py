@@ -100,6 +100,7 @@ class TestAgentRuntimeBootstrapper:
         exploration_state_passed = MagicMock(name="exploration_state_passed")
         system_prompt_state_passed = MagicMock(name="system_prompt_state_passed")
         safety_state_passed = MagicMock(name="safety_state_passed")
+        coordination_state_passed = MagicMock(name="coordination_state_passed")
         orch._factory.create_exploration_state_passed_coordinator.return_value = (
             exploration_state_passed
         )
@@ -107,6 +108,9 @@ class TestAgentRuntimeBootstrapper:
             system_prompt_state_passed
         )
         orch._factory.create_safety_state_passed_coordinator.return_value = safety_state_passed
+        orch._factory.create_coordination_state_passed_coordinator.return_value = (
+            coordination_state_passed
+        )
 
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
@@ -148,6 +152,7 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["exploration_state_passed"] is exploration_state_passed
         assert kwargs["system_prompt_state_passed"] is system_prompt_state_passed
         assert kwargs["safety_state_passed"] is safety_state_passed
+        assert kwargs["coordination_state_passed"] is coordination_state_passed
         assert kwargs["presentation"] is orch._presentation
         assert kwargs["vertical_integration_adapter"] is orch._vertical_integration_adapter
         assert kwargs["vertical_context"] is orch._vertical_context
@@ -161,6 +166,11 @@ class TestAgentRuntimeBootstrapper:
             task_analyzer=orch._task_analyzer
         )
         orch._factory.create_safety_state_passed_coordinator.assert_called_once_with()
+        orch._factory.create_coordination_state_passed_coordinator.assert_called_once_with(
+            coordination_runtime=orch._coordination_advisor_runtime,
+            coordination_advisor=getattr(orch, "_coordination_advisor", None),
+            vertical_context=orch._vertical_context,
+        )
 
     def test_create_facades_binds_deprecated_chat_slot_and_tool_session_getters(self):
         orch = self._make_mock_orchestrator()
@@ -244,6 +254,7 @@ class TestAgentRuntimeBootstrapper:
 
         # Verify lazy placeholders are None
         assert orch._coordination_advisor is None
+        assert orch._coordination_advisor_runtime is None
         assert orch._turn_executor is None
         assert orch._deprecated_sync_chat_coordinator is None
         assert orch._deprecated_streaming_chat_coordinator is None

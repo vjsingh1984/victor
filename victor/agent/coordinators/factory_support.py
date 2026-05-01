@@ -121,6 +121,31 @@ def create_safety_state_passed_coordinator() -> Any:
     return SafetyStatePassedCoordinator()
 
 
+def create_coordination_advisor_runtime() -> Any:
+    """Create the canonical service-owned coordination runtime surface."""
+    from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+
+    return CoordinationAdvisorRuntime()
+
+
+def create_coordination_state_passed_coordinator(
+    *,
+    coordination_runtime: Any,
+    coordination_advisor: Any = None,
+    vertical_context: Any = None,
+) -> Any:
+    """Create the canonical state-passed coordination wrapper."""
+    from victor.agent.coordinators.coordination_state_passed import (
+        CoordinationStatePassedCoordinator,
+    )
+
+    return CoordinationStatePassedCoordinator(
+        coordination_runtime=coordination_runtime,
+        coordination_advisor=coordination_advisor,
+        vertical_context=vertical_context,
+    )
+
+
 def resolve_task_analyzer(container: Any) -> Any:
     """Resolve task analyzer from DI, then fall back to the singleton."""
     from victor.agent.protocols import TaskAnalyzerProtocol

@@ -69,6 +69,7 @@ from victor.agent.services.protocols.provider_service import ProviderServiceProt
 from victor.agent.services.protocols.recovery_service import RecoveryServiceProtocol
 from victor.agent.services.protocols.runtime_support import (
     ChunkRuntimeProtocol,
+    CoordinationAdvisorRuntimeProtocol,
     PromptRuntimeProtocol,
     RLLearningRuntimeProtocol,
     StateRuntimeProtocol,
@@ -99,6 +100,7 @@ __all__ = [
     "ChatCompatRuntimeProtocol",
     "ChatContextProtocol",
     "ChatOrchestratorProtocol",
+    "CoordinationAdvisorRuntimeProtocol",
     "ContextServiceProtocol",
     "ExecutionMode",
     "IntentClassifierProtocol",

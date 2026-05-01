@@ -577,6 +577,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         self._chunk_generator = self._coordination_runtime.chunk_generator
         self._tool_planner = self._coordination_runtime.tool_planner
         self._task_coordinator = self._coordination_runtime.task_coordinator
+        self._coordination_advisor_runtime = self._coordination_runtime.coordination_advisor_runtime
+        if hasattr(self, "_task_analyzer") and hasattr(
+            self._task_analyzer, "set_coordination_runtime"
+        ):
+            self._task_analyzer.set_coordination_runtime(self._coordination_advisor_runtime)
 
     def _initialize_resilience_runtime(self, *, context_compactor: Any) -> None:
         """Initialize resilience runtime boundaries with lazy recovery components."""
@@ -1287,8 +1292,8 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     ) -> Any:
         """Get team and workflow suggestions for a task.
 
-        Queries the ModeWorkflowTeamCoordinator to get recommendations for
-        teams and workflows based on task classification and current mode.
+        Prefers the service-owned coordination runtime, which delegates to the
+        shared framework recommendation engine.
 
         Args:
             task_type: Classified task type (e.g., "feature", "bugfix", "refactor")
@@ -1297,6 +1302,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             CoordinationSuggestion with team and workflow recommendations
         """
+        coordination_runtime = getattr(self, "_coordination_advisor_runtime", None)
+        if coordination_runtime is not None:
+            return coordination_runtime.suggest_for_task(
+                runtime_subject=self,
+                task_type=task_type,
+                complexity=complexity,
+            )
+
         from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
 
         return build_runtime_coordination_suggestion(

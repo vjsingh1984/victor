@@ -25,6 +25,7 @@ class CoordinationRuntimeComponents:
     chunk_generator: LazyRuntimeProxy[Any]
     tool_planner: LazyRuntimeProxy[Any]
     task_coordinator: LazyRuntimeProxy[Any]
+    coordination_advisor_runtime: LazyRuntimeProxy[Any]
 
 
 def create_coordination_runtime_components(
@@ -63,5 +64,9 @@ def create_coordination_runtime_components(
         task_coordinator=LazyRuntimeProxy(
             factory=lambda: factory.create_task_coordinator(),
             name="task_coordinator",
+        ),
+        coordination_advisor_runtime=LazyRuntimeProxy(
+            factory=lambda: factory.create_coordination_advisor_runtime(),
+            name="coordination_advisor_runtime",
         ),
     )

@@ -64,6 +64,9 @@ class TestRuntimeLazyInitialization:
                 chunk_generator = getattr(coordination_runtime, "chunk_generator", None)
                 tool_planner = getattr(coordination_runtime, "tool_planner", None)
                 task_coordinator = getattr(coordination_runtime, "task_coordinator", None)
+                coordination_advisor_runtime = getattr(
+                    coordination_runtime, "coordination_advisor_runtime", None
+                )
 
                 # All should be LazyRuntimeProxy instances
                 for component_name, component in [
@@ -71,6 +74,7 @@ class TestRuntimeLazyInitialization:
                     ("chunk_generator", chunk_generator),
                     ("tool_planner", tool_planner),
                     ("task_coordinator", task_coordinator),
+                    ("coordination_advisor_runtime", coordination_advisor_runtime),
                 ]:
                     assert component is not None, f"{component_name} should exist"
                     # Check initialized property - should be False

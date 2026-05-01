@@ -68,6 +68,7 @@ class OrchestrationFacade:
         - exploration_state_passed: State-passed exploration coordinator
         - system_prompt_state_passed: State-passed system prompt coordinator
         - safety_state_passed: State-passed safety coordinator
+        - coordination_state_passed: State-passed coordination suggestion coordinator
         - presentation: Presentation adapter for icon/emoji rendering
         - vertical_integration_adapter: VerticalIntegrationAdapter
         - vertical_context: VerticalContext for unified vertical state
@@ -118,6 +119,7 @@ class OrchestrationFacade:
         exploration_state_passed: Optional[Any] = None,
         system_prompt_state_passed: Optional[Any] = None,
         safety_state_passed: Optional[Any] = None,
+        coordination_state_passed: Optional[Any] = None,
         presentation: Optional[Any] = None,
         vertical_integration_adapter: Optional[Any] = None,
         vertical_context: Optional[Any] = None,
@@ -308,6 +310,7 @@ class OrchestrationFacade:
         self._exploration_state_passed = exploration_state_passed
         self._system_prompt_state_passed = system_prompt_state_passed
         self._safety_state_passed = safety_state_passed
+        self._coordination_state_passed = coordination_state_passed
         self._presentation = presentation
         self._vertical_integration_adapter = vertical_integration_adapter
         self._vertical_context = vertical_context
@@ -607,6 +610,11 @@ class OrchestrationFacade:
     def safety_state_passed(self) -> Optional[Any]:
         """State-passed safety coordinator."""
         return self._safety_state_passed
+
+    @property
+    def coordination_state_passed(self) -> Optional[Any]:
+        """State-passed coordination suggestion coordinator."""
+        return self._coordination_state_passed
 
     @property
     def presentation(self) -> Optional[Any]:

@@ -195,6 +195,13 @@ class AgentRuntimeBootstrapper:
                 safety_state_passed=(
                     orchestrator._factory.create_safety_state_passed_coordinator()
                 ),
+                coordination_state_passed=(
+                    orchestrator._factory.create_coordination_state_passed_coordinator(
+                        coordination_runtime=orchestrator._coordination_advisor_runtime,
+                        coordination_advisor=getattr(orchestrator, "_coordination_advisor", None),
+                        vertical_context=orchestrator._vertical_context,
+                    )
+                ),
                 presentation=orchestrator._presentation,
                 vertical_integration_adapter=(orchestrator._vertical_integration_adapter),
                 vertical_context=orchestrator._vertical_context,
@@ -297,6 +304,7 @@ class AgentRuntimeBootstrapper:
         # Lazy coordinator placeholders must exist before any runtime wiring that
         # may resolve protocol-based lazy properties.
         orchestrator._coordination_advisor = None
+        orchestrator._coordination_advisor_runtime = None
         orchestrator._turn_executor = None
         orchestrator._deprecated_sync_chat_coordinator = None
         orchestrator._deprecated_streaming_chat_coordinator = None
@@ -332,5 +340,5 @@ class AgentRuntimeBootstrapper:
             "RecoveryCoordinator, ChunkGenerator, ToolPlanner, "
             "TaskCoordinator, ObservabilityIntegration, "
             "WorkflowOptimization, VerticalContext, "
-            "ModeWorkflowTeamCoordinator, CapabilityRegistry"
+            "CoordinationAdvisorRuntime, CapabilityRegistry"
         )

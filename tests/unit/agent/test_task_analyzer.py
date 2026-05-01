@@ -294,6 +294,15 @@ class TestTaskAnalyzer:
 
         assert analyzer._coordinator is mock_coordinator
 
+    def test_set_coordination_runtime(self):
+        """Test setting the canonical coordination runtime."""
+        analyzer = TaskAnalyzer()
+        coordination_runtime = MagicMock()
+
+        analyzer.set_coordination_runtime(coordination_runtime)
+
+        assert analyzer._coordination_runtime is coordination_runtime
+
     def test_classify_task_keywords(self):
         """Test classify_task_keywords method."""
         analyzer = TaskAnalyzer()
@@ -316,8 +325,32 @@ class TestTaskAnalyzer:
         # No coordinator means no suggestions
         assert not result.has_team_suggestion
 
+    def test_analyze_with_suggestions_uses_coordination_runtime_when_available(self):
+        """TaskAnalyzer should prefer the service-owned coordination runtime when bound."""
+        coordination_runtime = MagicMock()
+        analyzer = TaskAnalyzer(
+            coordination_runtime=coordination_runtime,
+            runtime_subject=SimpleNamespace(name="runtime"),
+        )
+        suggestion = MagicMock()
+        suggestion.has_team_suggestion = True
+        suggestion.team_recommendations = [MagicMock()]
+        suggestion.action.value = "auto_spawn"
+
+        coordination_runtime.suggest_for_task.return_value = suggestion
+
+        result = analyzer.analyze_with_suggestions("Refactor this code", mode="build")
+
+        assert result.coordination_suggestion is suggestion
+        coordination_runtime.suggest_for_task.assert_called_once_with(
+            runtime_subject=analyzer._runtime_subject,
+            task_type=result.unified_task_type.value.lower(),
+            complexity=result.complexity.value.lower(),
+            mode="build",
+        )
+
     def test_analyze_with_suggestions_uses_shared_framework_runtime_subject(self):
-        """TaskAnalyzer should prefer the shared framework runtime helper when available."""
+        """TaskAnalyzer should still fall back to the framework runtime helper."""
         analyzer = TaskAnalyzer(runtime_subject=SimpleNamespace(name="runtime"))
         suggestion = MagicMock()
         suggestion.has_team_suggestion = True

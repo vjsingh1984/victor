@@ -27,6 +27,7 @@ from victor.framework.coordination_runtime import (
     RuleBasedTeamSelector,
     RuleBasedWorkflowSelector,
     VerticalCoordinationAdvisor,
+    create_vertical_coordination_advisor,
 )
 from victor.protocols.coordination import (
     CoordinationSuggestion,
@@ -49,8 +50,9 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         team_selector: Optional[Any] = None,
         workflow_selector: Optional[Any] = None,
         mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
+        advisor: Optional[ModeWorkflowTeamCoordinatorProtocol] = None,
     ):
-        self._advisor = VerticalCoordinationAdvisor(
+        self._advisor = advisor or VerticalCoordinationAdvisor(
             vertical_context=vertical_context,
             team_selector=team_selector,
             workflow_selector=workflow_selector,
@@ -127,22 +129,12 @@ def create_coordinator(
     selection_strategy: str = "hybrid",
 ) -> ModeWorkflowTeamCoordinator:
     """Create a ModeWorkflowTeamCoordinator."""
-    if selection_strategy == "rule":
-        team_selector = RuleBasedTeamSelector()
-    elif selection_strategy == "learning":
-        team_selector = LearningBasedTeamSelector(team_learner)
-    else:
-        learning_selector = LearningBasedTeamSelector(team_learner)
-        team_selector = HybridTeamSelector(
-            RuleBasedTeamSelector(),
-            learning_selector,
-        )
-
-    coordinator = ModeWorkflowTeamCoordinator(
+    advisor = create_vertical_coordination_advisor(
         vertical_context=vertical_context,
-        team_selector=team_selector,
-        workflow_selector=RuleBasedWorkflowSelector(),
+        team_learner=team_learner,
+        selection_strategy=selection_strategy,
     )
+    coordinator = ModeWorkflowTeamCoordinator(advisor=advisor)
     return coordinator
 
 

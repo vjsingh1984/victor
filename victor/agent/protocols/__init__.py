@@ -90,6 +90,7 @@ _MODULE_MEMBERS = {
         "IToolCallClassifier",
     ],
     "coordination_protocols": [
+        "CoordinationAdvisorRuntimeProtocol",
         "ToolPlannerProtocol",
         "TaskCoordinatorProtocol",
         "ToolCoordinatorProtocol",
@@ -153,6 +154,11 @@ for _mod, _names in _MODULE_MEMBERS.items():
 __all__ = list(_SUBMODULE_MAP.keys())
 
 _DEPRECATED_EXPORTS = {
+    "CoordinationAdvisorRuntimeProtocol": (
+        "victor.agent.protocols.CoordinationAdvisorRuntimeProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.CoordinationAdvisorRuntimeProtocol."
+    ),
     "ToolCoordinatorProtocol": (
         "victor.agent.protocols.ToolCoordinatorProtocol is deprecated compatibility "
         "surface. Prefer ToolServiceProtocol."

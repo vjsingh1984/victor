@@ -65,6 +65,7 @@ class TestOrchestrationFacadeInit:
             exploration_state_passed=MagicMock(),
             system_prompt_state_passed=MagicMock(),
             safety_state_passed=MagicMock(),
+            coordination_state_passed=MagicMock(),
             presentation=MagicMock(),
             vertical_integration_adapter=MagicMock(),
             vertical_context=MagicMock(),
@@ -106,6 +107,7 @@ class TestOrchestrationFacadeInit:
         assert facade.exploration_state_passed is None
         assert facade.system_prompt_state_passed is None
         assert facade.safety_state_passed is None
+        assert facade.coordination_state_passed is None
         assert facade.presentation is None
         assert facade.vertical_integration_adapter is None
         assert facade.vertical_context is None
@@ -147,6 +149,7 @@ class TestOrchestrationFacadeProperties:
             exploration_state_passed=MagicMock(name="exploration_state_passed"),
             system_prompt_state_passed=MagicMock(name="system_prompt_state_passed"),
             safety_state_passed=MagicMock(name="safety_state_passed"),
+            coordination_state_passed=MagicMock(name="coordination_state_passed"),
             presentation=MagicMock(name="presentation"),
             vertical_integration_adapter=MagicMock(name="vertical_adapter"),
             vertical_context=MagicMock(name="vertical_ctx"),
@@ -189,6 +192,10 @@ class TestOrchestrationFacadeProperties:
     def test_safety_state_passed_property(self, facade):
         """State-passed safety coordinator should be exposed directly."""
         assert facade.safety_state_passed._mock_name == "safety_state_passed"
+
+    def test_coordination_state_passed_property(self, facade):
+        """State-passed coordination coordinator should be exposed directly."""
+        assert facade.coordination_state_passed._mock_name == "coordination_state_passed"
 
     def test_chat_coordinator_property_is_deprecated(self, facade):
         """ChatCoordinator property remains available as a deprecated shim."""
@@ -664,6 +671,7 @@ class TestOrchestrationFacadeProtocolConformance:
             "exploration_state_passed",
             "system_prompt_state_passed",
             "safety_state_passed",
+            "coordination_state_passed",
         ]
         facade = OrchestrationFacade()
         for prop in required:

@@ -17,6 +17,9 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from victor.agent.coordinators.coordination_state_passed import (
+    CoordinationStatePassedCoordinator,
+)
 from victor.agent.coordinators.exploration_state_passed import (
     ExplorationStatePassedCoordinator,
 )
@@ -92,6 +95,10 @@ class TestFacadeCreation:
         assert isinstance(
             orchestrator._orchestration_facade.safety_state_passed,
             SafetyStatePassedCoordinator,
+        )
+        assert isinstance(
+            orchestrator._orchestration_facade.coordination_state_passed,
+            CoordinationStatePassedCoordinator,
         )
 
 

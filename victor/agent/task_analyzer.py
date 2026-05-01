@@ -35,8 +35,8 @@ from victor.agent.unified_classifier import (
 if TYPE_CHECKING:
     from victor.storage.embeddings.task_classifier import TaskType
     from victor.storage.embeddings.intent_classifier import IntentType
-    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
+    from victor.protocols.coordination import ModeWorkflowTeamCoordinatorProtocol
     from victor.framework.task.complexity import ComplexityBudget
 
 # Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
@@ -115,7 +115,8 @@ class TaskAnalyzer:
 
     def __init__(
         self,
-        coordinator: Optional["ModeWorkflowTeamCoordinator"] = None,
+        coordinator: Optional["ModeWorkflowTeamCoordinatorProtocol"] = None,
+        coordination_runtime: Optional[Any] = None,
         runtime_intelligence: Optional[Any] = None,
         runtime_subject: Optional[Any] = None,
     ):
@@ -123,6 +124,7 @@ class TaskAnalyzer:
 
         Args:
             coordinator: Optional ModeWorkflowTeamCoordinator compatibility fallback
+            coordination_runtime: Optional service-owned coordination runtime
             runtime_intelligence: Optional canonical runtime-intelligence service
             runtime_subject: Optional orchestrator-like runtime for shared coordination suggestions
         """
@@ -132,16 +134,21 @@ class TaskAnalyzer:
         self._task_classifier = None
         self._intent_classifier = None
         self._coordinator = coordinator
+        self._coordination_runtime = coordination_runtime
         self._runtime_intelligence = runtime_intelligence
         self._runtime_subject = runtime_subject
 
-    def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
-        """Set the coordinator for team/workflow suggestions.
+    def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinatorProtocol") -> None:
+        """Set the coordinator compatibility fallback for team/workflow suggestions.
 
         Args:
-            coordinator: ModeWorkflowTeamCoordinator instance
+            coordinator: Compatibility coordination surface
         """
         self._coordinator = coordinator
+
+    def set_coordination_runtime(self, coordination_runtime: Any) -> None:
+        """Attach the canonical coordination runtime used for shared suggestions."""
+        self._coordination_runtime = coordination_runtime
 
     def set_runtime_intelligence(self, runtime_intelligence: Any) -> None:
         """Attach the canonical runtime-intelligence service to this analyzer."""
@@ -281,8 +288,8 @@ class TaskAnalyzer:
         """Analyze task and get coordination suggestions.
 
         This extends the base analyze() method by adding coordination suggestions
-        from the shared framework coordination runtime, with coordinator fallback
-        for older compatibility surfaces.
+        from the service-owned coordination runtime, with direct framework and
+        coordinator fallbacks retained for compatibility surfaces.
 
         Args:
             message: User message to analyze
@@ -302,7 +309,11 @@ class TaskAnalyzer:
             context=context,
         )
 
-        if self._runtime_subject is not None or self._coordinator is not None:
+        if (
+            self._coordination_runtime is not None
+            or self._runtime_subject is not None
+            or self._coordinator is not None
+        ):
             try:
                 complexity_str = analysis.complexity.value.lower()
                 task_type_str = analysis.unified_task_type.value.lower()
@@ -332,7 +343,15 @@ class TaskAnalyzer:
         complexity: str,
         mode: str,
     ) -> "CoordinationSuggestion":
-        """Build coordination suggestions from the shared runtime or compatibility fallback."""
+        """Build coordination suggestions from service/runtime or compatibility fallback."""
+        if self._coordination_runtime is not None:
+            return self._coordination_runtime.suggest_for_task(
+                runtime_subject=self._runtime_subject,
+                task_type=task_type,
+                complexity=complexity,
+                mode=mode,
+            )
+
         if self._runtime_subject is not None:
             from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
 

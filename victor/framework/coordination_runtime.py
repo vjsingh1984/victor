@@ -160,6 +160,34 @@ class VerticalCoordinationAdvisor(ModeWorkflowTeamCoordinatorProtocol):
         return resolve_vertical_coordination_catalog(self._vertical_context)
 
 
+def create_vertical_coordination_advisor(
+    *,
+    vertical_context: Optional[Any] = None,
+    team_learner: Optional["TeamCompositionLearner"] = None,
+    selection_strategy: str = "hybrid",
+    workflow_selector: Optional[Any] = None,
+    mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
+) -> VerticalCoordinationAdvisor:
+    """Create a framework-native coordination advisor with a configured selector policy."""
+    if selection_strategy == "rule":
+        team_selector = RuleBasedTeamSelector()
+    elif selection_strategy == "learning":
+        team_selector = LearningBasedTeamSelector(team_learner)
+    else:
+        learning_selector = LearningBasedTeamSelector(team_learner)
+        team_selector = HybridTeamSelector(
+            RuleBasedTeamSelector(),
+            learning_selector,
+        )
+
+    return VerticalCoordinationAdvisor(
+        vertical_context=vertical_context,
+        team_selector=team_selector,
+        workflow_selector=workflow_selector or RuleBasedWorkflowSelector(),
+        mode_configs=mode_configs,
+    )
+
+
 @dataclass(frozen=True)
 class CatalogCoordinationSuggestion:
     """Serializable recommendation resolved from a shared coordination catalog."""
@@ -993,6 +1021,7 @@ __all__ = [
     "RuleBasedTeamSelector",
     "RuleBasedWorkflowSelector",
     "VerticalCoordinationAdvisor",
+    "create_vertical_coordination_advisor",
     "build_registered_coordination_suggestions",
     "build_coordination_suggestion",
     "build_runtime_coordination_suggestion",

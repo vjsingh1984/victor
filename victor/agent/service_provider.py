@@ -102,6 +102,7 @@ if TYPE_CHECKING:
     )
     from victor.agent.services.protocols import (
         ChunkRuntimeProtocol,
+        CoordinationAdvisorRuntimeProtocol,
         IntentClassifierProtocol,
         PromptRuntimeProtocol,
         RLLearningRuntimeProtocol,
@@ -1244,6 +1245,12 @@ class OrchestratorServiceProvider:
             prompt_builder=prompt_builder,
             settings=self._settings,
         )
+
+    def _create_coordination_advisor_runtime(self) -> "CoordinationAdvisorRuntimeProtocol":
+        """Create the service-owned coordination runtime adapter."""
+        from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+
+        return CoordinationAdvisorRuntime()
 
     # =========================================================================
     # New Coordinator Factory Methods (WS-D: Orchestrator SOLID Fixes)

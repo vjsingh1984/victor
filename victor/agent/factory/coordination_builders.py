@@ -27,6 +27,8 @@ from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
 
 from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
 from victor.agent.coordinators.factory_support import (
+    create_coordination_advisor_runtime as build_coordination_advisor_runtime,
+    create_coordination_state_passed_coordinator as build_coordination_state_passed_coordinator,
     create_exploration_coordinator as build_exploration_coordinator,
     create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
     create_prompt_runtime_support as build_prompt_runtime_support,
@@ -58,9 +60,9 @@ if TYPE_CHECKING:
     from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.session_ledger import SessionLedger
-    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.observability.integration import ObservabilityIntegration
     from victor.storage.embeddings.intent_classifier import IntentClassifier
+    from victor.protocols.coordination import ModeWorkflowTeamCoordinatorProtocol
     from victor.agent.protocols.infrastructure_protocols import (
         SafetyCheckerProtocol,
         AutoCommitterProtocol,
@@ -196,6 +198,33 @@ class CoordinationBuildersMixin:
         """Create the canonical state-passed safety wrapper."""
         coordinator = build_safety_state_passed_coordinator()
         logger.debug("SafetyStatePassedCoordinator created")
+        return coordinator
+
+    def create_coordination_advisor_runtime(self) -> Any:
+        """Create the canonical service-owned coordination runtime."""
+        from victor.agent.services.protocols import CoordinationAdvisorRuntimeProtocol
+
+        try:
+            runtime = self.container.get(CoordinationAdvisorRuntimeProtocol)
+        except Exception:
+            runtime = build_coordination_advisor_runtime()
+        logger.debug("CoordinationAdvisorRuntime created")
+        return runtime
+
+    def create_coordination_state_passed_coordinator(
+        self,
+        *,
+        coordination_runtime: Any,
+        coordination_advisor: Optional[Any] = None,
+        vertical_context: Optional[Any] = None,
+    ) -> Any:
+        """Create the canonical state-passed coordination wrapper."""
+        coordinator = build_coordination_state_passed_coordinator(
+            coordination_runtime=coordination_runtime,
+            coordination_advisor=coordination_advisor,
+            vertical_context=vertical_context,
+        )
+        logger.debug("CoordinationStatePassedCoordinator created")
         return coordinator
 
     def create_recovery_handler(self) -> Optional["RecoveryHandler"]:
@@ -503,16 +532,16 @@ class CoordinationBuildersMixin:
     def create_coordination_advisor(
         self,
         vertical_context: Any,
-    ) -> "ModeWorkflowTeamCoordinator":
+    ) -> "ModeWorkflowTeamCoordinatorProtocol":
         """Create the canonical coordination advisor for task/team/workflow routing.
 
         Args:
             vertical_context: VerticalContext with team specs and workflows
 
         Returns:
-            ModeWorkflowTeamCoordinator compatibility wrapper over the framework advisor
+            Framework-native coordination advisor
         """
-        from victor.agent.mode_workflow_team_coordinator import create_coordinator
+        from victor.framework.coordination_runtime import create_vertical_coordination_advisor
 
         team_learner = None
         try:
@@ -526,21 +555,25 @@ class CoordinationBuildersMixin:
 
         selection_strategy = getattr(self.settings, "team_selection_strategy", "hybrid")
 
-        coordinator = create_coordinator(
+        advisor = create_vertical_coordination_advisor(
             vertical_context=vertical_context,
             team_learner=team_learner,
             selection_strategy=selection_strategy,
         )
 
         logger.debug("Coordination advisor created with strategy=%s", selection_strategy)
-        return coordinator
+        return advisor
 
     def create_mode_workflow_team_coordinator(
         self,
         vertical_context: Any,
-    ) -> "ModeWorkflowTeamCoordinator":
-        """Deprecated compatibility wrapper for the canonical coordination advisor."""
-        return self.create_coordination_advisor(vertical_context)
+    ) -> "ModeWorkflowTeamCoordinatorProtocol":
+        """Deprecated compatibility wrapper over the canonical coordination advisor."""
+        from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
+
+        return ModeWorkflowTeamCoordinator(
+            advisor=self.create_coordination_advisor(vertical_context),
+        )
 
     def setup_subagent_orchestration(self) -> tuple[Optional[Any], bool]:
         """Setup sub-agent orchestration with lazy initialization.

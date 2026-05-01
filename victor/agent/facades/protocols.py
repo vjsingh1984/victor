@@ -245,3 +245,8 @@ class OrchestrationFacadeProtocol(Protocol):
     def safety_state_passed(self) -> Optional[Any]:
         """Optional state-passed safety coordinator."""
         ...
+
+    @property
+    def coordination_state_passed(self) -> Optional[Any]:
+        """Optional state-passed coordination recommendation coordinator."""
+        ...

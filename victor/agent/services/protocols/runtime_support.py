@@ -22,6 +22,7 @@ compatibility, but new service-first runtime code should prefer these names.
 """
 
 from victor.agent.protocols.coordination_protocols import (
+    CoordinationAdvisorRuntimeProtocol,
     PromptCoordinatorProtocol as PromptRuntimeProtocol,
     StateCoordinatorProtocol as StateRuntimeProtocol,
     TaskCoordinatorProtocol as TaskRuntimeProtocol,
@@ -37,6 +38,7 @@ from victor.agent.protocols.streaming_protocols import (
 
 __all__ = [
     "ChunkRuntimeProtocol",
+    "CoordinationAdvisorRuntimeProtocol",
     "PromptRuntimeProtocol",
     "RLLearningRuntimeProtocol",
     "StateRuntimeProtocol",
