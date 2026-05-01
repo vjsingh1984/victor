@@ -30,7 +30,10 @@ from victor.framework.agentic_graph.state import (
     should_continue_loop,
 )
 from victor.framework.agentic_graph.builder import create_agentic_loop_graph
-from victor.framework.agentic_graph.service_nodes import inject_execution_context, prompt_service_node
+from victor.framework.agentic_graph.service_nodes import (
+    inject_execution_context,
+    prompt_service_node,
+)
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph

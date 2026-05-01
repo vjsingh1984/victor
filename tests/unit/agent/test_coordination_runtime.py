@@ -82,7 +82,10 @@ def test_initialize_coordination_runtime_binds_task_analyzer_to_coordination_run
     ):
         AgentOrchestrator._initialize_coordination_runtime(orchestrator)
 
-    assert orchestrator._coordination_advisor_runtime is coordination_runtime.coordination_advisor_runtime
+    assert (
+        orchestrator._coordination_advisor_runtime
+        is coordination_runtime.coordination_advisor_runtime
+    )
     analyzer.set_coordination_runtime.assert_called_once_with(
         coordination_runtime.coordination_advisor_runtime
     )

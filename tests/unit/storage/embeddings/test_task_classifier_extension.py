@@ -83,3 +83,15 @@ class TestMergeVerticalPhrases:
         )
 
         assert hasattr(TaskClassifierPhraseProtocol, "get_classifier_phrases")
+
+
+class TestDirectResponseClassification:
+    def test_exact_response_bypasses_embedding_lookup(self):
+        classifier = TaskTypeClassifier.__new__(TaskTypeClassifier)
+        classifier._initialized = False
+
+        result = classifier.classify_sync("Reply with exactly READY")
+
+        assert result.task_type == TaskType.GENERAL_QUERY
+        assert result.nudge_applied == "direct_response"
+        assert result.has_file_context is False

@@ -92,7 +92,9 @@ class PromptBuilderRuntime:
         """Rebuild the runtime system prompt with query-aware classification."""
         runtime = self._runtime
         pipeline = getattr(runtime, "_prompt_pipeline", None)
-        is_frozen = pipeline.is_frozen if pipeline else getattr(runtime, "_system_prompt_frozen", False)
+        is_frozen = (
+            pipeline.is_frozen if pipeline else getattr(runtime, "_system_prompt_frozen", False)
+        )
         if getattr(runtime, "_kv_optimization_enabled", False) and is_frozen:
             logger.debug("[cache] System prompt frozen - skipping rebuild for query classification")
             return
@@ -128,7 +130,11 @@ class PromptBuilderRuntime:
         if builder is not None:
             builder.invalidate_cache()
 
-        if query_classification is None and preserve_existing_classification and builder is not None:
+        if (
+            query_classification is None
+            and preserve_existing_classification
+            and builder is not None
+        ):
             query_classification = getattr(builder, "query_classification", None)
 
         self.update_system_prompt_for_query(query_classification=query_classification)
@@ -160,7 +166,9 @@ class PromptBuilderRuntime:
 
         prompt = getattr(runtime, "_system_prompt", "")
         conversation.system_prompt = prompt
-        if getattr(conversation, "_system_added", False) and getattr(conversation, "_messages", None):
+        if getattr(conversation, "_system_added", False) and getattr(
+            conversation, "_messages", None
+        ):
             if conversation._messages[0].role == "system":
                 from victor.providers.base import Message
 

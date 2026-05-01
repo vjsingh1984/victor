@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -35,14 +36,15 @@ from victor.agent.unified_classifier import (
 if TYPE_CHECKING:
     from victor.storage.embeddings.task_classifier import TaskType
     from victor.storage.embeddings.intent_classifier import IntentType
+    from victor.protocols.coordination import CoordinationAdvisorProtocol
     from victor.protocols.coordination import CoordinationSuggestion
-    from victor.protocols.coordination import ModeWorkflowTeamCoordinatorProtocol
     from victor.framework.task.complexity import ComplexityBudget
 
 # Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
 from victor.core.protocols import TaskClassifierProtocol, IntentClassifierProtocol
 
 logger = logging.getLogger(__name__)
+_DEPRECATED_COORDINATOR = object()
 
 
 @dataclass
@@ -115,7 +117,8 @@ class TaskAnalyzer:
 
     def __init__(
         self,
-        coordinator: Optional["ModeWorkflowTeamCoordinatorProtocol"] = None,
+        coordination_advisor: Optional["CoordinationAdvisorProtocol"] = None,
+        coordinator: Any = _DEPRECATED_COORDINATOR,
         coordination_runtime: Optional[Any] = None,
         runtime_intelligence: Optional[Any] = None,
         runtime_subject: Optional[Any] = None,
@@ -123,28 +126,52 @@ class TaskAnalyzer:
         """Initialize task analyzer.
 
         Args:
-            coordinator: Optional ModeWorkflowTeamCoordinator compatibility fallback
+            coordination_advisor: Optional canonical coordination advisor compatibility surface
+            coordinator: Deprecated compatibility alias for ``coordination_advisor``
             coordination_runtime: Optional service-owned coordination runtime
             runtime_intelligence: Optional canonical runtime-intelligence service
             runtime_subject: Optional orchestrator-like runtime for shared coordination suggestions
         """
+        if coordinator is not _DEPRECATED_COORDINATOR:
+            warnings.warn(
+                "TaskAnalyzer(coordinator=...) is deprecated. "
+                "Use TaskAnalyzer(coordination_advisor=...) instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if coordination_advisor is None:
+                coordination_advisor = coordinator
+
         self._complexity_classifier = None
         self._action_authorizer = None
         self._unified_classifier = None
         self._task_classifier = None
         self._intent_classifier = None
-        self._coordinator = coordinator
+        self._coordination_advisor = coordination_advisor
         self._coordination_runtime = coordination_runtime
         self._runtime_intelligence = runtime_intelligence
         self._runtime_subject = runtime_subject
 
-    def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinatorProtocol") -> None:
-        """Set the coordinator compatibility fallback for team/workflow suggestions.
+    def set_coordination_advisor(
+        self,
+        coordination_advisor: "CoordinationAdvisorProtocol",
+    ) -> None:
+        """Set the canonical coordination advisor compatibility surface.
 
         Args:
-            coordinator: Compatibility coordination surface
+            coordination_advisor: Compatibility coordination surface
         """
-        self._coordinator = coordinator
+        self._coordination_advisor = coordination_advisor
+
+    def set_coordinator(self, coordinator: "CoordinationAdvisorProtocol") -> None:
+        """Deprecated compatibility alias for ``set_coordination_advisor()``."""
+        warnings.warn(
+            "TaskAnalyzer.set_coordinator(...) is deprecated. "
+            "Use TaskAnalyzer.set_coordination_advisor(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.set_coordination_advisor(coordinator)
 
     def set_coordination_runtime(self, coordination_runtime: Any) -> None:
         """Attach the canonical coordination runtime used for shared suggestions."""
@@ -312,7 +339,7 @@ class TaskAnalyzer:
         if (
             self._coordination_runtime is not None
             or self._runtime_subject is not None
-            or self._coordinator is not None
+            or self._coordination_advisor is not None
         ):
             try:
                 complexity_str = analysis.complexity.value.lower()
@@ -343,31 +370,36 @@ class TaskAnalyzer:
         complexity: str,
         mode: str,
     ) -> "CoordinationSuggestion":
-        """Build coordination suggestions from service/runtime or compatibility fallback."""
-        if self._coordination_runtime is not None:
-            return self._coordination_runtime.suggest_for_task(
+        """Build coordination suggestions through the service runtime when available."""
+        runtime = self._resolve_coordination_runtime()
+        if runtime is not None:
+            return runtime.suggest_for_task(
                 runtime_subject=self._runtime_subject,
+                coordination_advisor=self._coordination_advisor,
                 task_type=task_type,
                 complexity=complexity,
                 mode=mode,
             )
 
-        if self._runtime_subject is not None:
-            from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
-
-            return build_runtime_coordination_suggestion(
-                runtime_subject=self._runtime_subject,
-                task_type=task_type,
-                complexity=complexity,
-                mode=mode,
-            )
-
-        assert self._coordinator is not None
-        return self._coordinator.suggest_for_task(
+        assert self._coordination_advisor is not None
+        return self._coordination_advisor.suggest_for_task(
             task_type=task_type,
             complexity=complexity,
             mode=mode,
         )
+
+    def _resolve_coordination_runtime(self) -> Optional[Any]:
+        """Resolve the coordination runtime, lazily creating the service adapter if needed."""
+        if self._coordination_runtime is not None:
+            return self._coordination_runtime
+
+        if self._runtime_subject is None and self._coordination_advisor is None:
+            return None
+
+        from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
+
+        self._coordination_runtime = CoordinationAdvisorRuntime()
+        return self._coordination_runtime
 
     def classify_complexity(self, message: str) -> TaskClassification:
         return self.complexity_classifier.classify(message)

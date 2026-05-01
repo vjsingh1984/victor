@@ -1657,6 +1657,21 @@ class TaskTypeClassifier:
         Returns:
             TaskTypeResult with classified task type
         """
+        from victor.framework.task.direct_response import classify_direct_response_prompt
+
+        direct_response = classify_direct_response_prompt(prompt)
+        if direct_response.is_direct_response:
+            return TaskTypeResult(
+                task_type=TaskType.GENERAL_QUERY,
+                confidence=direct_response.confidence,
+                top_matches=[
+                    (f"direct_response:{direct_response.reason}", direct_response.confidence)
+                ],
+                has_file_context=False,
+                nudge_applied="direct_response",
+                preprocessed_prompt=prompt,
+            )
+
         if not self._initialized:
             self.initialize_sync()
 

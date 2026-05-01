@@ -33,14 +33,18 @@ import logging
 from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
-from victor.framework.message_execution import execute_message, iter_runtime_stream_events
+from victor.framework.message_execution import (
+    execute_message,
+    iter_runtime_stream_events,
+    stream_message_events,
+)
 from victor.framework.task import TaskResult
 
 if TYPE_CHECKING:
     from victor.framework.session_config import SessionConfig
     from victor.framework.agent import Agent
     from victor.framework.agent_components import AgentSession
-    from victor.runtime.context import RuntimeExecutionContext, ServiceAccessor
+    from victor.runtime.context import RuntimeExecutionContext
     from victor.core.container import ServiceContainer
 
 logger = logging.getLogger(__name__)
@@ -327,27 +331,6 @@ class VictorClient:
 
             return ServiceContainer()
 
-    def _get_services(self) -> "ServiceAccessor":
-        """Get ServiceAccessor to access services (NOT orchestrator directly)."""
-        if self._agent is None:
-            raise RuntimeError("Client not initialized. Call await _ensure_initialized() first.")
-
-        runtime_context = self._context
-        if runtime_context is not None and getattr(runtime_context, "services", None) is not None:
-            return runtime_context.services
-
-        if hasattr(self._agent, "get_orchestrator"):
-            orchestrator = self._agent.get_orchestrator()
-            runtime_context = getattr(orchestrator, "_execution_context", None)
-            if runtime_context is not None and getattr(runtime_context, "services", None) is not None:
-                self._context = runtime_context
-                return runtime_context.services
-
-        # Fallback: create ServiceAccessor from container
-        from victor.runtime.context import ServiceAccessor
-
-        return ServiceAccessor(_container=self._container)
-
     # ─────────────────────────────────────────────────────────────────────────
     # Public API — the UI layer uses ONLY these methods
     # ─────────────────────────────────────────────────────────────────────────
@@ -401,11 +384,16 @@ class VictorClient:
             StreamEvent instances (content, thinking, tool_call, etc.)
         """
         agent = await self._ensure_initialized()
-        services = self._get_services()
-        chat_runtime = getattr(services, "chat", None) if services is not None else None
-        runtime = chat_runtime if chat_runtime is not None else agent
+        if hasattr(agent, "get_orchestrator"):
+            async for event in stream_message_events(
+                orchestrator=agent.get_orchestrator(),
+                execution_context=self._context,
+                user_message=message,
+            ):
+                yield _to_stream_event(event)
+            return
 
-        async for event in iter_runtime_stream_events(runtime, message):
+        async for event in iter_runtime_stream_events(agent, message):
             yield _to_stream_event(event)
 
     async def stream_chat(self, message: str) -> AsyncIterator[_RenderChunk]:
@@ -520,6 +508,53 @@ class VictorClient:
             return list_available_providers()
         except Exception:
             return ["anthropic", "openai", "ollama", "google"]
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Conversation Management
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def reset_conversation(self) -> None:
+        """Reset conversation history and state.
+
+        Uses ChatService to clear conversation context while preserving
+        system prompts and session configuration.
+
+        Raises:
+            RuntimeError: If client is not initialized
+        """
+        if not self._initialized or not self._context:
+            raise RuntimeError("VictorClient not initialized. Call initialize() first.")
+
+        if self._context.services and self._context.services.chat:
+            await self._context.services.chat.reset_conversation()
+        else:
+            logger.warning("ChatService not available for conversation reset")
+
+    async def get_messages(
+        self,
+        limit: Optional[int] = None,
+        role: Optional[str] = None,
+    ) -> List[Any]:
+        """Get conversation messages.
+
+        Args:
+            limit: Maximum number of messages to return (most recent first)
+            role: Optional filter by message role (e.g., "user", "assistant")
+
+        Returns:
+            List of message objects (type depends on Message implementation)
+
+        Raises:
+            RuntimeError: If client is not initialized
+        """
+        if not self._initialized or not self._context:
+            raise RuntimeError("VictorClient not initialized. Call initialize() first.")
+
+        if self._context.services and self._context.services.context:
+            return await self._context.services.context.get_messages(limit=limit, role=role)
+        else:
+            logger.warning("ContextService not available for get_messages")
+            return []
 
     # ─────────────────────────────────────────────────────────────────────────
     # Lifecycle Management

@@ -17,8 +17,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.text import Text
 
-# ✅ PROPER: Import VictorClient and SessionConfig
-from victor.framework.client import VictorClient
+# ✅ PROPER: Import SessionConfig and framework-owned session runner
 from victor.framework.session_config import SessionConfig
 from victor.framework.session_runner import FrameworkSessionRunner
 from victor.config.settings import get_project_paths, load_settings
@@ -266,6 +265,27 @@ def _should_render_cli_chrome(formatter: Any) -> bool:
 def _should_render_interactive_tool_banner(use_tui: bool) -> bool:
     """Return True when interactive startup should print CLI tool-output chrome."""
     return not use_tui
+
+
+def _should_prompt_for_model_warning(
+    *,
+    actual_message: Optional[str],
+    automation_mode: bool,
+    input_file: Optional[Path],
+) -> bool:
+    """Return whether CLI startup should block on a non-fatal model warning.
+
+    Interactive chat can prompt for confirmation. One-shot, stdin/file-driven,
+    or automation-oriented invocations should stay non-blocking and continue
+    after surfacing the warning.
+    """
+    return not (
+        bool(actual_message)
+        or automation_mode
+        or input_file is not None
+        or not sys.stdin.isatty()
+        or not sys.stdout.isatty()
+    )
 
 
 def _print_interactive_startup_messages(con: Console, messages: list[str]) -> None:
@@ -1363,22 +1383,32 @@ async def run_oneshot(
             # Validate default model existence (Phase 1 UX improvement)
             model_valid, model_warning = session_runner.validate_default_model()
             if not model_valid and model_warning:
+                prompt_for_model_warning = _should_prompt_for_model_warning(
+                    actual_message=message,
+                    automation_mode=not show_cli_chrome,
+                    input_file=None,
+                )
                 if not show_cli_chrome:
-                    formatter.error("Configuration warning", model_warning)
-                    raise typer.Exit(code=1)
+                    if prompt_for_model_warning:
+                        formatter.error("Configuration warning", model_warning)
+                        raise typer.Exit(code=1)
+                    formatter.info("Configuration warning", model_warning)
 
                 # Model validation failed - show warning and offer to continue
-                console.print("\n[yellow]⚠ Configuration Warning:[/]")
-                console.print(model_warning)
-                console.print()
+                if show_cli_chrome:
+                    console.print("\n[yellow]⚠ Configuration Warning:[/]")
+                    console.print(model_warning)
+                    console.print()
 
-                # Ask user if they want to continue
-                from rich.prompt import Confirm
+                    if prompt_for_model_warning:
+                        from rich.prompt import Confirm
 
-                if not Confirm.ask("Continue anyway?", default=False, show_default=True):
-                    console.print("\n[yellow]Setup cancelled.[/]")
-                    console.print("Fix the issue above and run 'victor chat' again.\n")
-                    raise typer.Exit(code=1)
+                        if not Confirm.ask("Continue anyway?", default=False, show_default=True):
+                            console.print("\n[yellow]Setup cancelled.[/]")
+                            console.print("Fix the issue above and run 'victor chat' again.\n")
+                            raise typer.Exit(code=1)
+                    else:
+                        console.print("[dim]Continuing in non-interactive mode.[/]")
 
             # Step 2: Initialize VictorClient with SessionConfig
             status.update("Initializing VictorClient...")
@@ -2660,10 +2690,12 @@ async def run_workflow_mode(
         has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
 
         if has_agent_nodes:
-            # ✅ PROPER: Use VictorClient instead of FrameworkShim
+            # ✅ PROPER: Use FrameworkSessionRunner/VictorClient instead of FrameworkShim
+            settings = load_settings()
             config = SessionConfig.from_cli_flags(agent_profile=profile)
-            client = VictorClient(config)
-            orchestrator = await client.initialize()
+            workflow_session_runner = FrameworkSessionRunner(settings, config)
+            client = workflow_session_runner.create_client(config)
+            orchestrator = await workflow_session_runner.initialize_client(client)
 
         # Execute with StateGraphExecutor
         executor = StateGraphExecutor(

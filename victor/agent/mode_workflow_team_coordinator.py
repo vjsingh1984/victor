@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.framework.coordination_runtime import (
@@ -30,8 +31,8 @@ from victor.framework.coordination_runtime import (
     create_vertical_coordination_advisor,
 )
 from victor.protocols.coordination import (
+    CoordinationAdvisorProtocol,
     CoordinationSuggestion,
-    ModeWorkflowTeamCoordinatorProtocol,
 )
 
 if TYPE_CHECKING:
@@ -41,8 +42,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
-    """Agent wrapper that delegates recommendation logic to framework helpers."""
+class ModeWorkflowTeamCoordinator(CoordinationAdvisorProtocol):
+    """Deprecated agent wrapper over the framework-native coordination advisor."""
 
     def __init__(
         self,
@@ -50,8 +51,14 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         team_selector: Optional[Any] = None,
         workflow_selector: Optional[Any] = None,
         mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
-        advisor: Optional[ModeWorkflowTeamCoordinatorProtocol] = None,
+        advisor: Optional[CoordinationAdvisorProtocol] = None,
     ):
+        warnings.warn(
+            "ModeWorkflowTeamCoordinator is deprecated. "
+            "Use victor.framework.coordination_runtime.VerticalCoordinationAdvisor instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._advisor = advisor or VerticalCoordinationAdvisor(
             vertical_context=vertical_context,
             team_selector=team_selector,
@@ -128,7 +135,14 @@ def create_coordinator(
     team_learner: Optional["TeamCompositionLearner"] = None,
     selection_strategy: str = "hybrid",
 ) -> ModeWorkflowTeamCoordinator:
-    """Create a ModeWorkflowTeamCoordinator."""
+    """Create the deprecated ModeWorkflowTeamCoordinator compatibility wrapper."""
+    warnings.warn(
+        "victor.agent.mode_workflow_team_coordinator.create_coordinator(...) is deprecated. "
+        "Use victor.framework.coordination_runtime.create_vertical_coordination_advisor(...) "
+        "instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     advisor = create_vertical_coordination_advisor(
         vertical_context=vertical_context,
         team_learner=team_learner,

@@ -22,6 +22,7 @@ from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label
 from victor.agent.response_sanitizer import create_streaming_filter
+from victor.framework.events import EventType
 from victor.ui.rendering.utils import (
     StreamDeltaNormalizer,
     is_thinking_status_message,
@@ -973,15 +974,13 @@ class VictorTUI(App):
         self._set_status("Streaming", "streaming")
 
         try:
-            async for chunk in self.agent.stream_chat(message):
-                # Handle different chunk types
-                if hasattr(chunk, "type"):
-                    chunk_type = chunk.type
+            async for event in self.agent.stream(message):
+                # Handle different event types
+                if hasattr(event, "type"):
+                    if event.type == EventType.CONTENT:
+                        process_content(event.content or "")
 
-                    if chunk_type == "content":
-                        process_content(chunk.content or "")
-
-                    elif chunk_type == "thinking_start":
+                    elif event.type == EventType.THINKING:
                         try:
                             thinking_buffer = ""
                             thinking_normalizer.reset()
@@ -990,41 +989,42 @@ class VictorTUI(App):
                         except Exception as e:
                             logger.warning(f"Failed to show thinking panel: {e}")
 
-                    elif chunk_type == "thinking":
+                    elif event.type == EventType.THINKING:
                         try:
-                            thinking_delta = thinking_normalizer.consume(chunk.content or "")
+                            thinking_delta = thinking_normalizer.consume(event.content or "")
                             if thinking_delta:
                                 append_thinking(thinking_delta)
                         except Exception as e:
                             logger.warning(f"Failed to update thinking content: {e}")
 
-                    elif chunk_type == "thinking_end":
+                    elif event.type == EventType.CONTENT:
                         try:
                             thinking_visible = False
                             self._hide_thinking()
                         except Exception as e:
                             logger.warning(f"Failed to hide thinking panel: {e}")
 
-                    elif chunk_type == "tool_start":
+                    elif event.type == EventType.TOOL_CALL:
                         try:
                             self._show_tool_call(
-                                chunk.tool_name or "unknown",
-                                chunk.arguments or {},
+                                event.tool_name or "unknown",
+                                event.metadata.get("arguments", {}) if event.metadata else {} or {},
                             )
                         except Exception as e:
                             logger.warning(f"Failed to show tool call: {e}")
 
-                    elif chunk_type == "tool_end":
+                    elif event.type == EventType.TOOL_RESULT:
                         try:
+                            result_data = event.result or {}
                             self._finish_tool_call(
-                                success=(chunk.success if hasattr(chunk, "success") else True),
-                                elapsed=(chunk.elapsed if hasattr(chunk, "elapsed") else None),
+                                success=result_data.get("success", True),
+                                elapsed=result_data.get("elapsed"),
                             )
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
 
                 elif isinstance(getattr(chunk, "metadata", None), dict):
-                    metadata = chunk.metadata or {}
+                    metadata = event.metadata or {}
 
                     if "status" in metadata:
                         try:
@@ -1109,14 +1109,14 @@ class VictorTUI(App):
                             thinking_delta = thinking_normalizer.consume(reasoning)
                             if thinking_delta:
                                 append_thinking(thinking_delta)
-                            if chunk.content:
-                                process_content(chunk.content)
+                            if event.content:
+                                process_content(event.content)
                         except Exception as e:
                             logger.warning(f"Failed to update thinking content: {e}")
 
-                elif hasattr(chunk, "content") and chunk.content:
+                elif hasattr(chunk, "content") and event.content:
                     # Simple content chunk
-                    process_content(chunk.content)
+                    process_content(event.content)
 
                 if content_filter.should_abort():
                     warning_message = f"Warning: {content_filter.abort_reason}"

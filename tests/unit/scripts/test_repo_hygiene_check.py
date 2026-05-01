@@ -698,8 +698,7 @@ def __getattr__(name):
         "It will be removed in a future release.",
         DeprecationWarning,
     )
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\n")
     write_file(tmp_path, "docs/development/deprecation-inventory-2026-03-03.md", "")
@@ -737,8 +736,7 @@ def test_deprecation_contract_accepts_complete_teamnode_contract(
         "docs/development/deprecation-inventory-2026-03-03.md",
         """
 | `TeamNode*` workflow compatibility aliases | source | `TeamStep*` workflow names | Architecture Lead | `v0.9.0` | `2027-03-31` |
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -752,8 +750,7 @@ def test_deprecation_contract_accepts_complete_teamnode_contract(
   - Target removal date: `2027-03-31`
   - Replacement: `TeamStep*` workflow names
   - Compatibility shim status: warning-backed aliases remain supported through `v0.9.0`
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -762,8 +759,7 @@ def test_deprecation_contract_accepts_complete_teamnode_contract(
 Legacy `TeamNode*` workflow names are deprecated.
 Use `TeamStep*` names during the migration window.
 Removal target: `v0.9.0` (`2027-03-31`).
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
@@ -772,10 +768,9 @@ Removal target: `v0.9.0` (`2027-03-31`).
 
 
 def test_public_shim_contracts_register_workflowgraph_alias() -> None:
-    labels = {
-        contract.label for contract in repo_hygiene_check.PUBLIC_SHIM_DEPRECATION_CONTRACTS
-    }
+    labels = {contract.label for contract in repo_hygiene_check.PUBLIC_SHIM_DEPRECATION_CONTRACTS}
 
+    assert "FrameworkShim compatibility surface" in labels
     assert "TeamNode*" in labels
     assert "WorkflowGraph alias from victor.workflows.graph" in labels
 
@@ -802,8 +797,7 @@ def test_deprecation_contract_accepts_complete_workflowgraph_contract(
         "docs/development/deprecation-inventory-2026-03-03.md",
         """
 | `WorkflowGraph` alias from `victor.workflows.graph` | source | `BasicWorkflowGraph` or `victor.workflows.graph_dsl.WorkflowGraph` | Architecture Lead | `v0.8.0` | `2026-12-31` |
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -817,8 +811,7 @@ def test_deprecation_contract_accepts_complete_workflowgraph_contract(
   - Target removal date: `2026-12-31`
   - Replacement: `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL
   - Compatibility shim status: warning-backed alias remains supported through `v0.8.0`
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(
         tmp_path,
@@ -827,8 +820,62 @@ def test_deprecation_contract_accepts_complete_workflowgraph_contract(
 Legacy `WorkflowGraph` import from `victor.workflows.graph` is deprecated.
 Use `BasicWorkflowGraph` for the simple container or `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL.
 Removal target: `v0.8.0` (`2026-12-31`).
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
+
+    assert findings == []
+
+
+def test_deprecation_contract_accepts_complete_frameworkshim_contract(
+    tmp_path: Path,
+) -> None:
+    contract = repo_hygiene_check.FRAMEWORK_SHIM_DEPRECATION_CONTRACT
+    warning_text = (
+        "FrameworkShim is deprecated. Use Agent.create() from the Framework API instead. "
+        "Internal surface layers should compose AgentFactory / AgentCreationFactory. "
+        "This warning-backed compatibility shim remains supported through v1.0.0 "
+        "(2027-06-30). See docs/architecture/migration.md for migration guidance."
+    )
+    compat_export_text = (
+        "victor.framework.FrameworkShim is deprecated. "
+        "Use Agent.create() from the Framework API instead. "
+        "This warning-backed compatibility export remains supported through v1.0.0 "
+        "(2027-06-30). See docs/architecture/migration.md for migration guidance."
+    )
+    for rel_path in contract.runtime_files:
+        text = compat_export_text if rel_path.name == "__init__.py" else warning_text
+        write_file(tmp_path, rel_path.as_posix(), text + "\n")
+    write_file(
+        tmp_path,
+        "docs/development/deprecation-inventory-2026-03-03.md",
+        """
+| `FrameworkShim` compatibility surface | `victor/framework/shim.py`, `victor/framework/__init__.py` | `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition | Architecture Lead | `v1.0.0` | `2027-06-30` |
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "CHANGELOG.md",
+        """
+## [Unreleased] (develop)
+
+### Deprecated
+- **`FrameworkShim` compatibility surface**
+  - To be removed in: `v1.0.0`
+  - Target removal date: `2027-06-30`
+  - Replacement: `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition
+  - Compatibility shim status: warning-backed shim remains supported through `v1.0.0`
+        """.strip() + "\n",
+    )
+    write_file(
+        tmp_path,
+        "docs/architecture/migration.md",
+        """
+Legacy `FrameworkShim` usage is deprecated.
+Use `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition.
+Removal target: `v1.0.0` (`2027-06-30`).
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.check_deprecation_contract(tmp_path, contract)
@@ -890,8 +937,7 @@ warnings.warn(
     "See docs/migration/foo.md for migration guidance.",
     DeprecationWarning,
 )
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
     write_file(tmp_path, "docs/development/foo-inventory.md", "LegacyFoo\n")
     write_file(tmp_path, "CHANGELOG.md", "## [Unreleased] (develop)\nLegacyFoo\n")

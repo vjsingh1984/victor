@@ -40,7 +40,7 @@ agent.chat()  # Interactive chat loop
 | **Agent** | High-level agent interface | [agent.md](agent.md) |
 | **StateGraph** | Stateful workflow engine | [graph.md](graph.md) |
 | **Tools** | Tool registry and execution | [tools.md](tools.md) |
-| **Configuration** | Settings and profiles | [config.md](config.md) |
+| **Configuration** | Settings and profiles | [../users/reference/config.md](../users/reference/config.md) |
 | **Providers** | LLM provider adapters | [providers.md](providers.md) |
 | **Core** | Events, state, teams, errors | [core.md](core.md) |
 
@@ -329,7 +329,7 @@ agent = Agent(
   - [Agent API](agent.md) - Agent creation and usage
   - [StateGraph API](graph.md) - Workflow creation
   - [Tools API](tools.md) - Tool registration and usage
-  - [Configuration API](config.md) - Settings and profiles
+  - [Configuration API](../users/reference/config.md) - Settings and profiles
   - [Provider API](providers.md) - Provider customization
   - [Core APIs](core.md) - Events, state, workflows
 

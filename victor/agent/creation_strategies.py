@@ -104,8 +104,50 @@ class AgentCreationStrategy(ABC):
         pass
 
 
+def _vertical_name(vertical: Optional[Any]) -> Optional[str]:
+    """Return a stable vertical display name for telemetry metadata."""
+    if vertical is None:
+        return None
+    return getattr(vertical, "__name__", getattr(vertical, "name", str(vertical)))
+
+
+def _emit_session_start(agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
+    """Emit session-start telemetry via the canonical observability surface."""
+    observability = getattr(agent, "observability", None)
+    if observability is None or not hasattr(observability, "on_session_start"):
+        return
+
+    event_metadata = {
+        "mode": context.metadata.get("mode", "unknown"),
+        "vertical": _vertical_name(context.vertical),
+        "thinking": context.thinking,
+    }
+    observability.on_session_start(event_metadata)
+
+
+def _apply_tracker_overrides(agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
+    """Apply tracker-based runtime overrides to a created orchestrator."""
+    if context.tool_budget is not None:
+        agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
+
+    if context.max_iterations is not None:
+        agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
+
+
+def _apply_mode_override(context: AgentCreationContext) -> None:
+    """Apply mode override after agent creation."""
+    if context.mode:
+        from victor.agent.mode_controller import AgentMode, get_mode_controller
+
+        controller = get_mode_controller()
+        try:
+            controller.switch_mode(AgentMode(context.mode))
+        except Exception as e:
+            logger.warning(f"Failed to switch mode to {context.mode}: {e}")
+
+
 class FrameworkStrategy(AgentCreationStrategy):
-    """Agent creation using FrameworkShim with full feature support.
+    """Agent creation using AgentFactory with full framework support.
 
     This is the recommended strategy that provides:
     - Observability integration
@@ -114,36 +156,26 @@ class FrameworkStrategy(AgentCreationStrategy):
     - Event tracking
     """
 
-    def __init__(self) -> None:
-        self._shim: Optional[Any] = None
-
     async def create_agent(self, context: AgentCreationContext) -> "AgentOrchestrator":
-        """Create agent using FrameworkShim."""
-        from victor.framework.shim import FrameworkShim
+        """Create agent using the canonical AgentFactory."""
+        from victor.framework.agent_factory import AgentFactory
 
-        self._shim = FrameworkShim(
+        factory = AgentFactory(
             context.settings,
-            profile_name=context.profile,
+            profile=context.profile,
+            provider=context.provider,
+            model=context.model,
             thinking=context.thinking,
             vertical=context.vertical,
             enable_observability=context.enable_observability,
             session_id=context.session_id,
+            tool_budget=context.tool_budget,
+            max_iterations=context.max_iterations,
         )
 
-        agent = await self._shim.create_orchestrator()
-
-        # Emit session start event
-        self._shim.emit_session_start(
-            {
-                "mode": context.metadata.get("mode", "unknown"),
-                "vertical": context.vertical.__name__ if context.vertical else None,
-                "thinking": context.thinking,
-            }
-        )
-
-        # Apply overrides
-        self._apply_overrides(agent, context)
-
+        agent = await factory.create()
+        _emit_session_start(agent, context)
+        _apply_mode_override(context)
         return agent
 
     def supports_observability(self) -> bool:
@@ -151,23 +183,6 @@ class FrameworkStrategy(AgentCreationStrategy):
 
     def supports_verticals(self) -> bool:
         return True
-
-    def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
-        """Apply budget, iteration, and mode overrides to agent."""
-        if context.tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
-
-        if context.max_iterations is not None:
-            agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
-
-        if context.mode:
-            from victor.agent.mode_controller import AgentMode, get_mode_controller
-
-            controller = get_mode_controller()
-            try:
-                controller.switch_mode(AgentMode(context.mode))
-            except Exception as e:
-                logger.warning(f"Failed to switch mode to {context.mode}: {e}")
 
 
 class LegacyStrategy(AgentCreationStrategy):
@@ -192,8 +207,8 @@ class LegacyStrategy(AgentCreationStrategy):
             thinking=context.thinking,
         )
 
-        # Apply overrides (same as framework strategy)
-        self._apply_overrides(agent, context)
+        _apply_tracker_overrides(agent, context)
+        _apply_mode_override(context)
 
         return agent
 
@@ -202,23 +217,6 @@ class LegacyStrategy(AgentCreationStrategy):
 
     def supports_verticals(self) -> bool:
         return False
-
-    def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
-        """Apply budget, iteration, and mode overrides to agent."""
-        if context.tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
-
-        if context.max_iterations is not None:
-            agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
-
-        if context.mode:
-            from victor.agent.mode_controller import AgentMode, get_mode_controller
-
-            controller = get_mode_controller()
-            try:
-                controller.switch_mode(AgentMode(context.mode))
-            except Exception as e:
-                logger.warning(f"Failed to switch mode to {context.mode}: {e}")
 
 
 class AgentCreationFactory:

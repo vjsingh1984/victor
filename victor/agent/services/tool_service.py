@@ -982,7 +982,7 @@ class ToolService:
         nudge_sent_flag: Optional[List[bool]] = None,
         add_message: Optional[Callable[[str, str], None]] = None,
         observability: Optional[Any] = None,
-        pipeline_calls_used: int = 0,
+        iteration_count: int = 0,
         tool_name: Optional[str] = None,
         elapsed: float = 0.0,
         session_id: Optional[str] = None,
@@ -1007,7 +1007,7 @@ class ToolService:
                 nudge_sent_flag=nudge_sent_flag,
                 add_message=add_message,
                 observability=observability,
-                pipeline_calls_used=pipeline_calls_used,
+                iteration_count=iteration_count,
             )
             return
 

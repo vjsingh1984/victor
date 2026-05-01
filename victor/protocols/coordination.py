@@ -35,12 +35,12 @@ Architecture:
 
 Usage:
     from victor.protocols.coordination import (
+        CoordinationAdvisorProtocol,
         CoordinationSuggestion,
-        ModeWorkflowTeamCoordinatorProtocol,
         TeamSelectionStrategyProtocol,
     )
 
-    class MyCoordinator(ModeWorkflowTeamCoordinatorProtocol):
+    class MyCoordinator(CoordinationAdvisorProtocol):
         def suggest_for_task(self, task_type, complexity, mode):
             ...
 """
@@ -248,8 +248,8 @@ class CoordinationSuggestion:
 
 
 @runtime_checkable
-class ModeWorkflowTeamCoordinatorProtocol(Protocol):
-    """Protocol for coordinating mode, workflow, and team selection.
+class CoordinationAdvisorProtocol(Protocol):
+    """Canonical protocol for coordination advice across teams and workflows.
 
     Implementations coordinate between:
     1. Agent modes (explore/plan/build)
@@ -258,7 +258,7 @@ class ModeWorkflowTeamCoordinatorProtocol(Protocol):
     4. Task analysis results
 
     Example:
-        class DefaultCoordinator(ModeWorkflowTeamCoordinatorProtocol):
+        class DefaultCoordinator(CoordinationAdvisorProtocol):
             def suggest_for_task(
                 self,
                 task_type: str,
@@ -346,6 +346,10 @@ class ModeWorkflowTeamCoordinatorProtocol(Protocol):
             TeamSuggestionAction to take
         """
         ...
+
+
+ModeWorkflowTeamCoordinatorProtocol = CoordinationAdvisorProtocol
+"""Deprecated compatibility alias for ``CoordinationAdvisorProtocol``."""
 
 
 @runtime_checkable
@@ -522,6 +526,7 @@ __all__ = [
     "WorkflowRecommendation",
     "CoordinationSuggestion",
     # Protocols
+    "CoordinationAdvisorProtocol",
     "ModeWorkflowTeamCoordinatorProtocol",
     "TeamSelectionStrategyProtocol",
     "WorkflowSelectionStrategyProtocol",

@@ -40,8 +40,8 @@ from victor.agent.intelligent_pipeline import (
     PipelineStats,
     RequestContext,
     ResponseResult,
-    get_pipeline,
-    clear_pipeline_cache,
+    get_intelligent_agent,
+    clear_intelligent_agent_cache,
     PROVIDERS_WITH_REPETITION_ISSUES,
 )
 
@@ -1253,19 +1253,19 @@ class TestModuleFunctions:
     """Tests for module-level convenience functions."""
 
     @pytest.mark.asyncio
-    async def test_get_pipeline(self, mock_provider_adapter):
-        """Test get_pipeline creates and caches pipelines (lines 908-918)."""
-        clear_pipeline_cache()  # Start fresh
+    async def test_get_intelligent_agent(self, mock_provider_adapter):
+        """Test get_intelligent_agent creates and caches agents (lines 894-914)."""
+        clear_intelligent_agent_cache()  # Start fresh
 
         with patch(
             "victor.agent.intelligent_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline1 = await get_pipeline(
+            pipeline1 = await get_intelligent_agent(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
             )
-            pipeline2 = await get_pipeline(
+            pipeline2 = await get_intelligent_agent(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
             )
@@ -1274,29 +1274,29 @@ class TestModuleFunctions:
         assert pipeline1 is pipeline2
 
     @pytest.mark.asyncio
-    async def test_get_pipeline_different_keys(self, mock_provider_adapter):
-        """Test get_pipeline creates different instances for different keys."""
-        clear_pipeline_cache()
+    async def test_get_intelligent_agent_different_keys(self, mock_provider_adapter):
+        """Test get_intelligent_agent creates different instances for different keys."""
+        clear_intelligent_agent_cache()
 
         with patch(
             "victor.agent.intelligent_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline1 = await get_pipeline(
+            pipeline1 = await get_intelligent_agent(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
             )
-            pipeline2 = await get_pipeline(
+            pipeline2 = await get_intelligent_agent(
                 provider_name="openai",
                 model="gpt-4",
             )
 
         assert pipeline1 is not pipeline2
 
-    def test_clear_pipeline_cache(self, mock_provider_adapter):
-        """Test clear_pipeline_cache (line 923)."""
+    def test_clear_intelligent_agent_cache(self, mock_provider_adapter):
+        """Test clear_intelligent_agent_cache (line 919)."""
         # Add something to cache
-        from victor.agent.intelligent_pipeline import _pipeline_cache
+        from victor.agent.intelligent_pipeline import _intelligent_agent_cache
 
         with patch(
             "victor.agent.intelligent_pipeline.get_provider_adapter",
@@ -1307,11 +1307,34 @@ class TestModuleFunctions:
                 model="test",
                 profile_name="test",
             )
-        _pipeline_cache[("test", "test", "test", None)] = test_pipeline
+        _intelligent_agent_cache[("test", "test", "test", None)] = test_pipeline
 
-        clear_pipeline_cache()
+        clear_intelligent_agent_cache()
 
-        assert len(_pipeline_cache) == 0
+        assert len(_intelligent_agent_cache) == 0
+
+    def test_get_optimal_tool_budget_delegates_to_mode_controller(self, mock_provider_adapter):
+        """Test get_optimal_tool_budget delegates to mode controller."""
+        pipeline = IntelligentAgentPipeline(
+            provider_name="test",
+            model="test",
+            profile_name="test",
+        )
+
+        # Mock _get_mode_controller to return None (not initialized)
+        with patch.object(pipeline, "_get_mode_controller", return_value=None):
+            # Without mode controller, returns 0
+            assert pipeline.get_optimal_tool_budget("analysis") == 0
+
+        # With mode controller mocked
+        mock_controller = MagicMock()
+        mock_controller.get_optimal_tool_budget.return_value = 25
+
+        with patch.object(pipeline, "_get_mode_controller", return_value=mock_controller):
+            budget = pipeline.get_optimal_tool_budget("analysis")
+
+            assert budget == 25
+            mock_controller.get_optimal_tool_budget.assert_called_once_with("analysis")
 
 
 # =============================================================================

@@ -93,7 +93,7 @@ class ToolObservabilityHandler:
         nudge_sent_flag: Optional[List[bool]] = None,
         add_message: Optional[Callable[[str, str], None]] = None,
         observability: Optional[Any] = None,
-        pipeline_calls_used: int = 0,
+        iteration_count: int = 0,
     ) -> None:
         """Handle tool execution completion with event emission and file tracking.
 
@@ -106,11 +106,11 @@ class ToolObservabilityHandler:
             nudge_sent_flag: Single-element list used as mutable bool flag for nudge tracking
             add_message: Callback to inject messages into conversation
             observability: Optional observability handler
-            pipeline_calls_used: Current pipeline call count for observability
+            iteration_count: Current iteration count for observability
         """
         metrics_collector.on_tool_complete(result)
         follow_up_suggestions = self._extract_follow_up_suggestions(result.result)
-        tool_id = getattr(result, "tool_id", None) or f"tool-{max(pipeline_calls_used - 1, 0)}"
+        tool_id = getattr(result, "tool_id", None) or f"tool-{max(iteration_count - 1, 0)}"
 
         # Emit tool complete event
         from victor.core.events import get_observability_bus

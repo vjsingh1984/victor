@@ -133,7 +133,9 @@ def resolve_runtime_services(
         if resolved.chat is not None or resolved.session is not None:
             return resolved
 
-    context_container = getattr(runtime_context, "container", None) if runtime_context is not None else None
+    context_container = (
+        getattr(runtime_context, "container", None) if runtime_context is not None else None
+    )
     if context_container is not None:
         accessor = ServiceAccessor(_container=context_container)
         resolved = ResolvedRuntimeServices(

@@ -67,6 +67,7 @@ from victor.ui.rendering.markdown import render_markdown_with_hooks
 from victor.ui.rendering.utils import (
     format_duration,
     format_tool_args,
+    format_tool_display_name,
     render_status_message,
     render_tool_preview,
 )
@@ -304,7 +305,8 @@ class OutputFormatter:
             )
         elif self.config.mode == OutputMode.RICH:
             status_icon = "[green]✓[/]" if success else "[red]✗[/]"
-            status_line = f"{status_icon} [bold]{tool_name}[/]"
+            display_name = format_tool_display_name(tool_name)
+            status_line = f"{status_icon} [bold]{display_name}[/]"
             if args_str:
                 status_line += f" [dim]{args_str}[/]"
             if duration_str:
@@ -386,7 +388,8 @@ class OutputFormatter:
         elif self.config.mode == OutputMode.PLAIN:
             # Compact single-line format: ✓ tool_name(args) (X.XXs)
             status_icon = "✓" if success else "✗"
-            base = f"{tool_name}({args_str})" if args_str else tool_name
+            display_name = format_tool_display_name(tool_name)
+            base = f"{display_name}({args_str})" if args_str else display_name
             time_display = f" ({duration_str.strip('()')})" if duration_str else ""
             error_display = f" {error[:40]}" if error else ""
             print(
@@ -445,6 +448,7 @@ class OutputFormatter:
 
         content = data["result"]
         tool_name = data["tool_name"]
+        display_name = format_tool_display_name(tool_name)
 
         # Try syntax highlighting for code-like content
         if self.config.mode == OutputMode.RICH:
@@ -462,16 +466,24 @@ class OutputFormatter:
 
                 syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
                 self._console.print(
-                    Panel(syntax, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+                    Panel(
+                        syntax,
+                        title=f"[bold]{display_name}[/] - Full Output",
+                        border_style="blue",
+                    )
                 )
             except Exception:
                 # Fallback to plain panel
                 self._console.print(
-                    Panel(content, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+                    Panel(
+                        content,
+                        title=f"[bold]{display_name}[/] - Full Output",
+                        border_style="blue",
+                    )
                 )
         else:
             # Plain mode
-            print(f"\n--- Full Output: {tool_name} ---")
+            print(f"\n--- Full Output: {display_name} ---")
             print(content)
             print("--- End of Output ---\n")
 

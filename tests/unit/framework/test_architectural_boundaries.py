@@ -172,9 +172,7 @@ class TestUILayerArchitecturalBoundaries:
                 "UI layer must NOT call private VictorClient methods.\n"
                 "Use VictorClient.initialize() or other public surfaces instead.\n\n"
                 "Violations:\n"
-                + "\n".join(
-                    f"  - {v['file']}:{v['line']}: {v['content']}" for v in violations
-                )
+                + "\n".join(f"  - {v['file']}:{v['line']}: {v['content']}" for v in violations)
             )
 
 
@@ -231,6 +229,21 @@ class TestVictorClientArchitecturalBoundaries:
             pytest.fail(
                 "VictorClient must use SessionConfig, not VictorConfig.\n"
                 "VictorConfig is the legacy pattern."
+            )
+
+    def test_victor_client_chat_returns_canonical_task_result(self):
+        """VictorClient.chat() must expose TaskResult, not a client-only wrapper."""
+        from victor.framework.client import VictorClient
+        import inspect
+
+        signature = inspect.signature(VictorClient.chat)
+        return_annotation = signature.return_annotation
+
+        if "TaskResult" not in str(return_annotation):
+            pytest.fail(
+                "VictorClient.chat() must return TaskResult.\n"
+                "Framework clients should reuse the canonical framework execution result "
+                "instead of defining parallel chat-result wrappers."
             )
 
 

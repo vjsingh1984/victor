@@ -23,7 +23,11 @@ from victor.framework._internal import format_context_message
 from victor.framework.task import DirectResponseOutputState, TaskResult
 from victor.providers.base import CompletionResponse
 from victor.runtime.chat_runtime import resolve_chat_runtime, resolve_chat_service
-from victor.runtime.context import ResolvedRuntimeServices, resolve_execution_context, resolve_runtime_services
+from victor.runtime.context import (
+    ResolvedRuntimeServices,
+    resolve_execution_context,
+    resolve_runtime_services,
+)
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,7 @@ def prepare_message(
         runtime_message=runtime_message,
         response_message=user_message,
     )
+
 
 def _coerce_completion_response(
     result: Any,

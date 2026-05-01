@@ -1626,7 +1626,7 @@ class RLCoordinator:
     ) -> None:
         """Async version of record_outcome - offloads SQLite to thread pool.
 
-        Use this from async code (like orchestrator.stream_chat) to avoid
+        Use this from async code (like ChatService.stream_chat) to avoid
         blocking the event loop during SQLite operations.
 
         When the writer queue is enabled (via enable_writer_queue()), outcomes

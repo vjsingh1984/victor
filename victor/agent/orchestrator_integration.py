@@ -360,8 +360,10 @@ class OrchestratorIntegration:
         Returns:
             Optimal tool budget
         """
-        if self._pipeline._mode_controller and self._config.enable_mode_learning:
-            return self._pipeline._mode_controller.get_optimal_tool_budget(task_type)
+        if self._config.enable_mode_learning:
+            learned_budget = self._pipeline.get_optimal_tool_budget(task_type)
+            if learned_budget > 0:
+                return learned_budget
         return self._orchestrator.tool_budget
 
     def add_quality_observer(self, observer: Callable[[float, Dict[str, float]], None]) -> None:

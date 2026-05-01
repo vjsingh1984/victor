@@ -29,7 +29,7 @@ class CallbackCoordinator:
         *,
         metrics_coordinator: "MetricsCoordinator",
         get_observability: Callable[[], Optional[Any]],
-        get_pipeline_calls_used: Callable[[], int],
+        get_iteration_count: Callable[[], int],
         get_usage_analytics: Callable[[], Optional[Any]],
         get_rl_coordinator: Callable[[], Any],
         get_vertical_context: Callable[[], Any],
@@ -37,7 +37,7 @@ class CallbackCoordinator:
     ) -> None:
         self._metrics = metrics_coordinator
         self._get_observability = get_observability
-        self._get_pipeline_calls_used = get_pipeline_calls_used
+        self._get_iteration_count = get_iteration_count
         self._get_usage_analytics = get_usage_analytics
         self._get_rl_coordinator = get_rl_coordinator
         self._get_vertical_context = get_vertical_context
@@ -45,7 +45,7 @@ class CallbackCoordinator:
 
     def on_tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Called when tool execution starts (from ToolPipeline)."""
-        iteration = self._get_pipeline_calls_used()
+        iteration = self._get_iteration_count()
         self._metrics.on_tool_start(tool_name, arguments, iteration)
 
         obs = self._get_observability()
@@ -75,7 +75,7 @@ class CallbackCoordinator:
                 nudge_sent_flag=nudge_sent_flag,
                 add_message=add_message,
                 observability=self._get_observability(),
-                pipeline_calls_used=self._get_pipeline_calls_used(),
+                iteration_count=self._get_iteration_count(),
             )
             return
 

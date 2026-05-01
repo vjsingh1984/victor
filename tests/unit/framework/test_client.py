@@ -226,6 +226,40 @@ async def test_victor_client_stream_preserves_framework_event_contract() -> None
 
 
 @pytest.mark.asyncio
+async def test_victor_client_stream_delegates_to_shared_stream_helper() -> None:
+    config = SessionConfig()
+    client = VictorClient(config, container=object())
+    orchestrator = MagicMock()
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=MagicMock()))
+
+    class _FakeAgent:
+        def __init__(self):
+            self.execution_context = execution_context
+
+        def get_orchestrator(self):
+            return orchestrator
+
+    client._agent = _FakeAgent()
+    client._context = execution_context
+
+    async def _fake_stream_message_events(**kwargs):
+        assert kwargs["orchestrator"] is orchestrator
+        assert kwargs["execution_context"] is execution_context
+        assert kwargs["user_message"] == "ping"
+        yield AgentExecutionEvent(type=EventType.CONTENT, content="READY")
+
+    with patch(
+        "victor.framework.client.stream_message_events",
+        _fake_stream_message_events,
+    ):
+        events = [event async for event in client.stream("ping")]
+
+    assert len(events) == 1
+    assert events[0].event_type == "content"
+    assert events[0].content == "READY"
+
+
+@pytest.mark.asyncio
 async def test_victor_client_create_session_reuses_agent_session_and_closes_service() -> None:
     config = SessionConfig.from_cli_flags(tool_budget=4)
     client = VictorClient(config, container=object())
@@ -275,7 +309,9 @@ async def test_victor_client_create_session_reuses_agent_session_and_closes_serv
             )
         ),
     )
-    execution_context = SimpleNamespace(services=SimpleNamespace(session=session_service, chat=chat_service))
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(session=session_service, chat=chat_service)
+    )
 
     client._agent = agent
     client._context = execution_context

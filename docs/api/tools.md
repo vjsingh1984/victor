@@ -964,6 +964,6 @@ print(tool._tool_source)  # "native", "langchain", "mcp", or "plugin"
 ## See Also
 
 - [Agent API](agent.md) - Agent creation with tools
-- [Configuration API](config.md) - Tool configuration in profiles
+- [Configuration API](../users/reference/config.md) - Tool configuration in profiles
 - [Core APIs](core.md) - Tool execution framework
 - [Tool Deduplication Architecture](../architecture/tool-deduplication.md) - Detailed design documentation

@@ -631,7 +631,7 @@ def test_prepare_visible_content_normalizes_exact_response_output():
     pipeline = StreamingChatExecutor(DummyCoordinator())
 
     prepared = pipeline._prepare_visible_content(
-        'The user wants exactly READY, so the answer is READY',
+        "The user wants exactly READY, so the answer is READY",
         user_message="Reply with exactly READY",
     )
 

@@ -113,10 +113,23 @@ def test_create_client_uses_framework_client_for_prepared_config() -> None:
     sentinel_client = MagicMock()
 
     with patch(
-        "victor.framework.client.VictorClient",
+        "victor.framework.session_runner.create_victor_client",
         return_value=sentinel_client,
-    ) as client_cls:
+    ) as client_factory:
         client = runner.create_client(prepared_config)
 
     assert client is sentinel_client
-    client_cls.assert_called_once_with(prepared_config)
+    client_factory.assert_called_once_with(prepared_config)
+
+
+def test_create_client_uses_injected_client_factory() -> None:
+    settings = _build_settings()
+    config = SessionConfig()
+    sentinel_client = MagicMock()
+    factory = MagicMock(return_value=sentinel_client)
+    runner = FrameworkSessionRunner(settings, config, client_factory=factory)
+
+    client = runner.create_client()
+
+    assert client is sentinel_client
+    factory.assert_called_once_with(config)

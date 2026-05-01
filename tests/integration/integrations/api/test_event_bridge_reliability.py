@@ -21,6 +21,7 @@ reconnection.
 
 import asyncio
 import json
+import random
 import time
 from typing import List, Dict, Any
 from unittest.mock import AsyncMock
@@ -381,7 +382,7 @@ class TestEventBridgeReliabilitySLOs:
 
         async def reliable_send(message: str) -> None:
             # Simulate 99.95% success rate (better than SLO)
-            if hash(message) % 10000 != 0:  # 1 in 10000 fails
+            if random.random() < 0.9995:  # 99.95% success
                 bridge._broadcaster._client_send_success_count += 1
             else:
                 raise RuntimeError("Simulated send failure")

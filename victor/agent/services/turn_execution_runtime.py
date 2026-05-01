@@ -1176,7 +1176,9 @@ class TurnExecutor:
         snapshot["conversation"] = conversation
         snapshot["conversation_system_prompt"] = self._get_current_system_prompt(conversation)
         snapshot["conversation_system_added"] = (
-            getattr(conversation, "_system_added", _MISSING) if conversation is not None else _MISSING
+            getattr(conversation, "_system_added", _MISSING)
+            if conversation is not None
+            else _MISSING
         )
 
         setter = getattr(self._chat_context, "set_system_prompt", None)

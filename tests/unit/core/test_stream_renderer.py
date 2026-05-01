@@ -20,6 +20,8 @@ from victor.ui.rendering import (
     stream_response,
     format_tool_args,
 )
+from victor.ui.rendering.utils import format_tool_display_name
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.providers.base import StreamChunk
 
 
@@ -68,6 +70,13 @@ class TestFormatterRenderer:
         mock_formatter.status.assert_called_once()
         assert "read" in mock_formatter.status.call_args[0][0]
         mock_formatter.start_streaming.assert_called_once()
+
+    def test_on_tool_start_formats_display_name_in_status(self, renderer, mock_formatter):
+        """Tool start status uses lower-camel display formatting only for UI text."""
+        renderer.on_tool_start("code_search", {"query": "foo"})
+
+        mock_formatter.tool_start.assert_called_once_with("code_search", {"query": "foo"})
+        mock_formatter.status.assert_called_once_with("🔧 Running codeSearch...")
 
     def test_on_tool_result_success(self, renderer, mock_formatter):
         """Test on_tool_result() for successful tool execution."""
@@ -348,6 +357,33 @@ class TestLiveDisplayRenderer:
         call_str = str(mock_console.print.call_args)
         assert "green" in call_str
         assert "✓" in call_str
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_on_tool_result_formats_tool_name_for_display(
+        self, mock_live_class, renderer, mock_console
+    ):
+        """Tool status lines use lower-camel names without changing internal identifiers."""
+        from unittest.mock import MagicMock
+
+        mock_live_class.return_value = MagicMock()
+        renderer.start()
+
+        with patch("victor.config.tool_settings.get_tool_settings") as mock_settings:
+            tool_settings = MagicMock()
+            tool_settings.enable_tool_grouping = False
+            tool_settings.tool_output_preview_enabled = False
+            mock_settings.return_value = tool_settings
+
+            renderer.on_tool_result(
+                name="code_search",
+                success=True,
+                elapsed=0.1,
+                arguments={"query": "main"},
+            )
+
+        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
+        assert any("codeSearch" in call_str for call_str in printed_calls)
+        assert not any("[bold]code_search[/]" in call_str for call_str in printed_calls)
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_failure_prints_x(self, mock_live_class, renderer, mock_console):
@@ -833,6 +869,19 @@ class TestAccessibilityFeatures:
             assert mock_console.print.called
 
 
+class TestToolDisplayFormatting:
+    """Tests for renderer-facing tool display formatting."""
+
+    def test_format_tool_display_name_from_snake_case(self):
+        assert format_tool_display_name("code_search") == "codeSearch"
+
+    def test_format_tool_display_name_preserves_existing_camel_case(self):
+        assert format_tool_display_name("codeSearch") == "codeSearch"
+
+    def test_format_tool_display_name_normalizes_pascal_case(self):
+        assert format_tool_display_name("CodeSearch") == "codeSearch"
+
+
 class TestStreamResponse:
     """Tests for stream_response() unified handler."""
 
@@ -1188,6 +1237,21 @@ class TestStreamResponse:
         assert renderer._tool_calls[0]["result"]["output"] == "line1\nline2\nline3\nline4"
 
     @pytest.mark.asyncio
+    async def test_buffered_renderer_normalizes_exact_response_output(self, mock_agent):
+        async def mock_stream():
+            yield AgentExecutionEvent(
+                type=EventType.CONTENT,
+                content="The user asked for exactly READY, so the answer is READY",
+            )
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+        renderer = BufferedRenderer(user_message="Reply with exactly READY")
+
+        result = await stream_response(mock_agent, "Reply with exactly READY", renderer)
+
+        assert result == "READY"
+
+    @pytest.mark.asyncio
     async def test_calls_lifecycle_methods(self, mock_agent, mock_renderer):
         """Test stream_response calls start, finalize, cleanup."""
 
@@ -1211,7 +1275,7 @@ class TestStreamResponse:
             yield StreamChunk(content="test", metadata=None)
             raise RuntimeError("Simulated error")
 
-        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+        mock_agent.stream = MagicMock(return_value=mock_stream())
 
         with pytest.raises(RuntimeError, match="Simulated error"):
             await stream_response(mock_agent, "test message", mock_renderer)
@@ -1324,6 +1388,26 @@ class TestStreamResponse:
         # Should still call lifecycle methods
         mock_renderer.start.assert_called()
         mock_renderer.finalize.assert_called()
+
+
+class TestBufferedRenderer:
+    """Tests for BufferedRenderer-specific display behavior."""
+
+    def test_flush_formats_tool_name_for_display(self):
+        renderer = BufferedRenderer()
+        renderer.on_tool_start("code_search", {"query": "main"})
+        renderer.on_tool_result(
+            name="code_search",
+            success=True,
+            elapsed=0.1,
+            arguments={"query": "main"},
+        )
+        console = MagicMock(spec=Console)
+
+        renderer.flush(console)
+
+        printed_calls = [str(call_args) for call_args in console.print.call_args_list]
+        assert any("codeSearch" in call_str for call_str in printed_calls)
 
 
 class TestProtocolCompliance:

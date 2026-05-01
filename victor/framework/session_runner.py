@@ -21,12 +21,19 @@ framework layer so UI entrypoints stay focused on parsing and rendering.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.agent import Agent
     from victor.framework.client import VictorClient
     from victor.framework.session_config import SessionConfig
+
+
+def create_victor_client(config: "SessionConfig") -> "VictorClient":
+    """Create the canonical framework client for a prepared session config."""
+    from victor.framework.client import VictorClient
+
+    return VictorClient(config)
 
 
 @dataclass(frozen=True)
@@ -41,9 +48,16 @@ class PreparedSessionState:
 class FrameworkSessionRunner:
     """Prepare session state and bootstrap framework client execution."""
 
-    def __init__(self, settings: Any, config: "SessionConfig") -> None:
+    def __init__(
+        self,
+        settings: Any,
+        config: "SessionConfig",
+        *,
+        client_factory: Optional[Callable[["SessionConfig"], "VictorClient"]] = None,
+    ) -> None:
         self._settings = settings
         self._config = config
+        self._client_factory = client_factory
 
     @property
     def settings(self) -> Any:
@@ -84,9 +98,8 @@ class FrameworkSessionRunner:
         config: Optional["SessionConfig"] = None,
     ) -> "VictorClient":
         """Create a framework client for the prepared session config."""
-        from victor.framework.client import VictorClient
-
-        return VictorClient(config or self._config)
+        factory = self._client_factory or create_victor_client
+        return factory(config or self._config)
 
     async def initialize_client(
         self,
@@ -97,7 +110,7 @@ class FrameworkSessionRunner:
         """Initialize a client and apply agent-level planning overrides."""
         agent = await client.initialize()
         if planning_model:
-            setattr(agent, "_planning_model_override", planning_model)
+            agent._planning_model_override = planning_model
         return agent
 
     async def start_embedding_preload(self, client: "VictorClient") -> None:
@@ -137,4 +150,4 @@ class FrameworkSessionRunner:
         return bool(caps and getattr(caps, "thinking_mode", False))
 
 
-__all__ = ["FrameworkSessionRunner", "PreparedSessionState"]
+__all__ = ["FrameworkSessionRunner", "PreparedSessionState", "create_victor_client"]

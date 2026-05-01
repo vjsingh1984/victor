@@ -18,7 +18,7 @@ class TestCallbackCoordinator:
         self.coordinator = CallbackCoordinator(
             metrics_coordinator=self.metrics,
             get_observability=lambda: self.observability,
-            get_pipeline_calls_used=lambda: 5,
+            get_iteration_count=lambda: 5,
             get_usage_analytics=lambda: self.analytics,
             get_rl_coordinator=lambda: self.rl_coordinator,
             get_vertical_context=lambda: self.vertical_context,
@@ -39,7 +39,7 @@ class TestCallbackCoordinator:
         coordinator = CallbackCoordinator(
             metrics_coordinator=self.metrics,
             get_observability=lambda: None,
-            get_pipeline_calls_used=lambda: 0,
+            get_iteration_count=lambda: 0,
             get_usage_analytics=lambda: None,
             get_rl_coordinator=lambda: self.rl_coordinator,
             get_vertical_context=lambda: self.vertical_context,
@@ -64,7 +64,7 @@ class TestCallbackCoordinator:
         coordinator = CallbackCoordinator(
             metrics_coordinator=self.metrics,
             get_observability=lambda: self.observability,
-            get_pipeline_calls_used=lambda: 5,
+            get_iteration_count=lambda: 5,
             get_usage_analytics=lambda: self.analytics,
             get_rl_coordinator=lambda: self.rl_coordinator,
             get_vertical_context=lambda: self.vertical_context,
@@ -99,7 +99,7 @@ class TestCallbackCoordinator:
         coordinator = CallbackCoordinator(
             metrics_coordinator=self.metrics,
             get_observability=lambda: None,
-            get_pipeline_calls_used=lambda: 0,
+            get_iteration_count=lambda: 0,
             get_usage_analytics=lambda: None,
             get_rl_coordinator=lambda: self.rl_coordinator,
             get_vertical_context=lambda: self.vertical_context,

@@ -377,7 +377,127 @@ WORKFLOW_GRAPH_ALIAS_DEPRECATION_CONTRACT = DeprecationContract(
     ),
 )
 
+FRAMEWORK_SHIM_DEPRECATION_CONTRACT = DeprecationContract(
+    label="FrameworkShim compatibility surface",
+    runtime_files=(
+        Path("victor/framework/shim.py"),
+        Path("victor/framework/__init__.py"),
+    ),
+    activation_needles=(
+        "FrameworkShim is deprecated",
+        "victor.framework.FrameworkShim is deprecated",
+    ),
+    runtime_requirements=(
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="deprecation warning must publish the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="deprecation warning must publish the target removal date",
+        ),
+        TextRequirement(
+            needle="docs/architecture/migration.md",
+            missing_message="deprecation warning must point at the migration guide",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="deprecation warning must publish the public replacement path",
+        ),
+    ),
+    inventory_path=Path("docs/development/deprecation-inventory-2026-03-03.md"),
+    inventory_requirements=(
+        TextRequirement(
+            needle="`FrameworkShim` compatibility surface",
+            missing_message="deprecation inventory entry is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="deprecation inventory entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="deprecation inventory entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="deprecation inventory entry is missing the public replacement path",
+        ),
+        TextRequirement(
+            needle="AgentFactory",
+            missing_message="deprecation inventory entry is missing the internal replacement path",
+        ),
+    ),
+    changelog_path=Path("CHANGELOG.md"),
+    changelog_requirements=(
+        TextRequirement(
+            needle="## [Unreleased]",
+            missing_message="deprecation changelog entry is missing the Unreleased section",
+        ),
+        TextRequirement(
+            needle="`FrameworkShim` compatibility surface",
+            missing_message="deprecation changelog entry is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="To be removed in:",
+            missing_message="deprecation changelog entry is missing the removal-version line",
+        ),
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="deprecation changelog entry is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="Target removal date:",
+            missing_message="deprecation changelog entry is missing the removal-date line",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="deprecation changelog entry is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Replacement:",
+            missing_message="deprecation changelog entry is missing the replacement line",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="deprecation changelog entry is missing the public replacement path",
+        ),
+        TextRequirement(
+            needle="AgentFactory",
+            missing_message="deprecation changelog entry is missing the internal replacement path",
+        ),
+        TextRequirement(
+            needle="Compatibility shim status:",
+            missing_message="deprecation changelog entry is missing shim-status guidance",
+        ),
+    ),
+    migration_path=Path("docs/architecture/migration.md"),
+    migration_requirements=(
+        TextRequirement(
+            needle="`FrameworkShim`",
+            missing_message="migration guidance is missing the shim family name",
+        ),
+        TextRequirement(
+            needle="v1.0.0",
+            missing_message="migration guidance is missing the target removal version",
+        ),
+        TextRequirement(
+            needle="2027-06-30",
+            missing_message="migration guidance is missing the target removal date",
+        ),
+        TextRequirement(
+            needle="Agent.create()",
+            missing_message="migration guidance is missing the public replacement path",
+        ),
+        TextRequirement(
+            needle="AgentFactory",
+            missing_message="migration guidance is missing the internal replacement path",
+        ),
+    ),
+)
+
 PUBLIC_SHIM_DEPRECATION_CONTRACTS = (
+    FRAMEWORK_SHIM_DEPRECATION_CONTRACT,
     TEAM_NODE_DEPRECATION_CONTRACT,
     WORKFLOW_GRAPH_ALIAS_DEPRECATION_CONTRACT,
 )

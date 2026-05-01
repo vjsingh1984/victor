@@ -376,6 +376,62 @@ async def run_configured_team(
     return resolved_plan, result
 
 
+def resolve_named_team(
+    orchestrator: Any,
+    *,
+    team_name: str,
+    preferred_formation: Optional[str] = None,
+    max_workers: Optional[int] = None,
+    tool_budget: Optional[int] = None,
+) -> Optional[ResolvedTeamExecutionPlan]:
+    """Resolve an explicitly named configured team into a concrete execution plan."""
+    team_specs = _get_team_specs(orchestrator)
+    if not team_specs or team_name not in team_specs:
+        return None
+
+    return resolve_configured_team(
+        orchestrator,
+        task_type=str(team_name),
+        complexity="high",
+        preferred_team=team_name,
+        preferred_formation=preferred_formation,
+        max_workers=max_workers,
+        tool_budget=tool_budget,
+    )
+
+
+async def run_named_team(
+    orchestrator: Any,
+    *,
+    team_name: str,
+    goal: str,
+    preferred_formation: Optional[str] = None,
+    max_workers: Optional[int] = None,
+    tool_budget: Optional[int] = None,
+    context: Optional[Dict[str, Any]] = None,
+    timeout_seconds: int = 600,
+) -> Optional[tuple[ResolvedTeamExecutionPlan, TeamResult]]:
+    """Resolve and execute an explicitly named configured team."""
+    resolved_plan = resolve_named_team(
+        orchestrator,
+        team_name=team_name,
+        preferred_formation=preferred_formation,
+        max_workers=max_workers,
+        tool_budget=tool_budget,
+    )
+    if resolved_plan is None:
+        return None
+
+    result = await execute_resolved_team(
+        orchestrator,
+        goal=goal,
+        resolved_plan=resolved_plan,
+        context=context,
+        timeout_seconds=timeout_seconds,
+    )
+    return resolved_plan, result
+
+
 def resolve_vertical_team_catalog(vertical: Any) -> VerticalTeamCatalog:
     """Resolve team specs from a vertical or cached vertical context.
 
@@ -646,9 +702,9 @@ def _get_coordination_suggestion(
 ) -> Optional[Any]:
     """Ask the shared framework coordination engine for a team recommendation."""
     try:
-        from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
+        from victor.framework.coordination_runtime import get_runtime_coordination_suggestion
 
-        return build_runtime_coordination_suggestion(
+        return get_runtime_coordination_suggestion(
             runtime_subject=orchestrator,
             task_type=task_type,
             complexity=complexity,
@@ -715,11 +771,13 @@ __all__ = [
     "list_registered_team_names",
     "list_registered_workflow_names",
     "resolve_configured_team",
+    "resolve_named_team",
     "resolve_registered_coordination_catalogs",
     "resolve_registered_team_catalogs",
     "resolve_registered_workflow_catalogs",
     "resolve_vertical_coordination_catalog",
     "resolve_vertical_team_catalog",
     "resolve_vertical_workflow_catalog",
+    "run_named_team",
     "run_configured_team",
 ]

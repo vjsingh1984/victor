@@ -100,66 +100,71 @@ class TestFeatureFlagManager:
         config = FeatureFlagConfig(default_enabled=False)
         manager = FeatureFlagManager(config)
 
-        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        # USE_SEMANTIC_RESPONSE_CACHE is opt-in, so it's disabled by default
+        assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
-        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_disable_flag_at_runtime(self):
         """Test disabling a flag at runtime."""
-        config = FeatureFlagConfig(default_enabled=True)
+        config = FeatureFlagConfig(default_enabled=False)
         manager = FeatureFlagManager(config)
 
-        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        # Enable the flag first
+        manager.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
-        manager.disable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        # Then disable it
+        manager.disable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_runtime_override_precedence(self):
         """Test that runtime overrides take precedence over env vars."""
         manager = FeatureFlagManager()
 
         # Enable via runtime
-        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
         # Set env var to false (should be ignored due to runtime override)
-        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": "false"}):
-            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "false"}):
+            assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_clear_runtime_override(self):
         """Test clearing runtime override."""
         config = FeatureFlagConfig(default_enabled=False)
         manager = FeatureFlagManager(config)
 
-        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
-        manager.clear_runtime_override(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.clear_runtime_override(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_get_enabled_flags(self):
         """Test getting all enabled flags."""
         config = FeatureFlagConfig(default_enabled=False)
         manager = FeatureFlagManager(config)
 
-        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        manager.enable(FeatureFlag.USE_NEW_TOOL_SERVICE)
+        manager.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        manager.enable(FeatureFlag.USE_SMART_ROUTING)
 
         enabled = manager.get_enabled_flags()
-        assert enabled[FeatureFlag.USE_NEW_CHAT_SERVICE] is True
-        assert enabled[FeatureFlag.USE_NEW_TOOL_SERVICE] is True
-        assert enabled[FeatureFlag.USE_NEW_CONTEXT_SERVICE] is False
+        assert enabled[FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE] is True
+        assert enabled[FeatureFlag.USE_SMART_ROUTING] is True
+        # Opt-in flags are disabled by default
+        assert enabled[FeatureFlag.USE_FUZZY_MATCHING] is False
 
     def test_set_convenience_method(self):
         """Test the set() convenience method."""
         manager = FeatureFlagManager()
 
-        manager.set(FeatureFlag.USE_NEW_CHAT_SERVICE, True)
-        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.set(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE, True)
+        assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
-        manager.set(FeatureFlag.USE_NEW_CHAT_SERVICE, False)
-        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.set(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE, False)
+        assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_reload_config(self):
         """Test reloading configuration."""
@@ -167,12 +172,12 @@ class TestFeatureFlagManager:
         manager = FeatureFlagManager(config)
 
         # Enable via runtime
-        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
         # Reload should clear runtime overrides
         manager.reload_config()
-        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
 
 class TestEnvironmentVariableLoading:
@@ -180,29 +185,29 @@ class TestEnvironmentVariableLoading:
 
     def test_env_var_true(self):
         """Test loading true from environment variable."""
-        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": "true"}):
+        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "true"}):
             manager = FeatureFlagManager()
-            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+            assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_env_var_false(self):
         """Test loading false from environment variable."""
-        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": "false"}):
+        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": "false"}):
             manager = FeatureFlagManager()
-            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+            assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     @pytest.mark.parametrize("value", ["1", "yes", "on", "YES", "ON"])
     def test_env_var_truthy_values(self, value):
         """Test various truthy values for environment variables."""
-        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": value}):
+        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": value}):
             manager = FeatureFlagManager()
-            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+            assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     @pytest.mark.parametrize("value", ["0", "no", "off", "NO", "OFF", "invalid"])
     def test_env_var_falsy_values(self, value):
         """Test various falsy values for environment variables."""
-        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": value}):
+        with mock.patch.dict(os.environ, {"VICTOR_USE_SEMANTIC_RESPONSE_CACHE": value}):
             manager = FeatureFlagManager()
-            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+            assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
 
 class TestYamlConfiguration:
@@ -214,8 +219,8 @@ class TestYamlConfiguration:
             yaml.dump(
                 {
                     "features": {
-                        "use_new_chat_service": True,
-                        "use_new_tool_service": False,
+                        "use_semantic_response_cache": True,
+                        "use_smart_routing": False,
                     }
                 },
                 f,
@@ -226,10 +231,10 @@ class TestYamlConfiguration:
             config = FeatureFlagConfig(config_path=config_path)
             manager = FeatureFlagManager(config)
 
-            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
-            assert not manager.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE)
-            # Flags not in YAML fall back to default_enabled (True)
-            assert manager.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE)
+            assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+            assert not manager.is_enabled(FeatureFlag.USE_SMART_ROUTING)
+            # Flags not in YAML fall back to default_enabled (False)
+            assert manager.is_enabled(FeatureFlag.USE_FUZZY_MATCHING)
         finally:
             config_path.unlink()
 
@@ -241,7 +246,7 @@ class TestYamlConfiguration:
         manager = FeatureFlagManager(config)
 
         # Should use defaults (False)
-        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_load_from_invalid_yaml_strict_mode(self):
         """Test loading from invalid YAML in strict mode."""
@@ -269,7 +274,7 @@ class TestYamlConfiguration:
             manager = FeatureFlagManager(config)
 
             # Should use defaults (False)
-            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+            assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
         finally:
             config_path.unlink()
 
@@ -279,7 +284,7 @@ class TestYamlConfiguration:
             yaml.dump(
                 {
                     "features": {
-                        "use_new_chat_service": "not_a_bool",
+                        "use_semantic_response_cache": "not_a_bool",
                     }
                 },
                 f,
@@ -299,7 +304,7 @@ class TestYamlConfiguration:
             yaml.dump(
                 {
                     "features": {
-                        "use_new_chat_service": "not_a_bool",
+                        "use_semantic_response_cache": "not_a_bool",
                     }
                 },
                 f,
@@ -313,7 +318,7 @@ class TestYamlConfiguration:
             manager = FeatureFlagManager(config)
 
             # Should ignore invalid value and use default (False)
-            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+            assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
         finally:
             config_path.unlink()
 
@@ -336,12 +341,12 @@ class TestGlobalManager:
 
         config = FeatureFlagConfig(default_enabled=False)
         manager1 = get_feature_flag_manager(config=config)
-        manager1.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager1.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
         manager2 = get_feature_flag_manager(config=config, force_reload=True)
 
         # New instance should not have runtime override
-        assert not manager2.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert not manager2.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
     def test_convenience_functions(self):
         """Test convenience functions."""
@@ -351,13 +356,13 @@ class TestGlobalManager:
         config = FeatureFlagConfig(default_enabled=False)
         get_feature_flag_manager(config=config, force_reload=True)
 
-        assert not is_feature_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert not is_feature_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
-        enable_feature(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert is_feature_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        enable_feature(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert is_feature_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
-        disable_feature(FeatureFlag.USE_NEW_CHAT_SERVICE)
-        assert not is_feature_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        disable_feature(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+        assert not is_feature_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
 
 class TestFeatureConfigModule:
@@ -368,9 +373,9 @@ class TestFeatureConfigModule:
         flags = load_feature_flags_from_settings()
 
         # Should return all expected flags
-        assert "use_new_chat_service" in flags
-        assert "use_new_tool_service" in flags
-        assert "use_new_context_service" in flags
+        assert "use_semantic_response_cache" in flags
+        assert "use_smart_routing" in flags
+        assert "use_fuzzy_matching" in flags
 
     def test_load_from_yaml_config(self):
         """Test loading from YAML configuration file."""
@@ -378,8 +383,8 @@ class TestFeatureConfigModule:
             yaml.dump(
                 {
                     "features": {
-                        "use_new_chat_service": True,
-                        "use_new_tool_service": False,
+                        "use_semantic_response_cache": True,
+                        "use_smart_routing": False,
                     }
                 },
                 f,
@@ -389,8 +394,8 @@ class TestFeatureConfigModule:
         try:
             flags = load_feature_flags_from_yaml(config_path)
 
-            assert flags["use_new_chat_service"] is True
-            assert flags["use_new_tool_service"] is False
+            assert flags["use_semantic_response_cache"] is True
+            assert flags["use_smart_routing"] is False
         finally:
             config_path.unlink()
 
@@ -400,9 +405,9 @@ class TestFeatureConfigModule:
             config_path = Path(tmpdir) / "features.yaml"
 
             flags = {
-                "use_new_chat_service": True,
-                "use_new_tool_service": False,
-                "use_new_context_service": True,
+                "use_semantic_response_cache": True,
+                "use_smart_routing": False,
+                "use_fuzzy_matching": True,
             }
 
             save_feature_flags_to_yaml(flags, config_path)
@@ -414,22 +419,22 @@ class TestFeatureConfigModule:
             with open(config_path, "r") as f:
                 data = yaml.safe_load(f)
 
-            assert data["features"]["use_new_chat_service"] is True
-            assert data["features"]["use_new_tool_service"] is False
-            assert data["features"]["use_new_context_service"] is True
+            assert data["features"]["use_semantic_response_cache"] is True
+            assert data["features"]["use_smart_routing"] is False
+            assert data["features"]["use_fuzzy_matching"] is True
 
     def test_validate_valid_flags(self):
         """Test validation of valid flags."""
         flags = {
-            "use_new_chat_service": True,
-            "use_new_tool_service": False,
+            "use_semantic_response_cache": True,
+            "use_smart_routing": False,
         }
         assert validate_feature_flags(flags) is True
 
     def test_validate_invalid_flag_name(self):
         """Test validation rejects invalid flag names."""
         flags = {
-            "use_new_chat_service": True,
+            "use_semantic_response_cache": True,
             "invalid_flag_name": False,
         }
         assert validate_feature_flags(flags) is False
@@ -437,7 +442,7 @@ class TestFeatureConfigModule:
     def test_validate_invalid_flag_value(self):
         """Test validation rejects invalid flag values."""
         flags = {
-            "use_new_chat_service": "not_a_bool",
+            "use_semantic_response_cache": "not_a_bool",
         }
         assert validate_feature_flags(flags) is False
 
@@ -445,16 +450,16 @@ class TestFeatureConfigModule:
         """Test getting feature flag summary."""
         # Pass flags directly to avoid environment variable interference
         flags = {
-            "use_new_chat_service": True,
-            "use_new_tool_service": False,
+            "use_semantic_response_cache": True,
+            "use_smart_routing": False,
         }
         summary = get_feature_flag_summary(flags)
 
         assert "Feature Flags Status:" in summary
         assert "ENABLED" in summary
         assert "DISABLED" in summary
-        assert "use_new_chat_service" in summary
-        assert "use_new_tool_service" in summary
+        assert "use_semantic_response_cache" in summary
+        assert "use_smart_routing" in summary
 
 
 class TestThreadSafety:
@@ -469,10 +474,10 @@ class TestThreadSafety:
 
         def enable_flag():
             for _ in range(100):
-                manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-                assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
-                manager.disable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-                assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+                manager.enable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+                assert manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+                manager.disable(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
+                assert not manager.is_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE)
 
         threads = [threading.Thread(target=enable_flag) for _ in range(10)]
 

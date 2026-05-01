@@ -46,7 +46,9 @@ def test_chat_graph_watch_ensures_project_singleton_by_default(tmp_path):
 
     with (
         patch.object(chat_cmd, "get_project_paths", return_value=paths),
-        patch("victor.ui.commands.graph.ensure_graph_watch_daemon", return_value=state) as mock_ensure,
+        patch(
+            "victor.ui.commands.graph.ensure_graph_watch_daemon", return_value=state
+        ) as mock_ensure,
         patch("victor.ui.commands.graph._read_graph_watch_manifest", return_value=manifest),
     ):
         messages = chat_cmd._ensure_graph_watch_for_chat(enabled=True)

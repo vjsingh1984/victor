@@ -170,9 +170,7 @@ def test_refresh_system_prompt_preserves_existing_classification():
     builder.invalidate_cache.assert_called_once_with()
     assert host._system_prompt_frozen is False
     assert host._session_tools is None
-    runtime.update_system_prompt_for_query.assert_called_once_with(
-        query_classification="existing"
-    )
+    runtime.update_system_prompt_for_query.assert_called_once_with(query_classification="existing")
 
 
 def test_get_set_and_append_system_prompt_delegate_to_builder():

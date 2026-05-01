@@ -649,6 +649,18 @@ class TaskComplexityService:
                 matched_patterns=[],
             )
 
+        from victor.framework.task.direct_response import classify_direct_response_prompt
+
+        direct_response = classify_direct_response_prompt(message)
+        if direct_response.is_direct_response:
+            tool_budget = 1 if direct_response.is_exact_response else 2
+            return TaskClassification(
+                complexity=TaskComplexity.SIMPLE,
+                tool_budget=tool_budget,
+                confidence=direct_response.confidence,
+                matched_patterns=[f"direct_response:{direct_response.reason}"],
+            )
+
         # Try custom classifiers first
         for classifier in self.custom_classifiers:
             result = classifier(message)

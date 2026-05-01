@@ -23,9 +23,9 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from victor.framework.team_runtime import VerticalCoordinationCatalog
 from victor.protocols.coordination import (
+    CoordinationAdvisorProtocol,
     CoordinationSuggestion,
     ComplexityLevel,
-    ModeWorkflowTeamCoordinatorProtocol,
     TeamRecommendation,
     TeamSelectionStrategyProtocol,
     TeamSuggestionAction,
@@ -60,7 +60,7 @@ class ModeCoordinationConfig:
     system_prompt_addition: str = ""
 
 
-class VerticalCoordinationAdvisor(ModeWorkflowTeamCoordinatorProtocol):
+class VerticalCoordinationAdvisor(CoordinationAdvisorProtocol):
     """Framework-native advisor for team/workflow coordination on one vertical context."""
 
     def __init__(
@@ -819,6 +819,37 @@ def build_runtime_coordination_suggestion(
     )
 
 
+def get_runtime_coordination_suggestion(
+    *,
+    runtime_subject: Any,
+    task_type: str,
+    complexity: str,
+    mode: Optional[str] = None,
+) -> CoordinationSuggestion:
+    """Get a runtime coordination suggestion via the subject's canonical API when available."""
+    getter = getattr(runtime_subject, "get_coordination_suggestion", None)
+    if callable(getter):
+        try:
+            return getter(task_type, complexity, mode=mode)
+        except TypeError:
+            if mode is None:
+                try:
+                    return getter(task_type, complexity)
+                except Exception as exc:
+                    logger.debug("Runtime coordination getter fallback failed: %s", exc)
+            else:
+                logger.debug("Runtime coordination getter rejected mode=%s", mode)
+        except Exception as exc:
+            logger.debug("Runtime coordination getter failed: %s", exc)
+
+    return build_runtime_coordination_suggestion(
+        runtime_subject=runtime_subject,
+        task_type=task_type,
+        complexity=complexity,
+        mode=mode,
+    )
+
+
 def _resolve_runtime_mode(runtime_subject: Any) -> str:
     """Resolve the current mode from a runtime-like object."""
     mode_controller = getattr(runtime_subject, "mode_controller", None)
@@ -1025,6 +1056,7 @@ __all__ = [
     "build_registered_coordination_suggestions",
     "build_coordination_suggestion",
     "build_runtime_coordination_suggestion",
+    "get_runtime_coordination_suggestion",
     "get_action_for_complexity",
     "recommend_teams_for_catalog",
     "recommend_workflows_for_catalog",

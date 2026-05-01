@@ -107,7 +107,9 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         self._streaming_executor: Optional["StreamingChatExecutor"] = None
         self._runtime_bindings: Optional[StreamingRuntimeBindings] = None
 
-    def _get_runtime_bindings(self, runtime_owner: Optional[Any] = None) -> StreamingRuntimeBindings:
+    def _get_runtime_bindings(
+        self, runtime_owner: Optional[Any] = None
+    ) -> StreamingRuntimeBindings:
         """Return resolved runtime state/capability bindings for the active owner."""
         owner = runtime_owner if runtime_owner is not None else self._orchestrator
         if self._runtime_bindings is None or self._runtime_bindings.runtime_owner is not owner:

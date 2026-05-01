@@ -149,6 +149,37 @@ def test_build_codebase_embedding_config_forwards_existing_search_settings(tmp_p
         assert config["extra_config"]["upstream_vector_store"] == "lancedb"
 
 
+def test_build_codebase_embedding_config_reads_nested_groups(tmp_path) -> None:
+    """Nested Settings groups should be the primary config source."""
+    settings = SimpleNamespace(
+        search=SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="",
+            codebase_persist_directory=None,
+            codebase_dimension=256,
+            codebase_batch_size=9,
+            codebase_structural_indexing_enabled=True,
+            codebase_chunking_strategy="custom_chunks",
+            codebase_chunk_size=111,
+            codebase_chunk_overlap=7,
+            codebase_embedding_extra_config={"table_name": "nested_embeddings"},
+        ),
+        embedding=SimpleNamespace(unified_embedding_model="nested-shared-model"),
+    )
+
+    config = _build_codebase_embedding_config(settings, tmp_path)
+
+    assert config["embedding_model_name"] == "nested-shared-model"
+    assert config["extra_config"]["dimension"] == 256
+    assert config["extra_config"]["batch_size"] == 9
+    assert config["extra_config"]["structural_indexing_enabled"] is True
+    assert config["extra_config"]["code_chunking_strategy"] == "custom_chunks"
+    assert config["extra_config"]["chunk_size"] == 111
+    assert config["extra_config"]["chunk_overlap"] == 7
+    assert config["extra_config"]["table_name"] == "nested_embeddings"
+
+
 @pytest.mark.asyncio
 async def test_code_search_bug_mode_uses_provider_capability(tmp_path) -> None:
     """Bug mode should delegate to the provider-backed similar bug search."""
@@ -2525,6 +2556,10 @@ async def test_code_search_reuses_missing_provider_failure_across_repo_subdirect
         staticmethod(lambda: registry),
     )
     monkeypatch.setattr(bootstrap_module, "_discover_plugin_capabilities", lambda *_args: None)
+    monkeypatch.setattr(
+        "victor.tools.code_search_tool._load_codebase_index_factory_via_importlib",
+        lambda: None,
+    )
     monkeypatch.setattr(_get_or_build_index, "_failure_cache", failure_cache, raising=False)
     clear_index_cache()
 

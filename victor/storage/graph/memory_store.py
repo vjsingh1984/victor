@@ -153,7 +153,10 @@ class MemoryGraphStore(GraphStoreProtocol):
             file
             for file, current_mtime in file_mtimes.items()
             if max(
-                (self._file_mtimes.get(variant, float("-inf")) for variant in self._file_path_variants(file)),
+                (
+                    self._file_mtimes.get(variant, float("-inf"))
+                    for variant in self._file_path_variants(file)
+                ),
                 default=float("-inf"),
             )
             < current_mtime

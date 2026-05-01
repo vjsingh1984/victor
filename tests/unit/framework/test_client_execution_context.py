@@ -113,10 +113,16 @@ async def test_victor_client_stream_prefers_execution_context_chat_service() -> 
         stream_chat=MagicMock(side_effect=_stream_chat),
     )
     execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service, session=None))
+    orchestrator = SimpleNamespace(_execution_context=execution_context)
 
     class _FakeAgent:
         async def stream(self, _message: str):
-            raise AssertionError("VictorClient.stream() should prefer execution-context chat service")
+            raise AssertionError(
+                "VictorClient.stream() should prefer execution-context chat service"
+            )
+
+        def get_orchestrator(self):
+            return orchestrator
 
     client._agent = _FakeAgent()
     client._context = execution_context
@@ -208,9 +214,7 @@ async def test_chat_session_stream_prefers_execution_context_chat_service() -> N
         stream_chat=MagicMock(side_effect=_stream_chat),
         reset_conversation=MagicMock(),
     )
-    execution_context = SimpleNamespace(
-        services=SimpleNamespace(chat=chat_service, session=None)
-    )
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service, session=None))
     mock_orchestrator = MagicMock()
     mock_orchestrator.__class__.__name__ = "AgentOrchestrator"
     mock_orchestrator.provider = MagicMock()

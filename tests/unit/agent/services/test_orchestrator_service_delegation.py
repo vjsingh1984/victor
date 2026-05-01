@@ -1507,9 +1507,7 @@ class TestChatServiceBootstrapLaziness:
 
         AgentOrchestrator.update_system_prompt_for_query(obj, query_classification="coding")
 
-        helper.update_system_prompt_for_query.assert_called_once_with(
-            query_classification="coding"
-        )
+        helper.update_system_prompt_for_query.assert_called_once_with(query_classification="coding")
 
     def test_refresh_system_prompt_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator

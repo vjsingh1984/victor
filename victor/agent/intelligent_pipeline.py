@@ -862,6 +862,20 @@ class IntelligentAgentPipeline:
             )
         return self._stats
 
+    def get_optimal_tool_budget(self, task_type: str) -> int:
+        """Get the learned optimal tool budget for a task type.
+
+        Args:
+            task_type: The type of task to get the budget for
+
+        Returns:
+            The learned optimal tool budget, or 0 if mode learning is not enabled
+        """
+        controller = self._get_mode_controller()
+        if controller:
+            return controller.get_optimal_tool_budget(task_type)
+        return 0
+
     def reset_session(self) -> None:
         """Reset session tracking."""
         self._session_start = datetime.now()
@@ -888,16 +902,16 @@ class IntelligentAgentPipeline:
 
 
 # Module-level convenience functions
-_pipeline_cache: Dict[tuple, IntelligentAgentPipeline] = {}
+_intelligent_agent_cache: Dict[tuple, IntelligentAgentPipeline] = {}
 
 
-async def get_pipeline(
+async def get_intelligent_agent(
     provider_name: str,
     model: str,
     profile_name: Optional[str] = None,
     project_root: Optional[str] = None,
 ) -> IntelligentAgentPipeline:
-    """Get or create a pipeline instance.
+    """Get or create an intelligent agent instance.
 
     Args:
         provider_name: Provider name
@@ -910,17 +924,17 @@ async def get_pipeline(
     """
     key = (provider_name, model, profile_name or "default", project_root)
 
-    if key not in _pipeline_cache:
-        _pipeline_cache[key] = await IntelligentAgentPipeline.create(
+    if key not in _intelligent_agent_cache:
+        _intelligent_agent_cache[key] = await IntelligentAgentPipeline.create(
             provider_name=provider_name,
             model=model,
             profile_name=profile_name,
             project_root=project_root,
         )
 
-    return _pipeline_cache[key]
+    return _intelligent_agent_cache[key]
 
 
-def clear_pipeline_cache() -> None:
-    """Clear the pipeline cache."""
-    _pipeline_cache.clear()
+def clear_intelligent_agent_cache() -> None:
+    """Clear the intelligent agent cache."""
+    _intelligent_agent_cache.clear()

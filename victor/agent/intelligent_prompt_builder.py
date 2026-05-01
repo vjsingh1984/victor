@@ -869,6 +869,10 @@ GROUNDING:
             "action": "[ACTION] Execute git/test/build. Continue until complete.",
             "analysis_deep": "[ANALYSIS] Thorough exploration. Read all modules.",
             "analyze": "[ANALYZE] Examine code carefully. Structured findings.",
+            "general_query": (
+                "[QUERY] Answer directly. Use tools only if the prompt explicitly "
+                "requires external lookup or workspace inspection."
+            ),
             "general": "[GENERAL] Moderate exploration. Answer concisely.",
         }
         task_type_str = str(task_type).lower() if task_type else "general"

@@ -263,6 +263,10 @@ class TestQADetection:
         msg = "Can you fix the broken authentication in the login page?"
         assert TurnExecutor._is_question_only(msg) is False
 
+    def test_codebase_question_not_qa(self):
+        msg = "What does the auth module do?"
+        assert TurnExecutor._is_question_only(msg) is False
+
 
 # =====================================================================
 # Streaming pipeline Q&A bypass

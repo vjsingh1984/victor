@@ -407,7 +407,7 @@ async def test_tool_service_on_tool_complete_uses_canonical_completion_flow():
             nudge_sent_flag=nudge_flag,
             add_message=add_message,
             observability=observability,
-            pipeline_calls_used=2,
+            iteration_count=2,
         )
         await asyncio.sleep(0)
 

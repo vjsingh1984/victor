@@ -1662,6 +1662,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             ClassifierTaskType.ANALYZE: TrackerTaskType.ANALYZE,
             ClassifierTaskType.DESIGN: TrackerTaskType.DESIGN,
             ClassifierTaskType.GENERAL: TrackerTaskType.GENERAL,
+            ClassifierTaskType.GENERAL_QUERY: TrackerTaskType.GENERAL,
             # Map additional types to closest match
             ClassifierTaskType.ACTION: TrackerTaskType.GENERAL,  # Actions use general limits
             ClassifierTaskType.ANALYSIS_DEEP: TrackerTaskType.ANALYZE,  # Deep analysis uses analyze limits

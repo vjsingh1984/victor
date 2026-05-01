@@ -157,6 +157,12 @@ The following will be deprecated in future releases:
    Use `BasicWorkflowGraph` for the simple container or
    `victor.workflows.graph_dsl.WorkflowGraph` for the typed DSL. Removal
    target: `v0.8.0` (`2026-12-31`).
+6. **Legacy `FrameworkShim` compatibility surface**
+   Use `Agent.create()` for public callers or `AgentFactory` /
+   `AgentCreationFactory` for internal composition. The legacy
+   `victor chat --legacy` path has been removed; chat now always uses the
+   canonical framework client path. Removal target: `v1.0.0`
+   (`2027-06-30`).
 
 ## Performance
 

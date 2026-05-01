@@ -13,12 +13,14 @@ from victor.framework.team_runtime import (
     list_registered_team_names,
     list_registered_workflow_names,
     resolve_configured_team,
+    resolve_named_team,
     resolve_registered_coordination_catalogs,
     resolve_registered_team_catalogs,
     resolve_registered_workflow_catalogs,
     resolve_vertical_coordination_catalog,
     resolve_vertical_team_catalog,
     resolve_vertical_workflow_catalog,
+    run_named_team,
     VerticalWorkflowCatalog,
 )
 from victor.teams.types import TeamFormation, TeamResult
@@ -49,14 +51,12 @@ def test_resolve_configured_team_prefers_coordination_recommendation():
             "feature_team": feature_team,
             "review_team": review_team,
         },
-        coordination=SimpleNamespace(
-            suggest_for_task=lambda **_: SimpleNamespace(
-                primary_team=SimpleNamespace(
-                    team_name="feature_team",
-                    formation="parallel",
-                    reason="Feature work needs parallel research and execution",
-                    source="hybrid",
-                )
+        get_coordination_suggestion=lambda *_, **__: SimpleNamespace(
+            primary_team=SimpleNamespace(
+                team_name="feature_team",
+                formation="parallel",
+                reason="Feature work needs parallel research and execution",
+                source="hybrid",
             )
         ),
         mode_controller=SimpleNamespace(current_mode=SimpleNamespace(value="build")),
@@ -78,6 +78,30 @@ def test_resolve_configured_team_prefers_coordination_recommendation():
     assert resolved.recommendation_source == "hybrid"
 
 
+def test_resolve_named_team_prefers_explicit_team_and_reuses_plan_logic():
+    feature_team = _make_team_spec(name="Feature Team", formation=TeamFormation.PARALLEL)
+    orchestrator = SimpleNamespace(
+        get_team_specs=lambda: {
+            "feature_team": feature_team,
+        }
+    )
+
+    resolved = resolve_named_team(
+        orchestrator,
+        team_name="feature_team",
+        max_workers=1,
+        tool_budget=7,
+    )
+
+    assert resolved is not None
+    assert resolved.team_name == "feature_team"
+    assert resolved.display_name == "Feature Team"
+    assert resolved.formation == TeamFormation.PARALLEL
+    assert resolved.member_count == 1
+    assert resolved.total_tool_budget == 7
+    assert resolved.recommendation_source == "explicit"
+
+
 @pytest.mark.asyncio
 async def test_execute_resolved_team_limits_members_and_passes_budget():
     members = [
@@ -95,14 +119,12 @@ async def test_execute_resolved_team_limits_members_and_passes_budget():
                 max_iterations=9,
             )
         },
-        coordination=SimpleNamespace(
-            suggest_for_task=lambda **_: SimpleNamespace(
-                primary_team=SimpleNamespace(
-                    team_name="feature_team",
-                    formation="hierarchical",
-                    reason="Hierarchical execution fits the task",
-                    source="rule",
-                )
+        get_coordination_suggestion=lambda *_, **__: SimpleNamespace(
+            primary_team=SimpleNamespace(
+                team_name="feature_team",
+                formation="hierarchical",
+                reason="Hierarchical execution fits the task",
+                source="rule",
             )
         ),
         mode_controller=SimpleNamespace(current_mode=SimpleNamespace(value="build")),
@@ -145,6 +167,45 @@ async def test_execute_resolved_team_limits_members_and_passes_budget():
     assert kwargs["total_tool_budget"] == 5
     assert len(kwargs["members"]) == 2
     assert kwargs["members"][0].name == "Planner"
+
+
+@pytest.mark.asyncio
+async def test_run_named_team_executes_explicit_team_plan():
+    feature_team = _make_team_spec(name="Feature Team", formation=TeamFormation.PARALLEL)
+    orchestrator = SimpleNamespace(
+        get_team_specs=lambda: {"feature_team": feature_team},
+    )
+    expected_result = TeamResult(
+        success=True,
+        final_output="done",
+        member_results={},
+        formation=TeamFormation.PARALLEL,
+        total_tool_calls=1,
+    )
+
+    with patch(
+        "victor.framework.team_runtime.execute_resolved_team",
+        new=AsyncMock(return_value=expected_result),
+    ) as execute_team:
+        team_execution = await run_named_team(
+            orchestrator,
+            team_name="feature_team",
+            goal="Ship the feature",
+            context={"query": "Ship the feature"},
+            timeout_seconds=30,
+        )
+
+    assert team_execution is not None
+    resolved_plan, result = team_execution
+    assert resolved_plan.team_name == "feature_team"
+    assert result is expected_result
+    execute_team.assert_awaited_once_with(
+        orchestrator,
+        goal="Ship the feature",
+        resolved_plan=resolved_plan,
+        context={"query": "Ship the feature"},
+        timeout_seconds=30,
+    )
 
 
 def test_resolve_vertical_team_catalog_reads_provider_specs():

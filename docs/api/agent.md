@@ -575,7 +575,7 @@ agent = Agent(
 
 ## See Also
 
-- [Configuration API](config.md) - Profiles and settings
+- [Configuration API](../users/reference/config.md) - Profiles and settings
 - [Tools API](tools.md) - Tool registration
 - [Provider API](providers.md) - Provider customization
 - [StateGraph API](graph.md) - Workflow creation

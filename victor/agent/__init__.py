@@ -76,8 +76,8 @@ if not _LIGHT_IMPORT:
         RequestContext,
         ResponseResult,
         PipelineStats,
-        get_pipeline,
-        clear_pipeline_cache,
+        get_intelligent_agent,
+        clear_intelligent_agent_cache,
     )
     from victor.agent.orchestrator_integration import (
         OrchestratorIntegration,
@@ -132,8 +132,8 @@ if not _LIGHT_IMPORT:
         "RequestContext",
         "ResponseResult",
         "PipelineStats",
-        "get_pipeline",
-        "clear_pipeline_cache",
+        "get_intelligent_agent",
+        "clear_intelligent_agent_cache",
         # Orchestrator Integration
         "OrchestratorIntegration",
         "IntegrationConfig",

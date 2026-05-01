@@ -10,6 +10,7 @@ import logging
 from typing import Any, TYPE_CHECKING
 
 from victor.agent.response_sanitizer import create_streaming_filter
+from victor.framework.events import EventType
 from victor.ui.rendering.protocol import StreamRenderer
 from victor.ui.rendering.utils import (
     StreamDeltaNormalizer,
@@ -36,7 +37,7 @@ async def stream_response(
 
     Thinking Content Handling (dual-mode):
     - **API-based reasoning**: DeepSeek API sends reasoning content via
-      `chunk.metadata["reasoning_content"]`. This is handled directly and
+      `event.metadata["reasoning_content"]`. This is handled directly and
       rendered through `renderer.on_thinking_content()`.
     - **Inline markers**: Models like Qwen3 or local Ollama models may use
       inline markers (`<think>...</think>`, `<|begin_of_thinking|>`).
@@ -47,7 +48,7 @@ async def stream_response(
     to regular content output.
 
     Args:
-        agent: The agent instance to stream from (any type with stream_chat method)
+        agent: The agent instance to stream from (Agent facade with stream method)
         message: The user message to send
         renderer: The renderer to use for output
         suppress_thinking: If True, completely hide thinking content
@@ -56,7 +57,7 @@ async def stream_response(
         The accumulated response content
     """
     renderer.start()
-    stream_gen = agent.stream_chat(message)
+    stream_gen = agent.stream(message)
 
     # Initialize content filter for thinking markers
     content_filter = create_streaming_filter(suppress_thinking=suppress_thinking)
@@ -105,48 +106,46 @@ async def stream_response(
             was_thinking = False
 
     try:
-        async for chunk in stream_gen:
+        async for event in stream_gen:
             chunk_count += 1
 
-            # Log every 100th chunk to diagnose duplication/buffering issues
+            # Log every 100th event to diagnose duplication/buffering issues
             if chunk_count % 100 == 0:
-                content_len = len(chunk.content) if chunk.content else 0
-                metadata_keys = list(chunk.metadata.keys()) if chunk.metadata else []
+                content_len = len(event.content) if event.content else 0
                 logger.debug(
-                    f"Stream chunk #{chunk_count}: "
+                    f"Stream event #{chunk_count}: "
+                    f"type={event.type}, "
                     f"content_len={content_len}, "
-                    f"metadata_keys={metadata_keys}, "
                     f"is_thinking={content_filter.is_thinking}"
                 )
 
             # Handle structured tool events
-            if chunk.metadata and "tool_start" in chunk.metadata:
-                tool_data = chunk.metadata["tool_start"]
+            if event.type == EventType.TOOL_CALL:
                 renderer.on_tool_start(
-                    name=tool_data["name"],
-                    arguments=tool_data.get("arguments", {}),
+                    name=event.tool_name or "unknown",
+                    arguments=event.metadata.get("arguments", {}) if event.metadata else {},
                 )
-            elif chunk.metadata and "tool_result" in chunk.metadata:
-                tool_data = chunk.metadata["tool_result"]
+            elif event.type == EventType.TOOL_RESULT:
+                result_data = event.result or {}
                 tool_result_kwargs = {
-                    "name": tool_data["name"],
-                    "success": tool_data.get("success", True),
-                    "elapsed": tool_data.get("elapsed", 0),
-                    "arguments": tool_data.get("arguments", {}),
-                    "error": tool_data.get("error"),
-                    "follow_up_suggestions": tool_data.get("follow_up_suggestions"),
-                    "result": tool_data.get("result"),
+                    "name": event.tool_name or "unknown",
+                    "success": result_data.get("success", True),
+                    "elapsed": result_data.get("elapsed", 0),
+                    "arguments": result_data.get("arguments", {}),
+                    "error": result_data.get("error"),
+                    "follow_up_suggestions": result_data.get("follow_up_suggestions"),
+                    "result": result_data.get("result"),
                 }
-                if "original_result" in tool_data:
-                    tool_result_kwargs["original_result"] = tool_data.get("original_result")
-                if tool_data.get("was_pruned"):
+                if "original_result" in result_data:
+                    tool_result_kwargs["original_result"] = result_data.get("original_result")
+                if result_data.get("was_pruned"):
                     tool_result_kwargs["was_pruned"] = True
                 renderer.on_tool_result(
                     **tool_result_kwargs,
                 )
             # Handle status messages (thinking indicator, etc.)
-            elif chunk.metadata and "status" in chunk.metadata:
-                status_message = str(chunk.metadata["status"])
+            elif event.metadata and "status" in event.metadata:
+                status_message = str(event.metadata["status"])
                 if is_thinking_status_message(status_message):
                     if not suppress_thinking and not was_thinking:
                         logger.debug("→ Entering thinking mode (status event)")
@@ -156,21 +155,21 @@ async def stream_response(
                 else:
                     renderer.on_status(status_message)
             # Handle file preview
-            elif chunk.metadata and "file_preview" in chunk.metadata:
+            elif event.metadata and "file_preview" in event.metadata:
                 renderer.on_file_preview(
-                    path=chunk.metadata.get("path", ""),
-                    content=chunk.metadata["file_preview"],
+                    path=event.metadata.get("path", ""),
+                    content=event.metadata["file_preview"],
                 )
             # Handle edit preview
-            elif chunk.metadata and "edit_preview" in chunk.metadata:
+            elif event.metadata and "edit_preview" in event.metadata:
                 renderer.on_edit_preview(
-                    path=chunk.metadata.get("path", ""),
-                    diff=chunk.metadata["edit_preview"],
+                    path=event.metadata.get("path", ""),
+                    diff=event.metadata["edit_preview"],
                 )
             # Handle reasoning_content from DeepSeek API (separate from inline markers)
             # DeepSeek sends reasoning via metadata, not inline <think> markers
-            elif chunk.metadata and "reasoning_content" in chunk.metadata:
-                reasoning = chunk.metadata["reasoning_content"]
+            elif event.metadata and "reasoning_content" in event.metadata:
+                reasoning = event.metadata["reasoning_content"]
                 if reasoning and not suppress_thinking:
                     # Filter out provider-added continuation markers to avoid
                     # duplicating our own thinking indicator in the transcript.
@@ -201,11 +200,11 @@ async def stream_response(
                             len(reasoning),
                             reasoning[:60],
                         )
-                if chunk.content:
-                    process_content(chunk.content)
+                if event.content:
+                    process_content(event.content)
             # Handle content - filter through StreamingContentFilter
-            elif chunk.content:
-                process_content(chunk.content)
+            elif event.content:
+                process_content(event.content)
 
             # Check if we should abort due to excessive thinking
             if content_filter.should_abort():

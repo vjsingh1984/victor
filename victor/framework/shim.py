@@ -15,8 +15,10 @@
 """Backward-compatible shim bridging legacy CLI to Framework API.
 
 .. deprecated::
-    This module is deprecated and will be removed in Victor 2.0.
-    Migrate to using ``Agent.create()`` directly from the Framework API.
+    This module is deprecated and remains supported only through
+    ``v1.0.0`` (``2027-06-30``). Migrate to ``Agent.create()`` from the
+    Framework API or, for internal composition, ``AgentFactory`` /
+    ``AgentCreationFactory``.
 
 This module provides a transition layer that allows existing code using
 AgentOrchestrator.from_settings() to benefit from framework features
@@ -40,7 +42,7 @@ Design Pattern: Adapter
 - Wraps legacy creation with framework wiring
 - Adds framework features without breaking existing callers
 
-For migration examples, see: ``docs/MIGRATION_GUIDE.md``
+For migration examples, see: ``docs/architecture/migration.md``
 """
 
 from __future__ import annotations
@@ -66,8 +68,9 @@ class FrameworkShim:
     """Shim layer for framework-enhanced orchestrator creation.
 
     .. deprecated::
-        ``FrameworkShim`` is deprecated and will be removed in Victor 2.0.
-        Use ``Agent.create()`` from the Framework API instead.
+        ``FrameworkShim`` is deprecated and remains supported only through
+        ``v1.0.0`` (``2027-06-30``). Use ``Agent.create()`` from the
+        Framework API instead.
 
     This class bridges the gap between the legacy CLI path (which uses
     AgentOrchestrator.from_settings()) and the new Framework API (which
@@ -140,10 +143,11 @@ class FrameworkShim:
         import warnings
 
         warnings.warn(
-            "FrameworkShim is deprecated and will be removed in Victor 2.0. "
-            "Use Agent.create() from the Framework API instead. "
-            "See docs/MIGRATION_GUIDE.md for migration examples. "
-            "Example: orchestrator = await Agent.create(settings, profile='default')",
+            "FrameworkShim is deprecated. Use Agent.create() from the Framework API instead. "
+            "Internal surface layers should compose AgentFactory / AgentCreationFactory. "
+            "This warning-backed compatibility shim remains supported through "
+            "v1.0.0 (2027-06-30). "
+            "See docs/architecture/migration.md for migration guidance.",
             DeprecationWarning,
             stacklevel=2,
         )

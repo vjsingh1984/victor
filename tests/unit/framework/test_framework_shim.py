@@ -128,6 +128,19 @@ class TestFrameworkShimBasic:
         )
         return orch
 
+    def test_warning_publishes_removal_milestone(self, mock_settings):
+        """FrameworkShim warning should publish the tracked deprecation contract."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", DeprecationWarning)
+            FrameworkShim(mock_settings)
+
+        assert caught
+        message = str(caught[0].message)
+        assert "v1.0.0" in message
+        assert "2027-06-30" in message
+        assert "Agent.create()" in message
+        assert "docs/architecture/migration.md" in message
+
     @pytest.mark.asyncio
     async def test_create_orchestrator_without_vertical(self, mock_settings, mock_orchestrator):
         """Test basic orchestrator creation without vertical."""

@@ -430,7 +430,9 @@ async def prompt_service_node(
     )
     model = str(context.get("current_model") or context.get("model") or "")
     task_type = str(context.get("task_type") or "default")
-    resolved_base_prompt = base_prompt if base_prompt is not None else context.get("base_prompt", "")
+    resolved_base_prompt = (
+        base_prompt if base_prompt is not None else context.get("base_prompt", "")
+    )
 
     activated = False
     try:

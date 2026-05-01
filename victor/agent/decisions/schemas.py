@@ -136,16 +136,26 @@ class ContinuationAction(str, Enum):
     """Action to take for continuation decisions.
 
     Determines how to proceed:
-    - FINISH: Task is complete
-    - PROMPT_TOOL_CALL: Prompt to use tools
-    - REQUEST_SUMMARY: Request summary
+    - CONTINUE_ASKING_INPUT: Ask a short follow-up and continue
     - RETURN_TO_USER: Return control to user
+    - PROMPT_TOOL_CALL: Prompt to use tools
+    - CONTINUE_WITH_SYNTHESIS_HINT: Continue with a synthesis nudge
+    - REQUEST_SUMMARY: Request summary
+    - REQUEST_COMPLETION: Request explicit completion
+    - EXECUTE_EXTRACTED_TOOL: Execute a recovered tool call
+    - FORCE_TOOL_EXECUTION: Force the model to emit a real tool call
+    - FINISH: Task is complete
     """
 
+    CONTINUE_ASKING_INPUT = "continue_asking_input"
+    RETURN_TO_USER = "return_to_user"
+    PROMPT_TOOL_CALL = "prompt_tool_call"
+    CONTINUE_WITH_SYNTHESIS_HINT = "continue_with_synthesis_hint"
+    REQUEST_SUMMARY = "request_summary"
+    REQUEST_COMPLETION = "request_completion"
+    EXECUTE_EXTRACTED_TOOL = "execute_extracted_tool"
+    FORCE_TOOL_EXECUTION = "force_tool_execution"
     FINISH = "finish"  # Task complete
-    PROMPT_TOOL_CALL = "prompt_tool_call"  # Prompt to use tools
-    REQUEST_SUMMARY = "request_summary"  # Request summary
-    RETURN_TO_USER = "return_to_user"  # Return control
 
 
 class DeliverableType(str, Enum):

@@ -96,6 +96,38 @@ def _get_instance_attr(obj: Any, name: str, default: Any = None) -> Any:
     return default
 
 
+def _get_settings_group_value(
+    settings: Any, group_name: str, field_name: str, default: Any = None
+) -> Any:
+    """Resolve a setting from its nested group, with flat fallback for test doubles."""
+
+    group = getattr(settings, group_name, None)
+    if group is not None and hasattr(group, field_name):
+        return getattr(group, field_name)
+    return getattr(settings, field_name, default)
+
+
+def _get_search_setting(settings: Any, field_name: str, default: Any = None) -> Any:
+    """Resolve a code-search setting from the canonical search group."""
+
+    return _get_settings_group_value(settings, "search", field_name, default)
+
+
+def _get_embedding_setting(settings: Any, field_name: str, default: Any = None) -> Any:
+    """Resolve an embedding setting from the canonical embedding group."""
+
+    return _get_settings_group_value(settings, "embedding", field_name, default)
+
+
+def _resolve_codebase_embedding_model(settings: Any) -> Any:
+    """Resolve the codebase embedding model with nested-group fallback semantics."""
+
+    codebase_model = _get_search_setting(settings, "codebase_embedding_model", None)
+    if codebase_model not in (None, ""):
+        return codebase_model
+    return _get_embedding_setting(settings, "unified_embedding_model", "all-MiniLM-L12-v2")
+
+
 def _get_index_build_failure_cache(exec_ctx: Optional[Any] = None) -> Any:
     """Resolve the index-build failure cache without triggering mock fallback attrs."""
 
@@ -212,21 +244,23 @@ def _build_codebase_embedding_extra_config(
     """
 
     extra_config: Dict[str, Any] = {
-        "dimension": getattr(settings, "codebase_dimension", 384),
-        "batch_size": getattr(settings, "codebase_batch_size", 32),
-        "structural_indexing_enabled": getattr(
+        "dimension": _get_search_setting(settings, "codebase_dimension", 384),
+        "batch_size": _get_search_setting(settings, "codebase_batch_size", 32),
+        "structural_indexing_enabled": _get_search_setting(
             settings, "codebase_structural_indexing_enabled", False
         ),
-        "code_chunking_strategy": getattr(
+        "code_chunking_strategy": _get_search_setting(
             settings, "codebase_chunking_strategy", DEFAULT_CODEBASE_CHUNKING_STRATEGY
         ),
-        "chunk_size": getattr(settings, "codebase_chunk_size", DEFAULT_CODEBASE_CHUNK_SIZE),
-        "chunk_overlap": getattr(
+        "chunk_size": _get_search_setting(
+            settings, "codebase_chunk_size", DEFAULT_CODEBASE_CHUNK_SIZE
+        ),
+        "chunk_overlap": _get_search_setting(
             settings, "codebase_chunk_overlap", DEFAULT_CODEBASE_CHUNK_OVERLAP
         ),
     }
 
-    custom_extra = getattr(settings, "codebase_embedding_extra_config", None)
+    custom_extra = _get_search_setting(settings, "codebase_embedding_extra_config", None)
     if isinstance(custom_extra, dict):
         extra_config.update(custom_extra)
 
@@ -243,16 +277,12 @@ def _build_codebase_embedding_config(settings: Any, root: Path) -> Dict[str, Any
 
     default_persist_dir = str(get_project_paths(root).embeddings_dir)
     config = {
-        "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
-        "embedding_model_type": getattr(
+        "vector_store": _get_search_setting(settings, "codebase_vector_store", "lancedb"),
+        "embedding_model_type": _get_search_setting(
             settings, "codebase_embedding_provider", "sentence-transformers"
         ),
-        "embedding_model_name": getattr(
-            settings,
-            "codebase_embedding_model",
-            getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
-        ),
-        "persist_directory": getattr(settings, "codebase_persist_directory", None)
+        "embedding_model_name": _resolve_codebase_embedding_model(settings),
+        "persist_directory": _get_search_setting(settings, "codebase_persist_directory", None)
         or default_persist_dir,
         "extra_config": _build_codebase_embedding_extra_config(settings, root),
     }
@@ -290,24 +320,28 @@ def _collect_code_search_backend_metadata(index: Any, settings: Any) -> Dict[str
             )
 
     # Fall back to settings when the backend does not expose explicit config.
-    metadata.setdefault("vector_store", getattr(settings, "codebase_vector_store", "lancedb"))
+    metadata.setdefault(
+        "vector_store", _get_search_setting(settings, "codebase_vector_store", "lancedb")
+    )
     metadata.setdefault(
         "embedding_provider",
-        getattr(settings, "codebase_embedding_provider", "sentence-transformers"),
+        _get_search_setting(settings, "codebase_embedding_provider", "sentence-transformers"),
     )
     metadata.setdefault(
         "embedding_model",
-        getattr(
-            settings,
-            "codebase_embedding_model",
-            getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
-        ),
+        _resolve_codebase_embedding_model(settings),
     )
-    metadata.setdefault("embedding_dimension", getattr(settings, "codebase_dimension", 384))
-    metadata.setdefault("embedding_batch_size", getattr(settings, "codebase_batch_size", 32))
+    metadata.setdefault(
+        "embedding_dimension", _get_search_setting(settings, "codebase_dimension", 384)
+    )
+    metadata.setdefault(
+        "embedding_batch_size", _get_search_setting(settings, "codebase_batch_size", 32)
+    )
     metadata.setdefault(
         "chunking_strategy",
-        getattr(settings, "codebase_chunking_strategy", DEFAULT_CODEBASE_CHUNKING_STRATEGY),
+        _get_search_setting(
+            settings, "codebase_chunking_strategy", DEFAULT_CODEBASE_CHUNKING_STRATEGY
+        ),
     )
     return metadata
 
@@ -3301,7 +3335,7 @@ async def code_search(
             results = _filter_search_results_by_test_only(results, manual_test_only_filter)
 
         # Record outcome for RL threshold learning if enabled
-        if getattr(settings, "enable_semantic_threshold_rl_learning", False):
+        if _get_search_setting(settings, "enable_semantic_threshold_rl_learning", False):
             try:
                 from victor.framework.rl.coordinator import get_rl_coordinator
                 from victor.framework.rl.base import RLOutcome
@@ -3309,11 +3343,7 @@ async def code_search(
                 coordinator = get_rl_coordinator()
 
                 # Get embedding model from settings
-                embedding_model = getattr(
-                    settings,
-                    "codebase_embedding_model",
-                    getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
-                )
+                embedding_model = _resolve_codebase_embedding_model(settings)
 
                 # Get task type from execution context (default to "search")
                 task_type = _exec_ctx.get("task_type", "search") if _exec_ctx else "search"

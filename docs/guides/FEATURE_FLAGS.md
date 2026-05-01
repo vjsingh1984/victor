@@ -163,89 +163,24 @@ tool_settings:
 
 ---
 
-### Service Layer Flags
+### Service Layer (Phase 3) — Complete ✅
 
-#### `use_new_chat_service`
+> **Status**: All services are now **mandatory**. Feature flags removed in W3 cleanup.
 
-**Purpose**: Use ChatService instead of orchestrator methods for chat operations
-
-**Default**: `false`
-
-**Environment Variable**: `VICTOR_USE_NEW_CHAT_SERVICE=true`
-
-**Status**: 🔄 Phase 3 — Service Implementation
-
-**Impact**:
-- Cleaner separation of concerns
-- Easier testing and mocking
-- Required for future service layer work
-
-**Migration**: Safe to enable; report any chat issues
-
----
-
-#### `use_new_tool_service`
-
-**Purpose**: Use ToolService instead of orchestrator methods for tool operations
-
-**Default**: `false`
-
-**Environment Variable**: `VICTOR_USE_NEW_TOOL_SERVICE=true`
-
-**Status**: 🔄 Phase 3 — Service Implementation
+The following service layer flags have been removed as services are now always enabled:
+- ~~`use_new_chat_service`~~ → ChatService is mandatory
+- ~~`use_new_tool_service`~~ → ToolService is mandatory
+- ~~`use_new_context_service`~~ → ContextService is mandatory
+- ~~`use_new_provider_service`~~ → ProviderService is mandatory
+- ~~`use_new_recovery_service`~~ → RecoveryService is mandatory
+- ~~`use_new_session_service`~~ → SessionService is mandatory
 
 **Impact**:
-- Centralized tool execution logic
-- Better error handling and retries
-- Required for tool orchestration features
+- Cleaner separation of concerns (completed)
+- Better testing and mocking (completed)
+- Foundation for future features (completed)
 
-**Migration**: Safe to enable; report any tool execution issues
-
----
-
-#### `use_new_context_service`
-
-**Purpose**: Use ContextService for context management
-
-**Default**: `false`
-
-**Environment Variable**: `VICTOR_USE_NEW_CONTEXT_SERVICE=true`
-
-**Status**: 🔄 Phase 3 — Service Implementation
-
-**Impact**:
-- Unified context management across sessions
-- Better context window utilization
-- Required for context optimization features
-
-**Migration**: Safe to enable; report any context issues
-
----
-
-#### `use_new_provider_service`
-
-**Purpose**: Use ProviderService for provider management
-
-**Default**: `false`
-
-**Environment Variable**: `VICTOR_USE_NEW_PROVIDER_SERVICE=true`
-
-**Status**: 🔄 Phase 3 — Service Implementation
-
-**Impact**:
-- Centralized provider configuration
-- Easier provider switching
-- Required for multi-provider features
-
-**Migration**: Safe to enable; report any provider issues
-
----
-
-#### `use_new_recovery_service`
-
-**Purpose**: Use RecoveryService for error recovery
-
-**Default**: `false`
+**Migration**: No action needed — services are automatically initialized
 
 **Environment Variable**: `VICTOR_USE_NEW_RECOVERY_SERVICE=true`
 
@@ -468,5 +403,5 @@ else:
 
 - [Feature Flag Implementation](../architecture/adr/008-feature-flags.md)
 - [Edge Model Guide](./EDGE_MODEL.md)
-- [Configuration Guide](../config.md)
+- [Configuration Guide](../users/reference/config.md)
 - [Architecture Decision Records](../architecture/adr/)

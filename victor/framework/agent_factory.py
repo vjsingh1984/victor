@@ -1,10 +1,10 @@
 """Unified AgentFactory — single authority for all agent creation paths.
 
-Replaces 4 inconsistent initialization paths with one Facade:
-- CLI chat → FrameworkShim → from_settings (deprecated)
-- CLI tools → direct from_settings (no vertical)
-- API server → direct from_settings (no profile)
-- Agent.create() → inline creation
+Replaces older divergent initialization paths with one Facade:
+- CLI and TUI session handlers → AgentCreationFactory → AgentFactory
+- CLI tools → direct from_settings (legacy internal path)
+- API server → direct from_settings (legacy internal path)
+- Agent.create() → AgentFactory
 
 All entry points now use:
     factory = AgentFactory(settings, profile=..., vertical=..., ...)

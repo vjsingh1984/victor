@@ -439,6 +439,16 @@ class TestAgentSession:
         assert session.turns[0]["context"] == {"error": "IndexError"}
 
     @pytest.mark.asyncio
+    async def test_send_uses_message_when_initial_prompt_not_provided(self, mock_agent):
+        """Deferred sessions should use the first send() message as the opening turn."""
+        session = AgentSession(mock_agent)
+
+        await session.send("Deferred first turn")
+
+        assert session.turn_count == 1
+        assert session.turns[0]["prompt"] == "Deferred first turn"
+
+    @pytest.mark.asyncio
     async def test_stream(self, mock_agent):
         """Test streaming."""
         session = AgentSession(mock_agent, "Hello")

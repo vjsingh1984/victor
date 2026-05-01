@@ -252,3 +252,7 @@ MagicMock/
 !victor/workflows/models/
 victor/workflows/models/__pycache__/
 .coverage*
+
+# Documentation Archive
+docs/archive/sessions/*.md
+

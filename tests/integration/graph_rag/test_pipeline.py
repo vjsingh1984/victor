@@ -108,18 +108,14 @@ async def test_graph_indexing_pipeline_reuses_unchanged_files_incrementally():
         unchanged_file = tmpdir / "stable.py"
         ignored_file = tmpdir / "README.md"
 
-        changed_file.write_text(
-            """
+        changed_file.write_text("""
 def old_name():
     return 1
-""".strip()
-        )
-        unchanged_file.write_text(
-            """
+""".strip())
+        unchanged_file.write_text("""
 def stable_name():
     return 2
-""".strip()
-        )
+""".strip())
         ignored_file.write_text("# Not indexable by the graph pipeline")
 
         graph_store = create_graph_store(name="sqlite", project_path=tmpdir)
@@ -140,12 +136,10 @@ def stable_name():
         assert initial_stats.files_unchanged == 0
 
         os.utime(changed_file, (time.time() + 2, time.time() + 2))
-        changed_file.write_text(
-            """
+        changed_file.write_text("""
 def new_name():
     return 3
-""".strip()
-        )
+""".strip())
 
         incremental_stats = await pipeline.index_repository()
         assert incremental_stats.files_processed == 1

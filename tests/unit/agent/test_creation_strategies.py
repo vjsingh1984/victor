@@ -132,55 +132,59 @@ class TestFrameworkStrategy:
 
     @pytest.mark.asyncio
     async def test_create_agent_success(self, strategy, mock_context):
-        """Test successful agent creation with FrameworkShim."""
+        """Test successful agent creation via AgentFactory."""
         mock_agent = MagicMock()
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        # Patch where FrameworkShim is imported, not where it's defined
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             result = await strategy.create_agent(mock_context)
 
         assert result is mock_agent
-        mock_shim.create_orchestrator.assert_called_once()
-        mock_shim.emit_session_start.assert_called_once()
+        mock_factory.create.assert_called_once_with()
+        mock_agent.observability.on_session_start.assert_called_once_with(
+            {"mode": "unknown", "vertical": None, "thinking": False}
+        )
 
     @pytest.mark.asyncio
     async def test_create_agent_applies_overrides(self, strategy, mock_context):
-        """Test that budget and iteration overrides are applied."""
+        """Test that mode override still applies on the canonical path."""
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
-
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_context.tool_budget = 100
         mock_context.max_iterations = 50
+        mock_context.mode = "plan"
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
-            result = await strategy.create_agent(mock_context)
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
+                mock_controller = MagicMock()
+                mock_get_controller.return_value = mock_controller
 
-        # Verify overrides were applied
-        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(100, user_override=True)
-        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
-            50, user_override=True
-        )
+                result = await strategy.create_agent(mock_context)
+
+        assert result is mock_agent
+        mock_factory.create.assert_called_once_with()
+        mock_controller.switch_mode.assert_called_once()
+        mock_agent.unified_tracker.set_tool_budget.assert_not_called()
+        mock_agent.unified_tracker.set_max_iterations.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_create_agent_with_mode_override(self, strategy, mock_context):
         """Test that mode override is applied."""
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
-
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_context.mode = "plan"
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_get_controller.return_value = mock_controller
@@ -272,11 +276,11 @@ class TestAgentCreationFactory:
     async def test_create_agent_with_default_strategy(self, factory, mock_context):
         """Test agent creation with default (Framework) strategy."""
         mock_agent = MagicMock()
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             result = await factory.create_agent(mock_context)
 
         assert result is mock_agent
@@ -394,11 +398,11 @@ class TestStrategyLogging:
         mock_context.vertical = None  # No vertical to avoid __name__ error
 
         mock_agent = MagicMock()
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             await factory.create_agent(mock_context)
 
         # Verify logging occurred from the factory

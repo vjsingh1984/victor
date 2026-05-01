@@ -290,10 +290,9 @@ class TestBootstrapServices:
                 LLMDecisionServiceProtocol,
             )
 
-            assert (
-                container.get_optional(LLMDecisionServiceProtocol) is None
-                or container.is_registered(LLMDecisionServiceProtocol)
-            )
+            assert container.get_optional(
+                LLMDecisionServiceProtocol
+            ) is None or container.is_registered(LLMDecisionServiceProtocol)
 
 
 class TestMockToolComponents:

@@ -186,11 +186,11 @@ class TestBaseSessionHandler:
     async def test_initialize_creates_agent(self, handler, mock_config):
         """Test that initialize creates an agent."""
         mock_agent = MagicMock()
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             agent = await handler.initialize(mock_config)
 
         assert agent is mock_agent
@@ -281,19 +281,16 @@ class TestBaseSessionHandler:
 
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
-
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             await handler.initialize(mock_config)
 
-        # Verify overrides were applied
-        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(100, user_override=True)
-        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
-            50, user_override=True
-        )
+        mock_factory.create.assert_called_once_with()
+        mock_agent.unified_tracker.set_tool_budget.assert_not_called()
+        mock_agent.unified_tracker.set_max_iterations.assert_not_called()
 
 
 class TestOneshotSessionHandler:
@@ -318,12 +315,12 @@ class TestOneshotSessionHandler:
     async def test_execute_successful_session(self, handler, mock_config):
         """Test successful one-shot session execution."""
         mock_agent = MagicMock()
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         # Mock process_message
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch.object(handler, "process_message", return_value="Response"):
                 metrics = await handler.execute(mock_config, "Test message")
 
@@ -333,10 +330,10 @@ class TestOneshotSessionHandler:
     @pytest.mark.asyncio
     async def test_execute_handles_errors(self, handler, mock_config):
         """Test that execute handles errors gracefully."""
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(side_effect=Exception("Test error"))
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(side_effect=Exception("Test error"))
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with pytest.raises(Exception, match="Test error"):
                 await handler.execute(mock_config, "Test message")
 
@@ -344,10 +341,11 @@ class TestOneshotSessionHandler:
     async def test_execute_cleans_up_on_error(self, handler, mock_config):
         """Test that execute cleans up even when error occurs."""
         mock_agent = MagicMock()
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch.object(handler, "process_message", side_effect=Exception("Process error")):
                 with patch.object(handler, "cleanup") as mock_cleanup:
                     with pytest.raises(Exception):
@@ -433,19 +431,19 @@ class TestTUISessionHandler:
     async def test_start_tui_creates_agent(self, handler, mock_config):
         """Test starting TUI creates agent if not provided."""
         mock_agent = MagicMock()
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 await handler.start_tui(mock_config, agent=None)
 
         # Verify agent was created
-        mock_shim.create_orchestrator.assert_called_once()
+        mock_factory.create.assert_called_once_with()
         # Verify TUI was started
         mock_tui.run_async.assert_called_once()
 
@@ -514,12 +512,11 @@ class TestSessionHandlerErrorHandling:
         handler = BaseSessionHandler()
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
+        mock_agent.observability = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
-
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_controller.switch_mode.side_effect = Exception("Invalid mode")

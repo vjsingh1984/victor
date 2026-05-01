@@ -8,7 +8,7 @@ Tests the unified session management for TUI mode including:
 - Error handling and graceful degradation
 
 Test Approach:
-- Uses real session handlers but mocks VictorTUI for testability
+- Uses real session handlers and creation strategies but mocks AgentFactory and VictorTUI
 - Tests integration between TUISessionHandler and TUI components
 - Verifies agent creation and cleanup in TUI context
 """
@@ -58,19 +58,18 @@ class TestTUISessionInitialization:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 await handler.start_tui(session_config, agent=None)
 
         # Verify agent was created
-        mock_shim.create_orchestrator.assert_called_once()
+        mock_factory.create.assert_called_once_with()
 
         # Verify TUI was started
         mock_tui.run_async.assert_called_once()
@@ -104,22 +103,22 @@ class TestTUISessionInitialization:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch(
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ) as mock_agent_factory:
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 await handler.start_tui(session_config, agent=None)
 
-        # Verify custom settings were applied
-        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(200, user_override=True)
-        mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
-            100, user_override=True
-        )
+        # Verify custom settings were forwarded to the canonical factory
+        assert mock_agent_factory.call_args.kwargs["thinking"] is True
+        assert mock_agent_factory.call_args.kwargs["tool_budget"] == 200
+        assert mock_agent_factory.call_args.kwargs["max_iterations"] == 100
 
 
 class TestTUISessionLifecycle:
@@ -152,20 +151,19 @@ class TestTUISessionLifecycle:
             "iterations": 10,
         }
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 # Start TUI (includes initialization and cleanup)
                 await handler.start_tui(session_config, agent=None)
 
         # Verify full lifecycle
-        mock_shim.create_orchestrator.assert_called_once()
+        mock_factory.create.assert_called_once_with()
         mock_tui.run_async.assert_called_once()
 
     @pytest.mark.asyncio
@@ -180,9 +178,8 @@ class TestTUISessionLifecycle:
             "iterations": 2,
         }
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
 
@@ -197,12 +194,12 @@ class TestTUISessionLifecycle:
 
         import asyncio
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 await handler.start_tui(session_config, agent=None)
 
         # Verify cleanup happened
-        assert mock_shim.create_orchestrator.called
+        assert mock_factory.create.called
 
 
 class TestTUIWithVerticals:
@@ -227,14 +224,13 @@ class TestTUIWithVerticals:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.core.verticals.get_vertical") as mock_get_vertical:
                 with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                     mock_get_vertical.return_value = CodingAssistant
@@ -263,14 +259,13 @@ class TestTUIWithVerticals:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.core.verticals.get_vertical") as mock_get_vertical:
                 with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                     mock_get_vertical.return_value = ResearchAssistant
@@ -297,12 +292,10 @@ class TestTUIErrorHandling:
 
         handler = TUISessionHandler()
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(
-            side_effect=Exception("Provider connection failed")
-        )
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(side_effect=Exception("Provider connection failed"))
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             # Should raise the error (TUI would handle this)
             with pytest.raises(Exception, match="Provider connection failed"):
                 await handler.start_tui(config, agent=None)
@@ -323,9 +316,8 @@ class TestTUIErrorHandling:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         # Simulate TUI runtime error
         async def mock_run_with_error():
@@ -334,7 +326,7 @@ class TestTUIErrorHandling:
         mock_tui = MagicMock()
         mock_tui.run_async = mock_run_with_error
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 # Should propagate the error
                 with pytest.raises(RuntimeError, match="TUI rendering failed"):
@@ -361,9 +353,8 @@ class TestTUIErrorHandling:
             "iterations": 0,
         }
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         # Simulate error during TUI run
         async def mock_run_with_error():
@@ -372,7 +363,7 @@ class TestTUIErrorHandling:
         mock_tui = MagicMock()
         mock_tui.run_async = mock_run_with_error
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 with patch("victor.ui.commands.utils.graceful_shutdown") as mock_shutdown:
                     try:
@@ -404,27 +395,21 @@ class TestTUIWithThinkingMode:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
-
-        # Verify thinking was passed to shim
-        def verify_shim_init(settings, profile_name, thinking, **kwargs):
-            assert thinking is True
-            return mock_shim
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
         with patch(
-            "victor.framework.shim.FrameworkShim", side_effect=verify_shim_init
-        ) as mock_shim_patch:
+            "victor.framework.agent_factory.AgentFactory", return_value=mock_factory
+        ) as mock_agent_factory:
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 await handler.start_tui(config, agent=None)
 
                 # Verify thinking mode was used
-                mock_shim_patch.assert_called_once()
-                call_kwargs = mock_shim_patch.call_args[1]
+                mock_agent_factory.assert_called_once()
+                call_kwargs = mock_agent_factory.call_args[1]
                 assert call_kwargs["thinking"] is True
 
 
@@ -453,14 +438,13 @@ class TestTUIConcurrentSessions:
             mock_agent = MagicMock()
             mock_agent.unified_tracker = MagicMock()
 
-            mock_shim = MagicMock()
-            mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-            mock_shim.emit_session_start = MagicMock()
+            mock_factory = MagicMock()
+            mock_factory.create = AsyncMock(return_value=mock_agent)
 
             mock_tui = MagicMock()
             mock_tui.run_async = AsyncMock()
 
-            with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+            with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
                 with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                     await handler.start_tui(config, agent=None)
 
@@ -497,17 +481,16 @@ class TestTUISessionMetrics:
             "iterations": 12,
         }
 
-        mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
-        mock_shim.emit_session_start = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_agent)
 
         mock_tui = MagicMock()
         mock_tui.run_async = AsyncMock()
 
-        with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
+        with patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
                 await handler.start_tui(config, agent=None)
 
         # Metrics would be collected during cleanup
         # (which happens in start_tui's finally block)
-        assert mock_shim.create_orchestrator.called
+        assert mock_factory.create.called

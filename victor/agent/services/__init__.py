@@ -38,6 +38,10 @@ Deprecated compatibility exports retained here:
 """
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+from victor.agent.services.chat_stream_executor import (
+    StreamingChatExecutor,
+    create_streaming_chat_executor,
+)
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 from victor.agent.services.chunk_runtime import ChunkGenerator
 from victor.agent.services.coordination_advisor_runtime import CoordinationAdvisorRuntime
@@ -105,6 +109,7 @@ from victor.agent.services.turn_execution_runtime import TurnExecutor, TurnResul
 __all__ = [
     "ChatService",
     "ChatServiceConfig",
+    "StreamingChatExecutor",
     "ServiceStreamingRuntime",
     "ChunkGenerator",
     "CoordinationAdvisorRuntime",
@@ -148,6 +153,7 @@ __all__ = [
     "ToolRetryExecutor",
     "TurnExecutor",
     "TurnResult",
+    "create_streaming_chat_executor",
     "create_metrics_coordinator",
     "analyze_prompt_rollout_experiment",
     "analyze_prompt_rollout_experiment_async",

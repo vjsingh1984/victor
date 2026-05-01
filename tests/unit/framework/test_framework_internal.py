@@ -420,6 +420,37 @@ class TestStreamWithEvents:
         assert len(end_events) == 1
         assert end_events[0].success is False
 
+    @pytest.mark.asyncio
+    async def test_stream_buffers_and_normalizes_exact_response_output(self):
+        """Exact-response prompts should be normalized by the framework bridge."""
+        mock_orchestrator = MagicMock()
+
+        async def mock_stream_chat(prompt):
+            first = MagicMock()
+            first.content = "The requested literal is "
+            first.metadata = None
+            first.tool_calls = None
+            yield first
+
+            second = MagicMock()
+            second.content = "READY"
+            second.metadata = {"source": "model"}
+            second.tool_calls = None
+            yield second
+
+        mock_orchestrator.stream_chat = mock_stream_chat
+
+        events = []
+        async for event in stream_with_events(
+            mock_orchestrator,
+            "Reply with exactly READY",
+        ):
+            events.append(event)
+
+        content_events = [e for e in events if e.type == EventType.CONTENT]
+        assert [event.content for event in content_events] == ["READY"]
+        assert content_events[0].metadata == {"source": "model"}
+
 
 class TestFormatContextMessage:
     """Test context formatting utility."""

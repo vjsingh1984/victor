@@ -27,7 +27,7 @@ class TestEmbeddingSettings:
         assert settings.codebase_embedding_provider == "sentence-transformers"
         assert settings.codebase_dimension == 384
         assert settings.codebase_batch_size == 32
-        assert settings.codebase_structural_indexing_enabled is True
+        assert settings.codebase_structural_indexing_enabled is False
         assert settings.codebase_chunking_strategy == "tree_sitter_structural"
         assert settings.codebase_chunk_size == 500
         assert settings.codebase_chunk_overlap == 50
@@ -212,9 +212,11 @@ class TestPhase5ConfigGroupsIntegration:
 
         settings = Settings()
 
-        # Nested access only
+        # Nested access is the canonical runtime contract.
         assert settings.embedding is not None
         assert isinstance(settings.embedding, EmbeddingSettings)
+        assert settings.embedding.unified_embedding_model == "BAAI/bge-small-en-v1.5"
+        assert settings.search.codebase_embedding_provider == "sentence-transformers"
 
     def test_tool_selection_settings_in_main_settings(self):
         """Test that ToolSelectionSettings is accessible from Settings."""

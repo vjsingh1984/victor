@@ -121,6 +121,11 @@ class QueryClassifier:
 
     def _classify_query_type(self, message: str) -> QueryType:
         """Determine the semantic type via regex patterns."""
+        from victor.framework.task.direct_response import classify_direct_response_prompt
+
+        if classify_direct_response_prompt(message).is_direct_response:
+            return QueryType.QUICK_QUESTION
+
         for pattern, query_type in _QUERY_PATTERNS:
             if pattern.search(message):
                 return query_type

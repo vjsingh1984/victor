@@ -290,8 +290,7 @@ class GraphIndexingPipeline:
         stats = GraphIndexStats()
         current_files = {str(file_path): file_path for file_path in files}
         file_mtimes = {
-            path_str: file_path.stat().st_mtime
-            for path_str, file_path in current_files.items()
+            path_str: file_path.stat().st_mtime for path_str, file_path in current_files.items()
         }
 
         stale_files = set(await self.graph_store.get_stale_files(file_mtimes))

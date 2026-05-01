@@ -120,9 +120,7 @@ class IntentClassificationResult:
         self.action = coerce_continuation_action(self.action)
         if not isinstance(self.action_result, ContinuationDirective):
             legacy_payload = (
-                dict(self.action_result)
-                if isinstance(self.action_result, dict)
-                else {}
+                dict(self.action_result) if isinstance(self.action_result, dict) else {}
             )
             self.action_result = ContinuationDirective.from_legacy(
                 action=legacy_payload.get("action", self.action),

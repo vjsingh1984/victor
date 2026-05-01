@@ -25,9 +25,11 @@ The orchestrator delegates property access through this facade.
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
+_DEPRECATED_MODE_WORKFLOW_TEAM_COORDINATOR = object()
 
 
 class WorkflowFacade:
@@ -51,12 +53,22 @@ class WorkflowFacade:
         workflow_runtime: Optional[Any] = None,
         workflow_optimization: Optional[Any] = None,
         coordination_advisor: Optional[Any] = None,
-        mode_workflow_team_coordinator: Optional[Any] = None,
+        mode_workflow_team_coordinator: Any = _DEPRECATED_MODE_WORKFLOW_TEAM_COORDINATOR,
     ) -> None:
+        if mode_workflow_team_coordinator is not _DEPRECATED_MODE_WORKFLOW_TEAM_COORDINATOR:
+            warnings.warn(
+                "WorkflowFacade(mode_workflow_team_coordinator=...) is deprecated. "
+                "Use WorkflowFacade(coordination_advisor=...) instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if coordination_advisor is None:
+                coordination_advisor = mode_workflow_team_coordinator
+
         self._workflow_registry = workflow_registry
         self._workflow_runtime = workflow_runtime
         self._workflow_optimization = workflow_optimization
-        self._coordination_advisor = coordination_advisor or mode_workflow_team_coordinator
+        self._coordination_advisor = coordination_advisor
 
         logger.debug(
             "WorkflowFacade initialized (registry=%s, optimization=%s, advisor=%s)",
@@ -102,9 +114,21 @@ class WorkflowFacade:
     @property
     def mode_workflow_team_coordinator(self) -> Optional[Any]:
         """Compatibility alias for the coordination advisor surface."""
+        warnings.warn(
+            "WorkflowFacade.mode_workflow_team_coordinator is deprecated. "
+            "Use WorkflowFacade.coordination_advisor instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._coordination_advisor
 
     @mode_workflow_team_coordinator.setter
     def mode_workflow_team_coordinator(self, value: Any) -> None:
         """Update the compatibility coordinator alias."""
+        warnings.warn(
+            "WorkflowFacade.mode_workflow_team_coordinator is deprecated. "
+            "Set WorkflowFacade.coordination_advisor instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._coordination_advisor = value

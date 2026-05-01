@@ -54,6 +54,7 @@ class TestOrchestratorPropertyInstallation:
             "turn_executor",
             "intelligent_integration",
             "subagent_orchestrator",
+            "orchestration_facade",
             "coordination_advisor",
             "coordination",
         ]
@@ -111,6 +112,17 @@ class TestOrchestratorPropertyInstallation:
 
         assert orchestrator.coordination_advisor is advisor
         assert orchestrator.coordination is advisor
+
+    def test_orchestration_facade_property_resolves_lazy_surface(self):
+        """orchestration_facade should resolve lazy runtime proxies to concrete facades."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        facade = MagicMock(name="orchestration_facade")
+        orchestrator._orchestration_facade = SimpleNamespace(get_instance=lambda: facade)
+
+        assert orchestrator.orchestration_facade is facade
+        assert orchestrator._orchestration_facade is facade
 
     def test_mode_workflow_team_coordinator_alias_warns_and_maps_to_coordination_advisor(self):
         """The deprecated private coordinator alias should forward to _coordination_advisor."""

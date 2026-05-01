@@ -47,7 +47,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-
 DEFAULT_PROVIDER_MODELS = {
     "anthropic": "claude-3-5-sonnet-20241022",
     "openai": "gpt-4o",
@@ -423,9 +422,7 @@ class SessionConfig:
                     self.observability_logging,
                 )
 
-        if self.auto_skill_enabled is not None and hasattr(
-            settings, "skill_auto_select_enabled"
-        ):
+        if self.auto_skill_enabled is not None and hasattr(settings, "skill_auto_select_enabled"):
             object.__setattr__(
                 settings,
                 "skill_auto_select_enabled",

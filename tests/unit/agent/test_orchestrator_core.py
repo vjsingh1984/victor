@@ -3097,9 +3097,7 @@ class TestPrepareStream:
         assert isinstance(cumulative_usage, dict)
 
     @pytest.mark.asyncio
-    async def test_prepare_stream_skips_intelligent_request_for_direct_response(
-        self, orchestrator
-    ):
+    async def test_prepare_stream_skips_intelligent_request_for_direct_response(self, orchestrator):
         """Direct-response prompts should bypass intelligent reminder injection."""
         runtime = orchestrator._get_chat_stream_adapter()
         orchestrator._prepare_intelligent_request = AsyncMock(
@@ -3111,8 +3109,7 @@ class TestPrepareStream:
         messages_after = orchestrator.get_messages()[len(messages_before) :]
 
         assert not any(
-            "[SYSTEM-REMINDER:" in getattr(message, "content", "")
-            for message in messages_after
+            "[SYSTEM-REMINDER:" in getattr(message, "content", "") for message in messages_after
         )
 
 

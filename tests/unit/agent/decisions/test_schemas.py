@@ -119,8 +119,13 @@ class TestContinuationDecision:
 
     def test_valid_actions(self):
         for action in (
+            "continue_asking_input",
+            "continue_with_synthesis_hint",
+            "execute_extracted_tool",
             "finish",
+            "force_tool_execution",
             "prompt_tool_call",
+            "request_completion",
             "request_summary",
             "return_to_user",
         ):

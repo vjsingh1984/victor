@@ -34,6 +34,7 @@ from victor.framework.events import (
     stream_end_event,
     stream_start_event,
 )
+from victor.framework.task import DirectResponseOutputState
 from victor.framework.tools import ToolSet
 from victor.framework.protocols import ObservabilityPortProtocol
 
@@ -321,6 +322,8 @@ def configure_tools(
 async def stream_with_events(
     orchestrator: Any,
     prompt: str,
+    *,
+    response_prompt: Optional[str] = None,
 ) -> AsyncIterator[AgentExecutionEvent]:
     """Stream orchestrator response as framework AgentExecutionEvents.
 
@@ -329,12 +332,14 @@ async def stream_with_events(
 
     Args:
         orchestrator: AgentOrchestrator instance
-        prompt: User prompt
+        prompt: Prompt sent to the runtime
+        response_prompt: Original user prompt for output normalization
 
     Yields:
         AgentExecutionEvent objects representing agent actions
     """
     registry = get_event_registry()
+    output_state = DirectResponseOutputState(response_prompt or prompt)
 
     # Emit stream start
     yield stream_start_event()
@@ -353,7 +358,10 @@ async def stream_with_events(
                     metadata=chunk_metadata,
                 )
 
-            content = getattr(chunk, "content", "")
+            content = output_state.consume_stream_content(
+                getattr(chunk, "content", ""),
+                metadata=chunk_metadata,
+            )
             if content:
                 yield registry.from_external(
                     {"content": content},
@@ -403,6 +411,15 @@ async def stream_with_events(
                     EventTarget.STREAM_CHUNK,
                     metadata=chunk_metadata,
                 )
+
+        final_content, final_metadata = output_state.flush_stream_content()
+        if final_content:
+            yield registry.from_external(
+                {"content": final_content},
+                "content",
+                EventTarget.STREAM_CHUNK,
+                metadata=final_metadata,
+            )
 
         # Emit stream end
         yield stream_end_event(success=True)

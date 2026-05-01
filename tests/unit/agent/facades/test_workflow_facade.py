@@ -47,7 +47,23 @@ class TestWorkflowFacadeInit:
         assert facade.workflow_runtime is None
         assert facade.workflow_optimization is None
         assert facade.coordination_advisor is None
-        assert facade.mode_workflow_team_coordinator is None
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
+        ):
+            assert facade.mode_workflow_team_coordinator is None
+
+    def test_init_with_legacy_mode_coordinator_warns_and_maps_to_coordination_advisor(self):
+        """Legacy init alias should warn and map onto coordination_advisor."""
+        legacy_coordinator = MagicMock(name="legacy_coordinator")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade\\(mode_workflow_team_coordinator=\\.\\.\\.\\) is deprecated",
+        ):
+            facade = WorkflowFacade(mode_workflow_team_coordinator=legacy_coordinator)
+
+        assert facade.coordination_advisor is legacy_coordinator
 
 
 class TestWorkflowFacadeProperties:
@@ -83,13 +99,25 @@ class TestWorkflowFacadeProperties:
 
     def test_mode_coordinator_property(self, facade):
         """Compatibility alias returns the same advisor instance."""
-        assert facade.mode_workflow_team_coordinator._mock_name == "coordinator"
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
+        ):
+            assert facade.mode_workflow_team_coordinator._mock_name == "coordinator"
 
     def test_mode_coordinator_setter(self, facade):
         """Compatibility alias setter updates the advisor surface."""
         new_coordinator = MagicMock(name="new_coordinator")
-        facade.mode_workflow_team_coordinator = new_coordinator
-        assert facade.mode_workflow_team_coordinator is new_coordinator
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
+        ):
+            facade.mode_workflow_team_coordinator = new_coordinator
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
+        ):
+            assert facade.mode_workflow_team_coordinator is new_coordinator
         assert facade.coordination_advisor is new_coordinator
 
     def test_coordination_advisor_property(self, facade):
@@ -101,7 +129,11 @@ class TestWorkflowFacadeProperties:
         new_advisor = MagicMock(name="new_advisor")
         facade.coordination_advisor = new_advisor
         assert facade.coordination_advisor is new_advisor
-        assert facade.mode_workflow_team_coordinator is new_advisor
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
+        ):
+            assert facade.mode_workflow_team_coordinator is new_advisor
 
 
 class TestWorkflowFacadeProtocolConformance:
@@ -116,6 +148,9 @@ class TestWorkflowFacadeProtocolConformance:
         """All protocol-required properties are present on WorkflowFacade."""
         required = [
             "workflow_registry",
+            "workflow_runtime",
+            "workflow_optimization",
+            "coordination_advisor",
         ]
         facade = WorkflowFacade()
         for prop in required:

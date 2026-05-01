@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 from victor.ui.rendering.utils import (
     expand_tool_output,
+    format_tool_display_name,
     render_edit_preview,
     render_file_preview,
     render_thinking_indicator,
@@ -104,7 +105,7 @@ class FormatterRenderer:
         """
         self.pause()
         self.formatter.tool_start(name, arguments)
-        self.formatter.status(f"🔧 Running {name}...")
+        self.formatter.status(f"🔧 Running {format_tool_display_name(name)}...")
         self.resume()
 
     def on_tool_result(

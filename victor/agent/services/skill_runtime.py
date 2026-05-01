@@ -152,7 +152,9 @@ class SkillRuntime:
             return
 
         prompt_runtime = getattr(runtime, "_prompt_builder_runtime", None)
-        if prompt_runtime is not None and hasattr(prompt_runtime, "sync_conversation_system_prompt"):
+        if prompt_runtime is not None and hasattr(
+            prompt_runtime, "sync_conversation_system_prompt"
+        ):
             prompt_runtime.sync_conversation_system_prompt()
             return
 
@@ -162,7 +164,9 @@ class SkillRuntime:
 
         prompt = getattr(runtime, "_system_prompt", "")
         conversation.system_prompt = prompt
-        if getattr(conversation, "_system_added", False) and getattr(conversation, "_messages", None):
+        if getattr(conversation, "_system_added", False) and getattr(
+            conversation, "_messages", None
+        ):
             if conversation._messages[0].role == "system":
                 from victor.providers.base import Message
 

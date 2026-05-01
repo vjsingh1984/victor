@@ -164,6 +164,21 @@ def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
     return self._vertical_context
 
 
+def _resolve_lazy_surface(self: "AgentOrchestrator", attr_name: str) -> Any:
+    """Resolve a lazily-proxied facade surface and cache the concrete instance."""
+    surface = getattr(self, attr_name, None)
+    if hasattr(surface, "get_instance"):
+        resolved = surface.get_instance()
+        setattr(self, attr_name, resolved)
+        return resolved
+    return surface
+
+
+def _orchestration_facade(self: "AgentOrchestrator") -> Any:
+    """Get the canonical orchestration facade surface."""
+    return _resolve_lazy_surface(self, "_orchestration_facade")
+
+
 # =====================================================================
 # Group 2: Lazy coordinator constructor properties
 # =====================================================================
@@ -270,7 +285,9 @@ def _coordination(self: "AgentOrchestrator") -> Any:
 def _coordination_advisor(self: "AgentOrchestrator") -> Any:
     """Get the framework-facing coordination advisor (lazy init)."""
     if getattr(self, "_coordination_advisor", None) is None:
-        self._coordination_advisor = self._factory.create_coordination_advisor(self._vertical_context)
+        self._coordination_advisor = self._factory.create_coordination_advisor(
+            self._vertical_context
+        )
         logger.debug("Coordination advisor initialized on first access")
 
     return self._coordination_advisor
@@ -543,6 +560,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "code_correction_middleware": (_code_correction_middleware, None),
     "checkpoint_manager": (_checkpoint_manager, None),
     "vertical_context": (_vertical_context, None),
+    "orchestration_facade": (_orchestration_facade, None),
     # Group 2: Lazy coordinators (getter only)
     "protocol_adapter": (_protocol_adapter, None),
     "turn_executor": (_turn_executor, None),

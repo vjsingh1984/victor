@@ -617,18 +617,20 @@ def _write_graph_watch_manifest(
         except (OSError, json.JSONDecodeError):
             payload = {}
 
-    payload.update({
-        "project_root": str(root_path),
-        "pid_file": str(state.pid_file),
-        "lock_file": str(_default_graph_watch_lock_file(root_path)),
-        "running": state.running,
-        "pid": state.pid,
-        "started": state.started,
-        "stopped": state.stopped,
-        "stale_pid_file": state.stale_pid_file,
-        "stale_pid_removed": state.stale_pid_removed,
-        "updated_at": time.time(),
-    })
+    payload.update(
+        {
+            "project_root": str(root_path),
+            "pid_file": str(state.pid_file),
+            "lock_file": str(_default_graph_watch_lock_file(root_path)),
+            "running": state.running,
+            "pid": state.pid,
+            "started": state.started,
+            "stopped": state.stopped,
+            "stale_pid_file": state.stale_pid_file,
+            "stale_pid_removed": state.stale_pid_removed,
+            "updated_at": time.time(),
+        }
+    )
     if enable_ccg is not None:
         payload["enable_ccg"] = enable_ccg
     if build_now is not None:
@@ -662,7 +664,9 @@ def _read_graph_watch_manifest(project_root: Path) -> Optional[dict[str, Any]]:
 def _record_graph_watch_refresh(project_root: Path, stats: Any) -> Path:
     """Persist the latest incremental refresh health for graph watch status."""
     root_path = project_root.resolve()
-    state = _inspect_graph_watch_daemon(_default_graph_watch_pid_file(root_path), remove_stale=False)
+    state = _inspect_graph_watch_daemon(
+        _default_graph_watch_pid_file(root_path), remove_stale=False
+    )
     return _write_graph_watch_manifest(
         root_path,
         state,

@@ -37,6 +37,11 @@ class TestQueryTypeClassification:
         assert result.query_type == QueryType.QUICK_QUESTION
         assert result.should_plan is False
 
+    def test_exact_response_prompt_is_quick_question(self, classifier):
+        result = classifier.classify("Reply with exactly READY")
+        assert result.query_type == QueryType.QUICK_QUESTION
+        assert result.should_plan is False
+
     def test_exploration_classification(self, classifier):
         result = classifier.classify("Explore the auth module and map its dependencies")
         assert result.query_type == QueryType.EXPLORATION

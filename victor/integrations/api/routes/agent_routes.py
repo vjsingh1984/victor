@@ -50,7 +50,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             manager = get_agent_manager()
             if manager is None:
                 orchestrator = await server._get_orchestrator()
-                chat_service = resolve_chat_service(orchestrator) or resolve_chat_runtime(orchestrator)
+                chat_service = resolve_chat_service(orchestrator) or resolve_chat_runtime(
+                    orchestrator
+                )
                 manager = init_agent_manager(
                     orchestrator=orchestrator,
                     chat_service=chat_service,

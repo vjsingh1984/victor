@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from typer.testing import CliRunner
 
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.ui.cli import app
 
 
@@ -37,41 +38,33 @@ class _FakeVictorClient:
     async def get_session_metrics(self):
         return {"tool_calls": 1}
 
-    async def stream_chat(self, message: str):
+    async def stream(self, message: str):
         type(self).last_agent.messages.append(message)
-        yield SimpleNamespace(
-            content="",
-            metadata={
-                "tool_start": {
-                    "name": "database",
-                    "arguments": {
-                        "action": "query",
-                        "sql": (
-                            "SELECT generation, text_hash "
-                            "FROM agent_prompt_candidate ORDER BY generation"
-                        ),
-                    },
-                }
+        yield AgentExecutionEvent(
+            type=EventType.TOOL_CALL,
+            tool_name="database",
+            arguments={
+                "action": "query",
+                "sql": "SELECT generation, text_hash FROM agent_prompt_candidate ORDER BY generation",
             },
         )
-        yield SimpleNamespace(
-            content="",
-            metadata={
-                "tool_result": {
-                    "name": "database",
-                    "success": True,
-                    "elapsed": 0.02,
-                    "arguments": {"action": "query"},
-                    "result": "generation | text_hash\n1 | hash_gen_1\n2 | hash_gen_2",
-                }
+        yield AgentExecutionEvent(
+            type=EventType.TOOL_RESULT,
+            tool_name="database",
+            arguments={"action": "query"},
+            result={
+                "success": True,
+                "elapsed": 0.02,
+                "arguments": {"action": "query"},
+                "result": "generation | text_hash\n1 | hash_gen_1\n2 | hash_gen_2",
             },
         )
-        yield SimpleNamespace(
+        yield AgentExecutionEvent(
+            type=EventType.CONTENT,
             content=(
                 "I queried agent_prompt_candidate directly and found generations 1 and 2. "
                 "Generation 2 is the active evolved candidate."
             ),
-            metadata={},
         )
 
     async def close(self):
@@ -79,7 +72,7 @@ class _FakeVictorClient:
 
 
 def test_chat_oneshot_renders_database_tool_flow_for_explicit_sqllite_request(monkeypatch):
-    monkeypatch.setattr("victor.ui.commands.chat.VictorClient", _FakeVictorClient)
+    monkeypatch.setattr("victor.framework.session_runner.create_victor_client", _FakeVictorClient)
     monkeypatch.setattr("victor.ui.commands.chat.graceful_shutdown", AsyncMock())
 
     runner = CliRunner()
@@ -107,3 +100,46 @@ def test_chat_oneshot_renders_database_tool_flow_for_explicit_sqllite_request(mo
         "also review the sqllite db for evolved prompts and explain significance"
     ]
     assert _FakeVictorClient.last_config.tool_budget is None
+
+
+def test_chat_oneshot_no_stream_uses_framework_owned_direct_response_contract(monkeypatch):
+    from victor.ui.rendering.buffered import BufferedRenderer as _RealBufferedRenderer
+
+    captured_kwargs = {}
+
+    class _ExactResponseClient(_FakeVictorClient):
+        async def stream(self, message: str):
+            type(self).last_agent.messages.append(message)
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="READY")
+
+    class _SpyBufferedRenderer(_RealBufferedRenderer):
+        def __init__(self, *args, **kwargs):
+            captured_kwargs.update(kwargs)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "victor.framework.session_runner.create_victor_client",
+        _ExactResponseClient,
+    )
+    monkeypatch.setattr("victor.ui.rendering.BufferedRenderer", _SpyBufferedRenderer)
+    monkeypatch.setattr("victor.ui.commands.chat.graceful_shutdown", AsyncMock())
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "chat",
+            "--provider",
+            "ollama",
+            "--model",
+            "qwen3.5:4b",
+            "--no-stream",
+            "Reply with exactly READY",
+        ],
+    )
+
+    rendered = _strip_ansi(result.stdout)
+
+    assert result.exit_code == 0, rendered
+    assert "READY" in rendered
+    assert "user_message" not in captured_kwargs

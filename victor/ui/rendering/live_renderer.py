@@ -23,6 +23,7 @@ from victor.ui.rendering.utils import (
     expand_tool_output,
     format_duration,
     format_tool_args,
+    format_tool_display_name,
     render_content_badge,
     render_edit_preview,
     render_file_preview,
@@ -198,7 +199,7 @@ class LiveDisplayRenderer:
         args_display = format_tool_args(arguments)
         icon = "✓" if success else "✗"
         color = "green" if success else "red"
-        status_line = f"[{color}]{icon}[/] [bold]{name}[/]"
+        status_line = f"[{color}]{icon}[/] [bold]{format_tool_display_name(name)}[/]"
         if args_display:
             status_line += f" [dim]{args_display}[/]"
         status_line += f" [dim]• {format_duration(elapsed)}[/]"
@@ -430,7 +431,8 @@ class LiveDisplayRenderer:
         """
         if elapsed > 3.0 and int(elapsed) % 2 == 0:  # Every 2 seconds after 3s
             dots = "." * (int(elapsed) % 3 + 1)
-            self.console.print(f"[dim]  {tool_name} still running{dots} ({elapsed:.1f}s)[/]")
+            display_name = format_tool_display_name(tool_name)
+            self.console.print(f"[dim]  {display_name} still running{dots} ({elapsed:.1f}s)[/]")
             self.resume()  # Resume after printing progress update
 
     def had_tool_calls(self) -> bool:

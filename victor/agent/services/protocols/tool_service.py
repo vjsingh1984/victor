@@ -339,7 +339,7 @@ class ToolServiceProtocol(Protocol):
         nudge_sent_flag: Optional[List[bool]] = None,
         add_message: Optional[Callable[[str, str], None]] = None,
         observability: Optional[Any] = None,
-        pipeline_calls_used: int = 0,
+        iteration_count: int = 0,
         tool_name: Optional[str] = None,
         elapsed: float = 0.0,
         session_id: Optional[str] = None,
@@ -359,7 +359,7 @@ class ToolServiceProtocol(Protocol):
             nudge_sent_flag: Mutable one-item flag tracking synthesis nudges
             add_message: Optional message injection callback
             observability: Optional observability integration
-            pipeline_calls_used: Current pipeline tool-call count
+            iteration_count: Current iteration/tool-call count
             tool_name: Optional explicit tool name for narrow observability hooks
             elapsed: Elapsed wall-clock seconds for the execution
             session_id: Optional session identifier for metrics

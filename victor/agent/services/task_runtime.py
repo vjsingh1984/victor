@@ -133,6 +133,9 @@ class TaskCoordinator:
         from victor.agent.prompt_builder import get_task_type_hint
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
         from victor.framework.task import TaskComplexity, DEFAULT_BUDGETS
+        from victor.framework.task.direct_response import classify_direct_response_prompt
+
+        direct_response = classify_direct_response_prompt(user_message)
 
         # Get granular task type for more specific hints
         granular_task_type = None
@@ -164,13 +167,15 @@ class TaskCoordinator:
             if task_hint:
                 hint_source = unified_task_type.value
 
-        if task_hint:
+        if task_hint and not direct_response.is_direct_response:
             conversation_controller.add_message(
                 "user",
                 f"[TASK-HINT: {task_hint.strip()}]",
                 metadata=build_internal_history_metadata("task_hint"),
             )
             logger.debug(f"Injected task hint for task type: {hint_source}")
+        elif task_hint:
+            logger.debug("Skipping task hint injection for direct-response prompt")
 
         # Classify task complexity and adjust tool budget
         task_classification = self.task_analyzer.classify_complexity(user_message)
@@ -251,10 +256,12 @@ class TaskCoordinator:
             has_explicit_readonly_shell_request,
             split_continuation_request,
         )
+        from victor.framework.task.direct_response import classify_direct_response_prompt
 
         previous_intent = self._current_intent
         intent_result = self.task_analyzer.detect_intent(user_message)
         is_continuation, continuation_payload = split_continuation_request(user_message)
+        direct_response = classify_direct_response_prompt(user_message)
 
         if (
             is_continuation
@@ -288,7 +295,12 @@ class TaskCoordinator:
         self._current_intent = intent_result.intent
 
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
-            if intent_result.prompt_guard:
+            if direct_response.is_direct_response:
+                logger.info(
+                    "Intent: %s, skipping prompt guard for direct-response prompt",
+                    intent_result.intent.value,
+                )
+            elif intent_result.prompt_guard:
                 conversation_controller.add_message(
                     "user", f"[INTENT-GUARD: {intent_result.prompt_guard.strip()}]"
                 )

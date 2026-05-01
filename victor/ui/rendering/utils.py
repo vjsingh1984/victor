@@ -7,6 +7,7 @@ renderer implementations to ensure consistent visual output.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from rich.console import Console
@@ -15,6 +16,8 @@ from rich.syntax import Syntax
 from rich.text import Text
 
 logger = logging.getLogger(__name__)
+
+_TOOL_NAME_SEPARATOR_PATTERN = re.compile(r"[\s_\-]+")
 
 _REASONING_PREFIX_MARKERS = (
     "💭 Thinking...",
@@ -119,6 +122,38 @@ def is_thinking_status_message(message: str) -> bool:
 
     lowered = normalized.lower()
     return lowered in {"thinking", "thinking...", "thinking…"}
+
+
+def format_tool_display_name(name: str) -> str:
+    """Format a canonical tool identifier for lower-camel display in the UI.
+
+    This keeps protocol and registry names unchanged while making renderer output
+    easier to scan for humans.
+
+    Examples:
+        "code_search" -> "codeSearch"
+        "git-status" -> "gitStatus"
+        "CodeSearch" -> "codeSearch"
+    """
+    normalized = str(name).strip()
+    if not normalized:
+        return "unknown"
+
+    if _TOOL_NAME_SEPARATOR_PATTERN.search(normalized):
+        parts = [part for part in _TOOL_NAME_SEPARATOR_PATTERN.split(normalized) if part]
+        if not parts:
+            return normalized
+        first = parts[0].lower()
+        rest = [part[:1].upper() + part[1:] for part in parts[1:]]
+        return first + "".join(rest)
+
+    if normalized.isupper():
+        return normalized.lower()
+
+    if normalized[:1].isupper():
+        return normalized[:1].lower() + normalized[1:]
+
+    return normalized
 
 
 def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:
@@ -403,15 +438,16 @@ def expand_tool_output(
     # Derive a lexer only from the whitelisted set; fall back to plain text.
     last_segment = tool_name.split("_")[-1] if "_" in tool_name else tool_name
     lexer = last_segment if last_segment in _SYNTAX_TOOL_WHITELIST else "text"
+    display_name = format_tool_display_name(tool_name)
 
     try:
         syntax = Syntax(content, lexer, theme="monokai", line_numbers=True, word_wrap=True)
         console.print(
-            Panel(syntax, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+            Panel(syntax, title=f"[bold]{display_name}[/] - Full Output", border_style="blue")
         )
     except Exception:
         console.print(
-            Panel(content, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+            Panel(content, title=f"[bold]{display_name}[/] - Full Output", border_style="blue")
         )
 
     if resume_fn is not None:

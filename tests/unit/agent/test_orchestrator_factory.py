@@ -404,14 +404,17 @@ class TestCanonicalCoordinatorBuilders:
         advisor = MagicMock(name="coordination_advisor")
         wrapper = MagicMock(name="mode_workflow_team_coordinator")
 
-        with patch.object(
-            factory,
-            "create_coordination_advisor",
-            return_value=advisor,
-        ) as mock_create, patch(
-            "victor.agent.mode_workflow_team_coordinator.ModeWorkflowTeamCoordinator",
-            return_value=wrapper,
-        ) as mock_wrapper:
+        with (
+            patch.object(
+                factory,
+                "create_coordination_advisor",
+                return_value=advisor,
+            ) as mock_create,
+            patch(
+                "victor.agent.mode_workflow_team_coordinator.ModeWorkflowTeamCoordinator",
+                return_value=wrapper,
+            ) as mock_wrapper,
+        ):
             with pytest.warns(
                 DeprecationWarning,
                 match=(

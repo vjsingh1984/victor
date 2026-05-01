@@ -185,7 +185,9 @@ def test_ensure_graph_watch_daemon_writes_project_manifest(tmp_path):
     with (
         patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
         patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
-        patch.object(graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"),
+        patch.object(
+            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+        ),
         patch.object(graph_cmd, "_fork_watch_daemon", return_value=456),
     ):
         state = graph_cmd.ensure_graph_watch_daemon(
@@ -216,7 +218,9 @@ def test_stop_graph_watch_daemon_updates_manifest_to_not_running(tmp_path):
     with (
         patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
         patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
-        patch.object(graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"),
+        patch.object(
+            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+        ),
         patch.object(graph_cmd.os, "kill"),
     ):
         state = graph_cmd.stop_graph_watch_daemon(project_root)
@@ -255,7 +259,9 @@ def test_graph_watch_status_reports_last_refresh_details(tmp_path):
         patch.object(graph_cmd, "console", record_console),
         patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
         patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
-        patch.object(graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"),
+        patch.object(
+            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+        ),
     ):
         graph_cmd.graph_watch_status(path=str(project_root), pid_file=pid_file)
 
@@ -286,6 +292,7 @@ def test_summarize_graph_watch_health_reports_active_refresh_counts() -> None:
 def test_summarize_graph_watch_health_reports_stale_or_missing_state() -> None:
     """Compact health summaries should distinguish stale and disabled graph watch states."""
     assert graph_cmd.summarize_graph_watch_health(None) == ("Graph: off", "inactive")
-    assert graph_cmd.summarize_graph_watch_health(
-        {"running": False, "stale_pid_file": True}
-    ) == ("Graph: stale", "warning")
+    assert graph_cmd.summarize_graph_watch_health({"running": False, "stale_pid_file": True}) == (
+        "Graph: stale",
+        "warning",
+    )

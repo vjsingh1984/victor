@@ -43,6 +43,7 @@ from victor.agent.config import (
 )
 from victor.core.errors import AgentError, CancellationError, ProviderError
 from victor.framework.events import AgentExecutionEvent, EventType
+from victor.framework.message_execution import execute_message, stream_message_events
 from victor.framework.state import State, StateObserver
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
@@ -137,7 +138,12 @@ class Agent:
         self._model = model
         self._vertical = vertical
         self._vertical_config = vertical_config
-        self._context = getattr(orchestrator, "_execution_context", None)
+        orchestrator_state = getattr(orchestrator, "__dict__", {})
+        self._context = (
+            orchestrator_state.get("_execution_context")
+            if isinstance(orchestrator_state, dict)
+            else None
+        )
         self._state = State(orchestrator)
         self._state_observers: List[StateObserver] = []
         # LSP capability (language intelligence)
@@ -422,61 +428,15 @@ class Agent:
         if runtime_context is not None:
             return runtime_context
 
-        runtime_context = getattr(self._orchestrator, "_execution_context", None)
+        orchestrator_state = getattr(self._orchestrator, "__dict__", {})
+        runtime_context = (
+            orchestrator_state.get("_execution_context")
+            if isinstance(orchestrator_state, dict)
+            else None
+        )
         if runtime_context is not None:
             self._context = runtime_context
         return runtime_context
-
-    def _resolve_chat_runtime(self) -> Any:
-        """Resolve the canonical chat runtime for this agent.
-
-        Preference order:
-        1. RuntimeExecutionContext services accessor
-        2. Orchestrator-bound ChatService
-        3. Container-resolved ChatService
-        4. Underlying orchestrator as a compatibility fallback
-        """
-        runtime_context = self.execution_context
-        services = getattr(runtime_context, "services", None)
-        if services is not None:
-            chat_service = getattr(services, "chat", None)
-            if chat_service is not None:
-                return chat_service
-
-        chat_service = getattr(self._orchestrator, "_chat_service", None)
-        if chat_service is not None:
-            return chat_service
-
-        container = getattr(self._orchestrator, "_container", None)
-        if container is not None:
-            from victor.runtime.context import ServiceAccessor
-
-            accessor = ServiceAccessor(_container=container)
-            chat_service = accessor.chat
-            if chat_service is not None:
-                return chat_service
-
-        return self._orchestrator
-
-    @staticmethod
-    def _coerce_completion_response(
-        result: Any,
-        *,
-        default_model: Optional[str],
-    ) -> Any:
-        """Normalize service-layer chat results to CompletionResponse."""
-        from victor.providers.base import CompletionResponse
-
-        if isinstance(result, CompletionResponse):
-            return result
-
-        return CompletionResponse(
-            content=str(result),
-            model=default_model,
-            tool_calls=[],
-            usage=None,
-            stop_reason="stop",
-        )
 
     def _notify_state_observers_if_changed(self, previous_stage: Any) -> Any:
         """Notify observers when the observable stage changes."""
@@ -521,50 +481,12 @@ class Agent:
                 context={"file": "auth.py", "error": "IndexError"}
             )
         """
-        from victor.framework._internal import format_context_message
-
-        # Apply context to prompt for one-shot runs.
-        if context:
-            context_message = format_context_message(context)
-            if context_message:
-                prompt = f"{context_message}\n\n{prompt}"
-
-        try:
-            chat_runtime = self._resolve_chat_runtime()
-            response = self._coerce_completion_response(
-                await chat_runtime.chat(prompt),
-                default_model=getattr(self._orchestrator, "model", "unknown"),
-            )
-
-            return TaskResult(
-                content=response.content or "",
-                tool_calls=response.tool_calls or [],
-                success=True,
-                error=None,
-                metadata={
-                    "stage": self._state.stage.value,
-                    "model": response.model,
-                    "usage": response.usage,
-                    "stop_reason": response.stop_reason,
-                },
-            )
-
-        except CancellationError:
-            return TaskResult(
-                content="",
-                tool_calls=[],
-                success=False,
-                error="Operation cancelled",
-                metadata={"stage": self._state.stage.value},
-            )
-        except Exception as e:
-            return TaskResult(
-                content="",
-                tool_calls=[],
-                success=False,
-                error=str(e),
-                metadata={"stage": self._state.stage.value},
-            )
+        return await execute_message(
+            orchestrator=self._orchestrator,
+            execution_context=self.execution_context,
+            user_message=prompt,
+            context=context,
+        )
 
     async def stream(
         self,
@@ -595,20 +517,15 @@ class Agent:
                 elif event.type == EventType.CONTENT:
                     print(event.content, end="", flush=True)
         """
-        from victor.framework._internal import format_context_message, stream_with_events
-
-        # Apply context to conversation if provided
-        if context:
-            context_message = format_context_message(context)
-            if context_message:
-                # Prepend context to the prompt
-                prompt = f"{context_message}\n\n{prompt}"
-
         # Track state for observers
         old_stage = self._state.stage
 
-        chat_runtime = self._resolve_chat_runtime()
-        async for event in stream_with_events(chat_runtime, prompt):
+        async for event in stream_message_events(
+            orchestrator=self._orchestrator,
+            execution_context=self.execution_context,
+            user_message=prompt,
+            context=context,
+        ):
             old_stage = self._notify_state_observers_if_changed(old_stage)
             yield event
 
@@ -630,6 +547,24 @@ class Agent:
             response = await session.send("Now extract the validation logic")
         """
         return ChatSession(self, prompt)
+
+    def create_session(
+        self,
+        initial_prompt: Optional[str] = None,
+        **kwargs: Any,
+    ) -> "AgentSession":
+        """Create the canonical multi-turn session implementation.
+
+        Args:
+            initial_prompt: Optional initial prompt for the first turn.
+            **kwargs: Additional ``AgentSession`` constructor options.
+
+        Returns:
+            AgentSession with shared runtime/state behavior.
+        """
+        from victor.framework.agent_components import AgentSession
+
+        return AgentSession(self, initial_prompt, **kwargs)
 
     async def run_oneshot(
         self,
@@ -1099,8 +1034,7 @@ class Agent:
                 context={"error_log": "TimeoutError at auth.py:45"}
             )
         """
-        from victor.framework.teams import AgentTeam
-        from victor.framework.team_runtime import resolve_vertical_team_catalog
+        from victor.framework.team_runtime import resolve_vertical_team_catalog, run_named_team
 
         # Check if vertical is configured
         if not self._vertical:
@@ -1119,30 +1053,41 @@ class Agent:
             available = team_catalog.list_names()
             raise AgentError(f"Team '{team_name}' not found. " f"Available: {', '.join(available)}")
 
-        # Create and run team
-        team = await AgentTeam.create(
-            orchestrator=self._orchestrator,
-            name=team_spec.name,
+        team_execution = await run_named_team(
+            self._orchestrator,
+            team_name=team_name,
             goal=goal,
-            members=team_spec.members,
-            formation=team_spec.formation,
-            total_tool_budget=team_spec.total_tool_budget,
-            max_iterations=team_spec.max_iterations,
+            context=context,
             timeout_seconds=timeout_seconds,
-            shared_context=context,
         )
+        if team_execution is None:
+            raise AgentError(f"Team '{team_name}' could not be resolved for execution.")
+        resolved_team, result = team_execution
 
-        # Execute team and collect result
-        result = await team.run()
-
-        return {
-            "success": result.success if hasattr(result, "success") else True,
-            "final_output": (
-                result.final_output if hasattr(result, "final_output") else str(result)
-            ),
-            "team_name": team_spec.name,
-            "goal": goal,
-        }
+        payload: Dict[str, Any] = {}
+        to_dict = getattr(result, "to_dict", None)
+        if callable(to_dict):
+            serialized = to_dict()
+            if isinstance(serialized, dict):
+                payload = dict(serialized)
+        if not payload:
+            payload = {
+                "success": bool(getattr(result, "success", True)),
+                "final_output": (
+                    getattr(result, "final_output", None)
+                    if getattr(result, "final_output", None) is not None
+                    else str(result)
+                ),
+            }
+        payload.update(
+            {
+                "team_name": resolved_team.team_name,
+                "team_display_name": resolved_team.display_name,
+                "goal": goal,
+                "recommendation_source": resolved_team.recommendation_source,
+            }
+        )
+        return payload
 
     def get_available_workflows(self) -> List[str]:
         """Get list of available workflow names from the vertical.
@@ -1195,13 +1140,53 @@ class Agent:
         Returns:
             CoordinationSuggestion with team and workflow recommendations.
         """
-        from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
+        from victor.framework.coordination_runtime import get_runtime_coordination_suggestion
 
-        return build_runtime_coordination_suggestion(
+        return get_runtime_coordination_suggestion(
             runtime_subject=self._orchestrator,
             task_type=task_type,
             complexity=complexity,
             mode=mode,
+        )
+
+    async def get_coordination_transitions(
+        self,
+        task_type: str,
+        complexity: Optional[str] = None,
+        *,
+        mode: Optional[str] = None,
+    ) -> Any:
+        """Get state-passed coordination transitions for a task.
+
+        This is the framework-facing state-passed companion to
+        ``get_coordination_suggestion()``. It returns the raw coordinator result
+        so callers can inspect transitions, confidence, and metadata without
+        mutating orchestrator state directly.
+        """
+        from victor.agent.coordinators.state_context import create_snapshot
+
+        orchestration_facade = getattr(self._orchestrator, "orchestration_facade", None)
+        if orchestration_facade is None:
+            orchestration_facade = getattr(self._orchestrator, "_orchestration_facade", None)
+
+        coordination_state_passed = (
+            getattr(orchestration_facade, "coordination_state_passed", None)
+            if orchestration_facade is not None
+            else None
+        )
+        if coordination_state_passed is None:
+            raise AgentError("Coordination state-passed surface is not available")
+
+        mode_controller = getattr(self._orchestrator, "mode_controller", None)
+        current_mode = getattr(mode_controller, "current_mode", None)
+        resolved_mode = mode or getattr(current_mode, "value", None) or "build"
+
+        snapshot = create_snapshot(self._orchestrator)
+        return await coordination_state_passed.suggest(
+            snapshot,
+            task_type=task_type,
+            complexity=complexity,
+            mode=resolved_mode,
         )
 
     # =========================================================================
@@ -1323,10 +1308,7 @@ class ChatSession:
             agent: Agent instance
             initial_prompt: First message in the conversation
         """
-        # Delegate to AgentSession for actual implementation
-        from victor.framework.agent_components import AgentSession
-
-        self._delegate = AgentSession(agent, initial_prompt)
+        self._delegate = agent.create_session(initial_prompt)
 
     async def send(self, message: str) -> TaskResult:
         """Send a message in the conversation.

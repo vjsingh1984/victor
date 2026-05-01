@@ -143,6 +143,31 @@ class TestTaskPreparation:
             assert len(calls) > 0
             assert calls[0].kwargs["metadata"] == build_internal_history_metadata("task_hint")
 
+    def test_prepare_task_skips_task_hint_for_direct_response(
+        self, task_coordinator, mock_conversation_controller
+    ):
+        """Direct-response prompts should not receive hidden task-hint injections."""
+        from unittest.mock import patch
+
+        unified_type = Mock(value="general")
+
+        with patch(
+            "victor.agent.prompt_builder.get_task_type_hint",
+            return_value="Test task hint",
+        ):
+            task_coordinator.prepare_task(
+                "Reply with exactly READY",
+                unified_type,
+                mock_conversation_controller,
+            )
+
+        hint_calls = [
+            call
+            for call in mock_conversation_controller.add_message.call_args_list
+            if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
+        ]
+        assert hint_calls == []
+
 
 class TestIntentDetection:
     """Tests for intent detection operations."""
@@ -192,6 +217,25 @@ class TestIntentDetection:
         )
 
         # Verify current intent was set
+        assert task_coordinator.current_intent == ActionIntent.DISPLAY_ONLY
+
+    def test_apply_intent_guard_skips_guard_for_direct_response(
+        self, task_coordinator, mock_task_analyzer, mock_conversation_controller
+    ):
+        """Direct-response prompts should not receive hidden prompt-guard injections."""
+        from victor.agent.action_authorizer import ActionIntent
+
+        intent_result = Mock()
+        intent_result.intent = ActionIntent.DISPLAY_ONLY
+        intent_result.prompt_guard = "READ ONLY MODE: Do not modify files."
+        mock_task_analyzer.detect_intent.return_value = intent_result
+
+        task_coordinator.apply_intent_guard(
+            "Reply with exactly READY",
+            mock_conversation_controller,
+        )
+
+        mock_conversation_controller.add_message.assert_not_called()
         assert task_coordinator.current_intent == ActionIntent.DISPLAY_ONLY
 
     def test_apply_intent_guard_read_only(

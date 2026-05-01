@@ -183,6 +183,11 @@ class AgentExecutionEvent:
         """Check if this is a custom user-defined event."""
         return self.type == EventType.CUSTOM
 
+    @property
+    def event_type(self) -> str:
+        """String alias for callers that use event_type naming."""
+        return self.type.value
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {

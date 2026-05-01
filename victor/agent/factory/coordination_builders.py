@@ -23,6 +23,7 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
 
 from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
@@ -62,7 +63,7 @@ if TYPE_CHECKING:
     from victor.agent.session_ledger import SessionLedger
     from victor.observability.integration import ObservabilityIntegration
     from victor.storage.embeddings.intent_classifier import IntentClassifier
-    from victor.protocols.coordination import ModeWorkflowTeamCoordinatorProtocol
+    from victor.protocols.coordination import CoordinationAdvisorProtocol
     from victor.agent.protocols.infrastructure_protocols import (
         SafetyCheckerProtocol,
         AutoCommitterProtocol,
@@ -532,7 +533,7 @@ class CoordinationBuildersMixin:
     def create_coordination_advisor(
         self,
         vertical_context: Any,
-    ) -> "ModeWorkflowTeamCoordinatorProtocol":
+    ) -> "CoordinationAdvisorProtocol":
         """Create the canonical coordination advisor for task/team/workflow routing.
 
         Args:
@@ -567,8 +568,14 @@ class CoordinationBuildersMixin:
     def create_mode_workflow_team_coordinator(
         self,
         vertical_context: Any,
-    ) -> "ModeWorkflowTeamCoordinatorProtocol":
+    ) -> "CoordinationAdvisorProtocol":
         """Deprecated compatibility wrapper over the canonical coordination advisor."""
+        warnings.warn(
+            "OrchestratorFactory.create_mode_workflow_team_coordinator(...) is deprecated. "
+            "Use create_coordination_advisor(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
 
         return ModeWorkflowTeamCoordinator(

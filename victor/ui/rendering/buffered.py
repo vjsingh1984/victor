@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from victor.ui.rendering.utils import format_duration, format_tool_args, render_tool_preview
+from victor.ui.rendering.utils import (
+    format_duration,
+    format_tool_args,
+    format_tool_display_name,
+    render_tool_preview,
+)
 
 
 class BufferedRenderer:
@@ -19,9 +24,15 @@ class BufferedRenderer:
     until flush() or finalize() is called.
     """
 
-    def __init__(self, show_reasoning: bool = False, plain: bool = False):
+    def __init__(
+        self,
+        show_reasoning: bool = False,
+        plain: bool = False,
+        user_message: str = "",
+    ):
         self._show_reasoning = show_reasoning
         self._plain = plain
+        self._user_message = user_message
         self._tool_calls: list[dict[str, Any]] = []
         self._reasoning_chunks: list[str] = []
         self._content_chunks: list[str] = []
@@ -117,7 +128,14 @@ class BufferedRenderer:
 
     def finalize(self) -> str:
         """Return accumulated content."""
-        return "".join(self._content_chunks)
+        content = "".join(self._content_chunks)
+        if self._user_message:
+            from victor.framework.task.direct_response import normalize_direct_response_output
+
+            # Compatibility fallback for callers that still bypass framework-owned
+            # stream normalization and only hand the renderer raw content.
+            content = normalize_direct_response_output(self._user_message, content)
+        return content
 
     def cleanup(self) -> None:
         """Clean up resources."""
@@ -135,11 +153,12 @@ class BufferedRenderer:
         if self._tool_calls:
             for tc in self._tool_calls:
                 result = tc.get("result", {})
+                display_name = format_tool_display_name(tc["name"])
                 if result:
                     icon = "[green]✓[/]" if result.get("success") else "[red]✗[/]"
                     elapsed = result.get("elapsed", 0)
                     args_display = format_tool_args(tc.get("arguments", {}))
-                    status_line = f"{icon} [bold]{tc['name']}[/]"
+                    status_line = f"{icon} [bold]{display_name}[/]"
                     if args_display:
                         status_line += f" [dim]{args_display}[/]"
                     status_line += f" [dim]• {format_duration(elapsed)}[/]"
@@ -160,7 +179,7 @@ class BufferedRenderer:
                                 hotkey="^O",
                             )
                 else:
-                    console.print(f"[blue]•[/] [bold]{tc['name']}[/] [dim]pending[/]")
+                    console.print(f"[blue]•[/] [bold]{display_name}[/] [dim]pending[/]")
 
         # Print reasoning if --show-reasoning
         if self._reasoning_chunks:
@@ -168,7 +187,7 @@ class BufferedRenderer:
             console.print(f"\n[dim italic]{reasoning_text}[/]\n")
 
         # Print final content
-        content = "".join(self._content_chunks)
+        content = self.finalize()
         if content.strip():
             if self._plain:
                 console.print(content)

@@ -8,6 +8,7 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 |---|---|---|---|---|---|
 | `UnifiedWorkflowCompilerAdapter` legacy API surface | `victor/workflows/adapter.py` | Protocol-based compiler API (`victor.workflows.compiler`) | Architecture Lead | `v0.7.0` | `2026-06-30` |
 | ~~`UnifiedWorkflowCompiler`~~ | `victor/workflows/unified_compiler.py` | **Removed from deprecation** — canonical compiler API; `create_compiler` was never implemented. See M4 update below. | Architecture Lead | N/A | N/A |
+| `FrameworkShim` compatibility surface | `victor/framework/shim.py`, `victor/framework/__init__.py` | `Agent.create()` for public callers or `AgentFactory` / `AgentCreationFactory` for internal composition | Architecture Lead | `v1.0.0` | `2027-06-30` |
 | `WorkflowGraph` alias from `victor.workflows.graph` | `victor/workflows/graph.py` | `BasicWorkflowGraph` or `victor.workflows.graph_dsl.WorkflowGraph` | Architecture Lead | `v0.8.0` | `2026-12-31` |
 | `TeamNode*` workflow compatibility aliases (`TeamNode`, `TeamNodeConfig`, `TeamNodeWorkflow`, `TeamNodeExecutor`) | `victor/framework/workflows/nodes.py`, `victor/workflows/{__init__,definition.py}`, `victor/workflows/executors/{__init__,team.py}` | `TeamStep*` workflow names | Architecture Lead | `v0.9.0` | `2027-03-31` |
 | Sync `AgentOrchestrator.switch_provider(...)` | `victor/agent/orchestrator.py` | Async `await orchestrator.switch_provider(...)` | Architecture Lead | `v0.8.0` | `2026-12-31` |
@@ -26,6 +27,8 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 
 - Entries with explicit source-level targets were kept as-is (`v0.7.0` / `2026-06-30`).
 - Entries without explicit source targets are assigned provisional `v0.8.0` / `2026-12-31` per policy and should be re-validated at each milestone cut.
+- `FrameworkShim` remains a broad compatibility surface, so its removal is tracked
+  on the first post-`0.x` stabilization milestone: `v1.0.0` / `2027-06-30`.
 - `TeamNode*` workflow aliases were deprecated after `0.7.0` and therefore use
   the next compliant two-minor-release milestone: `v0.9.0` / `2027-03-31`.
 - `VerticalBase.create_agent()` and the legacy config-only vertical activation shim
