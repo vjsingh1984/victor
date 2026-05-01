@@ -94,6 +94,33 @@ async def test_execute_message_can_forward_stream_flag_when_requested() -> None:
 
 
 @pytest.mark.asyncio
+async def test_execute_message_preserves_tool_calls_from_completion_like_objects() -> None:
+    from victor.framework.message_execution import execute_message
+
+    orchestrator = _make_orchestrator()
+    tool_calls = [{"id": "call_1", "name": "read", "arguments": {"path": "a.py"}}]
+    completion_like = SimpleNamespace(
+        content="done",
+        role="assistant",
+        tool_calls=tool_calls,
+        usage={"total_tokens": 1},
+        stop_reason="stop",
+        model="test-model",
+    )
+    chat_service = SimpleNamespace(chat=AsyncMock(return_value=completion_like))
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service))
+
+    result = await execute_message(
+        orchestrator=orchestrator,
+        execution_context=execution_context,
+        user_message="Read a.py",
+    )
+
+    assert result.success is True
+    assert result.tool_calls == tool_calls
+
+
+@pytest.mark.asyncio
 async def test_iter_runtime_stream_events_uses_stream_with_events_for_chat_runtime() -> None:
     from victor.framework.message_execution import iter_runtime_stream_events
 

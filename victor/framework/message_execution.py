@@ -60,6 +60,47 @@ def _coerce_completion_response(
     if isinstance(result, CompletionResponse):
         return result
 
+    if isinstance(result, Mapping) or hasattr(result, "content"):
+        content = (
+            result.get("content", "")
+            if isinstance(result, Mapping)
+            else getattr(result, "content", "")
+        )
+        role = (
+            result.get("role", "assistant")
+            if isinstance(result, Mapping)
+            else getattr(result, "role", "assistant")
+        )
+        tool_calls = (
+            result.get("tool_calls", [])
+            if isinstance(result, Mapping)
+            else getattr(result, "tool_calls", [])
+        )
+        usage = (
+            result.get("usage")
+            if isinstance(result, Mapping)
+            else getattr(result, "usage", None)
+        )
+        stop_reason = (
+            result.get("stop_reason", "stop")
+            if isinstance(result, Mapping)
+            else getattr(result, "stop_reason", "stop")
+        )
+        model = (
+            result.get("model", default_model)
+            if isinstance(result, Mapping)
+            else getattr(result, "model", default_model)
+        )
+
+        return CompletionResponse(
+            content=content or "",
+            role=role or "assistant",
+            tool_calls=tool_calls or [],
+            usage=usage,
+            stop_reason=stop_reason or "stop",
+            model=model,
+        )
+
     return CompletionResponse(
         content=str(result),
         model=default_model,
