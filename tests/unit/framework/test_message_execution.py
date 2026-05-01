@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -47,6 +48,99 @@ def test_resolve_chat_runtime_prefers_execution_context_chat_service() -> None:
     runtime = resolve_chat_runtime(orchestrator, execution_context)
 
     assert runtime is chat_service
+
+
+def test_resolve_runtime_services_prefers_execution_context_services() -> None:
+    from victor.framework.message_execution import resolve_runtime_services
+
+    orchestrator = _make_orchestrator()
+    chat_service = MagicMock()
+    session_service = MagicMock()
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(chat=chat_service, session=session_service)
+    )
+
+    services = resolve_runtime_services(orchestrator, execution_context)
+
+    assert services.chat is chat_service
+    assert services.session is session_service
+
+
+def test_resolve_runtime_services_prefers_execution_context_container_over_legacy_attrs() -> None:
+    from victor.framework.message_execution import resolve_runtime_services
+
+    orchestrator = _make_orchestrator()
+    legacy_chat_service = MagicMock(name="legacy_chat_service")
+    legacy_session_service = MagicMock(name="legacy_session_service")
+    runtime_chat_service = MagicMock(name="runtime_chat_service")
+    runtime_session_service = MagicMock(name="runtime_session_service")
+    container = MagicMock()
+    container.get_optional.side_effect = [
+        runtime_chat_service,
+        runtime_session_service,
+    ]
+    execution_context = SimpleNamespace(container=container)
+    orchestrator._chat_service = legacy_chat_service
+    orchestrator._session_service = legacy_session_service
+
+    services = resolve_runtime_services(orchestrator, execution_context)
+
+    assert services.chat is runtime_chat_service
+    assert services.session is runtime_session_service
+    assert services.chat is not legacy_chat_service
+    assert services.session is not legacy_session_service
+
+
+def test_resolve_chat_service_returns_canonical_chat_service() -> None:
+    from victor.framework.message_execution import resolve_chat_service
+
+    orchestrator = _make_orchestrator()
+    chat_service = MagicMock()
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service))
+
+    resolved = resolve_chat_service(orchestrator, execution_context)
+
+    assert resolved is chat_service
+
+
+def test_resolve_runtime_services_falls_through_empty_execution_context_services() -> None:
+    from victor.framework.message_execution import resolve_runtime_services
+
+    orchestrator = _make_orchestrator()
+    legacy_chat_service = MagicMock(name="legacy_chat_service")
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=None, session=None))
+    orchestrator._chat_service = legacy_chat_service
+
+    services = resolve_runtime_services(orchestrator, execution_context)
+
+    assert services.chat is legacy_chat_service
+
+
+@pytest.mark.asyncio
+async def test_resolve_chat_runtime_wraps_orchestrator_fallback_without_warning() -> None:
+    from victor.framework.message_execution import resolve_chat_runtime
+
+    orchestrator = _make_orchestrator()
+    orchestrator.chat = AsyncMock(return_value="fallback-result")
+    orchestrator._container = None
+
+    async def _stream_chat(_message: str):
+        yield SimpleNamespace(content="chunk")
+
+    orchestrator.stream_chat = _stream_chat
+
+    runtime = resolve_chat_runtime(orchestrator)
+
+    assert runtime is not orchestrator
+
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always", DeprecationWarning)
+        result = await runtime.chat("hello")
+        chunks = [chunk async for chunk in runtime.stream_chat("hello")]
+
+    assert result == "fallback-result"
+    assert [chunk.content for chunk in chunks] == ["chunk"]
+    assert len(recorded) == 0
 
 
 @pytest.mark.asyncio
@@ -133,7 +227,6 @@ async def test_agent_run_delegates_to_shared_message_executor() -> None:
         execution_context=None,
         user_message="Reply with exactly READY",
         context={"file": "auth.py"},
-        compatibility_warning_origin="Agent.run()",
     )
 
 

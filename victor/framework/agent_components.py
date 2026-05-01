@@ -1412,30 +1412,18 @@ class AgentSession:
         self._history.append({"role": "assistant", "content": response})
 
     def _resolve_runtime_services(self) -> tuple[Optional[Any], Optional[Any]]:
-        """Resolve canonical chat/session services with compatibility fallbacks."""
-        runtime_context = getattr(self._agent, "execution_context", None)
-        services = getattr(runtime_context, "services", None)
-        if services is not None:
-            return getattr(services, "chat", None), getattr(services, "session", None)
+        """Resolve canonical chat/session services through the shared runtime helper."""
+        from victor.runtime.context import resolve_runtime_services
 
         orchestrator = getattr(self._agent, "_orchestrator", None)
-        if orchestrator is not None:
-            chat_service = getattr(orchestrator, "_chat_service", None)
-            session_service = getattr(orchestrator, "_session_service", None)
-            if chat_service is not None or session_service is not None:
-                return chat_service, session_service
+        if orchestrator is None:
+            return None, None
 
-            container = getattr(orchestrator, "_container", None)
-            if container is not None:
-                try:
-                    from victor.runtime.context import ServiceAccessor
-
-                    accessor = ServiceAccessor(_container=container)
-                    return accessor.chat, accessor.session
-                except Exception:
-                    return None, None
-
-        return None, None
+        services = resolve_runtime_services(
+            orchestrator,
+            getattr(self._agent, "execution_context", None),
+        )
+        return services.chat, services.session
 
     async def _ensure_runtime_session(self) -> None:
         """Create the canonical runtime session once and reset conversation state."""

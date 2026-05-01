@@ -177,3 +177,52 @@ async def test_chat_stream_emits_request_event_and_context(monkeypatch, tmp_path
     assert parsed_events[1]["request_id"] == request_id
     assert parsed_events[2]["type"] == "tool_call"
     assert parsed_events[2]["request_id"] == request_id
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_prefers_execution_context_chat_runtime_over_legacy_attr(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Streaming chat should resolve the canonical execution-context runtime first."""
+
+    class _LegacyChatRuntime:
+        async def stream_chat(self, _message: str):
+            raise AssertionError("legacy orchestrator-bound chat runtime should not be used")
+
+    class _RuntimeChatService:
+        def __init__(self) -> None:
+            self.stream_request_ids: list[str | None] = []
+
+        async def stream_chat(self, message: str):
+            self.stream_request_ids.append(get_request_correlation_id())
+            yield SimpleNamespace(content=f"runtime:{message}", tool_calls=None)
+
+    orchestrator = _FakeOrchestrator()
+    runtime_chat = _RuntimeChatService()
+    orchestrator._execution_context = SimpleNamespace(services=SimpleNamespace(chat=runtime_chat))
+    orchestrator._chat_service = _LegacyChatRuntime()
+    server = _create_server(monkeypatch, tmp_path, orchestrator)
+
+    transport = ASGITransport(app=server.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with client.stream(
+            "POST",
+            "/chat/stream",
+            json={"messages": [{"role": "user", "content": "prefer runtime"}]},
+        ) as response:
+            payloads: list[str] = []
+            async for line in response.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line.removeprefix("data: ").strip()
+                payloads.append(payload)
+                if payload == "[DONE]":
+                    break
+
+    request_event = json.loads(payloads[0])
+    content_event = json.loads(payloads[1])
+
+    assert response.status_code == 200
+    assert request_event["type"] == "request"
+    assert runtime_chat.stream_request_ids == [request_event["request_id"]]
+    assert content_event["content"] == "runtime:prefer runtime"

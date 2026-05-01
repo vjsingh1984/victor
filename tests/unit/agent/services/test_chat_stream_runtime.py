@@ -36,6 +36,19 @@ def _make_orchestrator_stub():
     return orch
 
 
+def test_streaming_runtime_bindings_resolve_adapter_state_and_capabilities():
+    orch = _make_orchestrator_stub()
+    adapter = OrchestratorProtocolAdapter(orch)
+    orch._perception_integration = "perception"
+
+    binding = ServiceStreamingRuntime(adapter)._get_runtime_bindings(adapter)
+
+    assert binding.state_host is orch
+    assert binding.state_dict is orch.__dict__
+    assert binding.get_capability_value("perception_integration") == "perception"
+    assert binding.has_capability("perception_integration") is True
+
+
 def test_service_streaming_runtime_caches_executor(monkeypatch):
     orch = _make_orchestrator_stub()
     runtime = ServiceStreamingRuntime(orch)

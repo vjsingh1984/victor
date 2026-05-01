@@ -156,13 +156,13 @@ class RuntimeBuildersMixin:
         logger.debug("StreamingChatExecutor created and bound to runtime owner")
         return executor
 
-    def create_service_streaming_runtime(self, orchestrator: Any) -> Any:
-        """Create the canonical service-owned streaming runtime adapter."""
+    def create_streaming_chat_adapter(self, runtime_owner: Any) -> Any:
+        """Create the canonical service-owned chat-stream adapter."""
         from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 
-        runtime = ServiceStreamingRuntime(orchestrator)
-        logger.debug("ServiceStreamingRuntime created")
-        return runtime
+        adapter = ServiceStreamingRuntime(runtime_owner)
+        logger.debug("Streaming chat adapter created")
+        return adapter
 
     def create_streaming_metrics_collector(
         self,

@@ -69,6 +69,7 @@ from victor.integrations.api.graph_export import (
 from victor.integrations.api.router_plugins import load_fastapi_router_registrations
 from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
+from victor.framework.message_execution import resolve_chat_runtime
 from victor.observability.request_correlation import request_correlation_id
 from fastapi.responses import HTMLResponse
 
@@ -394,6 +395,7 @@ class VictorFastAPIServer:
         self._container = ensure_bootstrapped(self._settings)
 
         self._orchestrator = None
+        self._victor_client = None  # NEW: VictorClient for service-layer access
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
         self._hitl_store = None
@@ -619,6 +621,38 @@ class VictorFastAPIServer:
 
         return self._orchestrator
 
+    async def _get_victor_client(self) -> Any:
+        """Get or create the VictorClient for service-layer access."""
+        if self._victor_client is None:
+            from victor.framework.client import VictorClient
+            from victor.framework.session_config import SessionConfig
+
+            config = SessionConfig()  # Use default config
+            self._victor_client = VictorClient(config, container=self._container)
+            await self._victor_client.initialize()
+
+        return self._victor_client
+
+    async def reset_conversation(self) -> None:
+        """Reset conversation history using VictorClient (service layer)."""
+        client = await self._get_victor_client()
+        await client.reset_conversation()
+
+    async def get_conversation_messages(
+        self, limit: Optional[int] = None, role: Optional[str] = None
+    ) -> List[Any]:
+        """Get conversation messages using VictorClient (service layer).
+
+        Args:
+            limit: Maximum number of messages to return
+            role: Optional filter by message role
+
+        Returns:
+            List of message objects
+        """
+        client = await self._get_victor_client()
+        return await client.get_messages(limit=limit, role=role)
+
     async def _record_rl_feedback(self) -> None:
         """Record RL feedback for the current session."""
         if self._orchestrator is None:
@@ -709,9 +743,10 @@ class VictorFastAPIServer:
                 return
 
             orchestrator = await self._get_orchestrator()
+            chat_runtime = resolve_chat_runtime(orchestrator)
 
             try:
-                async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
+                async for chunk in chat_runtime.stream_chat(messages[-1].get("content", "")):
                     if chunk.get("type") == "content":
                         await ws.send_json({"type": "content", "content": chunk["content"]})
                     elif chunk.get("type") == "tool_call":

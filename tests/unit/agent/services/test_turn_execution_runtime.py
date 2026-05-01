@@ -36,6 +36,24 @@ def _make_executor(exploration_coordinator=None) -> TurnExecutor:
     )
 
 
+def test_resolve_orchestrator_prefers_explicit_runtime_owner():
+    executor = _make_executor()
+    direct_owner = SimpleNamespace(name="direct")
+    fallback_owner = SimpleNamespace(name="fallback")
+    executor._orchestrator = direct_owner
+    executor._chat_context._orchestrator = fallback_owner
+
+    assert executor._resolve_orchestrator() is direct_owner
+
+
+def test_resolve_orchestrator_falls_back_to_chat_context_owner():
+    executor = _make_executor()
+    fallback_owner = SimpleNamespace(name="fallback")
+    executor._chat_context._orchestrator = fallback_owner
+
+    assert executor._resolve_orchestrator() is fallback_owner
+
+
 @pytest.mark.asyncio
 async def test_parallel_exploration_uses_injected_coordinator():
     explorer = MagicMock()

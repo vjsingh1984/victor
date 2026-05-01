@@ -11,7 +11,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor.runtime.context import ExecutionContext, ServiceAccessor
+from victor.runtime.context import (
+    ExecutionContext,
+    ServiceAccessor,
+    resolve_execution_context,
+    resolve_runtime_services,
+)
 
 
 class TestExecutionContextCreation:
@@ -218,7 +223,61 @@ class TestCleanupLifecycle:
 
 
 class TestExecutionContextIntegration:
-    """Test integration with real DI container."""
+    """Test integration with real DI container and runtime service resolution."""
+
+    def test_resolve_execution_context_prefers_explicit_argument(self):
+        explicit_context = MagicMock(name="explicit_context")
+        runtime_owner = MagicMock()
+        runtime_owner._execution_context = MagicMock(name="orchestrator_context")
+
+        resolved = resolve_execution_context(runtime_owner, explicit_context)
+
+        assert resolved is explicit_context
+
+    def test_resolve_runtime_services_prefers_execution_context_services(self):
+        chat_service = MagicMock(name="chat_service")
+        session_service = MagicMock(name="session_service")
+        runtime_owner = MagicMock()
+        execution_context = MagicMock()
+        execution_context.services = MagicMock()
+        execution_context.services.chat = chat_service
+        execution_context.services.session = session_service
+
+        resolved = resolve_runtime_services(runtime_owner, execution_context)
+
+        assert resolved.chat is chat_service
+        assert resolved.session is session_service
+
+    def test_resolve_runtime_services_falls_back_to_context_container(self):
+        chat_service = MagicMock(name="chat_service")
+        session_service = MagicMock(name="session_service")
+        container = MagicMock()
+        container.get_optional.side_effect = [chat_service, session_service]
+        runtime_owner = MagicMock()
+        runtime_owner._chat_service = MagicMock(name="legacy_chat")
+        runtime_owner._session_service = MagicMock(name="legacy_session")
+        execution_context = MagicMock()
+        execution_context.services = MagicMock()
+        execution_context.services.chat = None
+        execution_context.services.session = None
+        execution_context.container = container
+
+        resolved = resolve_runtime_services(runtime_owner, execution_context)
+
+        assert resolved.chat is chat_service
+        assert resolved.session is session_service
+
+    def test_resolve_runtime_services_falls_back_to_runtime_owner_state(self):
+        chat_service = MagicMock(name="chat_service")
+        session_service = MagicMock(name="session_service")
+        runtime_owner = MagicMock()
+        runtime_owner._chat_service = chat_service
+        runtime_owner._session_service = session_service
+
+        resolved = resolve_runtime_services(runtime_owner)
+
+        assert resolved.chat is chat_service
+        assert resolved.session is session_service
 
     def test_create_with_real_container(self):
         from victor.core.container import ServiceContainer

@@ -162,6 +162,13 @@ class TurnExecutor:
         self._exploration_done = False  # Instance-level: fires once per conversation
         self._last_tool_follow_up_guidance_signature: Optional[tuple[str, ...]] = None
 
+    def _resolve_orchestrator(self) -> Any:
+        """Return the explicit orchestrator owner for this runtime, if any."""
+        orchestrator = getattr(self, "_orchestrator", None)
+        if orchestrator is not None:
+            return orchestrator
+        return getattr(self._chat_context, "_orchestrator", None)
+
     @staticmethod
     def _serialize_conversation_message(message: Any) -> Optional[Dict[str, Any]]:
         """Normalize a conversation message into a serializable mapping."""
@@ -327,9 +334,7 @@ class TurnExecutor:
             prepare_topology_runtime_contract,
         )
 
-        orchestrator = getattr(self, "_orchestrator", None) or getattr(
-            self._chat_context, "_orchestrator", None
-        )
+        orchestrator = self._resolve_orchestrator()
         task_type, complexity = derive_topology_task_context(task_classification)
         prepared_runtime = prepare_topology_runtime_contract(
             topology_plan,
@@ -409,9 +414,7 @@ class TurnExecutor:
         try:
             # PHASE 16: Begin turn for stage transition batching
             # This batches tool executions and applies Phase 1 optimizations consistently
-            _orch = getattr(self, "_orchestrator", None) or getattr(
-                self._chat_context, "_orchestrator", None
-            )
+            _orch = self._resolve_orchestrator()
             if _orch and hasattr(_orch, "transition_coordinator") and _orch.transition_coordinator:
                 _orch.transition_coordinator.begin_turn()
 
@@ -463,9 +466,7 @@ class TurnExecutor:
             all_blocked = False
             if response.tool_calls:
                 # Resolve orchestrator/container once for all per-turn services
-                _orch = getattr(self, "_orchestrator", None) or getattr(
-                    self._chat_context, "_orchestrator", None
-                )
+                _orch = self._resolve_orchestrator()
 
                 # Sort tool calls by dependency order when multiple tools are requested
                 if len(response.tool_calls) > 1:
@@ -1096,9 +1097,7 @@ class TurnExecutor:
             return None
 
         snapshot: Dict[str, Any] = {}
-        orchestrator = getattr(self, "_orchestrator", None) or getattr(
-            self._chat_context, "_orchestrator", None
-        )
+        orchestrator = self._resolve_orchestrator()
         snapshot["orchestrator"] = orchestrator
         snapshot["chat_runtime_context"] = getattr(
             self._chat_context,
@@ -1493,7 +1492,17 @@ class TurnExecutor:
         how certain the heuristic is. Low confidence (<0.7) suggests the
         edge LLM should be consulted for refinement.
         """
+        from victor.framework.task.direct_response import (
+            classify_direct_response_prompt,
+            has_codebase_context,
+        )
+
+        direct_response = classify_direct_response_prompt(message)
+        if direct_response.is_direct_response:
+            return (True, direct_response.confidence)
+
         msg = message.strip().lower()
+        codebase_context = has_codebase_context(message)
 
         # Short messages ending with ? — high confidence Q&A
         if len(msg) < 120 and msg.endswith("?"):
@@ -1523,6 +1532,8 @@ class TurnExecutor:
             words = set(msg.split())
             action_matches = words.intersection(action_words)
             if not action_matches:
+                if codebase_context:
+                    return (False, 0.5)
                 return (True, 0.95)  # Strong Q&A signal
             else:
                 # Question with action words — ambiguous
@@ -1577,6 +1588,8 @@ class TurnExecutor:
                 rest_words = set(rest.split())
                 if rest_words.intersection(action_words):
                     return (True, 0.5)  # QA prefix but action words — ambiguous
+                if codebase_context:
+                    return (False, 0.5)
                 return (True, 0.9)
 
         # Action-heavy messages — high confidence NOT Q&A

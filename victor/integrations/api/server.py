@@ -44,6 +44,7 @@ from aiohttp import web
 from aiohttp.web import Request, Response, StreamResponse
 
 # Import middleware stack for optional rate limiting and auth
+from victor.framework.message_execution import resolve_chat_runtime
 from victor.integrations.api.change_tracker_ops import (
     apply_patch_request,
     change_history,
@@ -262,9 +263,10 @@ class VictorAPIServer:
 
             # Get or create orchestrator
             orchestrator = await self._get_orchestrator()
+            chat_runtime = resolve_chat_runtime(orchestrator)
 
             # Process chat
-            response = await orchestrator.chat(messages[-1].get("content", ""))
+            response = await chat_runtime.chat(messages[-1].get("content", ""))
 
             # CompletionResponse is a Pydantic model; access attributes
             content = getattr(response, "content", None) or ""
@@ -299,9 +301,10 @@ class VictorAPIServer:
                 return response
 
             orchestrator = await self._get_orchestrator()
+            chat_runtime = resolve_chat_runtime(orchestrator)
 
             # Stream response
-            async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
+            async for chunk in chat_runtime.stream_chat(messages[-1].get("content", "")):
                 # Support both dict and StreamChunk objects
                 if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
                     content = getattr(chunk, "content", "")
@@ -965,9 +968,10 @@ class VictorAPIServer:
                 return
 
             orchestrator = await self._get_orchestrator()
+            chat_runtime = resolve_chat_runtime(orchestrator)
 
             try:
-                async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
+                async for chunk in chat_runtime.stream_chat(messages[-1].get("content", "")):
                     if chunk.get("type") == "content":
                         await ws.send_json({"type": "content", "content": chunk["content"]})
                     elif chunk.get("type") == "tool_call":
@@ -2161,6 +2165,7 @@ class VictorAPIServer:
             async def run_agent():
                 try:
                     orchestrator = await self._get_orchestrator()
+                    chat_runtime = resolve_chat_runtime(orchestrator)
                     agent_data = self._agents.get(agent_id)
                     if not agent_data:
                         return
@@ -2168,7 +2173,7 @@ class VictorAPIServer:
                     # Track tool calls
                     tool_calls = []
 
-                    async for chunk in orchestrator.stream_chat(task):
+                    async for chunk in chat_runtime.stream_chat(task):
                         if agent_id not in self._agents:
                             break  # Agent was cancelled/deleted
 

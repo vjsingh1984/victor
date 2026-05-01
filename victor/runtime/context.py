@@ -96,6 +96,69 @@ class ServiceAccessor:
         return self._cache[key]
 
 
+@dataclass(frozen=True)
+class ResolvedRuntimeServices:
+    """Canonical runtime-owned view of resolved service instances."""
+
+    chat: Any = None
+    session: Any = None
+
+
+def resolve_execution_context(
+    runtime_owner: Any,
+    execution_context: Any = None,
+) -> Any:
+    """Resolve the explicit runtime execution context when available."""
+    if execution_context is not None:
+        return execution_context
+
+    runtime_state = getattr(runtime_owner, "__dict__", {})
+    return runtime_state.get("_execution_context")
+
+
+def resolve_runtime_services(
+    runtime_owner: Any,
+    execution_context: Any = None,
+) -> ResolvedRuntimeServices:
+    """Resolve canonical chat/session services from explicit runtime state."""
+    runtime_state = getattr(runtime_owner, "__dict__", {})
+    runtime_context = resolve_execution_context(runtime_owner, execution_context)
+
+    services = getattr(runtime_context, "services", None) if runtime_context is not None else None
+    if services is not None:
+        resolved = ResolvedRuntimeServices(
+            chat=getattr(services, "chat", None),
+            session=getattr(services, "session", None),
+        )
+        if resolved.chat is not None or resolved.session is not None:
+            return resolved
+
+    context_container = getattr(runtime_context, "container", None) if runtime_context is not None else None
+    if context_container is not None:
+        accessor = ServiceAccessor(_container=context_container)
+        resolved = ResolvedRuntimeServices(
+            chat=getattr(accessor, "chat", None),
+            session=getattr(accessor, "session", None),
+        )
+        if resolved.chat is not None or resolved.session is not None:
+            return resolved
+
+    chat_service = runtime_state.get("_chat_service")
+    session_service = runtime_state.get("_session_service")
+    if chat_service is not None or session_service is not None:
+        return ResolvedRuntimeServices(chat=chat_service, session=session_service)
+
+    container = runtime_state.get("_container")
+    if container is not None:
+        accessor = ServiceAccessor(_container=container)
+        return ResolvedRuntimeServices(
+            chat=getattr(accessor, "chat", None),
+            session=getattr(accessor, "session", None),
+        )
+
+    return ResolvedRuntimeServices()
+
+
 @dataclass
 class RuntimeExecutionContext:
     """Explicit context object replacing global singletons.

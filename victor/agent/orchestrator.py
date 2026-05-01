@@ -771,7 +771,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if self._chat_service and hasattr(self._chat_service, "bind_runtime_components"):
             from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
-            stream_chat_runtime = self._get_service_streaming_runtime()
+            chat_stream_adapter = self._get_chat_stream_adapter()
             protocol_adapter = self.protocol_adapter
             self._chat_service.bind_runtime_components(
                 turn_executor=LazyRuntimeProxy(
@@ -779,7 +779,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                     name="turn_executor",
                 ),
                 planning_handler=protocol_adapter._run_planning_chat_runtime,
-                stream_chat_handler=stream_chat_runtime.stream_chat,
+                stream_chat_handler=chat_stream_adapter.stream_chat,
                 context_limit_handler=protocol_adapter._handle_context_and_iteration_limits_runtime,
             )
 
@@ -1141,7 +1141,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return CallbackCoordinator(
             metrics_coordinator=self._metrics_coordinator,
             get_observability=lambda: getattr(self, "_observability", None),
-            get_pipeline_calls_used=lambda: (
+            get_iteration_count=lambda: (
                 self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
             ),
             get_usage_analytics=lambda: (
@@ -1290,7 +1290,29 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         task_type: str,
         complexity: str,
     ) -> Any:
-        """Get team and workflow suggestions for a task.
+        """Deprecated compatibility alias for ``get_coordination_suggestion()``.
+
+        Returns coordination suggestions for a task while preserving the older
+        team-centric method name used by legacy callers.
+        """
+        import warnings
+
+        warnings.warn(
+            "AgentOrchestrator.get_team_suggestions(...) is deprecated. "
+            "Use AgentOrchestrator.get_coordination_suggestion(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.get_coordination_suggestion(task_type, complexity)
+
+    def get_coordination_suggestion(
+        self,
+        task_type: str,
+        complexity: str,
+        *,
+        mode: Optional[str] = None,
+    ) -> Any:
+        """Get canonical coordination suggestions for a task.
 
         Prefers the service-owned coordination runtime, which delegates to the
         shared framework recommendation engine.
@@ -1298,24 +1320,34 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Args:
             task_type: Classified task type (e.g., "feature", "bugfix", "refactor")
             complexity: Complexity level (e.g., "low", "medium", "high", "extreme")
+            mode: Optional explicit mode override. Defaults to runtime mode.
 
         Returns:
             CoordinationSuggestion with team and workflow recommendations
         """
         coordination_runtime = getattr(self, "_coordination_advisor_runtime", None)
-        if coordination_runtime is not None:
-            return coordination_runtime.suggest_for_task(
-                runtime_subject=self,
-                task_type=task_type,
-                complexity=complexity,
-            )
+        if coordination_runtime is None:
+            factory = getattr(self, "_factory", None)
+            if factory is not None and hasattr(factory, "create_coordination_advisor_runtime"):
+                coordination_runtime = factory.create_coordination_advisor_runtime()
+            else:
+                from victor.agent.services.coordination_advisor_runtime import (
+                    CoordinationAdvisorRuntime,
+                )
 
-        from victor.framework.coordination_runtime import build_runtime_coordination_suggestion
+                coordination_runtime = CoordinationAdvisorRuntime()
 
-        return build_runtime_coordination_suggestion(
+            self._coordination_advisor_runtime = coordination_runtime
+
+        mode_controller = getattr(self, "mode_controller", None)
+        current_mode = getattr(mode_controller, "current_mode", None)
+        resolved_mode = mode or getattr(current_mode, "value", None) or "build"
+
+        return coordination_runtime.suggest_for_task(
             runtime_subject=self,
             task_type=task_type,
             complexity=complexity,
+            mode=resolved_mode,
         )
 
     # =========================================================================
@@ -3145,7 +3177,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         .. deprecated::
             Direct orchestrator access is deprecated. Use ChatService instead:
-            - From Agent: Use Agent.run() or Agent.stream() with USE_SERVICE_LAYER_FOR_AGENT flag
+            - From Agent: Use Agent.run() or Agent.stream() on the framework surface
             - Direct access: Use ChatService.chat() from the service layer
             This method will be removed in v2.0.
 
@@ -3163,7 +3195,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         warnings.warn(
             "Direct orchestrator.chat() access is deprecated. "
             "Use ChatService.chat() from the service layer instead. "
-            "From Agent, enable USE_SERVICE_LAYER_FOR_AGENT feature flag. "
             "This method will be removed in v2.0.",
             DeprecationWarning,
             stacklevel=2,
@@ -3291,27 +3322,19 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             last_quality_score,
         )
 
-    def _get_service_streaming_runtime(self) -> Any:
-        """Get the canonical service-owned streaming runtime adapter."""
-        runtime = getattr(self, "_service_streaming_runtime", None)
-        if runtime is None:
+    def _get_chat_stream_adapter(self) -> Any:
+        """Get the canonical service-owned chat-stream adapter."""
+        adapter = getattr(self, "_chat_stream_adapter", None)
+        if adapter is None:
             factory = getattr(self, "_factory", None)
-            if factory is not None and hasattr(factory, "create_service_streaming_runtime"):
-                runtime = factory.create_service_streaming_runtime(self.protocol_adapter)
+            if factory is not None and hasattr(factory, "create_streaming_chat_adapter"):
+                adapter = factory.create_streaming_chat_adapter(self.protocol_adapter)
             else:
                 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 
-                runtime = ServiceStreamingRuntime(self.protocol_adapter)
-            self._service_streaming_runtime = runtime
-        return runtime
-
-    async def _stream_chat_runtime(
-        self, user_message: str, **kwargs: Any
-    ) -> AsyncIterator[StreamChunk]:
-        """Stream via the canonical service-owned runtime adapter."""
-        runtime = self._get_service_streaming_runtime()
-        async for chunk in runtime.stream_chat(user_message, **kwargs):
-            yield chunk
+                adapter = ServiceStreamingRuntime(self.protocol_adapter)
+            self._chat_stream_adapter = adapter
+        return adapter
 
     def _get_task_guidance_runtime(self) -> Any:
         """Get the canonical service-owned task guidance runtime helper."""
@@ -4137,7 +4160,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         .. deprecated::
             Direct orchestrator access is deprecated. Use ChatService instead:
-            - From Agent: Use Agent.stream() with USE_SERVICE_LAYER_FOR_AGENT flag
+            - From Agent: Use Agent.stream() on the framework surface
             - Direct access: Use ChatService.stream_chat() from the service layer
             This method will be removed in v2.0.
 
@@ -4152,7 +4175,6 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         warnings.warn(
             "Direct orchestrator.stream_chat() access is deprecated. "
             "Use ChatService.stream_chat() from the service layer instead. "
-            "From Agent, enable USE_SERVICE_LAYER_FOR_AGENT feature flag. "
             "This method will be removed in v2.0.",
             DeprecationWarning,
             stacklevel=2,

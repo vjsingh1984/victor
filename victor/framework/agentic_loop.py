@@ -1239,7 +1239,7 @@ class AgenticLoop:
                     # Re-raise non-format errors
                     raise
         else:
-            logger.warning("[stream] No streaming pipeline provided")
+            logger.warning("[stream] No streaming executor provided")
             return
 
         # EVALUATE (post-hoc — decisions need full response context)

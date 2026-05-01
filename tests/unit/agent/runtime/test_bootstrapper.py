@@ -127,7 +127,7 @@ class TestAgentRuntimeBootstrapper:
 
         assert kwargs["interaction_runtime"] is orch._interaction_runtime
         assert kwargs["chat_service"] is getattr(orch, "_chat_service", None)
-        assert kwargs["get_chat_stream_runtime"] is orch._get_service_streaming_runtime
+        assert kwargs["get_chat_stream_adapter"] is orch._get_chat_stream_adapter
         assert kwargs["tool_service"] is getattr(orch, "_tool_service", None)
         assert kwargs["session_service"] is getattr(orch, "_session_service", None)
         assert kwargs["context_service"] is getattr(orch, "_context_service", None)

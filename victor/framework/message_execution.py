@@ -23,6 +23,11 @@ from victor.core.errors import CancellationError
 from victor.framework._internal import format_context_message
 from victor.framework.task import DirectResponseOutputState, TaskResult
 from victor.providers.base import CompletionResponse
+from victor.runtime.context import (
+    ResolvedRuntimeServices,
+    resolve_execution_context,
+    resolve_runtime_services,
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +36,37 @@ class PreparedMessage:
 
     runtime_message: str
     response_message: str
+
+
+class _OrchestratorChatRuntimeAdapter:
+    """Internal adapter that preserves framework runtime shape on orchestrator fallback.
+
+    Framework-facing callers should always execute against a chat-runtime surface.
+    When service bootstrap is unavailable, this adapter lets the framework keep one
+    execution contract while suppressing direct-orchestrator deprecation warnings.
+    """
+
+    def __init__(self, orchestrator: Any) -> None:
+        self._orchestrator = orchestrator
+
+    async def chat(self, message: str) -> Any:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Direct orchestrator\\.chat\\(\\) access is deprecated\\..*",
+                category=DeprecationWarning,
+            )
+            return await self._orchestrator.chat(message)
+
+    async def stream_chat(self, message: str) -> AsyncIterator[Any]:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Direct orchestrator\\.stream_chat\\(\\) access is deprecated\\..*",
+                category=DeprecationWarning,
+            )
+            async for chunk in self._orchestrator.stream_chat(message):
+                yield chunk
 
 
 def prepare_message(
@@ -51,33 +87,17 @@ def prepare_message(
     )
 
 
+def resolve_chat_service(orchestrator: Any, execution_context: Any = None) -> Any:
+    """Resolve the canonical chat service instance when one is available."""
+    return resolve_runtime_services(orchestrator, execution_context).chat
+
+
 def resolve_chat_runtime(orchestrator: Any, execution_context: Any = None) -> Any:
     """Resolve the canonical chat runtime for a framework-facing caller."""
-    orchestrator_state = getattr(orchestrator, "__dict__", {})
-    runtime_context = execution_context
-    if runtime_context is None:
-        runtime_context = orchestrator_state.get("_execution_context")
-
-    services = getattr(runtime_context, "services", None) if runtime_context is not None else None
-    if services is not None:
-        chat_service = getattr(services, "chat", None)
-        if chat_service is not None:
-            return chat_service
-
-    chat_service = orchestrator_state.get("_chat_service")
-    if chat_service is not None:
-        return chat_service
-
-    container = orchestrator_state.get("_container")
-    if container is not None:
-        from victor.runtime.context import ServiceAccessor
-
-        accessor = ServiceAccessor(_container=container)
-        chat_service = accessor.chat
-        if chat_service is not None:
-            return chat_service
-
-    return orchestrator
+    services = resolve_runtime_services(orchestrator, execution_context)
+    if services.chat is not None:
+        return services.chat
+    return _OrchestratorChatRuntimeAdapter(orchestrator)
 
 
 def _coerce_completion_response(
@@ -153,21 +173,12 @@ async def execute_message(
     context: Optional[Mapping[str, Any]] = None,
     stream: bool = False,
     forward_stream_option: bool = False,
-    compatibility_warning_origin: Optional[str] = None,
 ) -> TaskResult:
     """Execute a single message turn via the canonical service-backed runtime."""
     prepared = prepare_message(user_message, context)
 
     try:
         chat_runtime = resolve_chat_runtime(orchestrator, execution_context)
-        if chat_runtime is orchestrator and compatibility_warning_origin:
-            warnings.warn(
-                f"{compatibility_warning_origin} is using direct orchestrator access. "
-                "This compatibility fallback is deprecated; prefer service-owned "
-                "ChatService execution.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
         output_state = DirectResponseOutputState(prepared.response_message)
         response = _coerce_completion_response(
             await _invoke_chat(
@@ -217,21 +228,12 @@ async def stream_message_events(
     execution_context: Any = None,
     user_message: str,
     context: Optional[Mapping[str, Any]] = None,
-    compatibility_warning_origin: Optional[str] = None,
 ) -> AsyncIterator[Any]:
     """Yield framework stream events for a single message turn."""
     from victor.framework._internal import stream_with_events
 
     prepared = prepare_message(user_message, context)
     chat_runtime = resolve_chat_runtime(orchestrator, execution_context)
-    if chat_runtime is orchestrator and compatibility_warning_origin:
-        warnings.warn(
-            f"{compatibility_warning_origin} is using direct orchestrator access. "
-            "This compatibility fallback is deprecated; prefer service-owned "
-            "ChatService execution.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     async for event in stream_with_events(
         chat_runtime,

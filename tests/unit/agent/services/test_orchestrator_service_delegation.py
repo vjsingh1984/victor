@@ -466,7 +466,7 @@ class TestChatServiceBootstrapLaziness:
         obj._memory_session_id = "mem-1"
         obj.tool_budget = 100
         obj._factory = MagicMock()
-        obj._factory.create_service_streaming_runtime.return_value = MagicMock()
+        obj._factory.create_streaming_chat_adapter.return_value = MagicMock()
         obj._turn_executor = None
         obj._protocol_adapter = None
         obj.observability = MagicMock()
@@ -527,11 +527,11 @@ class TestChatServiceBootstrapLaziness:
         assert kwargs["planning_handler"].__self__ is obj._protocol_adapter
         assert (
             kwargs["stream_chat_handler"]
-            is obj._factory.create_service_streaming_runtime.return_value.stream_chat
+            is obj._factory.create_streaming_chat_adapter.return_value.stream_chat
         )
         assert callable(kwargs["context_limit_handler"])
         assert kwargs["context_limit_handler"].__self__ is obj._protocol_adapter
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj._protocol_adapter)
+        obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -583,7 +583,7 @@ class TestChatServiceBootstrapLaziness:
         obj._memory_session_id = "mem-1"
         obj.tool_budget = 100
         obj._factory = MagicMock()
-        obj._factory.create_service_streaming_runtime.return_value = MagicMock()
+        obj._factory.create_streaming_chat_adapter.return_value = MagicMock()
         obj._turn_executor = None
         obj._protocol_adapter = None
         obj.observability = MagicMock()
@@ -642,7 +642,7 @@ class TestChatServiceBootstrapLaziness:
         obj.conversation.ensure_system_prompt.assert_called_once()
         obj.add_message.assert_any_call("user", "plan this")
         obj.add_message.assert_any_call("assistant", "planned")
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj._protocol_adapter)
+        obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -1202,7 +1202,7 @@ class TestChatServiceBootstrapLaziness:
         obj._memory_session_id = "mem-1"
         obj.tool_budget = 100
         obj._factory = MagicMock()
-        obj._factory.create_service_streaming_runtime.return_value = MagicMock()
+        obj._factory.create_streaming_chat_adapter.return_value = MagicMock()
         obj._turn_executor = None
         obj._protocol_adapter = None
         obj.observability = MagicMock()
@@ -1342,7 +1342,7 @@ class TestChatServiceBootstrapLaziness:
 
         runtime = MagicMock()
         runtime.stream_chat = _runtime_stream_chat
-        obj._factory.create_service_streaming_runtime.return_value = runtime
+        obj._factory.create_streaming_chat_adapter.return_value = runtime
 
         with (
             patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
@@ -1355,7 +1355,7 @@ class TestChatServiceBootstrapLaziness:
             chunks = [c async for c in stream_chat_handler("hello", _preserve_iteration=True)]
 
         assert chunks == [stream_chunk]
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj._protocol_adapter)
+        obj._factory.create_streaming_chat_adapter.assert_called_once_with(obj._protocol_adapter)
         assert obj._deprecated_chat_coordinator.initialized is False
         assert trap_chat.touched is False
 
@@ -1631,22 +1631,22 @@ class TestChatServiceBootstrapLaziness:
         with pytest.raises(RuntimeError, match="chat failed"):
             await obj.chat("hello")
 
-    def test_get_service_streaming_runtime_prefers_factory_and_caches(self):
+    def test_get_chat_stream_adapter_prefers_factory_and_caches(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
         obj = object.__new__(AgentOrchestrator)
         adapter = MagicMock(name="protocol_adapter")
-        runtime = MagicMock(name="service_streaming_runtime")
+        chat_stream_adapter = MagicMock(name="chat_stream_adapter")
         obj._protocol_adapter = adapter
         obj._factory = MagicMock()
-        obj._factory.create_service_streaming_runtime.return_value = runtime
+        obj._factory.create_streaming_chat_adapter.return_value = chat_stream_adapter
 
-        first = obj._get_service_streaming_runtime()
-        second = obj._get_service_streaming_runtime()
+        first = obj._get_chat_stream_adapter()
+        second = obj._get_chat_stream_adapter()
 
-        assert first is runtime
-        assert second is runtime
-        obj._factory.create_service_streaming_runtime.assert_called_once_with(adapter)
+        assert first is chat_stream_adapter
+        assert second is chat_stream_adapter
+        obj._factory.create_streaming_chat_adapter.assert_called_once_with(adapter)
 
     def test_orchestrator_protocol_adapter_proxies_streaming_runtime_host_state(self):
         from types import SimpleNamespace

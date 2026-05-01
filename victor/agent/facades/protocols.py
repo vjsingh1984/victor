@@ -199,12 +199,27 @@ class WorkflowFacadeProtocol(Protocol):
     """Protocol for the workflow domain facade.
 
     Manages workflow registry, execution, optimization,
-    and mode-workflow-team coordination.
+    and framework-facing coordination advice.
     """
 
     @property
     def workflow_registry(self) -> Optional[Any]:
         """Optional workflow registry."""
+        ...
+
+    @property
+    def workflow_runtime(self) -> Optional[Any]:
+        """Optional workflow runtime boundary."""
+        ...
+
+    @property
+    def workflow_optimization(self) -> Optional[Any]:
+        """Optional workflow optimization surface."""
+        ...
+
+    @property
+    def coordination_advisor(self) -> Optional[Any]:
+        """Canonical framework-facing coordination advisor."""
         ...
 
 
@@ -222,8 +237,8 @@ class OrchestrationFacadeProtocol(Protocol):
         ...
 
     @property
-    def chat_stream_runtime(self) -> Optional[Any]:
-        """Canonical service-owned chat streaming runtime."""
+    def chat_stream_adapter(self) -> Optional[Any]:
+        """Canonical service-owned chat-stream adapter."""
         ...
 
     @property

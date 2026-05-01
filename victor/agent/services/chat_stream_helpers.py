@@ -28,6 +28,7 @@ from victor.core.errors import (
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
+from victor.framework.task.direct_response import classify_direct_response_prompt
 from victor.framework.topology_runtime import prepare_topology_runtime_contract
 from victor.framework.task import TaskComplexity
 from victor.providers.base import Message, StreamChunk
@@ -45,6 +46,13 @@ class ChatStreamHelperMixin:
     @staticmethod
     def _get_runtime_state_host(runtime_host: Any) -> Any:
         """Return the concrete object that owns raw runtime instance state."""
+        resolver = (
+            getattr(runtime_host, "_resolve_runtime_state_host", None)
+            if hasattr(type(runtime_host), "_resolve_runtime_state_host")
+            else None
+        )
+        if callable(resolver):
+            return resolver(runtime_host)
         instance_dict = getattr(runtime_host, "__dict__", {})
         if isinstance(instance_dict, dict) and "_orchestrator" in instance_dict:
             return instance_dict["_orchestrator"]
@@ -53,9 +61,56 @@ class ChatStreamHelperMixin:
     @classmethod
     def _get_runtime_state_dict(cls, runtime_host: Any) -> Dict[str, Any]:
         """Return the instance dictionary for raw runtime state lookups."""
+        resolver = (
+            getattr(runtime_host, "_resolve_runtime_state_dict", None)
+            if hasattr(type(runtime_host), "_resolve_runtime_state_dict")
+            else None
+        )
+        if callable(resolver):
+            resolved = resolver(runtime_host)
+            if isinstance(resolved, dict):
+                return resolved
         state_host = cls._get_runtime_state_host(runtime_host)
         instance_dict = getattr(state_host, "__dict__", {})
         return instance_dict if isinstance(instance_dict, dict) else {}
+
+    def _has_runtime_capability(self, name: str) -> bool:
+        """Return whether the active runtime exposes a named capability."""
+        resolver = getattr(self, "_resolve_runtime_capability_presence", None)
+        if callable(resolver):
+            return bool(resolver(name))
+
+        orch = self._orchestrator
+        checker = getattr(orch, "has_capability", None)
+        if callable(checker):
+            try:
+                return bool(checker(name))
+            except Exception:
+                logger.debug("Capability probe failed for %s", name, exc_info=True)
+
+        state_dict = self._get_runtime_state_dict(orch)
+        return name in state_dict or f"_{name}" in state_dict
+
+    def _get_runtime_capability_value(self, name: str, default: Any = None) -> Any:
+        """Return a named runtime capability or state-backed value."""
+        resolver = getattr(self, "_resolve_runtime_capability_value", None)
+        if callable(resolver):
+            return resolver(name, default)
+
+        orch = self._orchestrator
+        getter = getattr(orch, "get_capability_value", None)
+        if callable(getter):
+            try:
+                value = getter(name)
+                if value is not None:
+                    return value
+            except Exception:
+                logger.debug("Capability read failed for %s", name, exc_info=True)
+
+        state_dict = self._get_runtime_state_dict(orch)
+        if name in state_dict:
+            return state_dict.get(name)
+        return state_dict.get(f"_{name}", default)
 
     async def _handle_context_and_iteration_limits(
         self,
@@ -123,13 +178,13 @@ class ChatStreamHelperMixin:
         orch.unified_tracker.reset()
         orch.reminder_manager.reset()
 
-        if orch.has_capability("usage_analytics") and orch.get_capability_value("usage_analytics"):
-            orch.get_capability_value("usage_analytics").start_session()
+        usage_analytics = self._get_runtime_capability_value("usage_analytics")
+        if self._has_runtime_capability("usage_analytics") and usage_analytics:
+            usage_analytics.start_session()
 
-        if orch.has_capability("tool_sequence_tracker") and orch.get_capability_value(
-            "tool_sequence_tracker"
-        ):
-            orch.get_capability_value("tool_sequence_tracker").clear_history()
+        tool_sequence_tracker = self._get_runtime_capability_value("tool_sequence_tracker")
+        if self._has_runtime_capability("tool_sequence_tracker") and tool_sequence_tracker:
+            tool_sequence_tracker.clear_history()
 
         if orch._context_manager and hasattr(orch._context_manager, "start_background_compaction"):
             await orch._context_manager.start_background_compaction(interval_seconds=15.0)
@@ -150,8 +205,8 @@ class ChatStreamHelperMixin:
 
         orch.add_message("user", user_message)
 
-        if orch.has_capability("usage_analytics") and orch.get_capability_value("usage_analytics"):
-            orch.get_capability_value("usage_analytics").record_turn()
+        if self._has_runtime_capability("usage_analytics") and usage_analytics:
+            usage_analytics.record_turn()
 
         unified_task_type = orch.unified_tracker.detect_task_type(user_message)
         logger.info(f"Task type detected: {unified_task_type.value}")
@@ -180,12 +235,15 @@ class ChatStreamHelperMixin:
                     f"Dynamic iterations from prompt: {prompt_requirements.iteration_budget}"
                 )
 
-        intelligent_task = asyncio.create_task(
-            orch._prepare_intelligent_request(
-                task=user_message,
-                task_type=unified_task_type.value,
+        direct_response = classify_direct_response_prompt(user_message)
+        intelligent_task = None
+        if not direct_response.is_direct_response:
+            intelligent_task = asyncio.create_task(
+                orch._prepare_intelligent_request(
+                    task=user_message,
+                    task_type=unified_task_type.value,
+                )
             )
-        )
 
         max_exploration_iterations = orch.unified_tracker.max_exploration_iterations
 
@@ -193,7 +251,7 @@ class ChatStreamHelperMixin:
             user_message, unified_task_type
         )
 
-        intelligent_context = await intelligent_task
+        intelligent_context = await intelligent_task if intelligent_task is not None else None
         if intelligent_context:
             if intelligent_context.get("system_prompt_addition"):
                 orch.add_message(
@@ -202,6 +260,8 @@ class ChatStreamHelperMixin:
                     metadata=build_internal_history_metadata("system_reminder"),
                 )
                 logger.debug("Injected intelligent pipeline optimized prompt")
+        elif direct_response.is_direct_response:
+            logger.debug("Skipping intelligent prompt injection for direct-response prompt")
 
         return (
             stream_metrics,

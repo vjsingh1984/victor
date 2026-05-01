@@ -162,7 +162,7 @@ class AgentRuntimeBootstrapper:
             factory=lambda: OrchestrationFacade(
                 interaction_runtime=orchestrator._interaction_runtime,
                 chat_service=getattr(orchestrator, "_chat_service", None),
-                get_chat_stream_runtime=orchestrator._get_service_streaming_runtime,
+                get_chat_stream_adapter=orchestrator._get_chat_stream_adapter,
                 tool_service=getattr(orchestrator, "_tool_service", None),
                 session_service=getattr(orchestrator, "_session_service", None),
                 context_service=getattr(orchestrator, "_context_service", None),

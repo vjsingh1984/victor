@@ -43,7 +43,7 @@ class TestOrchestrationFacadeInit:
         facade = OrchestrationFacade(
             interaction_runtime=MagicMock(),
             chat_service=MagicMock(),
-            chat_stream_runtime=MagicMock(),
+            chat_stream_adapter=MagicMock(),
             tool_service=MagicMock(),
             session_service=MagicMock(),
             context_service=MagicMock(),
@@ -85,7 +85,7 @@ class TestOrchestrationFacadeInit:
 
         assert facade.interaction_runtime is None
         assert facade.chat_service is None
-        assert facade.chat_stream_runtime is None
+        assert facade.chat_stream_adapter is None
         assert facade.tool_service is None
         assert facade.session_service is None
         assert facade.context_service is None
@@ -127,7 +127,7 @@ class TestOrchestrationFacadeProperties:
         return OrchestrationFacade(
             interaction_runtime=MagicMock(name="interaction"),
             chat_service=MagicMock(name="chat_service"),
-            chat_stream_runtime=MagicMock(name="chat_stream_runtime"),
+            chat_stream_adapter=MagicMock(name="chat_stream_adapter"),
             tool_service=MagicMock(name="tool_service"),
             session_service=MagicMock(name="session_service"),
             context_service=MagicMock(name="context_service"),
@@ -170,16 +170,16 @@ class TestOrchestrationFacadeProperties:
         """ToolService property returns the canonical service."""
         assert facade.tool_service._mock_name == "tool_service"
 
-    def test_chat_stream_runtime_property(self, facade):
-        """chat_stream_runtime returns the canonical service-owned runtime."""
-        assert facade.chat_stream_runtime._mock_name == "chat_stream_runtime"
+    def test_chat_stream_adapter_property(self, facade):
+        """chat_stream_adapter returns the canonical service-owned adapter."""
+        assert facade.chat_stream_adapter._mock_name == "chat_stream_adapter"
 
-    def test_chat_stream_runtime_property_resolves_lazy_getter(self):
-        """chat_stream_runtime resolves lazily when only a getter is provided."""
-        runtime = MagicMock(name="chat_stream_runtime")
-        facade = OrchestrationFacade(get_chat_stream_runtime=lambda: runtime)
+    def test_chat_stream_adapter_property_resolves_lazy_getter(self):
+        """chat_stream_adapter resolves lazily when only a getter is provided."""
+        adapter = MagicMock(name="chat_stream_adapter")
+        facade = OrchestrationFacade(get_chat_stream_adapter=lambda: adapter)
 
-        assert facade.chat_stream_runtime is runtime
+        assert facade.chat_stream_adapter is adapter
 
     def test_exploration_state_passed_property(self, facade):
         """State-passed exploration coordinator should be exposed directly."""

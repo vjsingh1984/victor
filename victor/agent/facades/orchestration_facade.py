@@ -46,7 +46,7 @@ class OrchestrationFacade:
     Components managed:
         - interaction_runtime: Interaction runtime boundary components
         - chat_service: Canonical chat service
-        - chat_stream_runtime: Canonical service-owned chat streaming runtime
+        - chat_stream_adapter: Canonical service-owned chat-stream adapter
         - tool_service: Canonical tool service
         - session_service: Canonical session service
         - context_service: Canonical context service
@@ -84,8 +84,8 @@ class OrchestrationFacade:
         *,
         interaction_runtime: Optional[Any] = None,
         chat_service: Optional[Any] = None,
-        chat_stream_runtime: Optional[Any] = None,
-        get_chat_stream_runtime: Optional[Callable[[], Optional[Any]]] = None,
+        chat_stream_adapter: Optional[Any] = None,
+        get_chat_stream_adapter: Optional[Callable[[], Optional[Any]]] = None,
         tool_service: Optional[Any] = None,
         session_service: Optional[Any] = None,
         context_service: Optional[Any] = None,
@@ -281,8 +281,8 @@ class OrchestrationFacade:
 
         self._interaction_runtime = interaction_runtime
         self._chat_service = chat_service
-        self._chat_stream_runtime = chat_stream_runtime
-        self._get_chat_stream_runtime = get_chat_stream_runtime
+        self._chat_stream_adapter = chat_stream_adapter
+        self._get_chat_stream_adapter = get_chat_stream_adapter
         self._tool_service = tool_service
         self._session_service = session_service
         self._context_service = context_service
@@ -343,11 +343,11 @@ class OrchestrationFacade:
         return self._chat_service
 
     @property
-    def chat_stream_runtime(self) -> Optional[Any]:
-        """Canonical service-owned chat streaming runtime."""
-        if self._chat_stream_runtime is None and self._get_chat_stream_runtime is not None:
-            self._chat_stream_runtime = self._get_chat_stream_runtime()
-        return self._chat_stream_runtime
+    def chat_stream_adapter(self) -> Optional[Any]:
+        """Canonical service-owned chat-stream adapter."""
+        if self._chat_stream_adapter is None and self._get_chat_stream_adapter is not None:
+            self._chat_stream_adapter = self._get_chat_stream_adapter()
+        return self._chat_stream_adapter
 
     @property
     def tool_service(self) -> Optional[Any]:

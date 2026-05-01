@@ -3073,7 +3073,7 @@ class TestPrepareStream:
     @pytest.mark.asyncio
     async def test_prepare_stream_basic(self, orchestrator):
         """Test _prepare_stream initializes stream variables via service runtime."""
-        result = await orchestrator._get_service_streaming_runtime()._prepare_stream("test message")
+        result = await orchestrator._get_chat_stream_adapter()._prepare_stream("test message")
         assert result is not None
         assert len(result) == 11  # Should return 11 values
         # Unpack to verify structure
@@ -3101,7 +3101,7 @@ class TestPrepareStream:
         self, orchestrator
     ):
         """Direct-response prompts should bypass intelligent reminder injection."""
-        runtime = orchestrator._get_service_streaming_runtime()
+        runtime = orchestrator._get_chat_stream_adapter()
         orchestrator._prepare_intelligent_request = AsyncMock(
             side_effect=AssertionError("direct-response prompts should bypass intelligent hooks")
         )
@@ -4966,7 +4966,7 @@ class TestRateLimitRetry:
         from victor.core.errors import ProviderRateLimitError
 
         exc = ProviderRateLimitError("Rate limit hit", retry_after=10)
-        wait_time = orchestrator._get_service_streaming_runtime()._get_rate_limit_wait_time(
+        wait_time = orchestrator._get_chat_stream_adapter()._get_rate_limit_wait_time(
             exc, attempt=0
         )
         # Delegates to ProviderCoordinator - returns exact retry_after value
@@ -4975,7 +4975,7 @@ class TestRateLimitRetry:
     def test_get_rate_limit_wait_time_extracts_from_message(self, orchestrator):
         """Extract wait time from 'try again in X.XXs' pattern via service runtime."""
         exc = Exception("Rate limit exceeded. Please try again in 5.5s")
-        wait_time = orchestrator._get_service_streaming_runtime()._get_rate_limit_wait_time(
+        wait_time = orchestrator._get_chat_stream_adapter()._get_rate_limit_wait_time(
             exc, attempt=0
         )
         # Delegates to ProviderCoordinator - exact parsed value (no buffer)
@@ -4984,7 +4984,7 @@ class TestRateLimitRetry:
     def test_get_rate_limit_wait_time_extracts_retry_after_pattern(self, orchestrator):
         """Extract wait time from 'retry after Xs' pattern via service runtime."""
         exc = Exception("Too many requests. Please retry after 3 seconds")
-        wait_time = orchestrator._get_service_streaming_runtime()._get_rate_limit_wait_time(
+        wait_time = orchestrator._get_chat_stream_adapter()._get_rate_limit_wait_time(
             exc, attempt=0
         )
         # Delegates to ProviderCoordinator - exact parsed value (no buffer)
@@ -4996,7 +4996,7 @@ class TestRateLimitRetry:
         When no wait time can be parsed, ProviderCoordinator returns default_rate_limit_wait (60s).
         The service runtime helper then applies exponential backoff: base_wait * 2^attempt.
         """
-        cc = orchestrator._get_service_streaming_runtime()
+        cc = orchestrator._get_chat_stream_adapter()
         exc = Exception("429 Too Many Requests")
         # Attempt 0: 60 * 2^0 = 60 seconds (coordinator default)
         assert cc._get_rate_limit_wait_time(exc, attempt=0) == 60.0
@@ -5011,7 +5011,7 @@ class TestRateLimitRetry:
 
     def test_get_rate_limit_wait_time_caps_at_300_seconds(self, orchestrator):
         """Wait time capped at 300 seconds (5 minutes) via service runtime."""
-        cc = orchestrator._get_service_streaming_runtime()
+        cc = orchestrator._get_chat_stream_adapter()
         exc = Exception("Rate limit exceeded. Please try again in 120s")
         # attempt=0: 120 * 2^0 = 120 (under cap)
         wait_time = cc._get_rate_limit_wait_time(exc, attempt=0)

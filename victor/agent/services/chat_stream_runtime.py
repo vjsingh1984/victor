@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Mapping, Optional
 
 from victor.agent.services.chat_stream_helpers import ChatStreamHelperMixin
@@ -22,8 +23,77 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class StreamingRuntimeBindings:
+    """Resolved runtime state and capability accessors for a streaming owner."""
+
+    runtime_owner: Any
+    state_host: Any
+    instance_dicts: tuple[dict[str, Any], ...]
+
+    @classmethod
+    def resolve(cls, runtime_owner: Any) -> "StreamingRuntimeBindings":
+        """Resolve runtime ownership across direct owners and adapters."""
+        owner_dict = getattr(runtime_owner, "__dict__", {})
+        instance_dicts: list[dict[str, Any]] = []
+        state_host = runtime_owner
+        if isinstance(owner_dict, dict):
+            instance_dicts.append(owner_dict)
+            host = owner_dict.get("_orchestrator")
+            if host is not None:
+                state_host = host
+
+        host_dict = getattr(state_host, "__dict__", None)
+        if isinstance(host_dict, dict) and host_dict not in instance_dicts:
+            instance_dicts.append(host_dict)
+
+        return cls(
+            runtime_owner=runtime_owner,
+            state_host=state_host,
+            instance_dicts=tuple(instance_dicts),
+        )
+
+    @property
+    def state_dict(self) -> dict[str, Any]:
+        """Return the mutable runtime state dictionary."""
+        host_dict = getattr(self.state_host, "__dict__", {})
+        return host_dict if isinstance(host_dict, dict) else {}
+
+    def has_capability(self, name: str) -> bool:
+        """Return whether a capability is exposed by the runtime owner."""
+        checker = getattr(self.runtime_owner, "has_capability", None)
+        if callable(checker):
+            try:
+                if bool(checker(name)):
+                    return True
+            except Exception:
+                logger.debug("Capability probe failed for %s", name, exc_info=True)
+        for instance_dict in self.instance_dicts:
+            if name in instance_dict or f"_{name}" in instance_dict:
+                return True
+        return False
+
+    def get_capability_value(self, name: str, default: Any = None) -> Any:
+        """Return a capability value, falling back to runtime state when needed."""
+        getter = getattr(self.runtime_owner, "get_capability_value", None)
+        if callable(getter):
+            try:
+                value = getter(name)
+                if value is not None:
+                    return value
+            except Exception:
+                logger.debug("Capability read failed for %s", name, exc_info=True)
+        for instance_dict in self.instance_dicts:
+            if name in instance_dict:
+                return instance_dict.get(name)
+            underscored = f"_{name}"
+            if underscored in instance_dict:
+                return instance_dict.get(underscored)
+        return default
+
+
 class ServiceStreamingRuntime(ChatStreamHelperMixin):
-    """Service-owned runtime adapter for the canonical streaming pipeline.
+    """Service-owned runtime adapter for the canonical streaming executor.
 
     This adapter keeps the live streaming path off the deprecated ChatCoordinator
     shim while reusing the shared service-owned streaming helper implementations.
@@ -35,50 +105,30 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
         self._streaming_executor: Optional["StreamingChatExecutor"] = None
+        self._runtime_bindings: Optional[StreamingRuntimeBindings] = None
 
-    @staticmethod
-    def _iter_runtime_dicts(orch: Any) -> tuple[dict[str, Any], ...]:
-        """Yield direct and adapter-host instance dictionaries for runtime state lookup."""
-        instance_dict = getattr(orch, "__dict__", {})
-        dicts = [instance_dict] if isinstance(instance_dict, dict) else []
-        host = instance_dict.get("_orchestrator") if isinstance(instance_dict, dict) else None
-        host_dict = getattr(host, "__dict__", None)
-        if isinstance(host_dict, dict) and host_dict is not instance_dict:
-            dicts.append(host_dict)
-        return tuple(dicts)
+    def _get_runtime_bindings(self, runtime_owner: Optional[Any] = None) -> StreamingRuntimeBindings:
+        """Return resolved runtime state/capability bindings for the active owner."""
+        owner = runtime_owner if runtime_owner is not None else self._orchestrator
+        if self._runtime_bindings is None or self._runtime_bindings.runtime_owner is not owner:
+            self._runtime_bindings = StreamingRuntimeBindings.resolve(owner)
+        return self._runtime_bindings
 
-    @staticmethod
-    def _has_capability(orch: Any, name: str) -> bool:
-        """Resolve capability presence across direct orchestrators and adapters."""
-        checker = getattr(orch, "has_capability", None)
-        if callable(checker):
-            try:
-                return bool(checker(name))
-            except Exception:
-                logger.debug("Capability probe failed for %s", name, exc_info=True)
-        for instance_dict in ServiceStreamingRuntime._iter_runtime_dicts(orch):
-            if name in instance_dict or f"_{name}" in instance_dict:
-                return True
-        return False
+    def _resolve_runtime_state_host(self, runtime_host: Any) -> Any:
+        """Hook used by shared helpers to resolve the canonical state owner."""
+        return self._get_runtime_bindings(runtime_host).state_host
 
-    @staticmethod
-    def _get_capability_value(orch: Any, name: str) -> Any:
-        """Resolve capability values across direct orchestrators and adapters."""
-        getter = getattr(orch, "get_capability_value", None)
-        if callable(getter):
-            try:
-                value = getter(name)
-                if value is not None:
-                    return value
-            except Exception:
-                logger.debug("Capability read failed for %s", name, exc_info=True)
-        for instance_dict in ServiceStreamingRuntime._iter_runtime_dicts(orch):
-            if name in instance_dict:
-                return instance_dict.get(name)
-            underscored = f"_{name}"
-            if underscored in instance_dict:
-                return instance_dict.get(underscored)
-        return None
+    def _resolve_runtime_state_dict(self, runtime_host: Any) -> dict[str, Any]:
+        """Hook used by shared helpers to resolve mutable runtime state."""
+        return self._get_runtime_bindings(runtime_host).state_dict
+
+    def _resolve_runtime_capability_presence(self, name: str) -> bool:
+        """Hook used by shared helpers to resolve capability presence."""
+        return self._get_runtime_bindings().has_capability(name)
+
+    def _resolve_runtime_capability_value(self, name: str, default: Any = None) -> Any:
+        """Hook used by shared helpers to resolve capability values."""
+        return self._get_runtime_bindings().get_capability_value(name, default)
 
     def get_executor(self) -> "StreamingChatExecutor":
         """Get or create the canonical service-owned streaming executor."""
@@ -86,11 +136,12 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             from victor.agent.services.chat_stream_executor import create_streaming_chat_executor
             from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 
-            orch = self._orchestrator
-            state_host = self._get_runtime_state_host(orch)
-            state_dict = self._get_runtime_state_dict(orch)
-            perception = self._get_capability_value(orch, "perception_integration")
-            fulfillment = self._get_capability_value(orch, "fulfillment_detector")
+            bindings = self._get_runtime_bindings()
+            orch = bindings.runtime_owner
+            state_host = bindings.state_host
+            state_dict = bindings.state_dict
+            perception = bindings.get_capability_value("perception_integration")
+            fulfillment = bindings.get_capability_value("fulfillment_detector")
             runtime_intelligence = state_dict.get("_runtime_intelligence")
             if runtime_intelligence is None:
                 runtime_intelligence = RuntimeIntelligenceService.from_orchestrator(
@@ -270,7 +321,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         }
 
     async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator["StreamChunk"]:
-        """Stream a response through the canonical service-owned pipeline."""
+        """Stream a response through the canonical service-owned executor."""
         _ = kwargs.pop("_preserve_iteration", None)
         fallback_iteration = kwargs.pop("_fallback_iteration", 0)
 
@@ -280,8 +331,8 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             )
             kwargs["_fallback_iteration"] = fallback_iteration
 
-        orch = self._orchestrator
-        state_host = self._get_runtime_state_host(orch)
+        bindings = self._get_runtime_bindings()
+        state_host = bindings.state_host
         executor = self.get_executor()
         stream_failed = False
 
@@ -293,14 +344,14 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             raise
         finally:
             ctx = None
-            current_stream_context = self._get_capability_value(orch, "current_stream_context")
+            current_stream_context = bindings.get_capability_value("current_stream_context")
             if current_stream_context is not None:
                 ctx = current_stream_context
             else:
-                ctx = self._get_runtime_state_dict(orch).get("_current_stream_context")
+                ctx = bindings.state_dict.get("_current_stream_context")
 
             if ctx is not None:
-                state_dict = self._get_runtime_state_dict(orch)
+                state_dict = bindings.state_dict
                 if hasattr(ctx, "cumulative_usage"):
                     cumulative_usage = state_dict.get("_cumulative_token_usage")
                     for key in cumulative_usage or {}:
@@ -353,5 +404,5 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                 self._restore_stream_runtime_overrides(runtime_snapshot)
                 ctx.runtime_override_snapshot = None
 
-            if "_current_stream_context" in self._get_runtime_state_dict(orch):
+            if "_current_stream_context" in bindings.state_dict:
                 state_host._current_stream_context = None

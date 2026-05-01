@@ -209,17 +209,17 @@ class TestCreateProjectContext:
         mock_container.get.assert_called_with(ProjectContextProtocol)
 
 
-class TestCreateServiceStreamingRuntime:
-    """Tests for create_service_streaming_runtime method."""
+class TestCreateStreamingChatAdapter:
+    """Tests for create_streaming_chat_adapter method."""
 
-    def test_create_service_streaming_runtime_returns_runtime(self, factory):
-        """create_service_streaming_runtime returns the canonical runtime adapter."""
-        orchestrator = MagicMock()
+    def test_create_streaming_chat_adapter_returns_adapter(self, factory):
+        """create_streaming_chat_adapter returns the canonical chat-stream adapter."""
+        runtime_owner = MagicMock()
 
-        runtime = factory.create_service_streaming_runtime(orchestrator)
+        adapter = factory.create_streaming_chat_adapter(runtime_owner)
 
-        assert isinstance(runtime, ServiceStreamingRuntime)
-        assert runtime._orchestrator is orchestrator
+        assert isinstance(adapter, ServiceStreamingRuntime)
+        assert adapter._orchestrator is runtime_owner
 
 
 class TestCreateStreamingChatExecutor:
