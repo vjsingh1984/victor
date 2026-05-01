@@ -148,13 +148,13 @@ class TestInjectSkillsPlural:
     """Orchestrator.inject_skills() composes multiple skill prompts."""
 
     def test_inject_two_skills(self):
-        from unittest.mock import PropertyMock
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = MagicMock(spec=AgentOrchestrator)
+        orch = object.__new__(AgentOrchestrator)
         orch._system_prompt = "Base prompt."
-        orch._cache_optimization_enabled = False
-        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch._base_system_prompt = "Base prompt."
+        orch._active_skill_prompt = ""
+        orch._kv_opt_cached = False
         orch.conversation = None
 
         skill_a = _make_skill("debug", phase="diagnostic")
@@ -169,13 +169,13 @@ class TestInjectSkillsPlural:
         assert "debug" in prompt[: prompt.index("refactor")]
 
     def test_inject_caps_at_three(self):
-        from unittest.mock import PropertyMock
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = MagicMock(spec=AgentOrchestrator)
+        orch = object.__new__(AgentOrchestrator)
         orch._system_prompt = "Base."
-        orch._cache_optimization_enabled = False
-        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch._base_system_prompt = "Base."
+        orch._active_skill_prompt = ""
+        orch._kv_opt_cached = False
         orch.conversation = None
 
         skills = [(_make_skill(f"s{i}"), 0.70) for i in range(5)]
@@ -187,8 +187,10 @@ class TestInjectSkillsPlural:
     def test_inject_empty_is_noop(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = MagicMock(spec=AgentOrchestrator)
+        orch = object.__new__(AgentOrchestrator)
         orch._system_prompt = "Base."
+        orch._base_system_prompt = "Base."
+        orch._active_skill_prompt = ""
 
         AgentOrchestrator.inject_skills(orch, [])
         assert orch._system_prompt == "Base."

@@ -10,10 +10,6 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, PropertyMock
-
-import pytest
-
 from victor_sdk.skills import SkillDefinition
 
 
@@ -29,15 +25,15 @@ def _make_skill(name: str, **kwargs):
 
 
 def _make_orch_mock(kv_enabled=False):
-    """Create a mock orchestrator with correct _kv_optimization_enabled behavior."""
+    """Create a lightweight orchestrator instance for skill runtime tests."""
     from victor.agent.orchestrator import AgentOrchestrator
 
-    orch = MagicMock(spec=AgentOrchestrator)
+    orch = object.__new__(AgentOrchestrator)
     orch._system_prompt = "Base prompt."
     orch._base_system_prompt = "Base prompt."
     orch._active_skill_prompt = ""
     orch.conversation = None
-    type(orch)._kv_optimization_enabled = PropertyMock(return_value=kv_enabled)
+    orch._kv_opt_cached = kv_enabled
     return orch
 
 

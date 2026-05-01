@@ -1438,6 +1438,54 @@ class TestChatServiceBootstrapLaziness:
         assert result == {"auto_skill": "debug"}
         helper.get_last_skill_match_info.assert_called_once_with()
 
+    def test_clear_active_skills_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._skill_runtime = helper
+
+        AgentOrchestrator.clear_active_skills(obj)
+
+        helper.clear_active_skills.assert_called_once_with()
+
+    def test_get_skill_user_prefix_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_skill_user_prefix.return_value = "ACTIVE SKILL: debug"
+        obj._skill_runtime = helper
+
+        result = AgentOrchestrator.get_skill_user_prefix(obj)
+
+        assert result == "ACTIVE SKILL: debug"
+        helper.get_skill_user_prefix.assert_called_once_with()
+
+    def test_inject_skill_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._skill_runtime = helper
+        skill = SimpleNamespace(name="debug")
+
+        AgentOrchestrator.inject_skill(obj, skill)
+
+        helper.inject_skill.assert_called_once_with(skill)
+
+    def test_inject_skills_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._skill_runtime = helper
+        skills = [(SimpleNamespace(name="debug"), 0.9)]
+
+        AgentOrchestrator.inject_skills(obj, skills)
+
+        helper.inject_skills.assert_called_once_with(skills)
+
     def test_sync_prompt_builder_runtime_state_delegates_to_helper(self):
         from victor.agent.orchestrator import AgentOrchestrator
 

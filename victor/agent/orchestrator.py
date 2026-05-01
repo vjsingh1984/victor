@@ -1321,10 +1321,13 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """
         self._vertical_context = context
 
-        # Sync coordinator with new vertical context (if already initialized)
-        if self._mode_workflow_team_coordinator is not None:
-            self._mode_workflow_team_coordinator.set_vertical_context(context)
-            logger.debug(f"Coordinator synced with vertical context: {context.vertical_name}")
+        # Sync coordination advisor with new vertical context (if already initialized)
+        if getattr(self, "_coordination_advisor", None) is not None:
+            self._coordination_advisor.set_vertical_context(context)
+            logger.debug(
+                "Coordination advisor synced with vertical context: %s",
+                context.vertical_name,
+            )
 
         # Sync tool selector with vertical context for vertical-specific tool selection (DIP)
         if hasattr(self, "tool_selector") and self.tool_selector is not None:
@@ -2741,18 +2744,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         When cache_optimization enabled: just clears _active_skill_prompt
         (system prompt was never touched). Otherwise: restores base prompt.
         """
-        self._active_skill_prompt = ""
-
-        # Cache-friendly: system prompt was never mutated, nothing to restore
-        if self._kv_optimization_enabled:
-            return
-
-        # Legacy: restore base system prompt
-        base = getattr(self, "_base_system_prompt", None)
-        if base is not None:
-            self._system_prompt = base
-
-        self._get_prompt_builder_runtime().sync_conversation_system_prompt()
+        self._get_skill_runtime().clear_active_skills()
 
     def get_skill_user_prefix(self) -> str:
         """Get active skill prompt as user message prefix (cache-friendly).
@@ -2764,7 +2756,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             Skill prompt prefix string, or empty string if no active skill.
         """
-        return getattr(self, "_active_skill_prompt", "") or ""
+        return self._get_skill_runtime().get_skill_user_prefix()
 
     def inject_skill(self, skill: Any) -> None:
         """Inject a skill's prompt fragment.
@@ -2778,27 +2770,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Args:
             skill: A SkillDefinition with name, description, prompt_fragment.
         """
-        skill_prompt = (
-            f"ACTIVE SKILL: {skill.name}\n"
-            f"Description: {skill.description}\n"
-            f"{skill.prompt_fragment}\n\n"
-        )
-        self._active_skill_prompt = skill_prompt
-
-        # Cache-friendly: store for user message injection, don't touch system prompt
-        if self._kv_optimization_enabled:
-            logger.info("Skill '%s' stored for user message injection (cache-friendly)", skill.name)
-            return
-
-        # Legacy: mutate system prompt directly
-        if not getattr(self, "_base_system_prompt", None):
-            self._base_system_prompt = self._system_prompt or ""
-
-        self._system_prompt = skill_prompt + (self._base_system_prompt or "")
-
-        self._get_prompt_builder_runtime().sync_conversation_system_prompt()
-
-        logger.info("Injected skill '%s' into system prompt", skill.name)
+        self._get_skill_runtime().inject_skill(skill)
 
     def inject_skills(self, skills: List[Any]) -> None:
         """Inject multiple skills' prompt fragments.
@@ -2809,43 +2781,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Args:
             skills: List of (SkillDefinition, score) tuples.
         """
-        if not skills:
-            return
-
-        skills = skills[:3]
-
-        skill_names = []
-        fragments = []
-        for item in skills:
-            skill = item[0] if isinstance(item, tuple) else item
-            skill_names.append(skill.name)
-            fragments.append(
-                f"ACTIVE SKILL: {skill.name}\n"
-                f"Description: {skill.description}\n"
-                f"{skill.prompt_fragment}\n"
-            )
-
-        composed = (
-            f"ACTIVE SKILLS ({len(skill_names)}): {' → '.join(skill_names)}\n"
-            f"Execute these skills in the listed order.\n\n" + "\n".join(fragments) + "\n"
-        )
-
-        self._active_skill_prompt = composed
-
-        # Cache-friendly: store for user message injection
-        if self._kv_optimization_enabled:
-            logger.info("Skills %s stored for user message injection", skill_names)
-            return
-
-        # Legacy: mutate system prompt
-        if not getattr(self, "_base_system_prompt", None):
-            self._base_system_prompt = self._system_prompt or ""
-
-        self._system_prompt = composed + (self._base_system_prompt or "")
-
-        self._get_prompt_builder_runtime().sync_conversation_system_prompt()
-
-        logger.info("Injected %d skills: %s", len(skill_names), " → ".join(skill_names))
+        self._get_skill_runtime().inject_skills(skills)
 
     def update_system_prompt_for_query(self, query_classification=None) -> None:
         """Rebuild system prompt with query-specific classification context.
