@@ -30,55 +30,20 @@ Architecture:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+
+from victor.framework.message_execution import execute_message, iter_runtime_stream_events
+from victor.framework.task import TaskResult
 
 if TYPE_CHECKING:
     from victor.framework.session_config import SessionConfig
     from victor.framework.agent import Agent
+    from victor.framework.agent_components import AgentSession
     from victor.runtime.context import RuntimeExecutionContext, ServiceAccessor
     from victor.core.container import ServiceContainer
 
 logger = logging.getLogger(__name__)
-
-
-class _ChatResult:
-    """Concrete ChatResultProtocol implementation."""
-
-    def __init__(
-        self,
-        content: str,
-        *,
-        success: bool = True,
-        tool_calls: int = 0,
-        iterations: int = 0,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        self._content = content
-        self._success = success
-        self._tool_calls = tool_calls
-        self._iterations = iterations
-        self._metadata = metadata or {}
-
-    @property
-    def content(self) -> str:
-        return self._content
-
-    @property
-    def success(self) -> bool:
-        return self._success
-
-    @property
-    def tool_calls(self) -> int:
-        return self._tool_calls
-
-    @property
-    def iterations(self) -> int:
-        return self._iterations
-
-    @property
-    def metadata(self) -> Dict[str, Any]:
-        return self._metadata
 
 
 class _StreamEvent:
@@ -152,20 +117,16 @@ def _session_metadata(config: "SessionConfig") -> Dict[str, Any]:
     }
 
 
-async def _iter_runtime_stream_events(
-    runtime: Any,
-    message: str,
-) -> AsyncIterator[Any]:
-    """Yield framework stream events from a chat runtime or agent wrapper."""
-    if hasattr(runtime, "stream_chat"):
-        from victor.framework._internal import stream_with_events
-
-        async for event in stream_with_events(runtime, message, response_prompt=message):
-            yield event
-        return
-
-    async for event in runtime.stream(message):
-        yield event
+def _enrich_task_result(result: TaskResult, config: "SessionConfig") -> TaskResult:
+    """Attach client session metadata without changing the canonical result type."""
+    return replace(
+        result,
+        metadata={
+            **(result.metadata or {}),
+            "tool_budget": config.tool_budget,
+            "smart_routing": config.smart_routing.enabled,
+        },
+    )
 
 
 def _to_stream_event(event: Any) -> _StreamEvent:
@@ -396,40 +357,33 @@ class VictorClient:
         message: str,
         *,
         stream: bool = False,
-    ) -> _ChatResult:
+    ) -> TaskResult:
         """Send a single message and get a response.
 
-        Uses ChatService (not orchestrator directly) for proper service layering.
+        Uses the shared framework message-execution surface so UI callers get
+        the same service-first runtime resolution and output normalization as Agent.
 
         Args:
             message: User's message
             stream: If True, use streaming internally but return final result
 
         Returns:
-            ChatResult with response content and metadata
+            TaskResult with response content, tool calls, and metadata
         """
         agent = await self._ensure_initialized()
-        services = self._get_services()
-        chat_service = getattr(services, "chat", None) if services is not None else None
 
-        if chat_service is not None:
-            result = await chat_service.chat(message, stream=stream)
-            content = result.content if hasattr(result, "content") else str(result)
-            tool_calls = len(getattr(result, "tool_calls", []) or [])
+        if hasattr(agent, "get_orchestrator"):
+            result = await execute_message(
+                orchestrator=agent.get_orchestrator(),
+                execution_context=self._context,
+                user_message=message,
+                stream=stream,
+                forward_stream_option=True,
+            )
         else:
             result = await agent.run(message)
-            content = result.content if hasattr(result, "content") else str(result)
-            tool_calls = len(getattr(result, "tool_calls", []) or [])
 
-        return _ChatResult(
-            content=content,
-            success=True,
-            tool_calls=tool_calls,
-            metadata={
-                "tool_budget": self._config.tool_budget,
-                "smart_routing": self._config.smart_routing.enabled,
-            },
-        )
+        return _enrich_task_result(result, self._config)
 
     async def stream(
         self,
@@ -437,7 +391,8 @@ class VictorClient:
     ) -> AsyncIterator[_StreamEvent]:
         """Send a message and yield streaming events.
 
-        Uses ChatService for streaming (not orchestrator directly).
+        Uses the shared framework runtime-event iterator so chat services and
+        Agent wrappers present the same event contract to UI callers.
 
         Args:
             message: User's message
@@ -450,7 +405,7 @@ class VictorClient:
         chat_runtime = getattr(services, "chat", None) if services is not None else None
         runtime = chat_runtime if chat_runtime is not None else agent
 
-        async for event in _iter_runtime_stream_events(runtime, message):
+        async for event in iter_runtime_stream_events(runtime, message):
             yield _to_stream_event(event)
 
     async def stream_chat(self, message: str) -> AsyncIterator[_RenderChunk]:
@@ -490,34 +445,40 @@ class VictorClient:
 
             yield _RenderChunk(content=event.content or "", metadata=metadata)
 
-    async def create_session(self) -> "_ChatSession":
+    async def create_session(
+        self,
+        initial_prompt: Optional[str] = None,
+    ) -> "AgentSession":
         """Create an interactive multi-turn chat session.
 
-        Uses SessionService for proper session management.
+        Delegates to the canonical framework ``AgentSession`` so chat/session
+        behavior stays on one framework-owned path.
 
         Returns:
-            ChatSession for multi-turn conversation
+            AgentSession for multi-turn conversation
         """
         agent = await self._ensure_initialized()
-        services = self._get_services()
-        session_service = getattr(services, "session", None) if services is not None else None
-        chat_service = getattr(services, "chat", None) if services is not None else None
-        session_id = None
+        metadata = _session_metadata(self._config)
 
-        if session_service is not None:
-            session_id = await session_service.create_session(
-                metadata=_session_metadata(self._config)
+        create_session = getattr(agent, "create_session", None)
+        if callable(create_session):
+            session = create_session(
+                initial_prompt,
+                metadata=metadata,
+                container=self._container,
             )
-        if chat_service is not None and hasattr(chat_service, "reset_conversation"):
-            chat_service.reset_conversation()
+        else:
+            from victor.framework.agent_components import AgentSession
 
-        return _ChatSession(
-            agent,
-            self._config,
-            chat_service=chat_service,
-            session_service=session_service,
-            session_id=session_id,
-        )
+            session = AgentSession(
+                agent,
+                initial_prompt,
+                metadata=metadata,
+                container=self._container,
+            )
+
+        await session.initialize()
+        return session
 
     async def run_workflow(
         self,
@@ -594,73 +555,7 @@ class VictorClient:
         )
 
 
-class _ChatSession:
-    """Interactive multi-turn chat session."""
-
-    def __init__(
-        self,
-        agent: "Agent",
-        config: "SessionConfig",
-        *,
-        chat_service: Optional[Any] = None,
-        session_service: Optional[Any] = None,
-        session_id: Optional[str] = None,
-    ) -> None:
-        self._agent = agent
-        self._config = config
-        self._chat_service = chat_service
-        self._session_service = session_service
-        self._session_id = session_id
-        self._history: List[Dict[str, Any]] = []
-
-    async def send(self, message: str) -> _ChatResult:
-        """Send a message in the session."""
-        if self._chat_service is not None:
-            result = await self._chat_service.chat(message, stream=False)
-        else:
-            result = await self._agent.run(message)
-        self._history.append({"role": "user", "content": message})
-
-        response_content = result.content if hasattr(result, "content") else str(result)
-        self._history.append({"role": "assistant", "content": response_content})
-
-        return _ChatResult(
-            content=response_content,
-            success=True,
-            metadata={
-                "tool_budget": self._config.tool_budget,
-                "smart_routing": self._config.smart_routing.enabled,
-            },
-        )
-
-    async def stream(self, message: str) -> AsyncIterator[_StreamEvent]:
-        """Stream a response in the session."""
-        from victor.framework.events import EventType
-
-        collected = []
-        runtime = self._chat_service if self._chat_service is not None else self._agent
-        async for event in _iter_runtime_stream_events(runtime, message):
-            if event.type == EventType.CONTENT and event.content:
-                collected.append(event.content)
-            yield _to_stream_event(event)
-
-        self._history.append({"role": "user", "content": message})
-        self._history.append({"role": "assistant", "content": "".join(collected)})
-
-    def get_history(self) -> List[Dict[str, Any]]:
-        """Get conversation history."""
-        return list(self._history)
-
-    async def close(self) -> None:
-        """Close the session."""
-        if self._session_service is not None and self._session_id is not None:
-            await self._session_service.close_session(self._session_id)
-            self._session_id = None
-
-
 __all__ = [
     "VictorClient",
-    "_ChatResult",
     "_StreamEvent",
-    "_ChatSession",
 ]

@@ -18,6 +18,7 @@ Phase 7.4: Agent class decomposition for better maintainability and testability.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
@@ -887,7 +888,7 @@ class SessionLifecycleHooks:
     on_error: Optional[Callable[["AgentSession", Exception], None]] = None
     on_pause: Optional[Callable[["AgentSession"], None]] = None
     on_resume: Optional[Callable[["AgentSession"], None]] = None
-    on_close: Optional[Callable[["AgentSession", SessionMetrics], None]] = None
+    on_close: Optional[Callable[["AgentSession", SessionMetrics], Any]] = None
 
 
 class AgentSession:
@@ -939,7 +940,7 @@ class AgentSession:
     def __init__(
         self,
         agent: "Agent",
-        initial_prompt: str,
+        initial_prompt: Optional[str] = None,
         *,
         session_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -950,7 +951,8 @@ class AgentSession:
 
         Args:
             agent: Agent instance
-            initial_prompt: First message in conversation
+            initial_prompt: Optional first message in conversation. When omitted,
+                the first ``send()`` or ``stream()`` message becomes the opening turn.
             session_id: Optional session ID
             metadata: Optional session metadata
             hooks: Optional lifecycle hooks (Phase 8.3)
@@ -970,8 +972,13 @@ class AgentSession:
             metadata=metadata or {},
         )
 
+        self._history: List[Dict[str, str]] = []
         # Turn history for this session
         self._turns: List[Dict[str, Any]] = []
+        self._runtime_session_started = False
+        self._runtime_session_closed = False
+        self._session_service: Optional[Any] = None
+        self._chat_service: Optional[Any] = None
 
         # Phase 8.3: Lifecycle management
         self._hooks = hooks or SessionLifecycleHooks()
@@ -1008,6 +1015,9 @@ class AgentSession:
         Returns:
             List of message dicts with role and content
         """
+        if self._history:
+            return [dict(item) for item in self._history]
+
         messages = getattr(self._agent._orchestrator, "messages", [])
         return [{"role": msg.role, "content": msg.content} for msg in messages]
 
@@ -1052,6 +1062,11 @@ class AgentSession:
         """
         return self._scope
 
+    async def initialize(self) -> "AgentSession":
+        """Bind canonical runtime session services before the first turn."""
+        await self._ensure_runtime_session()
+        return self
+
     # -------------------------------------------------------------------------
     # Core Operations
     # -------------------------------------------------------------------------
@@ -1087,10 +1102,12 @@ class AgentSession:
         if self._state == SessionState.CLOSED:
             raise AgentError("Session is closed")
 
+        await self._ensure_runtime_session()
+
         # First turn uses initial prompt and triggers on_start hook
         if not self._initialized:
             self._initialized = True
-            prompt = self._initial_prompt
+            prompt = self._initial_prompt if self._initial_prompt is not None else message
             self._state = SessionState.ACTIVE
 
             # Phase 8.3: Invoke on_start lifecycle hook
@@ -1134,6 +1151,7 @@ class AgentSession:
             "context": context,
         }
         self._turns.append(turn_data)
+        self._record_history_turn(prompt, result.content)
 
         # Phase 8.3: Update metrics
         self._metrics.update(turn_data)
@@ -1179,10 +1197,12 @@ class AgentSession:
         if self._state == SessionState.CLOSED:
             raise AgentError("Session is closed")
 
+        await self._ensure_runtime_session()
+
         # First turn uses initial prompt and triggers on_start hook
         if not self._initialized:
             self._initialized = True
-            prompt = self._initial_prompt
+            prompt = self._initial_prompt if self._initial_prompt is not None else message
             self._state = SessionState.ACTIVE
 
             # Phase 8.3: Invoke on_start lifecycle hook
@@ -1239,6 +1259,7 @@ class AgentSession:
             "context": context,
         }
         self._turns.append(turn_data)
+        self._record_history_turn(prompt, "".join(content_parts))
 
         # Phase 8.3: Update metrics
         self._metrics.update(turn_data)
@@ -1306,10 +1327,23 @@ class AgentSession:
 
         self._state = SessionState.CLOSED
 
+        if (
+            self._runtime_session_started
+            and not self._runtime_session_closed
+            and self._session_service is not None
+        ):
+            try:
+                await self._session_service.close_session(self._context.session_id)
+                self._runtime_session_closed = True
+            except Exception as e:
+                logger.debug(f"Error closing session service runtime: {e}")
+
         # Phase 8.3: Invoke on_close lifecycle hook with final metrics
         if self._hooks.on_close:
             try:
-                self._hooks.on_close(self, self._metrics)
+                close_result = self._hooks.on_close(self, self._metrics)
+                if inspect.isawaitable(close_result):
+                    await close_result
             except Exception as e:
                 logger.debug(f"on_close hook error: {e}")
 
@@ -1340,9 +1374,14 @@ class AgentSession:
         # Reset session state
         self._turn_count = 0
         self._initialized = False
+        self._history.clear()
         self._turns.clear()
         self._metrics = SessionMetrics()  # Reset metrics
         self._state = SessionState.IDLE
+        self._runtime_session_started = False
+        self._runtime_session_closed = False
+        self._session_service = None
+        self._chat_service = None
 
         # Phase 8.3: Recreate scoped container if container provided
         if self._container is not None:
@@ -1366,6 +1405,71 @@ class AgentSession:
             f"AgentSession(id={self._context.session_id[:8]}..., "
             f"turns={self._turn_count}, state={self._state.value})"
         )
+
+    def _record_history_turn(self, prompt: str, response: str) -> None:
+        """Append the executed turn to the explicit session history."""
+        self._history.append({"role": "user", "content": prompt})
+        self._history.append({"role": "assistant", "content": response})
+
+    def _resolve_runtime_services(self) -> tuple[Optional[Any], Optional[Any]]:
+        """Resolve canonical chat/session services with compatibility fallbacks."""
+        runtime_context = getattr(self._agent, "execution_context", None)
+        services = getattr(runtime_context, "services", None)
+        if services is not None:
+            return getattr(services, "chat", None), getattr(services, "session", None)
+
+        orchestrator = getattr(self._agent, "_orchestrator", None)
+        if orchestrator is not None:
+            chat_service = getattr(orchestrator, "_chat_service", None)
+            session_service = getattr(orchestrator, "_session_service", None)
+            if chat_service is not None or session_service is not None:
+                return chat_service, session_service
+
+            container = getattr(orchestrator, "_container", None)
+            if container is not None:
+                try:
+                    from victor.runtime.context import ServiceAccessor
+
+                    accessor = ServiceAccessor(_container=container)
+                    return accessor.chat, accessor.session
+                except Exception:
+                    return None, None
+
+        return None, None
+
+    async def _ensure_runtime_session(self) -> None:
+        """Create the canonical runtime session once and reset conversation state."""
+        if self._runtime_session_started:
+            return
+
+        self._chat_service, self._session_service = self._resolve_runtime_services()
+
+        if self._session_service is not None:
+            metadata = dict(self._context.metadata)
+            try:
+                self._context.session_id = await self._session_service.create_session(
+                    metadata=metadata
+                )
+            except Exception as e:
+                logger.debug(f"Could not create session service runtime: {e}")
+                self._session_service = None
+
+        reset_target = self._chat_service
+        if reset_target is not None and hasattr(reset_target, "reset_conversation"):
+            try:
+                reset_target.reset_conversation()
+            except Exception as e:
+                logger.debug(f"Could not reset chat service conversation: {e}")
+        else:
+            orchestrator = getattr(self._agent, "_orchestrator", None)
+            if orchestrator is not None and hasattr(orchestrator, "reset_conversation"):
+                try:
+                    orchestrator.reset_conversation()
+                except Exception as e:
+                    logger.debug(f"Could not reset orchestrator conversation: {e}")
+
+        self._runtime_session_started = True
+        self._runtime_session_closed = False
 
 
 # =============================================================================
@@ -1513,7 +1617,7 @@ def create_builder(container: Optional["ServiceContainer"] = None) -> AgentBuild
 @asynccontextmanager
 async def create_session(
     agent: "Agent",
-    initial_prompt: str,
+    initial_prompt: Optional[str] = None,
     **kwargs: Any,
 ) -> AsyncIterator[AgentSession]:
     """Create and manage an AgentSession as a context manager.

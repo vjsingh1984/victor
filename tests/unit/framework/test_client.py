@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from victor.framework.agent import Agent
+from victor.framework.agent_components import AgentSession
 from victor.framework.client import VictorClient
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.session_config import SessionConfig
@@ -221,3 +223,72 @@ async def test_victor_client_stream_preserves_framework_event_contract() -> None
     assert events[1].arguments == {"sql": "select 1"}
     assert events[1].result["result"] == "row"
     assert events[1].result["arguments"] == {"sql": "select 1"}
+
+
+@pytest.mark.asyncio
+async def test_victor_client_create_session_reuses_agent_session_and_closes_service() -> None:
+    config = SessionConfig.from_cli_flags(tool_budget=4)
+    client = VictorClient(config, container=object())
+
+    mock_orchestrator = MagicMock()
+    mock_orchestrator.__class__.__name__ = "AgentOrchestrator"
+    mock_orchestrator.provider = MagicMock()
+    mock_orchestrator.provider.name = "test-provider"
+    mock_orchestrator.model = "test-model"
+    mock_orchestrator.messages = []
+    mock_orchestrator.get_stage = MagicMock(return_value=MagicMock(value="INITIAL"))
+    mock_orchestrator.get_tool_calls_count = MagicMock(return_value=0)
+    mock_orchestrator.get_tool_budget = MagicMock(return_value=50)
+    mock_orchestrator.get_observed_files = MagicMock(return_value=set())
+    mock_orchestrator.get_modified_files = MagicMock(return_value=set())
+    mock_orchestrator.get_message_count = MagicMock(return_value=0)
+    mock_orchestrator.is_streaming = MagicMock(return_value=False)
+    mock_orchestrator.get_iteration_count = MagicMock(return_value=0)
+    mock_orchestrator.get_max_iterations = MagicMock(return_value=25)
+    mock_orchestrator.reset = MagicMock()
+    mock_orchestrator.close = AsyncMock()
+
+    from victor.providers.base import CompletionResponse
+
+    mock_orchestrator.chat = AsyncMock(
+        return_value=CompletionResponse(
+            content="Session response",
+            role="assistant",
+            tool_calls=[],
+            model="test-model",
+        )
+    )
+
+    agent = Agent.from_orchestrator(mock_orchestrator)
+    session_service = SimpleNamespace(
+        create_session=AsyncMock(return_value="session-123"),
+        close_session=AsyncMock(return_value=True),
+    )
+    chat_service = SimpleNamespace(
+        reset_conversation=MagicMock(),
+        chat=AsyncMock(
+            return_value=CompletionResponse(
+                content="Session response",
+                role="assistant",
+                tool_calls=[],
+                model="test-model",
+            )
+        ),
+    )
+    execution_context = SimpleNamespace(services=SimpleNamespace(session=session_service, chat=chat_service))
+
+    client._agent = agent
+    client._context = execution_context
+    agent._context = execution_context
+
+    session = await client.create_session()
+
+    assert isinstance(session, AgentSession)
+    await session.send("Deferred hello")
+    chat_service.chat.assert_awaited_once_with("Deferred hello")
+    mock_orchestrator.chat.assert_not_awaited()
+    chat_service.reset_conversation.assert_called_once_with()
+    session_service.create_session.assert_awaited_once()
+
+    await session.close()
+    session_service.close_session.assert_awaited_once_with("session-123")

@@ -3,8 +3,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from victor.framework.agent import Agent
+from victor.framework.events import EventType
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
+from victor.framework.task import TaskResult
 from victor.providers.base import CompletionResponse, StreamChunk
 
 
@@ -91,8 +94,9 @@ async def test_victor_client_chat_prefers_execution_context_chat_service() -> No
     result = await client.chat("ping")
 
     chat_service.chat.assert_awaited_once_with("ping", stream=False)
+    assert isinstance(result, TaskResult)
     assert result.content == "Service response"
-    assert result.tool_calls == 1
+    assert result.tool_count == 1
 
 
 @pytest.mark.asyncio
@@ -145,30 +149,49 @@ async def test_victor_client_session_prefers_execution_context_services() -> Non
     execution_context = SimpleNamespace(
         services=SimpleNamespace(chat=chat_service, session=session_service)
     )
+    mock_orchestrator = MagicMock()
+    mock_orchestrator.__class__.__name__ = "AgentOrchestrator"
+    mock_orchestrator.provider = MagicMock()
+    mock_orchestrator.provider.name = "test-provider"
+    mock_orchestrator.model = "test-model"
+    mock_orchestrator.messages = []
+    mock_orchestrator.get_stage = MagicMock(return_value=MagicMock(value="INITIAL"))
+    mock_orchestrator.get_tool_calls_count = MagicMock(return_value=0)
+    mock_orchestrator.get_tool_budget = MagicMock(return_value=50)
+    mock_orchestrator.get_observed_files = MagicMock(return_value=set())
+    mock_orchestrator.get_modified_files = MagicMock(return_value=set())
+    mock_orchestrator.get_message_count = MagicMock(return_value=0)
+    mock_orchestrator.is_streaming = MagicMock(return_value=False)
+    mock_orchestrator.get_iteration_count = MagicMock(return_value=0)
+    mock_orchestrator.get_max_iterations = MagicMock(return_value=25)
+    mock_orchestrator.reset = MagicMock()
+    mock_orchestrator.close = AsyncMock()
+    mock_orchestrator.chat = AsyncMock(
+        side_effect=AssertionError(
+            "AgentSession.send() should prefer execution-context chat service"
+        )
+    )
 
-    class _FakeAgent:
-        async def run(self, _message: str):
-            raise AssertionError("ChatSession.send() should prefer execution-context chat service")
+    agent = Agent.from_orchestrator(mock_orchestrator)
+    agent._context = execution_context
 
-    client._agent = _FakeAgent()
+    client._agent = agent
     client._context = execution_context
 
     session = await client.create_session()
     result = await session.send("ping")
-    history = session.get_history()
     await session.close()
 
     session_service.create_session.assert_awaited_once_with(
         metadata={"tool_budget": 4, "smart_routing": True}
     )
     chat_service.reset_conversation.assert_called_once_with()
-    chat_service.chat.assert_awaited_once_with("ping", stream=False)
+    chat_service.chat.assert_awaited_once_with("ping")
+    mock_orchestrator.chat.assert_not_awaited()
     session_service.close_session.assert_awaited_once_with("session-123")
     assert result.content == "Session response"
-    assert history == [
-        {"role": "user", "content": "ping"},
-        {"role": "assistant", "content": "Session response"},
-    ]
+    assert session.turns[0]["prompt"] == "ping"
+    assert session.turns[0]["response"] == "Session response"
 
 
 @pytest.mark.asyncio
@@ -188,21 +211,41 @@ async def test_chat_session_stream_prefers_execution_context_chat_service() -> N
     execution_context = SimpleNamespace(
         services=SimpleNamespace(chat=chat_service, session=None)
     )
+    mock_orchestrator = MagicMock()
+    mock_orchestrator.__class__.__name__ = "AgentOrchestrator"
+    mock_orchestrator.provider = MagicMock()
+    mock_orchestrator.provider.name = "test-provider"
+    mock_orchestrator.model = "test-model"
+    mock_orchestrator.messages = []
+    mock_orchestrator.get_stage = MagicMock(return_value=MagicMock(value="INITIAL"))
+    mock_orchestrator.get_tool_calls_count = MagicMock(return_value=0)
+    mock_orchestrator.get_tool_budget = MagicMock(return_value=50)
+    mock_orchestrator.get_observed_files = MagicMock(return_value=set())
+    mock_orchestrator.get_modified_files = MagicMock(return_value=set())
+    mock_orchestrator.get_message_count = MagicMock(return_value=0)
+    mock_orchestrator.is_streaming = MagicMock(return_value=False)
+    mock_orchestrator.get_iteration_count = MagicMock(return_value=0)
+    mock_orchestrator.get_max_iterations = MagicMock(return_value=25)
+    mock_orchestrator.reset = MagicMock()
+    mock_orchestrator.close = AsyncMock()
+    mock_orchestrator.stream_chat = AsyncMock(
+        side_effect=AssertionError(
+            "AgentSession.stream() should prefer execution-context chat service"
+        )
+    )
 
-    class _FakeAgent:
-        async def stream(self, _message: str):
-            raise AssertionError("ChatSession.stream() should prefer execution-context chat service")
+    agent = Agent.from_orchestrator(mock_orchestrator)
+    agent._context = execution_context
 
-    client._agent = _FakeAgent()
+    client._agent = agent
     client._context = execution_context
 
     session = await client.create_session()
     events = [event async for event in session.stream("ping")]
 
     chat_service.stream_chat.assert_called_once_with("ping")
-    assert session.get_history() == [
-        {"role": "user", "content": "ping"},
-        {"role": "assistant", "content": "Session stream"},
-    ]
-    content_events = [event for event in events if event.event_type == "content"]
+    mock_orchestrator.stream_chat.assert_not_called()
+    assert session.turns[0]["prompt"] == "ping"
+    assert session.turns[0]["response"] == "Session stream"
+    content_events = [event for event in events if event.type == EventType.CONTENT]
     assert [event.content for event in content_events] == ["Session ", "stream"]
