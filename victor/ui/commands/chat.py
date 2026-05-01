@@ -5,7 +5,6 @@ from typer.models import ArgumentInfo, OptionInfo
 import os
 import sys
 import time
-import uuid
 from types import SimpleNamespace
 from typing import Optional, Any
 
@@ -20,13 +19,10 @@ from rich.text import Text
 # ✅ PROPER: Import VictorClient and SessionConfig
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
-from victor.config.settings import get_project_paths, load_settings, ProfileConfig
+from victor.config.settings import get_project_paths, load_settings
 from victor.core.async_utils import run_sync
 
-# ❌ REMOVED: Direct orchestrator and shim imports (architectural violation)
-# from victor.agent.orchestrator import AgentOrchestrator
-# ❌ REMOVED: FrameworkShim import (architectural violation)
-# ✅ PROPER: Use VictorClient instead
+# Framework-first boundary: UI composes VictorClient/SessionConfig only.
 from victor.core.verticals import get_vertical, list_verticals
 from victor.core.errors import (
     ConfigurationError,
@@ -132,6 +128,56 @@ def _collect_runtime_override_kwargs(
         kwargs["enable_pruning"] = enable_pruning
 
     return kwargs
+
+
+def _build_session_config(
+    *,
+    agent_profile: Optional[str],
+    tool_budget: Optional[int],
+    max_iterations: Optional[int],
+    compaction_threshold: Optional[float],
+    adaptive_threshold: Optional[bool],
+    compaction_min_threshold: Optional[float],
+    compaction_max_threshold: Optional[float],
+    enable_smart_routing: bool,
+    routing_profile: str,
+    fallback_chain: Optional[str],
+    tool_preview: bool,
+    enable_pruning: bool,
+    planning_enabled: Optional[bool],
+    planning_model: Optional[str],
+    mode: Optional[str],
+    show_reasoning: bool,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    auth_mode: Optional[str] = None,
+    coding_plan: bool = False,
+) -> SessionConfig:
+    """Create a normalized SessionConfig from chat CLI flags."""
+    return SessionConfig.from_cli_flags(
+        agent_profile=agent_profile,
+        tool_budget=tool_budget,
+        max_iterations=max_iterations,
+        compaction_threshold=compaction_threshold,
+        adaptive_threshold=adaptive_threshold,
+        compaction_min_threshold=compaction_min_threshold,
+        compaction_max_threshold=compaction_max_threshold,
+        enable_smart_routing=enable_smart_routing,
+        routing_profile=routing_profile,
+        fallback_chain=fallback_chain,
+        tool_preview=tool_preview,
+        enable_pruning=enable_pruning,
+        planning_enabled=planning_enabled,
+        planning_model=planning_model,
+        mode=mode,
+        show_reasoning=show_reasoning,
+        provider=provider,
+        model=model,
+        endpoint=endpoint,
+        auth_mode=auth_mode,
+        coding_plan=coding_plan,
+    )
 
 
 def _display_skill_preview(con: Console, agent: Any, message: str) -> None:
@@ -653,7 +699,7 @@ def chat(
     legacy_mode: bool = typer.Option(
         False,
         "--legacy",
-        help="Use legacy orchestrator creation path (bypasses FrameworkShim). For troubleshooting only.",
+        help="Deprecated no-op. Victor always uses the canonical framework client path.",
         rich_help_panel="Expert Auth & Compatibility",
     ),
     tui: bool = typer.Option(
@@ -948,6 +994,39 @@ victor chat --sessionid abc123            # Resume session
         )
 
         settings = load_settings()
+        try:
+            session_config = _build_session_config(
+                agent_profile=profile,
+                tool_budget=tool_budget,
+                max_iterations=max_iterations,
+                compaction_threshold=compaction_threshold,
+                adaptive_threshold=adaptive_threshold,
+                compaction_min_threshold=compaction_min_threshold,
+                compaction_max_threshold=compaction_max_threshold,
+                enable_smart_routing=enable_smart_routing,
+                routing_profile=routing_profile,
+                fallback_chain=fallback_chain,
+                tool_preview=tool_preview,
+                enable_pruning=enable_pruning,
+                planning_enabled=enable_planning,
+                planning_model=planning_model,
+                mode=mode,
+                show_reasoning=show_reasoning,
+                provider=provider,
+                model=model,
+                endpoint=endpoint,
+                auth_mode=auth_mode,
+                coding_plan=coding_plan,
+            )
+        except ValueError as exc:
+            console.print(f"[bold red]Error:[/] {exc}")
+            raise typer.Exit(1)
+
+        if provider and not model and session_config.provider_override.model:
+            console.print(
+                f"[dim]Using default model for {session_config.provider_override.provider}: "
+                f"{session_config.provider_override.model}[/]"
+            )
 
         # Periodic cleanup: check if history file needs rotation (once per 7 days)
         try:
@@ -963,83 +1042,15 @@ victor chat --sessionid abc123            # Resume session
 
         setup_safety_confirmation()
 
-        # Apply provider/model/endpoint overrides by creating a synthetic profile
-        if provider or model or endpoint:
-            # Early validation: endpoint is only supported for local providers
-            if endpoint and provider:
-                provider_lower = provider.lower()
-                local_providers = {"ollama", "lmstudio", "vllm", "mlx", "llama.cpp"}
-                if provider_lower not in local_providers:
-                    console.print(
-                        f"[bold red]Error:[/] --endpoint is only supported for local providers "
-                        f"(ollama, lmstudio, vllm, mlx, llama.cpp). Got: {provider}"
-                    )
-                    console.print(
-                        "[dim]Hint: Cloud providers (anthropic, openai, google, etc.) use fixed endpoints.[/]"
-                    )
-                    raise typer.Exit(1)
-
-            # If only provider is specified, resolve default model
-            if provider and not model:
-                provider = provider.lower()
-                # Default models for each provider
-                default_models = {
-                    "anthropic": "claude-3-5-sonnet-20241022",
-                    "openai": "gpt-4o",
-                    "google": "gemini-2.0-flash-exp",
-                    "ollama": "qwen2.5-coder:7b",
-                    "lmstudio": "local-model",
-                    "vllm": "local-model",
-                    "deepseek": "deepseek-chat",
-                    "xai": "grok-beta",
-                    "zai": "glm-4.7",
-                    "cohere": "command-r-plus",
-                    "azure": "gpt-4o",
-                }
-
-                model = default_models.get(provider)
-                if model is None:
-                    console.print(
-                        f"[bold red]Error:[/] No default model known for provider '{provider}'. "
-                        f"Please specify --model."
-                    )
-                    raise typer.Exit(1)
-                console.print(f"[dim]Using default model for {provider}: {model}[/]")
-            elif provider:
-                provider = provider.lower()
-
-            extra_fields = {}
-            if endpoint:
-                extra_fields["base_url"] = endpoint
-                if provider in {"ollama", "lmstudio", "vllm"}:
-                    if provider == "ollama":
-                        settings.provider.ollama_base_url = endpoint
-                    elif provider == "lmstudio":
-                        settings.provider.lmstudio_base_urls = [endpoint]
-                    elif provider == "vllm":
-                        settings.provider.vllm_base_url = endpoint
-
-            if auth_mode:
-                extra_fields["auth_mode"] = auth_mode.lower()
-            if coding_plan:
-                extra_fields["coding_plan"] = True
-
-            override_profile = ProfileConfig(
-                provider=provider,
-                model=model,
-                temperature=settings.provider.default_temperature,
-                max_tokens=settings.provider.default_max_tokens,
-                **extra_fields,
-            )
-
-            # Replace profile loader to use the synthetic profile
-            settings.load_profiles = lambda: {profile: override_profile}  # type: ignore[attr-defined]
-            settings.provider.default_provider = provider
-            settings.provider.default_model = model
-
         # Apply auto-skill CLI override to settings
         if auto_skill is not None:
             settings.skill_auto_select_enabled = auto_skill
+
+        if legacy_mode:
+            console.print(
+                "[yellow]Warning:[/] --legacy is deprecated and ignored. "
+                "Victor now always uses the canonical framework client path."
+            )
 
         if actual_message:
             runtime_override_kwargs = _collect_runtime_override_kwargs(
@@ -1070,8 +1081,8 @@ victor chat --sessionid abc123            # Resume session
                     enable_observability=enable_observability,
                     enable_planning=enable_planning,
                     planning_model=planning_model,
-                    legacy_mode=legacy_mode,
                     show_reasoning=show_reasoning,
+                    session_config=session_config,
                     **runtime_override_kwargs,
                 )
             )
@@ -1105,10 +1116,10 @@ victor chat --sessionid abc123            # Resume session
                     enable_observability=enable_observability,
                     enable_planning=enable_planning,
                     planning_model=planning_model,
-                    legacy_mode=legacy_mode,
                     use_tui=use_tui,
                     resume_session_id=session_id,
                     show_reasoning=show_reasoning,
+                    session_config=session_config,
                     **runtime_override_kwargs,
                 )
             )
@@ -1123,17 +1134,13 @@ def _configure_smart_routing(
     fallback_chain: Optional[str],
     show_status: bool = True,
 ) -> None:
-    """Apply smart-routing settings when the feature flag permits."""
+    """Display smart-routing state after SessionConfig normalization."""
     if not enable_smart_routing:
         return
     from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
     feature_manager = get_feature_flag_manager()
     if feature_manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
-        settings.smart_routing_enabled = True
-        settings.smart_routing_profile = routing_profile
-        if fallback_chain:
-            settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
         if show_status:
             console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
     else:
@@ -1171,7 +1178,6 @@ async def run_oneshot(
     enable_observability: bool = True,
     enable_planning: Optional[bool] = None,
     planning_model: Optional[str] = None,
-    legacy_mode: bool = False,
     show_reasoning: bool = False,
     compaction_threshold: Optional[float] = None,
     adaptive_threshold: Optional[bool] = None,
@@ -1184,12 +1190,12 @@ async def run_oneshot(
     # Tool output preview parameters
     tool_preview: bool = True,
     enable_pruning: bool = False,
+    session_config: Optional[SessionConfig] = None,
 ) -> None:
     """Run a single message and exit.
 
-    By default, uses VictorClient to bridge CLI with framework features
-    like observability and vertical configuration. Use legacy_mode=True
-    to bypass the framework and use direct orchestrator creation.
+    Uses VictorClient to bridge CLI with framework features like
+    observability and vertical configuration.
     """
     from victor.framework.agent_factory import InitializationError
     from victor.ui.output_formatter import create_formatter
@@ -1199,22 +1205,9 @@ async def run_oneshot(
 
     settings.automation.one_shot_mode = True
     start_time = time.time()
-    session_id = str(uuid.uuid4())
-    success = False
-    tool_calls_made = 0
     show_cli_chrome = _should_render_cli_chrome(formatter)
 
-    _configure_smart_routing(
-        settings,
-        console,
-        enable_smart_routing,
-        routing_profile,
-        fallback_chain,
-        show_status=show_cli_chrome,
-    )
-
-    # ✅ PROPER: Create SessionConfig from CLI flags (no settings mutations)
-    config = SessionConfig.from_cli_flags(
+    config = session_config or _build_session_config(
         agent_profile=profile,
         tool_budget=tool_budget,
         max_iterations=max_iterations,
@@ -1232,12 +1225,20 @@ async def run_oneshot(
         mode=mode,
         show_reasoning=show_reasoning,
     )
+    config.apply_to_settings(settings)
+
+    _configure_smart_routing(
+        settings,
+        console,
+        enable_smart_routing,
+        routing_profile,
+        fallback_chain,
+        show_status=show_cli_chrome,
+    )
 
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
 
-    # ✅ SessionConfig handles tool output settings (no direct mutations needed)
-    # The settings will be applied when VictorClient is created via config.apply_to_settings()
     tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
     if show_cli_chrome:
         _print_tool_output_mode_banner(console, tool_settings)
@@ -1521,9 +1522,7 @@ async def run_oneshot(
                 else:
                     formatter.response(content=buffered.finalize())
 
-            success = True
-            metrics = await client.get_session_metrics()
-            tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
+            await client.get_session_metrics()
 
     except InitializationError as e:
         formatter.error(f"{e.stage}: {e.message}")
@@ -1596,7 +1595,6 @@ async def run_interactive(
     enable_observability: bool = True,
     enable_planning: Optional[bool] = None,
     planning_model: Optional[str] = None,
-    legacy_mode: bool = False,
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
     show_reasoning: bool = False,
@@ -1611,21 +1609,18 @@ async def run_interactive(
     # Tool output preview parameters
     tool_preview: bool = True,
     enable_pruning: bool = False,
+    session_config: Optional[SessionConfig] = None,
 ) -> None:
     """Run interactive CLI mode.
 
-    By default, uses VictorClient to bridge CLI with framework features
-    like observability and vertical configuration. Use legacy_mode=True
-    to bypass the framework and use direct orchestrator creation.
+    Uses VictorClient to bridge CLI with framework features like
+    observability and vertical configuration.
 
     Args:
         use_tui: If True, use the modern TUI interface. If False, use simple CLI.
         show_reasoning: If True, show LLM reasoning/thinking content in output.
     """
-    # ✅ PROPER: Create SessionConfig from CLI flags (no settings mutations)
-    from victor.framework.session_config import SessionConfig
-
-    config = SessionConfig.from_cli_flags(
+    config = session_config or _build_session_config(
         agent_profile=profile,
         tool_budget=tool_budget,
         max_iterations=max_iterations,
@@ -1643,6 +1638,7 @@ async def run_interactive(
         mode=mode,
         show_reasoning=show_reasoning,
     )
+    config.apply_to_settings(settings)
 
     # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
     if not show_reasoning:
@@ -1660,10 +1656,6 @@ async def run_interactive(
 
     agent = None
     client = None  # ✅ NEW: VictorClient (replaces orchestrator/shim)
-    start_time = time.time()
-    session_id = str(uuid.uuid4())
-    success = False
-    tool_calls_made = 0
     show_startup_cli_chrome = _should_render_interactive_tool_banner(use_tui)
     smart_routing_status_shown = False
     compaction_status_shown = False
@@ -1686,13 +1678,6 @@ async def run_interactive(
 
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
-
-    # Apply tool output preview settings from flags
-    if not tool_preview:
-        settings.tool_settings.tool_output_preview_enabled = False
-    if enable_pruning:
-        settings.tool_settings.tool_output_pruning_enabled = True
-        settings.tool_settings.tool_output_pruning_safe_only = False
 
     tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
     tool_banner_shown = False
@@ -1746,19 +1731,19 @@ async def run_interactive(
 
             # Continue with default settings
             profile_config = None
-        profile_display = profile_config or SimpleNamespace(
-            provider=settings.provider.default_provider,
-            model=settings.provider.default_model,
-        )
+        if config.provider_override.is_active:
+            profile_display = SimpleNamespace(
+                provider=settings.provider.default_provider,
+                model=settings.provider.default_model,
+            )
+        else:
+            profile_display = profile_config or SimpleNamespace(
+                provider=settings.provider.default_provider,
+                model=settings.provider.default_model,
+            )
 
         # Unified initialization via AgentFactory
-        from victor.framework.agent_factory import AgentFactory, InitializationError
-
-        # Pass original vertical string to AgentFactory (preserves name for error reporting)
-        vertical_param = vertical if vertical else None
-
-        # Use "default" profile if profile_config is None (default settings)
-        profile_to_use = profile if profile_config else "default"
+        from victor.framework.agent_factory import InitializationError
 
         # ✅ PROPER: Create VictorClient (replaces AgentFactory)
         try:
@@ -1965,10 +1950,9 @@ async def run_interactive(
                 startup_messages=tui_startup_messages,
             )
 
-        success = True
         if hasattr(agent, "get_session_metrics"):
             metrics = agent.get_session_metrics()
-            tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
+            _ = metrics.get("tool_calls", 0) if metrics else 0
 
     except Exception as e:
         # Use contextual error formatting for better UX
@@ -2009,7 +1993,6 @@ async def run_interactive(
         raise typer.Exit(1)
     finally:
         # Emit session end event
-        duration = time.time() - start_time
         # ✅ PROPER: No shim needed - session cleanup handled by agent/services
         # Note: shim.emit_session_end() removed (FrameworkShim no longer used)
         if agent:
@@ -2226,7 +2209,7 @@ def _create_cli_prompt_session(settings=None):
 
 
 async def _run_cli_repl(
-    agent: AgentOrchestrator,
+    agent: Any,
     settings: Any,
     cmd_handler: Any,
     profile_config: Any,
@@ -2664,8 +2647,6 @@ async def run_workflow_mode(
         # Execute workflow
         console.print(f"\n[bold]Executing workflow '{workflow.name}'...[/]\n")
 
-        settings = load_settings()
-
         # Create orchestrator if agent nodes exist
         orchestrator = None
         from victor.workflows.definition import AgentNode
@@ -2674,7 +2655,7 @@ async def run_workflow_mode(
 
         if has_agent_nodes:
             # ✅ PROPER: Use VictorClient instead of FrameworkShim
-            config = SessionConfig(profile=profile, vertical=vertical)
+            config = SessionConfig.from_cli_flags(agent_profile=profile)
             client = VictorClient(config)
             orchestrator = await client._ensure_initialized()
 

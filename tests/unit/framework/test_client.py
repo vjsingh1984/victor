@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.framework.client import VictorClient
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.session_config import SessionConfig
 
 
@@ -36,6 +37,71 @@ async def test_victor_client_ensure_initialized_uses_provider_defaults() -> None
         model="mistral-tools:7b-instruct",
         session_config=config,
     )
+
+
+@pytest.mark.asyncio
+async def test_victor_client_does_not_clobber_profile_with_settings_defaults() -> None:
+    config = SessionConfig.from_cli_flags(agent_profile="zai-coding")
+    client = VictorClient(config, container=object())
+    settings = SimpleNamespace(
+        provider=SimpleNamespace(
+            default_provider="ollama",
+            default_model="qwen3.5:27b-q4_K_M",
+        )
+    )
+    mock_agent = object()
+
+    with (
+        patch("victor.config.settings.load_settings", return_value=settings),
+        patch(
+            "victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)
+        ) as create,
+    ):
+        agent = await client._ensure_initialized()
+
+    assert agent is mock_agent
+    create.assert_awaited_once_with(
+        profile="zai-coding",
+        provider=None,
+        model=None,
+        session_config=config,
+    )
+
+
+def test_session_config_normalizes_provider_override_and_applies_endpoint() -> None:
+    config = SessionConfig.from_cli_flags(
+        provider="OLLAMA",
+        endpoint="http://localhost:11434",
+        provider_timeout=180,
+    )
+    settings = SimpleNamespace(
+        provider=SimpleNamespace(
+            default_provider="anthropic",
+            default_model="claude-sonnet",
+            ollama_base_url="http://old-host:11434",
+            timeout=60,
+        ),
+        tool_settings=SimpleNamespace(
+            tool_output_preview_enabled=True,
+            tool_output_pruning_enabled=False,
+            tool_output_pruning_safe_only=True,
+        ),
+    )
+
+    config.apply_to_settings(settings)
+
+    assert config.provider_override.provider == "ollama"
+    assert config.provider_override.model == "qwen2.5-coder:7b"
+    assert config.provider_override.timeout == 180
+    assert settings.provider.default_provider == "ollama"
+    assert settings.provider.default_model == "qwen2.5-coder:7b"
+    assert settings.provider.ollama_base_url == "http://localhost:11434"
+    assert settings.provider.timeout == 180
+
+
+def test_session_config_rejects_endpoint_for_cloud_provider() -> None:
+    with pytest.raises(ValueError, match="--endpoint is only supported for local providers"):
+        SessionConfig.from_cli_flags(provider="openai", endpoint="https://custom.example")
 
 
 def test_victor_client_bootstrap_container_uses_bootstrap_factory_result() -> None:
@@ -110,3 +176,35 @@ async def test_agent_public_api_delegates_to_orchestrator_internals() -> None:
 
     assert agent.supports_streaming() is False
     mock_provider.supports_streaming.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_victor_client_stream_preserves_framework_event_contract() -> None:
+    config = SessionConfig()
+    client = VictorClient(config, container=object())
+
+    class _FakeAgent:
+        async def stream(self, _message: str):
+            yield AgentExecutionEvent(type=EventType.CONTENT, content="READY")
+            yield AgentExecutionEvent(
+                type=EventType.TOOL_RESULT,
+                tool_name="database",
+                arguments={"sql": "select 1"},
+                result="row",
+                metadata={"elapsed": 0.02},
+            )
+
+    client._agent = _FakeAgent()
+
+    events = [event async for event in client.stream("ping")]
+
+    assert events[0].type == EventType.CONTENT
+    assert events[0].event_type == "content"
+    assert events[0].content == "READY"
+
+    assert events[1].type == EventType.TOOL_RESULT
+    assert events[1].event_type == "tool_result"
+    assert events[1].tool_name == "database"
+    assert events[1].arguments == {"sql": "select 1"}
+    assert events[1].result["result"] == "row"
+    assert events[1].result["arguments"] == {"sql": "select 1"}

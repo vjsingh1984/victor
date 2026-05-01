@@ -48,6 +48,23 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 
+DEFAULT_PROVIDER_MODELS = {
+    "anthropic": "claude-3-5-sonnet-20241022",
+    "openai": "gpt-4o",
+    "google": "gemini-2.0-flash-exp",
+    "ollama": "qwen2.5-coder:7b",
+    "lmstudio": "local-model",
+    "vllm": "local-model",
+    "deepseek": "deepseek-chat",
+    "xai": "grok-beta",
+    "zai": "glm-4.7",
+    "cohere": "command-r-plus",
+    "azure": "gpt-4o",
+}
+
+LOCAL_ENDPOINT_PROVIDERS = frozenset({"ollama", "lmstudio", "vllm", "mlx", "llama.cpp"})
+
+
 @dataclass(frozen=True)
 class CompactionConfig:
     """Compaction threshold overrides for a session.
@@ -96,6 +113,93 @@ class ToolOutputConfig:
 
 
 @dataclass(frozen=True)
+class ProviderOverrideConfig:
+    """Explicit provider/model/runtime override state for a session."""
+
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    endpoint: Optional[str] = None
+    auth_mode: Optional[str] = None
+    timeout: Optional[int] = None
+    coding_plan: bool = False
+
+    @property
+    def is_active(self) -> bool:
+        """Return True when any explicit provider override is present."""
+        return any(
+            (
+                self.provider is not None,
+                self.model is not None,
+                self.endpoint is not None,
+                self.auth_mode is not None,
+                self.timeout is not None,
+                self.coding_plan,
+            )
+        )
+
+    @classmethod
+    def from_cli(
+        cls,
+        *,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        endpoint: Optional[str] = None,
+        auth_mode: Optional[str] = None,
+        timeout: Optional[int] = None,
+        coding_plan: bool = False,
+    ) -> "ProviderOverrideConfig":
+        """Normalize provider override flags from CLI-friendly inputs."""
+        normalized_provider = provider.lower() if provider else None
+        normalized_model = model
+        normalized_auth_mode = auth_mode.lower() if auth_mode else None
+
+        if endpoint and normalized_provider and normalized_provider not in LOCAL_ENDPOINT_PROVIDERS:
+            raise ValueError(
+                "--endpoint is only supported for local providers "
+                "(ollama, lmstudio, vllm, mlx, llama.cpp)."
+            )
+        if timeout is not None and timeout <= 0:
+            raise ValueError("--provider-timeout must be greater than 0.")
+
+        if normalized_provider and not normalized_model:
+            normalized_model = DEFAULT_PROVIDER_MODELS.get(normalized_provider)
+            if normalized_model is None:
+                raise ValueError(
+                    f"No default model known for provider '{normalized_provider}'. "
+                    "Please specify --model."
+                )
+
+        # Preserve existing CLI behavior: auth/coding-plan only participate in the
+        # explicit override path when at least one provider-selection flag is set.
+        has_selection = any((normalized_provider, normalized_model, endpoint))
+        if not has_selection:
+            normalized_auth_mode = None
+            coding_plan = False
+
+        return cls(
+            provider=normalized_provider,
+            model=normalized_model,
+            endpoint=endpoint,
+            auth_mode=normalized_auth_mode,
+            timeout=timeout,
+            coding_plan=coding_plan,
+        )
+
+    def to_profile_overrides(self) -> dict[str, object]:
+        """Return extra profile payload fields for AgentFactory synthesis."""
+        overrides: dict[str, object] = {}
+        if self.endpoint:
+            overrides["base_url"] = self.endpoint
+        if self.auth_mode:
+            overrides["auth_mode"] = self.auth_mode
+        if self.timeout is not None:
+            overrides["timeout"] = self.timeout
+        if self.coding_plan:
+            overrides["coding_plan"] = True
+        return overrides
+
+
+@dataclass(frozen=True)
 class SessionConfig:
     """Immutable capture of all CLI/runtime session overrides.
 
@@ -115,6 +219,7 @@ class SessionConfig:
         planning_model: Override model for planning tasks.
         mode: Initial agent mode ('build', 'plan', 'explore').
         show_reasoning: Show LLM reasoning/thinking content.
+        provider_override: Explicit provider/model/endpoint override state.
         tool_preview: Shorthand to disable tool output preview.
         enable_pruning: Shorthand to enable broader tool output pruning.
         enable_smart_routing: Shorthand to enable smart routing.
@@ -141,6 +246,7 @@ class SessionConfig:
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
     smart_routing: SmartRoutingConfig = field(default_factory=SmartRoutingConfig)
     tool_output: ToolOutputConfig = field(default_factory=ToolOutputConfig)
+    provider_override: ProviderOverrideConfig = field(default_factory=ProviderOverrideConfig)
 
     # --- Convenience shorthands (populate sub-configs) ---
 
@@ -174,6 +280,12 @@ class SessionConfig:
         planning_model: Optional[str] = None,
         mode: Optional[str] = None,
         show_reasoning: bool = False,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        endpoint: Optional[str] = None,
+        auth_mode: Optional[str] = None,
+        provider_timeout: Optional[int] = None,
+        coding_plan: bool = False,
     ) -> "SessionConfig":
         """Create a ``SessionConfig`` from flat CLI flags.
 
@@ -197,6 +309,12 @@ class SessionConfig:
             planning_model: Override model for planning.
             mode: Agent mode (build/plan/explore).
             show_reasoning: Show LLM reasoning.
+            provider: Override provider for this session.
+            model: Override model for this session.
+            endpoint: Override endpoint for local providers.
+            auth_mode: Override provider auth mode.
+            provider_timeout: Override provider request timeout in seconds.
+            coding_plan: Enable provider-specific coding-plan endpoint mode.
 
         Returns:
             Immutable ``SessionConfig`` instance.
@@ -234,6 +352,14 @@ class SessionConfig:
                 pruning_enabled=enable_pruning,
                 pruning_safe_only=not enable_pruning,
             ),
+            provider_override=ProviderOverrideConfig.from_cli(
+                provider=provider,
+                model=model,
+                endpoint=endpoint,
+                auth_mode=auth_mode,
+                timeout=provider_timeout,
+                coding_plan=coding_plan,
+            ),
         )
 
     def apply_to_settings(self, settings: object) -> None:
@@ -267,6 +393,53 @@ class SessionConfig:
                     "tool_output_pruning_safe_only",
                     self.tool_output.pruning_safe_only,
                 )
+
+        provider_override = self.provider_override
+        provider_settings = getattr(settings, "provider", None)
+        if provider_settings is not None:
+            if provider_override.provider and hasattr(provider_settings, "default_provider"):
+                object.__setattr__(
+                    provider_settings,
+                    "default_provider",
+                    provider_override.provider,
+                )
+            if provider_override.model and hasattr(provider_settings, "default_model"):
+                object.__setattr__(
+                    provider_settings,
+                    "default_model",
+                    provider_override.model,
+                )
+            if provider_override.timeout is not None and hasattr(provider_settings, "timeout"):
+                object.__setattr__(
+                    provider_settings,
+                    "timeout",
+                    provider_override.timeout,
+                )
+            if provider_override.endpoint:
+                if provider_override.provider == "ollama" and hasattr(
+                    provider_settings, "ollama_base_url"
+                ):
+                    object.__setattr__(
+                        provider_settings,
+                        "ollama_base_url",
+                        provider_override.endpoint,
+                    )
+                elif provider_override.provider == "lmstudio" and hasattr(
+                    provider_settings, "lmstudio_base_urls"
+                ):
+                    object.__setattr__(
+                        provider_settings,
+                        "lmstudio_base_urls",
+                        [provider_override.endpoint],
+                    )
+                elif provider_override.provider == "vllm" and hasattr(
+                    provider_settings, "vllm_base_url"
+                ):
+                    object.__setattr__(
+                        provider_settings,
+                        "vllm_base_url",
+                        provider_override.endpoint,
+                    )
 
         # Smart routing settings
         if self.smart_routing.enabled:

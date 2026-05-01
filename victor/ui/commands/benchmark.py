@@ -1380,6 +1380,7 @@ async def _run_benchmark_async(
         progress.update(task, description="Initializing agent...")
         try:
             from victor.evaluation.agent_adapter import AdapterConfig, PromptOptimizationBinding
+            from victor.framework.session_config import DEFAULT_PROVIDER_MODELS, SessionConfig
 
             adapter_config = AdapterConfig(
                 total_timeout=timeout,
@@ -1426,70 +1427,27 @@ async def _run_benchmark_async(
                 console.print("[dim]Edge model disabled (--no-edge-model)[/]")
 
             if provider_override:
-                # ✅ PROPER: Use VictorClient for normal profile path (else branch below)
-                # ⚠️ EXCEPTION: provider_override requires custom provider creation
-                # This is a benchmark-specific feature that bypasses profile configuration.
-                # TODO: Refactor VictorClient to support custom provider injection.
-                from victor.config.settings import load_settings
-                from victor.config.api_keys import get_api_key
-                from victor.providers.registry import ProviderRegistry
-
-                settings = load_settings()
-                profiles = settings.load_profiles()
-                profile_config = profiles.get(profile, profiles.get("default"))
-                # Use explicit --model, else provider's default model
-                _PROVIDER_DEFAULT_MODELS = {
-                    "deepseek": "deepseek-chat",
-                    "anthropic": "claude-sonnet-4-20250514",
-                    "openai": "gpt-4o",
-                    "google": "gemini-2.0-flash",
-                    "xai": "grok-3",
-                    "ollama": "gemma4:31b",
-                }
-                if model:
-                    effective_model = model
-                else:
-                    effective_model = _PROVIDER_DEFAULT_MODELS.get(provider_override)
-                    if not effective_model and profile_config:
-                        effective_model = profile_config.model
-                    if not effective_model:
-                        effective_model = "deepseek-chat"
-
-                # Build provider kwargs — use OAuth if account requires it
-                provider_kwargs: dict = {
-                    "settings": settings,
-                    "timeout": timeout,
-                }
-                if resolved_account and resolved_account.auth.method == "oauth":
-                    provider_kwargs["auth_mode"] = "oauth"
-                else:
-                    provider_kwargs["api_key"] = get_api_key(provider_override)
-
-                provider = ProviderRegistry.create(
-                    provider_override,
-                    **provider_kwargs,
+                effective_model = (
+                    model
+                    or DEFAULT_PROVIDER_MODELS.get(provider_override)
+                    or _resolve_effective_model(profile, None)
                 )
-
-                # Only enable thinking for providers that support it
-                use_thinking = (
-                    hasattr(provider, "supports_thinking") and provider.supports_thinking()
-                )
-
-                # ⚠️ ARCHITECTURAL EXCEPTION: Direct AgentOrchestrator import
-                # Rationale: provider_override requires creating a custom provider
-                # and passing it to the orchestrator. VictorClient doesn't support
-                # this pattern yet. This is isolated to benchmark's provider_override path.
-                # Future work: Add VictorClient.with_provider(provider) method.
-                from victor.agent.orchestrator import AgentOrchestrator
-
-                orchestrator = AgentOrchestrator(
-                    settings=settings,
-                    provider=provider,
+                session_config = SessionConfig.from_cli_flags(
+                    agent_profile=profile,
+                    provider=provider_override,
                     model=effective_model,
-                    provider_name=provider_override,
-                    thinking=use_thinking,
+                    auth_mode=(
+                        "oauth"
+                        if resolved_account and resolved_account.auth.method == "oauth"
+                        else None
+                    ),
+                    provider_timeout=timeout,
                 )
-                adapter = VictorAgentAdapter(orchestrator, adapter_config)
+                adapter = await VictorAgentAdapter.create_from_session_config(
+                    session_config,
+                    config=adapter_config,
+                    enable_observability=False,
+                )
             else:
                 adapter = VictorAgentAdapter.from_profile(
                     profile=profile,

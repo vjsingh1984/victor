@@ -205,6 +205,7 @@ def run_command(
 
     from victor.config.settings import load_settings
     from victor.core.async_utils import run_sync
+    from victor.framework.session_config import SessionConfig
     from victor.ui.commands.chat import run_oneshot
     from victor.ui.commands.utils import setup_logging
 
@@ -221,12 +222,15 @@ def run_command(
 
     setup_logging(command="run", cli_log_level="ERROR")
     settings = load_settings()
-
-    # Apply provider/model overrides
-    if provider:
-        settings.provider.default_provider = provider
-    if model:
-        settings.provider.default_model = model
+    try:
+        session_config = SessionConfig.from_cli_flags(
+            agent_profile=profile,
+            provider=provider,
+            model=model,
+        )
+    except ValueError as exc:
+        console.print(f"[bold red]Error:[/] {exc}")
+        raise typer.Exit(1)
 
     run_sync(
         run_oneshot(
@@ -239,6 +243,7 @@ def run_command(
             preindex=False,
             renderer_choice="text",
             show_reasoning=False,
+            session_config=session_config,
         )
     )
 

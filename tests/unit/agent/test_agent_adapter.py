@@ -17,7 +17,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.evaluation.agent_adapter import (
     AdapterConfig,
@@ -198,6 +198,36 @@ class TestVictorAgentAdapter:
         assert adapter._turns == 0
         assert len(adapter._file_snapshots) == 0
         adapter.orchestrator.reset_conversation.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_from_session_config_uses_agent_facade(self, mock_orchestrator):
+        """Session-based adapter creation should flow through Agent.create()."""
+        from victor.framework.session_config import SessionConfig
+
+        config = SessionConfig.from_cli_flags(
+            agent_profile="benchmark-profile",
+            provider="openai",
+            model="gpt-4o",
+            provider_timeout=180,
+        )
+        mock_agent = MagicMock()
+        mock_agent.get_orchestrator.return_value = mock_orchestrator
+
+        with patch(
+            "victor.framework.agent.Agent.create",
+            new=AsyncMock(return_value=mock_agent),
+        ) as create:
+            adapter = await VictorAgentAdapter.create_from_session_config(
+                config,
+                enable_observability=False,
+            )
+
+        assert adapter.orchestrator is mock_orchestrator
+        create.assert_awaited_once_with(
+            profile="benchmark-profile",
+            session_config=config,
+            enable_observability=False,
+        )
 
     def test_on_tool_start_records_call(self, adapter):
         """Test that tool start callback records tool call."""

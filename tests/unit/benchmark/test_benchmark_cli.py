@@ -21,7 +21,7 @@ Integration tests that run actual benchmarks are skipped when Ollama is unavaila
 import json
 import socket
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
 from rich.console import Console
@@ -1167,6 +1167,80 @@ class TestBenchmarkRun:
         assert binding is not None
         assert binding.prompt_candidate_hash == "cand-123"
         assert binding.section_name == "GROUNDING_RULES"
+
+    @pytest.mark.asyncio
+    async def test_run_benchmark_async_uses_session_config_for_provider_override(self):
+        """Provider overrides should route through SessionConfig + Agent facade."""
+        from victor.evaluation.protocol import BenchmarkTask, BenchmarkType, EvaluationConfig
+        from victor.ui.commands.benchmark import _run_benchmark_async
+
+        class FakeRunner:
+            async def load_tasks(self, _config):
+                return [
+                    BenchmarkTask(
+                        task_id="swe-1",
+                        benchmark=BenchmarkType.SWE_BENCH,
+                        description="Fix the bug",
+                        prompt="Fix the bug",
+                    )
+                ]
+
+        class FakeHarness:
+            def register_runner(self, _runner):
+                return None
+
+            async def run_evaluation(self, **_kwargs):
+                return {"status": "ok"}
+
+        fake_adapter = MagicMock()
+        fake_adapter.orchestrator = SimpleNamespace(provider_name="openai", provider=None)
+        fake_adapter.get_benchmark_tool_readiness.return_value = SimpleNamespace(
+            ready=True,
+            enabled_tools=("read", "graph"),
+            missing_tools=(),
+            disabled_tools=(),
+        )
+        resolved_account = SimpleNamespace(auth=SimpleNamespace(method="oauth"))
+
+        with (
+            patch("victor.evaluation.harness.EvaluationHarness", return_value=FakeHarness()),
+            patch(
+                "victor.evaluation.agent_adapter.VictorAgentAdapter.create_from_session_config",
+                new=AsyncMock(return_value=fake_adapter),
+            ) as create_from_session_config,
+            patch(
+                "victor.evaluation.agent_adapter.VictorAgentAdapter.from_profile",
+            ) as from_profile,
+            patch(
+                "victor.core.feature_flags.get_feature_flag_manager",
+                return_value=SimpleNamespace(is_enabled=lambda *_args, **_kwargs: False),
+            ),
+        ):
+            result = await _run_benchmark_async(
+                runner=FakeRunner(),
+                config=EvaluationConfig(
+                    benchmark=BenchmarkType.SWE_BENCH,
+                    model="gpt-4o",
+                ),
+                profile="default",
+                model=None,
+                timeout=180,
+                max_turns=6,
+                resume=False,
+                provider_override="openai",
+                start_task=0,
+                resolved_account=resolved_account,
+            )
+
+        assert result == {"status": "ok"}
+        create_from_session_config.assert_awaited_once()
+        from_profile.assert_not_called()
+        session_config = create_from_session_config.await_args.args[0]
+        assert session_config.agent_profile == "default"
+        assert session_config.provider_override.provider == "openai"
+        assert session_config.provider_override.model == "gpt-4o"
+        assert session_config.provider_override.auth_mode == "oauth"
+        assert session_config.provider_override.timeout == 180
 
 
 class TestBenchmarkCompare:

@@ -145,7 +145,7 @@ class Agent:
     @classmethod
     async def create(
         cls,
-        provider: str = "anthropic",
+        provider: Optional[str] = None,
         model: Optional[str] = None,
         *,
         temperature: float = 0.7,
@@ -167,8 +167,9 @@ class Agent:
         you only need to specify the provider.
 
         Args:
-            provider: LLM provider name (anthropic, openai, ollama, google, etc.)
-            model: Model identifier. If None, uses provider default.
+            provider: Optional LLM provider name (anthropic, openai, ollama, google, etc.).
+                If omitted, uses the active profile/default settings.
+            model: Model identifier. If None, uses provider/profile default.
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
             tools: Tool configuration - ToolSet, list of category names, or None
@@ -230,8 +231,15 @@ class Agent:
                     setattr(settings, key, value)
 
         # Apply SessionConfig overrides (preferred over direct settings mutation)
+        profile_overrides: Dict[str, Any] = {}
         if session_config is not None:
             session_config.apply_to_settings(settings)
+            profile = session_config.agent_profile or profile
+            provider_override = getattr(session_config, "provider_override", None)
+            if provider_override is not None:
+                provider = provider_override.provider or provider
+                model = provider_override.model or model
+                profile_overrides = provider_override.to_profile_overrides()
 
         # Extract vertical config for backward compat return value
         vertical_config: Optional["VerticalConfig"] = None
@@ -251,12 +259,20 @@ class Agent:
                 thinking=thinking,
                 session_id=session_id,
                 enable_observability=enable_observability,
+                profile_overrides=profile_overrides,
             )
             orchestrator = await factory.create()
+            resolved_provider = (
+                provider
+                or getattr(orchestrator, "provider_name", None)
+                or getattr(getattr(orchestrator, "provider", None), "name", None)
+                or "unknown"
+            )
+            resolved_model = model or getattr(orchestrator, "model", None)
             return cls(
                 orchestrator,
-                provider=provider,
-                model=model,
+                provider=resolved_provider,
+                model=resolved_model,
                 vertical=vertical,
                 vertical_config=vertical_config,
             )
@@ -398,6 +414,72 @@ class Agent:
     # Primary Methods
     # =========================================================================
 
+    def _resolve_chat_runtime(self) -> Any:
+        """Resolve the canonical chat runtime for this agent.
+
+        Preference order:
+        1. Orchestrator-bound ChatService
+        2. RuntimeExecutionContext services accessor
+        3. Container-resolved ChatService
+        4. Underlying orchestrator as a compatibility fallback
+        """
+        chat_service = getattr(self._orchestrator, "_chat_service", None)
+        if chat_service is not None:
+            return chat_service
+
+        runtime_context = getattr(self, "_context", None)
+        services = getattr(runtime_context, "services", None)
+        if services is not None:
+            chat_service = getattr(services, "chat", None)
+            if chat_service is not None:
+                return chat_service
+
+        container = getattr(self._orchestrator, "_container", None)
+        if container is not None:
+            from victor.runtime.context import ServiceAccessor
+
+            accessor = ServiceAccessor(_container=container)
+            chat_service = accessor.chat
+            if chat_service is not None:
+                return chat_service
+
+        return self._orchestrator
+
+    @staticmethod
+    def _coerce_completion_response(
+        result: Any,
+        *,
+        default_model: Optional[str],
+    ) -> Any:
+        """Normalize service-layer chat results to CompletionResponse."""
+        from victor.providers.base import CompletionResponse
+
+        if isinstance(result, CompletionResponse):
+            return result
+
+        return CompletionResponse(
+            content=str(result),
+            model=default_model,
+            tool_calls=[],
+            usage=None,
+            stop_reason="stop",
+        )
+
+    def _notify_state_observers_if_changed(self, previous_stage: Any) -> Any:
+        """Notify observers when the observable stage changes."""
+        new_stage = self._state.stage
+        if new_stage == previous_stage:
+            return previous_stage
+
+        old_state = State(self._orchestrator)
+        old_state._orchestrator = self._orchestrator
+        for observer in self._state_observers:
+            try:
+                observer(old_state, self._state)
+            except Exception:
+                logger.warning("State observer error", exc_info=True)
+        return new_stage
+
     async def run(
         self,
         prompt: str,
@@ -427,7 +509,6 @@ class Agent:
             )
         """
         from victor.framework._internal import format_context_message
-        from victor.providers.base import CompletionResponse
 
         # Apply context to prompt for one-shot runs.
         if context:
@@ -436,55 +517,11 @@ class Agent:
                 prompt = f"{context_message}\n\n{prompt}"
 
         try:
-            # Service-layer alignment: Use ChatService instead of orchestrator directly
-            # This follows the service+state-pass architecture and ensures Phase 2
-            # coordinator batching works consistently.
-            from victor.runtime.context import ServiceAccessor
-            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
-
-            # Feature flag to control service layer usage (opt-in for gradual rollout)
-            use_service_layer = is_feature_enabled(FeatureFlag.USE_SERVICE_LAYER_FOR_AGENT)
-
-            response: CompletionResponse
-            if use_service_layer:
-                accessor = ServiceAccessor(_container=self._orchestrator._container)
-                chat_service = accessor.chat
-
-                if chat_service is not None:
-                    # Use service layer (preferred path)
-                    from victor.providers.base import CompletionResponse as CR
-
-                    result = await chat_service.chat(prompt)
-
-                    # ChatService returns CompletionResponse, ensure compatibility
-                    if isinstance(result, CR):
-                        response = result
-                    else:
-                        # If service returns something else, wrap it
-                        response = CR(
-                            content=str(result),
-                            model=getattr(self._orchestrator, "model", "unknown"),
-                            tool_calls=[],
-                            usage=None,
-                            stop_reason="stop",
-                        )
-                else:
-                    # Service not available, fallback to orchestrator
-                    response = await self._orchestrator.chat(prompt)
-            else:
-                # Feature flag disabled, use orchestrator directly (legacy path)
-                import warnings
-
-                warnings.warn(
-                    "Agent.run() is using direct orchestrator access instead of ChatService. "
-                    "This legacy path bypasses the service layer and will be removed in a future version. "
-                    "Enable the USE_SERVICE_LAYER_FOR_AGENT feature flag to use the service layer: "
-                    "export VICTOR_USE_SERVICE_LAYER_FOR_AGENT=true or set "
-                    "features.use_service_layer_for_agent: true in ~/.victor/features.yaml",
-                    DeprecationWarning,
-                    stacklevel=3,
-                )
-                response = await self._orchestrator.chat(prompt)
+            chat_runtime = self._resolve_chat_runtime()
+            response = self._coerce_completion_response(
+                await chat_runtime.chat(prompt),
+                default_model=getattr(self._orchestrator, "model", "unknown"),
+            )
 
             return TaskResult(
                 content=response.content or "",
@@ -545,10 +582,7 @@ class Agent:
                 elif event.type == EventType.CONTENT:
                     print(event.content, end="", flush=True)
         """
-        from victor.framework._internal import (
-            format_context_message,
-            stream_with_events,
-        )
+        from victor.framework._internal import format_context_message, stream_with_events
 
         # Apply context to conversation if provided
         if context:
@@ -560,66 +594,10 @@ class Agent:
         # Track state for observers
         old_stage = self._state.stage
 
-        # Service-layer alignment: Use ChatService instead of stream_with_events
-        # This follows the service+state-pass architecture and ensures Phase 2
-        # coordinator batching works consistently.
-        from victor.runtime.context import ServiceAccessor
-        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
-        from victor.framework.events import EventType
-
-        # Feature flag to control service layer usage (opt-in for gradual rollout)
-        use_service_layer = is_feature_enabled(FeatureFlag.USE_SERVICE_LAYER_FOR_AGENT)
-
-        if use_service_layer:
-            accessor = ServiceAccessor(_container=self._orchestrator._container)
-            chat_service = accessor.chat
-
-            if chat_service is not None and hasattr(chat_service, "stream_chat"):
-                # Use service layer (preferred path)
-                async for chunk in chat_service.stream_chat(prompt):
-                    # Convert StreamChunk to AgentExecutionEvent
-                    event = AgentExecutionEvent(
-                        type=EventType.CONTENT,
-                        content=chunk.content if chunk.content else "",
-                        metadata={
-                            "model": getattr(chunk, "model", None),
-                            "finish_reason": getattr(chunk, "finish_reason", None),
-                            "is_complete": getattr(chunk, "is_complete", False),
-                        },
-                    )
-
-                    # Check for state changes and notify observers
-                    new_stage = self._state.stage
-                    if new_stage != old_stage:
-                        old_state = State(self._orchestrator)
-                        old_state._orchestrator = self._orchestrator
-                        for observer in self._state_observers:
-                            try:
-                                observer(old_state, self._state)
-                            except Exception:
-                                logger.warning("State observer error", exc_info=True)
-                        old_stage = new_stage
-
-                    yield event
-            else:
-                # Service not available, fallback to orchestrator
-                async for event in stream_with_events(self._orchestrator, prompt):
-                    yield event
-        else:
-            # Feature flag disabled, use legacy path
-            import warnings
-
-            warnings.warn(
-                "Agent.stream() is using direct orchestrator access instead of ChatService. "
-                "This legacy path bypasses the service layer and will be removed in a future version. "
-                "Enable the USE_SERVICE_LAYER_FOR_AGENT feature flag to use the service layer: "
-                "export VICTOR_USE_SERVICE_LAYER_FOR_AGENT=true or set "
-                "features.use_service_layer_for_agent: true in ~/.victor/features.yaml",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-            async for event in stream_with_events(self._orchestrator, prompt):
-                yield event
+        chat_runtime = self._resolve_chat_runtime()
+        async for event in stream_with_events(chat_runtime, prompt):
+            old_stage = self._notify_state_observers_if_changed(old_stage)
+            yield event
 
     def chat(self, prompt: str) -> "ChatSession":
         """Start an interactive chat session.

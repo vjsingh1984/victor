@@ -78,6 +78,7 @@ class AgentFactory:
         enable_observability: bool = True,
         tool_budget: Optional[int] = None,
         max_iterations: Optional[int] = None,
+        profile_overrides: Optional[Dict[str, Any]] = None,
     ) -> None:
         self._settings = settings
         self._profile = profile
@@ -90,6 +91,7 @@ class AgentFactory:
         self._enable_observability = enable_observability
         self._tool_budget = tool_budget
         self._max_iterations = max_iterations
+        self._profile_overrides = dict(profile_overrides or {})
         self._orchestrator: Optional["AgentOrchestrator"] = None
 
         # Store original vertical name for error reporting
@@ -105,6 +107,7 @@ class AgentFactory:
             and self._model is None
             and self._temperature is None
             and self._max_tokens is None
+            and not self._profile_overrides
         ):
             return
 
@@ -146,6 +149,7 @@ class AgentFactory:
                 ),
             }
         )
+        profile_payload.update(self._profile_overrides)
 
         profiles[self._profile] = ProfileConfig(**profile_payload)
         self._settings.load_profiles = lambda: profiles

@@ -86,20 +86,30 @@ class _StreamEvent:
 
     def __init__(
         self,
-        event_type: str,
+        event_type: Any,
         *,
         content: Optional[str] = None,
         tool_name: Optional[str] = None,
+        arguments: Optional[Dict[str, Any]] = None,
+        result: Optional[Any] = None,
+        success: bool = True,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        self._event_type = event_type
+        self._type = event_type
         self._content = content
         self._tool_name = tool_name
+        self._arguments = arguments or {}
+        self._result = result
+        self._success = success
         self._metadata = metadata or {}
 
     @property
     def event_type(self) -> str:
-        return self._event_type
+        return getattr(self._type, "value", str(self._type))
+
+    @property
+    def type(self) -> Any:
+        return self._type
 
     @property
     def content(self) -> Optional[str]:
@@ -108,6 +118,18 @@ class _StreamEvent:
     @property
     def tool_name(self) -> Optional[str]:
         return self._tool_name
+
+    @property
+    def arguments(self) -> Dict[str, Any]:
+        return self._arguments
+
+    @property
+    def result(self) -> Any:
+        return self._result
+
+    @property
+    def success(self) -> bool:
+        return self._success
 
     @property
     def metadata(self) -> Dict[str, Any]:
@@ -187,10 +209,20 @@ class VictorClient:
         # Apply SessionConfig overrides to settings (ONLY place where settings is mutated)
         self._config.apply_to_settings(settings)
 
-        # Extract provider/model from settings (used only if no profile specified)
-        provider_settings = getattr(settings, "provider", None)
-        provider_name = getattr(provider_settings, "default_provider", None)
-        model_name = getattr(provider_settings, "default_model", None)
+        provider_override = getattr(self._config, "provider_override", None)
+        provider_name = None
+        model_name = None
+
+        if provider_override is not None:
+            provider_name = provider_override.provider
+            model_name = provider_override.model
+
+        if self._config.agent_profile is None:
+            provider_settings = getattr(settings, "provider", None)
+            if provider_name is None:
+                provider_name = getattr(provider_settings, "default_provider", None)
+            if model_name is None:
+                model_name = getattr(provider_settings, "default_model", None)
 
         # Create agent with SessionConfig (including agent_profile if specified)
         self._agent = await Agent.create(
@@ -317,47 +349,52 @@ class VictorClient:
         async for event in agent.stream(message):
             if event.type == EventType.CONTENT:
                 yield _StreamEvent(
-                    "content",
+                    EventType.CONTENT,
                     content=event.content,
                     metadata=getattr(event, "metadata", {}),
                 )
             elif event.type == EventType.THINKING:
                 yield _StreamEvent(
-                    "thinking",
+                    EventType.THINKING,
                     content=event.content,
                     metadata=getattr(event, "metadata", {}),
                 )
             elif event.type == EventType.TOOL_CALL:
                 yield _StreamEvent(
-                    "tool_call",
+                    EventType.TOOL_CALL,
                     tool_name=getattr(event, "tool_name", None),
                     content=str(getattr(event, "arguments", "")),
+                    arguments=getattr(event, "arguments", {}),
                     metadata={
                         **getattr(event, "metadata", {}),
                         "arguments": getattr(event, "arguments", {}),
                     },
                 )
             elif event.type == EventType.TOOL_RESULT:
+                result_payload = {
+                    **getattr(event, "metadata", {}),
+                    "result": getattr(event, "result", None),
+                    "success": getattr(event, "success", True),
+                    "arguments": getattr(event, "arguments", {}),
+                }
                 yield _StreamEvent(
-                    "tool_result",
+                    EventType.TOOL_RESULT,
                     tool_name=getattr(event, "tool_name", None),
                     content=getattr(event, "result", None) or getattr(event, "content", None),
-                    metadata={
-                        **getattr(event, "metadata", {}),
-                        "result": getattr(event, "result", None),
-                        "success": getattr(event, "success", True),
-                        "arguments": getattr(event, "arguments", {}),
-                    },
+                    arguments=getattr(event, "arguments", {}),
+                    result=result_payload,
+                    success=getattr(event, "success", True),
+                    metadata=result_payload,
                 )
             elif event.type == EventType.ERROR:
                 yield _StreamEvent(
-                    "error",
+                    EventType.ERROR,
                     content=getattr(event, "content", str(event)),
                     metadata=getattr(event, "metadata", {}),
                 )
             else:
                 yield _StreamEvent(
-                    getattr(event.type, "value", str(event.type)),
+                    event.type,
                     content=getattr(event, "content", None),
                     metadata={"raw_event": event},
                 )
@@ -382,11 +419,12 @@ class VictorClient:
                 continue
 
             if event.event_type == "tool_result":
+                result_payload = event.result if isinstance(event.result, dict) else metadata
                 metadata["tool_result"] = {
                     "name": event.tool_name or "unknown",
-                    "result": event.content or metadata.get("result", ""),
-                    "success": metadata.get("success", True),
-                    "arguments": metadata.get("arguments", {}),
+                    "result": event.content or result_payload.get("result", ""),
+                    "success": result_payload.get("success", True),
+                    "arguments": result_payload.get("arguments", {}),
                 }
                 yield _RenderChunk(metadata=metadata)
                 continue

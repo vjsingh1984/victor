@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 from pathlib import Path
 
 import pytest
@@ -2641,9 +2641,10 @@ class TestChatSyncBridge:
             enable_observability=True,
             enable_planning=None,
             planning_model=None,
-            legacy_mode=False,
             show_reasoning=False,
+            session_config=ANY,
         )
+        assert isinstance(mock_async.call_args.kwargs["session_config"], chat_cmd.SessionConfig)
         mock_run_sync.assert_called_once_with(coro)
 
     def test_chat_interactive_uses_shared_sync_bridge(self) -> None:
@@ -2682,12 +2683,42 @@ class TestChatSyncBridge:
             enable_observability=True,
             enable_planning=None,
             planning_model=None,
-            legacy_mode=False,
             use_tui=False,
             resume_session_id="session-1",
             show_reasoning=False,
+            session_config=ANY,
         )
+        assert isinstance(mock_async.call_args.kwargs["session_config"], chat_cmd.SessionConfig)
         mock_run_sync.assert_called_once_with(coro)
+
+    def test_chat_legacy_mode_warns_but_does_not_reintroduce_runtime_branch(self) -> None:
+        settings = MagicMock()
+        formatter = MagicMock()
+        coro = object()
+        mock_async = Mock(return_value=coro)
+
+        with (
+            patch.object(chat_cmd, "setup_logging"),
+            patch.object(chat_cmd, "setup_safety_confirmation"),
+            patch.object(chat_cmd, "create_formatter", return_value=formatter),
+            patch.object(chat_cmd.InputReader, "read_message", return_value="hello"),
+            patch.object(chat_cmd, "load_settings", return_value=settings),
+            patch(
+                "victor.config.validation.validate_configuration",
+                return_value=SimpleNamespace(is_valid=True),
+            ),
+            patch.object(chat_cmd, "run_oneshot", mock_async),
+            patch.object(chat_cmd, "run_sync", return_value=None),
+            patch.object(chat_cmd.console, "print") as mock_print,
+        ):
+            _call_chat_command(message_opt="hello", legacy_mode=True)
+
+        forwarded_kwargs = mock_async.call_args.kwargs
+        assert "legacy_mode" not in forwarded_kwargs
+        assert any(
+            "--legacy is deprecated and ignored" in str(call.args[0])
+            for call in mock_print.call_args_list
+        )
 
     def test_default_interactive_uses_shared_sync_bridge(self) -> None:
         settings = MagicMock()

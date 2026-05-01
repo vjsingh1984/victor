@@ -41,6 +41,7 @@ from victor.config.settings import load_settings
 # Chain: orchestrator → code_correction_middleware → evaluation → agent_adapter → orchestrator
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.framework.session_config import SessionConfig
 else:
     # Deferred import at runtime - only when actually needed
     AgentOrchestrator = None  # Will be imported lazily in from_profile()
@@ -1023,6 +1024,29 @@ class VictorAgentAdapter:
         )
 
         return cls(orchestrator, config)
+
+    @classmethod
+    async def create_from_session_config(
+        cls,
+        session_config: "SessionConfig",
+        *,
+        profile: Optional[str] = None,
+        config: Optional[AdapterConfig] = None,
+        enable_observability: bool = True,
+    ) -> "VictorAgentAdapter":
+        """Create an adapter through the public framework Agent API.
+
+        This is the preferred path for CLI/runtime callers that already have a
+        normalized SessionConfig and want framework-owned provider/session setup.
+        """
+        from victor.framework.agent import Agent
+
+        agent = await Agent.create(
+            profile=profile or session_config.agent_profile,
+            session_config=session_config,
+            enable_observability=enable_observability,
+        )
+        return cls(agent.get_orchestrator(), config)
 
 
 def create_victor_agent_callback(

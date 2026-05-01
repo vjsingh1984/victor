@@ -26,6 +26,7 @@ These tests cover:
 
 import pytest
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Set, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
@@ -54,10 +55,10 @@ def mock_orchestrator():
     orchestrator.model = "test-model"
     orchestrator.messages = []
     orchestrator.reset_conversation = MagicMock()
-    orchestrator.stream_chat = AsyncMock(return_value=AsyncMock())
 
     # NEW: Add chat method for direct sync execution (Phase 2 refactoring)
     from victor.providers.base import CompletionResponse
+    from victor.providers.base import StreamChunk
 
     def mock_chat_response(content="Hello World", tool_calls=None):
         """Create a mock CompletionResponse."""
@@ -71,6 +72,17 @@ def mock_orchestrator():
         )
 
     orchestrator.chat = AsyncMock(return_value=mock_chat_response())
+
+    async def mock_stream_chat(_prompt):
+        yield StreamChunk(content="Test", is_final=False)
+        yield StreamChunk(content="", is_final=True, stop_reason="stop")
+
+    orchestrator.stream_chat = mock_stream_chat
+    orchestrator._chat_service = SimpleNamespace(
+        chat=orchestrator.chat,
+        stream_chat=orchestrator.stream_chat,
+    )
+    orchestrator._container = None
 
     # Add protocol methods for State wrapper
     orchestrator.get_stage = MagicMock(return_value=MagicMock(value="INITIAL"))
@@ -131,23 +143,10 @@ def mock_stream_chunk():
 
 @pytest.fixture(autouse=True)
 def reset_feature_flags_for_agent_tests():
-    """Reset feature flags and disable service layer for Agent tests.
-
-    These tests test Agent behavior, not service layer integration.
-    Disabling USE_SERVICE_LAYER_FOR_AGENT ensures tests continue to work
-    with the legacy path (Agent → orchestrator.chat()) without needing
-    to mock the entire service layer.
-    """
-    from victor.core.feature_flags import (
-        reset_feature_flag_manager,
-        FeatureFlag,
-        get_feature_flag_manager,
-    )
+    """Reset feature flags for isolation between Agent tests."""
+    from victor.core.feature_flags import reset_feature_flag_manager
 
     reset_feature_flag_manager()
-    # Disable service layer to test legacy Agent behavior
-    manager = get_feature_flag_manager()
-    manager.disable(FeatureFlag.USE_SERVICE_LAYER_FOR_AGENT)
 
     yield
 
@@ -250,7 +249,7 @@ class TestAgentRun:
 
     @pytest.mark.asyncio
     async def test_run_basic(self, mock_orchestrator):
-        """run should call orchestrator.chat and return TaskResult."""
+        """run should call the service-backed chat runtime and return TaskResult."""
         from victor.framework.agent import Agent
 
         agent = Agent(mock_orchestrator)
@@ -331,7 +330,6 @@ class TestAgentRun:
     async def test_run_with_context(self, mock_orchestrator):
         """run should format context into prompt."""
         from victor.framework.agent import Agent
-        from victor.providers.base import CompletionResponse
 
         agent = Agent(mock_orchestrator)
         context = {"file": "test.py", "error": "SyntaxError"}
@@ -347,6 +345,19 @@ class TestAgentRun:
 
         assert result.success is True
 
+    @pytest.mark.asyncio
+    async def test_run_falls_back_to_orchestrator_without_chat_service(self, mock_orchestrator):
+        """run should preserve compatibility for bare orchestrator wrappers."""
+        from victor.framework.agent import Agent
+
+        mock_orchestrator._chat_service = None
+        agent = Agent(mock_orchestrator)
+
+        result = await agent.run("test prompt")
+
+        mock_orchestrator.chat.assert_called_once_with("test prompt")
+        assert result.success is True
+
 
 # =============================================================================
 # Agent.stream Tests (lines 462-490)
@@ -358,12 +369,13 @@ class TestAgentStream:
 
     @pytest.mark.asyncio
     async def test_stream_basic(self, mock_orchestrator):
-        """stream should yield events from orchestrator."""
+        """stream should yield framework events from the service-backed runtime."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
 
         # Mock the internal stream function
-        async def mock_stream_with_events(orchestrator, prompt):
+        async def mock_stream_with_events(runtime, prompt):
+            assert runtime is mock_orchestrator._chat_service
             yield AgentExecutionEvent(type=EventType.STREAM_START)
             yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
             yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
@@ -386,10 +398,11 @@ class TestAgentStream:
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
 
-        captured_prompt = {}
+        captured = {}
 
-        async def mock_stream_with_events(orchestrator, prompt):
-            captured_prompt["prompt"] = prompt
+        async def mock_stream_with_events(runtime, prompt):
+            captured["runtime"] = runtime
+            captured["prompt"] = prompt
             yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
@@ -399,8 +412,9 @@ class TestAgentStream:
                 pass
 
         # Context should be prepended to prompt
-        assert "File: test.py" in captured_prompt["prompt"]
-        assert "fix bug" in captured_prompt["prompt"]
+        assert captured["runtime"] is mock_orchestrator._chat_service
+        assert "File: test.py" in captured["prompt"]
+        assert "fix bug" in captured["prompt"]
 
     @pytest.mark.asyncio
     async def test_stream_notifies_state_observers(self, mock_orchestrator):
@@ -479,6 +493,27 @@ class TestAgentStream:
 
         # All events should be yielded despite observer error
         assert len(events) == 3
+
+    @pytest.mark.asyncio
+    async def test_stream_falls_back_to_orchestrator_without_chat_service(self, mock_orchestrator):
+        """stream should preserve compatibility for bare orchestrator wrappers."""
+        from victor.framework.agent import Agent
+        from victor.framework.events import AgentExecutionEvent, EventType
+
+        mock_orchestrator._chat_service = None
+        captured = {}
+
+        async def mock_stream_with_events(runtime, prompt):
+            captured["runtime"] = runtime
+            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
+
+        agent = Agent(mock_orchestrator)
+
+        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
+            async for _ in agent.stream("test"):
+                pass
+
+        assert captured["runtime"] is mock_orchestrator
 
 
 # =============================================================================
@@ -1515,6 +1550,92 @@ class TestAgentCreate:
         ):
             with pytest.raises(AgentError, match="Configuration invalid"):
                 await Agent.create(provider="anthropic")
+
+    @pytest.mark.asyncio
+    async def test_create_forwards_session_provider_overrides_into_factory(self):
+        """create should route explicit session overrides through AgentFactory."""
+        from victor.framework.agent import Agent
+        from victor.framework.session_config import SessionConfig
+
+        mock_orchestrator = AgentOrchestrator()
+        settings = MagicMock()
+        settings.provider = SimpleNamespace(
+            default_provider="ollama",
+            default_model="qwen3.5:27b-q4_K_M",
+            ollama_base_url="http://localhost:11434",
+        )
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_orchestrator)
+
+        config = SessionConfig.from_cli_flags(
+            agent_profile="zai-coding",
+            provider="zai",
+            model="glm-4.7",
+            auth_mode="oauth",
+            coding_plan=True,
+        )
+
+        with (
+            patch("victor.config.settings.load_settings", return_value=settings),
+            patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory) as factory_cls,
+        ):
+            agent = await Agent.create(session_config=config)
+
+        assert agent._orchestrator is mock_orchestrator
+        factory_cls.assert_called_once_with(
+            settings=settings,
+            profile="zai-coding",
+            provider="zai",
+            model="glm-4.7",
+            temperature=0.7,
+            max_tokens=4096,
+            vertical=None,
+            thinking=False,
+            session_id=None,
+            enable_observability=True,
+            profile_overrides={"auth_mode": "oauth", "coding_plan": True},
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_profile_timeout_override_does_not_force_default_provider(self):
+        """Profile-scoped runtime overrides must not synthesize a provider override."""
+        from victor.framework.agent import Agent
+        from victor.framework.session_config import SessionConfig
+
+        mock_orchestrator = AgentOrchestrator()
+        settings = MagicMock()
+        settings.provider = SimpleNamespace(
+            default_provider="ollama",
+            default_model="qwen3.5:27b-q4_K_M",
+        )
+        mock_factory = MagicMock()
+        mock_factory.create = AsyncMock(return_value=mock_orchestrator)
+
+        config = SessionConfig.from_cli_flags(
+            agent_profile="zai-coding",
+            provider_timeout=180,
+        )
+
+        with (
+            patch("victor.config.settings.load_settings", return_value=settings),
+            patch("victor.framework.agent_factory.AgentFactory", return_value=mock_factory) as factory_cls,
+        ):
+            agent = await Agent.create(session_config=config)
+
+        assert agent._orchestrator is mock_orchestrator
+        factory_cls.assert_called_once_with(
+            settings=settings,
+            profile="zai-coding",
+            provider=None,
+            model=None,
+            temperature=0.7,
+            max_tokens=4096,
+            vertical=None,
+            thinking=False,
+            session_id=None,
+            enable_observability=True,
+            profile_overrides={"timeout": 180},
+        )
 
 
 # =============================================================================
