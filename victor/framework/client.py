@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from victor.framework.agent import Agent
     from victor.framework.agent_components import AgentSession
     from victor.runtime.context import RuntimeExecutionContext
+    from victor.runtime.context import ResolvedRuntimeServices
     from victor.core.container import ServiceContainer
 
 logger = logging.getLogger(__name__)
@@ -513,6 +514,19 @@ class VictorClient:
     # Conversation Management
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _resolve_runtime_services(self) -> "ResolvedRuntimeServices":
+        """Resolve the canonical runtime service bundle for client helpers."""
+        from victor.runtime.context import ResolvedRuntimeServices, resolve_runtime_services
+
+        if self._context is None:
+            return ResolvedRuntimeServices()
+
+        runtime_owner = None
+        if self._agent is not None and hasattr(self._agent, "get_orchestrator"):
+            runtime_owner = self._agent.get_orchestrator()
+
+        return resolve_runtime_services(runtime_owner, self._context)
+
     async def reset_conversation(self) -> None:
         """Reset conversation history and state.
 
@@ -525,8 +539,9 @@ class VictorClient:
         if not self._initialized or not self._context:
             raise RuntimeError("VictorClient not initialized. Call initialize() first.")
 
-        if self._context.services and self._context.services.chat:
-            await self._context.services.chat.reset_conversation()
+        services = self._resolve_runtime_services()
+        if services.chat is not None:
+            await services.chat.reset_conversation()
         else:
             logger.warning("ChatService not available for conversation reset")
 
@@ -550,8 +565,9 @@ class VictorClient:
         if not self._initialized or not self._context:
             raise RuntimeError("VictorClient not initialized. Call initialize() first.")
 
-        if self._context.services and self._context.services.context:
-            return await self._context.services.context.get_messages(limit=limit, role=role)
+        services = self._resolve_runtime_services()
+        if services.context is not None:
+            return await services.context.get_messages(limit=limit, role=role)
         else:
             logger.warning("ContextService not available for get_messages")
             return []
