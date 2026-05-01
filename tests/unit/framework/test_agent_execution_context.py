@@ -9,6 +9,7 @@ from victor.core.shared_types import ConversationStage
 from victor.framework.agent import Agent
 from victor.framework.agent_components import AgentSession
 from victor.providers.base import CompletionResponse
+from victor.runtime.context import ResolvedRuntimeServices
 
 
 class AgentOrchestrator:
@@ -33,6 +34,7 @@ def _make_orchestrator(
             model="test-model",
         )
     )
+    orchestrator.reset_conversation = MagicMock()
     orchestrator.get_stage = MagicMock(return_value=ConversationStage.INITIAL)
     return orchestrator
 
@@ -121,6 +123,10 @@ async def test_agent_session_initialize_prefers_execution_context_services():
         {"role": "user", "content": "test prompt"},
         {"role": "assistant", "content": "runtime service response"},
     ]
+    assert session._runtime_services == ResolvedRuntimeServices(
+        chat=runtime_chat_service,
+        session=session_service,
+    )
 
 
 @pytest.mark.asyncio
@@ -152,3 +158,39 @@ async def test_agent_session_stream_tracks_explicit_history():
         {"role": "user", "content": "stream prompt"},
         {"role": "assistant", "content": "runtime stream"},
     ]
+
+
+@pytest.mark.asyncio
+async def test_agent_session_reset_clears_runtime_service_bundle():
+    runtime_chat_service = SimpleNamespace(
+        chat=AsyncMock(
+            return_value=CompletionResponse(
+                content="runtime service response",
+                role="assistant",
+                model="runtime-model",
+            )
+        ),
+        reset_conversation=MagicMock(),
+    )
+    session_service = SimpleNamespace(
+        create_session=AsyncMock(return_value="session-123"),
+        close_session=AsyncMock(return_value=True),
+    )
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(chat=runtime_chat_service, session=session_service)
+    )
+    orchestrator = _make_orchestrator(execution_context=execution_context)
+
+    agent = Agent.from_orchestrator(orchestrator)
+    session = AgentSession(agent)
+
+    await session.initialize()
+    assert session._runtime_services == ResolvedRuntimeServices(
+        chat=runtime_chat_service,
+        session=session_service,
+    )
+
+    await session.reset()
+
+    assert session._runtime_services is None
+    session_service.close_session.assert_awaited_once_with("session-123")

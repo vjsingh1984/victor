@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -56,6 +56,7 @@ if TYPE_CHECKING:
         EventRegistryService,
         ToolConfiguratorService,
     )
+    from victor.runtime.context import ResolvedRuntimeServices
     from victor.observability.integration import ObservabilityIntegration
     from victor.core.events import ObservabilityBus
     from victor.core.verticals.base import VerticalBase, VerticalConfig
@@ -977,8 +978,7 @@ class AgentSession:
         self._turns: List[Dict[str, Any]] = []
         self._runtime_session_started = False
         self._runtime_session_closed = False
-        self._session_service: Optional[Any] = None
-        self._chat_service: Optional[Any] = None
+        self._runtime_services: Optional["ResolvedRuntimeServices"] = None
 
         # Phase 8.3: Lifecycle management
         self._hooks = hooks or SessionLifecycleHooks()
@@ -1330,10 +1330,11 @@ class AgentSession:
         if (
             self._runtime_session_started
             and not self._runtime_session_closed
-            and self._session_service is not None
+            and self._runtime_services is not None
+            and self._runtime_services.session is not None
         ):
             try:
-                await self._session_service.close_session(self._context.session_id)
+                await self._runtime_services.session.close_session(self._context.session_id)
                 self._runtime_session_closed = True
             except Exception as e:
                 logger.debug(f"Error closing session service runtime: {e}")
@@ -1380,8 +1381,7 @@ class AgentSession:
         self._state = SessionState.IDLE
         self._runtime_session_started = False
         self._runtime_session_closed = False
-        self._session_service = None
-        self._chat_service = None
+        self._runtime_services = None
 
         # Phase 8.3: Recreate scoped container if container provided
         if self._container is not None:
@@ -1411,38 +1411,37 @@ class AgentSession:
         self._history.append({"role": "user", "content": prompt})
         self._history.append({"role": "assistant", "content": response})
 
-    def _resolve_runtime_services(self) -> tuple[Optional[Any], Optional[Any]]:
-        """Resolve canonical chat/session services through the shared runtime helper."""
+    def _resolve_runtime_services(self) -> "ResolvedRuntimeServices":
+        """Resolve the canonical runtime service bundle through the shared helper."""
         from victor.runtime.context import resolve_runtime_services
+        from victor.runtime.context import ResolvedRuntimeServices
 
         orchestrator = getattr(self._agent, "_orchestrator", None)
         if orchestrator is None:
-            return None, None
+            return ResolvedRuntimeServices()
 
-        services = resolve_runtime_services(
+        return resolve_runtime_services(
             orchestrator,
             getattr(self._agent, "execution_context", None),
         )
-        return services.chat, services.session
 
     async def _ensure_runtime_session(self) -> None:
         """Create the canonical runtime session once and reset conversation state."""
         if self._runtime_session_started:
             return
 
-        self._chat_service, self._session_service = self._resolve_runtime_services()
+        self._runtime_services = self._resolve_runtime_services()
+        session_service = self._runtime_services.session
 
-        if self._session_service is not None:
+        if session_service is not None:
             metadata = dict(self._context.metadata)
             try:
-                self._context.session_id = await self._session_service.create_session(
-                    metadata=metadata
-                )
+                self._context.session_id = await session_service.create_session(metadata=metadata)
             except Exception as e:
                 logger.debug(f"Could not create session service runtime: {e}")
-                self._session_service = None
+                self._runtime_services = replace(self._runtime_services, session=None)
 
-        reset_target = self._chat_service
+        reset_target = self._runtime_services.chat
         if reset_target is not None and hasattr(reset_target, "reset_conversation"):
             try:
                 reset_target.reset_conversation()
