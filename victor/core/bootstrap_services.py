@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Service bootstrap for SOLID-refactored architecture.
+"""Canonical agent-service bootstrap.
 
-This module provides factory functions to bootstrap the new service-oriented
-architecture when feature flags are enabled. It creates and wires up all the
-new services (ChatService, ToolService, etc.) and registers them with the
-ServiceContainer.
+This module bootstraps the service layer used by the orchestrator runtime.
+It creates and wires the canonical chat/tool/context/provider/recovery/session
+services and registers them with the :class:`ServiceContainer`.
 
-Usage:
-    container = ServiceContainer()
-    bootstrap_new_services(container)
+These services are mandatory in the live runtime. Optional decision-service
+registration still consults feature flags, but the core service graph does not.
 """
 
 from __future__ import annotations
@@ -45,6 +43,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _get_feature_flag_manager_optional() -> Any:
+    """Return the feature-flag manager when available.
+
+    Service bootstrap is unconditional. Feature flags are only consulted for the
+    optional decision-service branch, so missing flag infrastructure must not
+    block core service registration.
+    """
+    try:
+        from victor.core.feature_flags import get_feature_flag_manager
+    except ImportError:
+        logger.debug("Feature flags not available; skipping optional decision-service bootstrap")
+        return None
+    return get_feature_flag_manager()
+
+
 def bootstrap_new_services(
     container: ServiceContainer,
     conversation_controller: "ConversationController",
@@ -52,12 +65,12 @@ def bootstrap_new_services(
     tool_selector: Optional[Any] = None,
     tool_executor: Optional[Any] = None,
 ) -> None:
-    """Bootstrap all new services with the container.
+    """Bootstrap all services with the container.
 
-    This function creates and registers all the new service-oriented
+    This function creates and registers all the service-oriented
     implementations (ChatService, ToolService, etc.). Services are
-    always created for availability, but the orchestrator only uses
-    them when USE_SERVICE_LAYER flag is enabled.
+    always created and the orchestrator uses them by default following
+    the service+state-pass architecture.
 
     Args:
         container: Service container to register services with
@@ -74,15 +87,6 @@ def bootstrap_new_services(
             streaming_coordinator=my_streaming,
         )
     """
-    # Import feature flags first
-    try:
-        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
-    except ImportError:
-        logger.warning("Feature flags not available, skipping service bootstrap")
-        return
-
-    feature_flags = get_feature_flag_manager()
-
     # Import service protocols and implementations
     from victor.agent.services.protocols import (
         ChatServiceProtocol,
@@ -167,21 +171,27 @@ def bootstrap_new_services(
     # fall back to single edge, then cloud
     decision_service = None
 
-    if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
-        # Try tiered service first (routes different DecisionTypes to different tiers)
-        decision_service = _create_tiered_decision_service()
-        if decision_service is not None:
-            logger.info("Bootstrapped TieredDecisionService (edge/balanced/performance)")
-        else:
-            # Fall back to single edge model
-            decision_service = _create_edge_decision_service()
-            if decision_service is not None:
-                logger.info("Bootstrapped LLMDecisionService with edge model")
+    feature_flags = _get_feature_flag_manager_optional()
+    if feature_flags is not None:
+        from victor.core.feature_flags import FeatureFlag
 
-    if decision_service is None and feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
-        decision_service = _create_llm_decision_service(container)
-        if decision_service is not None:
-            logger.info("Bootstrapped LLMDecisionService with cloud provider")
+        if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
+            # Try tiered service first (routes different DecisionTypes to different tiers)
+            decision_service = _create_tiered_decision_service()
+            if decision_service is not None:
+                logger.info("Bootstrapped TieredDecisionService (edge/balanced/performance)")
+            else:
+                # Fall back to single edge model
+                decision_service = _create_edge_decision_service()
+                if decision_service is not None:
+                    logger.info("Bootstrapped LLMDecisionService with edge model")
+
+        if decision_service is None and feature_flags.is_enabled(
+            FeatureFlag.USE_LLM_DECISION_SERVICE
+        ):
+            decision_service = _create_llm_decision_service(container)
+            if decision_service is not None:
+                logger.info("Bootstrapped LLMDecisionService with cloud provider")
 
     if decision_service is not None:
         from victor.agent.services.protocols.decision_service import (

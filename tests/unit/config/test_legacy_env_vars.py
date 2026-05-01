@@ -87,3 +87,13 @@ class TestLegacyEnvironmentVariables:
 
         assert settings.analytics.analytics_enabled is True
         assert settings.analytics.show_token_count is True
+
+    def test_removed_service_rollout_env_vars_no_longer_map(self, monkeypatch):
+        """Removed service-rollout env vars should not populate nested settings."""
+        monkeypatch.setenv("VICTOR_USE_NEW_CHAT_SERVICE", "true")
+
+        from victor.config.settings import Settings
+
+        settings = Settings()
+
+        assert not hasattr(settings.feature_flags, "use_new_chat_service")

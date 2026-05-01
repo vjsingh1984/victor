@@ -2,7 +2,7 @@
 
 Tests that the orchestrator methods produce the same results whether
 using direct coordinator delegation or service adapter delegation,
-based on the USE_SERVICE_LAYER feature flag.
+through the canonical service-adapter boundary.
 """
 
 from types import SimpleNamespace
@@ -11,38 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.core.feature_flags import FeatureFlag, FeatureFlagConfig, FeatureFlagManager
 from victor.providers.base import CompletionResponse, Message, StreamChunk
-
-
-class TestFeatureFlagIntegration:
-    """Test that the USE_SERVICE_LAYER flag is properly recognized."""
-
-    def test_flag_exists_in_enum(self):
-        assert hasattr(FeatureFlag, "USE_SERVICE_LAYER")
-        assert FeatureFlag.USE_SERVICE_LAYER.value == "use_service_layer"
-
-    def test_flag_env_var_name(self):
-        assert FeatureFlag.USE_SERVICE_LAYER.get_env_var_name() == "VICTOR_USE_SERVICE_LAYER"
-
-    def test_flag_enabled_by_default(self):
-        manager = FeatureFlagManager(FeatureFlagConfig())
-        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is True
-
-    def test_flag_enabled_via_env(self, monkeypatch):
-        monkeypatch.setenv("VICTOR_USE_SERVICE_LAYER", "true")
-        manager = FeatureFlagManager(FeatureFlagConfig())
-        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is True
-
-    def test_flag_disabled_via_env(self, monkeypatch):
-        monkeypatch.setenv("VICTOR_USE_SERVICE_LAYER", "false")
-        manager = FeatureFlagManager(FeatureFlagConfig())
-        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is False
-
-    def test_flag_runtime_enable(self):
-        manager = FeatureFlagManager(FeatureFlagConfig())
-        manager.enable(FeatureFlag.USE_SERVICE_LAYER)
-        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is True
 
 
 class TestAdapterImports:

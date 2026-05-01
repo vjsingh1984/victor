@@ -878,12 +878,6 @@ class Settings(BaseSettings):
             # Context Configuration
             "max_context_tokens": "context.max_context_tokens",
             # Feature Flags Configuration
-            "use_new_chat_service": "feature_flags.use_new_chat_service",
-            "use_new_tool_service": "feature_flags.use_new_tool_service",
-            "use_new_context_service": "feature_flags.use_new_context_service",
-            "use_new_provider_service": "feature_flags.use_new_provider_service",
-            "use_new_recovery_service": "feature_flags.use_new_recovery_service",
-            "use_new_session_service": "feature_flags.use_new_session_service",
             "use_composition_over_inheritance": "feature_flags.use_composition_over_inheritance",
             "use_strategy_based_tool_registration": "feature_flags.use_strategy_based_tool_registration",
             "use_provider_pooling": "feature_flags.use_provider_pooling",
@@ -1320,19 +1314,15 @@ class Settings(BaseSettings):
     # NOTE: stategraph_copy_on_write_enabled now in workflow nested group
 
     # ==========================================================================
-    # Feature Flags (SOLID Refactoring)
+    # Feature Flags (Architecture Rollout)
     # ==========================================================================
-    # Feature flags for gradual rollout of new architecture components.
-    # These enable zero-downtime migration and instant rollback if issues arise.
+    # Feature flags guard optional architecture and optimization behavior that
+    # still ships behind rollout controls. The canonical agent-service layer is
+    # no longer flag-gated; service bootstrap is unconditional.
     #
-    # All flags default to False (disabled) for backward compatibility.
-    # Enable via environment variables: VICTOR_USE_NEW_CHAT_SERVICE=true
+    # Enable via environment variables such as:
+    #   VICTOR_USE_COMPOSITION_OVER_INHERITANCE=true
     # Or via YAML config: ~/.victor/features.yaml
-    #
-    # Phase 3 - Service Implementation:
-    #   - Extract orchestrator logic into focused services (ChatService, ToolService, etc.)
-    #   - Each service can be independently enabled/disabled
-    #   - Services implement protocols for ISP compliance
     #
     # Phase 4 - Vertical Composition:
     #   - Use composition over inheritance for vertical capabilities
@@ -1341,9 +1331,6 @@ class Settings(BaseSettings):
     # Phase 5 - Tool Registration Strategy:
     #   - Strategy pattern for extensible tool registration
     #   - Enables OCP compliance (add tool types without modifying registry)
-
-    # Phase 3 - Service Implementation flags
-    # NOTE: use_new_* service flags now in feature_flags nested group
 
     # Phase 4 - Vertical Composition flag
     # NOTE: use_composition_over_inheritance now in feature_flags nested group

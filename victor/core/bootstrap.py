@@ -347,9 +347,9 @@ def _phase_orchestrator(container, settings, context):
     _register_orchestrator_services(container, settings)
 
 
-def _phase_solid(container, settings, context):
-    """Phase: SOLID-refactored services (feature-flag gated)."""
-    _register_solid_refactored_services(container, settings)
+def _phase_agent_services(container, settings, context):
+    """Phase: canonical agent-service bootstrap."""
+    _register_agent_services(container, settings)
 
 
 def _phase_workflow(container, settings, context):
@@ -416,7 +416,12 @@ _BOOTSTRAP_PHASES = [
     ),
     BootstrapPhase("signature", _phase_signature, depends_on=("settings",)),
     BootstrapPhase("orchestrator", _phase_orchestrator, depends_on=("capabilities",)),
-    BootstrapPhase("solid", _phase_solid, depends_on=("orchestrator",), optional=True),
+    BootstrapPhase(
+        "agent_services",
+        _phase_agent_services,
+        depends_on=("orchestrator",),
+        optional=True,
+    ),
     BootstrapPhase("workflow", _phase_workflow, depends_on=("settings",)),
     BootstrapPhase("compiler_plugins", _phase_compiler_plugins, depends_on=("settings",)),
     BootstrapPhase("extensions", _phase_extensions, depends_on=("events",)),
@@ -645,7 +650,7 @@ def _register_embedding_services(container: ServiceContainer, settings: Settings
     """
     from victor.storage.embeddings.service import EmbeddingService
 
-    model_name = settings.search.unified_embedding_model
+    model_name = settings.embedding.unified_embedding_model
 
     container.register(
         EmbeddingServiceProtocol,
@@ -1005,23 +1010,13 @@ def _register_orchestrator_services(container: ServiceContainer, settings: Setti
         logger.warning(f"Failed to register orchestrator services: {e}")
 
 
-def _register_solid_refactored_services(container: ServiceContainer, settings: Settings) -> None:
-    """Register SOLID-refactored service architecture (Phase 6).
+def _register_agent_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register the canonical agent-service layer.
 
-    This function bootstraps the new service-oriented architecture when
-    feature flags are enabled. It provides a graceful migration path by:
-
-    1. Checking feature flags before bootstrapping new services
-    2. Only registering services that have their flags enabled
-    3. Maintaining backward compatibility when flags are disabled
-
-    Services registered (when flags enabled):
-    - ChatServiceProtocol: Chat flow coordination
-    - ToolServiceProtocol: Tool operations
-    - ContextServiceProtocol: Context management
-    - ProviderServiceProtocol: Provider management
-    - RecoveryServiceProtocol: Error recovery
-    - SessionServiceProtocol: Session lifecycle
+    The service layer is part of the default runtime shape. Bootstrap occurs
+    whenever the required conversation and streaming collaborators are
+    available; only optional decision-service registration remains feature-flag
+    controlled inside :mod:`victor.core.bootstrap_services`.
 
     Args:
         container: DI container to register services in
@@ -1037,8 +1032,6 @@ def _register_solid_refactored_services(container: ServiceContainer, settings: S
         conversation_controller = container.get_optional(ConversationControllerProtocol)
         streaming_coordinator = container.get_optional(StreamingCoordinatorProtocol)
 
-        # Only bootstrap new services if feature flags are enabled
-        # AND we have the required dependencies
         if conversation_controller is not None and streaming_coordinator is not None:
             from victor.core.bootstrap_services import bootstrap_new_services
 
@@ -1047,13 +1040,12 @@ def _register_solid_refactored_services(container: ServiceContainer, settings: S
                 conversation_controller=conversation_controller,
                 streaming_coordinator=streaming_coordinator,
             )
-            logger.debug("Bootstrapped SOLID-refactored services (feature flag controlled)")
+            logger.debug("Bootstrapped canonical agent services")
         else:
-            logger.debug("Skipping SOLID-refactored services bootstrap (missing dependencies)")
+            logger.debug("Skipping canonical agent-service bootstrap (missing dependencies)")
     except Exception as e:
-        # Don't fail bootstrap if new services can't be registered
-        # The orchestrator will fall back to existing implementation
-        logger.debug(f"Failed to bootstrap SOLID-refactored services: {e}")
+        # Don't fail bootstrap if canonical services can't be registered.
+        logger.debug("Failed to bootstrap canonical agent services: %s", e)
 
 
 def _register_workflow_services(container: ServiceContainer, settings: Settings) -> None:

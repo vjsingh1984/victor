@@ -533,20 +533,6 @@ class TestStreamingExecutorIntegration:
 # =============================================================================
 # Test Helpers
 # =============================================================================
-
-
-def test_chat_service_integration_with_feature_flags():
-    """Test that ChatService works with feature flags."""
-    from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
-
-    # Enable new chat service flag
-    manager = get_feature_flag_manager()
-    manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-
-    # Flag should be enabled
-    assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
-
-
 class TestToolService:
     """Tests for ToolService implementation."""
 

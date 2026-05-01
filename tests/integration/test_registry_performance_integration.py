@@ -155,7 +155,7 @@ class TestFeatureFlagCacheIntegration:
 
         # Check multiple flags
         flags_to_check = [
-            FeatureFlag.USE_SERVICE_LAYER,
+            FeatureFlag.USE_EDGE_MODEL,
             FeatureFlag.USE_LEARNING_FROM_EXECUTION,
             FeatureFlag.USE_EDGE_MODEL,
         ]
@@ -178,7 +178,7 @@ class TestFeatureFlagCacheIntegration:
         cache = FeatureFlagCache(scoped=True)
 
         # Cache some flags
-        cache.is_enabled(FeatureFlag.USE_SERVICE_LAYER)
+        cache.is_enabled(FeatureFlag.USE_EDGE_MODEL)
         cache.is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
 
         stats_before = cache.get_stats()
@@ -195,7 +195,7 @@ class TestFeatureFlagCacheIntegration:
         with FeatureFlagCache.scope(ttl_seconds=60) as cache:
             # Perform some checks
             for _ in range(10):
-                cache.is_enabled(FeatureFlag.USE_SERVICE_LAYER)
+                cache.is_enabled(FeatureFlag.USE_EDGE_MODEL)
 
             stats = cache.get_stats()
             assert stats["total_checks"] == 10
@@ -383,7 +383,7 @@ class TestErrorHandling:
         cache = FeatureFlagCache(scoped=True)
 
         # Use a flag that might not exist
-        result = cache.is_enabled(FeatureFlag.USE_SERVICE_LAYER, default=True)
+        result = cache.is_enabled(FeatureFlag.USE_EDGE_MODEL, default=True)
         assert isinstance(result, bool)
 
 

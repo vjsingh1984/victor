@@ -232,7 +232,7 @@ class TestFeatureFlagCachePerformance:
 
         def check_flags():
             for _ in range(100):
-                is_feature_enabled(FeatureFlag.USE_SERVICE_LAYER)
+                is_feature_enabled(FeatureFlag.USE_EDGE_MODEL)
 
         benchmark(check_flags)
 
@@ -245,7 +245,7 @@ class TestFeatureFlagCachePerformance:
         def check_flags_cached():
             with FeatureFlagCache.scope() as cache:
                 for _ in range(100):
-                    cache.is_enabled(FeatureFlag.USE_SERVICE_LAYER)
+                    cache.is_enabled(FeatureFlag.USE_EDGE_MODEL)
 
         benchmark(check_flags_cached)
 

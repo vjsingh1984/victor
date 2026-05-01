@@ -27,8 +27,7 @@ def _make_flag_manager(flags: dict) -> FeatureFlagManager:
     return mgr
 
 
-# Representative flag combos covering the 3 groups:
-# Service group (6 flags), Decision group (2), Architecture (2), Meta (1)
+# Representative flag combos covering active rollout groups.
 def _all_off() -> dict:
     return dict.fromkeys(FeatureFlag, False)
 
@@ -49,23 +48,14 @@ F = FeatureFlag  # shorthand
 REPRESENTATIVE_COMBOS = [
     _all_off(),
     _all_on(),
-    _with(F.USE_SERVICE_LAYER),
     _with(F.USE_EDGE_MODEL),
-    _with(
-        F.USE_SERVICE_LAYER,
-        F.USE_NEW_CHAT_SERVICE,
-        F.USE_NEW_TOOL_SERVICE,
-        F.USE_NEW_CONTEXT_SERVICE,
-        F.USE_NEW_PROVIDER_SERVICE,
-        F.USE_NEW_RECOVERY_SERVICE,
-        F.USE_NEW_SESSION_SERVICE,
-    ),
+    _with(F.USE_LLM_DECISION_SERVICE),
     _with(
         F.USE_COMPOSITION_OVER_INHERITANCE,
         F.USE_STRATEGY_BASED_TOOL_REGISTRATION,
     ),
+    _with(F.USE_STATEGRAPH_AGENTIC_LOOP, F.USE_STAGE_TRANSITION_COORDINATOR),
     _with(F.USE_LLM_DECISION_SERVICE, F.USE_EDGE_MODEL),
-    _with(F.USE_EDGE_MODEL, F.USE_SERVICE_LAYER),
 ]
 
 

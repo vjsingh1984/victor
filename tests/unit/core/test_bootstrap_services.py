@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for service bootstrap functionality.
+"""Tests for canonical agent-service bootstrap."""
 
-Tests verify that services are created and registered correctly when
-feature flags are enabled.
-"""
-
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from victor.core.bootstrap_services import bootstrap_new_services
-from victor.core.container import ServiceContainer, ServiceLifetime
+from victor.core.container import ServiceContainer
 from victor.core.feature_flags import FeatureFlag
 
 
@@ -31,18 +27,11 @@ class TestBootstrapServices:
     """Tests for bootstrap_new_services function."""
 
     def test_bootstrap_registers_core_services_regardless_of_flags(self):
-        """Test that bootstrap registers core services even when no feature flags are enabled.
-
-        Services are always created for availability, but the orchestrator only uses them
-        when USE_SERVICE_LAYER flag is enabled.
-        """
+        """Bootstrap always registers the canonical core services."""
         container = ServiceContainer()
-
-        # Mock conversation and streaming controllers
         conversation_controller = MagicMock()
         streaming_coordinator = MagicMock()
 
-        # Create mock feature flag manager with all flags disabled
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
             mgr.is_enabled.return_value = False
@@ -79,15 +68,26 @@ class TestBootstrapServices:
 
             assert not container.is_registered(LLMDecisionServiceProtocol)
 
-    def test_bootstrap_context_service_when_flag_enabled(self):
-        """Test that ContextService is bootstrapped when USE_NEW_CONTEXT_SERVICE is enabled."""
+    @pytest.mark.parametrize(
+        ("protocol_name", "health_attr"),
+        [
+            ("ContextServiceProtocol", "is_healthy"),
+            ("ProviderServiceProtocol", "is_healthy"),
+            ("ToolServiceProtocol", "is_healthy"),
+            ("RecoveryServiceProtocol", "is_healthy"),
+            ("SessionServiceProtocol", "is_healthy"),
+            ("ChatServiceProtocol", "is_healthy"),
+        ],
+    )
+    def test_bootstrap_registers_each_core_service(self, protocol_name, health_attr):
+        """Each canonical service is registered without service-layer rollout flags."""
         container = ServiceContainer()
         conversation_controller = MagicMock()
         streaming_coordinator = MagicMock()
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_CONTEXT_SERVICE
+            mgr.is_enabled.return_value = False
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -96,144 +96,13 @@ class TestBootstrapServices:
                 streaming_coordinator,
             )
 
-            # Verify ContextServiceProtocol is registered
-            from victor.agent.services.protocols import ContextServiceProtocol
+            from victor.agent.services import protocols as service_protocols
 
-            assert container.is_registered(ContextServiceProtocol)
-
-            # Verify we can get the service
-            context_service = container.get(ContextServiceProtocol)
-            assert context_service is not None
-
-    def test_bootstrap_provider_service_when_flag_enabled(self):
-        """Test that ProviderService is bootstrapped when USE_NEW_PROVIDER_SERVICE is enabled."""
-        container = ServiceContainer()
-        conversation_controller = MagicMock()
-        streaming_coordinator = MagicMock()
-
-        with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
-            mgr = MagicMock()
-            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_PROVIDER_SERVICE
-            mock_mgr.return_value = mgr
-
-            bootstrap_new_services(
-                container,
-                conversation_controller,
-                streaming_coordinator,
-            )
-
-            # Verify ProviderServiceProtocol is registered
-            from victor.agent.services.protocols import ProviderServiceProtocol
-
-            assert container.is_registered(ProviderServiceProtocol)
-
-            # Verify we can get the service
-            provider_service = container.get(ProviderServiceProtocol)
-            assert provider_service is not None
-
-    def test_bootstrap_tool_service_when_flag_enabled(self):
-        """Test that ToolService is bootstrapped when USE_NEW_TOOL_SERVICE is enabled."""
-        container = ServiceContainer()
-        conversation_controller = MagicMock()
-        streaming_coordinator = MagicMock()
-
-        with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
-            mgr = MagicMock()
-            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_TOOL_SERVICE
-            mock_mgr.return_value = mgr
-
-            bootstrap_new_services(
-                container,
-                conversation_controller,
-                streaming_coordinator,
-            )
-
-            # Verify ToolServiceProtocol is registered
-            from victor.agent.services.protocols import ToolServiceProtocol
-
-            assert container.is_registered(ToolServiceProtocol)
-
-            # Verify we can get the service
-            tool_service = container.get(ToolServiceProtocol)
-            assert tool_service is not None
-
-    def test_bootstrap_recovery_service_when_flag_enabled(self):
-        """Test that RecoveryService is bootstrapped when USE_NEW_RECOVERY_SERVICE is enabled."""
-        container = ServiceContainer()
-        conversation_controller = MagicMock()
-        streaming_coordinator = MagicMock()
-
-        with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
-            mgr = MagicMock()
-            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_RECOVERY_SERVICE
-            mock_mgr.return_value = mgr
-
-            bootstrap_new_services(
-                container,
-                conversation_controller,
-                streaming_coordinator,
-            )
-
-            # Verify RecoveryServiceProtocol is registered
-            from victor.agent.services.protocols import RecoveryServiceProtocol
-
-            assert container.is_registered(RecoveryServiceProtocol)
-
-            # Verify we can get the service
-            recovery_service = container.get(RecoveryServiceProtocol)
-            assert recovery_service is not None
-
-    def test_bootstrap_session_service_when_flag_enabled(self):
-        """Test that SessionService is bootstrapped when USE_NEW_SESSION_SERVICE is enabled."""
-        container = ServiceContainer()
-        conversation_controller = MagicMock()
-        streaming_coordinator = MagicMock()
-
-        with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
-            mgr = MagicMock()
-            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_SESSION_SERVICE
-            mock_mgr.return_value = mgr
-
-            bootstrap_new_services(
-                container,
-                conversation_controller,
-                streaming_coordinator,
-            )
-
-            # Verify SessionServiceProtocol is registered
-            from victor.agent.services.protocols import SessionServiceProtocol
-
-            assert container.is_registered(SessionServiceProtocol)
-
-            # Verify we can get the service
-            session_service = container.get(SessionServiceProtocol)
-            assert session_service is not None
-
-    def test_bootstrap_chat_service_when_flag_enabled(self):
-        """Test that ChatService is bootstrapped when USE_NEW_CHAT_SERVICE is enabled."""
-        container = ServiceContainer()
-        conversation_controller = MagicMock()
-        streaming_coordinator = MagicMock()
-
-        with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
-            mgr = MagicMock()
-            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_CHAT_SERVICE
-            mock_mgr.return_value = mgr
-
-            bootstrap_new_services(
-                container,
-                conversation_controller,
-                streaming_coordinator,
-            )
-
-            # Verify ChatServiceProtocol is registered
-            from victor.agent.services.protocols import ChatServiceProtocol
-
-            assert container.is_registered(ChatServiceProtocol)
-
-            # Verify we can get the service
-            chat_service = container.get(ChatServiceProtocol)
-            assert chat_service is not None
+            protocol = getattr(service_protocols, protocol_name)
+            service = container.get(protocol)
+            assert service is not None
+            assert container.is_registered(protocol)
+            assert hasattr(service, health_attr)
 
     def test_bootstrap_all_services_when_all_flags_enabled(self):
         """Test that all services are bootstrapped when all feature flags are enabled."""
@@ -288,7 +157,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_TOOL_SERVICE
+            mgr.is_enabled.return_value = False
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -308,28 +177,26 @@ class TestBootstrapServices:
             tool_service = container.get(ToolServiceProtocol)
             assert tool_service is not None
 
-    def test_bootstrap_returns_early_without_feature_flags_module(self):
-        """Test that bootstrap returns early when feature flags module is not available."""
-        import builtins
-
+    def test_bootstrap_without_feature_flags_still_registers_core_services(self):
+        """Missing feature-flag infrastructure should not block core services."""
         container = ServiceContainer()
         conversation_controller = MagicMock()
         streaming_coordinator = MagicMock()
 
-        original_import = builtins.__import__
-
-        def mock_import(name, *args, **kwargs):
-            if name == "victor.core.feature_flags":
-                raise ImportError("feature flags not available")
-            return original_import(name, *args, **kwargs)
-
-        with patch("builtins.__import__", side_effect=mock_import):
-            # Should handle ImportError gracefully and return early
+        with patch(
+            "victor.core.bootstrap_services._get_feature_flag_manager_optional",
+            return_value=None,
+        ):
             bootstrap_new_services(
                 container,
                 conversation_controller,
                 streaming_coordinator,
             )
+
+        from victor.agent.services.protocols import ChatServiceProtocol, ToolServiceProtocol
+
+        assert container.is_registered(ChatServiceProtocol)
+        assert container.is_registered(ToolServiceProtocol)
 
     def test_chat_service_receives_dependencies(self):
         """Test that ChatService receives its dependencies correctly."""
@@ -423,8 +290,10 @@ class TestBootstrapServices:
                 LLMDecisionServiceProtocol,
             )
 
-            # Note: May not be registered if edge model unavailable in test env
-            # The important thing is core services are always created
+            assert (
+                container.get_optional(LLMDecisionServiceProtocol) is None
+                or container.is_registered(LLMDecisionServiceProtocol)
+            )
 
 
 class TestMockToolComponents:

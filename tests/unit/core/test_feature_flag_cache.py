@@ -102,7 +102,7 @@ class TestFeatureFlagCache:
         # Cache multiple flags
         cache.is_enabled(FeatureFlag.USE_EDGE_MODEL)
         cache.is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION)
-        cache.is_enabled(FeatureFlag.USE_SERVICE_LAYER)
+        cache.is_enabled(FeatureFlag.USE_EDGE_MODEL)
 
         stats = cache.get_stats()
         assert stats["cache_size"] >= 1

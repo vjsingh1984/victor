@@ -29,25 +29,25 @@ Example:
     manager = get_feature_flag_manager()
 
     # Check if a feature is enabled
-    if manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-        # Use new chat service
+    if manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
+        # Use smart routing
         pass
     else:
-        # Use legacy implementation
+        # Use default provider
         pass
 
     # Enable a feature at runtime
-    manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+    manager.enable(FeatureFlag.USE_SMART_ROUTING)
 
 Environment Variables:
-    VICTOR_USE_NEW_CHAT_SERVICE=true
-    VICTOR_USE_NEW_TOOL_SERVICE=false
+    VICTOR_USE_SMART_ROUTING=true
+    VICTOR_USE_EDGE_MODEL=false
     VICTOR_USE_COMPOSITION_OVER_INHERITANCE=true
 
 YAML Configuration (~/.victor/features.yaml):
     features:
-        use_new_chat_service: true
-        use_new_tool_service: false
+        use_smart_routing: true
+        use_edge_model: false
         use_composition_over_inheritance: true
 """
 
@@ -67,44 +67,22 @@ logger = logging.getLogger(__name__)
 
 
 class FeatureFlag(Enum):
-    """Feature flags for gradual rollout of SOLID refactoring.
+    """Feature flags for gradual rollout of new features.
 
-    Phase 1 - Foundation:
-        USE_NEW_CHAT_SERVICE: Use extracted ChatService instead of orchestrator methods
-        USE_NEW_TOOL_SERVICE: Use extracted ToolService instead of orchestrator methods
-        USE_NEW_CONTEXT_SERVICE: Use extracted ContextService for context management
-        USE_NEW_PROVIDER_SERVICE: Use extracted ProviderService for provider management
-        USE_NEW_RECOVERY_SERVICE: Use extracted RecoveryService for error recovery
-        USE_NEW_SESSION_SERVICE: Use extracted SessionService for session management
-
-    Phase 4 - Vertical Composition:
-        USE_COMPOSITION_OVER_INHERITANCE: Use composition-based verticals instead of inheritance
-
-    Phase 5 - Tool Registration:
-        USE_STRATEGY_BASED_TOOL_REGISTRATION: Use strategy pattern for tool registration
+    Active flags guard real behavior in the codebase. Removed flags that
+    no longer guard behavior (Phase 3 service layer flags removed in W3 cleanup).
 
     Usage:
-        Set via environment variable: VICTOR_USE_NEW_CHAT_SERVICE=true
-        Set via YAML config: features.use_new_chat_service: true
-        Enable at runtime: manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        Set via environment variable: VICTOR_USE_SMART_ROUTING=true
+        Set via YAML config: features.use_smart_routing: true
+        Enable at runtime: manager.enable(FeatureFlag.USE_SMART_ROUTING)
     """
-
-    # Phase 3 - Service Implementation
-    USE_NEW_CHAT_SERVICE = "use_new_chat_service"
-    USE_NEW_TOOL_SERVICE = "use_new_tool_service"
-    USE_NEW_CONTEXT_SERVICE = "use_new_context_service"
-    USE_NEW_PROVIDER_SERVICE = "use_new_provider_service"
-    USE_NEW_RECOVERY_SERVICE = "use_new_recovery_service"
-    USE_NEW_SESSION_SERVICE = "use_new_session_service"
 
     # Phase 4 - Vertical Composition
     USE_COMPOSITION_OVER_INHERITANCE = "use_composition_over_inheritance"
 
     # Phase 5 - Tool Registration
     USE_STRATEGY_BASED_TOOL_REGISTRATION = "use_strategy_based_tool_registration"
-
-    # Phase 6 - Service Layer (Strangler Fig)
-    USE_SERVICE_LAYER = "use_service_layer"
 
     # Phase 7 - LLM Decision Service
     USE_LLM_DECISION_SERVICE = "use_llm_decision_service"
@@ -185,7 +163,7 @@ class FeatureFlag(Enum):
         """Get the environment variable name for this flag.
 
         Returns:
-            Environment variable name (e.g., VICTOR_USE_NEW_CHAT_SERVICE)
+            Environment variable name (e.g., VICTOR_USE_SMART_ROUTING)
         """
         return f"VICTOR_{self.value.upper()}"
 
@@ -193,7 +171,7 @@ class FeatureFlag(Enum):
         """Get the YAML configuration key for this flag.
 
         Returns:
-            YAML key (e.g., use_new_chat_service)
+            YAML key (e.g., use_edge_model)
         """
         return self.value
 
@@ -257,11 +235,11 @@ class FeatureFlagManager:
         manager = FeatureFlagManager()
 
         # Check if a feature is enabled
-        if manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-            use_new_service()
+        if manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
+            use_smart_routing()
 
         # Enable a feature at runtime
-        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.enable(FeatureFlag.USE_SMART_ROUTING)
 
         # Get all enabled flags
         enabled_flags = manager.get_enabled_flags()
@@ -398,8 +376,8 @@ class FeatureFlagManager:
 
         Expected YAML format:
             features:
-                use_new_chat_service: true
-                use_new_tool_service: false
+                use_edge_model: true
+                use_llm_decision_service: false
                 use_composition_over_inheritance: true
         """
         try:

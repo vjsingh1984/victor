@@ -30,13 +30,7 @@ class FeatureFlagSettings(BaseModel):
         Set VICTOR_ENABLE_PREDICTIVE_TOOLS=false for instant rollback
     """
 
-    # Existing service flags (Phase 3-6)
-    use_new_chat_service: bool = False
-    use_new_tool_service: bool = False
-    use_new_context_service: bool = False
-    use_new_provider_service: bool = False
-    use_new_recovery_service: bool = False
-    use_new_session_service: bool = False
+    # Architecture flags still guarding live behavior
     use_composition_over_inheritance: bool = False
     use_strategy_based_tool_registration: bool = False
     use_provider_pooling: bool = False
