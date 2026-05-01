@@ -91,6 +91,7 @@ from victor.framework.agentic_graph.service_nodes import (
     tool_service_node,
     context_service_node,
     provider_service_node,
+    prompt_service_node,
     inject_execution_context,
 )
 
@@ -127,6 +128,7 @@ __all__ = [
     "tool_service_node",
     "context_service_node",
     "provider_service_node",
+    "prompt_service_node",
     "inject_execution_context",
     # Team selector
     "select_formation",

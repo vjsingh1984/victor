@@ -1438,6 +1438,115 @@ class TestChatServiceBootstrapLaziness:
         assert result == {"auto_skill": "debug"}
         helper.get_last_skill_match_info.assert_called_once_with()
 
+    def test_sync_prompt_builder_runtime_state_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._prompt_builder_runtime = helper
+
+        AgentOrchestrator._sync_prompt_builder_runtime_state(obj)
+
+        helper.sync_prompt_builder_runtime_state.assert_called_once_with()
+
+    def test_build_system_prompt_uses_helper_before_pipeline(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.build_system_prompt_fallback.return_value = "fallback prompt"
+        obj._prompt_builder_runtime = helper
+        obj._prompt_pipeline = MagicMock()
+        obj._prompt_pipeline.build_system_prompt.return_value = "pipeline prompt"
+
+        result = AgentOrchestrator.build_system_prompt(obj)
+
+        assert result == "pipeline prompt"
+        helper.sync_prompt_builder_runtime_state.assert_called_once_with()
+        obj._prompt_pipeline.build_system_prompt.assert_called_once_with()
+        helper.build_system_prompt_fallback.assert_not_called()
+
+    def test_build_system_prompt_delegates_fallback_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.build_system_prompt_fallback.return_value = "fallback prompt"
+        obj._prompt_builder_runtime = helper
+        obj._prompt_pipeline = None
+
+        result = AgentOrchestrator.build_system_prompt(obj)
+
+        assert result == "fallback prompt"
+        helper.sync_prompt_builder_runtime_state.assert_called_once_with()
+        helper.build_system_prompt_fallback.assert_called_once_with()
+
+    def test_update_system_prompt_for_query_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._prompt_builder_runtime = helper
+
+        AgentOrchestrator.update_system_prompt_for_query(obj, query_classification="coding")
+
+        helper.update_system_prompt_for_query.assert_called_once_with(
+            query_classification="coding"
+        )
+
+    def test_refresh_system_prompt_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._prompt_builder_runtime = helper
+
+        AgentOrchestrator.refresh_system_prompt(
+            obj,
+            query_classification="coding",
+            preserve_existing_classification=False,
+        )
+
+        helper.refresh_system_prompt.assert_called_once_with(
+            query_classification="coding",
+            preserve_existing_classification=False,
+        )
+
+    def test_get_system_prompt_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        helper.get_system_prompt.return_value = "system prompt"
+        obj._prompt_builder_runtime = helper
+
+        result = AgentOrchestrator.get_system_prompt(obj)
+
+        assert result == "system prompt"
+        helper.get_system_prompt.assert_called_once_with()
+
+    def test_set_system_prompt_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._prompt_builder_runtime = helper
+
+        AgentOrchestrator.set_system_prompt(obj, "new system prompt")
+
+        helper.set_system_prompt.assert_called_once_with("new system prompt")
+
+    def test_append_to_system_prompt_delegates_to_helper(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        helper = MagicMock()
+        obj._prompt_builder_runtime = helper
+
+        AgentOrchestrator.append_to_system_prompt(obj, "extra guidance")
+
+        helper.append_to_system_prompt.assert_called_once_with("extra guidance")
+
     @pytest.mark.asyncio
     async def test_orchestrator_chat_delegates_to_chat_service(self):
         from victor.agent.orchestrator import AgentOrchestrator

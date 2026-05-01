@@ -146,7 +146,7 @@ class PromptOrchestrator:
             "legacy" or "framework"
         """
         # If has prompt_contributors, use legacy
-        if "prompt_contributors" in kwargs:
+        if "prompt_contributors" in kwargs or "builder" in kwargs or "legacy_builder" in kwargs:
             return "legacy"
 
         # If has base_prompt, use framework
@@ -176,16 +176,32 @@ class PromptOrchestrator:
         """
         from victor.agent.prompt_builder import SystemPromptBuilder
 
-        builder = SystemPromptBuilder(
-            provider_name=provider,
-            model=model,
-            task_type=task_type,
-            **kwargs,
-        )
+        builder = kwargs.pop("builder", kwargs.pop("legacy_builder", None))
+        get_context_window = kwargs.pop("get_context_window", None)
+        on_prompt_built = kwargs.pop("on_prompt_built", None)
 
-        # Legacy builder already handles evolved content via OptimizationInjector
-        # Just need to ensure it's wired up
-        return builder.build()
+        if builder is None:
+            builder = SystemPromptBuilder(
+                provider_name=provider,
+                model=model,
+                task_type=task_type,
+                **kwargs,
+            )
+
+        prompt = builder.build()
+
+        if get_context_window is not None:
+            context_window = get_context_window()
+            if context_window >= 32768:
+                from victor.agent.context_compactor import calculate_parallel_read_budget
+
+                budget = calculate_parallel_read_budget(context_window)
+                prompt = f"{prompt}\n\n{budget.to_prompt_hint()}"
+
+        if on_prompt_built is not None:
+            on_prompt_built(prompt)
+
+        return prompt
 
     def _build_with_framework(
         self,

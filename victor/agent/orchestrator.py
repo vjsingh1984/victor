@@ -998,8 +998,8 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         # Inject project context if available
         if self.project_context.content:
-            self._system_prompt = (
-                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            self._system_prompt = self._get_prompt_builder_runtime().compose_system_prompt(
+                base_system_prompt
             )
             logger.info(f"Loaded project context from {self.project_context.context_file}")
         else:
@@ -1401,8 +1401,8 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         base_prompt = self.build_system_prompt()
         if self.project_context.content:
-            self._system_prompt = (
-                base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            self._system_prompt = self._get_prompt_builder_runtime().compose_system_prompt(
+                base_prompt
             )
             logger.info(f"Loaded project context from {self.project_context.context_file}")
         else:
@@ -2724,6 +2724,16 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """Return metadata about the last skill match for response attachment."""
         return self._get_skill_runtime().get_last_skill_match_info()
 
+    def _get_prompt_builder_runtime(self) -> Any:
+        """Get the canonical service-owned prompt-builder runtime helper."""
+        runtime = getattr(self, "_prompt_builder_runtime", None)
+        if runtime is None:
+            from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
+
+            runtime = PromptBuilderRuntime(self.protocol_adapter)
+            self._prompt_builder_runtime = runtime
+        return runtime
+
     def clear_active_skills(self) -> None:
         """Remove any active skill injection.
 
@@ -2742,15 +2752,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if base is not None:
             self._system_prompt = base
 
-        if hasattr(self, "conversation") and self.conversation is not None:
-            self.conversation.system_prompt = self._system_prompt
-            if self.conversation._system_added and self.conversation._messages:
-                if self.conversation._messages[0].role == "system":
-                    from victor.agent.message_history import Message
-
-                    self.conversation._messages[0] = Message(
-                        role="system", content=self._system_prompt
-                    )
+        self._get_prompt_builder_runtime().sync_conversation_system_prompt()
 
     def get_skill_user_prefix(self) -> str:
         """Get active skill prompt as user message prefix (cache-friendly).
@@ -2794,16 +2796,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         self._system_prompt = skill_prompt + (self._base_system_prompt or "")
 
-        # Sync to conversation's live message
-        if hasattr(self, "conversation") and self.conversation is not None:
-            self.conversation.system_prompt = self._system_prompt
-            if self.conversation._system_added and self.conversation._messages:
-                if self.conversation._messages[0].role == "system":
-                    from victor.agent.message_history import Message
-
-                    self.conversation._messages[0] = Message(
-                        role="system", content=self._system_prompt
-                    )
+        self._get_prompt_builder_runtime().sync_conversation_system_prompt()
 
         logger.info("Injected skill '%s' into system prompt", skill.name)
 
@@ -2850,15 +2843,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
 
         self._system_prompt = composed + (self._base_system_prompt or "")
 
-        if hasattr(self, "conversation") and self.conversation is not None:
-            self.conversation.system_prompt = self._system_prompt
-            if self.conversation._system_added and self.conversation._messages:
-                if self.conversation._messages[0].role == "system":
-                    from victor.agent.message_history import Message
-
-                    self.conversation._messages[0] = Message(
-                        role="system", content=self._system_prompt
-                    )
+        self._get_prompt_builder_runtime().sync_conversation_system_prompt()
 
         logger.info("Injected %d skills: %s", len(skill_names), " → ".join(skill_names))
 
@@ -2877,43 +2862,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Args:
             query_classification: Optional QueryClassification for task-aware prompting
         """
-        # Freeze system prompt after first build for prefix cache stability
-        # Gate on _kv_optimization_enabled so both API-caching and KV-caching providers benefit
-        # Check if system prompt is frozen (pipeline owns this state when available)
-        pipeline = getattr(self, "_prompt_pipeline", None)
-        is_frozen = (
-            pipeline.is_frozen if pipeline else getattr(self, "_system_prompt_frozen", False)
+        self._get_prompt_builder_runtime().update_system_prompt_for_query(
+            query_classification=query_classification
         )
-        if self._kv_optimization_enabled and is_frozen:
-            logger.debug("[cache] System prompt frozen — skipping rebuild for query classification")
-            return
-
-        if query_classification is not None:
-            self.prompt_builder.query_classification = query_classification
-            self.prompt_builder.invalidate_cache()
-        base_system_prompt = self.build_system_prompt()
-        if self.project_context and self.project_context.content:
-            self._system_prompt = (
-                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
-            )
-        else:
-            self._system_prompt = base_system_prompt
-
-        # Mark as frozen after first build (KV or API cache optimization)
-        if self._kv_optimization_enabled:
-            self._system_prompt_frozen = True
-
-        # Sync to conversation's live message list so provider receives it
-        if hasattr(self, "conversation") and self.conversation is not None:
-            self.conversation.system_prompt = self._system_prompt
-            # Replace the existing system message if already inserted
-            if self.conversation._system_added and self.conversation._messages:
-                if self.conversation._messages[0].role == "system":
-                    from victor.agent.message_history import Message
-
-                    self.conversation._messages[0] = Message(
-                        role="system", content=self._system_prompt
-                    )
 
     def refresh_system_prompt(
         self,
@@ -2922,49 +2873,14 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         preserve_existing_classification: bool = True,
     ) -> None:
         """Force a system prompt rebuild after an explicit runtime change."""
-        if getattr(self, "_prompt_pipeline", None):
-            self._prompt_pipeline.unfreeze()
-        self._system_prompt_frozen = False
-        self._session_tools = None
-        if getattr(self, "prompt_builder", None):
-            self.prompt_builder.invalidate_cache()
-
-        if query_classification is None and preserve_existing_classification:
-            query_classification = getattr(self.prompt_builder, "query_classification", None)
-
-        self.update_system_prompt_for_query(query_classification=query_classification)
+        self._get_prompt_builder_runtime().refresh_system_prompt(
+            query_classification=query_classification,
+            preserve_existing_classification=preserve_existing_classification,
+        )
 
     def _sync_prompt_builder_runtime_state(self) -> None:
         """Align prompt-builder state with current mode and enabled tools."""
-        builder = getattr(self, "prompt_builder", None)
-        if builder is None:
-            return
-
-        cache_invalidated = False
-        try:
-            enabled_tools = sorted(self.get_enabled_tools())
-            if builder.available_tools != enabled_tools:
-                builder.available_tools = enabled_tools
-                cache_invalidated = True
-        except Exception as exc:
-            logger.debug("Failed to sync enabled tools into prompt builder: %s", exc)
-            if builder.available_tools:
-                builder.available_tools = []
-                cache_invalidated = True
-
-        try:
-            mode_prompt = self.get_mode_system_prompt()
-            if builder.mode_prompt_addition != mode_prompt:
-                builder.mode_prompt_addition = mode_prompt
-                cache_invalidated = True
-        except Exception as exc:
-            logger.debug("Failed to sync mode prompt into prompt builder: %s", exc)
-            if builder.mode_prompt_addition:
-                builder.mode_prompt_addition = ""
-                cache_invalidated = True
-
-        if cache_invalidated:
-            builder.invalidate_cache()
+        self._get_prompt_builder_runtime().sync_prompt_builder_runtime_state()
 
     def build_system_prompt(self) -> str:
         """Build the system prompt via the canonical prompt runtime surface.
@@ -2979,21 +2895,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if pipeline is not None:
             return pipeline.build_system_prompt()
 
-        runtime_support = getattr(self, "_prompt_runtime_support", None)
-        if runtime_support is not None:
-            return runtime_support.build_system_prompt()
-
-        legacy_coordinator = getattr(self, "_system_prompt_coordinator", None)
-        if legacy_coordinator is not None:
-            return legacy_coordinator.build_system_prompt()
-
-        # Fallback for calls during __init__ before pipeline is created
-        base_prompt = self.prompt_builder.build()
-        context_window = self._get_model_context_window()
-        budget = calculate_parallel_read_budget(context_window)
-        if context_window >= 32768:
-            return f"{base_prompt}\n\n{budget.to_prompt_hint()}"
-        return base_prompt
+        return self._get_prompt_builder_runtime().build_system_prompt_fallback()
 
     def _emit_prompt_used_event(self, prompt: str) -> None:
         """Emit PROMPT_USED event for RL prompt template learner.
@@ -4756,9 +4658,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             Complete system prompt string
         """
-        if self.prompt_builder:
-            return self.prompt_builder.build()
-        return ""
+        return self._get_prompt_builder_runtime().get_system_prompt()
 
     def set_system_prompt(self, prompt: str) -> None:
         """Set custom system prompt (protocol method).
@@ -4766,8 +4666,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Args:
             prompt: New system prompt (replaces existing)
         """
-        if self.prompt_builder and hasattr(self.prompt_builder, "set_custom_prompt"):
-            self.prompt_builder.set_custom_prompt(prompt)
+        self._get_prompt_builder_runtime().set_system_prompt(prompt)
 
     def append_to_system_prompt(self, content: str) -> None:
         """Append content to system prompt (protocol method).
@@ -4775,8 +4674,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Args:
             content: Content to append
         """
-        current = self.get_system_prompt()
-        self.set_system_prompt(current + "\n\n" + content)
+        self._get_prompt_builder_runtime().append_to_system_prompt(content)
 
     # --- MessagesProtocol ---
 

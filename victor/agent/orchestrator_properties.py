@@ -171,7 +171,7 @@ def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
 
 def _protocol_adapter(self: "AgentOrchestrator") -> Any:
     """Get the protocol adapter for DIP compliance (lazy init)."""
-    if self._protocol_adapter is None:
+    if getattr(self, "_protocol_adapter", None) is None:
         from victor.agent.services.orchestrator_protocol_adapter import (
             OrchestratorProtocolAdapter,
         )

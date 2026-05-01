@@ -27,6 +27,7 @@ from victor.framework.agentic_graph.service_nodes import (
     tool_service_node,
     context_service_node,
     provider_service_node,
+    prompt_service_node,
 )
 
 
@@ -318,6 +319,67 @@ class TestProviderServiceNode:
 
         assert result.context.get("current_provider") == "override-provider"
         assert result.context.get("current_model") == "override-model"
+
+
+class TestPromptServiceNode:
+    """Tests for prompt_service_node."""
+
+    @pytest.mark.asyncio
+    async def test_prompt_service_node_uses_context_prompt_orchestrator(self):
+        state = create_initial_state(query="Build prompt")
+        mock_prompt_orchestrator = MagicMock()
+        mock_prompt_orchestrator.build_system_prompt.return_value = "Prompt text"
+        mock_ctx = MagicMock()
+        mock_ctx.metadata = {"prompt_orchestrator": mock_prompt_orchestrator}
+        state = inject_execution_context(state, mock_ctx)
+        state = state.model_copy(
+            update={
+                "context": {
+                    **state.context,
+                    "provider": "anthropic",
+                    "model": "claude",
+                    "task_type": "edit",
+                    "base_prompt": "You are an assistant.",
+                }
+            }
+        )
+
+        result = await prompt_service_node(state)
+
+        assert result.context.get("system_prompt") == "Prompt text"
+        assert result.context.get("system_prompt_builder_type") == "framework"
+        mock_prompt_orchestrator.build_system_prompt.assert_called_once_with(
+            builder_type="framework",
+            provider="anthropic",
+            model="claude",
+            task_type="edit",
+            base_prompt="You are an assistant.",
+        )
+
+    @pytest.mark.asyncio
+    async def test_prompt_service_node_activates_and_deactivates_constraints(self):
+        state = create_initial_state(query="Build prompt")
+        mock_prompt_orchestrator = MagicMock()
+        mock_prompt_orchestrator.build_system_prompt.return_value = "Prompt text"
+        mock_prompt_orchestrator.activate_constraints.return_value = True
+        mock_ctx = MagicMock()
+        mock_ctx.metadata = {"prompt_orchestrator": mock_prompt_orchestrator}
+        state = inject_execution_context(state, mock_ctx)
+        constraints = object()
+
+        result = await prompt_service_node(
+            state,
+            base_prompt="You are an assistant.",
+            constraints=constraints,
+            vertical="coding",
+        )
+
+        assert result.context.get("constraints_activated") is True
+        mock_prompt_orchestrator.activate_constraints.assert_called_once_with(
+            constraints,
+            "coding",
+        )
+        mock_prompt_orchestrator.deactivate_constraints.assert_called_once_with()
 
 
 class TestServiceIntegration:

@@ -1,5 +1,7 @@
 """Tests for PromptOrchestrator."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from victor.agent.prompt_orchestrator import (
@@ -81,6 +83,14 @@ class TestPromptOrchestrator:
 
         assert builder_type == "legacy"  # Default for backward compatibility
 
+    def test_detect_builder_type_existing_builder(self):
+        """Test auto-detection of legacy builder from existing builder instance."""
+        orchestrator = PromptOrchestrator()
+
+        builder_type = orchestrator._detect_builder_type(builder=object())
+
+        assert builder_type == "legacy"
+
     def test_build_system_prompt_with_auto_detection(self):
         """Test build_system_prompt with auto builder type detection."""
         orchestrator = PromptOrchestrator()
@@ -90,6 +100,25 @@ class TestPromptOrchestrator:
 
         # Should return a string (even if minimal)
         assert isinstance(prompt, str)
+
+    def test_build_system_prompt_with_existing_legacy_builder(self):
+        """Test legacy facade path can reuse an existing builder instance."""
+        orchestrator = PromptOrchestrator()
+        builder = MagicMock()
+        builder.build.return_value = "Base prompt"
+        hook = MagicMock()
+
+        prompt = orchestrator.build_system_prompt(
+            builder_type="legacy",
+            builder=builder,
+            get_context_window=lambda: 65536,
+            on_prompt_built=hook,
+        )
+
+        assert "Base prompt" in prompt
+        assert "PARALLEL READ BUDGET" in prompt
+        builder.build.assert_called_once_with()
+        hook.assert_called_once_with(prompt)
 
     def test_activate_constraints(self):
         """Test constraint activation through orchestrator."""

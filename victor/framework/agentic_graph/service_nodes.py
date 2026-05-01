@@ -106,6 +106,19 @@ def _get_service_accessor(state: AgenticLoopStateModel) -> Optional[Any]:
     return None
 
 
+def _get_prompt_orchestrator(state: AgenticLoopStateModel) -> Any:
+    """Get PromptOrchestrator from execution context metadata or global fallback."""
+    ctx = _get_execution_context(state)
+    if ctx and getattr(ctx, "metadata", None):
+        prompt_orchestrator = ctx.metadata.get("prompt_orchestrator")
+        if prompt_orchestrator is not None:
+            return prompt_orchestrator
+
+    from victor.agent.prompt_orchestrator import get_prompt_orchestrator
+
+    return get_prompt_orchestrator()
+
+
 # =============================================================================
 # Chat Service Node
 # =============================================================================
@@ -372,6 +385,67 @@ async def provider_service_node(
     except Exception as e:
         logger.warning(f"Provider service node failed: {e}")
         # Continue without provider info - not critical
+
+    return state
+
+
+async def prompt_service_node(
+    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    base_prompt: Optional[str] = None,
+    *,
+    builder_type: str = "framework",
+    constraints: Optional[Any] = None,
+    vertical: str = "coding",
+) -> AgenticLoopStateModel:
+    """Prompt facade node: build a system prompt through PromptOrchestrator.
+
+    This node provides a framework-first entry point for prompt construction.
+    It uses PromptOrchestrator from RuntimeExecutionContext metadata when
+    available, otherwise falls back to the shared global facade.
+    """
+    state = _unwrap_state(state)
+
+    prompt_orchestrator = _get_prompt_orchestrator(state)
+    context = dict(state.context or {})
+
+    provider = str(
+        context.get("current_provider")
+        or context.get("provider")
+        or context.get("provider_name")
+        or ""
+    )
+    model = str(context.get("current_model") or context.get("model") or "")
+    task_type = str(context.get("task_type") or "default")
+    resolved_base_prompt = base_prompt if base_prompt is not None else context.get("base_prompt", "")
+
+    activated = False
+    try:
+        if constraints is not None:
+            activated = bool(prompt_orchestrator.activate_constraints(constraints, vertical))
+
+        prompt = prompt_orchestrator.build_system_prompt(
+            builder_type=builder_type,
+            provider=provider,
+            model=model,
+            task_type=task_type,
+            base_prompt=resolved_base_prompt,
+        )
+
+        context["system_prompt"] = prompt
+        context["system_prompt_builder_type"] = builder_type
+        if constraints is not None:
+            context["constraints_activated"] = activated
+
+        state = state.model_copy(update={"context": context})
+        logger.info("Prompt service node: Built system prompt")
+    except Exception as e:
+        logger.warning(f"Prompt service node failed: {e}")
+    finally:
+        if constraints is not None and activated:
+            try:
+                prompt_orchestrator.deactivate_constraints()
+            except Exception as exc:
+                logger.debug("Prompt service node cleanup failed: %s", exc)
 
     return state
 
