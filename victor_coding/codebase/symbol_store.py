@@ -422,18 +422,30 @@ class SymbolStore:
                     stats["errors"].append((rel_path, error_type, str(e)))
                     logger.warning(f"Failed to index {rel_path}: {error_type}: {e}")
 
-            # Step 3: Refresh architecture patterns (only if we indexed something)
+            # Step 3: Refresh architecture patterns (incremental-aware)
             if stats["files_indexed"] > 0 or stats["files_deleted"] > 0 or force:
-                # Clear old patterns and regenerate
-                conn.execute("DELETE FROM patterns")
-                patterns = self._detect_patterns(conn)
-                for pattern in patterns:
-                    conn.execute(
-                        """INSERT INTO patterns (pattern_name, pattern_type, file_path, symbol_name, line_number, description)
-                           VALUES (?, ?, ?, ?, ?, ?)""",
-                        pattern,
-                    )
-                    stats["patterns_detected"] += 1
+                if force:
+                    # Full reindex: clear all patterns and regenerate (destructive but complete)
+                    conn.execute("DELETE FROM patterns")
+                    patterns = self._detect_patterns(conn)
+                    for pattern in patterns:
+                        conn.execute(
+                            """INSERT INTO patterns (pattern_name, pattern_type, file_path, symbol_name, line_number, description)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            pattern,
+                        )
+                        stats["patterns_detected"] += 1
+                else:
+                    # Incremental update: use INSERT OR REPLACE (preserves existing patterns)
+                    # This prevents wiping patterns from unchanged files
+                    patterns = self._detect_patterns(conn)
+                    for pattern in patterns:
+                        conn.execute(
+                            """INSERT OR REPLACE INTO patterns (pattern_name, pattern_type, file_path, symbol_name, line_number, description)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            pattern,
+                        )
+                        stats["patterns_detected"] += 1
 
             # Update metadata
             conn.execute(
@@ -454,6 +466,10 @@ class SymbolStore:
                 msg += f" ({stats['files_failed']} failed)"
             print(msg)
 
+            # Show total database stats for context
+            db_stats = self.get_stats()
+            print(f"  → {db_stats['total_symbols']:,} total symbols in database")
+
             # Show summary of failed files if any (helps users fix their code)
             if stats["files_failed"] > 0 and stats["files_failed"] <= 10:
                 print("  ⚠️  Failed files:")
@@ -465,7 +481,10 @@ class SymbolStore:
                     f"  ⚠️  {stats['files_failed']} files failed to index (run with --verbose for details)"
                 )
         else:
+            # Even when no files changed, show total stats
+            db_stats = self.get_stats()
             print(f"✅ Index up to date ({stats['files_skipped']} files unchanged)")
+            print(f"  → {db_stats['total_symbols']:,} total symbols in database")
 
         return stats
 

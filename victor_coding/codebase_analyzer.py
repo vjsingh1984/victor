@@ -2390,7 +2390,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     - Learned patterns and hot spots
 
     Args:
-        root_path: Root directory containing .victor/conversation.db
+        root_path: Root directory containing .victor/project.db with sessions/messages tables
 
     Returns:
         Dictionary with extracted insights
@@ -2399,7 +2399,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     from collections import Counter
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
-    db_path = root / ".victor" / "conversation.db"
+    db_path = root / ".victor" / "project.db"  # Fixed: conversations are in project.db, not conversation.db
 
     if not db_path.exists():
         return {"error": "No conversation history found"}
@@ -3037,9 +3037,20 @@ async def generate_enhanced_init_md(
             progress("graph", f"Auto-indexing failed: {e}", complete=True)
 
     if graph_insights.get("has_graph"):
+        total_nodes = graph_insights['stats'].get('total_nodes', 0)
+        node_types = graph_insights['stats'].get('node_types', {})
+
+        # Build detailed summary with node type breakdown
+        summary_parts = [f"{total_nodes:,} nodes"]
+        if node_types:
+            # Show top 3 node types
+            top_types = sorted(node_types.items(), key=lambda x: x[1], reverse=True)[:3]
+            type_summary = ", ".join([f"{count:,} {name}" for name, count in top_types])
+            summary_parts.append(f"({type_summary})")
+
         progress(
             "graph",
-            f"Graph analyzed ({graph_insights['stats'].get('total_nodes', 0)} nodes)",
+            f"Graph analyzed ({' - '.join(summary_parts)})",
             complete=True,
         )
 
