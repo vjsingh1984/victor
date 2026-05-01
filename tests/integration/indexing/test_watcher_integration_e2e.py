@@ -73,6 +73,27 @@ def temp_project():
 class TestFileWatcherInitializer:
     """Test file watcher initialization utilities."""
 
+    async def _build_initial_graph(self, temp_project: Path):
+        """Build an initial graph and background refresh manager for a temp project."""
+        graph_store = create_graph_store("sqlite", project_path=temp_project)
+        await graph_store.initialize()
+        await graph_store.delete_by_repo()
+
+        pipeline = GraphIndexingPipeline(
+            graph_store,
+            GraphIndexConfig(
+                root_path=temp_project,
+                enable_ccg=False,
+                enable_embeddings=False,
+                enable_subgraph_cache=False,
+            ),
+        )
+        await pipeline.index_repository()
+
+        manager = GraphManager.get_instance()
+        await manager.ensure_background_refresh(temp_project, enable_ccg=False)
+        return graph_store, manager
+
     @pytest.mark.asyncio
     async def test_initialize_single_project(self, temp_project):
         """Verify single project initialization."""
@@ -240,23 +261,7 @@ class TestFileWatcherInitializer:
     @pytest.mark.asyncio
     async def test_graph_manager_background_refresh_updates_project_graph(self, temp_project):
         """GraphManager should incrementally refresh the stored graph after file changes."""
-        graph_store = create_graph_store("sqlite", project_path=temp_project)
-        await graph_store.initialize()
-        await graph_store.delete_by_repo()
-
-        pipeline = GraphIndexingPipeline(
-            graph_store,
-            GraphIndexConfig(
-                root_path=temp_project,
-                enable_ccg=False,
-                enable_embeddings=False,
-                enable_subgraph_cache=False,
-            ),
-        )
-        await pipeline.index_repository()
-
-        manager = GraphManager.get_instance()
-        await manager.ensure_background_refresh(temp_project, enable_ccg=False)
+        graph_store, manager = await self._build_initial_graph(temp_project)
 
         target_file = temp_project / "src" / "module.py"
         time.sleep(0.5)
@@ -276,6 +281,82 @@ class TestFileWatcherInitializer:
         refreshed_nodes = await graph_store.get_nodes_by_file(str(target_file))
         assert {node.name for node in refreshed_nodes} == {"bar"}
         assert str(temp_project.resolve()) not in manager._refresh_tasks
+
+    @pytest.mark.asyncio
+    async def test_graph_manager_background_refresh_indexes_new_file(self, temp_project):
+        """Background refresh should index newly created files."""
+        graph_store, manager = await self._build_initial_graph(temp_project)
+
+        new_file = temp_project / "src" / "new_module.py"
+        time.sleep(0.5)
+        new_file.write_text("def created_later():\n    return 3\n")
+
+        await manager._on_file_change(
+            FileChangeEvent(
+                path=new_file,
+                change_type=FileChangeType.CREATED,
+                timestamp=datetime.now(),
+            ),
+            temp_project,
+            None,
+        )
+        await manager.wait_for_refresh(temp_project)
+
+        new_nodes = await graph_store.get_nodes_by_file(str(new_file))
+        assert {node.name for node in new_nodes} == {"created_later"}
+
+    @pytest.mark.asyncio
+    async def test_graph_manager_background_refresh_deletes_removed_file(self, temp_project):
+        """Background refresh should remove graph state for deleted files."""
+        graph_store, manager = await self._build_initial_graph(temp_project)
+
+        deleted_file = temp_project / "src" / "module.py"
+        assert {node.name for node in await graph_store.get_nodes_by_file(str(deleted_file))} == {
+            "foo"
+        }
+
+        time.sleep(0.5)
+        deleted_file.unlink()
+
+        await manager._on_file_change(
+            FileChangeEvent(
+                path=deleted_file,
+                change_type=FileChangeType.DELETED,
+                timestamp=datetime.now(),
+            ),
+            temp_project,
+            None,
+        )
+        await manager.wait_for_refresh(temp_project)
+
+        assert await graph_store.get_nodes_by_file(str(deleted_file)) == []
+
+    @pytest.mark.asyncio
+    async def test_graph_manager_background_refresh_handles_renamed_file(self, temp_project):
+        """Background refresh should remove old graph state and index the renamed file."""
+        graph_store, manager = await self._build_initial_graph(temp_project)
+
+        old_file = temp_project / "src" / "module.py"
+        renamed_file = temp_project / "src" / "renamed_module.py"
+        time.sleep(0.5)
+        old_file.rename(renamed_file)
+
+        await manager._on_file_change(
+            FileChangeEvent(
+                path=renamed_file,
+                change_type=FileChangeType.RENAMED,
+                timestamp=datetime.now(),
+                old_path=old_file,
+            ),
+            temp_project,
+            None,
+        )
+        await manager.wait_for_refresh(temp_project)
+
+        assert await graph_store.get_nodes_by_file(str(old_file)) == []
+        assert {node.name for node in await graph_store.get_nodes_by_file(str(renamed_file))} == {
+            "foo"
+        }
 
 
 class TestCrossSessionBehavior:

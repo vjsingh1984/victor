@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import hashlib
 import json
 import os
@@ -39,6 +40,19 @@ graph_app = typer.Typer(name="graph", help="Graph-based code intelligence operat
 watch_app = typer.Typer(help="Keep the persisted graph incrementally updated.")
 console = Console()
 graph_app.add_typer(watch_app, name="watch")
+
+
+@dataclass
+class GraphWatchDaemonState:
+    """Observed or requested state for a graph watcher daemon."""
+
+    pid_file: Path
+    running: bool = False
+    pid: Optional[int] = None
+    started: bool = False
+    stopped: bool = False
+    stale_pid_file: bool = False
+    stale_pid_removed: bool = False
 
 
 async def _index_async(
@@ -572,6 +586,42 @@ def _resolve_graph_watch_pid_file(project_root: Path, pid_file: Optional[Path]) 
     return pid_file if pid_file is not None else _default_graph_watch_pid_file(project_root)
 
 
+def _inspect_graph_watch_daemon(
+    pid_file: Path,
+    *,
+    remove_stale: bool = False,
+) -> GraphWatchDaemonState:
+    """Inspect the daemon state represented by a PID file."""
+    state = GraphWatchDaemonState(pid_file=pid_file)
+    if not pid_file.exists():
+        return state
+
+    try:
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        state.stale_pid_file = True
+        if remove_stale:
+            with suppress(FileNotFoundError):
+                pid_file.unlink()
+            state.stale_pid_removed = True
+        return state
+
+    state.pid = pid
+    try:
+        os.kill(pid, 0)
+        state.running = True
+    except PermissionError:
+        state.running = True
+    except ProcessLookupError:
+        state.stale_pid_file = True
+        if remove_stale:
+            with suppress(FileNotFoundError):
+                pid_file.unlink()
+            state.stale_pid_removed = True
+
+    return state
+
+
 async def _watch_async(
     path: str,
     enable_ccg: bool,
@@ -632,38 +682,21 @@ async def _watch_async(
     return True
 
 
-def _start_watch_daemon(
+def _fork_watch_daemon(
     pid_file: Path,
     path: str,
     enable_ccg: bool,
     poll_interval: float,
     debounce_seconds: float,
     build_now: bool,
-) -> None:
+) -> int:
     """Fork and run the graph watcher as a background daemon."""
-    pid_file.parent.mkdir(parents=True, exist_ok=True)
-
-    if pid_file.exists():
-        try:
-            pid = int(pid_file.read_text().strip())
-            os.kill(pid, 0)
-            console.print(f"[yellow]Graph watcher already running (PID {pid})[/]")
-            raise typer.Exit(1)
-        except (ProcessLookupError, ValueError):
-            pid_file.unlink()
-
-    try:
-        pid = os.fork()
-        if pid > 0:
-            console.print(f"[green]Graph watcher started (PID {pid})[/]")
-            console.print(f"[dim]PID file: {pid_file}[/]")
-            raise typer.Exit(0)
-    except OSError as exc:
-        console.print(f"[red]Failed to fork graph watcher: {exc}[/]")
-        raise typer.Exit(1)
+    pid = os.fork()
+    if pid > 0:
+        return pid
 
     os.setsid()
-    pid_file.write_text(str(os.getpid()))
+    pid_file.write_text(str(os.getpid()), encoding="utf-8")
 
     log_file = pid_file.with_suffix(".log")
     sys.stdout = open(log_file, "a", buffering=1)
@@ -682,6 +715,68 @@ def _start_watch_daemon(
     finally:
         with suppress(FileNotFoundError):
             pid_file.unlink()
+    os._exit(0)
+
+
+def ensure_graph_watch_daemon(
+    project_root: Path,
+    *,
+    enable_ccg: bool,
+    build_now: bool = False,
+    pid_file: Optional[Path] = None,
+    poll_interval: float = 1.0,
+    debounce_seconds: float = 0.3,
+) -> GraphWatchDaemonState:
+    """Ensure a background graph watcher daemon exists for a project."""
+    root_path = project_root.resolve()
+    resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
+    resolved_pid_file.parent.mkdir(parents=True, exist_ok=True)
+
+    state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=True)
+    if state.running:
+        return state
+
+    pid = _fork_watch_daemon(
+        resolved_pid_file,
+        str(root_path),
+        enable_ccg,
+        poll_interval,
+        debounce_seconds,
+        build_now,
+    )
+    return GraphWatchDaemonState(
+        pid_file=resolved_pid_file,
+        running=True,
+        pid=pid,
+        started=True,
+        stale_pid_removed=state.stale_pid_removed,
+    )
+
+
+def stop_graph_watch_daemon(
+    project_root: Path,
+    *,
+    pid_file: Optional[Path] = None,
+) -> GraphWatchDaemonState:
+    """Stop the background graph watcher daemon for a project."""
+    root_path = project_root.resolve()
+    resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
+    state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=False)
+
+    if state.running and state.pid is not None:
+        os.kill(state.pid, signal.SIGTERM)
+        with suppress(FileNotFoundError):
+            resolved_pid_file.unlink()
+        state.running = False
+        state.stopped = True
+        return state
+
+    if state.stale_pid_file:
+        with suppress(FileNotFoundError):
+            resolved_pid_file.unlink()
+        state.stale_pid_removed = True
+
+    return state
 
 
 @watch_app.command("start")
@@ -704,17 +799,28 @@ def graph_watch_start(
 ):
     """Watch a project and keep its persisted graph updated incrementally."""
     root_path = Path(path).resolve()
-    resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
 
     if daemon:
-        _start_watch_daemon(
-            resolved_pid_file,
-            str(root_path),
-            enable_ccg,
-            poll_interval,
-            debounce_seconds,
-            build_now,
-        )
+        try:
+            state = ensure_graph_watch_daemon(
+                root_path,
+                enable_ccg=enable_ccg,
+                build_now=build_now,
+                pid_file=pid_file,
+                poll_interval=poll_interval,
+                debounce_seconds=debounce_seconds,
+            )
+        except OSError as exc:
+            console.print(f"[red]Failed to fork graph watcher: {exc}[/]")
+            raise typer.Exit(1)
+
+        if state.stale_pid_removed:
+            console.print("[dim]Recovered stale PID file before starting watcher[/]")
+        if state.started and state.pid is not None:
+            console.print(f"[green]Graph watcher started (PID {state.pid})[/]")
+            console.print(f"[dim]PID file: {state.pid_file}[/]")
+        elif state.running and state.pid is not None:
+            console.print(f"[yellow]Graph watcher already running (PID {state.pid})[/]")
         return
 
     success = run_sync(
@@ -737,23 +843,17 @@ def graph_watch_stop(
 ):
     """Stop the graph watcher daemon for a project."""
     root_path = Path(path).resolve()
-    resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
+    state = stop_graph_watch_daemon(root_path, pid_file=pid_file)
 
-    if not resolved_pid_file.exists():
-        console.print("[yellow]Graph watcher is not running (no PID file)[/]")
-        raise typer.Exit(0)
-
-    try:
-        pid = int(resolved_pid_file.read_text().strip())
-        os.kill(pid, signal.SIGTERM)
-        resolved_pid_file.unlink()
-        console.print(f"[green]Graph watcher stopped (PID {pid})[/]")
-    except ProcessLookupError:
-        resolved_pid_file.unlink()
+    if state.stopped and state.pid is not None:
+        console.print(f"[green]Graph watcher stopped (PID {state.pid})[/]")
+        return
+    if state.stale_pid_removed:
         console.print("[yellow]Graph watcher was not running (stale PID file removed)[/]")
-    except ValueError:
-        console.print("[red]Invalid PID file[/]")
-        raise typer.Exit(1)
+        return
+
+    console.print("[yellow]Graph watcher is not running (no PID file)[/]")
+    raise typer.Exit(0)
 
 
 @watch_app.command("status")
@@ -764,26 +864,24 @@ def graph_watch_status(
     """Show graph watcher daemon status for a project."""
     root_path = Path(path).resolve()
     resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
-
-    running = False
-    daemon_pid = None
-    if resolved_pid_file.exists():
-        try:
-            daemon_pid = int(resolved_pid_file.read_text().strip())
-            os.kill(daemon_pid, 0)
-            running = True
-        except (ProcessLookupError, ValueError):
-            running = False
+    state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=False)
 
     console.print(f"\n[green]Graph Watcher Status:[/green] {root_path}\n")
     table = Table(show_header=False)
     table.add_column("Field", style="cyan")
     table.add_column("Value", style="green")
-    table.add_row("Running", "yes" if running else "no")
+    if state.running:
+        status_label = "running"
+    elif state.stale_pid_file:
+        status_label = "stale PID file"
+    else:
+        status_label = "not running"
+    table.add_row("State", status_label)
+    table.add_row("Running", "yes" if state.running else "no")
     table.add_row("PID file", str(resolved_pid_file))
     table.add_row("Log file", str(resolved_pid_file.with_suffix(".log")))
-    if daemon_pid is not None:
-        table.add_row("PID", str(daemon_pid))
+    if state.pid is not None:
+        table.add_row("PID", str(state.pid))
     console.print(table)
 
 
