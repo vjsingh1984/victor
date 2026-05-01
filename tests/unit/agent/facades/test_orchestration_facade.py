@@ -181,6 +181,22 @@ class TestOrchestrationFacadeProperties:
 
         assert facade.chat_stream_adapter is adapter
 
+    def test_runtime_intelligence_integration_property_resolves_lazy_getter(self):
+        """Runtime-intelligence integration resolves lazily when only a getter is provided."""
+        integration = MagicMock(name="runtime_intelligence")
+        facade = OrchestrationFacade(
+            get_runtime_intelligence_integration=lambda: integration
+        )
+
+        assert facade.runtime_intelligence_integration is integration
+
+    def test_subagent_orchestrator_property_resolves_lazy_getter(self):
+        """Subagent orchestrator resolves lazily when only a getter is provided."""
+        subagent = MagicMock(name="subagent_orchestrator")
+        facade = OrchestrationFacade(get_subagent_orchestrator=lambda: subagent)
+
+        assert facade.subagent_orchestrator is subagent
+
     def test_exploration_state_passed_property(self, facade):
         """State-passed exploration coordinator should be exposed directly."""
         assert facade.exploration_state_passed._mock_name == "exploration_state_passed"

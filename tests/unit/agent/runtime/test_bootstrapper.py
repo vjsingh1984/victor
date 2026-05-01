@@ -97,6 +97,8 @@ class TestAgentRuntimeBootstrapper:
 
     def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(self):
         orch = self._make_mock_orchestrator()
+        orch.runtime_intelligence_integration = sentinel.runtime_intelligence_integration
+        orch.subagent_orchestrator = sentinel.subagent_orchestrator
         exploration_state_passed = MagicMock(name="exploration_state_passed")
         system_prompt_state_passed = MagicMock(name="system_prompt_state_passed")
         safety_state_passed = MagicMock(name="safety_state_passed")
@@ -159,8 +161,13 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["observability"] is orch._observability
         assert kwargs["execution_tracer"] is getattr(orch, "_execution_tracer", None)
         assert kwargs["tool_call_tracer"] is getattr(orch, "_tool_call_tracer", None)
-        assert kwargs["runtime_intelligence_integration"] is orch._runtime_intelligence_integration
-        assert kwargs["subagent_orchestrator"] is orch._subagent_orchestrator
+        assert callable(kwargs["get_runtime_intelligence_integration"])
+        assert callable(kwargs["get_subagent_orchestrator"])
+        assert (
+            kwargs["get_runtime_intelligence_integration"]()
+            is sentinel.runtime_intelligence_integration
+        )
+        assert kwargs["get_subagent_orchestrator"]() is sentinel.subagent_orchestrator
         orch._factory.create_exploration_state_passed_coordinator.assert_called_once_with()
         orch._factory.create_system_prompt_state_passed_coordinator.assert_called_once_with(
             task_analyzer=orch._task_analyzer

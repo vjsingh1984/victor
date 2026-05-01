@@ -127,7 +127,9 @@ class OrchestrationFacade:
         execution_tracer: Optional[Any] = None,
         tool_call_tracer: Optional[Any] = None,
         runtime_intelligence_integration: Optional[Any] = None,
+        get_runtime_intelligence_integration: Optional[Callable[[], Optional[Any]]] = None,
         subagent_orchestrator: Optional[Any] = None,
+        get_subagent_orchestrator: Optional[Callable[[], Optional[Any]]] = None,
     ) -> None:
         if chat_coordinator is not None and deprecated_chat_coordinator is not None:
             raise TypeError("Use only one of chat_coordinator or deprecated_chat_coordinator.")
@@ -318,7 +320,9 @@ class OrchestrationFacade:
         self._execution_tracer = execution_tracer
         self._tool_call_tracer = tool_call_tracer
         self._runtime_intelligence_integration = runtime_intelligence_integration
+        self._get_runtime_intelligence_integration = get_runtime_intelligence_integration
         self._subagent_orchestrator = subagent_orchestrator
+        self._get_subagent_orchestrator = get_subagent_orchestrator
 
         logger.debug(
             "OrchestrationFacade initialized (protocol_adapter=%s, observability=%s, "
@@ -654,6 +658,11 @@ class OrchestrationFacade:
     @property
     def runtime_intelligence_integration(self) -> Optional[Any]:
         """Runtime-intelligence integration."""
+        if (
+            self._runtime_intelligence_integration is None
+            and self._get_runtime_intelligence_integration is not None
+        ):
+            self._runtime_intelligence_integration = self._get_runtime_intelligence_integration()
         return self._runtime_intelligence_integration
 
     @runtime_intelligence_integration.setter
@@ -673,6 +682,8 @@ class OrchestrationFacade:
     @property
     def subagent_orchestrator(self) -> Optional[Any]:
         """Sub-agent orchestration."""
+        if self._subagent_orchestrator is None and self._get_subagent_orchestrator is not None:
+            self._subagent_orchestrator = self._get_subagent_orchestrator()
         return self._subagent_orchestrator
 
     @subagent_orchestrator.setter

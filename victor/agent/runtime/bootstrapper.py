@@ -208,8 +208,12 @@ class AgentRuntimeBootstrapper:
                 observability=orchestrator._observability,
                 execution_tracer=getattr(orchestrator, "_execution_tracer", None),
                 tool_call_tracer=getattr(orchestrator, "_tool_call_tracer", None),
-                runtime_intelligence_integration=orchestrator._runtime_intelligence_integration,
-                subagent_orchestrator=orchestrator._subagent_orchestrator,
+                get_runtime_intelligence_integration=(
+                    lambda: getattr(orchestrator, "runtime_intelligence_integration", None)
+                ),
+                get_subagent_orchestrator=(
+                    lambda: getattr(orchestrator, "subagent_orchestrator", None)
+                ),
             ),
             name="orchestration_facade",
         )
