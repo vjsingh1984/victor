@@ -281,8 +281,10 @@ class VictorClient:
         if execution_context is not None:
             self._context = execution_context
         elif hasattr(self._agent, "get_orchestrator"):
+            from victor.runtime.context import resolve_execution_context
+
             orchestrator = self._agent.get_orchestrator()
-            self._context = getattr(orchestrator, "_execution_context", None)
+            self._context = resolve_execution_context(orchestrator)
         self._initialized = True
 
         logger.info(

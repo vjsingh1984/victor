@@ -274,6 +274,13 @@ class TestAgenticLoop:
         assert resolved_context.session_id == "session-123"
         assert resolved_context.metadata["prompt_orchestrator"] is prompt_orchestrator
 
+    def test_resolve_stategraph_execution_context_falls_back_to_orchestrator(self):
+        """StateGraph execution should fall back to the orchestrator when no runtime context exists."""
+        orchestrator = MagicMock(spec=[])
+        loop = self._make_loop(orchestrator=orchestrator, max_iterations=1)
+
+        assert loop._resolve_stategraph_execution_context() is orchestrator
+
     async def test_run_applies_topology_overrides_and_records_event(self, monkeypatch):
         perception = _make_perception()
         perception.confidence = 0.9

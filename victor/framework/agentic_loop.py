@@ -2620,7 +2620,9 @@ class AgenticLoop:
 
     def _resolve_stategraph_execution_context(self) -> Any:
         """Resolve the explicit execution context for StateGraph execution."""
-        execution_context = getattr(self.orchestrator, "_execution_context", None)
+        from victor.runtime.context import resolve_execution_context
+
+        execution_context = resolve_execution_context(self.orchestrator)
         if execution_context is None:
             return self.orchestrator
 

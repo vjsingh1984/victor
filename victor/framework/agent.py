@@ -47,6 +47,7 @@ from victor.framework.message_execution import execute_message, stream_message_e
 from victor.framework.state import State, StateObserver
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet, ToolsInput
+from victor.runtime.context import resolve_execution_context
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -138,12 +139,7 @@ class Agent:
         self._model = model
         self._vertical = vertical
         self._vertical_config = vertical_config
-        orchestrator_state = getattr(orchestrator, "__dict__", {})
-        self._context = (
-            orchestrator_state.get("_execution_context")
-            if isinstance(orchestrator_state, dict)
-            else None
-        )
+        self._context = resolve_execution_context(orchestrator)
         self._state = State(orchestrator)
         self._state_observers: List[StateObserver] = []
         # LSP capability (language intelligence)
@@ -428,12 +424,7 @@ class Agent:
         if runtime_context is not None:
             return runtime_context
 
-        orchestrator_state = getattr(self._orchestrator, "__dict__", {})
-        runtime_context = (
-            orchestrator_state.get("_execution_context")
-            if isinstance(orchestrator_state, dict)
-            else None
-        )
+        runtime_context = resolve_execution_context(self._orchestrator)
         if runtime_context is not None:
             self._context = runtime_context
         return runtime_context
