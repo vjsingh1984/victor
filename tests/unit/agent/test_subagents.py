@@ -554,14 +554,14 @@ class TestOrchestratorSubAgentIntegration:
         )
 
     def test_subagent_orchestrator_property_is_lazy(self):
-        """Test that intelligent_integration property follows lazy init pattern."""
+        """Test that runtime_intelligence_integration property follows lazy init pattern."""
         import inspect
         from victor.agent.orchestrator import AgentOrchestrator
 
-        source = inspect.getsource(AgentOrchestrator.intelligent_integration.fget)
+        source = inspect.getsource(AgentOrchestrator.runtime_intelligence_integration.fget)
         # Check for lazy initialization pattern
         assert "_runtime_intelligence_enabled" in source
-        assert "_intelligent_integration is None" in source
+        assert "_runtime_intelligence_integration is None" in source
         assert "from victor.agent.orchestrator_integration import OrchestratorIntegration" in source
 
     def test_subagent_orchestrator_returns_none_when_disabled(self):

@@ -239,7 +239,7 @@ class ChatStreamHelperMixin:
         intelligent_task = None
         if not direct_response.is_direct_response:
             intelligent_task = asyncio.create_task(
-                orch._prepare_intelligent_request(
+                orch._prepare_runtime_intelligence_request(
                     task=user_message,
                     task_type=unified_task_type.value,
                 )
@@ -796,7 +796,7 @@ class ChatStreamHelperMixin:
         if orch._check_cancellation():
             logger.info("Stream cancelled by user request")
             orch._is_streaming = False
-            orch._record_intelligent_outcome(
+            orch._record_runtime_intelligence_outcome(
                 success=False,
                 quality_score=stream_ctx.last_quality_score,
                 user_satisfied=False,

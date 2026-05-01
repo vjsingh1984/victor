@@ -52,7 +52,7 @@ class TestOrchestratorPropertyInstallation:
         lazy_props = [
             "protocol_adapter",
             "turn_executor",
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             "subagent_orchestrator",
             "orchestration_facade",
             "coordination_advisor",

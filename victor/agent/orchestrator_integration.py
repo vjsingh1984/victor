@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Orchestrator integration bridge for intelligent pipeline components.
+"""Orchestrator integration bridge for runtime-intelligence components.
 
 This module provides a non-intrusive integration layer that connects the
-IntelligentAgentPipeline to the AgentOrchestrator. It hooks into the
+RuntimeIntelligencePipeline to the AgentOrchestrator. It hooks into the
 orchestrator's request/response flow to enable:
 
 1. Resilient Provider Calls:
@@ -49,7 +49,7 @@ Architecture (Decorator Pattern):
                     │                   │
                     ▼                   ▼
     ┌───────────────────────┐  ┌────────────────────────────┐
-    │  AgentOrchestrator    │  │  IntelligentAgentPipeline  │
+    │  AgentOrchestrator    │  │ RuntimeIntelligencePipeline│
     │  (existing behavior)  │  │  (learning components)     │
     └───────────────────────┘  └────────────────────────────┘
 
@@ -73,14 +73,14 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.intelligent_pipeline import (
-        IntelligentAgentPipeline,
+    from victor.agent.runtime_intelligence_pipeline import (
+        RuntimeIntelligencePipeline,
         RequestContext,
         ResponseResult,
     )
 
 # Import protocols for runtime type hints (protocols.py has no heavy deps)
-from victor.core.protocols import OrchestratorProtocol, IntelligentPipelineProtocol
+from victor.core.protocols import OrchestratorProtocol, RuntimeIntelligencePipelineProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +121,10 @@ class IntegrationMetrics:
 
 
 class OrchestratorIntegration:
-    """Integration bridge connecting IntelligentAgentPipeline to AgentOrchestrator.
+    """Integration bridge connecting RuntimeIntelligencePipeline to AgentOrchestrator.
 
     This class wraps around an AgentOrchestrator instance and enhances its
-    functionality with intelligent pipeline features. It uses a non-intrusive
+    functionality with runtime-intelligence features. It uses a non-intrusive
     approach - the orchestrator continues to work normally, but gains:
 
     1. Pre-request optimization (prompt building, mode selection)
@@ -135,14 +135,14 @@ class OrchestratorIntegration:
     def __init__(
         self,
         orchestrator: "AgentOrchestrator",
-        pipeline: "IntelligentAgentPipeline",
+        pipeline: "RuntimeIntelligencePipeline",
         config: Optional[IntegrationConfig] = None,
     ):
         """Initialize the integration bridge.
 
         Args:
             orchestrator: The AgentOrchestrator to enhance
-            pipeline: The IntelligentAgentPipeline to use
+            pipeline: The RuntimeIntelligencePipeline to use
             config: Optional configuration settings
         """
         self._orchestrator = orchestrator
@@ -173,10 +173,10 @@ class OrchestratorIntegration:
         Returns:
             Initialized OrchestratorIntegration
         """
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
         # Create pipeline from orchestrator's current state
-        pipeline = await IntelligentAgentPipeline.create(
+        pipeline = await RuntimeIntelligencePipeline.create(
             provider_name=orchestrator.provider_name,
             model=orchestrator.model,
             profile_name=f"{orchestrator.provider_name}:{orchestrator.model}",
@@ -197,7 +197,7 @@ class OrchestratorIntegration:
     ) -> "RequestContext":
         """Prepare an optimized request context.
 
-        Uses the intelligent pipeline to:
+        Uses the runtime-intelligence pipeline to:
         1. Build an optimized system prompt
         2. Get mode transition recommendation
         3. Calculate optimal tool budget
@@ -214,7 +214,7 @@ class OrchestratorIntegration:
 
         if not self._config.enable_prompt_optimization:
             # Return minimal context if optimization disabled
-            from victor.agent.intelligent_pipeline import RequestContext
+            from victor.agent.runtime_intelligence_pipeline import RequestContext
 
             return RequestContext(
                 system_prompt="",
@@ -263,7 +263,7 @@ class OrchestratorIntegration:
     ) -> "ResponseResult":
         """Validate and score a response.
 
-        Uses the intelligent pipeline to:
+        Uses the runtime-intelligence pipeline to:
         1. Score response quality
         2. Verify grounding (hallucination detection)
         3. Record feedback for learning
@@ -278,7 +278,7 @@ class OrchestratorIntegration:
         Returns:
             ResponseResult with quality and grounding info
         """
-        from victor.agent.intelligent_pipeline import ResponseResult
+        from victor.agent.runtime_intelligence_pipeline import ResponseResult
 
         if not self._config.enable_quality_scoring:
             return ResponseResult(
@@ -447,22 +447,22 @@ class OrchestratorIntegration:
         return self._orchestrator
 
     @property
-    def pipeline(self) -> "IntelligentAgentPipeline":
-        """Get the intelligent pipeline."""
+    def pipeline(self) -> "RuntimeIntelligencePipeline":
+        """Get the runtime-intelligence pipeline."""
         return self._pipeline
 
     # =========================================================================
-    # Intelligent Pipeline Methods (moved from AgentOrchestrator)
+    # Runtime-intelligence methods (moved from AgentOrchestrator)
     # =========================================================================
 
-    async def prepare_intelligent_request(
+    async def prepare_runtime_intelligence_request(
         self,
         task: str,
         task_type: str,
         conversation_state: Any,
         unified_tracker: Any,
     ) -> Optional[Dict[str, Any]]:
-        """Pre-request hook for intelligent pipeline integration.
+        """Pre-request hook for runtime-intelligence integration.
 
         Called at the start of stream_chat to:
         - Get mode transition recommendations (Q-learning)
@@ -504,7 +504,8 @@ class OrchestratorIntegration:
                     # Only log significant differences, but don't reduce the budget
                     if abs(context.recommended_tool_budget - current_budget) > 10:
                         logger.debug(
-                            f"IntelligentPipeline recommended budget {context.recommended_tool_budget} "
+                            "RuntimeIntelligencePipeline recommended budget "
+                            f"{context.recommended_tool_budget} "
                             f"differs from current {current_budget}, keeping current budget"
                         )
 
@@ -517,20 +518,24 @@ class OrchestratorIntegration:
                 ),
             }
         except (AttributeError, KeyError) as e:
-            logger.debug(f"IntelligentPipeline prepare_request skipped (not configured): {e}")
+            logger.debug(
+                f"RuntimeIntelligencePipeline prepare_request skipped (not configured): {e}"
+            )
             return None
         except (ValueError, TypeError) as e:
-            logger.debug(f"IntelligentPipeline prepare_request failed (data error): {e}")
+            logger.debug(
+                f"RuntimeIntelligencePipeline prepare_request failed (data error): {e}"
+            )
             return None
 
-    async def validate_intelligent_response(
+    async def validate_runtime_intelligence_response(
         self,
         response: str,
         query: str,
         tool_calls: int,
         task_type: str,
     ) -> Optional[Dict[str, Any]]:
-        """Post-response hook for intelligent pipeline integration.
+        """Post-response hook for runtime-intelligence integration.
 
         Called after each streaming iteration to:
         - Score response quality (coherence, completeness, relevance)
@@ -562,7 +567,7 @@ class OrchestratorIntegration:
             # Log quality info (debug-level; internal pipeline detail)
             if not result.is_valid:
                 logger.debug(
-                    "IntelligentPipeline: Response below quality threshold "
+                    "RuntimeIntelligencePipeline: Response below quality threshold "
                     "(quality=%.2f, grounded=%s)",
                     result.quality_score,
                     result.is_grounded,
@@ -582,13 +587,17 @@ class OrchestratorIntegration:
                 "grounding_feedback": getattr(result, "grounding_feedback", ""),
             }
         except (AttributeError, KeyError) as e:
-            logger.debug(f"IntelligentPipeline validate_response skipped (not configured): {e}")
+            logger.debug(
+                f"RuntimeIntelligencePipeline validate_response skipped (not configured): {e}"
+            )
             return None
         except (ValueError, TypeError) as e:
-            logger.debug(f"IntelligentPipeline validate_response failed (data error): {e}")
+            logger.debug(
+                f"RuntimeIntelligencePipeline validate_response failed (data error): {e}"
+            )
             return None
 
-    def record_intelligent_outcome(
+    def record_runtime_intelligence_outcome(
         self,
         success: bool,
         quality_score: float,
@@ -717,13 +726,13 @@ class OrchestratorIntegration:
                     completed=completed,
                 )
                 logger.debug(
-                    f"IntelligentPipeline recorded outcome: "
+                    "RuntimeIntelligencePipeline recorded outcome: "
                     f"success={success}, quality={quality_score:.2f}"
                 )
         except Exception as e:
-            logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
+            logger.debug(f"RuntimeIntelligencePipeline record_outcome failed: {e}")
 
-    def should_continue_intelligent(self) -> tuple[bool, str]:
+    def should_continue_runtime_intelligence(self) -> tuple[bool, str]:
         """Check if processing should continue using learned behaviors.
 
         Uses Q-learning based decisions to determine if the agent
@@ -735,8 +744,72 @@ class OrchestratorIntegration:
         try:
             return self.should_continue()
         except Exception as e:
-            logger.debug(f"IntelligentPipeline should_continue failed: {e}")
+            logger.debug(f"RuntimeIntelligencePipeline should_continue failed: {e}")
             return True, "Fallback to continue"
+
+    # Backward-compatible aliases while callers migrate to runtime-intelligence naming.
+    async def prepare_intelligent_request(
+        self,
+        task: str,
+        task_type: str,
+        conversation_state: Any,
+        unified_tracker: Any,
+    ) -> Optional[Dict[str, Any]]:
+        return await self.prepare_runtime_intelligence_request(
+            task=task,
+            task_type=task_type,
+            conversation_state=conversation_state,
+            unified_tracker=unified_tracker,
+        )
+
+    async def validate_intelligent_response(
+        self,
+        response: str,
+        query: str,
+        tool_calls: int,
+        task_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        return await self.validate_runtime_intelligence_response(
+            response=response,
+            query=query,
+            tool_calls=tool_calls,
+            task_type=task_type,
+        )
+
+    def record_intelligent_outcome(
+        self,
+        success: bool,
+        quality_score: float,
+        user_satisfied: bool,
+        completed: bool,
+        rl_coordinator: Any,
+        stream_context: Any,
+        vertical_context: Any,
+        provider_name: str,
+        model: str,
+        tool_calls_used: int,
+        continuation_prompts: int,
+        max_continuation_prompts_used: int,
+        stuck_loop_detected: bool,
+    ) -> None:
+        self.record_runtime_intelligence_outcome(
+            success=success,
+            quality_score=quality_score,
+            user_satisfied=user_satisfied,
+            completed=completed,
+            rl_coordinator=rl_coordinator,
+            stream_context=stream_context,
+            vertical_context=vertical_context,
+            provider_name=provider_name,
+            model=model,
+            tool_calls_used=tool_calls_used,
+            continuation_prompts=continuation_prompts,
+            max_continuation_prompts_used=max_continuation_prompts_used,
+            stuck_loop_detected=stuck_loop_detected,
+        )
+
+    def should_continue_intelligent(self) -> tuple[bool, str]:
+        return self.should_continue_runtime_intelligence()
 
     def emit_continuation_event(
         self,
@@ -805,7 +878,7 @@ async def enhance_orchestrator(
     orchestrator: "AgentOrchestrator",
     config: Optional[IntegrationConfig] = None,
 ) -> OrchestratorIntegration:
-    """Enhance an orchestrator with intelligent pipeline capabilities.
+    """Enhance an orchestrator with runtime-intelligence capabilities.
 
     This is the main entry point for adding intelligent features to
     an existing orchestrator.

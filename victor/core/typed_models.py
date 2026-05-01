@@ -210,7 +210,12 @@ class AgentInfo:
     mcp_client: Optional[Any] = None
     codebase_index: Optional[Any] = None
     conversation_state: Optional[Any] = None
-    intelligent_integration: Optional[Any] = None
+    runtime_intelligence_integration: Optional[Any] = None
+
+    @property
+    def intelligent_integration(self) -> Optional[Any]:
+        """Compatibility alias for runtime_intelligence_integration."""
+        return self.runtime_intelligence_integration
 
     @classmethod
     def from_agent(cls, agent: Any) -> AgentInfo:
@@ -220,7 +225,11 @@ class AgentInfo:
             mcp_client=getattr(agent, "mcp_client", None),
             codebase_index=getattr(agent, "codebase_index", None),
             conversation_state=getattr(agent, "conversation_state", None),
-            intelligent_integration=getattr(agent, "intelligent_integration", None),
+            runtime_intelligence_integration=getattr(
+                agent,
+                "runtime_intelligence_integration",
+                None,
+            ),
         )
 
 

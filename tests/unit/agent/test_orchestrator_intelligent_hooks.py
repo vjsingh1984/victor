@@ -121,10 +121,10 @@ class TestOrchestratorIntelligentHooks:
         # Create a minimal mock orchestrator
         orchestrator = MagicMock()
         orchestrator._runtime_intelligence_enabled = False
-        orchestrator._intelligent_integration = None
+        orchestrator._runtime_intelligence_integration = None
 
         # Access the property should return None
-        assert orchestrator._intelligent_integration is None
+        assert orchestrator._runtime_intelligence_integration is None
 
     def test_prepare_intelligent_request_handles_exceptions(self):
         """Should handle exceptions gracefully in prepare_request."""
@@ -204,19 +204,19 @@ class TestOrchestratorIntelligentHooks:
 
 
 class TestOrchestratorIntegrationProperty:
-    """Tests for the intelligent_integration property accessor."""
+    """Tests for the runtime_intelligence_integration property accessor."""
 
     def test_property_returns_none_when_disabled(self):
         """Property should return None when feature is disabled."""
         orchestrator = MagicMock()
         orchestrator._runtime_intelligence_enabled = False
-        orchestrator._intelligent_integration = None
+        orchestrator._runtime_intelligence_integration = None
 
         # Simulating the property behavior
         if not orchestrator._runtime_intelligence_enabled:
             result = None
         else:
-            result = orchestrator._intelligent_integration
+            result = orchestrator._runtime_intelligence_integration
 
         assert result is None
 
@@ -224,21 +224,21 @@ class TestOrchestratorIntegrationProperty:
         """Property should lazy initialize on first access."""
         orchestrator = MagicMock()
         orchestrator._runtime_intelligence_enabled = True
-        orchestrator._intelligent_integration = None
+        orchestrator._runtime_intelligence_integration = None
 
         # First access triggers initialization
         # In real code, this would create the integration
-        assert orchestrator._intelligent_integration is None  # Before init
+        assert orchestrator._runtime_intelligence_integration is None  # Before init
 
     def test_property_returns_cached_instance(self):
         """Property should return cached instance on subsequent calls."""
         integration = MagicMock()
         orchestrator = MagicMock()
         orchestrator._runtime_intelligence_enabled = True
-        orchestrator._intelligent_integration = integration
+        orchestrator._runtime_intelligence_integration = integration
 
         # Should return the cached instance
-        assert orchestrator._intelligent_integration is integration
+        assert orchestrator._runtime_intelligence_integration is integration
 
 
 class TestHookIntegration:

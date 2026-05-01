@@ -70,14 +70,15 @@ if not _LIGHT_IMPORT:
         reset_task_analyzer,
     )
 
-    # Intelligent agent components (RL-based learning, quality scoring, prompt optimization)
-    from victor.agent.intelligent_pipeline import (
-        IntelligentAgentPipeline,
+    # Runtime-intelligence components (RL-based learning, quality scoring,
+    # prompt optimization)
+    from victor.agent.runtime_intelligence_pipeline import (
+        RuntimeIntelligencePipeline,
         RequestContext,
         ResponseResult,
         PipelineStats,
-        get_intelligent_agent,
-        clear_intelligent_agent_cache,
+        get_runtime_intelligence_pipeline,
+        clear_runtime_intelligence_pipeline_cache,
     )
     from victor.agent.orchestrator_integration import (
         OrchestratorIntegration,
@@ -85,6 +86,11 @@ if not _LIGHT_IMPORT:
         IntegrationMetrics,
         enhance_orchestrator,
     )
+
+    # Backward-compatible aliases while external imports migrate.
+    IntelligentAgentPipeline = RuntimeIntelligencePipeline
+    get_intelligent_agent = get_runtime_intelligence_pipeline
+    clear_intelligent_agent_cache = clear_runtime_intelligence_pipeline_cache
 
     __all__ = [
         "AgentOrchestrator",
@@ -127,11 +133,14 @@ if not _LIGHT_IMPORT:
         "TaskAnalysis",
         "get_task_analyzer",
         "reset_task_analyzer",
-        # Intelligent Pipeline
+        # Runtime Intelligence
+        "RuntimeIntelligencePipeline",
         "IntelligentAgentPipeline",
         "RequestContext",
         "ResponseResult",
         "PipelineStats",
+        "get_runtime_intelligence_pipeline",
+        "clear_runtime_intelligence_pipeline_cache",
         "get_intelligent_agent",
         "clear_intelligent_agent_cache",
         # Orchestrator Integration

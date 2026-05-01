@@ -90,7 +90,7 @@ class ContextLimitRuntime:
                 sanitized = runtime.sanitizer.sanitize(response.content)
                 if sanitized:
                     runtime.add_message("assistant", sanitized)
-                    runtime._record_intelligent_outcome(
+                    runtime._record_runtime_intelligence_outcome(
                         success=True,
                         quality_score=last_quality_score,
                         user_satisfied=True,
@@ -100,7 +100,7 @@ class ContextLimitRuntime:
         except Exception as exc:
             logger.warning("Final response after context overflow failed: %s", exc)
 
-        runtime._record_intelligent_outcome(
+        runtime._record_runtime_intelligence_outcome(
             success=True,
             quality_score=last_quality_score,
             user_satisfied=True,
@@ -149,7 +149,7 @@ class ContextLimitRuntime:
                 if sanitized:
                     runtime.add_message("assistant", sanitized)
                     chunk = StreamChunk(content=sanitized, is_final=True)
-                    runtime._record_intelligent_outcome(
+                    runtime._record_runtime_intelligence_outcome(
                         success=True,
                         quality_score=last_quality_score,
                         user_satisfied=True,
@@ -178,7 +178,7 @@ class ContextLimitRuntime:
                 is_final=True,
             )
 
-        runtime._record_intelligent_outcome(
+        runtime._record_runtime_intelligence_outcome(
             success=True,
             quality_score=last_quality_score,
             user_satisfied=True,

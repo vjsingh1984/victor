@@ -183,7 +183,7 @@ class ChatOrchestratorProtocol(
         """Apply a recovery action and return optional StreamChunk."""
         ...
 
-    def _record_intelligent_outcome(
+    def _record_runtime_intelligence_outcome(
         self,
         success: bool,
         quality_score: float,
@@ -193,7 +193,7 @@ class ChatOrchestratorProtocol(
         """Record outcome for intelligent pipeline metrics."""
         ...
 
-    async def _validate_intelligent_response(
+    async def _validate_runtime_intelligence_response(
         self,
         response: str,
         query: str,
@@ -203,7 +203,7 @@ class ChatOrchestratorProtocol(
         """Validate response quality using intelligent pipeline."""
         ...
 
-    async def _prepare_intelligent_request(
+    async def _prepare_runtime_intelligence_request(
         self,
         task: str,
         task_type: str,

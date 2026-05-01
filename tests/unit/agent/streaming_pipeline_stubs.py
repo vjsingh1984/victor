@@ -90,7 +90,7 @@ class OrchestratorStub:
         self._asking_input_prompts = 0
         self._consecutive_blocked_attempts = 0
         self._cumulative_prompt_interventions = 0
-        self._record_intelligent_outcome = lambda **__: None
+        self._record_runtime_intelligence_outcome = lambda **__: None
         self._force_finalize = False
         self._container = None
         self._session_tools = None
@@ -131,7 +131,7 @@ class OrchestratorStub:
     def create_recovery_context(self, *_):
         return object()
 
-    async def _validate_intelligent_response(self, *args, **kwargs):
+    async def _validate_runtime_intelligence_response(self, *args, **kwargs):
         return None
 
 

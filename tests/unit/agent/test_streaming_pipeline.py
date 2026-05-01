@@ -164,7 +164,7 @@ async def test_pipeline_records_pending_grounding_feedback():
     async def mock_validate(*args, **kwargs):
         return validate_result
 
-    coordinator._orchestrator._validate_intelligent_response = mock_validate
+    coordinator._orchestrator._validate_runtime_intelligence_response = mock_validate
     intent_result = IntentClassificationResult(
         chunks=[],
         action_result={"reason": "finish"},

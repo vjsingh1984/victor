@@ -268,7 +268,7 @@ class TestProtocolCompleteness:
             annotations.update(getattr(cls, "__annotations__", {}))
         assert "_recovery_coordinator" in annotations
         assert "_recovery_integration" in annotations
-        assert hasattr(ChatOrchestratorProtocol, "_record_intelligent_outcome")
+        assert hasattr(ChatOrchestratorProtocol, "_record_runtime_intelligence_outcome")
 
     def test_composite_protocol_declares_presentation_members(self):
         from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol

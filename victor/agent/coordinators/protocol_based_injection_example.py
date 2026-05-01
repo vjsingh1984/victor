@@ -222,17 +222,17 @@ class MockChatOrchestrator(ChatOrchestratorProtocol):
     def _apply_recovery_action(self, recovery_action: Any, stream_ctx: Any) -> Any:
         return None
 
-    def _record_intelligent_outcome(
+    def _record_runtime_intelligence_outcome(
         self, success: bool, quality_score: float, user_satisfied: bool, completed: bool
     ) -> None:
         pass
 
-    async def _validate_intelligent_response(
+    async def _validate_runtime_intelligence_response(
         self, response: str, query: str, tool_calls: int, task_type: str
     ) -> Any:
         return {"valid": True}
 
-    async def _prepare_intelligent_request(self, task: str, task_type: str) -> Any:
+    async def _prepare_runtime_intelligence_request(self, task: str, task_type: str) -> Any:
         return {"mock": "intelligent_context"}
 
     # Presentation & output

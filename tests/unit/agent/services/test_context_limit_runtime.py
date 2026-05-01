@@ -21,7 +21,7 @@ def _make_runtime_host():
         max_tokens=4096,
         sanitizer=MagicMock(),
         add_message=MagicMock(),
-        _record_intelligent_outcome=MagicMock(),
+        _record_runtime_intelligence_outcome=MagicMock(),
     )
     host._presentation.icon.return_value = "!"
     host.sanitizer.sanitize.side_effect = lambda text: text
@@ -69,7 +69,7 @@ async def test_context_limit_runtime_forces_summary_on_iteration_limit():
     assert chunk.content == "summary"
     assert chunk.is_final is True
     runtime_host.add_message.assert_called_once_with("assistant", "summary")
-    runtime_host._record_intelligent_outcome.assert_called_once_with(
+    runtime_host._record_runtime_intelligence_outcome.assert_called_once_with(
         success=True,
         quality_score=0.8,
         user_satisfied=True,

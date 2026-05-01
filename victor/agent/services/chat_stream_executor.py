@@ -939,7 +939,7 @@ class StreamingChatExecutor:
                 else:
                     recovery_ctx = create_recovery_context(stream_ctx)
                     fallback_msg = recovery.get_recovery_fallback_message(recovery_ctx)
-                    orch._record_intelligent_outcome(
+                    orch._record_runtime_intelligence_outcome(
                         success=False,
                         quality_score=0.3,
                         user_satisfied=False,
@@ -999,7 +999,7 @@ class StreamingChatExecutor:
                 and len(full_content.strip()) > 50
                 and not getattr(stream_ctx, "is_qa_task", False)
             ):
-                quality_result = await orch._validate_intelligent_response(
+                quality_result = await orch._validate_runtime_intelligence_response(
                     response=full_content,
                     query=user_message,
                     tool_calls=orch.tool_calls_used,

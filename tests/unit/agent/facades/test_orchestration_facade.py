@@ -72,7 +72,7 @@ class TestOrchestrationFacadeInit:
             observability=MagicMock(),
             execution_tracer=MagicMock(),
             tool_call_tracer=MagicMock(),
-            intelligent_integration=MagicMock(),
+            runtime_intelligence_integration=MagicMock(),
             subagent_orchestrator=MagicMock(),
         )
 
@@ -114,7 +114,7 @@ class TestOrchestrationFacadeInit:
         assert facade.observability is None
         assert facade.execution_tracer is None
         assert facade.tool_call_tracer is None
-        assert facade.intelligent_integration is None
+        assert facade.runtime_intelligence_integration is None
         assert facade.subagent_orchestrator is None
 
 
@@ -154,7 +154,7 @@ class TestOrchestrationFacadeProperties:
             vertical_integration_adapter=MagicMock(name="vertical_adapter"),
             vertical_context=MagicMock(name="vertical_ctx"),
             observability=MagicMock(name="observability"),
-            intelligent_integration=MagicMock(name="intelligent"),
+            runtime_intelligence_integration=MagicMock(name="intelligent"),
             subagent_orchestrator=MagicMock(name="subagent"),
         )
 
@@ -639,8 +639,8 @@ class TestOrchestrationFacadeProperties:
     def test_intelligent_integration_setter(self, facade):
         """IntelligentIntegration setter updates the integration."""
         new_int = MagicMock(name="new_int")
-        facade.intelligent_integration = new_int
-        assert facade.intelligent_integration is new_int
+        facade.runtime_intelligence_integration = new_int
+        assert facade.runtime_intelligence_integration is new_int
 
     def test_subagent_orchestrator_setter(self, facade):
         """SubagentOrchestrator setter updates the orchestrator."""

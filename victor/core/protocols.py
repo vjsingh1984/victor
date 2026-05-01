@@ -30,7 +30,7 @@ Design Pattern: Dependency Inversion Principle (SOLID)
 Circular Import Chains Addressed:
 1. orchestrator ↔ evaluation ↔ agent_adapter
 2. task_analyzer ↔ embeddings.task_classifier
-3. intelligent_pipeline ↔ orchestrator
+3. runtime_intelligence_pipeline ↔ orchestrator
 4. tool_calling/registry ↔ adapters
 
 Usage Example:
@@ -340,10 +340,11 @@ class ToolCallingAdapterProtocol(Protocol):
 
 
 @runtime_checkable
-class IntelligentPipelineProtocol(Protocol):
-    """Protocol for intelligent pipeline integration.
+class RuntimeIntelligencePipelineProtocol(Protocol):
+    """Protocol for runtime-intelligence pipeline integration.
 
-    Breaks chain: intelligent_pipeline → orchestrator → intelligent_pipeline
+    Breaks chain:
+        runtime_intelligence_pipeline → orchestrator → runtime_intelligence_pipeline
     """
 
     async def prepare_request(
@@ -386,6 +387,7 @@ class IntelligentPipelineProtocol(Protocol):
         """
         ...
 
+
     def should_continue(self) -> tuple[bool, str]:
         """Check if processing should continue.
 
@@ -393,6 +395,9 @@ class IntelligentPipelineProtocol(Protocol):
             Tuple of (should_continue, reason)
         """
         ...
+
+
+IntelligentPipelineProtocol = RuntimeIntelligencePipelineProtocol
 
 
 @runtime_checkable
@@ -528,6 +533,7 @@ __all__ = [
     "IntentClassifierProtocol",
     "EmbeddingServiceProtocol",
     "ToolCallingAdapterProtocol",
+    "RuntimeIntelligencePipelineProtocol",
     "IntelligentPipelineProtocol",
     "ProviderProtocol",
     "CacheProtocol",

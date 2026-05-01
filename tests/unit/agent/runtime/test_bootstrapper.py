@@ -159,7 +159,7 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["observability"] is orch._observability
         assert kwargs["execution_tracer"] is getattr(orch, "_execution_tracer", None)
         assert kwargs["tool_call_tracer"] is getattr(orch, "_tool_call_tracer", None)
-        assert kwargs["intelligent_integration"] is orch._intelligent_integration
+        assert kwargs["runtime_intelligence_integration"] is orch._runtime_intelligence_integration
         assert kwargs["subagent_orchestrator"] is orch._subagent_orchestrator
         orch._factory.create_exploration_state_passed_coordinator.assert_called_once_with()
         orch._factory.create_system_prompt_state_passed_coordinator.assert_called_once_with(

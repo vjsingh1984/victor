@@ -353,24 +353,22 @@ class LearningCommand(BaseSlashCommand):
 
         # Handle reset subcommand
         if subcommand == "reset":
-            # Reset intelligent pipeline
+            # Reset runtime-intelligence pipeline
             if ctx.agent:
-                # Use capability registry for intelligent pipeline access
-                if hasattr(ctx.agent, "get_capability_value"):
+                integration = getattr(ctx.agent, "runtime_intelligence_integration", None)
+                if integration is None and hasattr(ctx.agent, "get_capability_value"):
                     integration = ctx.agent.get_capability_value("intelligent_pipeline")
-                else:
-                    integration = getattr(ctx.agent, "intelligent_integration", None)
 
                 if integration:
                     if hasattr(integration, "reset_session"):
                         integration.reset_session()
-                        ctx.console.print("[green]Intelligent pipeline session reset[/]")
+                        ctx.console.print("[green]Runtime-intelligence session reset[/]")
                     else:
                         # Fallback to _pipeline attribute
                         pipeline = getattr(integration, "_pipeline", None)
                         if pipeline:
                             pipeline.reset_session()
-                            ctx.console.print("[green]Intelligent pipeline session reset[/]")
+                            ctx.console.print("[green]Runtime-intelligence session reset[/]")
 
             # Reset model selector
             from victor.framework.rl.coordinator import get_rl_coordinator
@@ -438,13 +436,11 @@ class LearningCommand(BaseSlashCommand):
         # Default: show stats
         content = "[bold]Reinforcement Learning Statistics[/]\n\n"
 
-        # 1. Intelligent Pipeline stats (mode controller)
+        # 1. Runtime-intelligence stats (mode controller)
         if ctx.agent:
-            # Use capability registry for intelligent pipeline access
-            if hasattr(ctx.agent, "get_capability_value"):
+            integration = getattr(ctx.agent, "runtime_intelligence_integration", None)
+            if integration is None and hasattr(ctx.agent, "get_capability_value"):
                 integration = ctx.agent.get_capability_value("intelligent_pipeline")
-            else:
-                integration = getattr(ctx.agent, "intelligent_integration", None)
 
             if integration:
                 if hasattr(integration, "get_stats"):

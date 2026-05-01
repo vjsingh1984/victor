@@ -209,17 +209,17 @@ def _turn_executor(self: "AgentOrchestrator") -> Any:
     return self._turn_executor
 
 
-def _intelligent_integration(
+def _runtime_intelligence_integration(
     self: "AgentOrchestrator",
 ) -> Optional["OrchestratorIntegration"]:
-    """Get the intelligent pipeline integration (lazy init)."""
+    """Get the runtime-intelligence integration (lazy init)."""
     if not self._runtime_intelligence_enabled:
         return None
 
-    if self._intelligent_integration is None:
+    if self._runtime_intelligence_integration is None:
         try:
             from victor.agent.orchestrator_integration import OrchestratorIntegration
-            from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+            from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
             from victor.config.settings import get_project_paths
             from victor.context.project_context import VICTOR_DIR_NAME
 
@@ -232,29 +232,38 @@ def _intelligent_integration(
             else:
                 intelligent_project_root = str(get_project_paths().project_root)
 
-            pipeline = IntelligentAgentPipeline(
+            pipeline = RuntimeIntelligencePipeline(
                 provider_name=self.provider_name,
                 model=self.model,
                 profile_name=f"{self.provider_name}:{self.model}",
                 project_root=intelligent_project_root,
             )
-            self._intelligent_integration = OrchestratorIntegration(
+            self._runtime_intelligence_integration = OrchestratorIntegration(
                 orchestrator=self,
                 pipeline=pipeline,
-                config=self._intelligent_integration_config,
+                config=self._runtime_intelligence_integration_config,
             )
             logger.info(
                 f"Runtime-intelligence integration initialized for "
                 f"{self.provider_name}:{self.model}"
             )
         except ImportError as e:
-            logger.debug(f"IntelligentPipeline dependencies not available: {e}")
+            logger.debug(f"RuntimeIntelligencePipeline dependencies not available: {e}")
             self._runtime_intelligence_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
+            logger.warning(
+                f"Failed to initialize RuntimeIntelligencePipeline (config error): {e}"
+            )
             self._runtime_intelligence_enabled = False
 
-    return self._intelligent_integration
+    return self._runtime_intelligence_integration
+
+
+def _intelligent_integration(
+    self: "AgentOrchestrator",
+) -> Optional["OrchestratorIntegration"]:
+    """Compatibility alias for the runtime-intelligence integration property."""
+    return _runtime_intelligence_integration(self)
 
 
 def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
@@ -565,6 +574,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     # Group 2: Lazy coordinators (getter only)
     "protocol_adapter": (_protocol_adapter, None),
     "turn_executor": (_turn_executor, None),
+    "runtime_intelligence_integration": (_runtime_intelligence_integration, None),
     "intelligent_integration": (_intelligent_integration, None),
     "subagent_orchestrator": (_subagent_orchestrator, None),
     "coordination_advisor": (_coordination_advisor, None),

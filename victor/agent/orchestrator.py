@@ -687,9 +687,19 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             SessionServiceProtocol,
             ToolServiceProtocol,
         )
-        from victor.runtime.context import register_runtime_services, resolve_runtime_services
+        from victor.runtime.context import ResolvedRuntimeServices, register_runtime_services
 
-        register_runtime_services(self._container, resolve_runtime_services(self))
+        register_runtime_services(
+            self._container,
+            ResolvedRuntimeServices(
+                chat=getattr(self, "_chat_service", None),
+                tool=getattr(self, "_tool_service", None),
+                session=getattr(self, "_session_service", None),
+                context=getattr(self, "_context_service", None),
+                provider=getattr(self, "_provider_service", None),
+                recovery=getattr(self, "_recovery_service", None),
+            ),
+        )
 
         # Register coordinators in container for service dependencies
         self._register_coordinators_for_services()
@@ -1054,9 +1064,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Intent classifier for semantic continuation/completion detection
         self.intent_classifier = self._factory.create_intent_classifier()
 
-        # Intelligent pipeline integration (lazy initialization)
-        self._intelligent_integration: Optional["OrchestratorIntegration"] = None
-        self._intelligent_integration_config = self._factory.create_integration_config()
+        # Runtime-intelligence integration (lazy initialization)
+        self._runtime_intelligence_integration: Optional["OrchestratorIntegration"] = None
+        self._runtime_intelligence_integration_config = self._factory.create_integration_config()
         from victor.config.pipeline_settings import resolve_runtime_intelligence_enabled
 
         self._runtime_intelligence_enabled = resolve_runtime_intelligence_enabled(settings)
@@ -1480,12 +1490,12 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """
         return await self._session_service.maybe_auto_checkpoint()
 
-    async def _prepare_intelligent_request(
+    async def _prepare_runtime_intelligence_request(
         self, task: str, task_type: str
     ) -> Optional[Dict[str, Any]]:
-        """Pre-request hook for intelligent pipeline integration.
+        """Pre-request hook for runtime-intelligence integration.
 
-        Delegates to OrchestratorIntegration.prepare_intelligent_request().
+        Delegates to OrchestratorIntegration.prepare_runtime_intelligence_request().
 
         Args:
             task: The user's task/query
@@ -1494,27 +1504,27 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             Dictionary with recommendations, or None if pipeline disabled
         """
-        integration = self.intelligent_integration
+        integration = self.runtime_intelligence_integration
         if not integration:
             return None
 
-        return await integration.prepare_intelligent_request(
+        return await integration.prepare_runtime_intelligence_request(
             task=task,
             task_type=task_type,
             conversation_state=self.conversation_state,
             unified_tracker=self.unified_tracker,
         )
 
-    async def _validate_intelligent_response(
+    async def _validate_runtime_intelligence_response(
         self,
         response: str,
         query: str,
         tool_calls: int,
         task_type: str,
     ) -> Optional[Dict[str, Any]]:
-        """Post-response hook for intelligent pipeline integration.
+        """Post-response hook for runtime-intelligence integration.
 
-        Delegates to OrchestratorIntegration.validate_intelligent_response().
+        Delegates to OrchestratorIntegration.validate_runtime_intelligence_response().
 
         Args:
             response: The model's response content
@@ -1525,18 +1535,18 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         Returns:
             Dictionary with quality/grounding scores, or None if pipeline disabled
         """
-        integration = self.intelligent_integration
+        integration = self.runtime_intelligence_integration
         if not integration:
             return None
 
-        return await integration.validate_intelligent_response(
+        return await integration.validate_runtime_intelligence_response(
             response=response,
             query=query,
             tool_calls=tool_calls,
             task_type=task_type,
         )
 
-    def _record_intelligent_outcome(
+    def _record_runtime_intelligence_outcome(
         self,
         success: bool,
         quality_score: float = 0.5,
@@ -1545,7 +1555,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     ) -> None:
         """Record outcome for Q-learning feedback.
 
-        Delegates to OrchestratorIntegration.record_intelligent_outcome().
+        Delegates to OrchestratorIntegration.record_runtime_intelligence_outcome().
 
         Args:
             success: Whether the task was completed successfully
@@ -1553,7 +1563,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             user_satisfied: Whether user seemed satisfied
             completed: Whether task reached completion
         """
-        integration = self.intelligent_integration
+        integration = self.runtime_intelligence_integration
         if not integration:
             return
 
@@ -1564,7 +1574,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
 
         try:
-            integration.record_intelligent_outcome(
+            integration.record_runtime_intelligence_outcome(
                 success=success,
                 quality_score=quality_score,
                 user_satisfied=user_satisfied,
@@ -1580,7 +1590,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 stuck_loop_detected=stuck_loop_detected,
             )
         except Exception as e:
-            logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
+            logger.debug(f"RuntimeIntelligencePipeline record_outcome failed: {e}")
 
         # EvoTest: trigger session-end GEPA evolution (E12)
         if self.tool_calls_used >= 3:
@@ -1598,19 +1608,56 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             except Exception as e:
                 logger.debug(f"[evotest] Session-end evolution failed: {e}")
 
-    def _should_continue_intelligent(self) -> tuple[bool, str]:
+    def _should_continue_runtime_intelligence(self) -> tuple[bool, str]:
         """Check if processing should continue using learned behaviors.
 
-        Delegates to OrchestratorIntegration.should_continue_intelligent().
+        Delegates to OrchestratorIntegration.should_continue_runtime_intelligence().
 
         Returns:
             Tuple of (should_continue, reason)
         """
-        integration = self.intelligent_integration
+        integration = self.runtime_intelligence_integration
         if not integration:
             return True, "Pipeline disabled"
 
-        return integration.should_continue_intelligent()
+        return integration.should_continue_runtime_intelligence()
+
+    # Backward-compatible aliases while runtime-intelligence naming propagates.
+    async def _prepare_intelligent_request(
+        self, task: str, task_type: str
+    ) -> Optional[Dict[str, Any]]:
+        return await self._prepare_runtime_intelligence_request(task, task_type)
+
+    async def _validate_intelligent_response(
+        self,
+        response: str,
+        query: str,
+        tool_calls: int,
+        task_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        return await self._validate_runtime_intelligence_response(
+            response=response,
+            query=query,
+            tool_calls=tool_calls,
+            task_type=task_type,
+        )
+
+    def _record_intelligent_outcome(
+        self,
+        success: bool,
+        quality_score: float = 0.5,
+        user_satisfied: bool = True,
+        completed: bool = True,
+    ) -> None:
+        self._record_runtime_intelligence_outcome(
+            success=success,
+            quality_score=quality_score,
+            user_satisfied=user_satisfied,
+            completed=completed,
+        )
+
+    def _should_continue_intelligent(self) -> tuple[bool, str]:
+        return self._should_continue_runtime_intelligence()
 
     @property
     def safety_checker(self) -> "SafetyChecker":

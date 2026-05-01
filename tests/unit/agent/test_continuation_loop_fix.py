@@ -557,9 +557,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_finalize_after_max_grounding_retries(self):
         """Should finalize with best-effort response after max grounding failures."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        pipeline = IntelligentAgentPipeline(
+        pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
             profile_name="test",
@@ -596,9 +596,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_retry_on_first_grounding_failure(self):
         """Should allow retry on first grounding failure."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        pipeline = IntelligentAgentPipeline(
+        pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
             profile_name="test",
@@ -632,9 +632,9 @@ class TestBestEffortFinalize:
     @pytest.mark.asyncio
     async def test_reset_counter_on_success(self):
         """Should reset grounding failure counter on success."""
-        from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
+        from victor.agent.runtime_intelligence_pipeline import RuntimeIntelligencePipeline
 
-        pipeline = IntelligentAgentPipeline(
+        pipeline = RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-5-sonnet",
             profile_name="test",

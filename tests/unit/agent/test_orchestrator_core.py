@@ -2380,23 +2380,23 @@ class TestSwitchModel:
 
 
 class TestIntelligentIntegration:
-    """Tests for intelligent_integration property."""
+    """Tests for runtime_intelligence_integration property."""
 
     def test_returns_none_when_disabled(self, orchestrator):
         """Returns None when intelligent pipeline is disabled."""
         orchestrator._runtime_intelligence_enabled = False
-        result = orchestrator.intelligent_integration
+        result = orchestrator.runtime_intelligence_integration
         assert result is None
 
     def test_lazy_initialization(self, orchestrator):
         """Integration is lazily initialized."""
         # Initially should be None
-        assert orchestrator._intelligent_integration is None
+        assert orchestrator._runtime_intelligence_integration is None
 
     def test_property_is_accessible(self, orchestrator):
-        """intelligent_integration property is accessible."""
+        """runtime_intelligence_integration property is accessible."""
         # This may return None or an integration object
-        result = orchestrator.intelligent_integration
+        result = orchestrator.runtime_intelligence_integration
         # Should not raise
 
 
@@ -2904,18 +2904,18 @@ class TestIntelligentPipelineIntegration:
 
     @pytest.mark.asyncio
     async def test_prepare_intelligent_request_no_integration(self, orchestrator):
-        """Test _prepare_intelligent_request returns None without integration."""
+        """Test _prepare_runtime_intelligence_request returns None without integration."""
         # Pipeline is disabled by default in test settings
         orchestrator._runtime_intelligence_enabled = False
-        result = await orchestrator._prepare_intelligent_request("test task", "analysis")
+        result = await orchestrator._prepare_runtime_intelligence_request("test task", "analysis")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_prepare_intelligent_request_with_integration(self, orchestrator):
-        """Test _prepare_intelligent_request with integration."""
+        """Test _prepare_runtime_intelligence_request with integration."""
         mock_integration = MagicMock()
         # Mock the new method name (TD-002 refactoring)
-        mock_integration.prepare_intelligent_request = AsyncMock(
+        mock_integration.prepare_runtime_intelligence_request = AsyncMock(
             return_value={
                 "recommended_mode": "explore",
                 "recommended_tool_budget": 10,
@@ -2926,10 +2926,10 @@ class TestIntelligentPipelineIntegration:
         # Patch the property to return our mock
         with patch.object(
             type(orchestrator),
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._prepare_intelligent_request("test task", "analysis")
+            result = await orchestrator._prepare_runtime_intelligence_request("test task", "analysis")
 
         assert result is not None
         assert result["recommended_mode"] == "explore"
@@ -2939,53 +2939,53 @@ class TestIntelligentPipelineIntegration:
 
     @pytest.mark.asyncio
     async def test_prepare_intelligent_request_error(self, orchestrator):
-        """Test _prepare_intelligent_request handles errors."""
+        """Test _prepare_runtime_intelligence_request handles errors."""
         mock_integration = MagicMock()
         # Mock the new method name (TD-002 refactoring)
-        mock_integration.prepare_intelligent_request = AsyncMock(return_value=None)
+        mock_integration.prepare_runtime_intelligence_request = AsyncMock(return_value=None)
         with patch.object(
             type(orchestrator),
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._prepare_intelligent_request("test task", "analysis")
+            result = await orchestrator._prepare_runtime_intelligence_request("test task", "analysis")
 
         assert result is None
 
     @pytest.mark.asyncio
     async def test_validate_intelligent_response_no_integration(self, orchestrator):
-        """Test _validate_intelligent_response returns None without integration."""
+        """Test _validate_runtime_intelligence_response returns None without integration."""
         orchestrator._runtime_intelligence_enabled = False
-        result = await orchestrator._validate_intelligent_response(
+        result = await orchestrator._validate_runtime_intelligence_response(
             "response", "query", 5, "analysis"
         )
         assert result is None
 
     @pytest.mark.asyncio
     async def test_validate_intelligent_response_empty_response(self, orchestrator):
-        """Test _validate_intelligent_response skips empty responses."""
+        """Test _validate_runtime_intelligence_response skips empty responses."""
         mock_integration = MagicMock()
         # Mock returns None for short/empty responses (TD-002 refactoring)
-        mock_integration.validate_intelligent_response = AsyncMock(return_value=None)
+        mock_integration.validate_runtime_intelligence_response = AsyncMock(return_value=None)
         with patch.object(
             type(orchestrator),
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._validate_intelligent_response("", "query", 5, "analysis")
+            result = await orchestrator._validate_runtime_intelligence_response("", "query", 5, "analysis")
             assert result is None
 
-            result = await orchestrator._validate_intelligent_response(
+            result = await orchestrator._validate_runtime_intelligence_response(
                 "short", "query", 5, "analysis"
             )
             assert result is None
 
     @pytest.mark.asyncio
     async def test_validate_intelligent_response_with_integration(self, orchestrator):
-        """Test _validate_intelligent_response with integration."""
+        """Test _validate_runtime_intelligence_response with integration."""
         mock_integration = MagicMock()
         # Mock the new method name (TD-002 refactoring)
-        mock_integration.validate_intelligent_response = AsyncMock(
+        mock_integration.validate_runtime_intelligence_response = AsyncMock(
             return_value={
                 "quality_score": 0.9,
                 "grounding_score": 0.85,
@@ -2996,10 +2996,10 @@ class TestIntelligentPipelineIntegration:
         )
         with patch.object(
             type(orchestrator),
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._validate_intelligent_response(
+            result = await orchestrator._validate_runtime_intelligence_response(
                 "This is a longer response with at least 50 characters for testing purposes.",
                 "query",
                 5,
@@ -3014,16 +3014,16 @@ class TestIntelligentPipelineIntegration:
 
     @pytest.mark.asyncio
     async def test_validate_intelligent_response_error(self, orchestrator):
-        """Test _validate_intelligent_response handles errors."""
+        """Test _validate_runtime_intelligence_response handles errors."""
         mock_integration = MagicMock()
         # Mock returns None on error (TD-002 refactoring)
-        mock_integration.validate_intelligent_response = AsyncMock(return_value=None)
+        mock_integration.validate_runtime_intelligence_response = AsyncMock(return_value=None)
         with patch.object(
             type(orchestrator),
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._validate_intelligent_response(
+            result = await orchestrator._validate_runtime_intelligence_response(
                 "This is a longer response with at least 50 characters for testing purposes.",
                 "query",
                 5,
@@ -3033,38 +3033,38 @@ class TestIntelligentPipelineIntegration:
         assert result is None
 
     def test_record_intelligent_outcome_no_integration(self, orchestrator):
-        """Test _record_intelligent_outcome with no integration."""
+        """Test _record_runtime_intelligence_outcome with no integration."""
         orchestrator._runtime_intelligence_enabled = False
         # Should not raise
-        orchestrator._record_intelligent_outcome(True, 0.9, True, True)
+        orchestrator._record_runtime_intelligence_outcome(True, 0.9, True, True)
 
     def test_record_intelligent_outcome_with_integration(self, orchestrator):
-        """Test _record_intelligent_outcome with integration."""
+        """Test _record_runtime_intelligence_outcome with integration."""
         mock_integration = MagicMock()
         # Mock the new method name (TD-002 refactoring)
-        mock_integration.record_intelligent_outcome = MagicMock()
+        mock_integration.record_runtime_intelligence_outcome = MagicMock()
         with patch.object(
             type(orchestrator),
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            orchestrator._record_intelligent_outcome(True, 0.9, True, True)
+            orchestrator._record_runtime_intelligence_outcome(True, 0.9, True, True)
 
         # Verify the method was called (exact args depend on orchestrator state)
-        mock_integration.record_intelligent_outcome.assert_called_once()
+        mock_integration.record_runtime_intelligence_outcome.assert_called_once()
 
     def test_record_intelligent_outcome_error(self, orchestrator):
-        """Test _record_intelligent_outcome handles errors."""
+        """Test _record_runtime_intelligence_outcome handles errors."""
         mock_integration = MagicMock()
         # Mock the new method name (TD-002 refactoring)
-        mock_integration.record_intelligent_outcome = MagicMock(side_effect=Exception("Error"))
+        mock_integration.record_runtime_intelligence_outcome = MagicMock(side_effect=Exception("Error"))
         with patch.object(
             type(orchestrator),
-            "intelligent_integration",
+            "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
             # Should not raise - errors are handled internally
-            orchestrator._record_intelligent_outcome(True, 0.9, True, True)
+            orchestrator._record_runtime_intelligence_outcome(True, 0.9, True, True)
 
 
 class TestPrepareStream:
@@ -3100,7 +3100,7 @@ class TestPrepareStream:
     async def test_prepare_stream_skips_intelligent_request_for_direct_response(self, orchestrator):
         """Direct-response prompts should bypass intelligent reminder injection."""
         runtime = orchestrator._get_chat_stream_adapter()
-        orchestrator._prepare_intelligent_request = AsyncMock(
+        orchestrator._prepare_runtime_intelligence_request = AsyncMock(
             side_effect=AssertionError("direct-response prompts should bypass intelligent hooks")
         )
 
@@ -3778,11 +3778,11 @@ class TestGetCurrentProviderInfo:
 
 
 class TestShouldContinueIntelligent:
-    """Tests for _should_continue_intelligent method."""
+    """Tests for _should_continue_runtime_intelligence method."""
 
     def test_returns_tuple(self, orchestrator):
-        """Test _should_continue_intelligent returns tuple."""
-        result = orchestrator._should_continue_intelligent()
+        """Test _should_continue_runtime_intelligence returns tuple."""
+        result = orchestrator._should_continue_runtime_intelligence()
         assert isinstance(result, tuple)
         assert len(result) == 2
         assert isinstance(result[0], bool)
@@ -3791,9 +3791,9 @@ class TestShouldContinueIntelligent:
     def test_with_no_integration(self, orchestrator):
         """Test returns continue when no integration."""
         with patch.object(
-            type(orchestrator), "intelligent_integration", property(lambda self: None)
+            type(orchestrator), "runtime_intelligence_integration", property(lambda self: None)
         ):
-            should_continue, reason = orchestrator._should_continue_intelligent()
+            should_continue, reason = orchestrator._should_continue_runtime_intelligence()
             assert should_continue is True
             assert "disabled" in reason.lower()
 

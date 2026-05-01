@@ -563,7 +563,7 @@ class TestChatServiceBootstrapLaziness:
         obj.conversation.messages = [Message(role="user", content="existing")]
         obj.add_message = MagicMock()
         obj._check_context_overflow = MagicMock(return_value=False)
-        obj._record_intelligent_outcome = MagicMock()
+        obj._record_runtime_intelligence_outcome = MagicMock()
 
         class TrapChatCoordinator:
             touched = False
@@ -1182,7 +1182,7 @@ class TestChatServiceBootstrapLaziness:
         obj.conversation.messages = [Message(role="system", content="existing")]
         obj.add_message = MagicMock()
         obj._check_context_overflow = MagicMock(return_value=False)
-        obj._record_intelligent_outcome = MagicMock()
+        obj._record_runtime_intelligence_outcome = MagicMock()
 
         direct_response = CompletionResponse(content="already recorded", role="assistant")
 

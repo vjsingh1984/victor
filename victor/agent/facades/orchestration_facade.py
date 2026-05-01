@@ -75,7 +75,7 @@ class OrchestrationFacade:
         - observability: ObservabilityIntegration for unified event bus
         - execution_tracer: Execution tracing (if available)
         - tool_call_tracer: Tool call tracing (if available)
-        - intelligent_integration: Intelligent pipeline integration
+        - runtime_intelligence_integration: Runtime-intelligence integration
         - subagent_orchestrator: Sub-agent orchestration
     """
 
@@ -126,7 +126,7 @@ class OrchestrationFacade:
         observability: Optional[Any] = None,
         execution_tracer: Optional[Any] = None,
         tool_call_tracer: Optional[Any] = None,
-        intelligent_integration: Optional[Any] = None,
+        runtime_intelligence_integration: Optional[Any] = None,
         subagent_orchestrator: Optional[Any] = None,
     ) -> None:
         if chat_coordinator is not None and deprecated_chat_coordinator is not None:
@@ -317,7 +317,7 @@ class OrchestrationFacade:
         self._observability = observability
         self._execution_tracer = execution_tracer
         self._tool_call_tracer = tool_call_tracer
-        self._intelligent_integration = intelligent_integration
+        self._runtime_intelligence_integration = runtime_intelligence_integration
         self._subagent_orchestrator = subagent_orchestrator
 
         logger.debug(
@@ -652,14 +652,23 @@ class OrchestrationFacade:
         return self._tool_call_tracer
 
     @property
+    def runtime_intelligence_integration(self) -> Optional[Any]:
+        """Runtime-intelligence integration."""
+        return self._runtime_intelligence_integration
+
+    @runtime_intelligence_integration.setter
+    def runtime_intelligence_integration(self, value: Any) -> None:
+        """Update the runtime-intelligence integration."""
+        self._runtime_intelligence_integration = value
+
+    @property
     def intelligent_integration(self) -> Optional[Any]:
-        """Intelligent pipeline integration."""
-        return self._intelligent_integration
+        """Compatibility alias for runtime-intelligence integration."""
+        return self.runtime_intelligence_integration
 
     @intelligent_integration.setter
     def intelligent_integration(self, value: Any) -> None:
-        """Update the intelligent integration."""
-        self._intelligent_integration = value
+        self.runtime_intelligence_integration = value
 
     @property
     def subagent_orchestrator(self) -> Optional[Any]:

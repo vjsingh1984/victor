@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for the IntelligentAgentPipeline module.
+"""Unit tests for the RuntimeIntelligencePipeline module.
 
-Tests the intelligent pipeline which integrates:
+Tests the runtime-intelligence pipeline which integrates:
 - IntelligentPromptBuilder: Embedding-based context selection
 - AdaptiveModeController: Q-learning for mode transitions
 - ResponseQualityScorer: Multi-dimensional quality assessment
@@ -35,13 +35,13 @@ from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-from victor.agent.intelligent_pipeline import (
-    IntelligentAgentPipeline,
+from victor.agent.runtime_intelligence_pipeline import (
+    RuntimeIntelligencePipeline,
     PipelineStats,
     RequestContext,
     ResponseResult,
-    get_intelligent_agent,
-    clear_intelligent_agent_cache,
+    get_runtime_intelligence_pipeline,
+    clear_runtime_intelligence_pipeline_cache,
     PROVIDERS_WITH_REPETITION_ISSUES,
 )
 
@@ -72,12 +72,12 @@ def mock_provider_adapter_with_dedup():
 
 @pytest.fixture
 def pipeline(tmp_path, mock_provider_adapter):
-    """Create an IntelligentAgentPipeline for testing."""
+    """Create a RuntimeIntelligencePipeline for testing."""
     with patch(
-        "victor.agent.intelligent_pipeline.get_provider_adapter",
+        "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
         return_value=mock_provider_adapter,
     ):
-        return IntelligentAgentPipeline(
+        return RuntimeIntelligencePipeline(
             provider_name="anthropic",
             model="claude-3-sonnet",
             profile_name="test-profile",
@@ -87,12 +87,12 @@ def pipeline(tmp_path, mock_provider_adapter):
 
 @pytest.fixture
 def pipeline_xai(tmp_path, mock_provider_adapter_with_dedup):
-    """Create an IntelligentAgentPipeline for xAI provider (has dedup)."""
+    """Create a RuntimeIntelligencePipeline for xAI provider (has dedup)."""
     with patch(
-        "victor.agent.intelligent_pipeline.get_provider_adapter",
+        "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
         return_value=mock_provider_adapter_with_dedup,
     ):
-        return IntelligentAgentPipeline(
+        return RuntimeIntelligencePipeline(
             provider_name="xai",
             model="grok-2",
             profile_name="test-xai",
@@ -289,20 +289,20 @@ class TestPipelineStats:
 
 
 # =============================================================================
-# Test IntelligentAgentPipeline Initialization
+# Test RuntimeIntelligencePipeline Initialization
 # =============================================================================
 
 
 class TestPipelineInit:
-    """Tests for IntelligentAgentPipeline initialization."""
+    """Tests for RuntimeIntelligencePipeline initialization."""
 
     def test_init_basic(self, tmp_path, mock_provider_adapter):
         """Test basic pipeline initialization."""
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline = IntelligentAgentPipeline(
+            pipeline = RuntimeIntelligencePipeline(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
                 profile_name="test",
@@ -322,10 +322,10 @@ class TestPipelineInit:
     def test_init_without_project_root(self, mock_provider_adapter):
         """Test pipeline initialization without project root."""
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline = IntelligentAgentPipeline(
+            pipeline = RuntimeIntelligencePipeline(
                 provider_name="openai",
                 model="gpt-4",
                 profile_name="test-openai",
@@ -336,10 +336,10 @@ class TestPipelineInit:
     def test_deduplication_enabled_for_xai(self, tmp_path, mock_provider_adapter_with_dedup):
         """Test deduplication is enabled for xAI provider."""
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter_with_dedup,
         ):
-            pipeline = IntelligentAgentPipeline(
+            pipeline = RuntimeIntelligencePipeline(
                 provider_name="xai",
                 model="grok-2",
                 profile_name="test-xai",
@@ -350,10 +350,10 @@ class TestPipelineInit:
     def test_deduplication_disabled_for_anthropic(self, tmp_path, mock_provider_adapter):
         """Test deduplication is disabled for anthropic provider."""
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline = IntelligentAgentPipeline(
+            pipeline = RuntimeIntelligencePipeline(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
                 profile_name="test",
@@ -369,10 +369,10 @@ class TestPipelineCreateFactory:
     async def test_create_with_profile_name(self, tmp_path, mock_provider_adapter):
         """Test create factory with explicit profile name."""
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline = await IntelligentAgentPipeline.create(
+            pipeline = await RuntimeIntelligencePipeline.create(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
                 profile_name="custom-profile",
@@ -385,10 +385,10 @@ class TestPipelineCreateFactory:
     async def test_create_without_profile_name(self, mock_provider_adapter):
         """Test create factory generates default profile name (line 215)."""
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline = await IntelligentAgentPipeline.create(
+            pipeline = await RuntimeIntelligencePipeline.create(
                 provider_name="openai",
                 model="gpt-4o",
             )
@@ -585,10 +585,10 @@ class TestLazyGroundingVerifier:
     async def test_get_grounding_verifier_no_project_root(self, mock_provider_adapter):
         """Test grounding verifier not created without project root."""
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline = IntelligentAgentPipeline(
+            pipeline = RuntimeIntelligencePipeline(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
                 profile_name="test",
@@ -1253,19 +1253,19 @@ class TestModuleFunctions:
     """Tests for module-level convenience functions."""
 
     @pytest.mark.asyncio
-    async def test_get_intelligent_agent(self, mock_provider_adapter):
-        """Test get_intelligent_agent creates and caches agents (lines 894-914)."""
-        clear_intelligent_agent_cache()  # Start fresh
+    async def test_get_runtime_intelligence_pipeline(self, mock_provider_adapter):
+        """Test get_runtime_intelligence_pipeline creates and caches agents (lines 894-914)."""
+        clear_runtime_intelligence_pipeline_cache()  # Start fresh
 
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline1 = await get_intelligent_agent(
+            pipeline1 = await get_runtime_intelligence_pipeline(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
             )
-            pipeline2 = await get_intelligent_agent(
+            pipeline2 = await get_runtime_intelligence_pipeline(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
             )
@@ -1274,48 +1274,50 @@ class TestModuleFunctions:
         assert pipeline1 is pipeline2
 
     @pytest.mark.asyncio
-    async def test_get_intelligent_agent_different_keys(self, mock_provider_adapter):
-        """Test get_intelligent_agent creates different instances for different keys."""
-        clear_intelligent_agent_cache()
+    async def test_get_runtime_intelligence_pipeline_different_keys(self, mock_provider_adapter):
+        """Test get_runtime_intelligence_pipeline creates different instances for different keys."""
+        clear_runtime_intelligence_pipeline_cache()
 
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            pipeline1 = await get_intelligent_agent(
+            pipeline1 = await get_runtime_intelligence_pipeline(
                 provider_name="anthropic",
                 model="claude-3-sonnet",
             )
-            pipeline2 = await get_intelligent_agent(
+            pipeline2 = await get_runtime_intelligence_pipeline(
                 provider_name="openai",
                 model="gpt-4",
             )
 
         assert pipeline1 is not pipeline2
 
-    def test_clear_intelligent_agent_cache(self, mock_provider_adapter):
-        """Test clear_intelligent_agent_cache (line 919)."""
+    def test_clear_runtime_intelligence_pipeline_cache(self, mock_provider_adapter):
+        """Test clear_runtime_intelligence_pipeline_cache (line 919)."""
         # Add something to cache
-        from victor.agent.intelligent_pipeline import _intelligent_agent_cache
+        from victor.agent.runtime_intelligence_pipeline import (
+            _runtime_intelligence_pipeline_cache,
+        )
 
         with patch(
-            "victor.agent.intelligent_pipeline.get_provider_adapter",
+            "victor.agent.runtime_intelligence_pipeline.get_provider_adapter",
             return_value=mock_provider_adapter,
         ):
-            test_pipeline = IntelligentAgentPipeline(
+            test_pipeline = RuntimeIntelligencePipeline(
                 provider_name="test",
                 model="test",
                 profile_name="test",
             )
-        _intelligent_agent_cache[("test", "test", "test", None)] = test_pipeline
+        _runtime_intelligence_pipeline_cache[("test", "test", "test", None)] = test_pipeline
 
-        clear_intelligent_agent_cache()
+        clear_runtime_intelligence_pipeline_cache()
 
-        assert len(_intelligent_agent_cache) == 0
+        assert len(_runtime_intelligence_pipeline_cache) == 0
 
     def test_get_optimal_tool_budget_delegates_to_mode_controller(self, mock_provider_adapter):
         """Test get_optimal_tool_budget delegates to mode controller."""
-        pipeline = IntelligentAgentPipeline(
+        pipeline = RuntimeIntelligencePipeline(
             provider_name="test",
             model="test",
             profile_name="test",
