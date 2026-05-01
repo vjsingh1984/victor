@@ -163,6 +163,19 @@ class TestBackgroundAgent:
         assert len(d["output"]) <= 500
 
 
+@pytest.fixture
+def mock_chat_service():
+    """Create a mock chat service."""
+    mock = AsyncMock()
+
+    async def mock_stream():
+        yield {"type": "content", "content": "Hello"}
+        yield {"type": "content", "content": " World"}
+
+    mock.stream_chat = MagicMock(return_value=mock_stream())
+    return mock
+
+
 class TestBackgroundAgentManager:
     """Tests for BackgroundAgentManager."""
 
@@ -180,10 +193,11 @@ class TestBackgroundAgentManager:
         return mock
 
     @pytest.fixture
-    def manager(self, mock_orchestrator):
+    def manager(self, mock_orchestrator, mock_chat_service):
         """Create a BackgroundAgentManager instance."""
         return BackgroundAgentManager(
             orchestrator=mock_orchestrator,
+            chat_service=mock_chat_service,
             max_concurrent=2,
         )
 
@@ -199,27 +213,29 @@ class TestBackgroundAgentManager:
         manager.set_event_callback(callback)
         assert manager._event_callback == callback
 
-    def test_from_factory_uses_shared_sync_bridge(self):
+    def test_from_factory_uses_shared_sync_bridge(self, mock_chat_service):
         """from_factory should bridge async factory creation from sync code."""
         factory = MagicMock()
         orchestrator = MagicMock()
         factory.create_agent = AsyncMock(return_value=orchestrator)
 
-        manager = BackgroundAgentManager.from_factory(factory, max_concurrent=3)
+        manager = BackgroundAgentManager.from_factory(
+            factory, chat_service=mock_chat_service, max_concurrent=3
+        )
 
         assert manager._orchestrator is orchestrator
         assert manager._factory is factory
         assert manager._max_concurrent == 3
         factory.create_agent.assert_awaited_once_with(mode="foreground")
 
-    def test_from_factory_rejects_running_loop(self):
+    def test_from_factory_rejects_running_loop(self, mock_chat_service):
         """from_factory should fail fast when called from an async context."""
         factory = MagicMock()
         factory.create_agent = AsyncMock(return_value=MagicMock())
 
         async def _inner():
             with pytest.raises(RuntimeError, match="Cannot use run_sync\\(\\)"):
-                BackgroundAgentManager.from_factory(factory)
+                BackgroundAgentManager.from_factory(factory, chat_service=mock_chat_service)
 
         asyncio.run(_inner())
         factory.create_agent.assert_called_once_with(mode="foreground")
@@ -388,12 +404,13 @@ class TestGlobalFunctions:
         module._agent_manager = None
         assert get_agent_manager() is None
 
-    def test_init_agent_manager(self):
+    def test_init_agent_manager(self, mock_chat_service):
         """init_agent_manager should create and return manager."""
         mock_orch = MagicMock()
 
         manager = init_agent_manager(
             orchestrator=mock_orch,
+            chat_service=mock_chat_service,
             max_concurrent=8,
         )
 
@@ -401,13 +418,14 @@ class TestGlobalFunctions:
         assert manager._max_concurrent == 8
         assert get_agent_manager() is manager
 
-    def test_init_agent_manager_with_callback(self):
+    def test_init_agent_manager_with_callback(self, mock_chat_service):
         """init_agent_manager should accept event callback."""
         mock_orch = MagicMock()
         callback = MagicMock()
 
         manager = init_agent_manager(
             orchestrator=mock_orch,
+            chat_service=mock_chat_service,
             event_callback=callback,
         )
 

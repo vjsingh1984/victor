@@ -801,7 +801,8 @@ providers:
                     from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
                     from victor.storage.graph import create_graph_store
 
-                    console.print("[dim]  Updating Code Context Graph incrementally...[/]")
+                    ccg_mode = "rebuilding" if force else "updating incrementally"
+                    console.print(f"[dim]  {ccg_mode.title()} Code Context Graph...[/]")
                     import asyncio
 
                     async def _build_ccg_index():
@@ -810,22 +811,35 @@ providers:
                             root_path=project_root,
                             enable_ccg=True,
                             enable_embeddings=False,  # Skip embeddings for faster init
+                            incremental=not force,  # force=True wipes clean, force=False is incremental
                         )
                         pipeline = GraphIndexingPipeline(graph_store, config)
                         return await pipeline.index_repository()
 
                     stats = asyncio.run(_build_ccg_index())
+
+                    # Get total database stats for context
+                    db_stats = asyncio.run(graph_store.stats())
+
                     if stats.files_processed or stats.files_deleted:
                         console.print(
                             f"[green]✓[/] CCG index updated "
                             f"({stats.files_processed} changed, {stats.files_deleted} deleted, "
-                            f"{stats.files_unchanged} unchanged; "
-                            f"{stats.nodes_created} nodes, {stats.edges_created} edges)"
+                            f"{stats.files_unchanged} unchanged)"
+                        )
+                        console.print(
+                            f"[dim]    → {stats.nodes_created:,} nodes, {stats.edges_created:,} edges created[/]"
+                        )
+                        console.print(
+                            f"[dim]    → {db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges in database[/]"
                         )
                     else:
                         console.print(
                             f"[green]✓[/] CCG graph already current "
                             f"({stats.files_unchanged} unchanged files reused)"
+                        )
+                        console.print(
+                            f"[dim]    → {db_stats['nodes']:,} total nodes, {db_stats['edges']:,} total edges[/]"
                         )
                 except ImportError:
                     console.print(
