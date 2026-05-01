@@ -283,6 +283,60 @@ class TestFileWatcherInitializer:
         assert str(temp_project.resolve()) not in manager._refresh_tasks
 
     @pytest.mark.asyncio
+    async def test_graph_manager_background_refresh_invokes_refresh_callback(self, temp_project):
+        """Background refresh should report incremental stats through the completion callback."""
+        graph_store = create_graph_store("sqlite", project_path=temp_project)
+        await graph_store.initialize()
+        await graph_store.delete_by_repo()
+
+        pipeline = GraphIndexingPipeline(
+            graph_store,
+            GraphIndexConfig(
+                root_path=temp_project,
+                enable_ccg=False,
+                enable_embeddings=False,
+                enable_subgraph_cache=False,
+            ),
+        )
+        await pipeline.index_repository()
+
+        callback_events: list[tuple[Path, int, int, int]] = []
+
+        def _on_refresh_complete(root: Path, stats) -> None:
+            callback_events.append(
+                (root, stats.files_processed, stats.files_deleted, stats.files_unchanged)
+            )
+
+        manager = GraphManager.get_instance()
+        await manager.ensure_background_refresh(
+            temp_project,
+            enable_ccg=False,
+            on_refresh_complete=_on_refresh_complete,
+        )
+
+        target_file = temp_project / "src" / "module.py"
+        time.sleep(0.5)
+        target_file.write_text("def bar():\n    return 2\n")
+
+        await manager._on_file_change(
+            FileChangeEvent(
+                path=target_file,
+                change_type=FileChangeType.MODIFIED,
+                timestamp=datetime.now(),
+            ),
+            temp_project,
+            None,
+        )
+        await manager.wait_for_refresh(temp_project)
+
+        assert callback_events
+        refreshed_root, changed, deleted, unchanged = callback_events[-1]
+        assert refreshed_root == temp_project.resolve()
+        assert changed == 1
+        assert deleted == 0
+        assert unchanged == 1
+
+    @pytest.mark.asyncio
     async def test_graph_manager_background_refresh_indexes_new_file(self, temp_project):
         """Background refresh should index newly created files."""
         graph_store, manager = await self._build_initial_graph(temp_project)

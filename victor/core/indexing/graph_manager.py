@@ -23,6 +23,7 @@ Pattern: Singleton + Observer + Cache + Repository
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -156,6 +157,7 @@ class GraphManager:
         poll_interval_seconds: float = 1.0,
         debounce_seconds: float = 0.3,
         build_now: bool = False,
+        on_refresh_complete: Optional[Any] = None,
     ) -> Optional[Any]:
         """Ensure file watching plus incremental persisted-graph refresh for a root.
 
@@ -176,6 +178,7 @@ class GraphManager:
             "enable_ccg": enable_ccg,
             "exec_ctx": exec_ctx,
             "pending": False,
+            "on_refresh_complete": on_refresh_complete,
         }
 
         initial_stats = None
@@ -340,6 +343,12 @@ class GraphManager:
             )
         else:
             logger.debug("[GraphManager] Graph already current for %s", root_str)
+
+        callback = refresh_config.get("on_refresh_complete")
+        if callable(callback):
+            callback_result = callback(root, stats)
+            if inspect.isawaitable(callback_result):
+                await callback_result
 
         return stats
 

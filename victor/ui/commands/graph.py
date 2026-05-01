@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 import json
 import os
 import signal
@@ -25,7 +26,7 @@ import sys
 import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 
 import typer
 from rich.console import Console
@@ -52,6 +53,12 @@ class GraphWatchDaemonState:
     stopped: bool = False
     stale_pid_file: bool = False
     stale_pid_removed: bool = False
+
+
+def _default_graph_watch_manifest_file(project_root: Path) -> Path:
+    """Return the manifest file for a project-scoped graph watcher."""
+    paths = get_project_paths(project_root)
+    return paths.project_victor_dir / "graph-watch.json"
 
 
 async def _index_async(
@@ -585,6 +592,91 @@ def _default_graph_watch_lock_file(project_root: Path) -> Path:
     return paths.project_victor_dir / "graph-watch.lock"
 
 
+def _write_graph_watch_manifest(
+    project_root: Path,
+    state: GraphWatchDaemonState,
+    *,
+    enable_ccg: Optional[bool] = None,
+    build_now: Optional[bool] = None,
+    poll_interval: Optional[float] = None,
+    debounce_seconds: Optional[float] = None,
+    last_refresh: Optional[dict[str, Any]] = None,
+    manifest_file: Optional[Path] = None,
+) -> Path:
+    """Persist project-scoped graph watcher state for other sessions."""
+    root_path = project_root.resolve()
+    resolved_manifest_file = manifest_file or _default_graph_watch_manifest_file(root_path)
+    resolved_manifest_file.parent.mkdir(parents=True, exist_ok=True)
+
+    payload: dict[str, object] = {}
+    if resolved_manifest_file.exists():
+        try:
+            existing_payload = json.loads(resolved_manifest_file.read_text(encoding="utf-8"))
+            if isinstance(existing_payload, dict):
+                payload.update(existing_payload)
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+
+    payload.update({
+        "project_root": str(root_path),
+        "pid_file": str(state.pid_file),
+        "lock_file": str(_default_graph_watch_lock_file(root_path)),
+        "running": state.running,
+        "pid": state.pid,
+        "started": state.started,
+        "stopped": state.stopped,
+        "stale_pid_file": state.stale_pid_file,
+        "stale_pid_removed": state.stale_pid_removed,
+        "updated_at": time.time(),
+    })
+    if enable_ccg is not None:
+        payload["enable_ccg"] = enable_ccg
+    if build_now is not None:
+        payload["build_now"] = build_now
+    if poll_interval is not None:
+        payload["poll_interval"] = poll_interval
+    if debounce_seconds is not None:
+        payload["debounce_seconds"] = debounce_seconds
+    if last_refresh is not None:
+        payload["last_refresh"] = last_refresh
+
+    resolved_manifest_file.write_text(
+        json.dumps(payload, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return resolved_manifest_file
+
+
+def _read_graph_watch_manifest(project_root: Path) -> Optional[dict[str, Any]]:
+    """Load the graph watch manifest for a project if it exists."""
+    manifest_file = _default_graph_watch_manifest_file(project_root.resolve())
+    if not manifest_file.exists():
+        return None
+    try:
+        payload = json.loads(manifest_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _record_graph_watch_refresh(project_root: Path, stats: Any) -> Path:
+    """Persist the latest incremental refresh health for graph watch status."""
+    root_path = project_root.resolve()
+    state = _inspect_graph_watch_daemon(_default_graph_watch_pid_file(root_path), remove_stale=False)
+    return _write_graph_watch_manifest(
+        root_path,
+        state,
+        last_refresh={
+            "changed": getattr(stats, "files_processed", 0),
+            "deleted": getattr(stats, "files_deleted", 0),
+            "unchanged": getattr(stats, "files_unchanged", 0),
+            "errors": getattr(stats, "error_count", 0),
+            "duration_seconds": getattr(stats, "processing_time_seconds", 0.0),
+            "completed_at": time.time(),
+        },
+    )
+
+
 def _graph_watch_lock_is_stale(lock_file: Path, stale_after_seconds: float) -> bool:
     """Return True when a graph-watch startup lock is old enough to reap."""
     try:
@@ -695,12 +787,17 @@ async def _watch_async(
         return False
 
     manager = GraphManager.get_instance()
+
+    def _on_refresh_complete(refreshed_root: Path, stats: Any) -> None:
+        _record_graph_watch_refresh(refreshed_root, stats)
+
     initial_stats = await manager.ensure_background_refresh(
         root_path,
         enable_ccg=enable_ccg,
         poll_interval_seconds=poll_interval,
         debounce_seconds=debounce_seconds,
         build_now=build_now,
+        on_refresh_complete=_on_refresh_complete,
     )
 
     if initial_stats is not None:
@@ -790,6 +887,14 @@ def ensure_graph_watch_daemon(
     with _acquire_graph_watch_startup_lock(root_path):
         state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=True)
         if state.running:
+            _write_graph_watch_manifest(
+                root_path,
+                state,
+                enable_ccg=enable_ccg,
+                build_now=build_now,
+                poll_interval=poll_interval,
+                debounce_seconds=debounce_seconds,
+            )
             return state
 
         pid = _fork_watch_daemon(
@@ -800,13 +905,22 @@ def ensure_graph_watch_daemon(
             debounce_seconds,
             build_now,
         )
-        return GraphWatchDaemonState(
+        state = GraphWatchDaemonState(
             pid_file=resolved_pid_file,
             running=True,
             pid=pid,
             started=True,
             stale_pid_removed=state.stale_pid_removed,
         )
+        _write_graph_watch_manifest(
+            root_path,
+            state,
+            enable_ccg=enable_ccg,
+            build_now=build_now,
+            poll_interval=poll_interval,
+            debounce_seconds=debounce_seconds,
+        )
+        return state
 
 
 def stop_graph_watch_daemon(
@@ -826,6 +940,7 @@ def stop_graph_watch_daemon(
                 resolved_pid_file.unlink()
             state.running = False
             state.stopped = True
+            _write_graph_watch_manifest(root_path, state)
             return state
 
         if state.stale_pid_file:
@@ -833,6 +948,7 @@ def stop_graph_watch_daemon(
                 resolved_pid_file.unlink()
             state.stale_pid_removed = True
 
+        _write_graph_watch_manifest(root_path, state)
         return state
 
 
@@ -926,6 +1042,7 @@ def graph_watch_status(
     root_path = Path(path).resolve()
     resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
     state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=False)
+    manifest = _read_graph_watch_manifest(root_path)
 
     console.print(f"\n[green]Graph Watcher Status:[/green] {root_path}\n")
     table = Table(show_header=False)
@@ -940,10 +1057,33 @@ def graph_watch_status(
     table.add_row("State", status_label)
     table.add_row("Running", "yes" if state.running else "no")
     table.add_row("PID file", str(resolved_pid_file))
+    table.add_row("Manifest file", str(_default_graph_watch_manifest_file(root_path)))
     table.add_row("Lock file", str(_default_graph_watch_lock_file(root_path)))
     table.add_row("Log file", str(resolved_pid_file.with_suffix(".log")))
     if state.pid is not None:
         table.add_row("PID", str(state.pid))
+    if manifest and isinstance(manifest.get("last_refresh"), dict):
+        last_refresh = manifest["last_refresh"]
+        completed_at = last_refresh.get("completed_at")
+        if isinstance(completed_at, (int, float)):
+            completed_at_value = datetime.fromtimestamp(completed_at).isoformat(
+                sep=" ", timespec="seconds"
+            )
+        else:
+            completed_at_value = "unknown"
+        table.add_row("Last refresh", completed_at_value)
+        table.add_row(
+            "Refresh counts",
+            (
+                f"changed={last_refresh.get('changed', 0)}, "
+                f"deleted={last_refresh.get('deleted', 0)}, "
+                f"unchanged={last_refresh.get('unchanged', 0)}"
+            ),
+        )
+        table.add_row("Refresh errors", str(last_refresh.get("errors", 0)))
+        duration_seconds = last_refresh.get("duration_seconds")
+        if isinstance(duration_seconds, (int, float)):
+            table.add_row("Refresh duration", f"{duration_seconds:.2f}s")
     console.print(table)
 
 

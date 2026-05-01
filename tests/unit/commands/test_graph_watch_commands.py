@@ -14,6 +14,7 @@
 
 import os
 import time
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -35,6 +36,21 @@ def test_graph_watch_lock_file_uses_project_victor_dir(tmp_path):
 
     assert lock_file.parent == project_root / ".victor"
     assert lock_file.name == "graph-watch.lock"
+
+
+def test_graph_watch_manifest_file_uses_project_victor_dir(tmp_path):
+    """Graph watch manifest files should live under the project .victor dir."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+
+    with patch(
+        "victor.ui.commands.graph.get_project_paths",
+        return_value=type("Paths", (), {"project_victor_dir": project_root / ".victor"})(),
+    ):
+        manifest_file = graph_cmd._default_graph_watch_manifest_file(project_root)
+
+    assert manifest_file.parent == project_root / ".victor"
+    assert manifest_file.name == "graph-watch.json"
 
 
 def test_graph_watch_startup_lock_recovers_stale_lock_file(tmp_path):
@@ -157,3 +173,93 @@ def test_graph_watch_status_reports_stale_pid_file(tmp_path):
 
     output = record_console.export_text().lower()
     assert "stale pid file" in output
+
+
+def test_ensure_graph_watch_daemon_writes_project_manifest(tmp_path):
+    """Ensuring the graph watcher should persist a project-scoped manifest."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    pid_file = tmp_path / "graph-watch.pid"
+    manifest_file = tmp_path / "graph-watch.json"
+
+    with (
+        patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
+        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
+        patch.object(graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"),
+        patch.object(graph_cmd, "_fork_watch_daemon", return_value=456),
+    ):
+        state = graph_cmd.ensure_graph_watch_daemon(
+            project_root,
+            enable_ccg=True,
+            build_now=True,
+            poll_interval=1.0,
+            debounce_seconds=0.3,
+        )
+
+    assert state.started is True
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    assert manifest["project_root"] == str(project_root.resolve())
+    assert manifest["pid"] == 456
+    assert manifest["running"] is True
+    assert manifest["enable_ccg"] is True
+    assert manifest["build_now"] is True
+
+
+def test_stop_graph_watch_daemon_updates_manifest_to_not_running(tmp_path):
+    """Stopping the graph watcher should persist the stopped state to the manifest."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    pid_file = tmp_path / "graph-watch.pid"
+    manifest_file = tmp_path / "graph-watch.json"
+    pid_file.write_text("123", encoding="utf-8")
+
+    with (
+        patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
+        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
+        patch.object(graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"),
+        patch.object(graph_cmd.os, "kill"),
+    ):
+        state = graph_cmd.stop_graph_watch_daemon(project_root)
+
+    assert state.stopped is True
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    assert manifest["running"] is False
+    assert manifest["stopped"] is True
+    assert manifest["pid"] == 123
+
+
+def test_graph_watch_status_reports_last_refresh_details(tmp_path):
+    """Status should surface the last refresh telemetry from the manifest."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    pid_file = tmp_path / "graph-watch.pid"
+    manifest_file = tmp_path / "graph-watch.json"
+    manifest_file.write_text(
+        json.dumps(
+            {
+                "last_refresh": {
+                    "changed": 2,
+                    "deleted": 1,
+                    "unchanged": 7,
+                    "errors": 0,
+                    "duration_seconds": 1.25,
+                    "completed_at": 1_777_597_000.0,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    record_console = Console(record=True, force_terminal=False, width=160)
+
+    with (
+        patch.object(graph_cmd, "console", record_console),
+        patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
+        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
+        patch.object(graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"),
+    ):
+        graph_cmd.graph_watch_status(path=str(project_root), pid_file=pid_file)
+
+    output = record_console.export_text().lower()
+    assert "last refresh" in output
+    assert "changed=2, deleted=1, unchanged=7" in output
+    assert "1.25s" in output
