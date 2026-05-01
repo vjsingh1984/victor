@@ -1057,7 +1057,9 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         # Intelligent pipeline integration (lazy initialization)
         self._intelligent_integration: Optional["OrchestratorIntegration"] = None
         self._intelligent_integration_config = self._factory.create_integration_config()
-        self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
+        from victor.config.pipeline_settings import resolve_runtime_intelligence_enabled
+
+        self._runtime_intelligence_enabled = resolve_runtime_intelligence_enabled(settings)
 
         # Sub-agent orchestration (lazy initialization)
         self._subagent_orchestrator, self._subagent_orchestration_enabled = (

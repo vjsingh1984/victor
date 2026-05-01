@@ -97,3 +97,13 @@ class TestLegacyEnvironmentVariables:
         settings = Settings()
 
         assert not hasattr(settings.feature_flags, "use_new_chat_service")
+
+    def test_legacy_runtime_intelligence_env_var_maps_to_canonical_pipeline_field(self, monkeypatch):
+        """Legacy runtime gate env var should populate the canonical nested field."""
+        monkeypatch.setenv("VICTOR_INTELLIGENT_PIPELINE_ENABLED", "false")
+
+        from victor.config.settings import Settings
+
+        settings = Settings()
+
+        assert settings.pipeline.runtime_intelligence_enabled is False

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from victor.core.loop_thresholds import (
     DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD,
@@ -53,7 +53,13 @@ class PipelineSettings(BaseModel):
     exploration_tool_budget: int = 10
     exploration_timeout: int = 90  # seconds (increase for local models)
 
-    intelligent_pipeline_enabled: bool = True
+    runtime_intelligence_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "runtime_intelligence_enabled",
+            "intelligent_pipeline_enabled",
+        ),
+    )
     intelligent_quality_scoring: bool = True
     intelligent_mode_learning: bool = True
     intelligent_prompt_optimization: bool = True
@@ -83,3 +89,18 @@ class PipelineSettings(BaseModel):
     continuation_prompt_overrides: dict = Field(default_factory=dict)
     enable_continuation_rl_learning: bool = True
     session_idle_timeout: int = 180
+
+
+def resolve_runtime_intelligence_enabled(settings: Any, default: bool = True) -> bool:
+    """Resolve the canonical runtime-intelligence gate from nested or legacy settings."""
+    pipeline_settings = getattr(settings, "pipeline", None)
+    if pipeline_settings is not None and hasattr(pipeline_settings, "runtime_intelligence_enabled"):
+        return bool(pipeline_settings.runtime_intelligence_enabled)
+
+    if hasattr(settings, "runtime_intelligence_enabled"):
+        return bool(settings.runtime_intelligence_enabled)
+
+    if hasattr(settings, "intelligent_pipeline_enabled"):
+        return bool(settings.intelligent_pipeline_enabled)
+
+    return default

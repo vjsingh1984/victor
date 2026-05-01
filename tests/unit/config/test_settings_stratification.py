@@ -78,6 +78,14 @@ class TestNestedAccess:
         s = Settings(max_exploration_iterations=100)
         assert s.pipeline.max_exploration_iterations == 100
 
+    def test_nested_pipeline_runtime_intelligence_access(self):
+        s = Settings(runtime_intelligence_enabled=False)
+        assert s.pipeline.runtime_intelligence_enabled is False
+
+    def test_nested_pipeline_legacy_runtime_intelligence_alias(self):
+        s = Settings(pipeline={"intelligent_pipeline_enabled": False})
+        assert s.pipeline.runtime_intelligence_enabled is False
+
 
 class TestNestedModelDefaults:
     """Nested config groups work independently with correct defaults."""
@@ -137,7 +145,7 @@ class TestNestedModelDefaults:
 
     def test_pipeline_settings_defaults(self):
         ps = PipelineSettings()
-        assert ps.intelligent_pipeline_enabled is True
+        assert ps.runtime_intelligence_enabled is True
         assert ps.max_exploration_iterations == 200
         assert ps.recovery_empty_response_threshold == 5
         assert ps.session_idle_timeout == 180

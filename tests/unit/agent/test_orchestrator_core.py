@@ -2384,7 +2384,7 @@ class TestIntelligentIntegration:
 
     def test_returns_none_when_disabled(self, orchestrator):
         """Returns None when intelligent pipeline is disabled."""
-        orchestrator._intelligent_pipeline_enabled = False
+        orchestrator._runtime_intelligence_enabled = False
         result = orchestrator.intelligent_integration
         assert result is None
 
@@ -2906,7 +2906,7 @@ class TestIntelligentPipelineIntegration:
     async def test_prepare_intelligent_request_no_integration(self, orchestrator):
         """Test _prepare_intelligent_request returns None without integration."""
         # Pipeline is disabled by default in test settings
-        orchestrator._intelligent_pipeline_enabled = False
+        orchestrator._runtime_intelligence_enabled = False
         result = await orchestrator._prepare_intelligent_request("test task", "analysis")
         assert result is None
 
@@ -2955,7 +2955,7 @@ class TestIntelligentPipelineIntegration:
     @pytest.mark.asyncio
     async def test_validate_intelligent_response_no_integration(self, orchestrator):
         """Test _validate_intelligent_response returns None without integration."""
-        orchestrator._intelligent_pipeline_enabled = False
+        orchestrator._runtime_intelligence_enabled = False
         result = await orchestrator._validate_intelligent_response(
             "response", "query", 5, "analysis"
         )
@@ -3034,7 +3034,7 @@ class TestIntelligentPipelineIntegration:
 
     def test_record_intelligent_outcome_no_integration(self, orchestrator):
         """Test _record_intelligent_outcome with no integration."""
-        orchestrator._intelligent_pipeline_enabled = False
+        orchestrator._runtime_intelligence_enabled = False
         # Should not raise
         orchestrator._record_intelligent_outcome(True, 0.9, True, True)
 

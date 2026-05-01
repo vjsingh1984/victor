@@ -261,9 +261,10 @@ class InfrastructureBuildersMixin:
             IntegrationConfig instance with intelligent pipeline settings
         """
         from victor.agent.orchestrator_integration import IntegrationConfig
+        from victor.config.pipeline_settings import resolve_runtime_intelligence_enabled
 
         config = IntegrationConfig(
-            enable_resilient_calls=getattr(self.settings, "intelligent_pipeline_enabled", True),
+            enable_resilient_calls=resolve_runtime_intelligence_enabled(self.settings),
             enable_quality_scoring=getattr(self.settings, "intelligent_quality_scoring", True),
             enable_mode_learning=getattr(self.settings, "intelligent_mode_learning", True),
             enable_prompt_optimization=getattr(

@@ -213,7 +213,7 @@ def _intelligent_integration(
     self: "AgentOrchestrator",
 ) -> Optional["OrchestratorIntegration"]:
     """Get the intelligent pipeline integration (lazy init)."""
-    if not self._intelligent_pipeline_enabled:
+    if not self._runtime_intelligence_enabled:
         return None
 
     if self._intelligent_integration is None:
@@ -244,14 +244,15 @@ def _intelligent_integration(
                 config=self._intelligent_integration_config,
             )
             logger.info(
-                f"IntelligentPipeline initialized for " f"{self.provider_name}:{self.model}"
+                f"Runtime-intelligence integration initialized for "
+                f"{self.provider_name}:{self.model}"
             )
         except ImportError as e:
             logger.debug(f"IntelligentPipeline dependencies not available: {e}")
-            self._intelligent_pipeline_enabled = False
+            self._runtime_intelligence_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
             logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
-            self._intelligent_pipeline_enabled = False
+            self._runtime_intelligence_enabled = False
 
     return self._intelligent_integration
 

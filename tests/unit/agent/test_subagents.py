@@ -560,7 +560,7 @@ class TestOrchestratorSubAgentIntegration:
 
         source = inspect.getsource(AgentOrchestrator.intelligent_integration.fget)
         # Check for lazy initialization pattern
-        assert "_intelligent_pipeline_enabled" in source
+        assert "_runtime_intelligence_enabled" in source
         assert "_intelligent_integration is None" in source
         assert "from victor.agent.orchestrator_integration import OrchestratorIntegration" in source
 

@@ -62,7 +62,7 @@ class TestOrchestratorIntelligentHooks:
     def mock_settings(self):
         """Create mock settings with intelligent pipeline enabled."""
         settings = MagicMock()
-        settings.intelligent_pipeline_enabled = True
+        settings.runtime_intelligence_enabled = True
         settings.intelligent_quality_scoring = True
         settings.intelligent_mode_learning = True
         settings.intelligent_prompt_optimization = True
@@ -116,11 +116,11 @@ class TestOrchestratorIntelligentHooks:
 
     def test_prepare_intelligent_request_returns_none_when_disabled(self, mock_settings):
         """Should return None when intelligent pipeline is disabled."""
-        mock_settings.intelligent_pipeline_enabled = False
+        mock_settings.runtime_intelligence_enabled = False
 
         # Create a minimal mock orchestrator
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = False
+        orchestrator._runtime_intelligence_enabled = False
         orchestrator._intelligent_integration = None
 
         # Access the property should return None
@@ -209,11 +209,11 @@ class TestOrchestratorIntegrationProperty:
     def test_property_returns_none_when_disabled(self):
         """Property should return None when feature is disabled."""
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = False
+        orchestrator._runtime_intelligence_enabled = False
         orchestrator._intelligent_integration = None
 
         # Simulating the property behavior
-        if not orchestrator._intelligent_pipeline_enabled:
+        if not orchestrator._runtime_intelligence_enabled:
             result = None
         else:
             result = orchestrator._intelligent_integration
@@ -223,7 +223,7 @@ class TestOrchestratorIntegrationProperty:
     def test_property_lazy_initializes(self):
         """Property should lazy initialize on first access."""
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = True
+        orchestrator._runtime_intelligence_enabled = True
         orchestrator._intelligent_integration = None
 
         # First access triggers initialization
@@ -234,7 +234,7 @@ class TestOrchestratorIntegrationProperty:
         """Property should return cached instance on subsequent calls."""
         integration = MagicMock()
         orchestrator = MagicMock()
-        orchestrator._intelligent_pipeline_enabled = True
+        orchestrator._runtime_intelligence_enabled = True
         orchestrator._intelligent_integration = integration
 
         # Should return the cached instance
@@ -307,7 +307,7 @@ class TestConfigurationSettings:
         pipeline = settings.pipeline
 
         # These should all exist with defaults under the pipeline group
-        assert hasattr(pipeline, "intelligent_pipeline_enabled")
+        assert hasattr(pipeline, "runtime_intelligence_enabled")
         assert hasattr(pipeline, "intelligent_quality_scoring")
         assert hasattr(pipeline, "intelligent_mode_learning")
         assert hasattr(pipeline, "intelligent_prompt_optimization")
@@ -322,7 +322,7 @@ class TestConfigurationSettings:
         settings = Settings()
         pipeline = settings.pipeline
 
-        assert pipeline.intelligent_pipeline_enabled is True
+        assert pipeline.runtime_intelligence_enabled is True
         assert pipeline.intelligent_quality_scoring is True
         assert pipeline.intelligent_min_quality_threshold == 0.5
         assert pipeline.intelligent_grounding_threshold == 0.7
