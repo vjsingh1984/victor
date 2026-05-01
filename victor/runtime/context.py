@@ -120,6 +120,11 @@ class RuntimeExecutionContext:
     metadata: Dict[str, Any] = field(default_factory=dict)
     _cleanup_hooks: list = field(default_factory=list, repr=False)
 
+    @property
+    def prompt_orchestrator(self) -> Any:
+        """Typed access to the active prompt orchestrator when configured."""
+        return self.metadata.get("prompt_orchestrator")
+
     @classmethod
     def create(
         cls,
@@ -184,6 +189,12 @@ class RuntimeExecutionContext:
             services=self.services,
             metadata=new_meta,
         )
+
+    def with_prompt_orchestrator(self, prompt_orchestrator: Any) -> RuntimeExecutionContext:
+        """Create a new context with a typed prompt-orchestrator binding."""
+        if self.prompt_orchestrator is prompt_orchestrator:
+            return self
+        return self.with_metadata(prompt_orchestrator=prompt_orchestrator)
 
     # ── Cleanup Lifecycle (GS-4) ──────────────────────────────────────
 

@@ -2638,6 +2638,6 @@ class AgenticLoop:
 
             prompt_orchestrator = get_prompt_orchestrator()
 
-        if execution_context.metadata.get("prompt_orchestrator") is prompt_orchestrator:
+        if execution_context.prompt_orchestrator is prompt_orchestrator:
             return execution_context
-        return execution_context.with_metadata(prompt_orchestrator=prompt_orchestrator)
+        return execution_context.with_prompt_orchestrator(prompt_orchestrator)

@@ -231,6 +231,9 @@ class VictorClient:
             model=model_name,
             session_config=self._config,  # Pass SessionConfig
         )
+        if hasattr(self._agent, "get_orchestrator"):
+            orchestrator = self._agent.get_orchestrator()
+            self._context = getattr(orchestrator, "_execution_context", None)
         self._initialized = True
 
         logger.info(
@@ -285,15 +288,21 @@ class VictorClient:
         if self._agent is None:
             raise RuntimeError("Client not initialized. Call await _ensure_initialized() first.")
 
-        # Access services through agent's orchestrator context
-        orchestrator = self._agent.get_orchestrator()
-        if hasattr(orchestrator, "_execution_context"):
-            return orchestrator._execution_context.services
-        else:
-            # Fallback: create ServiceAccessor from container
-            from victor.runtime.context import ServiceAccessor
+        runtime_context = self._context
+        if runtime_context is not None and getattr(runtime_context, "services", None) is not None:
+            return runtime_context.services
 
-            return ServiceAccessor(_container=self._container)
+        if hasattr(self._agent, "get_orchestrator"):
+            orchestrator = self._agent.get_orchestrator()
+            runtime_context = getattr(orchestrator, "_execution_context", None)
+            if runtime_context is not None and getattr(runtime_context, "services", None) is not None:
+                self._context = runtime_context
+                return runtime_context.services
+
+        # Fallback: create ServiceAccessor from container
+        from victor.runtime.context import ServiceAccessor
+
+        return ServiceAccessor(_container=self._container)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public API — the UI layer uses ONLY these methods
@@ -317,11 +326,22 @@ class VictorClient:
             ChatResult with response content and metadata
         """
         agent = await self._ensure_initialized()
-        result = await agent.run(message)
+        services = self._get_services()
+        chat_service = getattr(services, "chat", None) if services is not None else None
+
+        if chat_service is not None:
+            result = await chat_service.chat(message, stream=stream)
+            content = result.content if hasattr(result, "content") else str(result)
+            tool_calls = len(getattr(result, "tool_calls", []) or [])
+        else:
+            result = await agent.run(message)
+            content = result.content if hasattr(result, "content") else str(result)
+            tool_calls = len(getattr(result, "tool_calls", []) or [])
 
         return _ChatResult(
-            content=result.content if hasattr(result, "content") else str(result),
+            content=content,
             success=True,
+            tool_calls=tool_calls,
             metadata={
                 "tool_budget": self._config.tool_budget,
                 "smart_routing": self._config.smart_routing.enabled,
@@ -505,6 +525,7 @@ class VictorClient:
                 logger.debug(f"Container dispose error: {e}")
             self._container = None
 
+        self._context = None
         self._initialized = False
 
     async def __aenter__(self) -> "VictorClient":

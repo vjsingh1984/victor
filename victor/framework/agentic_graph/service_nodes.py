@@ -109,10 +109,21 @@ def _get_service_accessor(state: AgenticLoopStateModel) -> Optional[Any]:
 def _get_prompt_orchestrator(state: AgenticLoopStateModel) -> Any:
     """Get PromptOrchestrator from execution context metadata or global fallback."""
     ctx = _get_execution_context(state)
-    if ctx and getattr(ctx, "metadata", None):
-        prompt_orchestrator = ctx.metadata.get("prompt_orchestrator")
-        if prompt_orchestrator is not None:
-            return prompt_orchestrator
+    if ctx:
+        try:
+            from victor.runtime.context import RuntimeExecutionContext
+
+            if isinstance(ctx, RuntimeExecutionContext):
+                prompt_orchestrator = ctx.prompt_orchestrator
+                if prompt_orchestrator is not None:
+                    return prompt_orchestrator
+        except Exception:
+            pass
+
+        if getattr(ctx, "metadata", None):
+            prompt_orchestrator = ctx.metadata.get("prompt_orchestrator")
+            if prompt_orchestrator is not None:
+                return prompt_orchestrator
 
     from victor.agent.prompt_orchestrator import get_prompt_orchestrator
 
