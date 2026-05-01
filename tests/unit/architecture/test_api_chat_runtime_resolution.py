@@ -61,8 +61,16 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
         "_start_agent",
     )
 
+    assert "from victor.runtime.chat_runtime import resolve_chat_runtime" in fastapi_chat_source
+    assert "from victor.framework.message_execution import resolve_chat_runtime" not in fastapi_chat_source
     assert "resolve_chat_runtime" in fastapi_chat_source
     assert "orchestrator._chat_service" not in fastapi_chat_source
+    assert "from victor.runtime.chat_runtime import resolve_chat_service, resolve_chat_runtime" in (
+        fastapi_agent_source
+    )
+    assert "from victor.framework.message_execution import resolve_chat_service" not in (
+        fastapi_agent_source
+    )
     assert "resolve_chat_service" in fastapi_agent_source
     assert "orchestrator._chat_service" not in fastapi_agent_source
     assert "resolve_chat_runtime" in fastapi_ws_source

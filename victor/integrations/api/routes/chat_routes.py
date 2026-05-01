@@ -32,7 +32,7 @@ from victor.integrations.api.fastapi_server import (
     _new_chat_request_id,
 )
 from victor.observability.request_correlation import request_correlation_id
-from victor.framework.message_execution import resolve_chat_runtime
+from victor.runtime.chat_runtime import resolve_chat_runtime
 
 if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer

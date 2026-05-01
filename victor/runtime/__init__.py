@@ -1,6 +1,7 @@
 """Victor runtime module — execution context, lifecycle, cache, and tracing."""
 
 from victor.runtime.cache_registry import CacheCategory, CacheRegistry
+from victor.runtime.chat_runtime import resolve_chat_runtime, resolve_chat_service
 from victor.runtime.context import (
     ExecutionContext,  # Backward compatibility alias
     ResolvedRuntimeServices,
@@ -20,6 +21,8 @@ __all__ = [
     "ServiceAccessor",
     "resolve_execution_context",
     "resolve_runtime_services",
+    "resolve_chat_runtime",
+    "resolve_chat_service",
     "TraceContext",
     "current_trace",
     "get_correlation_id",

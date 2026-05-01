@@ -17,17 +17,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 import inspect
 from typing import Any, AsyncIterator, Mapping, Optional
-import warnings
 
 from victor.core.errors import CancellationError
 from victor.framework._internal import format_context_message
 from victor.framework.task import DirectResponseOutputState, TaskResult
 from victor.providers.base import CompletionResponse
-from victor.runtime.context import (
-    ResolvedRuntimeServices,
-    resolve_execution_context,
-    resolve_runtime_services,
-)
+from victor.runtime.chat_runtime import resolve_chat_runtime, resolve_chat_service
+from victor.runtime.context import ResolvedRuntimeServices, resolve_execution_context, resolve_runtime_services
 
 
 @dataclass(frozen=True)
@@ -36,37 +32,6 @@ class PreparedMessage:
 
     runtime_message: str
     response_message: str
-
-
-class _OrchestratorChatRuntimeAdapter:
-    """Internal adapter that preserves framework runtime shape on orchestrator fallback.
-
-    Framework-facing callers should always execute against a chat-runtime surface.
-    When service bootstrap is unavailable, this adapter lets the framework keep one
-    execution contract while suppressing direct-orchestrator deprecation warnings.
-    """
-
-    def __init__(self, orchestrator: Any) -> None:
-        self._orchestrator = orchestrator
-
-    async def chat(self, message: str) -> Any:
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="Direct orchestrator\\.chat\\(\\) access is deprecated\\..*",
-                category=DeprecationWarning,
-            )
-            return await self._orchestrator.chat(message)
-
-    async def stream_chat(self, message: str) -> AsyncIterator[Any]:
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="Direct orchestrator\\.stream_chat\\(\\) access is deprecated\\..*",
-                category=DeprecationWarning,
-            )
-            async for chunk in self._orchestrator.stream_chat(message):
-                yield chunk
 
 
 def prepare_message(
@@ -85,20 +50,6 @@ def prepare_message(
         runtime_message=runtime_message,
         response_message=user_message,
     )
-
-
-def resolve_chat_service(orchestrator: Any, execution_context: Any = None) -> Any:
-    """Resolve the canonical chat service instance when one is available."""
-    return resolve_runtime_services(orchestrator, execution_context).chat
-
-
-def resolve_chat_runtime(orchestrator: Any, execution_context: Any = None) -> Any:
-    """Resolve the canonical chat runtime for a framework-facing caller."""
-    services = resolve_runtime_services(orchestrator, execution_context)
-    if services.chat is not None:
-        return services.chat
-    return _OrchestratorChatRuntimeAdapter(orchestrator)
-
 
 def _coerce_completion_response(
     result: Any,

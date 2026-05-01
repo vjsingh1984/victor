@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
-from victor.framework.message_execution import resolve_chat_service, resolve_chat_runtime
+from victor.runtime.chat_runtime import resolve_chat_service, resolve_chat_runtime
 
 if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer

@@ -44,7 +44,6 @@ from aiohttp import web
 from aiohttp.web import Request, Response, StreamResponse
 
 # Import middleware stack for optional rate limiting and auth
-from victor.framework.message_execution import resolve_chat_runtime
 from victor.integrations.api.change_tracker_ops import (
     apply_patch_request,
     change_history,
@@ -53,6 +52,7 @@ from victor.integrations.api.change_tracker_ops import (
     undo_last_change,
 )
 from victor.integrations.api.middleware import APIMiddlewareStack
+from victor.runtime.chat_runtime import resolve_chat_runtime
 
 logger = logging.getLogger(__name__)
 

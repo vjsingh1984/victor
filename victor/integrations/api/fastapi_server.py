@@ -69,8 +69,8 @@ from victor.integrations.api.graph_export import (
 from victor.integrations.api.router_plugins import load_fastapi_router_registrations
 from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
-from victor.framework.message_execution import resolve_chat_runtime
 from victor.observability.request_correlation import request_correlation_id
+from victor.runtime.chat_runtime import resolve_chat_runtime
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
