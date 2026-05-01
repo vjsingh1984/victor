@@ -33,7 +33,7 @@ class TestWorkflowFacadeInit:
             workflow_registry=registry,
             workflow_runtime=runtime,
             workflow_optimization=MagicMock(),
-            mode_workflow_team_coordinator=MagicMock(),
+            coordination_advisor=MagicMock(),
         )
 
         assert facade.workflow_registry is registry
@@ -46,6 +46,7 @@ class TestWorkflowFacadeInit:
         assert facade.workflow_registry is None
         assert facade.workflow_runtime is None
         assert facade.workflow_optimization is None
+        assert facade.coordination_advisor is None
         assert facade.mode_workflow_team_coordinator is None
 
 
@@ -59,7 +60,7 @@ class TestWorkflowFacadeProperties:
             workflow_registry=MagicMock(name="registry"),
             workflow_runtime=MagicMock(name="runtime"),
             workflow_optimization=MagicMock(name="optimization"),
-            mode_workflow_team_coordinator=MagicMock(name="coordinator"),
+            coordination_advisor=MagicMock(name="coordinator"),
         )
 
     def test_workflow_registry_property(self, facade):
@@ -81,14 +82,26 @@ class TestWorkflowFacadeProperties:
         assert facade.workflow_optimization._mock_name == "optimization"
 
     def test_mode_coordinator_property(self, facade):
-        """ModeWorkflowTeamCoordinator property returns the coordinator."""
+        """Compatibility alias returns the same advisor instance."""
         assert facade.mode_workflow_team_coordinator._mock_name == "coordinator"
 
     def test_mode_coordinator_setter(self, facade):
-        """ModeWorkflowTeamCoordinator setter updates the coordinator."""
+        """Compatibility alias setter updates the advisor surface."""
         new_coordinator = MagicMock(name="new_coordinator")
         facade.mode_workflow_team_coordinator = new_coordinator
         assert facade.mode_workflow_team_coordinator is new_coordinator
+        assert facade.coordination_advisor is new_coordinator
+
+    def test_coordination_advisor_property(self, facade):
+        """Framework-facing coordination advisor property returns the advisor."""
+        assert facade.coordination_advisor._mock_name == "coordinator"
+
+    def test_coordination_advisor_setter(self, facade):
+        """Framework-facing coordination advisor setter updates the advisor."""
+        new_advisor = MagicMock(name="new_advisor")
+        facade.coordination_advisor = new_advisor
+        assert facade.coordination_advisor is new_advisor
+        assert facade.mode_workflow_team_coordinator is new_advisor
 
 
 class TestWorkflowFacadeProtocolConformance:

@@ -153,7 +153,7 @@ class AgentRuntimeBootstrapper:
                 workflow_registry=orchestrator._workflow_registry,
                 workflow_runtime=orchestrator._workflow_runtime,
                 workflow_optimization=orchestrator._workflow_optimization,
-                mode_workflow_team_coordinator=(orchestrator._mode_workflow_team_coordinator),
+                coordination_advisor=(orchestrator._coordination_advisor),
             ),
             name="workflow_facade",
         )
@@ -296,7 +296,7 @@ class AgentRuntimeBootstrapper:
 
         # Lazy coordinator placeholders must exist before any runtime wiring that
         # may resolve protocol-based lazy properties.
-        orchestrator._mode_workflow_team_coordinator = None
+        orchestrator._coordination_advisor = None
         orchestrator._turn_executor = None
         orchestrator._deprecated_sync_chat_coordinator = None
         orchestrator._deprecated_streaming_chat_coordinator = None

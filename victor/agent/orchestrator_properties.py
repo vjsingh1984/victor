@@ -263,14 +263,17 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
 
 
 def _coordination(self: "AgentOrchestrator") -> Any:
-    """Get the mode-workflow-team coordinator (lazy init)."""
-    if self._mode_workflow_team_coordinator is None:
-        self._mode_workflow_team_coordinator = self._factory.create_mode_workflow_team_coordinator(
-            self._vertical_context
-        )
-        logger.debug("ModeWorkflowTeamCoordinator initialized on first access")
+    """Compatibility alias for the framework-facing coordination advisor."""
+    return self.coordination_advisor
 
-    return self._mode_workflow_team_coordinator
+
+def _coordination_advisor(self: "AgentOrchestrator") -> Any:
+    """Get the framework-facing coordination advisor (lazy init)."""
+    if getattr(self, "_coordination_advisor", None) is None:
+        self._coordination_advisor = self._factory.create_coordination_advisor(self._vertical_context)
+        logger.debug("Coordination advisor initialized on first access")
+
+    return self._coordination_advisor
 
 
 # =====================================================================
@@ -459,6 +462,28 @@ def _provider_switch_coordinator_set(self: "AgentOrchestrator", value: Any) -> N
     self._deprecated_provider_switch_coordinator = value
 
 
+def _mode_workflow_team_coordinator_get(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated coordination-advisor storage alias."""
+    warnings.warn(
+        "AgentOrchestrator._mode_workflow_team_coordinator is deprecated compatibility "
+        "surface. Use AgentOrchestrator._coordination_advisor or "
+        "AgentOrchestrator.coordination_advisor instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return getattr(self, "_coordination_advisor", None)
+
+
+def _mode_workflow_team_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
+    warnings.warn(
+        "AgentOrchestrator._mode_workflow_team_coordinator is deprecated compatibility "
+        "surface. Store explicit values on _coordination_advisor instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    self._coordination_advisor = value
+
+
 # =====================================================================
 # Property installation registry
 # =====================================================================
@@ -523,6 +548,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "turn_executor": (_turn_executor, None),
     "intelligent_integration": (_intelligent_integration, None),
     "subagent_orchestrator": (_subagent_orchestrator, None),
+    "coordination_advisor": (_coordination_advisor, None),
     "coordination": (_coordination, None),
     # Group 3: Recovery (getter only, with lazy resolution)
     "recovery_handler": (_recovery_handler, None),
@@ -555,6 +581,10 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "_provider_switch_coordinator": (
         _provider_switch_coordinator_get,
         _provider_switch_coordinator_set,
+    ),
+    "_mode_workflow_team_coordinator": (
+        _mode_workflow_team_coordinator_get,
+        _mode_workflow_team_coordinator_set,
     ),
     # Group 6: ToolService convenience methods (delegates to canonical service)
     "is_tool_enabled": (_is_tool_enabled_get, None),

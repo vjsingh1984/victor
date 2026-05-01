@@ -140,6 +140,50 @@ def test_build_runtime_coordination_suggestion_uses_runtime_mode_and_vertical_co
     assert suggestion.primary_workflow.workflow_name == "feature_implementation"
 
 
+def test_build_runtime_coordination_suggestion_prefers_coordination_advisor_surface() -> None:
+    context = create_vertical_context("coding")
+    context.apply_team_specs(
+        {
+            "feature_team": SimpleNamespace(
+                name="Feature Team",
+                formation="parallel",
+                members=[],
+                description="Handles feature implementation",
+            )
+        }
+    )
+    context.apply_workflows(
+        {
+            "feature_implementation": SimpleNamespace(
+                name="feature_implementation",
+                description="Implement features end-to-end",
+            )
+        }
+    )
+    advisor = VerticalCoordinationAdvisor(
+        vertical_context=context,
+        team_selector=RuleBasedTeamSelector(),
+        workflow_selector=RuleBasedWorkflowSelector(),
+    )
+    runtime = SimpleNamespace(
+        get_vertical_context=lambda: context,
+        mode_controller=SimpleNamespace(current_mode=SimpleNamespace(value="build")),
+        coordination_advisor=advisor,
+        coordination=SimpleNamespace(suggest_for_task=lambda **_: None),
+    )
+
+    suggestion = build_runtime_coordination_suggestion(
+        runtime_subject=runtime,
+        task_type="feature",
+        complexity="high",
+    )
+
+    assert suggestion.primary_team is not None
+    assert suggestion.primary_team.team_name == "feature_team"
+    assert suggestion.primary_workflow is not None
+    assert suggestion.primary_workflow.workflow_name == "feature_implementation"
+
+
 def test_build_registered_coordination_suggestions_uses_shared_registered_catalogs() -> None:
     context = create_vertical_context("coding")
     context.apply_team_specs(

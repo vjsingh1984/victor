@@ -14,8 +14,8 @@
 
 """Workflow domain facade for orchestrator decomposition.
 
-Groups workflow registry, execution, optimization, and mode-workflow-team
-coordination components behind a single interface.
+Groups workflow registry, execution, optimization, and coordination-advisor
+components behind a single interface.
 
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
@@ -41,7 +41,7 @@ class WorkflowFacade:
         - workflow_registry: Workflow registry for workflow lookup
         - workflow_runtime: Workflow runtime boundary components
         - workflow_optimization: Workflow optimization components
-        - mode_workflow_team_coordinator: Coordinator for team/workflow suggestions
+        - coordination_advisor: Framework-facing team/workflow advisor surface
     """
 
     def __init__(
@@ -50,18 +50,19 @@ class WorkflowFacade:
         workflow_registry: Optional[Any] = None,
         workflow_runtime: Optional[Any] = None,
         workflow_optimization: Optional[Any] = None,
+        coordination_advisor: Optional[Any] = None,
         mode_workflow_team_coordinator: Optional[Any] = None,
     ) -> None:
         self._workflow_registry = workflow_registry
         self._workflow_runtime = workflow_runtime
         self._workflow_optimization = workflow_optimization
-        self._mode_workflow_team_coordinator = mode_workflow_team_coordinator
+        self._coordination_advisor = coordination_advisor or mode_workflow_team_coordinator
 
         logger.debug(
-            "WorkflowFacade initialized (registry=%s, optimization=%s, coordinator=%s)",
+            "WorkflowFacade initialized (registry=%s, optimization=%s, advisor=%s)",
             workflow_registry is not None,
             workflow_optimization is not None,
-            mode_workflow_team_coordinator is not None,
+            self._coordination_advisor is not None,
         )
 
     # ------------------------------------------------------------------
@@ -89,11 +90,21 @@ class WorkflowFacade:
         return self._workflow_optimization
 
     @property
+    def coordination_advisor(self) -> Optional[Any]:
+        """Framework-facing advisor for intelligent team/workflow suggestions."""
+        return self._coordination_advisor
+
+    @coordination_advisor.setter
+    def coordination_advisor(self, value: Any) -> None:
+        """Update the framework-facing coordination advisor."""
+        self._coordination_advisor = value
+
+    @property
     def mode_workflow_team_coordinator(self) -> Optional[Any]:
-        """Coordinator for intelligent team/workflow suggestions."""
-        return self._mode_workflow_team_coordinator
+        """Compatibility alias for the coordination advisor surface."""
+        return self._coordination_advisor
 
     @mode_workflow_team_coordinator.setter
     def mode_workflow_team_coordinator(self, value: Any) -> None:
-        """Update the mode-workflow-team coordinator."""
-        self._mode_workflow_team_coordinator = value
+        """Update the compatibility coordinator alias."""
+        self._coordination_advisor = value

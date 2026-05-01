@@ -500,17 +500,17 @@ class CoordinationBuildersMixin:
         logger.debug("IntentClassifier singleton retrieved")
         return classifier
 
-    def create_mode_workflow_team_coordinator(
+    def create_coordination_advisor(
         self,
         vertical_context: Any,
     ) -> "ModeWorkflowTeamCoordinator":
-        """Create ModeWorkflowTeamCoordinator for intelligent task coordination.
+        """Create the canonical coordination advisor for task/team/workflow routing.
 
         Args:
             vertical_context: VerticalContext with team specs and workflows
 
         Returns:
-            ModeWorkflowTeamCoordinator instance
+            ModeWorkflowTeamCoordinator compatibility wrapper over the framework advisor
         """
         from victor.agent.mode_workflow_team_coordinator import create_coordinator
 
@@ -532,8 +532,15 @@ class CoordinationBuildersMixin:
             selection_strategy=selection_strategy,
         )
 
-        logger.debug(f"ModeWorkflowTeamCoordinator created with strategy={selection_strategy}")
+        logger.debug("Coordination advisor created with strategy=%s", selection_strategy)
         return coordinator
+
+    def create_mode_workflow_team_coordinator(
+        self,
+        vertical_context: Any,
+    ) -> "ModeWorkflowTeamCoordinator":
+        """Deprecated compatibility wrapper for the canonical coordination advisor."""
+        return self.create_coordination_advisor(vertical_context)
 
     def setup_subagent_orchestration(self) -> tuple[Optional[Any], bool]:
         """Setup sub-agent orchestration with lazy initialization.

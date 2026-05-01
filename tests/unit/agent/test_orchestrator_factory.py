@@ -354,6 +354,37 @@ class TestCreateRecoveryHandler:
 class TestCanonicalCoordinatorBuilders:
     """Tests for canonical coordination helper surfaces on OrchestratorFactory."""
 
+    def test_create_coordination_advisor_returns_wrapper(self, factory):
+        vertical_context = MagicMock(name="vertical_context")
+        advisor = MagicMock(name="coordination_advisor")
+
+        with patch(
+            "victor.agent.mode_workflow_team_coordinator.create_coordinator",
+            return_value=advisor,
+        ) as mock_create:
+            result = factory.create_coordination_advisor(vertical_context)
+
+        assert result is advisor
+        mock_create.assert_called_once_with(
+            vertical_context=vertical_context,
+            team_learner=None,
+            selection_strategy=getattr(factory.settings, "team_selection_strategy", "hybrid"),
+        )
+
+    def test_create_mode_workflow_team_coordinator_forwards_to_coordination_advisor(self, factory):
+        vertical_context = MagicMock(name="vertical_context")
+        advisor = MagicMock(name="coordination_advisor")
+
+        with patch.object(
+            factory,
+            "create_coordination_advisor",
+            return_value=advisor,
+        ) as mock_create:
+            result = factory.create_mode_workflow_team_coordinator(vertical_context)
+
+        assert result is advisor
+        mock_create.assert_called_once_with(vertical_context)
+
     def test_create_exploration_coordinator_returns_runtime(self, factory):
         coordinator = factory.create_exploration_coordinator()
 

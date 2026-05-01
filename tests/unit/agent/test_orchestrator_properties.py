@@ -54,6 +54,7 @@ class TestOrchestratorPropertyInstallation:
             "turn_executor",
             "intelligent_integration",
             "subagent_orchestrator",
+            "coordination_advisor",
             "coordination",
         ]
         for prop_name in lazy_props:
@@ -99,6 +100,44 @@ class TestOrchestratorPropertyInstallation:
         orchestrator._skill_matcher = matcher
 
         assert orchestrator.skill_matcher is matcher
+
+    def test_coordination_advisor_property_returns_lazy_framework_surface(self):
+        """coordination_advisor should expose the normalized lazy coordination surface."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        advisor = MagicMock(name="coordination_advisor")
+        orchestrator._coordination_advisor = advisor
+
+        assert orchestrator.coordination_advisor is advisor
+        assert orchestrator.coordination is advisor
+
+    def test_mode_workflow_team_coordinator_alias_warns_and_maps_to_coordination_advisor(self):
+        """The deprecated private coordinator alias should forward to _coordination_advisor."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        advisor = MagicMock(name="coordination_advisor")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator._mode_workflow_team_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            orchestrator._mode_workflow_team_coordinator = advisor
+
+        assert orchestrator._coordination_advisor is advisor
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator._mode_workflow_team_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            assert orchestrator._mode_workflow_team_coordinator is advisor
 
     def test_removed_compatibility_aliases_are_not_installed_on_orchestrator(self):
         """Deprecated chat/session/tool coordinator aliases now live off-orchestrator."""

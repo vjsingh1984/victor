@@ -243,7 +243,7 @@ class TestAgentRuntimeBootstrapper:
         orch.__init_capability_registry__.assert_called_once()
 
         # Verify lazy placeholders are None
-        assert orch._mode_workflow_team_coordinator is None
+        assert orch._coordination_advisor is None
         assert orch._turn_executor is None
         assert orch._deprecated_sync_chat_coordinator is None
         assert orch._deprecated_streaming_chat_coordinator is None

@@ -826,12 +826,16 @@ def _resolve_runtime_vertical_subject(runtime_subject: Any) -> Any:
 
 def _resolve_runtime_coordination(runtime_subject: Any) -> Any:
     """Resolve the declared coordination surface for a runtime-like object."""
-    if not _has_declared_attribute(runtime_subject, "coordination"):
-        return None
-    try:
-        return getattr(runtime_subject, "coordination", None)
-    except Exception:
-        return None
+    for attr_name in ("coordination_advisor", "coordination"):
+        if not _has_declared_attribute(runtime_subject, attr_name):
+            continue
+        try:
+            coordination = getattr(runtime_subject, attr_name, None)
+        except Exception:
+            coordination = None
+        if coordination is not None:
+            return coordination
+    return None
 
 
 def _resolve_runtime_team_selector(runtime_subject: Any) -> Any:
