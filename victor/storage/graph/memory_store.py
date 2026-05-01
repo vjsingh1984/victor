@@ -1,6 +1,7 @@
 # Simple in-memory GraphStoreProtocol implementation (non-persistent).
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from victor.storage.graph.protocol import (
@@ -24,6 +25,19 @@ class MemoryGraphStore(GraphStoreProtocol):
 
     async def close(self) -> None:
         return None
+
+    def _canonical_file_path(self, file: str | Path) -> str:
+        """Normalize file paths so equivalent aliases share one key."""
+        path = Path(file).expanduser()
+        try:
+            return str(path.resolve(strict=False))
+        except OSError:
+            return str(path.absolute())
+
+    def _file_path_variants(self, file: str | Path) -> set[str]:
+        """Return raw plus canonical path forms for compatibility lookups."""
+        raw_path = str(file)
+        return {raw_path, self._canonical_file_path(raw_path)}
 
     async def upsert_nodes(self, nodes: Iterable[GraphNode]) -> None:
         for n in nodes:
@@ -83,13 +97,14 @@ class MemoryGraphStore(GraphStoreProtocol):
         type: str | None = None,
         file: str | None = None,
     ) -> List[GraphNode]:
+        file_variants = self._file_path_variants(file) if file is not None else None
         results: List[GraphNode] = []
         for node in self._nodes.values():
             if name is not None and node.name != name:
                 continue
             if type is not None and node.type != type:
                 continue
-            if file is not None and node.file != file:
+            if file_variants is not None and node.file not in file_variants:
                 continue
             results.append(node)
         return results
@@ -124,23 +139,32 @@ class MemoryGraphStore(GraphStoreProtocol):
         return sorted(self._nodes.values(), key=lambda node: (node.file, node.line or 0, node.name))
 
     async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
+        file_variants = self._file_path_variants(file)
         return sorted(
-            [node for node in self._nodes.values() if node.file == file],
+            [node for node in self._nodes.values() if node.file in file_variants],
             key=lambda node: (node.line or 0, node.name),
         )
 
     async def update_file_mtime(self, file: str, mtime: float) -> None:
-        self._file_mtimes[file] = mtime
+        self._file_mtimes[self._canonical_file_path(file)] = mtime
 
     async def get_stale_files(self, file_mtimes: Dict[str, float]) -> List[str]:
         return [
             file
             for file, current_mtime in file_mtimes.items()
-            if self._file_mtimes.get(file, float("-inf")) < current_mtime
+            if max(
+                (self._file_mtimes.get(variant, float("-inf")) for variant in self._file_path_variants(file)),
+                default=float("-inf"),
+            )
+            < current_mtime
         ]
 
+    async def get_indexed_files(self) -> List[str]:
+        return sorted(self._file_mtimes.keys())
+
     async def delete_by_file(self, file: str) -> None:
-        node_ids = {node.node_id for node in self._nodes.values() if node.file == file}
+        file_variants = self._file_path_variants(file)
+        node_ids = {node.node_id for node in self._nodes.values() if node.file in file_variants}
         self._nodes = {
             node_id: node for node_id, node in self._nodes.items() if node_id not in node_ids
         }
@@ -149,7 +173,8 @@ class MemoryGraphStore(GraphStoreProtocol):
             for key, edge in self._edges.items()
             if edge.src not in node_ids and edge.dst not in node_ids
         }
-        self._file_mtimes.pop(file, None)
+        for file_variant in file_variants:
+            self._file_mtimes.pop(file_variant, None)
 
     async def delete_by_repo(self) -> None:
         self._nodes.clear()

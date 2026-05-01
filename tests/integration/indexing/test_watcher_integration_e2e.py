@@ -16,10 +16,14 @@
 
 import asyncio
 import tempfile
+import time
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
+from victor.core.graph_rag import GraphIndexConfig, GraphIndexingPipeline
+from victor.core.indexing.file_watcher import FileChangeEvent, FileChangeType, FileWatcherRegistry
 from victor.core.indexing.watcher_initializer import (
     initialize_file_watchers,
     stop_file_watchers,
@@ -27,8 +31,8 @@ from victor.core.indexing.watcher_initializer import (
     initialize_from_context,
     cleanup_session,
 )
-from victor.core.indexing.file_watcher import FileWatcherRegistry
 from victor.core.indexing.graph_manager import GraphManager
+from victor.storage.graph import create_graph_store
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +47,7 @@ async def reset_registries():
     gm_manager = GraphManager.get_instance()
     await gm_manager.clear_cache()
     gm_manager._watcher_subscribed.clear()
+    await gm_manager.stop_background_refresh()
 
     yield
 
@@ -51,6 +56,7 @@ async def reset_registries():
     fw_registry._watchers.clear()
     await gm_manager.clear_cache()
     gm_manager._watcher_subscribed.clear()
+    await gm_manager.stop_background_refresh()
 
 
 @pytest.fixture
@@ -230,6 +236,46 @@ class TestFileWatcherInitializer:
                 # Final state should have 2 watchers
                 stats = FileWatcherRegistry.get_instance().get_stats()
                 assert stats["total_watchers"] == 2
+
+    @pytest.mark.asyncio
+    async def test_graph_manager_background_refresh_updates_project_graph(self, temp_project):
+        """GraphManager should incrementally refresh the stored graph after file changes."""
+        graph_store = create_graph_store("sqlite", project_path=temp_project)
+        await graph_store.initialize()
+        await graph_store.delete_by_repo()
+
+        pipeline = GraphIndexingPipeline(
+            graph_store,
+            GraphIndexConfig(
+                root_path=temp_project,
+                enable_ccg=False,
+                enable_embeddings=False,
+                enable_subgraph_cache=False,
+            ),
+        )
+        await pipeline.index_repository()
+
+        manager = GraphManager.get_instance()
+        await manager.ensure_background_refresh(temp_project, enable_ccg=False)
+
+        target_file = temp_project / "src" / "module.py"
+        time.sleep(0.5)
+        target_file.write_text("def bar():\n    return 2\n")
+
+        await manager._on_file_change(
+            FileChangeEvent(
+                path=target_file,
+                change_type=FileChangeType.MODIFIED,
+                timestamp=datetime.now(),
+            ),
+            temp_project,
+            None,
+        )
+        await manager.wait_for_refresh(temp_project)
+
+        refreshed_nodes = await graph_store.get_nodes_by_file(str(target_file))
+        assert {node.name for node in refreshed_nodes} == {"bar"}
+        assert str(temp_project.resolve()) not in manager._refresh_tasks
 
 
 class TestCrossSessionBehavior:

@@ -139,6 +139,22 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Get database connection."""
         return self._db.get_connection()
 
+    def _canonical_file_path(self, file: str | Path) -> str:
+        """Normalize file paths so equivalent aliases map to one graph key."""
+        path = Path(file).expanduser()
+        try:
+            return str(path.resolve(strict=False))
+        except OSError:
+            return str(path.absolute())
+
+    def _file_path_variants(self, file: str | Path) -> List[str]:
+        """Return raw plus canonical path forms for compatibility lookups."""
+        raw_path = str(file)
+        canonical_path = self._canonical_file_path(raw_path)
+        if canonical_path == raw_path:
+            return [raw_path]
+        return [raw_path, canonical_path]
+
     def _ensure_schema(self) -> None:
         conn = self._connect()
         conn.executescript(SCHEMA)
@@ -412,8 +428,13 @@ class SqliteGraphStore(GraphStoreProtocol):
             clauses.append("type = ?")
             params.append(type)
         if file:
-            clauses.append("file = ?")
-            params.append(file)
+            file_variants = self._file_path_variants(file)
+            if len(file_variants) == 1:
+                clauses.append("file = ?")
+            else:
+                placeholders = ",".join("?" for _ in file_variants)
+                clauses.append(f"file IN ({placeholders})")
+            params.extend(file_variants)
         where = " AND ".join(clauses) if clauses else "1=1"
         query = f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE {where}"
         async with self._lock:
@@ -528,11 +549,18 @@ class SqliteGraphStore(GraphStoreProtocol):
 
     async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
         """Get all symbols in a specific file."""
+        file_variants = self._file_path_variants(file)
+        placeholders = ",".join("?" for _ in file_variants)
         async with self._lock:
             conn = self._connect()
             cur = conn.execute(
-                f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE file = ? ORDER BY line",
-                (file,),
+                f"""
+                SELECT {self._NODE_COLS}
+                FROM {_NODE_TABLE}
+                WHERE file IN ({placeholders})
+                ORDER BY line
+                """,
+                file_variants,
             )
             return [self._row_to_node(row) for row in cur.fetchall()]
 
@@ -540,6 +568,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Record file modification time for staleness tracking."""
         import time
 
+        file = self._canonical_file_path(file)
         async with self._lock:
             conn = self._connect()
             conn.execute(
@@ -560,18 +589,36 @@ class SqliteGraphStore(GraphStoreProtocol):
         async with self._lock:
             conn = self._connect()
             for file, current_mtime in file_mtimes.items():
-                cur = conn.execute(f"SELECT mtime FROM {_MTIME_TABLE} WHERE file = ?", (file,))
+                file_variants = self._file_path_variants(file)
+                placeholders = ",".join("?" for _ in file_variants)
+                cur = conn.execute(
+                    f"SELECT MAX(mtime) FROM {_MTIME_TABLE} WHERE file IN ({placeholders})",
+                    file_variants,
+                )
                 row = cur.fetchone()
-                if row is None or row[0] < current_mtime:
+                recorded_mtime = None if row is None else row[0]
+                if recorded_mtime is None or recorded_mtime < current_mtime:
                     stale.append(file)
             return stale
 
+    async def get_indexed_files(self) -> List[str]:
+        """Get the set of files currently tracked for graph staleness."""
+        async with self._lock:
+            conn = self._connect()
+            cur = conn.execute(f"SELECT file FROM {_MTIME_TABLE} ORDER BY file")
+            return [str(row[0]) for row in cur.fetchall()]
+
     async def delete_by_file(self, file: str) -> None:
         """Delete all nodes and edges for a specific file (for incremental reindex)."""
+        file_variants = self._file_path_variants(file)
+        placeholders = ",".join("?" for _ in file_variants)
         async with self._lock:
             conn = self._connect()
             # Get node IDs for this file
-            cur = conn.execute(f"SELECT node_id FROM {_NODE_TABLE} WHERE file = ?", (file,))
+            cur = conn.execute(
+                f"SELECT node_id FROM {_NODE_TABLE} WHERE file IN ({placeholders})",
+                file_variants,
+            )
             node_ids = [row[0] for row in cur.fetchall()]
 
             if node_ids:
@@ -583,7 +630,11 @@ class SqliteGraphStore(GraphStoreProtocol):
                     node_ids,
                 )
 
-            conn.execute(f"DELETE FROM {_MTIME_TABLE} WHERE file = ?", (file,))
+            file_placeholders = ",".join("?" for _ in file_variants)
+            conn.execute(
+                f"DELETE FROM {_MTIME_TABLE} WHERE file IN ({file_placeholders})",
+                file_variants,
+            )
             conn.commit()
 
     async def get_all_edges(self) -> List[GraphEdge]:

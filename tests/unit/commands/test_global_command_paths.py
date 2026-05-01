@@ -23,6 +23,7 @@ from rich.console import Console
 from victor.ui.commands import ab_testing as ab_testing_cmd
 from victor.ui.commands import auth as auth_cmd
 from victor.ui.commands import db as db_cmd
+from victor.ui.commands import graph as graph_cmd
 from victor.ui.commands import scheduler as scheduler_cmd
 from victor.ui.commands import serve as serve_cmd
 
@@ -57,6 +58,23 @@ def test_scheduler_start_uses_global_victor_dir_for_default_pid_file(tmp_path):
         scheduler_cmd.start(daemon=True, pid_file=None, check_interval=15.0, config_file=None)
 
     mock_start_daemon.assert_called_once_with(global_dir / "scheduler.pid", 15.0, None)
+
+
+def test_graph_watch_pid_file_uses_global_victor_dir_and_project_hash(tmp_path):
+    """Graph watch daemon PID files should live under the canonical global Victor dir."""
+    global_dir = tmp_path / ".victor"
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+
+    with patch(
+        "victor.ui.commands.graph.get_project_paths",
+        return_value=SimpleNamespace(global_victor_dir=global_dir),
+    ):
+        pid_file = graph_cmd._default_graph_watch_pid_file(project_root)
+
+    assert pid_file.parent == global_dir
+    assert pid_file.name.startswith("graph-watch-")
+    assert pid_file.suffix == ".pid"
 
 
 def test_db_archive_uses_global_victor_dir_for_default_output(tmp_path):

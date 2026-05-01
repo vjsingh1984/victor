@@ -51,6 +51,7 @@ class GraphIndexConfig:
         enable_ccg: Whether to build Code Context Graph (CFG/CDG/DDG)
         enable_embeddings: Whether to generate embeddings for nodes
         enable_subgraph_cache: Whether to pre-compute subgraph cache
+        incremental: Whether to reindex only changed/deleted files using mtimes
         chunk_size: Number of files to process per batch
         max_file_size_bytes: Maximum file size to process
         exclude_patterns: Glob patterns for files/directories to exclude
@@ -67,6 +68,7 @@ class GraphIndexConfig:
     enable_ccg: bool = True
     enable_embeddings: bool = True
     enable_subgraph_cache: bool = True
+    incremental: bool = True
     chunk_size: int = 50
     max_file_size_bytes: int = 1_000_000  # 1MB
     exclude_patterns: List[str] = field(

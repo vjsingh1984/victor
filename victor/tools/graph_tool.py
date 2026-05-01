@@ -1747,7 +1747,7 @@ async def graph(
     if not reindex:
         try:
             manager = GraphManager.get_instance()
-            await manager._ensure_file_watcher(root_path, _exec_ctx)
+            await manager.ensure_background_refresh(root_path, exec_ctx=_exec_ctx)
         except Exception as e:
             # Non-fatal: log warning but continue
             logger.warning(f"[graph] Failed to subscribe to file watcher: {e}")

@@ -16,7 +16,9 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -91,6 +93,76 @@ class Calculator:
         # Check for expected symbols
         function_nodes = [n for n in all_nodes if n.type == "function"]
         assert len(function_nodes) > 0
+
+        await graph_store.close()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_graph_indexing_pipeline_reuses_unchanged_files_incrementally():
+    """Incremental indexing should touch only changed/deleted source files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+
+        changed_file = tmpdir / "changed.py"
+        unchanged_file = tmpdir / "stable.py"
+        ignored_file = tmpdir / "README.md"
+
+        changed_file.write_text(
+            """
+def old_name():
+    return 1
+""".strip()
+        )
+        unchanged_file.write_text(
+            """
+def stable_name():
+    return 2
+""".strip()
+        )
+        ignored_file.write_text("# Not indexable by the graph pipeline")
+
+        graph_store = create_graph_store(name="sqlite", project_path=tmpdir)
+        await graph_store.initialize()
+        await graph_store.delete_by_repo()
+
+        config = GraphIndexConfig(
+            root_path=tmpdir,
+            enable_ccg=False,
+            enable_embeddings=False,
+            enable_subgraph_cache=False,
+        )
+        pipeline = GraphIndexingPipeline(graph_store, config)
+
+        initial_stats = await pipeline.index_repository()
+        assert initial_stats.files_processed == 2
+        assert initial_stats.files_deleted == 0
+        assert initial_stats.files_unchanged == 0
+
+        os.utime(changed_file, (time.time() + 2, time.time() + 2))
+        changed_file.write_text(
+            """
+def new_name():
+    return 3
+""".strip()
+        )
+
+        incremental_stats = await pipeline.index_repository()
+        assert incremental_stats.files_processed == 1
+        assert incremental_stats.files_deleted == 0
+        assert incremental_stats.files_unchanged == 1
+
+        changed_nodes = await graph_store.get_nodes_by_file(str(changed_file))
+        unchanged_nodes = await graph_store.get_nodes_by_file(str(unchanged_file))
+        assert {node.name for node in changed_nodes} == {"new_name"}
+        assert {node.name for node in unchanged_nodes} == {"stable_name"}
+
+        unchanged_file.unlink()
+        deleted_stats = await pipeline.index_repository()
+        assert deleted_stats.files_processed == 0
+        assert deleted_stats.files_deleted == 1
+        assert deleted_stats.files_unchanged == 1
+        assert await graph_store.get_nodes_by_file(str(unchanged_file)) == []
 
         await graph_store.close()
 

@@ -15,6 +15,7 @@ from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
 from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
 from victor.core.utils.capability_loader import load_codebase_analyzer_attr
+from victor.tools.common import latest_mtime
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
@@ -790,12 +791,57 @@ providers:
             def on_progress(stage: str, msg: str) -> None:
                 console.print(f"[dim]  {msg}[/]")
 
-            # Build graph data BEFORE LLM synthesis so the LLM can leverage it
-            # Order: Synthetic edges → CCG → LLM synthesis
+            project_root = Path.cwd()
+            project_latest_mtime = latest_mtime(project_root)
 
-            # 1. Synthetic edges enrichment (IMPLEMENTS, DECORATES, REGISTERS)
+            # Build graph data BEFORE LLM synthesis so the LLM can leverage it.
+            # Order: incremental graph/CCG refresh → synthetic edge enrichment → LLM synthesis
+
+            # 1. CCG indexing (if enabled and not in quick/index mode)
+            if ccg and mode not in ("quick", "index"):
+                try:
+                    from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
+                    from victor.storage.graph import create_graph_store
+
+                    console.print("[dim]  Updating Code Context Graph incrementally...[/]")
+                    import asyncio
+
+                    async def _build_ccg_index():
+                        graph_store = create_graph_store("sqlite", project_path=project_root)
+                        config = GraphIndexConfig(
+                            root_path=project_root,
+                            enable_ccg=True,
+                            enable_embeddings=False,  # Skip embeddings for faster init
+                        )
+                        pipeline = GraphIndexingPipeline(graph_store, config)
+                        return await pipeline.index_repository()
+
+                    stats = asyncio.run(_build_ccg_index())
+                    if stats.files_processed or stats.files_deleted:
+                        console.print(
+                            f"[green]✓[/] CCG index updated "
+                            f"({stats.files_processed} changed, {stats.files_deleted} deleted, "
+                            f"{stats.files_unchanged} unchanged; "
+                            f"{stats.nodes_created} nodes, {stats.edges_created} edges)"
+                        )
+                    else:
+                        console.print(
+                            f"[green]✓[/] CCG graph already current "
+                            f"({stats.files_unchanged} unchanged files reused)"
+                        )
+                except ImportError:
+                    console.print(
+                        "[yellow]![/] CCG requires graph dependencies. Run: pip install 'victor-ai[graph]'"
+                    )
+                except Exception as exc:
+                    console.print(f"[yellow]![/] CCG indexing skipped: {exc}")
+
+            # 2. Synthetic edge enrichment (IMPLEMENTS, DECORATES, REGISTERS)
             try:
-                stats = ensure_project_graph_enriched(Path.cwd())
+                stats = ensure_project_graph_enriched(
+                    project_root,
+                    latest_mtime=project_latest_mtime,
+                )
                 if stats.total_edges:
                     console.print(
                         "[dim]  Enriched graph with synthetic architecture edges "
@@ -806,43 +852,12 @@ providers:
             except Exception as exc:
                 console.print(f"[yellow]![/] Graph enrichment skipped: {exc}")
 
-            # 2. CCG indexing (if enabled and not in quick/index mode)
-            if ccg and mode not in ("quick", "index"):
-                try:
-                    from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
-                    from victor.storage.graph import create_graph_store
-
-                    console.print("[dim]  Building Code Context Graph...[/]")
-                    import asyncio
-
-                    async def _build_ccg_index():
-                        graph_store = create_graph_store("sqlite", project_path=Path.cwd())
-                        config = GraphIndexConfig(
-                            root_path=Path.cwd(),
-                            enable_ccg=True,
-                            enable_embeddings=False,  # Skip embeddings for faster init
-                        )
-                        pipeline = GraphIndexingPipeline(graph_store, config)
-                        return await pipeline.index_repository()
-
-                    stats = asyncio.run(_build_ccg_index())
-                    console.print(
-                        f"[green]✓[/] CCG index built ({stats.files_processed} files, "
-                        f"{stats.nodes_created} nodes, {stats.edges_created} edges)"
-                    )
-                except ImportError:
-                    console.print(
-                        "[yellow]![/] CCG requires graph dependencies. Run: pip install 'victor-ai[graph]'"
-                    )
-                except Exception as exc:
-                    console.print(f"[yellow]![/] CCG indexing skipped: {exc}")
-
             # 3. Gather graph context for LLM synthesis (only when using LLM)
             graph_ctx = None
             if deep:  # Only gather for LLM synthesis
                 import asyncio
 
-                graph_ctx = asyncio.run(_gather_graph_context(Path.cwd()))
+                graph_ctx = asyncio.run(_gather_graph_context(project_root))
                 if graph_ctx:
                     console.print("[dim]  Gathered graph context for LLM synthesis[/]")
 

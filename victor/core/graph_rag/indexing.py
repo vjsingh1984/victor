@@ -81,6 +81,8 @@ class GraphIndexStats:
 
     files_processed: int = 0
     files_skipped: int = 0
+    files_unchanged: int = 0
+    files_deleted: int = 0
     nodes_created: int = 0
     edges_created: int = 0
     ccg_nodes_created: int = 0
@@ -100,6 +102,8 @@ class GraphIndexStats:
         return {
             "files_processed": self.files_processed,
             "files_skipped": self.files_skipped,
+            "files_unchanged": self.files_unchanged,
+            "files_deleted": self.files_deleted,
             "nodes_created": self.nodes_created,
             "edges_created": self.edges_created,
             "ccg_nodes_created": self.ccg_nodes_created,
@@ -141,6 +145,7 @@ class GraphIndexingPipeline:
         self.graph_store = graph_store
         self.config = config
         self._ccg_builder = None
+        self._files_to_process: Set[str] = set()
 
         if config.enable_ccg:
             try:
@@ -162,7 +167,7 @@ class GraphIndexingPipeline:
         Returns:
             GraphIndexStats with indexing results
         """
-        root = root_path or self.config.root_path
+        root = (root_path or self.config.root_path).resolve()
         stats = GraphIndexStats()
         start_time = time.time()
 
@@ -173,7 +178,20 @@ class GraphIndexingPipeline:
 
         # Discover source files
         files = await self._discover_files(root)
-        logger.info(f"Discovered {len(files)} source files")
+        logger.info("Discovered %d indexable source files", len(files))
+
+        planning_stats = await self._prepare_incremental_work(files)
+        self._merge_stats(stats, planning_stats)
+
+        if self.config.incremental:
+            files = [file_path for file_path in files if str(file_path) in self._files_to_process]
+            logger.info(
+                "Incremental graph indexing plan for %s: %d changed, %d unchanged, %d deleted",
+                root,
+                len(files),
+                planning_stats.files_unchanged,
+                planning_stats.files_deleted,
+            )
 
         # Process files in batches
         for i in range(0, len(files), self.config.chunk_size):
@@ -181,13 +199,22 @@ class GraphIndexingPipeline:
             batch_stats = await self._process_batch(batch)
             self._merge_stats(stats, batch_stats)
 
+        graph_changed = bool(
+            stats.files_processed
+            or stats.files_deleted
+            or stats.nodes_created
+            or stats.edges_created
+            or stats.ccg_nodes_created
+            or stats.ccg_edges_created
+        )
+
         # Generate embeddings if enabled
-        if self.config.enable_embeddings:
+        if self.config.enable_embeddings and graph_changed:
             embedding_stats = await self._generate_embeddings()
             self._merge_stats(stats, embedding_stats)
 
         # Cache subgraphs if enabled
-        if self.config.enable_subgraph_cache:
+        if self.config.enable_subgraph_cache and graph_changed:
             subgraph_stats = await self._cache_subgraphs()
             self._merge_stats(stats, subgraph_stats)
 
@@ -246,9 +273,81 @@ class GraphIndexingPipeline:
                 if not included:
                     continue
 
+            language = self._detect_language(file_path)
+            if not self._is_indexable_language(language):
+                continue
+
             files.append(file_path)
 
         return sorted(files)
+
+    async def _prepare_incremental_work(self, files: List[Path]) -> GraphIndexStats:
+        """Prepare an incremental indexing plan based on file mtimes and deletions."""
+        self._files_to_process = {str(file_path) for file_path in files}
+        if not self.config.incremental:
+            return GraphIndexStats()
+
+        stats = GraphIndexStats()
+        current_files = {str(file_path): file_path for file_path in files}
+        file_mtimes = {
+            path_str: file_path.stat().st_mtime
+            for path_str, file_path in current_files.items()
+        }
+
+        stale_files = set(await self.graph_store.get_stale_files(file_mtimes))
+        indexed_files = await self._get_indexed_files()
+        deleted_files = sorted(indexed_files - set(current_files))
+
+        for file_path in deleted_files:
+            await self.graph_store.delete_by_file(file_path)
+            stats.files_deleted += 1
+
+        files_to_process: Set[str] = set()
+        for file_path in sorted(stale_files):
+            await self.graph_store.delete_by_file(file_path)
+            files_to_process.add(file_path)
+
+        stats.files_unchanged = max(0, len(current_files) - len(files_to_process))
+        self._files_to_process = files_to_process
+        return stats
+
+    async def _get_indexed_files(self) -> Set[str]:
+        """Return currently indexed files, preferring store-native mtime metadata."""
+        get_indexed_files = getattr(self.graph_store, "get_indexed_files", None)
+        if callable(get_indexed_files):
+            try:
+                indexed_files = await get_indexed_files()
+                return {str(file_path) for file_path in indexed_files}
+            except Exception as exc:
+                logger.debug("Graph store get_indexed_files fallback: %s", exc)
+
+        indexed_nodes = await self.graph_store.get_all_nodes()
+        return {node.file for node in indexed_nodes if node.file}
+
+    def _is_indexable_language(self, language: str) -> bool:
+        """Return whether the built-in indexer can extract useful graph data for a language."""
+        symbol_languages = {
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust",
+            "java",
+            "c",
+            "cpp",
+        }
+        if language in symbol_languages:
+            return True
+
+        if not self.config.enable_ccg:
+            return False
+
+        try:
+            from victor.core.indexing.ccg_builder import SUPPORTED_CCG_LANGUAGES
+
+            return language in SUPPORTED_CCG_LANGUAGES
+        except Exception:
+            return False
 
     async def _process_batch(self, files: List[Path]) -> GraphIndexStats:
         """Process a batch of files.
@@ -1286,6 +1385,8 @@ class GraphIndexingPipeline:
         """
         target.files_processed += source.files_processed
         target.files_skipped += source.files_skipped
+        target.files_unchanged += source.files_unchanged
+        target.files_deleted += source.files_deleted
         target.nodes_created += source.nodes_created
         target.edges_created += source.edges_created
         target.ccg_nodes_created += source.ccg_nodes_created

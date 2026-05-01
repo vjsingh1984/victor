@@ -16,9 +16,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import os
+import signal
+import sys
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 
@@ -26,12 +31,14 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from victor.config.settings import load_settings
+from victor.config.settings import get_project_paths, load_settings
 from victor.core.async_utils import run_sync
 from victor.storage.graph import create_graph_store
 
 graph_app = typer.Typer(name="graph", help="Graph-based code intelligence operations.")
+watch_app = typer.Typer(help="Keep the persisted graph incrementally updated.")
 console = Console()
+graph_app.add_typer(watch_app, name="watch")
 
 
 async def _index_async(
@@ -521,8 +528,6 @@ async def _init_context_async(
     console.print(f"[dim]Generating graph-enhanced init.md for: {root_path}[/dim]")
 
     # Check if graph exists
-    from victor.storage.graph import create_graph_store
-
     graph_store = create_graph_store("sqlite", root_path)
     await graph_store.initialize()
 
@@ -553,6 +558,233 @@ async def _init_context_async(
         console.print("[yellow]init.md already exists[/yellow]")
         console.print("[dim]Use --force to overwrite[/dim]")
         return False
+
+
+def _default_graph_watch_pid_file(project_root: Path) -> Path:
+    """Return the default graph-watch PID file for a project root."""
+    paths = get_project_paths(project_root)
+    slug = hashlib.sha1(str(project_root.resolve()).encode("utf-8")).hexdigest()[:12]
+    return paths.global_victor_dir / f"graph-watch-{slug}.pid"
+
+
+def _resolve_graph_watch_pid_file(project_root: Path, pid_file: Optional[Path]) -> Path:
+    """Resolve an explicit or default PID file for graph watching."""
+    return pid_file if pid_file is not None else _default_graph_watch_pid_file(project_root)
+
+
+async def _watch_async(
+    path: str,
+    enable_ccg: bool,
+    poll_interval: float,
+    debounce_seconds: float,
+    build_now: bool,
+) -> bool:
+    """Run foreground graph watching until interrupted."""
+    from victor.core.indexing.graph_manager import GraphManager
+    from victor.core.indexing.watcher_initializer import stop_file_watchers
+
+    root_path = Path(path).resolve()
+    if not root_path.is_dir():
+        console.print(f"[red]Error:[/red] Path '{path}' is not a directory")
+        return False
+
+    manager = GraphManager.get_instance()
+    initial_stats = await manager.ensure_background_refresh(
+        root_path,
+        enable_ccg=enable_ccg,
+        poll_interval_seconds=poll_interval,
+        debounce_seconds=debounce_seconds,
+        build_now=build_now,
+    )
+
+    if initial_stats is not None:
+        console.print(
+            "[dim]Initial graph refresh: "
+            f"{initial_stats.files_processed} changed, "
+            f"{initial_stats.files_deleted} deleted, "
+            f"{initial_stats.files_unchanged} unchanged[/dim]"
+        )
+
+    console.print(f"[green]Watching graph updates for {root_path}[/green]")
+    console.print("[dim]Press Ctrl+C to stop[/dim]")
+
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    def _request_stop() -> None:
+        stop_event.set()
+
+    for handled_signal in (signal.SIGINT, signal.SIGTERM):
+        with suppress(NotImplementedError):
+            loop.add_signal_handler(handled_signal, _request_stop)
+
+    try:
+        await stop_event.wait()
+    except KeyboardInterrupt:
+        stop_event.set()
+    finally:
+        await manager.stop_background_refresh(root_path)
+        await stop_file_watchers([root_path])
+        for handled_signal in (signal.SIGINT, signal.SIGTERM):
+            with suppress(NotImplementedError):
+                loop.remove_signal_handler(handled_signal)
+
+    return True
+
+
+def _start_watch_daemon(
+    pid_file: Path,
+    path: str,
+    enable_ccg: bool,
+    poll_interval: float,
+    debounce_seconds: float,
+    build_now: bool,
+) -> None:
+    """Fork and run the graph watcher as a background daemon."""
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if pid_file.exists():
+        try:
+            pid = int(pid_file.read_text().strip())
+            os.kill(pid, 0)
+            console.print(f"[yellow]Graph watcher already running (PID {pid})[/]")
+            raise typer.Exit(1)
+        except (ProcessLookupError, ValueError):
+            pid_file.unlink()
+
+    try:
+        pid = os.fork()
+        if pid > 0:
+            console.print(f"[green]Graph watcher started (PID {pid})[/]")
+            console.print(f"[dim]PID file: {pid_file}[/]")
+            raise typer.Exit(0)
+    except OSError as exc:
+        console.print(f"[red]Failed to fork graph watcher: {exc}[/]")
+        raise typer.Exit(1)
+
+    os.setsid()
+    pid_file.write_text(str(os.getpid()))
+
+    log_file = pid_file.with_suffix(".log")
+    sys.stdout = open(log_file, "a", buffering=1)
+    sys.stderr = sys.stdout
+
+    try:
+        run_sync(
+            _watch_async(
+                path=path,
+                enable_ccg=enable_ccg,
+                poll_interval=poll_interval,
+                debounce_seconds=debounce_seconds,
+                build_now=build_now,
+            )
+        )
+    finally:
+        with suppress(FileNotFoundError):
+            pid_file.unlink()
+
+
+@watch_app.command("start")
+def graph_watch_start(
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
+    enable_ccg: bool = typer.Option(True, "--ccg/--no-ccg", help="Build Code Context Graph"),
+    daemon: bool = typer.Option(False, "--daemon", help="Run watcher as background daemon"),
+    pid_file: Optional[Path] = typer.Option(None, "--pid-file", help="PID file for daemon mode"),
+    poll_interval: float = typer.Option(
+        1.0, "--poll-interval", help="File watcher poll interval in seconds", min=0.1
+    ),
+    debounce_seconds: float = typer.Option(
+        0.3, "--debounce", help="Debounce window before incremental refresh", min=0.0
+    ),
+    build_now: bool = typer.Option(
+        True,
+        "--build-now/--no-build-now",
+        help="Run one incremental refresh immediately on startup",
+    ),
+):
+    """Watch a project and keep its persisted graph updated incrementally."""
+    root_path = Path(path).resolve()
+    resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
+
+    if daemon:
+        _start_watch_daemon(
+            resolved_pid_file,
+            str(root_path),
+            enable_ccg,
+            poll_interval,
+            debounce_seconds,
+            build_now,
+        )
+        return
+
+    success = run_sync(
+        _watch_async(
+            str(root_path),
+            enable_ccg,
+            poll_interval,
+            debounce_seconds,
+            build_now,
+        )
+    )
+    if not success:
+        raise typer.Exit(1)
+
+
+@watch_app.command("stop")
+def graph_watch_stop(
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
+    pid_file: Optional[Path] = typer.Option(None, "--pid-file", help="PID file for daemon mode"),
+):
+    """Stop the graph watcher daemon for a project."""
+    root_path = Path(path).resolve()
+    resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
+
+    if not resolved_pid_file.exists():
+        console.print("[yellow]Graph watcher is not running (no PID file)[/]")
+        raise typer.Exit(0)
+
+    try:
+        pid = int(resolved_pid_file.read_text().strip())
+        os.kill(pid, signal.SIGTERM)
+        resolved_pid_file.unlink()
+        console.print(f"[green]Graph watcher stopped (PID {pid})[/]")
+    except ProcessLookupError:
+        resolved_pid_file.unlink()
+        console.print("[yellow]Graph watcher was not running (stale PID file removed)[/]")
+    except ValueError:
+        console.print("[red]Invalid PID file[/]")
+        raise typer.Exit(1)
+
+
+@watch_app.command("status")
+def graph_watch_status(
+    path: str = typer.Option(".", "--path", "-p", help="Path to codebase root"),
+    pid_file: Optional[Path] = typer.Option(None, "--pid-file", help="PID file for daemon mode"),
+):
+    """Show graph watcher daemon status for a project."""
+    root_path = Path(path).resolve()
+    resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
+
+    running = False
+    daemon_pid = None
+    if resolved_pid_file.exists():
+        try:
+            daemon_pid = int(resolved_pid_file.read_text().strip())
+            os.kill(daemon_pid, 0)
+            running = True
+        except (ProcessLookupError, ValueError):
+            running = False
+
+    console.print(f"\n[green]Graph Watcher Status:[/green] {root_path}\n")
+    table = Table(show_header=False)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_row("Running", "yes" if running else "no")
+    table.add_row("PID file", str(resolved_pid_file))
+    table.add_row("Log file", str(resolved_pid_file.with_suffix(".log")))
+    if daemon_pid is not None:
+        table.add_row("PID", str(daemon_pid))
+    console.print(table)
 
 
 @graph_app.command("init-context")

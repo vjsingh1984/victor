@@ -787,21 +787,7 @@ class SqliteLanceDBStore:
         if not flag_manager.is_enabled(FeatureFlag.USE_CCG):
             enable_ccg = False
 
-        # Check if graph is fresh
-        if not force:
-            graph_stats = await self._graph_store.stats()
-            node_count = graph_stats.get("node_count", graph_stats.get("nodes", 0))
-            if node_count > 0:
-                # Graph exists, check if we should still update
-                # For now, consider any existing graph as "fresh enough"
-                # Future: add staleness detection based on file mtimes
-                return {
-                    "indexed": False,
-                    "reason": "graph_exists",
-                    "stats": graph_stats,
-                }
-
-        # Run graph indexing
+        # Run graph indexing (incremental by default, full only when forced)
         from victor.core.graph_rag import GraphIndexingPipeline, GraphIndexConfig
 
         # Get settings for CCG languages
@@ -820,9 +806,19 @@ class SqliteLanceDBStore:
 
         pipeline = GraphIndexingPipeline(self._graph_store, config)
         stats = await pipeline.index_repository()
+        indexed = bool(
+            force
+            or stats.files_processed
+            or stats.files_deleted
+            or stats.nodes_created
+            or stats.edges_created
+            or stats.ccg_nodes_created
+            or stats.ccg_edges_created
+        )
 
         return {
-            "indexed": True,
+            "indexed": indexed,
+            "reason": "indexed" if indexed else "graph_up_to_date",
             "stats": stats.to_dict(),
             "enable_ccg": enable_ccg,
         }
