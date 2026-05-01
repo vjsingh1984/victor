@@ -212,11 +212,6 @@ class AgentInfo:
     conversation_state: Optional[Any] = None
     runtime_intelligence_integration: Optional[Any] = None
 
-    @property
-    def intelligent_integration(self) -> Optional[Any]:
-        """Compatibility alias for runtime_intelligence_integration."""
-        return self.runtime_intelligence_integration
-
     @classmethod
     def from_agent(cls, agent: Any) -> AgentInfo:
         """Extract component references from agent."""

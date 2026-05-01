@@ -258,14 +258,6 @@ def _runtime_intelligence_integration(
 
     return self._runtime_intelligence_integration
 
-
-def _intelligent_integration(
-    self: "AgentOrchestrator",
-) -> Optional["OrchestratorIntegration"]:
-    """Compatibility alias for the runtime-intelligence integration property."""
-    return _runtime_intelligence_integration(self)
-
-
 def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
     """Get the sub-agent orchestrator (lazy init)."""
     if not self._subagent_orchestration_enabled:
@@ -575,7 +567,6 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "protocol_adapter": (_protocol_adapter, None),
     "turn_executor": (_turn_executor, None),
     "runtime_intelligence_integration": (_runtime_intelligence_integration, None),
-    "intelligent_integration": (_intelligent_integration, None),
     "subagent_orchestrator": (_subagent_orchestrator, None),
     "coordination_advisor": (_coordination_advisor, None),
     "coordination": (_coordination, None),

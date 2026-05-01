@@ -671,15 +671,6 @@ class OrchestrationFacade:
         self._runtime_intelligence_integration = value
 
     @property
-    def intelligent_integration(self) -> Optional[Any]:
-        """Compatibility alias for runtime-intelligence integration."""
-        return self.runtime_intelligence_integration
-
-    @intelligent_integration.setter
-    def intelligent_integration(self, value: Any) -> None:
-        self.runtime_intelligence_integration = value
-
-    @property
     def subagent_orchestrator(self) -> Optional[Any]:
         """Sub-agent orchestration."""
         if self._subagent_orchestrator is None and self._get_subagent_orchestrator is not None:

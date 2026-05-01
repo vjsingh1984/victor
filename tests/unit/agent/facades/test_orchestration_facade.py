@@ -652,11 +652,15 @@ class TestOrchestrationFacadeProperties:
         telemetry = get_deprecated_chat_shim_telemetry()
         assert telemetry["orchestration_facade.unified_chat_coordinator.setter"] == 1
 
-    def test_intelligent_integration_setter(self, facade):
-        """IntelligentIntegration setter updates the integration."""
+    def test_runtime_intelligence_integration_setter(self, facade):
+        """runtime_intelligence_integration setter updates the integration."""
         new_int = MagicMock(name="new_int")
         facade.runtime_intelligence_integration = new_int
         assert facade.runtime_intelligence_integration is new_int
+
+    def test_removed_intelligent_integration_alias_is_not_exposed(self):
+        """The removed intelligent_integration alias should stay absent."""
+        assert hasattr(OrchestrationFacade, "intelligent_integration") is False
 
     def test_subagent_orchestrator_setter(self, facade):
         """SubagentOrchestrator setter updates the orchestrator."""

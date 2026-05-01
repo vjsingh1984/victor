@@ -74,6 +74,7 @@ class TestOrchestratorPropertyInstallation:
             "sync_chat_coordinator",
             "streaming_chat_coordinator",
             "unified_chat_coordinator",
+            "intelligent_integration",
         ]
 
         for prop_name in removed_props:
