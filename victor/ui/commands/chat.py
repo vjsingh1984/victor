@@ -7,6 +7,7 @@ import sys
 import time
 from types import SimpleNamespace
 from typing import Optional, Any
+from pathlib import Path
 
 from rich import box
 from rich.console import Console, Group
@@ -264,6 +265,33 @@ def _print_interactive_startup_messages(con: Console, messages: list[str]) -> No
     """Print queued startup notices for interactive CLI surfaces."""
     for message in messages:
         render_status_message(con, message)
+
+
+def _ensure_graph_watch_for_chat(*, enabled: bool) -> list[str]:
+    """Ensure the project-scoped graph watch daemon exists for interactive chat."""
+    if not enabled:
+        return []
+
+    paths = get_project_paths(Path.cwd())
+    paths.ensure_project_dirs()
+
+    try:
+        from victor.ui.commands.graph import ensure_graph_watch_daemon
+
+        state = ensure_graph_watch_daemon(
+            paths.project_root,
+            enable_ccg=True,
+            build_now=True,
+        )
+    except Exception as exc:
+        return [f"Warning: failed to ensure graph watch daemon: {exc}"]
+
+    messages: list[str] = []
+    if state.stale_pid_removed:
+        messages.append("Recovered stale graph watch state before chat startup.")
+    if state.started and state.pid is not None:
+        messages.append(f"Graph watch daemon started for this project (PID {state.pid}).")
+    return messages
 
 
 def _summarize_smart_routing(
@@ -585,6 +613,12 @@ def chat(
         help="Preload semantic code index at startup (avoids 20-30s delay on first search).",
         rich_help_panel="Advanced Agent Behavior",
     ),
+    graph_watch: bool = typer.Option(
+        True,
+        "--graph-watch/--no-graph-watch",
+        help="Ensure a project-scoped graph watch daemon is running for interactive chat sessions.",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
     vertical: Optional[str] = typer.Option(
         None,
         "--vertical",
@@ -763,6 +797,7 @@ def chat(
     fallback_chain = _resolve_typer_default(fallback_chain)
     tool_preview = _resolve_typer_default(tool_preview)
     enable_pruning = _resolve_typer_default(enable_pruning)
+    graph_watch = _resolve_typer_default(graph_watch)
 
     # Handle --help-full flag for comprehensive help
     if help_full:
@@ -1119,6 +1154,7 @@ victor chat --sessionid abc123            # Resume session
                     use_tui=use_tui,
                     resume_session_id=session_id,
                     show_reasoning=show_reasoning,
+                    graph_watch=graph_watch,
                     session_config=session_config,
                     **runtime_override_kwargs,
                 )
@@ -1513,6 +1549,7 @@ async def run_oneshot(
                 buffered = BufferedRenderer(
                     show_reasoning=show_reasoning,
                     plain=formatter._plain if hasattr(formatter, "_plain") else False,
+                    user_message=message,
                 )
                 await stream_response(
                     client, message, buffered, suppress_thinking=not show_reasoning
@@ -1598,6 +1635,7 @@ async def run_interactive(
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
     show_reasoning: bool = False,
+    graph_watch: bool = True,
     compaction_threshold: Optional[float] = None,
     adaptive_threshold: Optional[bool] = None,
     compaction_min_threshold: Optional[float] = None,
@@ -1686,6 +1724,8 @@ async def run_interactive(
         tool_banner_shown = True
     elif use_tui:
         tui_status_messages.append(_summarize_tool_output_mode(tool_settings))
+
+    tui_startup_messages.extend(_ensure_graph_watch_for_chat(enabled=graph_watch))
 
     try:
         profiles = settings.load_profiles()

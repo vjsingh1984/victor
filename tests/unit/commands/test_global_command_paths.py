@@ -60,20 +60,20 @@ def test_scheduler_start_uses_global_victor_dir_for_default_pid_file(tmp_path):
     mock_start_daemon.assert_called_once_with(global_dir / "scheduler.pid", 15.0, None)
 
 
-def test_graph_watch_pid_file_uses_global_victor_dir_and_project_hash(tmp_path):
-    """Graph watch daemon PID files should live under the canonical global Victor dir."""
-    global_dir = tmp_path / ".victor"
+def test_graph_watch_pid_file_uses_project_victor_dir(tmp_path):
+    """Graph watch daemon PID files should live under the project .victor dir."""
+    project_victor_dir = tmp_path / "repo" / ".victor"
     project_root = tmp_path / "repo"
     project_root.mkdir()
 
     with patch(
         "victor.ui.commands.graph.get_project_paths",
-        return_value=SimpleNamespace(global_victor_dir=global_dir),
+        return_value=SimpleNamespace(project_victor_dir=project_victor_dir),
     ):
         pid_file = graph_cmd._default_graph_watch_pid_file(project_root)
 
-    assert pid_file.parent == global_dir
-    assert pid_file.name.startswith("graph-watch-")
+    assert pid_file.parent == project_victor_dir
+    assert pid_file.name == "graph-watch.pid"
     assert pid_file.suffix == ".pid"
 
 

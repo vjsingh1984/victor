@@ -18,15 +18,14 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-import hashlib
 import json
 import os
 import signal
 import sys
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 import typer
 from rich.console import Console
@@ -577,8 +576,65 @@ async def _init_context_async(
 def _default_graph_watch_pid_file(project_root: Path) -> Path:
     """Return the default graph-watch PID file for a project root."""
     paths = get_project_paths(project_root)
-    slug = hashlib.sha1(str(project_root.resolve()).encode("utf-8")).hexdigest()[:12]
-    return paths.global_victor_dir / f"graph-watch-{slug}.pid"
+    return paths.project_victor_dir / "graph-watch.pid"
+
+
+def _default_graph_watch_lock_file(project_root: Path) -> Path:
+    """Return the startup lock file for a project-scoped graph watcher."""
+    paths = get_project_paths(project_root)
+    return paths.project_victor_dir / "graph-watch.lock"
+
+
+def _graph_watch_lock_is_stale(lock_file: Path, stale_after_seconds: float) -> bool:
+    """Return True when a graph-watch startup lock is old enough to reap."""
+    try:
+        return (time.time() - lock_file.stat().st_mtime) > stale_after_seconds
+    except OSError:
+        return False
+
+
+@contextmanager
+def _acquire_graph_watch_startup_lock(
+    project_root: Path,
+    *,
+    lock_file: Optional[Path] = None,
+    timeout_seconds: float = 5.0,
+    poll_interval: float = 0.05,
+    stale_after_seconds: float = 30.0,
+) -> Iterator[Path]:
+    """Acquire a project-scoped startup lock for graph watcher daemon changes."""
+    resolved_lock_file = lock_file or _default_graph_watch_lock_file(project_root)
+    resolved_lock_file.parent.mkdir(parents=True, exist_ok=True)
+
+    deadline = time.monotonic() + timeout_seconds
+    payload = json.dumps({"pid": os.getpid(), "acquired_at": time.time()})
+
+    while True:
+        try:
+            fd = os.open(
+                resolved_lock_file,
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o644,
+            )
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+            break
+        except FileExistsError:
+            if _graph_watch_lock_is_stale(resolved_lock_file, stale_after_seconds):
+                with suppress(FileNotFoundError):
+                    resolved_lock_file.unlink()
+                continue
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Timed out waiting for graph watch startup lock: {resolved_lock_file}"
+                )
+            time.sleep(poll_interval)
+
+    try:
+        yield resolved_lock_file
+    finally:
+        with suppress(FileNotFoundError):
+            resolved_lock_file.unlink()
 
 
 def _resolve_graph_watch_pid_file(project_root: Path, pid_file: Optional[Path]) -> Path:
@@ -731,26 +787,26 @@ def ensure_graph_watch_daemon(
     root_path = project_root.resolve()
     resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
     resolved_pid_file.parent.mkdir(parents=True, exist_ok=True)
+    with _acquire_graph_watch_startup_lock(root_path):
+        state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=True)
+        if state.running:
+            return state
 
-    state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=True)
-    if state.running:
-        return state
-
-    pid = _fork_watch_daemon(
-        resolved_pid_file,
-        str(root_path),
-        enable_ccg,
-        poll_interval,
-        debounce_seconds,
-        build_now,
-    )
-    return GraphWatchDaemonState(
-        pid_file=resolved_pid_file,
-        running=True,
-        pid=pid,
-        started=True,
-        stale_pid_removed=state.stale_pid_removed,
-    )
+        pid = _fork_watch_daemon(
+            resolved_pid_file,
+            str(root_path),
+            enable_ccg,
+            poll_interval,
+            debounce_seconds,
+            build_now,
+        )
+        return GraphWatchDaemonState(
+            pid_file=resolved_pid_file,
+            running=True,
+            pid=pid,
+            started=True,
+            stale_pid_removed=state.stale_pid_removed,
+        )
 
 
 def stop_graph_watch_daemon(
@@ -761,22 +817,23 @@ def stop_graph_watch_daemon(
     """Stop the background graph watcher daemon for a project."""
     root_path = project_root.resolve()
     resolved_pid_file = _resolve_graph_watch_pid_file(root_path, pid_file)
-    state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=False)
+    with _acquire_graph_watch_startup_lock(root_path):
+        state = _inspect_graph_watch_daemon(resolved_pid_file, remove_stale=False)
 
-    if state.running and state.pid is not None:
-        os.kill(state.pid, signal.SIGTERM)
-        with suppress(FileNotFoundError):
-            resolved_pid_file.unlink()
-        state.running = False
-        state.stopped = True
+        if state.running and state.pid is not None:
+            os.kill(state.pid, signal.SIGTERM)
+            with suppress(FileNotFoundError):
+                resolved_pid_file.unlink()
+            state.running = False
+            state.stopped = True
+            return state
+
+        if state.stale_pid_file:
+            with suppress(FileNotFoundError):
+                resolved_pid_file.unlink()
+            state.stale_pid_removed = True
+
         return state
-
-    if state.stale_pid_file:
-        with suppress(FileNotFoundError):
-            resolved_pid_file.unlink()
-        state.stale_pid_removed = True
-
-    return state
 
 
 @watch_app.command("start")
@@ -810,7 +867,7 @@ def graph_watch_start(
                 poll_interval=poll_interval,
                 debounce_seconds=debounce_seconds,
             )
-        except OSError as exc:
+        except (OSError, TimeoutError) as exc:
             console.print(f"[red]Failed to fork graph watcher: {exc}[/]")
             raise typer.Exit(1)
 
@@ -843,7 +900,11 @@ def graph_watch_stop(
 ):
     """Stop the graph watcher daemon for a project."""
     root_path = Path(path).resolve()
-    state = stop_graph_watch_daemon(root_path, pid_file=pid_file)
+    try:
+        state = stop_graph_watch_daemon(root_path, pid_file=pid_file)
+    except TimeoutError as exc:
+        console.print(f"[red]Failed to stop graph watcher: {exc}[/]")
+        raise typer.Exit(1)
 
     if state.stopped and state.pid is not None:
         console.print(f"[green]Graph watcher stopped (PID {state.pid})[/]")
@@ -879,6 +940,7 @@ def graph_watch_status(
     table.add_row("State", status_label)
     table.add_row("Running", "yes" if state.running else "no")
     table.add_row("PID file", str(resolved_pid_file))
+    table.add_row("Lock file", str(_default_graph_watch_lock_file(root_path)))
     table.add_row("Log file", str(resolved_pid_file.with_suffix(".log")))
     if state.pid is not None:
         table.add_row("PID", str(state.pid))

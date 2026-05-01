@@ -12,12 +12,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import time
 from pathlib import Path
 from unittest.mock import patch
 
 from rich.console import Console
 
 import victor.ui.commands.graph as graph_cmd
+
+
+def test_graph_watch_lock_file_uses_project_victor_dir(tmp_path):
+    """Graph watch startup lock files should live under the project .victor dir."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+
+    with patch(
+        "victor.ui.commands.graph.get_project_paths",
+        return_value=type("Paths", (), {"project_victor_dir": project_root / ".victor"})(),
+    ):
+        lock_file = graph_cmd._default_graph_watch_lock_file(project_root)
+
+    assert lock_file.parent == project_root / ".victor"
+    assert lock_file.name == "graph-watch.lock"
+
+
+def test_graph_watch_startup_lock_recovers_stale_lock_file(tmp_path):
+    """Acquiring the graph watch startup lock should recover stale lock files."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    lock_file = tmp_path / "graph-watch.lock"
+    lock_file.write_text("stale", encoding="utf-8")
+    stale_time = time.time() - 60
+    os.utime(lock_file, (stale_time, stale_time))
+
+    with graph_cmd._acquire_graph_watch_startup_lock(
+        project_root,
+        lock_file=lock_file,
+        timeout_seconds=0.1,
+        poll_interval=0.0,
+        stale_after_seconds=0.01,
+    ):
+        assert lock_file.exists()
+
+    assert not lock_file.exists()
 
 
 def test_graph_watch_start_daemon_is_idempotent_when_already_running(tmp_path):
