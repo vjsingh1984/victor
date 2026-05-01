@@ -17,7 +17,7 @@
 This module provides the ContinuationHandler class which encapsulates
 the continuation decision logic that previously lived inside the legacy
 ``ChatCoordinator._stream_chat_impl`` and is now invoked through the
-``StreamingChatPipeline``.
+``StreamingChatExecutor``.
 
 The handler processes ContinuationStrategy action results and applies them
 to the streaming context, yielding appropriate chunks and returning control
@@ -67,6 +67,11 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from victor.agent.continuation_strategy import (
+    ContinuationActionType,
+    coerce_continuation_action,
+)
+from victor.agent.continuation_contract import ContinuationDirective
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
 from victor.agent.services.protocols.streaming_runtime import (
     StreamingChunkRuntimeProtocol,
@@ -204,7 +209,7 @@ class ContinuationHandler:
 
     async def handle_action(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -221,13 +226,33 @@ class ContinuationHandler:
         Returns:
             ContinuationResult with chunks and control flags.
         """
+        if not isinstance(action_result, ContinuationDirective):
+            legacy_payload = dict(action_result) if isinstance(action_result, dict) else {}
+            action_result = ContinuationDirective.from_legacy(
+                action=legacy_payload.get("action", ContinuationActionType.FINISH),
+                reason=legacy_payload.get("reason", "legacy_action_result"),
+                message=legacy_payload.get("message"),
+                updates=legacy_payload.get("updates"),
+                extracted_call=legacy_payload.get("extracted_call"),
+                mentioned_tools=legacy_payload.get("mentioned_tools"),
+                set_final_summary_requested=bool(
+                    legacy_payload.get("set_final_summary_requested", False)
+                ),
+                set_max_prompts_summary_requested=bool(
+                    legacy_payload.get("set_max_prompts_summary_requested", False)
+                ),
+            )
+
         # Apply state updates from action result
         self._apply_state_updates(action_result)
-        action = action_result.get("action", "finish")
+        action = coerce_continuation_action(action_result.get("action"))
 
         # AGENTIC LOOP FIX: Check if continuation should be skipped due to forced completion
         # This prevents continuation strategy from overriding task completion detector
-        recovery_actions = {"execute_extracted_tool", "force_tool_execution"}
+        recovery_actions = {
+            ContinuationActionType.EXECUTE_EXTRACTED_TOOL,
+            ContinuationActionType.FORCE_TOOL_EXECUTION,
+        }
         if getattr(stream_ctx, "skip_continuation", False) and action not in recovery_actions:
             logger.info("Continuation skipped: skip_continuation flag set (completion was forced)")
             return ContinuationResult(
@@ -238,21 +263,23 @@ class ContinuationHandler:
 
         # Dispatch to specific handler
         handlers = {
-            "continue_asking_input": self._handle_continue_asking_input,
-            "return_to_user": self._handle_return_to_user,
-            "prompt_tool_call": self._handle_prompt_tool_call,
-            "continue_with_synthesis_hint": self._handle_continue_with_synthesis_hint,
-            "request_summary": self._handle_request_summary,
-            "request_completion": self._handle_request_completion,
-            "execute_extracted_tool": self._handle_execute_extracted_tool,
-            "force_tool_execution": self._handle_force_tool_execution,
-            "finish": self._handle_finish,
+            ContinuationActionType.CONTINUE_ASKING_INPUT: self._handle_continue_asking_input,
+            ContinuationActionType.RETURN_TO_USER: self._handle_return_to_user,
+            ContinuationActionType.PROMPT_TOOL_CALL: self._handle_prompt_tool_call,
+            ContinuationActionType.CONTINUE_WITH_SYNTHESIS_HINT: (
+                self._handle_continue_with_synthesis_hint
+            ),
+            ContinuationActionType.REQUEST_SUMMARY: self._handle_request_summary,
+            ContinuationActionType.REQUEST_COMPLETION: self._handle_request_completion,
+            ContinuationActionType.EXECUTE_EXTRACTED_TOOL: self._handle_execute_extracted_tool,
+            ContinuationActionType.FORCE_TOOL_EXECUTION: self._handle_force_tool_execution,
+            ContinuationActionType.FINISH: self._handle_finish,
         }
 
         handler = handlers.get(action, self._handle_finish)
         return await handler(action_result, stream_ctx, full_content)
 
-    def _apply_state_updates(self, action_result: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_state_updates(self, action_result: ContinuationDirective) -> Dict[str, Any]:
         """Apply state updates from action result.
 
         Args:
@@ -261,24 +288,24 @@ class ContinuationHandler:
         Returns:
             Dict of updates that were applied.
         """
-        updates = action_result.get("updates", {})
+        updates = action_result.state_patch.to_updates_dict()
         applied = {}
 
         if "cumulative_prompt_interventions" in updates:
             # Note: This is tracked internally but also returned for orchestrator sync
             applied["cumulative_prompt_interventions"] = updates["cumulative_prompt_interventions"]
 
-        if action_result.get("set_final_summary_requested"):
+        if action_result.state_patch.final_summary_requested:
             applied["final_summary_requested"] = True
 
-        if action_result.get("set_max_prompts_summary_requested"):
+        if action_result.state_patch.max_prompts_summary_requested:
             applied["max_prompts_summary_requested"] = True
 
         return applied
 
     async def _handle_continue_asking_input(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -298,7 +325,7 @@ class ContinuationHandler:
 
     async def _handle_return_to_user(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -312,7 +339,7 @@ class ContinuationHandler:
 
     async def _handle_prompt_tool_call(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -343,7 +370,7 @@ class ContinuationHandler:
 
     async def _handle_continue_with_synthesis_hint(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -370,7 +397,7 @@ class ContinuationHandler:
 
     async def _handle_request_summary(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -466,7 +493,7 @@ class ContinuationHandler:
 
     async def _handle_request_completion(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -486,7 +513,7 @@ class ContinuationHandler:
 
     async def _handle_execute_extracted_tool(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -510,7 +537,7 @@ class ContinuationHandler:
 
     async def _handle_force_tool_execution(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -565,7 +592,7 @@ class ContinuationHandler:
 
     async def _handle_finish(
         self,
-        action_result: Dict[str, Any],
+        action_result: ContinuationDirective,
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:

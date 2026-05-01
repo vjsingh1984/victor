@@ -412,7 +412,7 @@ class ChatService:
         )
 
     # NOTE: Orchestrator now wires the canonical service/runtime path directly.
-    # ServiceStreamingRuntime owns StreamingChatPipeline + AgenticLoop
+    # ServiceStreamingRuntime owns the streaming executor + AgenticLoop
     # integration for perception, fulfillment, and progress tracking.
 
     def _is_response_complete(self, response: "CompletionResponse") -> bool:
@@ -1000,23 +1000,23 @@ class ChatService:
         }
 
     # ==========================================================================
-    # Streaming Pipeline Management
+    # Streaming Runtime Management
     # ==========================================================================
 
-    def set_streaming_pipeline(self, pipeline: Any) -> None:
-        """Set or override the streaming pipeline.
+    def set_streaming_executor(self, executor: Any) -> None:
+        """Set or override the streaming executor.
 
-        Allows injection of a pre-built streaming pipeline for
-        custom streaming behavior or testing.
+        Allows injection of a pre-built streaming executor for custom
+        streaming behavior or testing.
 
         Args:
-            pipeline: Streaming pipeline instance
+            executor: Streaming executor instance
 
         Example:
-            service.set_streaming_pipeline(custom_pipeline)
+            service.set_streaming_executor(custom_executor)
         """
-        self._streaming = pipeline
-        self._logger.debug(f"Streaming pipeline set to: {type(pipeline).__name__}")
+        self._streaming = executor
+        self._logger.debug("Streaming executor set to: %s", type(executor).__name__)
 
     # ==========================================================================
     # Planning and Task Preparation

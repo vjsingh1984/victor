@@ -15,7 +15,7 @@
 """Shared turn policy for batch and streaming execution paths.
 
 This module provides unified decision logic for both
-TurnExecutor (batch) and StreamingChatPipeline (streaming):
+TurnExecutor (batch) and StreamingChatExecutor (streaming):
 
 - SpinDetector: detects blocked/stuck agent loops
 - NudgePolicy: determines when/what nudge messages to inject
@@ -79,7 +79,7 @@ class SpinDetector:
 
     Tracks consecutive turns without tool calls and consecutive turns
     where all tool calls are blocked by dedup. Used by both batch
-    (AgenticLoop) and streaming (StreamingChatPipeline) paths.
+    (AgenticLoop) and streaming (StreamingChatExecutor) paths.
 
     Example:
         detector = SpinDetector()

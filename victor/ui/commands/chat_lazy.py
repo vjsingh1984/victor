@@ -51,17 +51,16 @@ from victor.core.errors import (
 if TYPE_CHECKING:
     from victor.config.settings import ProfileConfig
 
-    # ✅ PROPER: Use VictorClient instead of AgentOrchestrator and FrameworkShim
-    from victor.framework.client import VictorClient
     from victor.framework.session_config import SessionConfig
+    from victor.framework.session_runner import create_victor_client
 
 
 # Lazy import helpers
-def _get_victor_client():
-    """Lazy import VictorClient only when needed."""
-    from victor.framework.client import VictorClient
+def _get_create_victor_client():
+    """Lazy import the framework client factory only when needed."""
+    from victor.framework.session_runner import create_victor_client
 
-    return VictorClient
+    return create_victor_client
 
 
 def _get_session_config():
@@ -198,7 +197,9 @@ def chat(
         load_settings()
     )  # noqa: F841 - Used for type checking, will be used in full implementation
 
-    # ✅ PROPER: Lazy load VictorClient and SessionConfig (replaces AgentOrchestrator)
-    _VictorClient = _get_victor_client()  # noqa: F841 - Will be used in full implementation
+    # ✅ PROPER: Lazy load the framework client seam and SessionConfig
+    _create_victor_client = (
+        _get_create_victor_client()
+    )  # noqa: F841 - Will be used in full implementation
     _SessionConfig = _get_session_config()  # noqa: F841 - Will be used in full implementation
     # ... rest of implementation

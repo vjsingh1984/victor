@@ -17,7 +17,7 @@
 This module provides the IntentClassificationHandler class which encapsulates
 the intent classification and continuation action determination logic that
 previously lived inside ``ChatCoordinator._stream_chat_impl`` and is now
-orchestrated by ``StreamingChatPipeline``.
+orchestrated by ``StreamingChatExecutor``.
 
 The handler manages:
 - Content yielding when no tool calls
@@ -63,6 +63,11 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from victor.agent.continuation_contract import ContinuationDirective
+from victor.agent.continuation_strategy import (
+    ContinuationActionType,
+    coerce_continuation_action,
+)
 from victor.agent.services.protocols.streaming_runtime import (
     StreamingChunkRuntimeProtocol,
     StreamingConversationStateProtocol,
@@ -99,10 +104,40 @@ class IntentClassificationResult:
     """
 
     chunks: List[StreamChunk] = field(default_factory=list)
-    action_result: Dict[str, Any] = field(default_factory=dict)
-    action: str = "finish"
+    action_result: ContinuationDirective = field(
+        default_factory=lambda: ContinuationDirective.from_legacy(
+            action=ContinuationActionType.FINISH,
+            reason="default_finish",
+        )
+    )
+    action: ContinuationActionType = ContinuationActionType.FINISH
     state_updates: Dict[str, Any] = field(default_factory=dict)
     content_cleared: bool = False
+
+    def __post_init__(self) -> None:
+        """Coerce legacy stub payloads into the typed continuation contract."""
+
+        self.action = coerce_continuation_action(self.action)
+        if not isinstance(self.action_result, ContinuationDirective):
+            legacy_payload = (
+                dict(self.action_result)
+                if isinstance(self.action_result, dict)
+                else {}
+            )
+            self.action_result = ContinuationDirective.from_legacy(
+                action=legacy_payload.get("action", self.action),
+                reason=legacy_payload.get("reason", "legacy_action_result"),
+                message=legacy_payload.get("message"),
+                updates=legacy_payload.get("updates"),
+                extracted_call=legacy_payload.get("extracted_call"),
+                mentioned_tools=legacy_payload.get("mentioned_tools"),
+                set_final_summary_requested=bool(
+                    legacy_payload.get("set_final_summary_requested", False)
+                ),
+                set_max_prompts_summary_requested=bool(
+                    legacy_payload.get("set_max_prompts_summary_requested", False)
+                ),
+            )
 
     def add_chunk(self, chunk: StreamChunk) -> None:
         """Add a chunk to yield."""
@@ -263,11 +298,11 @@ class IntentClassificationHandler:
                     is_final=True,
                 )
             )
-            result.action_result = {
-                "action": "finish",
-                "reason": "Malformed tool-style plaintext detected instead of valid tool calls",
-            }
-            result.action = "finish"
+            result.action_result = ContinuationDirective.from_legacy(
+                action=ContinuationActionType.FINISH,
+                reason="Malformed tool-style plaintext detected instead of valid tool calls",
+            )
+            result.action = ContinuationActionType.FINISH
             return result
 
         # Step 2: Extract intent text (last 500 chars for pattern matching)
@@ -299,10 +334,9 @@ class IntentClassificationHandler:
         self._apply_state_updates(action_result, result)
 
         # Step 8: Determine final action with overrides
-        action = action_result.get("action", "finish")
+        action = coerce_continuation_action(action_result.get("action"))
         action = self._apply_action_overrides(action, is_repeated_response, tracking_state)
-
-        result.action_result = action_result
+        result.action_result = action_result.with_action(action)
         result.action = action
 
         return result
@@ -366,17 +400,23 @@ class IntentClassificationHandler:
         explicit_database_query_requested = False
         executed_tool_names: Set[str] = set()
         database_query_satisfied = False
+        direct_response_requested = False
         original_user_message = ""
         if stream_ctx:
             try:
                 from victor.agent.action_authorizer import has_explicit_readonly_shell_request
+                from victor.framework.task.direct_response import classify_direct_response_prompt
 
                 original_user_message = getattr(stream_ctx, "user_message", "") or ""
                 explicit_database_query_requested = has_explicit_readonly_shell_request(
                     original_user_message
                 )
+                direct_response_requested = classify_direct_response_prompt(
+                    original_user_message
+                ).is_direct_response
             except Exception:
                 explicit_database_query_requested = False
+                direct_response_requested = False
 
             executed_tool_names = set(getattr(stream_ctx, "executed_tool_names", set()) or set())
             database_query_satisfied = bool(executed_tool_names & {"shell", "db", "database"})
@@ -397,7 +437,22 @@ class IntentClassificationHandler:
             "executed_tool_names": executed_tool_names,
             "explicit_database_query_requested": explicit_database_query_requested,
             "database_query_satisfied": database_query_satisfied,
+            "is_qa_task": bool(getattr(stream_ctx, "is_qa_task", False)) if stream_ctx else False,
+            "direct_response_requested": direct_response_requested,
         }
+
+    def _resolve_one_shot_mode(self) -> bool:
+        """Resolve one-shot mode from the canonical nested settings group.
+
+        The headless/automation flags now live under ``settings.automation``.
+        Keep a flat fallback for compatibility with older test doubles or
+        transitional callers.
+        """
+        automation = getattr(self._settings, "automation", None)
+        nested_value = getattr(automation, "one_shot_mode", None)
+        if nested_value is not None:
+            return bool(nested_value)
+        return bool(getattr(self._settings, "one_shot_mode", False))
 
     def _determine_action(
         self,
@@ -412,7 +467,7 @@ class IntentClassificationHandler:
         """Determine continuation action using ContinuationStrategy."""
         from victor.agent.continuation_strategy import ContinuationStrategy
 
-        one_shot_mode = getattr(self._settings, "one_shot_mode", False)
+        one_shot_mode = self._resolve_one_shot_mode()
         strategy = ContinuationStrategy(runtime_intelligence=self._runtime_intelligence)
 
         return strategy.determine_continuation_action(
@@ -439,10 +494,10 @@ class IntentClassificationHandler:
         )
 
     def _apply_state_updates(
-        self, action_result: Dict[str, Any], result: IntentClassificationResult
+        self, action_result: ContinuationDirective, result: IntentClassificationResult
     ) -> None:
         """Apply state updates from action result."""
-        updates = action_result.get("updates", {})
+        updates = action_result.state_patch.to_updates_dict()
 
         if "continuation_prompts" in updates:
             result.state_updates["continuation_prompts"] = updates["continuation_prompts"]
@@ -451,24 +506,27 @@ class IntentClassificationHandler:
         if "synthesis_nudge_count" in updates:
             result.state_updates["synthesis_nudge_count"] = updates["synthesis_nudge_count"]
 
-        if action_result.get("set_final_summary_requested"):
+        if action_result.state_patch.final_summary_requested:
             result.state_updates["final_summary_requested"] = True
-        if action_result.get("set_max_prompts_summary_requested"):
+        if action_result.state_patch.max_prompts_summary_requested:
             result.state_updates["max_prompts_summary_requested"] = True
 
     def _apply_action_overrides(
         self,
-        action: str,
+        action: ContinuationActionType,
         is_repeated_response: bool,
         tracking_state: TrackingState,
-    ) -> str:
+    ) -> ContinuationActionType:
         """Apply action overrides based on conditions."""
         # Override: Repeated response detected
-        if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
+        if is_repeated_response and action in (
+            ContinuationActionType.PROMPT_TOOL_CALL,
+            ContinuationActionType.REQUEST_SUMMARY,
+        ):
             logger.info(
                 "Continuation action: finish - " "Overriding to finish due to repeated response"
             )
-            return "finish"
+            return ContinuationActionType.FINISH
 
         # Override: Force finalize from grounding failure
         if tracking_state.force_finalize:
@@ -476,7 +534,7 @@ class IntentClassificationHandler:
                 "Continuation action: finish - "
                 "Overriding to finish due to grounding failure limit"
             )
-            return "finish"
+            return ContinuationActionType.FINISH
 
         return action
 

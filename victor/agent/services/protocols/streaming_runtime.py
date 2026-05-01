@@ -44,9 +44,9 @@ from victor.providers.base import StreamChunk
 __all__ = [
     "StreamingChunkRuntimeProtocol",
     "StreamingConversationStateProtocol",
+    "StreamingExecutionRuntimeProtocol",
     "StreamingIntentClassifierRuntimeProtocol",
     "StreamingMessageAdderProtocol",
-    "StreamingPipelineRuntimeProtocol",
     "StreamingProviderRuntimeProtocol",
     "StreamingReminderRuntimeProtocol",
     "StreamingRLRuntimeProtocol",
@@ -132,8 +132,8 @@ class ToolExecutionRecoveryRuntimeProtocol(Protocol):
 
 
 @runtime_checkable
-class StreamingPipelineRuntimeProtocol(Protocol):
-    """Structural runtime contract consumed by ``StreamingChatPipeline``."""
+class StreamingExecutionRuntimeProtocol(Protocol):
+    """Structural runtime contract consumed by streaming chat executors."""
 
     _orchestrator: Any
     _intent_classification_handler: Any

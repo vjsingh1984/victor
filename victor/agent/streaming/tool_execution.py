@@ -16,7 +16,7 @@
 
 This module provides the ToolExecutionHandler class which encapsulates
 the tool execution logic that used to live in ``ChatCoordinator._stream_chat_impl``.
-The canonical orchestration now happens via ``StreamingChatPipeline``.
+The canonical orchestration now happens via ``StreamingChatExecutor``.
 
 The handler manages:
 - Budget warnings and exhaustion

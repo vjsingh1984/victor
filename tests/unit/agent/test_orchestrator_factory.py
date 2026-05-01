@@ -222,6 +222,21 @@ class TestCreateServiceStreamingRuntime:
         assert runtime._orchestrator is orchestrator
 
 
+class TestCreateStreamingChatExecutor:
+    """Tests for create_streaming_chat_executor method."""
+
+    def test_create_streaming_chat_executor_returns_executor(self, factory):
+        """create_streaming_chat_executor returns the canonical executor."""
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
+
+        runtime_owner = MagicMock()
+
+        executor = factory.create_streaming_chat_executor(runtime_owner)
+
+        assert isinstance(executor, StreamingChatExecutor)
+        assert executor._runtime_owner is runtime_owner
+
+
 class TestCreateComplexityClassifier:
     """Tests for create_complexity_classifier method."""
 
@@ -397,7 +412,14 @@ class TestCanonicalCoordinatorBuilders:
             "victor.agent.mode_workflow_team_coordinator.ModeWorkflowTeamCoordinator",
             return_value=wrapper,
         ) as mock_wrapper:
-            result = factory.create_mode_workflow_team_coordinator(vertical_context)
+            with pytest.warns(
+                DeprecationWarning,
+                match=(
+                    "OrchestratorFactory.create_mode_workflow_team_coordinator"
+                    "\\(\\.\\.\\.\\) is deprecated"
+                ),
+            ):
+                result = factory.create_mode_workflow_team_coordinator(vertical_context)
 
         assert result is wrapper
         mock_create.assert_called_once_with(vertical_context)

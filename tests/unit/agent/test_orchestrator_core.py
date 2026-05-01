@@ -3096,6 +3096,25 @@ class TestPrepareStream:
         # cumulative_usage may have zero values initialized
         assert isinstance(cumulative_usage, dict)
 
+    @pytest.mark.asyncio
+    async def test_prepare_stream_skips_intelligent_request_for_direct_response(
+        self, orchestrator
+    ):
+        """Direct-response prompts should bypass intelligent reminder injection."""
+        runtime = orchestrator._get_service_streaming_runtime()
+        orchestrator._prepare_intelligent_request = AsyncMock(
+            side_effect=AssertionError("direct-response prompts should bypass intelligent hooks")
+        )
+
+        messages_before = list(orchestrator.get_messages())
+        await runtime._prepare_stream("Reply with exactly READY")
+        messages_after = orchestrator.get_messages()[len(messages_before) :]
+
+        assert not any(
+            "[SYSTEM-REMINDER:" in getattr(message, "content", "")
+            for message in messages_after
+        )
+
 
 class TestApplyTaskGuidance:
     """Tests for _apply_task_guidance method."""
@@ -4881,7 +4900,7 @@ class TestStreamingHandlerProperty:
 
 
 class TestCheckProgressWithHandler:
-    """Tests for progress checking (now owned by StreamingChatPipeline).
+    """Tests for progress checking (now owned by StreamingChatExecutor).
 
     The _check_progress_with_handler method was removed from the orchestrator.
     Progress checking is now handled via the recovery coordinator directly.
@@ -4911,7 +4930,7 @@ class TestCheckProgressWithHandler:
 
 
 class TestHandleForceCompletionWithHandler:
-    """Tests for force completion (now driven by StreamingChatPipeline).
+    """Tests for force completion (now driven by StreamingChatExecutor).
 
     The _handle_force_completion_with_handler method was removed from the orchestrator.
     Force completion is now handled via the unified_tracker and streaming context.

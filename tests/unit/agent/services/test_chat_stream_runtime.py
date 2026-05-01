@@ -1,4 +1,5 @@
 import importlib
+import warnings
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -35,24 +36,24 @@ def _make_orchestrator_stub():
     return orch
 
 
-def test_service_streaming_runtime_caches_pipeline(monkeypatch):
+def test_service_streaming_runtime_caches_executor(monkeypatch):
     orch = _make_orchestrator_stub()
     runtime = ServiceStreamingRuntime(orch)
     created = []
 
-    class DummyPipeline:
+    class DummyExecutor:
         pass
 
     def fake_factory(owner, **kwargs):
         created.append((owner, kwargs))
-        return DummyPipeline()
+        return DummyExecutor()
 
-    streaming_module = importlib.import_module("victor.agent.streaming")
+    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
 
-    monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
+    monkeypatch.setattr(service_module, "create_streaming_chat_executor", fake_factory)
 
-    first = runtime.get_pipeline()
-    second = runtime.get_pipeline()
+    first = runtime.get_executor()
+    second = runtime.get_executor()
 
     assert first is second
     assert len(created) == 1
@@ -63,6 +64,46 @@ def test_service_streaming_runtime_caches_pipeline(monkeypatch):
     assert kwargs["runtime_intelligence"] is orch._runtime_intelligence
 
 
+def test_service_streaming_runtime_exposes_only_executor_interface(monkeypatch):
+    orch = _make_orchestrator_stub()
+    runtime = ServiceStreamingRuntime(orch)
+
+    class DummyExecutor:
+        pass
+
+    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    monkeypatch.setattr(
+        service_module,
+        "create_streaming_chat_executor",
+        lambda owner, **kwargs: DummyExecutor(),
+    )
+
+    assert not hasattr(runtime, "get_pipeline")
+    assert isinstance(runtime.get_executor(), DummyExecutor)
+
+
+def test_service_streaming_runtime_executor_initialization_is_warning_free(monkeypatch):
+    orch = _make_orchestrator_stub()
+    runtime = ServiceStreamingRuntime(orch)
+
+    class DummyExecutor:
+        pass
+
+    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    monkeypatch.setattr(
+        service_module,
+        "create_streaming_chat_executor",
+        lambda owner, **kwargs: DummyExecutor(),
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        executor = runtime.get_executor()
+
+    assert isinstance(executor, DummyExecutor)
+    assert caught == []
+
+
 @pytest.mark.asyncio
 async def test_service_streaming_runtime_supports_protocol_adapter_host(monkeypatch):
     orch = _make_orchestrator_stub()
@@ -70,7 +111,7 @@ async def test_service_streaming_runtime_supports_protocol_adapter_host(monkeypa
     runtime = ServiceStreamingRuntime(adapter)
     chunk = StreamChunk(content="service", is_final=True)
 
-    class DummyPipeline:
+    class DummyExecutor:
         async def run(self, user_message: str, **kwargs):
             assert user_message == "hello"
             assert kwargs == {"mode": "test"}
@@ -78,10 +119,10 @@ async def test_service_streaming_runtime_supports_protocol_adapter_host(monkeypa
 
     def fake_factory(owner, **kwargs):
         assert owner is runtime
-        return DummyPipeline()
+        return DummyExecutor()
 
-    streaming_module = importlib.import_module("victor.agent.streaming")
-    monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
+    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    monkeypatch.setattr(service_module, "create_streaming_chat_executor", fake_factory)
 
     ctx = SimpleNamespace(
         cumulative_usage={
@@ -103,12 +144,12 @@ async def test_service_streaming_runtime_supports_protocol_adapter_host(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_service_streaming_runtime_stream_chat_uses_pipeline(monkeypatch):
+async def test_service_streaming_runtime_stream_chat_uses_executor(monkeypatch):
     orch = _make_orchestrator_stub()
     runtime = ServiceStreamingRuntime(orch)
     chunk = StreamChunk(content="service", is_final=True)
 
-    class DummyPipeline:
+    class DummyExecutor:
         def __init__(self):
             self.calls = []
 
@@ -116,19 +157,18 @@ async def test_service_streaming_runtime_stream_chat_uses_pipeline(monkeypatch):
             self.calls.append((user_message, kwargs))
             yield chunk
 
-    pipeline = DummyPipeline()
+    executor = DummyExecutor()
 
     def fake_factory(owner, **kwargs):
-        return pipeline
+        return executor
 
-    streaming_module = importlib.import_module("victor.agent.streaming")
-
-    monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
+    service_module = importlib.import_module("victor.agent.services.chat_stream_executor")
+    monkeypatch.setattr(service_module, "create_streaming_chat_executor", fake_factory)
 
     chunks = [item async for item in runtime.stream_chat("hello", mode="test")]
 
     assert chunks == [chunk]
-    assert pipeline.calls == [("hello", {"mode": "test"})]
+    assert executor.calls == [("hello", {"mode": "test"})]
 
 
 @pytest.mark.asyncio
@@ -374,11 +414,11 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     )
     orch._current_stream_context = ctx
 
-    class DummyPipeline:
+    class DummyExecutor:
         async def run(self, user_message: str, **kwargs):
             yield StreamChunk(content="service", is_final=True)
 
-    runtime._streaming_pipeline = DummyPipeline()
+    runtime._streaming_executor = DummyExecutor()
 
     chunks = [item async for item in runtime.stream_chat("hello")]
 
@@ -441,11 +481,11 @@ async def test_service_streaming_runtime_stream_chat_normalizes_recovery_events(
     )
     orch._current_stream_context = ctx
 
-    class DummyPipeline:
+    class DummyExecutor:
         async def run(self, user_message: str, **kwargs):
             yield StreamChunk(content="service", is_final=True)
 
-    runtime._streaming_pipeline = DummyPipeline()
+    runtime._streaming_executor = DummyExecutor()
 
     chunks = [item async for item in runtime.stream_chat("hello")]
 

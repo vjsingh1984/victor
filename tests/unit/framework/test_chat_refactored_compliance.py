@@ -36,8 +36,8 @@ class TestChatRefactoredCompliance:
             "AgentFactory(" not in content
         ), "chat_refactored.py must NOT instantiate AgentFactory"
 
-    def test_chat_refactored_uses_victor_client(self):
-        """chat_refactored.py MUST use VictorClient."""
+    def test_chat_refactored_uses_framework_client_factory(self):
+        """chat_refactored.py MUST use the framework client creation seam."""
         chat_file = (
             Path(__file__).parent.parent.parent.parent
             / "victor"
@@ -54,8 +54,8 @@ class TestChatRefactoredCompliance:
 
         # Check for proper imports
         assert (
-            "from victor.framework.client import VictorClient" in content
-        ), "chat_refactored.py MUST import VictorClient"
+            "from victor.framework.session_runner import create_victor_client" in content
+        ), "chat_refactored.py MUST import create_victor_client"
         assert (
             "from victor.framework.session_config import SessionConfig" in content
         ), "chat_refactored.py MUST import SessionConfig"

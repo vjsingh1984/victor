@@ -13,10 +13,10 @@
 # limitations under the License.
 
 """
-Refactored chat command using VictorClient and SessionConfig.
+Refactored chat command using the framework client factory and SessionConfig.
 
 This demonstrates the proper architectural pattern:
-- Uses VictorClient instead of AgentFactory
+- Uses the framework client creation seam instead of AgentFactory
 - Uses SessionConfig for CLI/runtime overrides (not settings mutation)
 - No direct imports of AgentOrchestrator or FrameworkShim
 - Proper service-oriented architecture
@@ -26,10 +26,8 @@ import typer
 from typing import Optional, Any
 from rich.console import Console
 
-# ✅ PROPER: Import VictorClient and SessionConfig
-from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
-from victor.config.settings import load_settings
+from victor.framework.session_runner import create_victor_client
 
 app = typer.Typer()
 console = Console()
@@ -62,7 +60,7 @@ def chat(
     """Start interactive chat or send a one-shot message.
 
     This refactored version demonstrates the proper architectural pattern:
-    - Uses VictorClient (NOT AgentFactory or AgentOrchestrator)
+    - Uses the framework client seam (NOT AgentFactory or AgentOrchestrator)
     - Uses SessionConfig for CLI overrides (NOT settings mutations)
     - No FrameworkShim (deprecated)
     """
@@ -143,11 +141,11 @@ async def _run_oneshot(
     compaction_min_threshold: Optional[float],
     compaction_max_threshold: Optional[float],
 ) -> None:
-    """Run a single message using VictorClient.
+    """Run a single message using the framework client seam.
 
     This demonstrates the PROPER pattern:
     1. Create SessionConfig from CLI flags
-    2. Create VictorClient with SessionConfig
+    2. Create the canonical framework client
     3. Use client.chat() or client.stream()
     4. NO settings mutations, NO AgentFactory, NO orchestrator access
     """
@@ -170,15 +168,15 @@ async def _run_oneshot(
         show_reasoning=show_reasoning,
     )
 
-    # ✅ STEP 2: Create VictorClient with SessionConfig
-    client = VictorClient(config)
+    # ✅ STEP 2: Create the canonical framework client
+    client = create_victor_client(config)
 
-    # ✅ STEP 3: Use VictorClient methods (NOT orchestrator directly)
+    # ✅ STEP 3: Use client methods (NOT orchestrator directly)
     try:
         result = await client.chat(message)
 
         # Display result
-        console.print(f"[green]Response:[/]")
+        console.print("[green]Response:[/]")
         console.print(result.content)
 
         if result.metadata:
@@ -212,11 +210,11 @@ async def _run_interactive(
     compaction_min_threshold: Optional[float],
     compaction_max_threshold: Optional[float],
 ) -> None:
-    """Run interactive mode using VictorClient.
+    """Run interactive mode using the framework client seam.
 
     This demonstrates the PROPER pattern:
     1. Create SessionConfig from CLI flags
-    2. Create VictorClient with SessionConfig
+    2. Create the canonical framework client
     3. Use client.stream() for responses
     4. NO settings mutations, NO AgentFactory, NO orchestrator access
     """
@@ -239,8 +237,8 @@ async def _run_interactive(
         show_reasoning=show_reasoning,
     )
 
-    # ✅ STEP 2: Create VictorClient with SessionConfig
-    client = VictorClient(config)
+    # ✅ STEP 2: Create the canonical framework client
+    client = create_victor_client(config)
 
     console.print("[bold green]Victor Chat[/] [dim](Ctrl+D to exit)[/]")
     console.print("")

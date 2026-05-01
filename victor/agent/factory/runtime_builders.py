@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
-    from victor.agent.streaming.pipeline import StreamingChatPipeline
+    from victor.agent.services.chat_stream_executor import StreamingChatExecutor
     from victor.agent.provider import ProviderSwitchCoordinator
     from victor.agent.lifecycle_manager import LifecycleManager
     from victor.agent.provider_manager import ProviderManager
@@ -148,13 +148,13 @@ class RuntimeBuildersMixin:
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
 
-    def create_streaming_chat_pipeline(self, runtime_owner: Any) -> "StreamingChatPipeline":
-        """Create the canonical StreamingChatPipeline bound to a runtime owner."""
-        from victor.agent.streaming import create_streaming_chat_pipeline
+    def create_streaming_chat_executor(self, runtime_owner: Any) -> "StreamingChatExecutor":
+        """Create the canonical streaming executor bound to a runtime owner."""
+        from victor.agent.services import create_streaming_chat_executor
 
-        pipeline = create_streaming_chat_pipeline(runtime_owner)
-        logger.debug("StreamingChatPipeline created and bound to runtime owner")
-        return pipeline
+        executor = create_streaming_chat_executor(runtime_owner)
+        logger.debug("StreamingChatExecutor created and bound to runtime owner")
+        return executor
 
     def create_service_streaming_runtime(self, orchestrator: Any) -> Any:
         """Create the canonical service-owned streaming runtime adapter."""

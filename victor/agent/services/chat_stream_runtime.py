@@ -14,7 +14,7 @@ from victor.agent.services.chat_stream_helpers import ChatStreamHelperMixin
 
 if TYPE_CHECKING:
     from victor.providers.base import StreamChunk
-    from victor.agent.streaming.pipeline import StreamingChatPipeline
+    from victor.agent.services.chat_stream_executor import StreamingChatExecutor
     from victor.agent.streaming.intent_classification import IntentClassificationHandler
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
@@ -34,7 +34,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
-        self._streaming_pipeline: Optional["StreamingChatPipeline"] = None
+        self._streaming_executor: Optional["StreamingChatExecutor"] = None
 
     @staticmethod
     def _iter_runtime_dicts(orch: Any) -> tuple[dict[str, Any], ...]:
@@ -80,10 +80,10 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                 return instance_dict.get(underscored)
         return None
 
-    def get_pipeline(self) -> "StreamingChatPipeline":
-        """Get or create the canonical streaming pipeline for the service path."""
-        if self._streaming_pipeline is None:
-            from victor.agent.streaming import create_streaming_chat_pipeline
+    def get_executor(self) -> "StreamingChatExecutor":
+        """Get or create the canonical service-owned streaming executor."""
+        if self._streaming_executor is None:
+            from victor.agent.services.chat_stream_executor import create_streaming_chat_executor
             from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 
             orch = self._orchestrator
@@ -99,13 +99,13 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                     optimization_injector=state_dict.get("_optimization_injector"),
                 )
                 state_host._runtime_intelligence = runtime_intelligence
-            self._streaming_pipeline = create_streaming_chat_pipeline(
+            self._streaming_executor = create_streaming_chat_executor(
                 self,
                 runtime_intelligence=runtime_intelligence,
                 perception=perception,
                 fulfillment=fulfillment,
             )
-        return self._streaming_pipeline
+        return self._streaming_executor
 
     @staticmethod
     def _coerce_unit_float(value: Any, default: float = 0.0) -> float:
@@ -282,14 +282,14 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
         orch = self._orchestrator
         state_host = self._get_runtime_state_host(orch)
-        pipeline = self.get_pipeline()
-        pipeline_failed = False
+        executor = self.get_executor()
+        stream_failed = False
 
         try:
-            async for chunk in pipeline.run(user_message, **kwargs):
+            async for chunk in executor.run(user_message, **kwargs):
                 yield chunk
         except Exception:
-            pipeline_failed = True
+            stream_failed = True
             raise
         finally:
             ctx = None
@@ -323,7 +323,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
                 topology_feedback_payload = self._build_stream_topology_feedback_payload(
                     ctx,
-                    failed=pipeline_failed,
+                    failed=stream_failed,
                 )
                 if topology_feedback_payload is not None:
                     ctx.topology_events = list(topology_feedback_payload["topology_events"])
@@ -341,7 +341,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
 
                 degradation_feedback_payload = self._build_stream_degradation_feedback_payload(
                     ctx,
-                    failed=pipeline_failed,
+                    failed=stream_failed,
                 )
                 if degradation_feedback_payload is not None:
                     ctx.degradation_events = list(

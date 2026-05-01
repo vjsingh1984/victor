@@ -1182,13 +1182,13 @@ class AgenticLoop:
     async def stream_chat(
         self,
         query: str,
-        streaming_pipeline: Any = None,
+        streaming_executor: Any = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[Any]:
         """Stream chat with perception and evaluation lifecycle.
 
-        Wraps the existing StreamingChatPipeline with AgenticLoop's
-        PERCEIVE and EVALUATE phases. The streaming pipeline handles
+        Wraps the canonical StreamingChatExecutor with AgenticLoop's
+        PERCEIVE and EVALUATE phases. The streaming executor handles
         the ACT phase (LLM streaming + tool execution + recovery).
 
         Perception runs concurrently with streaming start to avoid
@@ -1197,11 +1197,11 @@ class AgenticLoop:
 
         Args:
             query: User's natural language query
-            streaming_pipeline: StreamingChatPipeline instance
+            streaming_executor: StreamingChatExecutor instance
             context: Additional context
 
         Yields:
-            StreamChunk objects from the streaming pipeline
+            StreamChunk objects from the streaming executor
         """
         # Reset spin detector for this conversation turn
         self.spin_detector.reset()
@@ -1215,10 +1215,10 @@ class AgenticLoop:
             f"confidence={perception.confidence:.2f}"
         )
 
-        # ACT via streaming pipeline (yields chunks token-by-token)
-        if streaming_pipeline is not None:
+        # ACT via streaming executor (yields chunks token-by-token)
+        if streaming_executor is not None:
             try:
-                async for chunk in streaming_pipeline.run(query):
+                async for chunk in streaming_executor.run(query):
                     yield chunk
             except Exception as e:
                 if "request format error" in str(e).lower():

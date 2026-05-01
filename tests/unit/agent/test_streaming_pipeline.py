@@ -7,7 +7,7 @@ import pytest
 from victor.agent.task_completion import CompletionConfidence
 from victor.agent.streaming.intent_classification import IntentClassificationResult
 from victor.core.completion_markers import SUMMARY_MARKER
-from victor.agent.streaming.pipeline import StreamingChatPipeline
+from victor.agent.services.chat_stream_executor import StreamingChatExecutor
 from victor.framework.team_runtime import ResolvedTeamExecutionPlan
 from victor.providers.base import StreamChunk
 from victor.teams.types import TeamFormation, TeamResult
@@ -25,7 +25,7 @@ from .streaming_pipeline_stubs import (
 async def test_pipeline_forwards_precheck_chunks():
     cancel_chunk = StreamChunk(content="", is_final=True)
     coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     chunks = []
     async for chunk in pipeline.run("hello"):
@@ -39,7 +39,7 @@ async def test_pipeline_forwards_precheck_chunks():
 async def test_pipeline_emits_iteration_limit_chunk():
     limit_chunk = StreamChunk(content="stop", is_final=True)
     coordinator = DummyCoordinator(limit_result=(True, limit_chunk))
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     chunks = []
     async for chunk in pipeline.run("world"):
@@ -67,7 +67,7 @@ async def test_pipeline_invokes_intent_and_continuation_handlers():
     )
     coordinator._continuation_handler = StubContinuationHandler(cont_result)
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     chunks = []
     async for chunk in pipeline.run("task"):
@@ -92,7 +92,7 @@ async def test_pipeline_executes_tool_calls():
     )
     coordinator._tool_execution_handler = StubToolExecutionHandler(exec_result)
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     chunks = []
     async for chunk in pipeline.run("tool task"):
@@ -140,7 +140,7 @@ async def test_pipeline_ignores_stale_blocked_state_before_current_tool_executio
             )
 
     coordinator._tool_execution_handler = _TwoIterationToolHandler()
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     chunks = []
     async for chunk in pipeline.run("retry the blocked read"):
@@ -175,7 +175,7 @@ async def test_pipeline_records_pending_grounding_feedback():
         StubContinuationResult(chunks=[], state_updates={}, should_return=True)
     )
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
     async for _ in pipeline.run("needs grounding"):
         pass
 
@@ -200,7 +200,7 @@ async def test_pipeline_returns_targeted_clarification_before_provider_call():
         )
     )
 
-    pipeline = StreamingChatPipeline(coordinator, perception=mock_perception)
+    pipeline = StreamingChatExecutor(coordinator, perception=mock_perception)
 
     chunks = []
     async for chunk in pipeline.run("Fix it and add tests."):
@@ -236,7 +236,7 @@ async def test_pipeline_uses_runtime_clarification_policy_default_prompt():
         ),
     )
 
-    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
 
     chunks = []
     async for chunk in pipeline.run("Fix it and add tests."):
@@ -267,7 +267,7 @@ async def test_pipeline_uses_runtime_intelligence_for_budget_reset_and_analysis(
         ),
     )
 
-    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
 
     chunks = []
     async for chunk in pipeline.run("hello"):
@@ -300,7 +300,7 @@ async def test_pipeline_merges_stream_context_provider_kwargs():
         StubContinuationResult(chunks=[], state_updates={}, should_return=True)
     )
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     async for _ in pipeline.run("hello"):
         pass
@@ -329,7 +329,7 @@ async def test_pipeline_executes_prepared_team_before_provider_stream():
         return_value=("assistant notes", None, None, False)
     )
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     with patch(
         "victor.framework.team_runtime.run_configured_team",
@@ -381,7 +381,7 @@ async def test_pipeline_resets_streaming_turn_state_before_execution():
     coordinator._orchestrator._tool_pipeline = SimpleNamespace(reset=MagicMock())
     coordinator._orchestrator._task_completion_detector = SimpleNamespace(reset=MagicMock())
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     chunks = []
     async for chunk in pipeline.run("hello"):
@@ -421,7 +421,7 @@ async def test_pipeline_passes_history_to_runtime_intelligence():
         ),
     )
 
-    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
 
     async for _ in pipeline.run("Fix that first."):
         pass
@@ -480,7 +480,7 @@ async def test_pipeline_prefers_assembled_history_for_runtime_intelligence():
         ),
     )
 
-    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+    pipeline = StreamingChatExecutor(coordinator, runtime_intelligence=runtime_intelligence)
 
     async for _ in pipeline.run("Fix that first."):
         pass
@@ -518,7 +518,7 @@ async def test_pipeline_passes_history_to_perception_fallback():
         )
     )
 
-    pipeline = StreamingChatPipeline(coordinator, perception=mock_perception)
+    pipeline = StreamingChatExecutor(coordinator, perception=mock_perception)
 
     async for _ in pipeline.run("Fix that first."):
         pass
@@ -537,7 +537,7 @@ async def test_pipeline_yields_recovery_fallback_when_empty():
     coordinator._provider_response = ("", None, None, False)
     coordinator._empty_recovery = (False, None, None)
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
     chunks = []
     async for chunk in pipeline.run("empty response"):
         chunks.append(chunk.content)
@@ -552,7 +552,7 @@ async def test_pipeline_prefers_canonical_recovery_context_factory():
     coordinator._empty_recovery = (False, None, None)
     coordinator._orchestrator.create_recovery_context = lambda *_: object()
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
     chunks = []
     async for chunk in pipeline.run("empty response"):
         chunks.append(chunk.content)
@@ -578,7 +578,7 @@ async def test_pipeline_records_confidence_early_stop_event(monkeypatch):
     coordinator = DummyCoordinator(limit_result=(False, None))
     coordinator._provider_response = ("High confidence answer", None, None, False)
     monitor = _ConfidenceMonitor()
-    pipeline = StreamingChatPipeline(coordinator, confidence_monitor=monitor)
+    pipeline = StreamingChatExecutor(coordinator, confidence_monitor=monitor)
 
     chunks = [chunk async for chunk in pipeline.run("answer directly")]
 
@@ -607,7 +607,7 @@ async def test_pipeline_records_recovery_action_event():
         return_value=StreamChunk(content="Recovered fallback", is_final=True)
     )
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
     chunks = [chunk async for chunk in pipeline.run("recover this")]
 
     assert [chunk.content for chunk in chunks] == ["Recovered fallback"]
@@ -620,15 +620,26 @@ async def test_pipeline_records_recovery_action_event():
 
 
 def test_prepare_visible_content_strips_completion_markers():
-    pipeline = StreamingChatPipeline(DummyCoordinator())
+    pipeline = StreamingChatExecutor(DummyCoordinator())
 
     prepared = pipeline._prepare_visible_content(f"{SUMMARY_MARKER} Key findings")
 
     assert prepared == "Key findings"
 
 
+def test_prepare_visible_content_normalizes_exact_response_output():
+    pipeline = StreamingChatExecutor(DummyCoordinator())
+
+    prepared = pipeline._prepare_visible_content(
+        'The user wants exactly READY, so the answer is READY',
+        user_message="Reply with exactly READY",
+    )
+
+    assert prepared == "READY"
+
+
 def test_prepare_visible_content_keeps_new_block_while_suppressing_repeated_block():
-    pipeline = StreamingChatPipeline(DummyCoordinator())
+    pipeline = StreamingChatExecutor(DummyCoordinator())
     repeated = (
         "Now I have enough data to produce the complete analysis based on the "
         "evidence collected from the repository."
@@ -660,7 +671,7 @@ async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_c
         StubContinuationResult(chunks=[], state_updates={}, should_return=True)
     )
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
     async for _ in pipeline.run("summarize"):
         pass
 
@@ -698,7 +709,7 @@ async def test_pipeline_does_not_force_completion_when_high_confidence_response_
     )
     coordinator._tool_execution_handler = StubToolExecutionHandler(exec_result)
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
 
     chunks = []
     async for chunk in pipeline.run("finish the analysis"):
@@ -757,7 +768,7 @@ async def test_pipeline_forced_completion_bypasses_recovery_and_stale_blocked_st
         StubContinuationResult(chunks=[], state_updates={}, should_return=True)
     )
 
-    pipeline = StreamingChatPipeline(coordinator)
+    pipeline = StreamingChatExecutor(coordinator)
     chunks = []
     async for chunk in pipeline.run("summarize architecture"):
         chunks.append(chunk)

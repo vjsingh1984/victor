@@ -340,14 +340,10 @@ def run_skill(
         console.print()
 
     async def _run():
-        from victor.config.settings import load_settings
         from victor.core.verticals import get_vertical
 
-        # ✅ PROPER: Use VictorClient instead of FrameworkShim
-        from victor.framework.client import VictorClient
         from victor.framework.session_config import SessionConfig
-
-        settings = load_settings()
+        from victor.framework.session_runner import create_victor_client
 
         # Compose the skill system prompt
         skill_system_prompt = (
@@ -375,7 +371,7 @@ def run_skill(
             enable_observability=False,
         )
 
-        client = VictorClient(config)
+        client = create_victor_client(config)
         agent = await client.initialize()
 
         # Inject skill prompt into the agent's system prompt

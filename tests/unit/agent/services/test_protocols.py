@@ -36,11 +36,11 @@ from victor.agent.services.protocols import (
     StreamingChunkRuntimeProtocol,
     StreamingConfidenceMonitorProtocol,
     StreamingConversationStateProtocol,
+    StreamingExecutionRuntimeProtocol,
     StreamingHandlerProtocol,
     StreamingIntentClassifierRuntimeProtocol,
     StreamingMessageAdderProtocol,
     StreamingMetricsCollectorProtocol,
-    StreamingPipelineRuntimeProtocol,
     StreamingProviderRuntimeProtocol,
     StreamingReminderRuntimeProtocol,
     StreamingRLRuntimeProtocol,
@@ -104,9 +104,9 @@ class TestProtocolDefinitions:
         """Service-owned streaming helper protocols should be importable."""
         assert StreamingChunkRuntimeProtocol is not None
         assert StreamingConversationStateProtocol is not None
+        assert StreamingExecutionRuntimeProtocol is not None
         assert StreamingIntentClassifierRuntimeProtocol is not None
         assert StreamingMessageAdderProtocol is not None
-        assert StreamingPipelineRuntimeProtocol is not None
         assert StreamingProviderRuntimeProtocol is not None
         assert StreamingReminderRuntimeProtocol is not None
         assert StreamingRLRuntimeProtocol is not None

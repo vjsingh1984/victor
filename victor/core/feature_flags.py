@@ -176,20 +176,10 @@ class FeatureFlag(Enum):
     # Phase 16 - Stage Transition Coordination (Streaming Path Optimization)
     # USE_STAGE_TRANSITION_COORDINATOR enables batching of tool executions
     # and Phase 1 optimizations (cooldown, high confidence skip) in the
-    # streaming path. Fixes the issue where StreamingChatPipeline bypasses
+    # streaming path. Fixes the issue where the legacy streaming runtime bypasses
     # Phase 1 optimizations and causes stage thrashing.
     # Default: False (opt-in for gradual rollout)
     USE_STAGE_TRANSITION_COORDINATOR = "use_stage_transition_coordinator"
-
-    # Phase 3 - Service Layer Alignment (Agent → ChatService)
-    # USE_SERVICE_LAYER_FOR_AGENT makes Agent.run() and Agent.stream()
-    # use ChatService instead of accessing orchestrator directly.
-    # This follows the service+state-pass architecture and ensures proper
-    # service boundaries. When enabled, Agent delegates to ChatService,
-    # which uses TurnExecutor with Phase 2 coordinator integration.
-    # Default: True (opt-out - enabled by default for architectural alignment)
-    # Set VICTOR_USE_SERVICE_LAYER_FOR_AGENT=false to use legacy path.
-    USE_SERVICE_LAYER_FOR_AGENT = "use_service_layer_for_agent"
 
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
@@ -226,10 +216,6 @@ class FeatureFlag(Enum):
             FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP,
             # Phase 16: Stage Transition Coordination (opt-in for gradual rollout)
             FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR,
-            # Phase 3: Service Layer Alignment (opt-out - enabled by default)
-            # USE_SERVICE_LAYER_FOR_AGENT is now enabled by default to ensure
-            # future development happens on the correct service+state-pass architecture.
-            # Set VICTOR_USE_SERVICE_LAYER_FOR_AGENT=false to use legacy path.
         }
 
     def get_default_enabled(self, fallback: bool) -> bool:

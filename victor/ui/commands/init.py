@@ -164,9 +164,9 @@ def _generate_init_content(
 
 
 async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
-    """Create an Agent for init synthesis using VictorClient (service-oriented architecture).
+    """Create an Agent for init synthesis using the framework client seam.
 
-    Uses VictorClient with SessionConfig for proper service layer alignment.
+    Uses the framework client factory with SessionConfig for proper service-layer alignment.
     Supports both profile names (e.g., "zai-coding") and bare provider names (e.g., "ollama").
 
     Args:
@@ -178,16 +178,16 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
 
     Architecture:
         This function follows the service-oriented architecture pattern:
-        - Uses VictorClient (not Agent.create directly)
+        - Uses the framework client seam (not Agent.create directly)
         - Passes configuration via SessionConfig (immutable)
-        - VictorClient initializes via Agent.create with proper service alignment
+        - VictorClient initialization stays framework-owned
         - Services are accessed through ServiceAccessor (not orchestrator directly)
     """
     from victor.config.settings import load_settings
 
-    # ✅ PROPER: Use VictorClient with SessionConfig (service-oriented architecture)
-    from victor.framework.client import VictorClient
+    # ✅ PROPER: Use the framework client factory with SessionConfig
     from victor.framework.session_config import SessionConfig
+    from victor.framework.session_runner import create_victor_client
 
     settings = load_settings()
     profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
@@ -198,13 +198,13 @@ async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
         config = SessionConfig(
             agent_profile=provider,  # Profile name (e.g., "zai-coding")
         )
-        client = VictorClient(config)
+        client = create_victor_client(config)
         agent = await client.initialize()
         return agent
 
     # Bare provider name: pass through SessionConfig, resolved by Agent.create
     config = SessionConfig()  # Default config (no agent_profile)
-    client = VictorClient(config)
+    client = create_victor_client(config)
 
     # For bare provider names, we need to pass provider/model to Agent.create
     # VictorClient doesn't support direct provider override, so we use Agent.create
@@ -247,8 +247,6 @@ async def _gather_graph_context(root: Path) -> Optional[dict]:
         # Detect other common patterns
         inheritance_edges = [e for e in all_edges if e.type == "INHERITS"]
         calls_edges = [e for e in all_edges if e.type == "CALLS"]
-        imports_edges = [e for e in all_edges if e.type == "IMPORTS"]
-
         # Calculate complexity metrics
         total_nodes = len(await graph_store.get_all_nodes())
         total_edges = len(all_edges)
@@ -780,7 +778,7 @@ providers:
         elif learn:
             console.print(f"[dim]Analysis: Index → Learn{ccg_note} (no LLM)...[/]")
         elif ccg:
-            console.print(f"[dim]Analysis: Index + CCG (no LLM, no conversation)...[/]")
+            console.print("[dim]Analysis: Index + CCG (no LLM, no conversation)...[/]")
         elif index:
             console.print("[dim]Analysis: Index only (no LLM, no conversation)...[/]")
         else:

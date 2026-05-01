@@ -484,46 +484,46 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
         assert "self._context.add_message(msg)" not in source
 
 
-class TestStreamingPipelineIntegration:
-    """Tests verifying streaming pipeline has AgenticLoop components."""
+class TestStreamingExecutorIntegration:
+    """Tests verifying the canonical streaming executor owns loop behavior."""
 
     def test_pipeline_accepts_perception(self):
-        """StreamingChatPipeline constructor accepts perception parameter."""
+        """StreamingChatExecutor constructor accepts perception parameter."""
         from unittest.mock import MagicMock
-        from victor.agent.streaming.pipeline import StreamingChatPipeline
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
 
         mock_coord = MagicMock()
         mock_perception = MagicMock()
-        pipeline = StreamingChatPipeline(mock_coord, perception=mock_perception)
+        pipeline = StreamingChatExecutor(mock_coord, perception=mock_perception)
         assert pipeline._perception is mock_perception
 
     def test_pipeline_accepts_fulfillment(self):
-        """StreamingChatPipeline constructor accepts fulfillment parameter."""
+        """StreamingChatExecutor constructor accepts fulfillment parameter."""
         from unittest.mock import MagicMock
-        from victor.agent.streaming.pipeline import StreamingChatPipeline
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
 
         mock_coord = MagicMock()
         mock_fulfillment = MagicMock()
-        pipeline = StreamingChatPipeline(mock_coord, fulfillment=mock_fulfillment)
+        pipeline = StreamingChatExecutor(mock_coord, fulfillment=mock_fulfillment)
         assert pipeline._fulfillment is mock_fulfillment
 
     def test_pipeline_has_progress_tracking(self):
-        """StreamingChatPipeline tracks progress scores."""
+        """StreamingChatExecutor tracks progress scores."""
         from unittest.mock import MagicMock
-        from victor.agent.streaming.pipeline import StreamingChatPipeline
+        from victor.agent.services.chat_stream_executor import StreamingChatExecutor
 
-        pipeline = StreamingChatPipeline(MagicMock())
+        pipeline = StreamingChatExecutor(MagicMock())
         assert hasattr(pipeline, "_progress_scores")
         assert pipeline._progress_scores == []
 
     def test_factory_passes_components(self):
-        """create_streaming_chat_pipeline passes perception and fulfillment."""
+        """create_streaming_chat_executor passes perception and fulfillment."""
         from unittest.mock import MagicMock
-        from victor.agent.streaming.pipeline import create_streaming_chat_pipeline
+        from victor.agent.services.chat_stream_executor import create_streaming_chat_executor
 
         mock_perception = MagicMock()
         mock_fulfillment = MagicMock()
-        pipeline = create_streaming_chat_pipeline(
+        pipeline = create_streaming_chat_executor(
             MagicMock(), perception=mock_perception, fulfillment=mock_fulfillment
         )
         assert pipeline._perception is mock_perception

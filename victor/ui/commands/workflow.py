@@ -773,9 +773,8 @@ async def _execute_workflow_async(
 ) -> None:
     from victor.config.settings import load_settings
 
-    # ✅ PROPER: Use VictorClient instead of FrameworkShim
-    from victor.framework.client import VictorClient
     from victor.framework.session_config import SessionConfig
+    from victor.framework.session_runner import create_victor_client
     from victor.ui.commands.utils import graceful_shutdown
     from victor.workflows import ExecutorConfig, StateGraphExecutor
     from victor.workflows.definition import AgentNode
@@ -783,7 +782,7 @@ async def _execute_workflow_async(
     import logging
 
     logger = logging.getLogger(__name__)
-    settings = load_settings()
+    load_settings()
 
     orchestrators = {}
     has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
@@ -811,9 +810,9 @@ async def _execute_workflow_async(
         for profile_name in sorted(all_profiles):
             try:
                 logger.debug(f"Creating orchestrator for profile: {profile_name}")
-                # ✅ PROPER: Use VictorClient instead of FrameworkShim
+                # ✅ PROPER: Use the framework client seam instead of FrameworkShim
                 config = SessionConfig(profile=profile_name)
-                client = VictorClient(config)
+                client = create_victor_client(config)
                 orchestrator = await client.initialize()
                 orchestrators[profile_name] = orchestrator
                 logger.debug(f"Successfully created orchestrator for profile: {profile_name}")
@@ -1132,9 +1131,8 @@ async def _generate_workflow_async(
 ) -> None:
     from victor.config.settings import load_settings
 
-    # ✅ PROPER: Use VictorClient instead of FrameworkShim
-    from victor.framework.client import VictorClient
     from victor.framework.session_config import SessionConfig
+    from victor.framework.session_runner import create_victor_client
     from victor.ui.commands.utils import graceful_shutdown
     from victor.workflows.generation import (
         PipelineMode,
@@ -1145,13 +1143,13 @@ async def _generate_workflow_async(
 
     import yaml
 
-    settings = load_settings()
+    load_settings()
 
     profile_name = profile or "default"
     try:
-        # ✅ PROPER: Use VictorClient instead of FrameworkShim
+        # ✅ PROPER: Use the framework client seam instead of FrameworkShim
         config = SessionConfig(profile=profile_name, vertical=vertical)
-        client = VictorClient(config)
+        client = create_victor_client(config)
         orchestrator = await client.initialize()
         console.print(f"[dim]Using profile: {profile_name}[/]")
     except Exception as e:

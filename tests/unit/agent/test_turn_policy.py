@@ -1,7 +1,7 @@
 """Tests for victor.agent.turn_policy module.
 
 Shared turn policy used by both batch (AgenticLoop) and streaming
-(StreamingChatPipeline) execution paths.
+(StreamingChatExecutor) execution paths.
 """
 
 from __future__ import annotations

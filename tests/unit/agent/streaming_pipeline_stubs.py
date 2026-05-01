@@ -136,7 +136,7 @@ class OrchestratorStub:
 
 
 class DummyCoordinator:
-    """Minimal coordinator façade for StreamingChatPipeline tests."""
+    """Minimal coordinator façade for StreamingChatExecutor tests."""
 
     def __init__(self, pre_chunks=None, limit_result=None) -> None:
         self._stream_ctx = DummyStreamContext()
