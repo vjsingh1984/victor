@@ -22,12 +22,7 @@ from victor.core.errors import CancellationError
 from victor.framework._internal import format_context_message
 from victor.framework.task import DirectResponseOutputState, TaskResult
 from victor.providers.base import CompletionResponse
-from victor.runtime.chat_runtime import resolve_chat_runtime, resolve_chat_service
-from victor.runtime.context import (
-    ResolvedRuntimeServices,
-    resolve_execution_context,
-    resolve_runtime_services,
-)
+from victor.runtime.chat_runtime import resolve_chat_runtime as _resolve_chat_runtime
 
 
 @dataclass(frozen=True)
@@ -134,7 +129,7 @@ async def execute_message(
     prepared = prepare_message(user_message, context)
 
     try:
-        chat_runtime = resolve_chat_runtime(orchestrator, execution_context)
+        chat_runtime = _resolve_chat_runtime(orchestrator, execution_context)
         output_state = DirectResponseOutputState(prepared.response_message)
         response = _coerce_completion_response(
             await _invoke_chat(
@@ -189,7 +184,7 @@ async def stream_message_events(
     from victor.framework._internal import stream_with_events
 
     prepared = prepare_message(user_message, context)
-    chat_runtime = resolve_chat_runtime(orchestrator, execution_context)
+    chat_runtime = _resolve_chat_runtime(orchestrator, execution_context)
 
     async for event in stream_with_events(
         chat_runtime,
@@ -213,3 +208,12 @@ async def iter_runtime_stream_events(
 
     async for event in runtime.stream(message):
         yield event
+
+
+__all__ = [
+    "PreparedMessage",
+    "prepare_message",
+    "execute_message",
+    "stream_message_events",
+    "iter_runtime_stream_events",
+]

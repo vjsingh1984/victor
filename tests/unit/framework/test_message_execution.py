@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -38,110 +37,13 @@ def test_prepare_message_prepends_context_but_preserves_response_message() -> No
     assert prepared.response_message == "Fix the bug"
 
 
-def test_resolve_chat_runtime_prefers_execution_context_chat_service() -> None:
-    from victor.framework.message_execution import resolve_chat_runtime
+def test_message_execution_does_not_expose_runtime_resolution_helpers() -> None:
+    import victor.framework.message_execution as message_execution
 
-    orchestrator = _make_orchestrator()
-    chat_service = MagicMock()
-    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service))
-
-    runtime = resolve_chat_runtime(orchestrator, execution_context)
-
-    assert runtime is chat_service
-
-
-def test_resolve_runtime_services_prefers_execution_context_services() -> None:
-    from victor.framework.message_execution import resolve_runtime_services
-
-    orchestrator = _make_orchestrator()
-    chat_service = MagicMock()
-    session_service = MagicMock()
-    execution_context = SimpleNamespace(
-        services=SimpleNamespace(chat=chat_service, session=session_service)
-    )
-
-    services = resolve_runtime_services(orchestrator, execution_context)
-
-    assert services.chat is chat_service
-    assert services.session is session_service
-
-
-def test_resolve_runtime_services_prefers_execution_context_container_over_legacy_attrs() -> None:
-    from victor.framework.message_execution import resolve_runtime_services
-    from victor.agent.services import protocols as service_protocols
-
-    orchestrator = _make_orchestrator()
-    legacy_chat_service = MagicMock(name="legacy_chat_service")
-    legacy_session_service = MagicMock(name="legacy_session_service")
-    runtime_chat_service = MagicMock(name="runtime_chat_service")
-    runtime_session_service = MagicMock(name="runtime_session_service")
-    container = MagicMock()
-    container.get_optional.side_effect = lambda protocol: {
-        service_protocols.ChatServiceProtocol: runtime_chat_service,
-        service_protocols.SessionServiceProtocol: runtime_session_service,
-    }.get(protocol)
-    execution_context = SimpleNamespace(container=container)
-    orchestrator._chat_service = legacy_chat_service
-    orchestrator._session_service = legacy_session_service
-
-    services = resolve_runtime_services(orchestrator, execution_context)
-
-    assert services.chat is runtime_chat_service
-    assert services.session is runtime_session_service
-    assert services.chat is not legacy_chat_service
-    assert services.session is not legacy_session_service
-
-
-def test_resolve_chat_service_returns_canonical_chat_service() -> None:
-    from victor.framework.message_execution import resolve_chat_service
-
-    orchestrator = _make_orchestrator()
-    chat_service = MagicMock()
-    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service))
-
-    resolved = resolve_chat_service(orchestrator, execution_context)
-
-    assert resolved is chat_service
-
-
-def test_resolve_runtime_services_falls_through_empty_execution_context_services() -> None:
-    from victor.framework.message_execution import resolve_runtime_services
-
-    orchestrator = _make_orchestrator()
-    legacy_chat_service = MagicMock(name="legacy_chat_service")
-    execution_context = SimpleNamespace(services=SimpleNamespace(chat=None, session=None))
-    orchestrator._chat_service = legacy_chat_service
-
-    services = resolve_runtime_services(orchestrator, execution_context)
-
-    assert services.chat is legacy_chat_service
-
-
-@pytest.mark.asyncio
-async def test_resolve_chat_runtime_wraps_orchestrator_fallback_without_warning() -> None:
-    from victor.framework.message_execution import resolve_chat_runtime
-
-    orchestrator = _make_orchestrator()
-    orchestrator.chat = AsyncMock(return_value="fallback-result")
-    orchestrator._container = None
-
-    async def _stream_chat(_message: str):
-        yield SimpleNamespace(content="chunk")
-
-    orchestrator.stream_chat = _stream_chat
-
-    runtime = resolve_chat_runtime(orchestrator)
-
-    assert runtime is not orchestrator
-
-    with warnings.catch_warnings(record=True) as recorded:
-        warnings.simplefilter("always", DeprecationWarning)
-        result = await runtime.chat("hello")
-        chunks = [chunk async for chunk in runtime.stream_chat("hello")]
-
-    assert result == "fallback-result"
-    assert [chunk.content for chunk in chunks] == ["chunk"]
-    assert len(recorded) == 0
+    assert not hasattr(message_execution, "resolve_chat_runtime")
+    assert not hasattr(message_execution, "resolve_chat_service")
+    assert not hasattr(message_execution, "resolve_execution_context")
+    assert not hasattr(message_execution, "resolve_runtime_services")
 
 
 @pytest.mark.asyncio

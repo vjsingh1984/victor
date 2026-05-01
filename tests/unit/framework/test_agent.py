@@ -525,7 +525,7 @@ class TestAgentStream:
         """stream should use the internal fallback adapter for bare orchestrators."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
-        from victor.framework.message_execution import resolve_chat_runtime
+        from victor.runtime import resolve_chat_runtime
 
         mock_orchestrator._chat_service = None
         mock_orchestrator._container = None

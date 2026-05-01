@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.runtime.chat_runtime import resolve_chat_runtime, resolve_chat_service
+from victor.runtime import resolve_chat_runtime, resolve_chat_service
 
 
 class _RuntimeOwner(MagicMock):
