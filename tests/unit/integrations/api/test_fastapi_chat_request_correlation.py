@@ -19,11 +19,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from fastapi.testclient import TestClient
 
+from victor.framework.session_config import SessionConfig
 from victor.integrations.api import fastapi_server
 from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType
 from victor.observability.request_correlation import get_request_correlation_id
@@ -226,3 +228,37 @@ async def test_chat_stream_prefers_execution_context_chat_runtime_over_legacy_at
     assert request_event["type"] == "request"
     assert runtime_chat.stream_request_ids == [request_event["request_id"]]
     assert content_event["content"] == "runtime:prefer runtime"
+
+
+@pytest.mark.asyncio
+async def test_fastapi_server_uses_framework_client_factory_for_conversation_access(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Conversation helpers should build their client through the framework seam."""
+    fake_client = SimpleNamespace(initialize=AsyncMock(return_value=SimpleNamespace()))
+
+    monkeypatch.setattr(
+        fastapi_server,
+        "load_fastapi_router_registrations",
+        lambda *, workspace_root: [],
+    )
+
+    with patch(
+        "victor.framework.session_runner.create_victor_client",
+        return_value=fake_client,
+    ) as create_client:
+        server = fastapi_server.VictorFastAPIServer(
+            workspace_root=str(tmp_path),
+            enable_graphql=False,
+        )
+
+        client = await server._get_victor_client()
+        cached_client = await server._get_victor_client()
+
+    assert client is fake_client
+    assert cached_client is fake_client
+    create_client.assert_called_once()
+    config = create_client.call_args.args[0]
+    assert isinstance(config, SessionConfig)
+    assert create_client.call_args.kwargs["container"] is server._container
+    fake_client.initialize.assert_awaited_once_with()

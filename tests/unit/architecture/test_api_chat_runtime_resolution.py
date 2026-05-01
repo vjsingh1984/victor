@@ -84,3 +84,13 @@ def test_api_chat_surfaces_use_canonical_runtime_resolution() -> None:
     assert "orchestrator._chat_service" not in aiohttp_ws_source
     assert "resolve_chat_runtime" in aiohttp_agent_source
     assert "orchestrator._chat_service" not in aiohttp_agent_source
+
+
+def test_fastapi_server_uses_framework_client_factory_for_conversation_helpers() -> None:
+    """FastAPI server should not instantiate framework clients directly."""
+    fastapi_server_source = _read("victor/integrations/api/fastapi_server.py")
+
+    assert "from victor.framework.client import VictorClient" not in fastapi_server_source
+    assert "VictorClient(" not in fastapi_server_source
+    assert "FrameworkSessionRunner" in fastapi_server_source
+    assert "create_victor_client" in fastapi_server_source

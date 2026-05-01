@@ -27,13 +27,18 @@ if TYPE_CHECKING:
     from victor.framework.agent import Agent
     from victor.framework.client import VictorClient
     from victor.framework.session_config import SessionConfig
+    from victor.core.container import ServiceContainer
 
 
-def create_victor_client(config: "SessionConfig") -> "VictorClient":
+def create_victor_client(
+    config: "SessionConfig",
+    *,
+    container: Optional["ServiceContainer"] = None,
+) -> "VictorClient":
     """Create the canonical framework client for a prepared session config."""
     from victor.framework.client import VictorClient
 
-    return VictorClient(config)
+    return VictorClient(config, container=container)
 
 
 @dataclass(frozen=True)

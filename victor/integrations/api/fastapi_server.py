@@ -27,6 +27,7 @@ Features:
 """
 
 import asyncio
+from functools import partial
 import json
 import logging
 import secrets
@@ -390,12 +391,19 @@ class VictorFastAPIServer:
 
         from victor.config.settings import load_settings
         from victor.core.bootstrap import ensure_bootstrapped
+        from victor.framework.session_config import SessionConfig
+        from victor.framework.session_runner import FrameworkSessionRunner, create_victor_client
 
         self._settings = load_settings()
         self._container = ensure_bootstrapped(self._settings)
+        self._session_runner = FrameworkSessionRunner(
+            self._settings,
+            SessionConfig(),
+            client_factory=partial(create_victor_client, container=self._container),
+        )
 
         self._orchestrator = None
-        self._victor_client = None  # NEW: VictorClient for service-layer access
+        self._victor_client = None
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
         self._hitl_store = None
@@ -622,14 +630,10 @@ class VictorFastAPIServer:
         return self._orchestrator
 
     async def _get_victor_client(self) -> Any:
-        """Get or create the VictorClient for service-layer access."""
+        """Get or create the framework-managed client for API conversation access."""
         if self._victor_client is None:
-            from victor.framework.client import VictorClient
-            from victor.framework.session_config import SessionConfig
-
-            config = SessionConfig()  # Use default config
-            self._victor_client = VictorClient(config, container=self._container)
-            await self._victor_client.initialize()
+            self._victor_client = self._session_runner.create_client()
+            await self._session_runner.initialize_client(self._victor_client)
 
         return self._victor_client
 
