@@ -1,11 +1,11 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from victor.framework.client import VictorClient
 from victor.framework.session_config import SessionConfig
-from victor.providers.base import CompletionResponse
+from victor.providers.base import CompletionResponse, StreamChunk
 
 
 @pytest.mark.asyncio
@@ -93,3 +93,116 @@ async def test_victor_client_chat_prefers_execution_context_chat_service() -> No
     chat_service.chat.assert_awaited_once_with("ping", stream=False)
     assert result.content == "Service response"
     assert result.tool_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_victor_client_stream_prefers_execution_context_chat_service() -> None:
+    config = SessionConfig()
+    client = VictorClient(config, container=object())
+
+    async def _stream_chat(_message: str):
+        yield StreamChunk(content="Service ")
+        yield StreamChunk(content="stream")
+        yield StreamChunk(content="", is_final=True)
+
+    chat_service = SimpleNamespace(
+        stream_chat=MagicMock(side_effect=_stream_chat),
+    )
+    execution_context = SimpleNamespace(services=SimpleNamespace(chat=chat_service, session=None))
+
+    class _FakeAgent:
+        async def stream(self, _message: str):
+            raise AssertionError("VictorClient.stream() should prefer execution-context chat service")
+
+    client._agent = _FakeAgent()
+    client._context = execution_context
+
+    events = [event async for event in client.stream("ping")]
+
+    chat_service.stream_chat.assert_called_once_with("ping")
+    content_events = [event for event in events if event.event_type == "content"]
+    assert [event.content for event in content_events] == ["Service ", "stream"]
+
+
+@pytest.mark.asyncio
+async def test_victor_client_session_prefers_execution_context_services() -> None:
+    config = SessionConfig.from_cli_flags(tool_budget=4, enable_smart_routing=True)
+    client = VictorClient(config, container=object())
+    session_service = SimpleNamespace(
+        create_session=AsyncMock(return_value="session-123"),
+        close_session=AsyncMock(return_value=True),
+    )
+    chat_service = SimpleNamespace(
+        chat=AsyncMock(
+            return_value=CompletionResponse(
+                content="Session response",
+                role="assistant",
+                model="test-model",
+            )
+        ),
+        reset_conversation=MagicMock(),
+    )
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(chat=chat_service, session=session_service)
+    )
+
+    class _FakeAgent:
+        async def run(self, _message: str):
+            raise AssertionError("ChatSession.send() should prefer execution-context chat service")
+
+    client._agent = _FakeAgent()
+    client._context = execution_context
+
+    session = await client.create_session()
+    result = await session.send("ping")
+    history = session.get_history()
+    await session.close()
+
+    session_service.create_session.assert_awaited_once_with(
+        metadata={"tool_budget": 4, "smart_routing": True}
+    )
+    chat_service.reset_conversation.assert_called_once_with()
+    chat_service.chat.assert_awaited_once_with("ping", stream=False)
+    session_service.close_session.assert_awaited_once_with("session-123")
+    assert result.content == "Session response"
+    assert history == [
+        {"role": "user", "content": "ping"},
+        {"role": "assistant", "content": "Session response"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_chat_session_stream_prefers_execution_context_chat_service() -> None:
+    config = SessionConfig()
+    client = VictorClient(config, container=object())
+
+    async def _stream_chat(_message: str):
+        yield StreamChunk(content="Session ")
+        yield StreamChunk(content="stream")
+        yield StreamChunk(content="", is_final=True)
+
+    chat_service = SimpleNamespace(
+        stream_chat=MagicMock(side_effect=_stream_chat),
+        reset_conversation=MagicMock(),
+    )
+    execution_context = SimpleNamespace(
+        services=SimpleNamespace(chat=chat_service, session=None)
+    )
+
+    class _FakeAgent:
+        async def stream(self, _message: str):
+            raise AssertionError("ChatSession.stream() should prefer execution-context chat service")
+
+    client._agent = _FakeAgent()
+    client._context = execution_context
+
+    session = await client.create_session()
+    events = [event async for event in session.stream("ping")]
+
+    chat_service.stream_chat.assert_called_once_with("ping")
+    assert session.get_history() == [
+        {"role": "user", "content": "ping"},
+        {"role": "assistant", "content": "Session stream"},
+    ]
+    content_events = [event for event in events if event.event_type == "content"]
+    assert [event.content for event in content_events] == ["Session ", "stream"]

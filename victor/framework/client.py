@@ -144,6 +144,86 @@ class _RenderChunk:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+def _session_metadata(config: "SessionConfig") -> Dict[str, Any]:
+    """Build stable metadata for a client-managed chat session."""
+    return {
+        "tool_budget": config.tool_budget,
+        "smart_routing": config.smart_routing.enabled,
+    }
+
+
+async def _iter_runtime_stream_events(
+    runtime: Any,
+    message: str,
+) -> AsyncIterator[Any]:
+    """Yield framework stream events from a chat runtime or agent wrapper."""
+    if hasattr(runtime, "stream_chat"):
+        from victor.framework._internal import stream_with_events
+
+        async for event in stream_with_events(runtime, message, response_prompt=message):
+            yield event
+        return
+
+    async for event in runtime.stream(message):
+        yield event
+
+
+def _to_stream_event(event: Any) -> _StreamEvent:
+    """Convert a framework event into the client stream-event surface."""
+    from victor.framework.events import EventType
+
+    if event.type == EventType.CONTENT:
+        return _StreamEvent(
+            EventType.CONTENT,
+            content=event.content,
+            metadata=getattr(event, "metadata", {}),
+        )
+    if event.type == EventType.THINKING:
+        return _StreamEvent(
+            EventType.THINKING,
+            content=event.content,
+            metadata=getattr(event, "metadata", {}),
+        )
+    if event.type == EventType.TOOL_CALL:
+        return _StreamEvent(
+            EventType.TOOL_CALL,
+            tool_name=getattr(event, "tool_name", None),
+            content=str(getattr(event, "arguments", "")),
+            arguments=getattr(event, "arguments", {}),
+            metadata={
+                **getattr(event, "metadata", {}),
+                "arguments": getattr(event, "arguments", {}),
+            },
+        )
+    if event.type == EventType.TOOL_RESULT:
+        result_payload = {
+            **getattr(event, "metadata", {}),
+            "result": getattr(event, "result", None),
+            "success": getattr(event, "success", True),
+            "arguments": getattr(event, "arguments", {}),
+        }
+        return _StreamEvent(
+            EventType.TOOL_RESULT,
+            tool_name=getattr(event, "tool_name", None),
+            content=getattr(event, "result", None) or getattr(event, "content", None),
+            arguments=getattr(event, "arguments", {}),
+            result=result_payload,
+            success=getattr(event, "success", True),
+            metadata=result_payload,
+        )
+    if event.type == EventType.ERROR:
+        return _StreamEvent(
+            EventType.ERROR,
+            content=getattr(event, "content", str(event)),
+            metadata=getattr(event, "metadata", {}),
+        )
+    return _StreamEvent(
+        event.type,
+        content=getattr(event, "content", None),
+        metadata={"raw_event": event},
+    )
+
+
 class VictorClient:
     """Unified client facade — the ONLY interface the UI layer uses.
 
@@ -365,62 +445,13 @@ class VictorClient:
         Yields:
             StreamEvent instances (content, thinking, tool_call, etc.)
         """
-        from victor.framework.events import EventType
-
         agent = await self._ensure_initialized()
+        services = self._get_services()
+        chat_runtime = getattr(services, "chat", None) if services is not None else None
+        runtime = chat_runtime if chat_runtime is not None else agent
 
-        async for event in agent.stream(message):
-            if event.type == EventType.CONTENT:
-                yield _StreamEvent(
-                    EventType.CONTENT,
-                    content=event.content,
-                    metadata=getattr(event, "metadata", {}),
-                )
-            elif event.type == EventType.THINKING:
-                yield _StreamEvent(
-                    EventType.THINKING,
-                    content=event.content,
-                    metadata=getattr(event, "metadata", {}),
-                )
-            elif event.type == EventType.TOOL_CALL:
-                yield _StreamEvent(
-                    EventType.TOOL_CALL,
-                    tool_name=getattr(event, "tool_name", None),
-                    content=str(getattr(event, "arguments", "")),
-                    arguments=getattr(event, "arguments", {}),
-                    metadata={
-                        **getattr(event, "metadata", {}),
-                        "arguments": getattr(event, "arguments", {}),
-                    },
-                )
-            elif event.type == EventType.TOOL_RESULT:
-                result_payload = {
-                    **getattr(event, "metadata", {}),
-                    "result": getattr(event, "result", None),
-                    "success": getattr(event, "success", True),
-                    "arguments": getattr(event, "arguments", {}),
-                }
-                yield _StreamEvent(
-                    EventType.TOOL_RESULT,
-                    tool_name=getattr(event, "tool_name", None),
-                    content=getattr(event, "result", None) or getattr(event, "content", None),
-                    arguments=getattr(event, "arguments", {}),
-                    result=result_payload,
-                    success=getattr(event, "success", True),
-                    metadata=result_payload,
-                )
-            elif event.type == EventType.ERROR:
-                yield _StreamEvent(
-                    EventType.ERROR,
-                    content=getattr(event, "content", str(event)),
-                    metadata=getattr(event, "metadata", {}),
-                )
-            else:
-                yield _StreamEvent(
-                    event.type,
-                    content=getattr(event, "content", None),
-                    metadata={"raw_event": event},
-                )
+        async for event in _iter_runtime_stream_events(runtime, message):
+            yield _to_stream_event(event)
 
     async def stream_chat(self, message: str) -> AsyncIterator[_RenderChunk]:
         """Yield renderer-compatible chunks for legacy UI streaming helpers."""
@@ -468,7 +499,25 @@ class VictorClient:
             ChatSession for multi-turn conversation
         """
         agent = await self._ensure_initialized()
-        return _ChatSession(agent, self._config)
+        services = self._get_services()
+        session_service = getattr(services, "session", None) if services is not None else None
+        chat_service = getattr(services, "chat", None) if services is not None else None
+        session_id = None
+
+        if session_service is not None:
+            session_id = await session_service.create_session(
+                metadata=_session_metadata(self._config)
+            )
+        if chat_service is not None and hasattr(chat_service, "reset_conversation"):
+            chat_service.reset_conversation()
+
+        return _ChatSession(
+            agent,
+            self._config,
+            chat_service=chat_service,
+            session_service=session_service,
+            session_id=session_id,
+        )
 
     async def run_workflow(
         self,
@@ -548,14 +597,28 @@ class VictorClient:
 class _ChatSession:
     """Interactive multi-turn chat session."""
 
-    def __init__(self, agent: "Agent", config: "SessionConfig") -> None:
+    def __init__(
+        self,
+        agent: "Agent",
+        config: "SessionConfig",
+        *,
+        chat_service: Optional[Any] = None,
+        session_service: Optional[Any] = None,
+        session_id: Optional[str] = None,
+    ) -> None:
         self._agent = agent
         self._config = config
+        self._chat_service = chat_service
+        self._session_service = session_service
+        self._session_id = session_id
         self._history: List[Dict[str, Any]] = []
 
     async def send(self, message: str) -> _ChatResult:
         """Send a message in the session."""
-        result = await self._agent.run(message)
+        if self._chat_service is not None:
+            result = await self._chat_service.chat(message, stream=False)
+        else:
+            result = await self._agent.run(message)
         self._history.append({"role": "user", "content": message})
 
         response_content = result.content if hasattr(result, "content") else str(result)
@@ -575,15 +638,11 @@ class _ChatSession:
         from victor.framework.events import EventType
 
         collected = []
-        async for event in self._agent.stream(message):
+        runtime = self._chat_service if self._chat_service is not None else self._agent
+        async for event in _iter_runtime_stream_events(runtime, message):
             if event.type == EventType.CONTENT and event.content:
                 collected.append(event.content)
-            yield _StreamEvent(
-                getattr(event.type, "value", str(event.type)),
-                content=getattr(event, "content", None),
-                tool_name=getattr(event, "tool_name", None),
-                metadata=getattr(event, "metadata", {}),
-            )
+            yield _to_stream_event(event)
 
         self._history.append({"role": "user", "content": message})
         self._history.append({"role": "assistant", "content": "".join(collected)})
@@ -594,7 +653,9 @@ class _ChatSession:
 
     async def close(self) -> None:
         """Close the session."""
-        pass
+        if self._session_service is not None and self._session_id is not None:
+            await self._session_service.close_session(self._session_id)
+            self._session_id = None
 
 
 __all__ = [
