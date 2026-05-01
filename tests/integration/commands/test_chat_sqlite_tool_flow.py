@@ -16,18 +16,29 @@ def _strip_ansi(text: str) -> str:
 
 class _FakeAgent:
     def __init__(self) -> None:
-        self.provider = SimpleNamespace(supports_streaming=lambda: True)
-        self.unified_tracker = MagicMock()
         self.messages: list[str] = []
+        self._skill_matcher = None
 
-    def start_embedding_preload(self) -> None:
+
+class _FakeVictorClient:
+    last_config = None
+    last_agent = None
+
+    def __init__(self, config):
+        type(self).last_config = config
+        type(self).last_agent = _FakeAgent()
+
+    async def initialize(self):
+        return type(self).last_agent
+
+    async def start_embedding_preload(self):
         return None
 
-    def get_session_metrics(self) -> dict[str, int]:
+    async def get_session_metrics(self):
         return {"tool_calls": 1}
 
     async def stream_chat(self, message: str):
-        self.messages.append(message)
+        type(self).last_agent.messages.append(message)
         yield SimpleNamespace(
             content="",
             metadata={
@@ -63,17 +74,8 @@ class _FakeAgent:
             metadata={},
         )
 
-
-class _FakeVictorClient:
-    last_config = None
-    last_agent = None
-
-    def __init__(self, config):
-        type(self).last_config = config
-        type(self).last_agent = _FakeAgent()
-
-    async def _ensure_initialized(self):
-        return type(self).last_agent
+    async def close(self):
+        return None
 
 
 def test_chat_oneshot_renders_database_tool_flow_for_explicit_sqllite_request(monkeypatch):

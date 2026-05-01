@@ -38,6 +38,20 @@ async def test_victor_client_ensure_initialized_uses_provider_defaults() -> None
     )
 
 
+def test_victor_client_bootstrap_container_uses_bootstrap_factory_result() -> None:
+    client = VictorClient(SessionConfig())
+    sentinel_container = object()
+
+    with patch(
+        "victor.core.bootstrap.bootstrap_container",
+        return_value=sentinel_container,
+    ) as bootstrap_container:
+        result = client._bootstrap_container()
+
+    assert result is sentinel_container
+    bootstrap_container.assert_called_once_with()
+
+
 @pytest.mark.asyncio
 async def test_agent_public_api_for_runtime_configuration() -> None:
     """Test Agent exposes runtime configuration methods for CLI integration."""

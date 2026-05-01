@@ -1215,6 +1215,7 @@ async def run_oneshot(
 
     # ✅ PROPER: Create SessionConfig from CLI flags (no settings mutations)
     config = SessionConfig.from_cli_flags(
+        agent_profile=profile,
         tool_budget=tool_budget,
         max_iterations=max_iterations,
         compaction_threshold=compaction_threshold,
@@ -1241,6 +1242,8 @@ async def run_oneshot(
     if show_cli_chrome:
         _print_tool_output_mode_banner(console, tool_settings)
 
+    client = None
+    agent = None
     try:
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
 
@@ -1403,8 +1406,8 @@ async def run_oneshot(
             # Step 3: Ensure VictorClient is initialized
             status.update("Creating agent...")
             try:
-                # ✅ PROPER: VictorClient creates Agent internally via Agent.create()
-                agent = await client._ensure_initialized()
+                # ✅ PROPER: Use VictorClient public initialization instead of touching internals.
+                agent = await client.initialize()
             except ConfigurationError as e:
                 console.print(f"\n[red]✗[/] Configuration error during agent creation: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
@@ -1432,29 +1435,10 @@ async def run_oneshot(
                     console.print(traceback.format_exc())
                 raise typer.Exit(code=1)
 
-            # Set planning model override if provided (for planning coordinator)
-            if planning_model:
-                agent._planning_model_override = planning_model
-
-            # Note: Observability (shim) is handled by AgentFactory internally
-            # The factory creates the agent with framework features already wired
-
             # Step 4: Configure agent settings
             status.update("Configuring agent settings...")
-            if tool_budget is not None:
-                agent.set_tool_budget(tool_budget, user_override=True)
-            if max_iterations is not None:
-                agent.set_max_iterations(max_iterations, user_override=True)
-
-            _configure_agent_compaction(
-                agent,
-                compaction_threshold=compaction_threshold,
-                adaptive_threshold=adaptive_threshold,
-                compaction_min_threshold=compaction_min_threshold,
-                compaction_max_threshold=compaction_max_threshold,
-                con=console,
-                show_status=show_cli_chrome,
-            )
+            # SessionConfig already carries runtime overrides into Agent/VictorClient creation.
+            # Avoid mutating the runtime again here so the UI stays on framework surfaces.
 
             if mode:
                 from victor.agent.mode_controller import AgentMode, get_mode_controller
@@ -1484,7 +1468,7 @@ async def run_oneshot(
             # Step 6: Start embedding preload
             status.update("Starting embedding preload...")
             try:
-                agent.start_embedding_preload()
+                await client.start_embedding_preload()
             except Exception as e:
                 if show_cli_chrome:
                     console.print(f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}")
@@ -1493,7 +1477,7 @@ async def run_oneshot(
                     )
 
             # Planning mode requires non-streaming (plan generation → step execution → summary)
-            use_streaming = stream and agent.supports_streaming() and not enable_planning
+            use_streaming = stream and not enable_planning
 
             # Display skill auto-selection feedback before response
             if show_cli_chrome:
@@ -1515,7 +1499,7 @@ async def run_oneshot(
                     else FormatterRenderer(formatter, console)
                 )
                 await stream_response(
-                    agent, message, renderer, suppress_thinking=not show_reasoning
+                    client, message, renderer, suppress_thinking=not show_reasoning
                 )
             else:
                 # Use streaming pipeline with BufferedRenderer to capture
@@ -1530,7 +1514,7 @@ async def run_oneshot(
                     plain=formatter._plain if hasattr(formatter, "_plain") else False,
                 )
                 await stream_response(
-                    agent, message, buffered, suppress_thinking=not show_reasoning
+                    client, message, buffered, suppress_thinking=not show_reasoning
                 )
                 if show_cli_chrome:
                     buffered.flush(console)
@@ -1538,9 +1522,8 @@ async def run_oneshot(
                     formatter.response(content=buffered.finalize())
 
             success = True
-            if hasattr(agent, "get_session_metrics"):
-                metrics = agent.get_session_metrics()
-                tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
+            metrics = await client.get_session_metrics()
+            tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
 
     except InitializationError as e:
         formatter.error(f"{e.stage}: {e.message}")
@@ -1594,12 +1577,9 @@ async def run_oneshot(
 
         raise typer.Exit(1)
     finally:
-        # Emit session end event
-        duration = time.time() - start_time
-        # ✅ PROPER: No shim needed - session cleanup handled by agent/services
-        # Note: shim.emit_session_end() removed (FrameworkShim no longer used)
-        if agent:
-            await graceful_shutdown(agent)
+        _duration = time.time() - start_time
+        if client is not None:
+            await client.close()
 
 
 async def run_interactive(
@@ -1646,6 +1626,7 @@ async def run_interactive(
     from victor.framework.session_config import SessionConfig
 
     config = SessionConfig.from_cli_flags(
+        agent_profile=profile,
         tool_budget=tool_budget,
         max_iterations=max_iterations,
         compaction_threshold=compaction_threshold,

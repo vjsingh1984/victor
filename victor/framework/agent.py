@@ -892,6 +892,23 @@ class Agent:
             return getattr(self._orchestrator.provider, "supports_streaming", lambda: True)()
         return True
 
+    def start_embedding_preload(self) -> None:
+        """Warm embedding-dependent runtime state when supported.
+
+        This is primarily used by chat surfaces to front-load semantic search
+        initialization without exposing orchestrator internals directly.
+        """
+        if hasattr(self._orchestrator, "start_embedding_preload"):
+            self._orchestrator.start_embedding_preload()
+
+    def get_session_metrics(self) -> Dict[str, Any]:
+        """Return session-level runtime metrics when available."""
+        if hasattr(self._orchestrator, "get_session_metrics"):
+            metrics = self._orchestrator.get_session_metrics()
+            if isinstance(metrics, dict):
+                return metrics
+        return {}
+
     # =========================================================================
     # Observability
     # =========================================================================

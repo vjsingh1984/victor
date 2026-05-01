@@ -30,6 +30,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -111,6 +112,14 @@ class _StreamEvent:
     @property
     def metadata(self) -> Dict[str, Any]:
         return self._metadata
+
+
+@dataclass
+class _RenderChunk:
+    """Chunk adapter consumed by existing CLI/TUI renderer helpers."""
+
+    content: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class VictorClient:
@@ -200,22 +209,39 @@ class VictorClient:
         )
         return self._agent
 
+    async def initialize(self) -> "Agent":
+        """Public initialization hook for UI surfaces."""
+        return await self._ensure_initialized()
+
+    async def start_embedding_preload(self) -> None:
+        """Warm embedding-dependent runtime state when supported."""
+        agent = await self._ensure_initialized()
+        if hasattr(agent, "start_embedding_preload"):
+            agent.start_embedding_preload()
+
+    async def get_session_metrics(self) -> Dict[str, Any]:
+        """Return session-level runtime metrics when available."""
+        agent = await self._ensure_initialized()
+        if hasattr(agent, "get_session_metrics"):
+            metrics = agent.get_session_metrics()
+            if isinstance(metrics, dict):
+                return metrics
+        return {}
+
     def _bootstrap_container(self) -> "ServiceContainer":
         """Bootstrap the DI container with core services."""
         try:
-            from victor.core.container import ServiceContainer
-
-            container = ServiceContainer()
-
             # Bootstrap core services
             try:
                 from victor.core.bootstrap import bootstrap_container
 
-                bootstrap_container(container)
+                return bootstrap_container()
             except ImportError:
                 logger.debug("bootstrap_container not available, using minimal DI")
 
-            return container
+            from victor.core.container import ServiceContainer
+
+            return ServiceContainer()
         except Exception as e:
             logger.warning(f"DI container bootstrap failed, continuing without: {e}")
             from victor.core.container import ServiceContainer
@@ -306,14 +332,22 @@ class VictorClient:
                     "tool_call",
                     tool_name=getattr(event, "tool_name", None),
                     content=str(getattr(event, "arguments", "")),
-                    metadata=getattr(event, "metadata", {}),
+                    metadata={
+                        **getattr(event, "metadata", {}),
+                        "arguments": getattr(event, "arguments", {}),
+                    },
                 )
             elif event.type == EventType.TOOL_RESULT:
                 yield _StreamEvent(
                     "tool_result",
                     tool_name=getattr(event, "tool_name", None),
-                    content=getattr(event, "content", None),
-                    metadata=getattr(event, "metadata", {}),
+                    content=getattr(event, "result", None) or getattr(event, "content", None),
+                    metadata={
+                        **getattr(event, "metadata", {}),
+                        "result": getattr(event, "result", None),
+                        "success": getattr(event, "success", True),
+                        "arguments": getattr(event, "arguments", {}),
+                    },
                 )
             elif event.type == EventType.ERROR:
                 yield _StreamEvent(
@@ -327,6 +361,42 @@ class VictorClient:
                     content=getattr(event, "content", None),
                     metadata={"raw_event": event},
                 )
+
+    async def stream_chat(self, message: str) -> AsyncIterator[_RenderChunk]:
+        """Yield renderer-compatible chunks for legacy UI streaming helpers."""
+        async for event in self.stream(message):
+            metadata = dict(event.metadata or {})
+
+            if event.event_type == "thinking":
+                if event.content:
+                    metadata["reasoning_content"] = event.content
+                yield _RenderChunk(metadata=metadata)
+                continue
+
+            if event.event_type == "tool_call":
+                metadata["tool_start"] = {
+                    "name": event.tool_name or "unknown",
+                    "arguments": metadata.get("arguments", {}),
+                }
+                yield _RenderChunk(metadata=metadata)
+                continue
+
+            if event.event_type == "tool_result":
+                metadata["tool_result"] = {
+                    "name": event.tool_name or "unknown",
+                    "result": event.content or metadata.get("result", ""),
+                    "success": metadata.get("success", True),
+                    "arguments": metadata.get("arguments", {}),
+                }
+                yield _RenderChunk(metadata=metadata)
+                continue
+
+            if event.event_type == "error":
+                metadata["status"] = event.content or metadata.get("error", "Error")
+                yield _RenderChunk(metadata=metadata)
+                continue
+
+            yield _RenderChunk(content=event.content or "", metadata=metadata)
 
     async def create_session(self) -> "_ChatSession":
         """Create an interactive multi-turn chat session.
