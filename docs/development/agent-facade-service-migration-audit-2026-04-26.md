@@ -157,8 +157,9 @@ Applied migration steps:
   `create_recovery_context(...)`
 - orchestrator-owned recovery helpers now build recovery state via the
   canonical surface
-- `StreamingChatPipeline` now prefers `orchestrator.create_recovery_context(...)`
-  and falls back to `_create_recovery_context(...)` only for compatibility
+- the canonical streaming executor now prefers
+  `orchestrator.create_recovery_context(...)` and falls back to
+  `_create_recovery_context(...)` only for compatibility
 - the streaming tool-execution factory now wires the canonical recovery-context
   builder into `ToolExecutionHandler`
 - `ChatOrchestratorProtocol` now declares `create_recovery_context(...)`
@@ -336,8 +337,9 @@ A ninth TDD slice finished the streaming recovery-context migration.
 
 Applied migration steps:
 
-- `StreamingChatPipeline` now requires `create_recovery_context(...)`
-  directly and no longer falls back to `orchestrator._create_recovery_context(...)`
+- the canonical streaming executor now requires
+  `create_recovery_context(...)` directly and no longer falls back to
+  `orchestrator._create_recovery_context(...)`
 - `create_tool_execution_handler(...)` now binds the canonical
   `orchestrator.create_recovery_context(...)` surface directly
 - `ChatOrchestratorProtocol` no longer declares `_create_recovery_context(...)`

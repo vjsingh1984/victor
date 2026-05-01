@@ -67,6 +67,8 @@ print(settings.security.write_approval_mode)  # "risky_only"
 print(settings.search.codebase_vector_store)  # "lancedb"
 print(settings.events.event_backend_type)     # "in_memory"
 print(settings.pipeline.intelligent_pipeline_enabled)  # True
+# Legacy field name; this now gates the runtime-intelligence path used by the
+# streaming executor, evaluation, and recovery surfaces.
 ```
 
 ### Nested Config Groups

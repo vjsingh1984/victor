@@ -165,7 +165,8 @@ tool_settings:
 
 ### Service Layer (Phase 3) — Complete ✅
 
-> **Status**: All services are now **mandatory**. Feature flags removed in W3 cleanup.
+> **Status**: All core agent services are now mandatory and bootstrapped
+> through the canonical runtime/service bundle.
 
 The following service layer flags have been removed as services are now always enabled:
 - ~~`use_new_chat_service`~~ → ChatService is mandatory
@@ -180,37 +181,9 @@ The following service layer flags have been removed as services are now always e
 - Better testing and mocking (completed)
 - Foundation for future features (completed)
 
-**Migration**: No action needed — services are automatically initialized
-
-**Environment Variable**: `VICTOR_USE_NEW_RECOVERY_SERVICE=true`
-
-**Status**: 🔄 Phase 3 — Service Implementation
-
-**Impact**:
-- Consistent error recovery patterns
-- Better error classification
-- Required for resilience features
-
-**Migration**: Safe to enable; report any error handling issues
-
----
-
-#### `use_new_session_service`
-
-**Purpose**: Use SessionService for session management
-
-**Default**: `false`
-
-**Environment Variable**: `VICTOR_USE_NEW_SESSION_SERVICE=true`
-
-**Status**: 🔄 Phase 3 — Service Implementation
-
-**Impact**:
-- Centralized session state management
-- Better session persistence
-- Required for multi-session features
-
-**Migration**: Safe to enable; report any session issues
+**Migration**: No action needed. Service-selection flags and their environment
+variables are no longer supported; runtime wiring now resolves the canonical
+service bundle automatically.
 
 ---
 

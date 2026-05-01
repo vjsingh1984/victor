@@ -21,7 +21,7 @@ settings.resilience.circuit_breaker_failure_threshold  # 5
 settings.security.write_approval_mode  # "risky_only"
 settings.search.codebase_vector_store  # "lancedb"
 settings.events.event_backend_type     # "in_memory"
-settings.pipeline.intelligent_pipeline_enabled  # True
+settings.pipeline.intelligent_pipeline_enabled  # True  # legacy field name
 ```
 
 | Config Group | Fields | Purpose |
@@ -32,7 +32,7 @@ settings.pipeline.intelligent_pipeline_enabled  # True
 | `ResilienceSettings` | 17 | Circuit breaker, retry, rate limiting |
 | `SecuritySettings` | 19 | Server security, sandboxing, approval |
 | `EventSettings` | 24 | Event system backend and configuration |
-| `PipelineSettings` | 30+ | Intelligent pipeline, quality scoring, recovery |
+| `PipelineSettings` | 30+ | Runtime intelligence, evaluation, recovery, and legacy pipeline-named toggles |
 
 ## Configuration Files
 
@@ -502,11 +502,16 @@ context:
 
 ---
 
-## Intelligent Pipeline
+## Runtime Intelligence And Evaluation
+
+These settings still live under `settings.pipeline.*` for backward
+compatibility. Several field names retain the older "intelligent pipeline"
+wording even though the live runtime now flows through the service-owned chat
+runtime and `StreamingChatExecutor`.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `intelligent_pipeline_enabled` | `True` | Master switch |
+| `intelligent_pipeline_enabled` | `True` | Master switch for runtime-intelligence features on the live chat/runtime path |
 | `intelligent_quality_scoring` | `True` | Enable quality scoring |
 | `intelligent_mode_learning` | `True` | Enable Q-learning for modes |
 | `intelligent_prompt_optimization` | `True` | Enable prompt optimization |

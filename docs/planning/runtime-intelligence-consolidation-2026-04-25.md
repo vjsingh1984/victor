@@ -10,7 +10,7 @@ The active runtime intelligence path is scattered across multiple modules with o
 |---|---|---|
 | Turn perception and task intent | `victor/framework/perception_integration.py`, `victor/agent/task_analyzer.py`, `victor/agent/action_authorizer.py` | Perception and task analysis are conceptually one runtime concern, but callers stitch them together ad hoc. |
 | Live evaluation and retry policy | `victor/framework/agentic_loop.py`, `victor/framework/enhanced_completion_evaluation.py` | Evaluation policy is split between the loop and the evaluator, which makes retry/clarification logic easy to duplicate or bypass. |
-| Decision-service access | `streaming/pipeline.py`, `prompt_builder.py`, `task_completion.py`, `tool_selection.py`, `state_machine.py`, others | Container lookup and budget management are repeated in multiple call sites. |
+| Decision-service access | `agent/services/chat_stream_executor.py`, `prompt_builder.py`, `task_completion.py`, `tool_selection.py`, `state_machine.py`, others | Container lookup and budget management are repeated in multiple call sites. |
 | Prompt optimization retrieval | `victor/agent/optimization_injector.py`, `victor/agent/prompt_pipeline.py`, orchestrator init | GEPA, MiPRO, CoT distillation, failure hints, and related prompt optimizations are a separate injection path rather than part of a canonical runtime intelligence service. |
 
 This creates SRP and DIP violations:
@@ -47,7 +47,7 @@ Phase 1:
 - `UnifiedPromptPipeline`
   - Consume prompt-optimization bundles from `RuntimeIntelligenceService`
   - Use service-provided task classification helpers
-- `StreamingChatPipeline`
+- `StreamingChatExecutor` (previously extracted as `StreamingChatPipeline`)
   - Use service for decision-budget reset
   - Use service for pre-loop turn analysis / perception snapshot
 - `AgenticLoop`
@@ -83,12 +83,12 @@ Phase 4:
 
 Scope:
 - Add `RuntimeIntelligenceService` with typed snapshot and prompt-optimization bundle.
-- Migrate `UnifiedPromptPipeline`, `StreamingChatPipeline`, and `AgenticLoop`.
+- Migrate `UnifiedPromptPipeline`, the canonical streaming executor, and `AgenticLoop`.
 - Keep old constructor arguments working as compatibility inputs.
 
 TDD checkpoints:
 1. Add unit tests for the new service.
-2. Add migration tests proving prompt pipeline, streaming pipeline, and agentic loop can consume the new service.
+2. Add migration tests proving prompt pipeline, the canonical streaming executor/runtime path, and the agentic loop can consume the new service.
 3. Implement the service.
 4. Migrate the active calling sites.
 5. Run focused and broader regression suites.
@@ -105,7 +105,7 @@ After Phase 1:
 Completed on 2026-04-25:
 - Phase 1 and 2 migrations:
   - `UnifiedPromptPipeline`
-  - `StreamingChatPipeline`
+  - `StreamingChatExecutor` (the earlier `StreamingChatPipeline` slice has since been retired in favor of the service-owned executor surface)
   - `ServiceStreamingRuntime`
   - `AgenticLoop`
   - orchestrator/factory runtime-intelligence wiring
@@ -133,7 +133,7 @@ Completed on 2026-04-25:
   - `service_provider.py` tool-selector construction path
 - Phase 4.1 clarification-policy normalization:
   - `RuntimeIntelligenceService` now exposes a typed clarification decision
-  - `StreamingChatPipeline` and `AgenticLoop` now consume the same canonical clarification prompt policy
+  - `StreamingChatExecutor` and `AgenticLoop` now consume the same canonical clarification prompt policy
 - Phase 4.2 low-confidence retry-budget normalization:
   - `RuntimeIntelligenceService` now owns the canonical confidence-band and retry-budget policy
   - `AgenticLoop` now delegates both raw confidence fallback and enhanced low-confidence retry gating through the same runtime policy
@@ -142,7 +142,7 @@ Completed on 2026-04-25:
   - `EnhancedCompletionEvaluator` now emits the same canonical confidence vocabulary as the live loop without mutating retry state
 - Phase 5.1 runtime evaluation-policy extraction:
   - Introduced `RuntimeEvaluationPolicy` as the shared threshold/wording object
-  - `PerceptionIntegration`, `RuntimeIntelligenceService`, `StreamingChatPipeline`,
+  - `PerceptionIntegration`, `RuntimeIntelligenceService`, `StreamingChatExecutor`,
     `AgenticLoop`, and `EnhancedCompletionEvaluator` now share one policy model for
     clarification defaults and confidence-band decisions
 - Phase 5.2 calibrated-completion policy consolidation:
