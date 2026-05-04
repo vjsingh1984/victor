@@ -656,6 +656,41 @@ no longer the live internal fallback object created by the orchestrator:
 - ✅ Framework extension modules (extensions, processing, lsp) export all documented symbols
 - **Conclusion:** Subservices removal has zero impact on external packages - they were never allowed to use those modules
 
+## Migration Update: ToolRegistrar Plugin Loading Delegation (2026-05-04)
+
+**Seam consolidated:** Plugin loading logic in ToolRegistrar
+
+**Canonical owner:** PluginLoader component (`victor/agent/plugin_loader.py`)
+
+**Changes applied:**
+
+1. **Refactored ToolRegistrar._load_plugin_tools()** to delegate to PluginLoader
+   - Removed ~40 lines of ToolPluginRegistry management code
+   - Changed to call PluginLoader.load() for plugin lifecycle management
+   - Maintained backward compatibility by storing plugin_manager reference
+   - ToolRegistrar is now a thinner facade coordinating components
+
+2. **Improved SRP compliance**
+   - ToolRegistrar focuses on coordination, not implementation
+   - PluginLoader is the single authority for plugin lifecycle
+   - Clearer separation of concerns between facade and component
+
+3. **All tests pass**
+   - 54 tool_registrar tests pass
+   - Plugin initialization tests verify delegation
+   - Backward compatibility maintained
+
+**Benefits:**
+
+- Cleaner architecture: facade delegates to specialized components
+- Easier to test: plugin loading tested in isolation in PluginLoader
+- Easier to extend: new plugin sources can be added to PluginLoader
+- Reduced complexity in ToolRegistrar
+
+**Breaking changes:** None. Backward compatibility maintained through plugin_manager reference.
+
+**Follow-up item #2** from migration audit: ToolRegistrar plugin-loading abstraction now properly delegates to PluginLoader component.
+
 ## Migration Update: Facade Boundary Guard (2026-05-04)
 
 **Seam consolidated:** Facade behavior ownership across the agent facade layer
@@ -720,14 +755,177 @@ compatibility view over that state, not a second source of truth.
 **Breaking changes:** None. Public compatibility access remains available; the
 change narrows ownership internally.
 
+## Migration Update: Tool And Session Facade Runtime-State Read-Through (2026-05-04)
+
+**Seam consolidated:** Mutable tool/session compatibility state cached in
+facades instead of reflecting the canonical orchestrator runtime.
+
+**Canonical owners:**
+
+- `tool_budget` remains owned by the concrete orchestrator runtime and the
+  canonical tool-service path.
+- session runtime state (`_session_ledger`, `active_session_id`,
+  `_memory_session_id`) remains owned by the concrete orchestrator runtime and
+  the canonical session-service path.
+- `ToolFacade` and `SessionFacade` remain compatibility/grouping views only.
+
+**Changes applied:**
+
+1. Updated `victor/agent/facades/tool_facade.py` so `tool_budget` reads through
+   an injected `runtime_state_host` when present and writes back through the
+   same host via the compatibility setter.
+2. Updated `victor/agent/facades/session_facade.py` so `session_ledger`,
+   `active_session_id`, and `memory_session_id` read through the canonical
+   runtime host and update that host via compatibility setters.
+3. Updated `victor/agent/runtime/bootstrapper.py` to pass the orchestrator as
+   the runtime-state host for both `ToolFacade` and `SessionFacade`.
+4. Added regression coverage proving that materialized tool/session facades
+   reflect later orchestrator state changes instead of holding stale snapshots.
+5. Added repo-level reminders in `AGENTS.md` and `CLAUDE.md` that the target
+   architecture is service-first with selective state-passed seams, and that
+   facades/coordinator shims are compatibility-only.
+
+**Benefits:**
+
+- Removed two more live duplication seams from the facade layer
+- Prevented stale compatibility views after runtime tool/session mutations
+- Kept ownership aligned with the determined service-first target state
+- Added guard-level guidance to reduce future architectural drift
+
+**Breaking changes:** None. Compatibility access remains available; ownership
+is simply narrower and more explicit.
+
+## Migration Update: Chat Facade Runtime-State Read-Through (2026-05-04)
+
+**Seam consolidated:** Mutable chat compatibility state cached in `ChatFacade`
+instead of reflecting the canonical orchestrator runtime.
+
+**Canonical owners:**
+
+- `_system_prompt` remains owned by the concrete orchestrator runtime and the
+  canonical prompt/chat runtime path.
+- `_conversation_embedding_store`, `_context_compactor`, and
+  `_memory_session_id` remain owned by the concrete orchestrator runtime and
+  service-owned runtime collaborators.
+- `ChatFacade` remains a grouping/compatibility view only.
+
+**Changes applied:**
+
+1. Updated `victor/agent/facades/chat_facade.py` so `memory_session_id`,
+   `embedding_store`, `system_prompt`, and `context_compactor` read through an
+   injected `runtime_state_host` when present.
+2. Updated compatibility setters on `ChatFacade` for `embedding_store`,
+   `system_prompt`, and `context_compactor` to write back to that canonical
+   runtime host.
+3. Updated `victor/agent/runtime/bootstrapper.py` to pass the orchestrator as
+   the chat facade's runtime-state host.
+4. Added regression coverage proving that a materialized chat facade reflects
+   later orchestrator prompt/embedding/context/session-id changes instead of
+   holding stale snapshots.
+
+**Benefits:**
+
+- Removed another live duplication seam from the facade layer
+- Prevented stale chat compatibility views after runtime prompt/context changes
+- Kept chat ownership aligned with the determined service-first target state
+- Extended the same explicit runtime-state pattern already applied to provider,
+  tool, and session compatibility facades
+
+**Breaking changes:** None. Compatibility access remains available; ownership
+is simply narrower and more explicit.
+
+## Migration Update: Workflow And Resilience Facade Runtime-State Read-Through (2026-05-04)
+
+**Seam consolidated:** Mutable workflow/resilience compatibility state cached
+in facades instead of reflecting the canonical orchestrator runtime.
+
+**Canonical owners:**
+
+- `_workflow_registry` and `_coordination_advisor` remain owned by the
+  concrete orchestrator runtime and the canonical workflow/service-owned path.
+- `_recovery_handler`, `_recovery_integration`, `_cancel_event`, and
+  `_is_streaming` remain owned by the concrete orchestrator runtime and the
+  canonical recovery/resilience service path.
+- `WorkflowFacade` and `ResilienceFacade` remain grouping/compatibility views
+  only.
+
+**Changes applied:**
+
+1. Updated `victor/agent/facades/workflow_facade.py` so `workflow_registry`
+   and `coordination_advisor` read through an injected `runtime_state_host`
+   when present and write back through compatibility setters.
+2. Updated the deprecated
+   `WorkflowFacade.mode_workflow_team_coordinator` alias to forward through the
+   same canonical advisor path instead of mutating a facade-local snapshot.
+3. Updated `victor/agent/facades/resilience_facade.py` so `recovery_handler`,
+   `recovery_integration`, `cancel_event`, and `is_streaming` read through the
+   canonical runtime host and write back through compatibility setters.
+4. Updated `victor/agent/runtime/bootstrapper.py` to pass the orchestrator as
+   the runtime-state host for both `WorkflowFacade` and `ResilienceFacade`.
+5. Added regression coverage proving that materialized workflow/resilience
+   facades reflect later orchestrator state changes instead of holding stale
+   snapshots.
+
+**Benefits:**
+
+- Removed two more live duplication seams from the facade layer
+- Prevented stale compatibility views after workflow/recovery runtime mutations
+- Kept workflow and resilience ownership aligned with the service-first target
+  state
+- Extended the same explicit runtime-state pattern already applied to provider,
+  tool, session, and chat compatibility facades
+
+**Breaking changes:** None. Compatibility access remains available; ownership
+is simply narrower and more explicit.
+
+## Migration Update: Orchestration Facade Runtime-State Read-Through (2026-05-04)
+
+**Seam consolidated:** Mutable orchestration compatibility state cached in
+`OrchestrationFacade` instead of reflecting the canonical orchestrator runtime.
+
+**Canonical owners:**
+
+- `_chat_stream_adapter`, `_turn_executor`, `_protocol_adapter`,
+  `_iteration_coordinator`, and `_observability` remain owned by the concrete
+  orchestrator runtime.
+- `_runtime_intelligence_integration` and `_subagent_orchestrator` remain
+  orchestrator-owned lazy runtime integrations.
+- deprecated coordinator shim slots remain orchestrator-owned compatibility
+  state, not facade-owned behavior.
+- `OrchestrationFacade` remains a grouping/compatibility view only.
+
+**Changes applied:**
+
+1. Updated `victor/agent/facades/orchestration_facade.py` so live runtime
+   surfaces (`chat_stream_adapter`, `turn_executor`, `protocol_adapter`,
+   `iteration_coordinator`, `observability`,
+   `runtime_intelligence_integration`, and `subagent_orchestrator`) read
+   through an injected `runtime_state_host` when present.
+2. Updated orchestration compatibility setters to write back through that same
+   canonical runtime host instead of mutating facade-local snapshots.
+3. Updated deprecated coordinator shim accessors in `OrchestrationFacade` so
+   materialized facades reflect later orchestrator shim-slot changes and
+   deprecated shim setters update the canonical host state.
+4. Updated `victor/agent/runtime/bootstrapper.py` to pass the orchestrator as
+   the runtime-state host for `OrchestrationFacade`.
+5. Added regression coverage proving that a materialized orchestration facade
+   reflects later orchestrator runtime/shim mutations instead of holding stale
+   copies.
+
+**Benefits:**
+
+- Removed the last major live duplication seam from the facade layer
+- Prevented stale orchestration compatibility views after runtime mutations
+- Kept orchestration ownership aligned with the service-first target state
+- Narrowed facades further toward grouping/compatibility only
+
+**Breaking changes:** None. Compatibility access remains available; ownership
+is simply narrower and more explicit.
+
 ## Follow-up Work
 
-1. Decide whether the remaining bridge-avoidance tests that mention old
-   wrapper names should be renamed for clarity now that the production
-   wrappers are gone.
-2. Decide whether `ToolRegistrar._load_plugin_tools(...)` should remain as a
-   private implementation detail or be refactored further behind a narrower
-   plugin-loading abstraction.
+1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).
+2. ~~**ToolRegistrar plugin-loading abstraction**~~ - **COMPLETED** (2026-05-04): Refactored `_load_plugin_tools()` to delegate to PluginLoader component. Improved SRP compliance by removing ~40 lines of implementation detail. ToolRegistrar is now a thinner facade.
 3. Design the long-term prompt end state now that both the prompt DI path and
    the live fallback surface are canonicalized; the remaining gap is aligning
    `PromptRuntimeProtocol`, `PromptRuntimeSupport`, and `UnifiedPromptPipeline`
