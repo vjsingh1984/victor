@@ -24,14 +24,14 @@ flowchart TB
         API["API Server"]
     end
 
-    subgraph Orchestrator["AGENT ORCHESTRATOR (Facade)"]
-        ORC["AgentOrchestrator"]
+    subgraph Orchestrator["AGENT RUNTIME"]
+        ORC["AgentOrchestrator<br/>(composition root)"]
         CC["ConversationController"]
         TP["ToolPipeline"]
         SC["StreamingController"]
         PM["ProviderManager"]
         TR["ToolRegistrar"]
-        SL["Service Layer<br/>(opt-in via USE_SERVICE_LAYER)"]
+        SL["Canonical Services<br/>(Chat/Tool/Session/Context/Provider/Recovery)"]
     end
 
     subgraph CoreSystems["CORE SYSTEMS"]
@@ -87,8 +87,8 @@ CLI/TUI  -->  Orchestrator  -->  Providers / Tools / Workflows / Verticals
 ```
 
 - **CLI/TUI**: User-facing entry point for chat and workflows
-- **Orchestrator**: Coordinates providers, tools, and workflows; delegates to service layer when `USE_SERVICE_LAYER` flag enabled (Strangler Fig pattern)
-- **Service Layer**: 6 focused services (Chat, Tool, Context, Provider, Recovery, Session) behind feature flags
+- **Orchestrator**: Composition root and runtime boundary; delegates effectful behavior to canonical services and preserves compatibility shims where needed
+- **Services**: 6 canonical services (Chat, Tool, Context, Provider, Recovery, Session) own the live runtime behavior by default
 - **Providers**: Local or cloud LLM backends (24 supported)
 - **Tools**: File ops, git, testing, search, etc. (34 tool modules)
 - **Verticals**: Domain presets (coding, research, devops, data, rag)

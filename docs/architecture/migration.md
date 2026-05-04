@@ -1,8 +1,19 @@
 # Victor Architecture Consolidation Migration Guide
 
+**Status**: Historical consolidation guide with some still-useful framework examples
+**Last Reviewed**: 2026-05-04
+**Authoritative current agent runtime doc**: `docs/architecture/CURRENT_STATE.md`
+
+> Historical note: this guide mixes framework-side `StateGraph` migration
+> examples with older `victor/agent` rollout guidance. Use it for background
+> and selected framework patterns, not as the current source of truth for agent
+> runtime ownership.
+
 ## Overview
 
-Victor has undergone a significant architectural consolidation to unify the framework layer and CLI/chat layer. This guide helps you migrate your code and understand the changes.
+Victor has undergone a significant architectural consolidation across the
+framework and agent runtime layers. This guide captures the original migration
+direction and still-useful examples, but some sections are now historical.
 
 ## What Changed
 
@@ -18,9 +29,9 @@ Victor has undergone a significant architectural consolidation to unify the fram
 
 ### After: Unified Architecture
 
-- **Framework as foundation**: All execution uses StateGraph-based patterns
-- **CLI/Chat as thin surface**: Composes framework components
-- **Service injection**: Services accessed via ExecutionContext
+- **Framework as foundation**: Workflow and team execution increasingly center on `StateGraph`
+- **CLI/Chat runtime as service-first**: `AgentOrchestrator` composes canonical services
+- **Service injection**: `ExecutionContext` remains useful for framework-side graph integrations
 - **Team formations**: 5 formations (SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE, CONSENSUS)
 
 ## Migration Paths
@@ -35,9 +46,9 @@ loop = AgenticLoop(orchestrator)
 result = await loop.run("Write tests")
 ```
 
-**After** (StateGraph-based - now default with feature flag):
+**After** (Optional framework-side `StateGraph` path during parity/benchmark work):
 ```python
-# Enable StateGraph path (opt-in during migration)
+# Enable the framework-side StateGraph path when explicitly validating it
 export VICTOR_USE_STATEGRAPH_AGENTIC_LOOP=true
 
 # Same API - no code changes needed
@@ -66,13 +77,13 @@ result = await exploration_node(state, exploration_coordinator=coordinator)
 
 ### 3. Service Access
 
-**Before** (Direct service access):
+**Current canonical runtime path**:
 ```python
 chat_service = orchestrator.chat_service
 response = await chat_service.chat(message="Hello")
 ```
 
-**After** (Via ExecutionContext):
+**Framework-side graph integration option**:
 ```python
 from victor.framework.agentic_graph.service_nodes import chat_service_node
 
@@ -136,6 +147,13 @@ surfaces. `UnifiedTeamCoordinator` is the primary runtime abstraction.
 
 ## Breaking Changes
 
+### Historical Planning Note
+
+The compatibility and removal targets below reflect the migration plan at the
+time this guide was drafted. Verify current deprecations and ownership against
+`docs/architecture/CURRENT_STATE.md` and the seam-by-seam migration audit
+before using them for new work.
+
 ### None During Migration
 
 All changes are backward compatible. Compatibility aliases remain available
@@ -173,10 +191,12 @@ Expected performance impact:
 
 ## Testing
 
-Run your tests with the new architecture:
+Use this when explicitly validating the framework-side `StateGraph`
+agentic-loop path. It is not required for the default service-first
+`victor/agent` runtime.
 
 ```bash
-# Enable all consolidation features
+# Enable the optional StateGraph path
 export VICTOR_USE_STATEGRAPH_AGENTIC_LOOP=true
 
 # Run tests

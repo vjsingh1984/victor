@@ -1,29 +1,39 @@
 # State-Passed Architecture for Victor Orchestrator
 
-**Status**: Foundation Implemented (P3 - Lower Priority)
-**Date**: 2026-04-14
-**Priority**: P3 (Architecture Improvement)
+**Status**: Active selective pattern within the service-first runtime
+**Last Reviewed**: 2026-05-04
+**Priority**: Apply only where explicit snapshots and transitions improve correctness
 
 ---
 
 ## Overview
 
-The state-passed architecture is a design pattern that decouples coordinators from the orchestrator by using immutable snapshots and explicit state transitions. This addresses the 3,915 LOC orchestrator complexity issue identified in the Gemini feedback.
+The state-passed architecture is a selective design pattern used in Victor for
+decision, policy, and read-heavy seams that benefit from immutable snapshots
+and explicit transitions.
+
+It is not the canonical answer for every runtime concern. Effectful chat, tool,
+provider, session, context, and recovery flows are service-owned. State-passed
+is used where it improves correctness and testability without introducing a
+second parallel runtime layer.
 
 ### Problem Statement
 
-The current `AgentOrchestrator` has several issues:
-1. **High Coupling**: 6+ coordinators hold direct references to the orchestrator
-2. **Stateful Glue**: Orchestrator acts as stateful glue - if lost, all coordinators lose context
-3. **Testing Difficulties**: Coordinators require full orchestrator mocks for testing
-4. **Cognitive Load**: 3,915 LOC makes the orchestrator difficult to understand
+The current `AgentOrchestrator` still has too much composition and
+compatibility logic:
+1. **Large composition root**: `victor/agent/orchestrator.py` is still 4,720 LOC
+2. **Compatibility drag**: Deprecated coordinator shims still exist for some seams
+3. **Testing difficulties**: Some decision-heavy flows are still easier to test via explicit snapshots than host-object reach-through
+4. **Architecture risk**: Without discipline, state-passed and service patterns can become parallel layers instead of complementary ones
 
-### Solution: State-Passed Architecture
+### Solution: Selective State-Passed Architecture
 
-Coordinators become pure functions:
+Use state-passed where the seam is fundamentally about analysis, classification,
+policy, or recommended transitions:
 - **Input**: Immutable `ContextSnapshot` of current state
 - **Output**: `CoordinatorResult` with explicit `StateTransition` objects
-- **No Side Effects**: No direct state mutation during execution
+- **No hidden mutation**: Decisions are explicit and testable
+- **No blanket rewrite**: Effectful runtime flows remain service-owned
 
 ## Current Entry Points
 
@@ -31,13 +41,17 @@ Use the concrete migration surfaces that are already wired into the runtime.
 
 | Need | Preferred surface | Notes |
 |------|-------------------|-------|
-| Chat execution | `ChatService` or `OrchestrationFacade.chat_service` | Service-owned runtime |
-| Tool execution | `ToolService` or `OrchestrationFacade.tool_service` | Service-owned runtime |
-| Session lifecycle | `SessionService` or `OrchestrationFacade.session_service` | Service-owned runtime |
-| Read-only exploration | `victor.agent.coordinators.ExplorationCoordinator` | First-class package-root export |
+| Chat execution | `ChatService` or `OrchestrationFacade.chat_service` | Canonical effectful runtime |
+| Tool execution | `ToolService` or `OrchestrationFacade.tool_service` | Canonical effectful runtime |
+| Session lifecycle | `SessionService` or `OrchestrationFacade.session_service` | Canonical effectful runtime |
+| Context management | `ContextService` or `OrchestrationFacade.context_service` | Canonical effectful runtime |
+| Provider management | `ProviderService` or `OrchestrationFacade.provider_service` | Canonical effectful runtime |
+| Recovery and resilience | `RecoveryService` or `OrchestrationFacade.recovery_service` | Canonical effectful runtime |
+| Read-only exploration helper | `victor.agent.coordinators.ExplorationCoordinator` | Legacy helper for direct exploration calls; use the state-passed wrapper for explicit transitions |
 | State-passed exploration | `victor.agent.coordinators.ExplorationStatePassedCoordinator` | Snapshot/transition wrapper |
 | State-passed system prompt logic | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` | Prefer over direct shim imports |
 | State-passed safety checks | `victor.agent.coordinators.SafetyStatePassedCoordinator` | Prefer over coordinator shim usage |
+| State-passed coordination recommendation | `victor.agent.coordinators.CoordinationStatePassedCoordinator` | Prefer over legacy coordination heuristics |
 
 Deprecated chat shims are compatibility-only. In particular,
 `ChatCoordinator.stream_chat()` now forwards in this order:
@@ -478,19 +492,24 @@ tests/unit/agent/coordinators/
 
 ## Status Summary
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Core Abstractions | ✅ Complete | All components implemented |
-| Example Coordinator | ✅ Complete | Demonstrates the pattern |
-| Unit Tests | ✅ Complete | 34 tests, all passing |
-| Documentation | ✅ Complete | This document |
-| Chat Coordinator | ✅ Complete | Deprecated shim; live path owned by `ChatService` |
-| Sync Chat Coordinator | ✅ Complete | Deprecated shim; live path owned by `ChatService` |
-| Planning Coordinator | ⏳ Pending | Migration not started |
-| Execution Coordinator | ⏳ Pending | Migration not started |
+| Concern | Status | Notes |
+|---------|--------|-------|
+| Core abstractions | ✅ Complete | Context snapshot, transitions, and result types exist |
+| Example coordinator | ✅ Complete | Reference implementation remains useful |
+| Service-owned effectful runtime | ✅ Canonical | Chat, tool, session, context, provider, and recovery stay service-owned |
+| Exploration / system prompt / safety | ✅ Canonical selective seams | State-passed is the preferred pattern here |
+| Coordination recommendation | ✅ Canonical selective seam | `coordination_state_passed.py` |
+| Blanket coordinator rewrites | 🚫 Not the goal | Do not create a second parallel runtime layer |
+| Remaining orchestrator shrink work | ⏳ In progress | `AgentOrchestrator` is still 4,720 LOC |
 
-**Overall Progress**: Foundation complete. Chat and sync chat have already been collapsed into shim-only compatibility layers; future state-passed work should focus on coordinators that still own live behavior.
+**Overall Progress**: State-passed is now an established selective pattern inside
+the broader service-first runtime. Future work should target seams that still
+benefit from explicit transitions, not re-migrate domains already cleanly owned
+by services.
 
 ---
 
-**Next Steps**: Keep chat and sync chat shim-only, continue deleting dead compatibility paths, and use `example_state_passed_coordinator.py` as the reference for coordinators that still need true state-passed migration.
+**Next Steps**: Keep service-owned domains service-owned, continue deleting dead
+compatibility paths, and use `example_state_passed_coordinator.py` as the
+reference when a remaining decision seam genuinely benefits from explicit
+snapshot/transition modeling.

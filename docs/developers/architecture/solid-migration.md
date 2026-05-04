@@ -2,7 +2,9 @@
 
 **Target Audience**: Victor framework contributors and extenders
 **Purpose**: Guide for migrating to and working with the SOLID-refactored architecture
-**Status**: Phases 1-5 Complete, Phase 6 (Service Layer) Complete — Services are now mandatory
+**Status**: Contributor guide for the post-refactor codebase
+**Last Reviewed**: 2026-05-04
+**Current agent runtime ownership**: `docs/architecture/CURRENT_STATE.md`
 
 ## Table of Contents
 
@@ -17,14 +19,16 @@
 
 ### For Users
 
-The refactored architecture is **opt-in via feature flags**. No changes are required to existing code.
+The service-owned runtime is the default architecture. No feature flag is
+required to use `ChatService`, `ToolService`, or the rest of the canonical
+service layer.
 
 ```bash
-# Current architecture (default)
+# Default runtime
 victor chat "Hello, world!"
 
-# New architecture (when flags enabled)
-VICTOR_USE_NEW_CHAT_SERVICE=true victor chat "Hello, world!"
+# Optional framework-side experiment when validating AgenticLoop parity
+VICTOR_USE_STATEGRAPH_AGENTIC_LOOP=true victor chat "Hello, world!"
 ```
 
 ### For Contributors
@@ -256,9 +260,9 @@ facade = OrchestrationFacade(
 
 ## Migration Patterns
 
-### Pattern 1: Gradual Feature Migration
+### Pattern 1: Service-First Delegation
 
-**Scenario**: Migrate an existing feature to use new services
+**Scenario**: Migrate an existing feature to the canonical service surface
 
 ```python
 # Old implementation
@@ -267,20 +271,15 @@ class AgentOrchestrator:
         # Direct implementation
         return await self._chat_coordinator.chat(message)
 
-# New implementation (feature flag controlled)
+# Current implementation (service-first)
 class AgentOrchestrator:
     def __init__(self, ...):
-        # Get feature flag manager
-        self._feature_flags = get_feature_flag_manager()
-
-        # Initialize new services if flag enabled
-        if self._feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-            self._new_chat_service = self._container.get(ChatServiceProtocol)
+        self._chat_service = self._container.get_optional(ChatServiceProtocol)
 
     async def chat(self, message: str):
-        if self._feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-            return await self._new_chat_service.chat(message)
-        return await self._chat_coordinator.chat(message)
+        if self._chat_service is not None:
+            return await self._chat_service.chat(message)
+        return await self._chat_coordinator.chat(message)  # compatibility-only fallback
 ```
 
 ### Pattern 2: Extending Without Modification
@@ -356,36 +355,30 @@ agent = Agent(assistant=MyVertical)
 
 ## Testing
 
-### Testing with Feature Flags
+### Testing Canonical and Experimental Paths
 
 ```python
 import pytest
 from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
-def test_with_old_implementation():
-    """Test with old implementation (default)."""
-    manager = get_feature_flag_manager()
-    manager.disable(FeatureFlag.USE_NEW_CHAT_SERVICE)
-
-    # Test old implementation
+def test_default_service_owned_runtime():
+    """Test the default service-owned runtime path."""
     response = await orchestrator.chat("test")
     assert response.content
 
-def test_with_new_implementation():
-    """Test with new implementation."""
+def test_with_stategraph_agentic_loop_enabled():
+    """Enable the remaining framework-side experiment explicitly."""
     manager = get_feature_flag_manager()
-    manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+    manager.enable(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
 
-    # Test new implementation
+    # Test the framework-side experimental path
     response = await orchestrator.chat("test")
     assert response.content
+    manager.disable(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
 
-@pytest.mark.parametrize("use_new_service", [True, False])
-def test_both_implementations(use_new_service):
-    """Test both implementations parametrized."""
-    manager = get_feature_flag_manager()
-    manager.set_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE, use_new_service)
-
+@pytest.mark.parametrize("service_present", [True, False])
+def test_service_and_compatibility_paths(service_present):
+    """Test canonical service and compatibility fallback where both still exist."""
     response = await orchestrator.chat("test")
     assert response.content
 ```
@@ -455,14 +448,17 @@ def test_vertical_composition():
 
 **Symptom**: `ServiceNotRegisteredError` when trying to get a service
 
-**Solution**: Check if feature flag is enabled and dependencies are available
+**Solution**: Verify bootstrap/container registration and resolve the canonical
+protocol from the bootstrapped container
 
 ```python
-from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+from victor.core.bootstrap import ensure_bootstrapped
+from victor.agent.services.protocols import ChatServiceProtocol
 
-manager = get_feature_flag_manager()
-if not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-    print("ChatService not enabled - enable feature flag first")
+container = ensure_bootstrapped(settings)
+chat_service = container.get_optional(ChatServiceProtocol)
+if chat_service is None:
+    print("ChatService is not registered - check bootstrap wiring")
 ```
 
 ### Issue: Custom Strategy Not Working
@@ -499,9 +495,10 @@ MyVertical = (
 )
 ```
 
-### Issue: Feature Flag Not Taking Effect
+### Issue: Runtime Experiment Flag Not Taking Effect
 
-**Symptom**: Feature flag enabled but old code still running
+**Symptom**: `VICTOR_USE_STATEGRAPH_AGENTIC_LOOP=true` is set but the framework
+path you expected is not active
 
 **Solution**: Check flag loading order
 
@@ -512,13 +509,16 @@ MyVertical = (
 # 3. Runtime overrides
 
 # Check flag state
-from victor.core.feature_flags import get_feature_flag_manager
+from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
 manager = get_feature_flag_manager()
-print(f"Flag enabled: {manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)}")
+print(
+    "Flag enabled:",
+    manager.is_enabled(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP),
+)
 
 # Enable explicitly
-manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+manager.enable(FeatureFlag.USE_STATEGRAPH_AGENTIC_LOOP)
 ```
 
 ## Best Practices
@@ -533,16 +533,18 @@ def process_chat(service: ChatServiceProtocol, message: str):
     return await service.chat(message)
 ```
 
-### 2. Check Feature Flags Before Using New Services
+### 2. Do Not Reintroduce Service-Gating Flags
 
 ```python
-from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+from victor.core.bootstrap import ensure_bootstrapped
+from victor.agent.services.protocols import ToolServiceProtocol
 
 def use_tool_service():
-    manager = get_feature_flag_manager()
-    if not manager.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE):
-        raise RuntimeError("ToolService feature flag not enabled")
-    # Proceed with ToolService
+    container = ensure_bootstrapped(settings)
+    tool_service = container.get_optional(ToolServiceProtocol)
+    if tool_service is None:
+        raise RuntimeError("ToolService is not registered")
+    return tool_service
 ```
 
 ### 3. Provide Fallbacks for Optional Dependencies
@@ -559,33 +561,30 @@ class MyService:
 ### 4. Write Tests for Both Old and New Implementations
 
 ```python
-# Test both implementations to ensure compatibility
-@pytest.mark.parametrize("use_new", [True, False])
-def test_feature_parity(use_new):
-    # Ensure old and new produce same results
+# Test canonical and compatibility paths only where compatibility still exists
+@pytest.mark.parametrize("service_present", [True, False])
+def test_chat_delegation_parity(service_present):
+    # Ensure canonical service and compatibility fallback stay aligned
     pass
 ```
 
 ## Rollback
 
-If you encounter issues with the new architecture:
+If you encounter issues with the framework-side experimental path:
 
-1. **Disable specific flags**:
+1. **Disable the remaining experiment flag**:
    ```bash
-   export VICTOR_USE_NEW_CHAT_SERVICE=false
+   export VICTOR_USE_STATEGRAPH_AGENTIC_LOOP=false
    ```
 
-2. **Disable all new architecture**:
+2. **Clear runtime overrides**:
    ```bash
-   # Unset all flags
-   unset VICTOR_USE_NEW_CHAT_SERVICE
-   unset VICTOR_USE_NEW_TOOL_SERVICE
-   # ... etc
+   unset VICTOR_USE_STATEGRAPH_AGENTIC_LOOP
    ```
 
-3. **Remove YAML config**:
+3. **For service-owned runtime issues, fix bootstrap or registration rather than toggling removed service flags**:
    ```bash
-   rm ~/.victor/features.yaml
+   python -m pytest tests/unit/agent/services/test_service_layer_validation.py
    ```
 
 ## Support

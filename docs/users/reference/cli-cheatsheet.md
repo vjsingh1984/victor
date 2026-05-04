@@ -296,7 +296,7 @@ export VICTOR_TOOL_BUDGET=50
 
 # Features
 export VICTOR_AIRGAPPED=true
-export VICTOR_USE_SERVICE_LAYER=true
+# Service-owned runtime is the default architecture; no service-layer flag is required.
 ```
 
 ## Cheat Sheet

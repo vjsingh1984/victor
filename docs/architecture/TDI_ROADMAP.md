@@ -1,7 +1,13 @@
 # Victor TDI Roadmap — Technical Debt & Implementation Items
 
 **Last Updated**: 2026-04-14 (**37/37 items DONE** — TDI roadmap COMPLETE)
+**Status**: Historical roadmap snapshot
+**Authoritative current runtime doc**: `docs/architecture/CURRENT_STATE.md`
 **Strategy**: Foundational/critical first, high impact + low effort, layered TDD
+
+> Historical note: this tracker is preserved as an implementation audit trail.
+> It is not the source of truth for current agent runtime ownership, active
+> migration priorities, or remaining seams.
 
 ---
 
@@ -54,7 +60,9 @@
 | SPA-3 | Migrate SystemPromptCoordinator to state-passed | LOW | Medium | Improves testability | DONE (system_prompt_state_passed.py + 13 tests) |
 | SPA-4 | Migrate SafetyCoordinator to state-passed | LOW | Medium | Same | DONE (safety_state_passed.py + 9 tests) |
 
-**Note**: ChatCoordinator uses excellent protocol-based design — no migration needed.
+**Historical note**: This roadmap predates later service-first cleanup work.
+Chat runtime ownership is now canonical in `ChatService`; coordinator references
+here should be read as historical migration context.
 
 ### Category 5: Global State Elimination (ARCHITECTURAL)
 
@@ -133,7 +141,7 @@ SVC-1 → SVC-2                    (Performance + integration validation)
   │
   ├── TDD: test_service_layer_performance.py — latency within 5%
   ├── TDD: test_service_layer_integration.py — feature parity
-  └── Regression: full test suite with USE_SERVICE_LAYER=true
+  └── Regression: full test suite validating the canonical service-first path
   │
 SVC-3 → SVC-4 → SVC-5            (Extend delegation to remaining services)
   │

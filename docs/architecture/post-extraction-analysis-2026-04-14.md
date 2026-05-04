@@ -3,6 +3,23 @@
 **Date**: 2026-04-14
 **Scope**: Core framework (victor-ai) + SDK (victor-sdk) + 6 external verticals
 **Method**: Static analysis of source code across all repos
+**Status**: Historical analysis snapshot
+**Authoritative current runtime doc**: `docs/architecture/CURRENT_STATE.md`
+
+## Update (2026-05-04)
+
+This document is preserved as a historical architecture analysis, not a
+current-state description.
+
+Since this snapshot:
+- `AgentOrchestrator` has continued to change and is now 4,720 LOC
+- the `USE_SERVICE_LAYER` rollout story became obsolete for `victor/agent`
+- provider ownership was consolidated further around `ProviderService`
+- the parallel `victor/agent/services/chat/*` and `tools/*` subservice trees
+  were removed on 2026-05-01
+
+Treat the detailed counts and migration phases below as dated evidence from
+2026-04-14, not as the current architecture contract.
 
 ---
 

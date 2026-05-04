@@ -1,258 +1,128 @@
-# Victor Architecture — Current State & Active Initiatives
+# Victor Agent Runtime — Current State
 
-**Last Updated**: 2026-04-15
-**Supersedes**: `post-extraction-analysis.md` (Mar 7), `post-extraction-architecture-review-2026-03-16.md` (Mar 16), `post-extraction-analysis-2026-04-10.md` (Apr 10), `victor-post-extraction-analysis.md` (Apr 14)
+**Last Updated**: 2026-05-04
 
-## Recent Changes (2026-04-15)
+**Scope**: This is the authoritative current-state document for the
+`victor/agent` runtime architecture. Historical ADRs, migration guides, and
+seam-by-seam audits remain useful for context, but they should not be treated
+as the steady-state design.
 
-### Conversation Consolidation
-- Unified `conversation/` package with 9 modules: types, scoring, controller, store, state_machine, assembler + 3 SOLID modules
-- Single canonical `score_messages()` with `STORE_WEIGHTS` and `CONTROLLER_WEIGHTS` presets
-- ML metadata extracted to `victor/agent/ml_metadata.py`
-- All 120+ import sites updated to canonical paths
+## Executive Summary
 
-### MCP Ecosystem
-- **MCPAdapterTool** (Adapter Pattern): projects MCP tools as first-class `BaseTool` instances — LLM sees `github_search` not `mcp(name=...)`
-- **MCPToolProjector** (Factory Pattern): batch-creates adapters with name collision handling and relevance filtering
-- **McpStepHandler** (order=12): verticals declare MCP dependencies via `McpProvider` protocol, auto-provisioned in pipeline
-- **MCPConnector._flatten_mcp_tools()**: registers adapter tools after server connection
+- The runtime is service-first. The canonical effectful surfaces are
+  `ChatService`, `ToolService`, `SessionService`, `ContextService`,
+  `ProviderService`, and `RecoveryService`.
+- `AgentOrchestrator` remains the composition root, session boundary, and
+  compatibility hotspot. It is still large at 4,720 LOC and should continue to
+  shrink.
+- State-passed is a selective architectural pattern, not a blanket rewrite
+  mandate. It is canonical for read-heavy, policy, and decision seams such as
+  exploration, safety, system-prompt classification, and coordination
+  recommendation.
+- Facades remain as grouping and compatibility surfaces. They must not become
+  behavior-owning layers.
+- The parallel `victor/agent/services/chat/*` and
+  `victor/agent/services/tools/*` trees were removed on 2026-05-01. The only
+  canonical owners in those domains are `chat_service.py` and
+  `tool_service.py`.
+- Deprecated coordinator/property accessors still exist in a few places as
+  explicit compatibility shims. Internal production code should not expand
+  those seams.
 
-### Framework Interop
-- **LangChainAdapterTool**: wraps any LangChain `BaseTool` as Victor `BaseTool` — `pip install victor-ai[langchain]`
-- **LangChainToolProjector**: batch creation with collision handling
-- Pydantic v1/v2 schema conversion, async bridging via `ainvoke()`
+## Verified Runtime Shape (2026-05-04)
 
-### Contract Hardening
-- **CompatibilityStepHandler** (order=1): validates vertical compatibility FIRST in pipeline
-- **VerticalCompatibilityError**: clear exception replacing silent degradation on version mismatch
-- PEP 440 version checking via `VerticalCompatibilityGate`
-
-### Core Decoupling (Phase 0 Complete)
-- Removed hardcoded "coding" default from `DEFAULT_VERTICAL`, RL schema, `import_resolver`
-- Marketplace uses entry-point discovery (`victor.marketplace` group) with fallback list
-- `coding_support.py` renamed to `capability_loader.py` (SRP)
-- Plugin discovery: `ToolRegistry` uses `UnifiedEntryPointRegistry` (eliminates redundant scans)
-
-### Tiered Tool Schema Broadcasting
-- `ToolDefinition.schema_level`: FULL/COMPACT/STUB metadata (excluded from provider serialization)
-- `tool_to_definition()` factory using `BaseTool.to_schema(level)` truncation
-- `select_tiered()`: mandatory→FULL, vertical_core→COMPACT, semantic_pool→STUB
-- Tier-aware ordering in `_sort_tools_for_kv_stability()`: stable FULL+COMPACT prefix, dynamic STUB suffix
-- Smart `cache_control` placement at stable/dynamic boundary in Anthropic provider
-- MCP/LangChain adapters default to STUB
-- **Token savings**: 48 tools 6000→2590 tokens (57%), 100 tools 65% reduction
-
-### Thinking/Reasoning Pipeline
-- **Claude extended thinking**: Anthropic provider now parses `ThinkingBlock` (type="thinking") in both chat and streaming paths
-- Streaming thinking deltas (`thinking_delta`) yielded as `StreamChunk` with `metadata["reasoning_content"]`
-- Existing dual-mode rendering pipeline handles both API-based (DeepSeek) and inline markers (`<think>`) seamlessly
-- CI: fixed 3 thinking mode test failures (mock response structure)
-
-### CI/CD
-- Python 3.13 added to ci-test.yml and version-matrix.yml
-- version-matrix.yml expanded: 3.10, 3.11, 3.12, 3.13 (was 3.11, 3.12)
-- Guard tests: plugin discovery perf (AST-based), tree_sitter capability pattern (5 tests)
-
----
-
-## System Architecture
-
-```
-User Code
-  │  agent = Agent.create(vertical="coding")
-  │  result = await agent.run("fix the bug")
-  ▼
-victor-ai (Framework Core)
-  ├── Agent (1,090 LOC) → Orchestrator (3,519 LOC) → 8 Domain Facades
-  ├── Runtime Layer
-  │   ├── ComponentAssembler (tools→conv→intelligence)
-  │   ├── AgentRuntimeBootstrapper (facades→lifecycle)
-  │   └── OrchestratorFactory (mixin builders)
-  ├── CapabilityRegistry (stub/enhance pattern)
-  ├── VerticalLoader (entry point discovery, cached)
-  └── EventSystem (async + backpressure)
-      ▼
-victor-sdk (Contract Layer — zero framework dependencies)
-  ├── VerticalBase (ABC) │ ProtocolRegistry │ Discovery API
-      ▼  entry_points["victor.plugins"]
-External Verticals
-  ├── victor-coding │ victor-research │ victor-devops
-  ├── victor-invest │ victor-rag      │ victor-dataanalysis
+```text
+Agent / Public API
+  -> AgentOrchestrator
+     - composition root
+     - lifecycle + session boundary
+     - compatibility hotspot
+     - not the canonical owner of business logic
+       ->
+       OrchestrationFacade
+         - service access
+         - deprecated coordinator shims
+       Canonical Services
+         - ChatService
+         - ToolService
+         - SessionService
+         - ContextService
+         - ProviderService
+         - RecoveryService
+       Selective State-Passed Boundaries
+         - ExplorationStatePassedCoordinator
+         - SystemPromptStatePassedCoordinator
+         - SafetyStatePassedCoordinator
+         - CoordinationStatePassedCoordinator
 ```
 
-### Vertical Loading Sequence
+## Canonical Ownership
 
-```
-1. Agent.create(vertical="coding")
-2. → VerticalLoader.discover_verticals()          [entry_points scan, cached]
-3. → VerticalLoader.load("coding")                [dynamic import]
-4. → VerticalRuntimeAdapter.create(CodingVertical) [SDK→runtime bridge]
-5. → _negotiate_manifest()                        [version + capability check]
-6. → VerticalIntegrationPipeline                  [inject tools/prompts/middleware]
-7. → CapabilityRegistry.register()                [enhanced providers replace stubs]
-8. → Agent ready
-```
+| Concern | Canonical owner | Notes |
+|---------|-----------------|-------|
+| Chat execution | `victor.agent.services.chat_service.ChatService` | Service-owned runtime |
+| Tool execution | `victor.agent.services.tool_service.ToolService` | Service-owned runtime |
+| Session lifecycle | `victor.agent.services.session_service.SessionService` | Service-owned runtime |
+| Context management | `victor.agent.services.context_service.ContextService` | Service-owned runtime |
+| Provider management | `victor.agent.services.provider_service.ProviderService` via `provider_management_runtime.py` | Provider runtime no longer owns provider coordinators |
+| Recovery and resilience | `victor.agent.services.recovery_service.RecoveryService` | Service-owned runtime |
+| Exploration decisions | `victor.agent.coordinators.ExplorationStatePassedCoordinator` | Selective state-passed seam |
+| System-prompt / task classification | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` | Selective state-passed seam |
+| Safety checks | `victor.agent.coordinators.SafetyStatePassedCoordinator` | Selective state-passed seam |
+| Coordination recommendation | `victor.agent.coordinators.CoordinationStatePassedCoordinator` | Selective state-passed seam |
 
-### Runtime Assembly
+## Compatibility and Historical Surfaces
 
-```
-OrchestratorFactory
-  → ComponentAssembler.assemble_tools()         [cache/graph/registry/executor/selector]
-  → ComponentAssembler.assemble_conversation()  [controller/ledger/pipeline/streaming]
-  → ComponentAssembler.assemble_intelligence()  [RL/compactor/analytics/resilience]
-  → AgentRuntimeBootstrapper.prepare_components() [checkpoint/workflow/vertical context]
-  → AgentRuntimeBootstrapper.finalize()          [8 facades/lifecycle/protocol assert]
-```
+- `victor/agent/facades/` is a grouping and property-access layer. It is not a
+  canonical behavior layer.
+- `victor/agent/coordinators/` is a mixed package. Treat the state-passed
+  modules as live architecture. Treat most remaining files there as
+  compatibility seams, examples, protocols, or historical helpers unless
+  verified otherwise.
+- Provider compatibility remains explicit. `provider_runtime.py` no longer owns
+  `provider_coordinator` or `provider_switch_coordinator`; deprecated accessors
+  now materialize compatibility shims on demand.
+- The older `USE_SERVICE_LAYER` rollout story is obsolete for the agent
+  runtime. The remaining major runtime feature flag in this area is
+  `USE_STATEGRAPH_AGENTIC_LOOP`, which belongs to the framework-side agentic
+  loop path rather than service ownership in `victor/agent`.
 
----
+## State-Passed Role
 
-## Coordinator Decoupling (Current State)
+- Use state-passed when immutable snapshots and explicit transitions improve
+  correctness, debuggability, and unit-test isolation.
+- Keep effectful runtime operations service-owned. Chat, tool, provider,
+  session, context, and recovery flows should not be rewritten into a second
+  parallel abstraction layer.
+- Do not move logic from the orchestrator into facades just to claim
+  decomposition.
+- Do not treat every legacy coordinator as a mandatory state-passed migration
+  candidate. If a seam is already cleanly owned by a service, keep it there.
 
-Victor has THREE complementary patterns for coordinator design:
+## Active Migration Priorities
 
-| Pattern | Used By | Best For |
-|---------|---------|----------|
-| **Dependency Injection** | ToolCoordinator, MetricsCoordinator, ExplorationCoordinator | Simple coordinators with clear deps |
-| **Protocol-Based** | ChatCoordinator (via ChatOrchestratorProtocol + 3 sub-protocols) | Complex coordinators needing many orchestrator capabilities |
-| **State-Passed** | ExampleStatePassedCoordinator (foundation) | New coordinators, high testability, pure functions |
+1. Continue shrinking `AgentOrchestrator` toward composition, lifecycle, and
+   compatibility only.
+2. Demote remaining facades to grouping-only and compatibility-only roles.
+3. Retire remaining internal dependencies on deprecated coordinator shims.
+4. Preserve the distinction between live runtime state
+   (`victor/agent/services/state_runtime.py`) and persisted vertical/project
+   state (`victor/agent/state_service.py`).
+5. Keep teams as formations on `StateGraph`; do not create a separate
+   multi-agent graph abstraction.
 
-All existing coordinators are already well-decoupled. State-passed is an additional pattern for new development.
+## Explicit Non-Goals
 
----
+- Reintroducing nested `services/chat/*` or `services/tools/*` trees
+- Moving business logic into facades
+- Creating a second first-class service hierarchy for the same concern
+- Treating teams as a distinct graph runtime instead of `StateGraph` formations
 
-## SDK Boundary
+## Historical References
 
-**Rule**: SDK MUST NOT import from `victor/` (framework). Verticals MUST only import from `victor-sdk`.
-
-### Current Violations (from Apr 10 analysis)
-
-| Vertical | Violation | Impact |
-|----------|-----------|--------|
-| victor-coding | `from victor.core.protocols import OrchestratorProtocol` | Core refactors break vertical |
-| victor-research | `from victor.core.tool_dependency_loader import ...` | Same |
-| victor-devops | `from victor.core.protocols import OrchestratorProtocol` | Same |
-| victor-invest | `from victor.core.verticals.base import VerticalRegistry` | Same |
-| victor-rag | `from victor.core.verticals.base import StageDefinition, VerticalBase` | Same + depends on victor-ai (not just SDK) |
-| victor-dataanalysis | `from victor.core.verticals.protocols import ...` | Same + depends on victor-ai |
-
-**Core→Vertical Violations**: 11 files in core import from `victor_coding` (extension_loader, coding_support, indexer, vertical_integration_adapter).
-
-### Enforcement
-
-- `scripts/check_imports.py` — layer rule: `config/ ← providers/ ← tools/ ← agent/ ← ui/`
-- `tests/unit/sdk/test_contrib_import_boundaries.py` — contrib directory guard
-- `tests/unit/sdk/test_sdk_contract_shapes.py` — SDK contract stability
-- `make test-definition-boundaries` — SDK import boundary validation
-
----
-
-## Service Layer (Strangler Fig Migration)
-
-**Feature Flag**: `USE_SERVICE_LAYER`
-
-### Status
-
-| Phase | Status | Details |
-|-------|--------|---------|
-| Foundation | COMPLETE | Services created/registered in DI container by default |
-| Delegation | COMPLETE | 16 delegation points: 4 chat + 5 tool + 3 session + 2 context + 2 provider |
-| Service Resolution | COMPLETE | All 6 services resolved: Chat, Tool, Session, Context, Provider, Recovery |
-| Validation | PENDING | Performance benchmarking (<5% impact), integration testing |
-| Optimization | FUTURE | Remove coordinator fallback paths, achieve 2,000 LOC target |
-
-### Delegation Pattern
-
-```python
-async def chat(self, user_message: str) -> CompletionResponse:
-    if self._use_service_layer and self._chat_service:
-        return await self._chat_service.chat(user_message)
-    return await self._chat_coordinator.chat(user_message)
-```
-
-### Service-to-Coordinator Mapping
-
-| Service | Coordinator(s) | Status |
-|---------|----------------|--------|
-| ChatService | ChatCoordinator (via adapter) | Delegating (3 methods) |
-| ToolService | ToolCoordinator | Delegating (5 methods) |
-| SessionService | SessionCoordinator | Delegating (4 methods) |
-| ContextService | ContextCompactor | Delegating (2 methods) |
-| ProviderService | ProviderCoordinator | Delegating (2 methods) |
-| RecoveryService | RecoveryController | Resolved, delegation pending |
-
----
-
-## Plugin-Based Tool Registration (COMPLETE)
-
-SDK protocols for dynamic tool registration:
-
-- **`ToolFactory`** — Lazy tool creation protocol
-- **`ToolFactoryAdapter`** — Converts factories/instances to VictorPlugin
-- **`ToolPluginHelper`** — Convenience: `from_instances()`, `from_factories()`, `from_module()`
-- **ToolRegistry** gained `register_plugin()`, `discover_plugins()` methods
-
-All 5 aligned external verticals use `VictorPlugin` from SDK. `victor-invest` still missing plugin registration.
-
----
-
-## External Vertical SDK Alignment
-
-| Package | VictorPlugin | SDK-Only Imports | Import Violations |
-|---------|-------------|------------------|-------------------|
-| victor-coding | YES | NO (uses victor.core) | OrchestratorProtocol |
-| victor-devops | YES | NO (uses victor.core) | OrchestratorProtocol |
-| victor-research | YES | NO (uses victor.core) | tool_dependency_loader |
-| victor-rag | YES | NO (depends on victor-ai) | StageDefinition, VerticalBase |
-| victor-dataanalysis | YES | NO (depends on victor-ai) | verticals.protocols |
-| victor-invest | NO (missing plugin.py) | N/A | VerticalRegistry |
-
----
-
-## Key Metrics
-
-| Metric | Current | Target |
-|--------|---------|--------|
-| Orchestrator LOC | 3,519-3,973 | <2,000 |
-| SDK import violations (verticals) | 6/6 verticals (external repos) | 0 |
-| Core→vertical imports | **0** (was 11 files) | 0 |
-| Hardcoded vertical configs in core | **0** (was 5 dicts) | 0 |
-| Service delegation points | **16/16** (was 12) | 16+ |
-| Services resolved in orchestrator | **6/6** (was 4) | 6 |
-| ExecutionContext | **Wired** (orchestrator + cleanup hooks) | Pass to all components |
-| Global state guard | **Capped** (get_global_manager: state/ + runtime/ only) | Eliminate |
-| Container singleton guard | **Capped** (25 non-infra calls) | Reduce via DI |
-| Singleton guard | **Capped** (68 files) | Reduce incrementally |
-| Cache registry | **Unified** (CacheRegistry with category invalidation) | All caches registered |
-| Trace context | **Implemented** (contextvars propagation) | Wire into vertical loader |
-| State-passed coordinators | **3** (Exploration, SystemPrompt, Safety) | Incremental |
-| TDI completion | **37/37 COMPLETE** | All done |
-
----
-
-## Scoring
-
-### Decoupling Assessment
-
-| Dimension | Score | Evidence |
-|-----------|-------|----------|
-| Package Separation | 9/10 | All 6 verticals in separate repos |
-| Logic Isolation | 5/10 | Hardcoded config dicts in 5+ core files |
-| Protocol Maturity | 8/10 | ISP-compliant focused protocols |
-| Inversion of Control | 6/10 | Core→vertical and vertical→core imports |
-| SDK Boundary | 6/10 | Defined but violated by all 6 verticals |
-| Failure Isolation | 9/10 | Nested try/except, graceful degradation |
-| **Overall** | **7.2/10** | Good structure; contract enforcement is the gap |
-
-### Competitive Positioning
-
-| Dimension (Weight) | Victor | LangGraph | CrewAI | LangChain | AutoGen |
-|-------------------|--------|-----------|--------|-----------|---------|
-| Orchestration (0.20) | 9 | 10 | 7 | 6 | 8 |
-| Extensibility (0.20) | 9 | 7 | 6 | 8 | 7 |
-| Multi-Agent (0.15) | 8 | 9 | 10 | 5 | 10 |
-| Tooling (0.15) | 10 | 8 | 7 | 9 | 7 |
-| Dev Experience (0.15) | 9 | 8 | 9 | 5 | 6 |
-| Production (0.15) | 7 | 9 | 8 | 7 | 6 |
-| **Weighted** | **8.7** | **8.7** | **7.7** | **6.8** | **7.5** |
-
-**Victor's edge**: Vertical SDK plugin system + native Rust hot paths + 34 tool modules. Tied with LangGraph; stronger on extensibility, weaker on production cloud story.
+- `docs/architecture/adr/001-agent-orchestration.md`: original
+  coordinator-centric ADR, now historical
+- `docs/architecture/state-passed-architecture.md`: reference for the selective
+  state-passed pattern
+- `docs/development/agent-facade-service-migration-audit-2026-04-26.md`:
+  seam-by-seam migration evidence
