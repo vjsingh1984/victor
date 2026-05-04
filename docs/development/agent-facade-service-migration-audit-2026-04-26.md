@@ -512,6 +512,214 @@ no longer the live internal fallback object created by the orchestrator:
 - coordinator factory helpers that intentionally preserve public compat access
 - compatibility tests that assert those shims still import and behave the same
 
+## Migration Update: Provider Coordinators Removal (2026-05-01)
+
+**Seam consolidated:** Both ProviderCoordinator and ProviderSwitchCoordinator lazy instantiation
+
+**Canonical owner:** ProviderService (`victor/agent/services/provider_service.py`)
+
+**Changes applied:**
+
+1. **Removed both coordinators from ProviderRuntimeComponents** (`victor/agent/runtime/provider_runtime.py`)
+   - Deleted `provider_coordinator` field from `ProviderRuntimeComponents` dataclass
+   - Deleted `provider_switch_coordinator` field from `ProviderRuntimeComponents` dataclass
+   - Removed `_build_provider_coordinator()` factory function
+   - Removed `_build_provider_switch_coordinator()` factory function
+   - Removed `get_provider_service` parameter from `create_provider_runtime_components()`
+   - Added migration notes to module docstring
+
+2. **Updated orchestrator initialization** (`victor/agent/orchestrator.py`)
+   - Removed `get_provider_service=lambda: getattr(self, "_provider_service", None)` parameter
+   - Updated `_initialize_provider_runtime()` docstring with migration note
+   - Simplified runtime initialization call
+
+3. **Updated tests** (`tests/unit/agent/test_provider_runtime.py`)
+   - Replaced `test_create_provider_runtime_components_provider_coordinator_lazy` with `test_create_provider_runtime_components_provider_coordinator_removed`
+   - Replaced `test_create_provider_runtime_components_switch_coordinator_lazy` with `test_create_provider_runtime_components_switch_coordinator_removed`
+   - Tests now verify both coordinators are NOT in runtime components
+
+4. **Updated lazy initialization tests** (`tests/unit/agent/test_runtime_lazy_init.py`)
+   - Modified `test_provider_runtime_components_are_lazy` to reflect that only pool remains
+
+5. **Enhanced import-boundary guard tests** (`tests/unit/agent/test_provider_coordinator_import_guard.py`)
+   - AST-based test to prevent new internal imports of both coordinators
+   - Scans the full `victor/` tree, not just `victor/agent/`
+   - Excludes only exact compatibility surfaces (`provider/__init__.py`, coordinator definitions, deprecated accessors)
+   - Verifies provider_runtime no longer creates either coordinator
+
+6. **Restored deprecated accessor semantics without re-expanding provider_runtime**
+   - `ProviderFacade.provider_coordinator` / `provider_switch_coordinator` now lazily materialize explicit compatibility shims when the runtime boundary no longer owns those fields
+   - `AgentOrchestrator._provider_coordinator` / `_provider_switch_coordinator` now do the same through deprecated override slots
+   - compatibility shims bind back to `ProviderService` where applicable, so canonical runtime ownership stays service-first
+
+7. **Updated initialization contract**
+   - `InitializationPhaseManager` now reports `provider_runtime` as the created component for the provider runtime phase
+   - stale references to `provider_coordinator` / `provider_switch_coordinator` as phase outputs were removed
+
+**What remains:**
+
+- **ProviderCoordinator class** (`victor/agent/provider/coordinator.py`) - Kept as external compatibility surface
+- **ProviderSwitchCoordinator class** (`victor/agent/provider/switch_coordinator.py`) - Kept as external compatibility surface
+- **External package compatibility** - Not validated in this batch
+
+**Benefits:**
+
+- Eliminated dead code (both coordinators were never used internally)
+- Clearer ownership: ProviderService is the single authority for all provider operations
+- Guard tests prevent regression
+- Significantly reduced complexity in provider_runtime.py
+- Simplified orchestrator initialization
+
+**Breaking changes:** None for canonical provider runtime flows. Deprecated provider accessors remain available as explicit compatibility shims, but they are no longer owned by `ProviderRuntimeComponents`.
+
+## Migration Update: Chat/Tool Subservices Removal (2026-05-01)
+
+**Seam consolidated:** Parallel subservice architectures under `victor/agent/services/chat/*` and `victor/agent/services/tools/*`
+
+**Canonical owners:** ChatService (`victor/agent/services/chat_service.py`) and ToolService (`victor/agent/services/tool_service.py`)
+
+**Changes applied:**
+
+1. **Removed chat subservices** (`victor/agent/services/chat/`)
+   - Deleted `__init__.py` (43 LOC)
+   - Deleted `ChatFlowService` via `chat_flow_service.py` (410 LOC)
+   - Deleted `StreamingService` via `streaming_service.py` (275 LOC)
+   - Deleted `ContinuationService` via `continuation_service.py` (252 LOC)
+   - Deleted `ResponseAggregationService` via `response_aggregation_service.py` (255 LOC)
+   - Deleted `protocols.py` (229 LOC)
+   - Deleted `chat_service_facade.py` (27 LOC)
+   - Total: 1,491 LOC removed
+
+2. **Removed tools subservices** (`victor/agent/services/tools/`)
+   - Deleted `__init__.py` (55 LOC)
+   - Deleted `ToolSelectorService` via `tool_selector_service.py` (305 LOC)
+   - Deleted `ToolExecutorService` via `tool_executor_service.py` (339 LOC)
+   - Deleted `ToolTrackerService` via `tool_tracker_service.py` (260 LOC)
+   - Deleted `ToolPlannerService` via `tool_planner_service.py` (337 LOC)
+   - Deleted `ToolResultProcessor` via `tool_result_processor.py` (301 LOC)
+   - Deleted `protocols.py` (329 LOC)
+   - Deleted `tool_service_facade.py` (27 LOC)
+   - Total: 1,953 LOC removed
+
+3. **Created import-boundary guard test** (`tests/unit/agent/test_subservices_import_guard.py`)
+   - AST-based test to prevent new internal imports of removed subservices
+   - Scans production code across `victor/`
+   - Rejects exact package imports, submodule imports, and `from victor.agent.services import chat/tools` patterns
+   - Allows canonical imports (`chat_service.py`, `tool_service.py`)
+   - NOTE: Does not allow `protocols` imports (those modules were deleted)
+
+4. **Removed test files for deleted subservices**
+   - Deleted `tests/unit/agent/services/chat/test_decomposed_services.py` (442 LOC)
+   - Deleted `tests/unit/agent/services/tools/test_decomposed_tools.py` (481 LOC)
+   - All 629 services tests passing
+
+**Why these were unused:**
+
+- Subservices were only referenced in their own package `__init__.py` files for re-export
+- Only instantiated in docstring examples
+- Never used in production code
+- Created confusion about canonical ownership (parallel vs. canonical architecture)
+
+**What was deleted:**
+
+- All files under `victor/agent/services/chat/` directory (complete removal)
+- All files under `victor/agent/services/tools/` directory (complete removal)
+- Test files: `tests/unit/agent/services/chat/test_decomposed_services.py` (442 LOC)
+- Test files: `tests/unit/agent/services/tools/test_decomposed_tools.py` (481 LOC)
+- Total deleted: 3,444 LOC from subservices + 923 LOC from tests = 4,367 LOC
+
+**What remains:**
+
+- **ChatService** (`victor/agent/services/chat_service.py`) - Canonical chat service
+- **ToolService** (`victor/agent/services/tool_service.py`) - Canonical tool service
+
+**Benefits:**
+
+- Eliminated 4,367 LOC of completely unused code (subservices + tests)
+- Clearer ownership: Single canonical service for each domain
+- No parallel architecture confusion
+- Guard tests prevent regression
+- Simplified package structure
+
+**Breaking changes:**
+- `import victor.agent.services.chat` now raises `ModuleNotFoundError` (package directory deleted)
+- `import victor.agent.services.tools` now raises `ModuleNotFoundError` (package directory deleted)
+- The removed subservices were never used in production code, so no production code needs updating
+- All existing production code uses the canonical ChatService and ToolService
+- **External packages are NOT affected** - External verticals are already forbidden from importing from `victor.agent.*` by the import boundary guard test (`test_external_vertical_import_boundaries.py`)
+
+**External package compatibility validation (2026-05-04):**
+- ✅ All external vertical import boundary tests pass (13/13)
+- ✅ External verticals (victor-coding, victor-research, victor-invest) verified to not import from `victor.agent.*`
+- ✅ External verticals only import from allowed public APIs: `victor.framework.*`, `victor.tools.*`, `victor_sdk.*`
+- ✅ No KNOWN_VIOLATIONS baseline entries needed
+- ✅ Framework extension modules (extensions, processing, lsp) export all documented symbols
+- **Conclusion:** Subservices removal has zero impact on external packages - they were never allowed to use those modules
+
+## Migration Update: Facade Boundary Guard (2026-05-04)
+
+**Seam consolidated:** Facade behavior ownership across the agent facade layer
+
+**Canonical owners:** Runtime behavior remains service-owned
+(`ChatService`, `ToolService`, `SessionService`, `ContextService`,
+`ProviderService`, `RecoveryService`) or state-passed where explicitly
+modeled. Facades are grouping and compatibility surfaces only.
+
+**Changes applied:**
+
+1. Updated facade module/package docstrings to state the intended boundary
+   directly: property access, grouping, and compatibility only.
+2. Added AST guard test
+   (`tests/unit/agent/facades/test_facade_boundary_guard.py`) that prevents the
+   facade layer from growing new behavior-owning methods.
+3. Verified the current facade shape:
+   - `ChatFacade`: constructor + property accessors only
+   - `ToolFacade`: constructor + property accessors only
+   - `OrchestrationFacade`: property accessors plus deprecated compatibility
+     warnings/lazy shim materialization only
+   - `ProviderFacade`: property accessors plus explicit private compatibility
+     shim materialization helpers only
+   - `SessionFacade`, `WorkflowFacade`, `ResilienceFacade`, `MetricsFacade`:
+     constructor + property accessors only, with deprecation warnings only
+     where compatibility aliases remain
+
+**Breaking changes:** None. This batch adds guardrails and documentation only.
+
+## Migration Update: Provider Facade State Read-Through (2026-05-04)
+
+**Seam consolidated:** Mutable provider configuration cached in both the
+orchestrator runtime and `ProviderFacade`
+
+**Canonical owner:** The concrete orchestrator runtime remains the canonical
+owner for mutable provider state (`provider`, `model`, `provider_name`,
+`temperature`, `max_tokens`, `thinking`). `ProviderFacade` is now an explicit
+compatibility view over that state, not a second source of truth.
+
+**Changes applied:**
+
+1. Updated `victor/agent/facades/provider_facade.py` so provider-config
+   properties read through to an injected `runtime_state_host` when present.
+2. Updated compatibility setters on `ProviderFacade` to write through to the
+   same canonical runtime host while preserving local fallback values for tests
+   and isolated construction.
+3. Updated `victor/agent/runtime/bootstrapper.py` to pass the orchestrator as
+   the provider facade's `runtime_state_host`.
+4. Added regression coverage proving that:
+   - a materialized provider facade reflects later orchestrator provider-state
+     changes
+   - compatibility setters update the canonical runtime host instead of only
+     mutating facade-local copies
+
+**Benefits:**
+
+- Removed a live duplication seam for provider configuration
+- Prevented stale facade snapshots after runtime provider/model changes
+- Kept `ProviderFacade` aligned with its intended compatibility-only role
+- Added TDD coverage around the canonical ownership boundary
+
+**Breaking changes:** None. Public compatibility access remains available; the
+change narrows ownership internally.
+
 ## Follow-up Work
 
 1. Decide whether the remaining bridge-avoidance tests that mention old
@@ -527,6 +735,8 @@ no longer the live internal fallback object created by the orchestrator:
 4. Decide whether `StateCoordinator` should eventually be retired into pure
    `ConversationController` ownership or replaced by a narrower state-passed
    boundary for conversation-stage transitions.
-5. Keep future migration reporting evidence-based: exact counts, exact files,
-   and explicit distinction between canonical services and compatibility
-   wrappers.
+5. ~~**External package compatibility validation**~~ - **COMPLETED**: Verified external verticals (victor-coding, victor-research, victor-invest) do not import from removed subservices (13/13 tests pass, zero impact on external packages)
+6. **Provider coordinator cleanup** - Consider removing coordinator classes entirely in a future breaking release
+7. ~~**Chat/tool subservices removal**~~ - **COMPLETED**: Eliminated parallel architecture (4,367 LOC unused code: 3,444 from subservices + 923 from tests)
+8. Keep future migration reporting evidence-based: exact counts, exact files,
+   and explicit distinction between canonical services and compatibility wrappers.
