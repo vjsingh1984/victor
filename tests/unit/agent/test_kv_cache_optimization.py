@@ -107,24 +107,50 @@ class TestSystemPromptFreezing:
 
     def test_kv_provider_freezes_prompt_after_first_build(self):
         """System prompt frozen after first build when kv_optimization=True."""
+        from unittest.mock import MagicMock, PropertyMock
         from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
-        orch = MagicMock(spec=AgentOrchestrator)
-        type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
-        type(orch)._cache_optimization_enabled = PropertyMock(return_value=False)
-        orch._system_prompt_frozen = False
-        orch.prompt_builder = MagicMock()
-        orch.prompt_builder.build.return_value = "system prompt"
-        orch.project_context = MagicMock()
-        orch.project_context.content = None
-        orch.conversation = MagicMock()
-        orch.conversation._system_added = False
+        # Create a mock orchestrator with all required attributes
+        orch_host = MagicMock(spec=AgentOrchestrator)
+        type(orch_host)._kv_optimization_enabled = PropertyMock(return_value=True)
+        type(orch_host)._cache_optimization_enabled = PropertyMock(return_value=False)
+        orch_host._system_prompt_frozen = False
+        orch_host._system_prompt = ""
+        orch_host._prompt_pipeline = None  # No pipeline, so is_frozen will check _system_prompt_frozen
 
-        # Call the real method
-        AgentOrchestrator.update_system_prompt_for_query(orch, query_classification=None)
+        # Mock prompt_builder
+        orch_host.prompt_builder = MagicMock()
+        orch_host.prompt_builder.build.return_value = "system prompt"
+        orch_host.prompt_builder.query_classification = None
+
+        # Mock project context
+        orch_host.project_context = MagicMock()
+        orch_host.project_context.content = None
+
+        # Mock conversation
+        orch_host.conversation = MagicMock()
+        orch_host.conversation._system_added = False
+        orch_host.conversation.system_prompt = ""
+        orch_host.conversation._messages = []
+
+        # Mock build_system_prompt
+        orch_host.build_system_prompt = MagicMock(return_value="system prompt")
+
+        # Create PromptBuilderRuntime with the mock host
+        protocol_adapter = OrchestratorProtocolAdapter(orch_host)
+        runtime = PromptBuilderRuntime(protocol_adapter)
+
+        # Add _get_prompt_builder_runtime to the mock orchestrator
+        orch_host._get_prompt_builder_runtime = MagicMock(return_value=runtime)
+        orch_host._prompt_builder_runtime = runtime
+
+        # Call the real method on the orchestrator
+        AgentOrchestrator.update_system_prompt_for_query(orch_host, query_classification=None)
 
         # Prompt should be frozen now
-        assert orch._system_prompt_frozen is True
+        assert orch_host._system_prompt_frozen is True
 
     def test_kv_provider_skips_rebuild_on_second_query(self):
         """update_system_prompt_for_query() is no-op after freeze."""
@@ -145,23 +171,37 @@ class TestSystemPromptFreezing:
 
     def test_update_system_prompt_for_query_prefers_canonical_builder(self):
         """Positive-path prompt rebuild uses build_system_prompt, not the legacy wrapper."""
+        from unittest.mock import MagicMock, PropertyMock
         from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 
-        orch = MagicMock(spec=AgentOrchestrator)
-        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
-        type(orch)._cache_optimization_enabled = PropertyMock(return_value=False)
-        orch._system_prompt_frozen = False
-        orch.prompt_builder = MagicMock()
-        orch.build_system_prompt = MagicMock(return_value="canonical prompt")
-        orch.project_context = None
-        orch.conversation = MagicMock()
-        orch.conversation._system_added = False
-        orch.conversation._messages = []
+        orch_host = MagicMock(spec=AgentOrchestrator)
+        type(orch_host)._kv_optimization_enabled = PropertyMock(return_value=False)
+        type(orch_host)._cache_optimization_enabled = PropertyMock(return_value=False)
+        orch_host._system_prompt_frozen = False
+        orch_host._system_prompt = ""
+        orch_host._prompt_pipeline = None
+        orch_host.prompt_builder = MagicMock()
+        orch_host.build_system_prompt = MagicMock(return_value="canonical prompt")
+        orch_host.project_context = None
+        orch_host.conversation = MagicMock()
+        orch_host.conversation._system_added = False
+        orch_host.conversation.system_prompt = ""
+        orch_host.conversation._messages = []
 
-        AgentOrchestrator.update_system_prompt_for_query(orch, query_classification=None)
+        # Create PromptBuilderRuntime with the mock host
+        protocol_adapter = OrchestratorProtocolAdapter(orch_host)
+        runtime = PromptBuilderRuntime(protocol_adapter)
 
-        orch.build_system_prompt.assert_called_once_with()
-        assert orch._system_prompt == "canonical prompt"
+        # Add _get_prompt_builder_runtime to the mock orchestrator
+        orch_host._get_prompt_builder_runtime = MagicMock(return_value=runtime)
+        orch_host._prompt_builder_runtime = runtime
+
+        AgentOrchestrator.update_system_prompt_for_query(orch_host, query_classification=None)
+
+        orch_host.build_system_prompt.assert_called_once_with()
+        assert orch_host._system_prompt == "canonical prompt"
 
 
 # =====================================================================

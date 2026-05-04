@@ -252,6 +252,49 @@ class TestOrchestratorPropertyInstallation:
         ):
             assert orchestrator._provider_switch_coordinator is shim
 
+    def test_provider_coordinator_alias_materializes_compat_shim_when_runtime_has_no_handle(self):
+        """The legacy alias should still materialize a compatibility shim on real runtimes."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        orchestrator._provider_runtime = SimpleNamespace()
+        orchestrator._provider_manager = MagicMock(name="provider_manager")
+        orchestrator._provider_manager._provider_switcher = MagicMock(name="provider_switcher")
+        orchestrator._provider_manager._health_monitor = MagicMock(name="health_monitor")
+        orchestrator._provider_service = MagicMock(name="provider_service")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._provider_coordinator is deprecated compatibility surface",
+        ):
+            result = orchestrator._provider_coordinator
+
+        assert result is not None
+        assert orchestrator._deprecated_provider_coordinator is result
+        assert result._provider_service is orchestrator._provider_service
+
+    def test_provider_switch_alias_materializes_compat_shim_when_runtime_has_no_handle(self):
+        """The legacy alias should still materialize a switch compatibility shim."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        orchestrator._provider_runtime = SimpleNamespace()
+        orchestrator._provider_manager = MagicMock(name="provider_manager")
+        orchestrator._provider_manager._provider_switcher = MagicMock(name="provider_switcher")
+        orchestrator._provider_manager._health_monitor = MagicMock(name="health_monitor")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator._provider_switch_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            result = orchestrator._provider_switch_coordinator
+
+        assert result is not None
+        assert orchestrator._deprecated_provider_switch_coordinator is result
+
     @pytest.mark.parametrize(
         ("property_name", "backing_attr", "facade_attr", "facade_value_attr"),
         [

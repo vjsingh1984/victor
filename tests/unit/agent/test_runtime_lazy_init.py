@@ -234,20 +234,13 @@ class TestRuntimeLazyInitialization:
                 assert provider_runtime is not None, "provider_runtime should exist"
 
                 # Check that components are NOT initialized (lazy)
-                provider_coordinator = getattr(provider_runtime, "provider_coordinator", None)
-                provider_switch_coordinator = getattr(
-                    provider_runtime, "provider_switch_coordinator", None
-                )
-
-                for component_name, component in [
-                    ("provider_coordinator", provider_coordinator),
-                    ("provider_switch_coordinator", provider_switch_coordinator),
-                ]:
-                    assert component is not None, f"{component_name} should exist"
-                    initialized = getattr(component, "initialized", False)
-                    assert (
-                        not initialized
-                    ), f"{component_name} should NOT be initialized after Agent.create()"
+                # Migration Note (2026-05-01): Both coordinators removed from runtime components
+                # ProviderCoordinator and ProviderSwitchCoordinator are now external-only
+                # Only provider pool remains (optional)
+                pool = getattr(provider_runtime, "pool", None)
+                if pool is not None:
+                    # Pool may or may not exist depending on feature flags
+                    assert hasattr(pool, "initialized") or pool is None
 
             finally:
                 await agent.close()
