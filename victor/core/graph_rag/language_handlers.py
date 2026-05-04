@@ -251,6 +251,20 @@ def _get_victor_coding_handler(language: str) -> Optional[LanguageEdgeHandler]:
     This provides the proper seam: victor-ai core discovers and uses
     victor_coding language plugins for edge detection.
 
+    ARCHITECTURAL VIOLATION (tracked):
+    This function imports directly from victor_coding (external vertical),
+    which violates the principle that core should not import from external
+    verticals. This is tracked in tests/unit/sdk/test_core_vertical_import_boundaries.py.
+
+    TODO: Migrate to entry point registration
+    Migration path:
+    1. Move LanguageEdgeHandler protocol to victor.framework.extensions
+    2. Add entry point registration in victor-coding's pyproject.toml:
+       [project.entry-points."victor.edge_handlers"]
+       python = "victor_coding.edge_handlers:PythonEdgeHandler"
+    3. Update core to discover plugins via importlib.metadata.entry_points()
+    4. Remove direct imports from victor_coding
+
     Args:
         language: Language identifier
 
