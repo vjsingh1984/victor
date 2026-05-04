@@ -92,8 +92,38 @@ class TestAgentRuntimeBootstrapper:
 
         kwargs = facade_cls.call_args.kwargs
         assert kwargs["provider_runtime"] is orch._provider_runtime
+        assert kwargs["provider_service"] is getattr(orch, "_provider_service", None)
+        assert kwargs["runtime_state_host"] is orch
         assert "provider_coordinator" not in kwargs
         assert "provider_switch_coordinator" not in kwargs
+
+    def test_provider_facade_tracks_current_orchestrator_state_after_materialization(self):
+        orch = self._make_mock_orchestrator()
+        orch.provider = sentinel.initial_provider
+        orch.model = "initial-model"
+        orch.provider_name = "initial-provider"
+        orch.temperature = 0.3
+        orch.max_tokens = 1024
+        orch.thinking = True
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        provider_facade = orch._provider_facade
+        assert provider_facade.model == "initial-model"
+
+        orch.provider = sentinel.updated_provider
+        orch.model = "updated-model"
+        orch.provider_name = "updated-provider"
+        orch.temperature = 0.8
+        orch.max_tokens = 4096
+        orch.thinking = False
+
+        assert provider_facade.provider is sentinel.updated_provider
+        assert provider_facade.model == "updated-model"
+        assert provider_facade.provider_name == "updated-provider"
+        assert provider_facade.temperature == 0.8
+        assert provider_facade.max_tokens == 4096
+        assert provider_facade.thinking is False
 
     def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(self):
         orch = self._make_mock_orchestrator()
