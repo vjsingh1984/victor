@@ -459,20 +459,23 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return calculate_max_context_chars(settings, provider, model)
 
     def _initialize_provider_runtime(self) -> None:
-        """Initialize provider runtime boundaries with canonical service and legacy coordinator."""
+        """Initialize provider runtime boundaries with canonical service.
+
+        Migration Note (2026-05-01):
+        - ProviderCoordinator removed from runtime components (unused internally)
+        - ProviderService is the canonical owner for provider operations
+        """
         from victor.agent.runtime.provider_runtime import (
             create_provider_runtime_components,
         )
         from victor.agent.services.provider_service import ProviderService
 
-        # [CANONICAL] Initialize state-passed provider service first so the lazy
-        # factory can bind it when the coordinator is first accessed.
+        # [CANONICAL] ProviderService is the single authority for provider operations
         self._provider_service = ProviderService(registry=ProviderRegistry)
 
         self._provider_runtime = create_provider_runtime_components(
             settings=self.settings,
             provider_manager=self._provider_manager,
-            get_provider_service=lambda: getattr(self, "_provider_service", None),
         )
 
     def _initialize_memory_runtime(self) -> None:

@@ -77,7 +77,7 @@ class InitializationPhaseManager:
         """Run all initialization phases in dependency order.
 
         Phase order:
-        1. provider_runtime — lazy provider coordinator loading (CRITICAL)
+        1. provider_runtime — canonical provider runtime boundary and optional pool (CRITICAL)
         2. metrics_runtime — metrics collectors and coordinators
         3. workflow_runtime — lazy workflow registry
         4. memory_runtime — memory manager and embedding store
@@ -97,7 +97,7 @@ class InitializationPhaseManager:
             (
                 "provider_runtime",
                 orchestrator._initialize_provider_runtime,
-                ["provider_coordinator", "provider_switch_coordinator"],
+                ["provider_runtime"],
                 True,  # critical
                 [],  # dependencies
             ),

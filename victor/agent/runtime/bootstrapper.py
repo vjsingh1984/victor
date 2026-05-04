@@ -96,8 +96,10 @@ class AgentRuntimeBootstrapper:
                 temperature=orchestrator.temperature,
                 max_tokens=orchestrator.max_tokens,
                 thinking=orchestrator.thinking,
+                runtime_state_host=orchestrator,
                 provider_manager=orchestrator._provider_manager,
                 provider_runtime=orchestrator._provider_runtime,
+                provider_service=getattr(orchestrator, "_provider_service", None),
             ),
             name="provider_facade",
         )
