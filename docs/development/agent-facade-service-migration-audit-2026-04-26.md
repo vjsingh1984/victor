@@ -922,14 +922,138 @@ is simply narrower and more explicit.
 **Breaking changes:** None. Compatibility access remains available; ownership
 is simply narrower and more explicit.
 
+## Migration Update: Stage-Transition Runtime Relocated To Services (2026-05-04)
+
+**Seam consolidated:** Active stage-transition batching runtime lived under
+`victor/agent/coordinators/` even though it is effectful runtime behavior, not
+one of the selective state-passed policy seams.
+
+**Canonical owners:**
+
+- `victor.agent.services.stage_transition_runtime.StageTransitionCoordinator`
+  is now the canonical runtime owner for batched conversation-stage
+  transitions.
+- `victor.agent.services.stage_transition_strategies` is now the canonical
+  home for the stage-transition strategy implementations.
+- `victor.agent.coordinators.stage_transition_coordinator` and
+  `victor.agent.coordinators.transition_strategies` remain compatibility
+  re-export modules only.
+
+**Changes applied:**
+
+1. Added canonical service-owned modules:
+   - `victor/agent/services/stage_transition_runtime.py`
+   - `victor/agent/services/stage_transition_strategies.py`
+2. Reduced the legacy coordinator modules to thin compatibility re-exports.
+3. Updated `victor/agent/runtime/component_assembler.py` so the feature-flagged
+   production runtime imports the canonical service-owned stage-transition
+   implementation rather than importing from `victor.agent.coordinators`.
+4. Exported the canonical stage-transition runtime surfaces from
+   `victor.agent.services`.
+5. Added an AST-based guard test preventing new internal production imports of
+   stage-transition runtime helpers from coordinator paths.
+
+**Benefits:**
+
+- Removed another active runtime ownership seam from `victor/agent/coordinators`
+- Kept effectful runtime behavior aligned with the service-first target state
+- Preserved old coordinator import paths as explicit compatibility-only shims
+- Added regression guardrails against future drift back to coordinator-owned
+  runtime behavior
+
+**Breaking changes:** None. Legacy coordinator module imports continue to work
+as compatibility re-export paths.
+
+## Migration Update: CoordinatorFactory Demoted To Explicit SDK Compatibility (2026-05-04)
+
+**Seam consolidated:** `CoordinatorFactory` still presented conversation and
+safety coordinator creation as if those were active `victor/agent` runtime
+surfaces, even though the repo already treats them as SDK-owned compatibility
+or extension contracts.
+
+**Canonical owners:**
+
+- `create_safety_state_passed_coordinator()` remains the canonical
+  `victor/agent` runtime path for safety policy evaluation.
+- `victor_sdk.safety.SafetyCoordinator` remains the SDK-owned extension
+  contract for external safety extensions.
+- `victor_sdk.conversation.ConversationCoordinator` remains the SDK-owned
+  extension contract for conversation-oriented helpers.
+- `CoordinatorFactory.create_safety_coordinator()` and
+  `CoordinatorFactory.create_conversation_coordinator()` now exist only as
+  deprecated compatibility helpers.
+
+**Changes applied:**
+
+1. Updated `victor/agent/coordinators/coordinator_factory.py` so the legacy
+   safety and conversation factory methods instantiate the SDK coordinator
+   classes directly instead of importing removed local modules.
+2. Added explicit `DeprecationWarning` messages that direct agent-runtime code
+   toward the canonical state-passed safety path and direct extension code
+   toward `victor_sdk`.
+3. Removed dead DI adapter plumbing from those compatibility methods.
+4. Added regression coverage proving those methods return SDK surfaces and that
+   `CoordinatorFactory` no longer imports the removed local coordinator
+   modules.
+
+**Benefits:**
+
+- Fixed two broken legacy factory methods that referenced non-existent local
+  coordinator modules
+- Made the compatibility boundary explicit instead of leaving a fake ownership
+  story in place
+- Reduced dead protocol-adapter plumbing in `CoordinatorFactory`
+- Added guardrails against drift back to local coordinator ownership for
+  SDK-based seams
+
+**Breaking changes:** None for working call sites. The factory methods remain
+available, but they now warn explicitly and behave as thin SDK compatibility
+helpers.
+
+## Migration Update: Coordinator Package SDK Re-exports Marked Compatibility-Only (2026-05-04)
+
+**Seam consolidated:** `victor.agent.coordinators` still exposed SDK-owned
+safety and conversation symbols silently, which made it easy for internal code
+to keep treating them like active `victor/agent` runtime architecture.
+
+**Canonical owners:**
+
+- `victor_sdk.safety.*` is the canonical import surface for SDK-owned safety
+  types.
+- `victor_sdk.conversation.*` is the canonical import surface for SDK-owned
+  conversation types.
+- `victor.agent.coordinators.SafetyStatePassedCoordinator` remains the
+  canonical agent-runtime safety wrapper.
+- `victor.agent.coordinators.*` exports for SDK-owned safety/conversation types
+  now exist only as deprecated compatibility shims.
+
+**Changes applied:**
+
+1. Updated `victor/agent/coordinators/__init__.py` to warn explicitly when
+   callers resolve SDK-owned safety or conversation exports through
+   `victor.agent.coordinators`.
+2. Added regression coverage proving the compatibility exports still resolve to
+   the same SDK types while warning.
+3. Added an AST-based import-boundary guard to prevent internal production code
+   from importing SDK-owned safety/conversation symbols through
+   `victor.agent.coordinators`.
+
+**Benefits:**
+
+- Made the coordinator package compatibility boundary explicit at access time
+- Preserved backward compatibility for existing import paths that still need to
+  resolve
+- Added guardrails against new internal drift toward the wrong package-level
+  ownership surface
+
+**Breaking changes:** None. Compatibility exports still resolve, but they now
+emit `DeprecationWarning` and point callers to the canonical SDK packages.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).
 2. ~~**ToolRegistrar plugin-loading abstraction**~~ - **COMPLETED** (2026-05-04): Refactored `_load_plugin_tools()` to delegate to PluginLoader component. Improved SRP compliance by removing ~40 lines of implementation detail. ToolRegistrar is now a thinner facade.
-3. Design the long-term prompt end state now that both the prompt DI path and
-   the live fallback surface are canonicalized; the remaining gap is aligning
-   `PromptRuntimeProtocol`, `PromptRuntimeSupport`, and `UnifiedPromptPipeline`
-   around clearly separated responsibilities.
+3. ~~**Design long-term prompt end state**~~ - **DESIGNED** (2026-05-04): Created comprehensive design proposal for aligning PromptRuntimeProtocol, PromptRuntimeSupport, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md` for detailed proposal. Key recommendation: UnifiedPromptPipeline as single authority, PromptRuntimeAdapter as thin protocol wrapper, remove PromptRuntimeSupport.
 4. Decide whether `StateCoordinator` should eventually be retired into pure
    `ConversationController` ownership or replaced by a narrower state-passed
    boundary for conversation-stage transitions.
