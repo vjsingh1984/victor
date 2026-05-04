@@ -29,7 +29,7 @@ Verification notes:
 | `victor/agent/services/session_compat.py` | 34,112 | `SessionService` |
 | `victor/agent/services/chat_compat.py` | 20,548 | `ChatService` |
 | `victor/agent/services/prompt_compat.py` | 16,398 | `PromptRuntimeAdapter` for `PromptRuntimeProtocol`; `UnifiedPromptPipeline` for orchestrator-owned live prompt assembly |
-| `victor/agent/services/state_compat.py` | 14,294 | `ConversationController` + `ConversationStateMachine` for live state; `victor.agent.state_service.StateService` for persisted vertical state only |
+| `victor/agent/services/state_compat.py` | 14,294 | Historical shim removed; canonical live state is `StateRuntimeAdapter` over `ConversationController` + `ConversationStateMachine`, while `victor.agent.state_service.StateService` remains persisted vertical state only |
 | `victor/agent/services/streaming_chat_compat.py` | 11,165 | `ChatService.stream_chat()` / service-owned streaming runtime |
 | `victor/agent/services/sync_chat_compat.py` | 10,964 | `ChatService` |
 | `victor/agent/services/unified_chat_compat.py` | 7,724 | `ChatService` |
@@ -45,8 +45,9 @@ Verification notes:
 - `StateService` persists vertical state to storage and is not a drop-in
   replacement for conversation-stage coordination
 - `StateRuntimeProtocol` now resolves through a canonical
-  `StateRuntimeAdapter` in DI; the deprecated `StateCoordinator` shim remains
-  importable for public compatibility only
+  `StateRuntimeAdapter` in DI; no concrete `StateCoordinator` shim remains in
+  the repo, and only the deprecated `StateCoordinatorProtocol` alias remains
+  for compatibility
 
 ### Prompt surfaces
 
@@ -436,12 +437,10 @@ Applied migration steps:
 
 ### Remaining state compatibility after this slice
 
-The public compatibility shim remains intentionally available, but it is no
-longer the canonical live runtime implementation behind DI:
-
-- `victor/agent/services/state_compat.py`: deprecated public shim
-- `victor/agent/state_coordinator.py`: deprecated import path shim
-- compatibility tests that assert those shims still import and warn correctly
+The concrete state shims have since been removed. The remaining compatibility
+surface is now limited to deprecated protocol aliases, primarily
+`StateCoordinatorProtocol`, while the canonical live runtime remains
+`StateRuntimeAdapter` over conversation-owned state.
 
 ## TDD Update: Canonical Prompt Runtime DI Surface
 
@@ -1049,16 +1048,54 @@ to keep treating them like active `victor/agent` runtime architecture.
 **Breaking changes:** None. Compatibility exports still resolve, but they now
 emit `DeprecationWarning` and point callers to the canonical SDK packages.
 
+## Migration Update: State Runtime Compatibility Story Corrected (2026-05-04)
+
+**Seam consolidated:** The runtime had already moved to
+`StateRuntimeAdapter` over `ConversationController`, but the migration audit
+and a few migration-focused tests still described deleted concrete state shims
+as if they remained available.
+
+**Canonical owners:**
+
+- `victor.agent.services.state_runtime.StateRuntimeAdapter` is the canonical
+  live conversation-stage runtime adapter.
+- `victor.agent.conversation.controller.ConversationController` and
+  `victor.agent.conversation.state_machine.ConversationStateMachine` own the
+  underlying live conversation state.
+- `victor.agent.state_service.StateService` remains the persisted vertical
+  state surface.
+- `victor.agent.protocols.StateCoordinatorProtocol` remains only as a
+  deprecated protocol alias; there is no concrete `StateCoordinator` module.
+
+**Changes applied:**
+
+1. Corrected the migration audit and current-state docs to say the concrete
+   `state_compat.py` and `state_coordinator.py` shims are gone.
+2. Added regression coverage proving those deleted modules remain absent and
+   cannot be re-imported by internal production code.
+3. Updated migration-focused test language so it no longer implies a concrete
+   `StateCoordinator` class still exists.
+
+**Benefits:**
+
+- Removed a stale architecture claim from the canonical migration evidence
+- Made the actual state-runtime end state explicit: conversation-owned live
+  state with a service-owned adapter, not a lingering coordinator shim
+- Added guardrails against accidentally reintroducing deleted state shim
+  modules
+
+**Breaking changes:** None. The concrete state shims were already absent; this
+batch aligns docs and guardrails with the actual repo state.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).
 2. ~~**ToolRegistrar plugin-loading abstraction**~~ - **COMPLETED** (2026-05-04): Refactored `_load_plugin_tools()` to delegate to PluginLoader component. Improved SRP compliance by removing ~40 lines of implementation detail. ToolRegistrar is now a thinner facade.
 3. ~~**Design long-term prompt end state**~~ - **DESIGNED** (2026-05-04): Created comprehensive design proposal for aligning PromptRuntimeProtocol, PromptRuntimeSupport, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md` for detailed proposal. Key recommendation: UnifiedPromptPipeline as single authority, PromptRuntimeAdapter as thin protocol wrapper, remove PromptRuntimeSupport.
-4. Decide whether `StateCoordinator` should eventually be retired into pure
-   `ConversationController` ownership or replaced by a narrower state-passed
-   boundary for conversation-stage transitions.
+4. ~~**StateCoordinator retirement**~~ - **COMPLETED** (2026-05-04): Already retired to ConversationController ownership. See `docs/development/state-coordinator-retirement-analysis.md` for details. StateCoordinator class removed, only protocol alias remains for type checking. ConversationController + ConversationStateMachine + StateRuntimeAdapter provide canonical functionality.
+   Note: StateRuntimeProtocol already uses StateRuntimeAdapter; protocol definition is service-native and does not alias StateCoordinatorProtocol.
 5. ~~**External package compatibility validation**~~ - **COMPLETED**: Verified external verticals (victor-coding, victor-research, victor-invest) do not import from removed subservices (13/13 tests pass, zero impact on external packages)
-6. **Provider coordinator cleanup** - Consider removing coordinator classes entirely in a future breaking release
+6. ~~**Provider coordinator cleanup**~~ - **DECIDED** (2026-05-04): Remove in breaking release v1.0.0. See `docs/development/provider-coordinator-cleanup-proposal.md` for details. External packages do NOT use ProviderCoordinator or ProviderSwitchCoordinator. Safe to remove 1,184 LOC of dead code. ProviderService is canonical authority.
 7. ~~**Chat/tool subservices removal**~~ - **COMPLETED**: Eliminated parallel architecture (4,367 LOC unused code: 3,444 from subservices + 923 from tests)
 8. Keep future migration reporting evidence-based: exact counts, exact files,
    and explicit distinction between canonical services and compatibility wrappers.
