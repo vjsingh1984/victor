@@ -605,49 +605,22 @@ class ToolRegistrar:
             logger.warning(f"Failed to load tool configurations: {e}")
 
     def _load_plugin_tools(self) -> int:
-        """Discover, load, and register plugin tools.
+        """Discover, load, and register plugin tools using PluginLoader component.
+
+        Delegates to PluginLoader for plugin management (SRP compliance).
 
         Returns:
             Number of plugin tools registered
         """
         try:
-            from victor.tools.plugin_registry import ToolPluginRegistry
-            from victor.config.settings import get_project_paths
+            plugin_loader = self._get_plugin_loader()
+            result = plugin_loader.load()
 
-            # Use centralized path for plugins directory
-            plugin_dirs = [get_project_paths().global_plugins_dir]
-            plugin_dirs.extend(self.config.plugin_dirs)
+            # Store plugin_manager for backward compatibility
+            # TODO: Remove self.plugin_manager attribute once callers migrate to PluginLoader
+            self.plugin_manager = plugin_loader._plugin_manager
 
-            plugin_config = getattr(self.settings, "plugin_config", {})
-
-            self.plugin_manager = ToolPluginRegistry(
-                plugin_dirs=plugin_dirs,
-                config=plugin_config,
-            )
-
-            # Disable specified plugins
-            for plugin_name in self.config.disabled_plugins:
-                self.plugin_manager.disable_plugin(plugin_name)
-
-            # Discover and load plugins from directories
-            loaded_count = self.plugin_manager.discover_and_load()
-
-            # Load plugins from packages
-            for package_name in self.config.plugin_packages:
-                plugin = self.plugin_manager.load_plugin_from_package(package_name)
-                if plugin:
-                    self.plugin_manager.register_plugin(plugin)
-
-            # Register plugin tools
-            tool_count = 0
-            if loaded_count > 0 or self.plugin_manager.loaded_plugins:
-                tool_count = self.plugin_manager.register_tools(self.tools)
-                logger.info(
-                    f"Plugins loaded: {len(self.plugin_manager.loaded_plugins)} plugins, "
-                    f"{tool_count} tools"
-                )
-
-            return tool_count
+            return result.tools_registered
 
         except Exception as e:
             logger.warning(f"Failed to initialize plugin system: {e}")
