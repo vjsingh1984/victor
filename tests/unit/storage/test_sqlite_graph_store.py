@@ -77,3 +77,29 @@ async def test_sqlite_graph_store_traverses_both_directions_and_depth(tmp_path):
 
     assert {(edge.src, edge.dst) for edge in both} == {("a", "b"), ("b", "c")}
     assert {(edge.src, edge.dst) for edge in incoming} == {("a", "b"), ("b", "c")}
+
+
+@pytest.mark.asyncio
+async def test_sqlite_graph_store_write_batch_rolls_back_on_error(tmp_path):
+    store = SqliteGraphStore(tmp_path)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        async with store.write_batch():
+            await store.upsert_nodes(
+                [
+                    GraphNode(
+                        node_id="symbol:main.py:foo",
+                        type="function",
+                        name="foo",
+                        file="main.py",
+                        line=1,
+                    )
+                ]
+            )
+            await store.update_file_mtime("main.py", 123.0)
+            raise RuntimeError("boom")
+
+    stats = await store.stats()
+    assert stats["nodes"] == 0
+    assert stats["edges"] == 0
+    assert stats["indexed_files"] == 0

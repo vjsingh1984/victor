@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import sqlite3
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Iterable, List, Optional, Set
 
@@ -121,6 +122,9 @@ class SqliteGraphStore(GraphStoreProtocol):
         self.db_path = self._db.db_path
         self._ensure_schema()
         self._lock = asyncio.Lock()
+        self._write_batch_conn: sqlite3.Connection | None = None
+        self._write_batch_owner: asyncio.Task[Any] | None = None
+        self._write_batch_depth = 0
 
     async def initialize(self) -> None:
         """Ensure schema exists for compatibility with higher-level stores."""
@@ -138,6 +142,17 @@ class SqliteGraphStore(GraphStoreProtocol):
     def _connect(self) -> sqlite3.Connection:
         """Get database connection."""
         return self._db.get_connection()
+
+    def _get_active_write_batch_connection(self) -> sqlite3.Connection | None:
+        """Return the active write-batch connection for the current task, if any."""
+        current_task = asyncio.current_task()
+        if (
+            current_task is not None
+            and current_task is self._write_batch_owner
+            and self._write_batch_depth > 0
+        ):
+            return self._write_batch_conn
+        return None
 
     def _canonical_file_path(self, file: str | Path) -> str:
         """Normalize file paths so equivalent aliases map to one graph key."""
@@ -197,6 +212,138 @@ class SqliteGraphStore(GraphStoreProtocol):
                 except sqlite3.OperationalError:
                     pass  # Column already exists
 
+    @asynccontextmanager
+    async def write_batch(self) -> AsyncIterator[None]:
+        """Batch multiple graph writes into a single SQLite transaction."""
+        current_task = asyncio.current_task()
+        if current_task is None:
+            raise RuntimeError("write_batch() requires an active asyncio task")
+
+        if (
+            current_task is self._write_batch_owner
+            and self._write_batch_conn is not None
+            and self._write_batch_depth > 0
+        ):
+            self._write_batch_depth += 1
+            try:
+                yield
+            finally:
+                self._write_batch_depth -= 1
+            return
+
+        async with self._lock:
+            conn = self._connect()
+            self._write_batch_owner = current_task
+            self._write_batch_conn = conn
+            self._write_batch_depth = 1
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                yield
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                self._write_batch_owner = None
+                self._write_batch_conn = None
+                self._write_batch_depth = 0
+
+    def _upsert_nodes_rows(
+        self,
+        conn: sqlite3.Connection,
+        rows: List[tuple[Any, ...]],
+    ) -> None:
+        """Write node rows using the provided connection."""
+        conn.executemany(
+            f"""
+            INSERT INTO {_NODE_TABLE}(node_id, type, name, file, line, end_line, lang,
+                             signature, docstring, parent_id, embedding_ref, metadata,
+                             ast_kind, scope_id, statement_type, requirement_id, visibility)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(node_id) DO UPDATE SET
+                type=excluded.type,
+                name=excluded.name,
+                file=excluded.file,
+                line=excluded.line,
+                end_line=excluded.end_line,
+                lang=excluded.lang,
+                signature=excluded.signature,
+                docstring=excluded.docstring,
+                parent_id=excluded.parent_id,
+                embedding_ref=excluded.embedding_ref,
+                metadata=excluded.metadata,
+                ast_kind=excluded.ast_kind,
+                scope_id=excluded.scope_id,
+                statement_type=excluded.statement_type,
+                requirement_id=excluded.requirement_id,
+                visibility=excluded.visibility
+            """,
+            rows,
+        )
+
+    def _upsert_edges_rows(
+        self,
+        conn: sqlite3.Connection,
+        rows: List[tuple[Any, ...]],
+    ) -> None:
+        """Write edge rows using the provided connection."""
+        conn.executemany(
+            f"""
+            INSERT INTO {_EDGE_TABLE}(src, dst, type, weight, metadata)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(src, dst, type) DO UPDATE SET
+                weight=excluded.weight,
+                metadata=excluded.metadata
+            """,
+            rows,
+        )
+
+    def _update_file_mtime_conn(self, conn: sqlite3.Connection, file: str, mtime: float) -> None:
+        """Record file modification time using the provided connection."""
+        import time
+
+        conn.execute(
+            f"""
+            INSERT INTO {_MTIME_TABLE}(file, mtime, indexed_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(file) DO UPDATE SET
+                mtime=excluded.mtime,
+                indexed_at=excluded.indexed_at
+            """,
+            (file, mtime, time.time()),
+        )
+
+    def _delete_by_file_conn(self, conn: sqlite3.Connection, file: str) -> None:
+        """Delete all nodes, edges, and mtimes for a specific file."""
+        file_variants = self._file_path_variants(file)
+        placeholders = ",".join("?" for _ in file_variants)
+        cur = conn.execute(
+            f"SELECT node_id FROM {_NODE_TABLE} WHERE file IN ({placeholders})",
+            file_variants,
+        )
+        node_ids = [row[0] for row in cur.fetchall()]
+
+        if node_ids:
+            placeholders = ",".join("?" for _ in node_ids)
+            conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids)
+            conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids)
+            conn.execute(
+                f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})",
+                node_ids,
+            )
+
+        file_placeholders = ",".join("?" for _ in file_variants)
+        conn.execute(
+            f"DELETE FROM {_MTIME_TABLE} WHERE file IN ({file_placeholders})",
+            file_variants,
+        )
+
+    def _delete_by_repo_conn(self, conn: sqlite3.Connection) -> None:
+        """Clear all repo graph tables using the provided connection."""
+        conn.execute(f"DELETE FROM {_EDGE_TABLE}")
+        conn.execute(f"DELETE FROM {_NODE_TABLE}")
+        conn.execute(f"DELETE FROM {_MTIME_TABLE}")
+
     async def upsert_nodes(self, nodes: Iterable[GraphNode]) -> None:
         rows = [
             (
@@ -223,34 +370,13 @@ class SqliteGraphStore(GraphStoreProtocol):
         ]
         if not rows:
             return
+        batch_conn = self._get_active_write_batch_connection()
+        if batch_conn is not None:
+            self._upsert_nodes_rows(batch_conn, rows)
+            return
         async with self._lock:
             conn = self._connect()
-            conn.executemany(
-                f"""
-                INSERT INTO {_NODE_TABLE}(node_id, type, name, file, line, end_line, lang,
-                                 signature, docstring, parent_id, embedding_ref, metadata,
-                                 ast_kind, scope_id, statement_type, requirement_id, visibility)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(node_id) DO UPDATE SET
-                    type=excluded.type,
-                    name=excluded.name,
-                    file=excluded.file,
-                    line=excluded.line,
-                    end_line=excluded.end_line,
-                    lang=excluded.lang,
-                    signature=excluded.signature,
-                    docstring=excluded.docstring,
-                    parent_id=excluded.parent_id,
-                    embedding_ref=excluded.embedding_ref,
-                    metadata=excluded.metadata,
-                    ast_kind=excluded.ast_kind,
-                    scope_id=excluded.scope_id,
-                    statement_type=excluded.statement_type,
-                    requirement_id=excluded.requirement_id,
-                    visibility=excluded.visibility
-                """,
-                rows,
-            )
+            self._upsert_nodes_rows(conn, rows)
             conn.commit()
 
     async def upsert_edges(self, edges: Iterable[GraphEdge]) -> None:
@@ -266,18 +392,13 @@ class SqliteGraphStore(GraphStoreProtocol):
         ]
         if not rows:
             return
+        batch_conn = self._get_active_write_batch_connection()
+        if batch_conn is not None:
+            self._upsert_edges_rows(batch_conn, rows)
+            return
         async with self._lock:
             conn = self._connect()
-            conn.executemany(
-                f"""
-                INSERT INTO {_EDGE_TABLE}(src, dst, type, weight, metadata)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(src, dst, type) DO UPDATE SET
-                    weight=excluded.weight,
-                    metadata=excluded.metadata
-                """,
-                rows,
-            )
+            self._upsert_edges_rows(conn, rows)
             conn.commit()
 
     async def get_neighbors(
@@ -444,11 +565,13 @@ class SqliteGraphStore(GraphStoreProtocol):
 
     async def delete_by_repo(self) -> None:
         """Clear all nodes, edges, and file mtimes for this repo (full rebuild)."""
+        batch_conn = self._get_active_write_batch_connection()
+        if batch_conn is not None:
+            self._delete_by_repo_conn(batch_conn)
+            return
         async with self._lock:
             conn = self._connect()
-            conn.executescript(
-                f"DELETE FROM {_EDGE_TABLE}; DELETE FROM {_NODE_TABLE}; DELETE FROM {_MTIME_TABLE};"
-            )
+            self._delete_by_repo_conn(conn)
             conn.commit()
 
     async def stats(self) -> Dict[str, Any]:
@@ -566,21 +689,14 @@ class SqliteGraphStore(GraphStoreProtocol):
 
     async def update_file_mtime(self, file: str, mtime: float) -> None:
         """Record file modification time for staleness tracking."""
-        import time
-
         file = self._canonical_file_path(file)
+        batch_conn = self._get_active_write_batch_connection()
+        if batch_conn is not None:
+            self._update_file_mtime_conn(batch_conn, file, mtime)
+            return
         async with self._lock:
             conn = self._connect()
-            conn.execute(
-                f"""
-                INSERT INTO {_MTIME_TABLE}(file, mtime, indexed_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(file) DO UPDATE SET
-                    mtime=excluded.mtime,
-                    indexed_at=excluded.indexed_at
-                """,
-                (file, mtime, time.time()),
-            )
+            self._update_file_mtime_conn(conn, file, mtime)
             conn.commit()
 
     async def get_stale_files(self, file_mtimes: Dict[str, float]) -> List[str]:
@@ -610,31 +726,13 @@ class SqliteGraphStore(GraphStoreProtocol):
 
     async def delete_by_file(self, file: str) -> None:
         """Delete all nodes and edges for a specific file (for incremental reindex)."""
-        file_variants = self._file_path_variants(file)
-        placeholders = ",".join("?" for _ in file_variants)
+        batch_conn = self._get_active_write_batch_connection()
+        if batch_conn is not None:
+            self._delete_by_file_conn(batch_conn, file)
+            return
         async with self._lock:
             conn = self._connect()
-            # Get node IDs for this file
-            cur = conn.execute(
-                f"SELECT node_id FROM {_NODE_TABLE} WHERE file IN ({placeholders})",
-                file_variants,
-            )
-            node_ids = [row[0] for row in cur.fetchall()]
-
-            if node_ids:
-                placeholders = ",".join("?" for _ in node_ids)
-                conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids)
-                conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids)
-                conn.execute(
-                    f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})",
-                    node_ids,
-                )
-
-            file_placeholders = ",".join("?" for _ in file_variants)
-            conn.execute(
-                f"DELETE FROM {_MTIME_TABLE} WHERE file IN ({file_placeholders})",
-                file_variants,
-            )
+            self._delete_by_file_conn(conn, file)
             conn.commit()
 
     async def get_all_edges(self) -> List[GraphEdge]:

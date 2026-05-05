@@ -479,6 +479,10 @@ class _DatabaseManagerBase:
 
         self._local = threading.local()
 
+    def _configure_connection(self, conn: sqlite3.Connection) -> None:
+        """Apply manager-specific settings to a newly opened connection."""
+        return None
+
     def _get_raw_connection(self) -> sqlite3.Connection:
         """Get raw SQLite connection (thread-local).
 
@@ -498,12 +502,14 @@ class _DatabaseManagerBase:
 
             for attempt in range(max_retries):
                 try:
-                    self._local.conn = sqlite3.connect(
+                    conn = sqlite3.connect(
                         str(self.db_path),
                         check_same_thread=False,
                         timeout=30.0,  # 30 second timeout for SQLite locks
                     )
-                    self._local.conn.row_factory = sqlite3.Row
+                    conn.row_factory = sqlite3.Row
+                    self._configure_connection(conn)
+                    self._local.conn = conn
                     break  # Success
                 except sqlite3.OperationalError as e:
                     last_error = e
@@ -606,6 +612,12 @@ class DatabaseManager(_DatabaseManagerBase):
         self._initialized = True
         logger.info(f"DatabaseManager initialized: {self.db_path}")
 
+    def _configure_connection(self, conn: sqlite3.Connection) -> None:
+        """Apply default SQLite settings for the global database."""
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+
     def _ensure_database(self) -> None:
         """Ensure database exists and is up to date."""
         from victor.core.schema import Tables, Schema
@@ -618,11 +630,6 @@ class DatabaseManager(_DatabaseManagerBase):
 
         # Create database if needed
         conn = self._get_raw_connection()
-
-        # Enable WAL mode for better concurrency
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA foreign_keys=ON")
 
         # Create metadata table using schema constant
         conn.execute(Schema.SYS_METADATA)
@@ -1440,6 +1447,7 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
         "change_groups",
         "file_changes",
     }
+    _WAL_AUTOCHECKPOINT_PAGES = 10000
 
     def __init__(self, project_path: Optional[Path] = None):
         """Initialize project database manager.
@@ -1464,16 +1472,22 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
 
         logger.info(f"ProjectDatabaseManager initialized: {self.db_path}")
 
+    def _configure_connection(self, conn: sqlite3.Connection) -> None:
+        """Apply SQLite settings for the project database.
+
+        The larger auto-checkpoint threshold keeps large graph-indexing writes
+        from triggering frequent WAL checkpoints on small default page budgets.
+        """
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute(f"PRAGMA wal_autocheckpoint={self._WAL_AUTOCHECKPOINT_PAGES}")
+
     def _ensure_database(self) -> None:
         """Ensure database exists and is up to date."""
         from victor.core.schema import Schema
 
         conn = self._get_raw_connection()
-
-        # Enable WAL mode for better concurrency
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA foreign_keys=ON")
 
         # Create metadata table
         conn.execute("""
