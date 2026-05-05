@@ -19,6 +19,9 @@ The deprecated service-first coordinators (chat, tool, session) have been remove
 
 Preferred surfaces:
 - ``victor.agent.services`` for service-owned chat, tool, and session flows
+- ``victor.agent.services.stage_transition_runtime`` and
+  ``victor.agent.services.stage_transition_strategies`` for service-owned
+  stage-transition batching runtime
 - ``victor.agent.coordinators.ExplorationStatePassedCoordinator`` for exploration
 - ``victor.agent.coordinators.CoordinationStatePassedCoordinator`` for
   coordination recommendations
@@ -27,6 +30,10 @@ Preferred surfaces:
 
 Note: ToolCoordinator, ChatCoordinator, SessionCoordinator have been removed.
 Use ToolService, ChatService, SessionService instead.
+StageTransitionCoordinator and its strategies remain available here only as
+compatibility re-export paths. SDK-owned safety and conversation exports remain
+available here only as deprecated compatibility shims; new code should import
+them from ``victor_sdk`` directly.
 """
 
 from __future__ import annotations
@@ -41,18 +48,18 @@ _SUBMODULE_MAP: dict[str, str] = {
     "ExplorationResult": "services.exploration_runtime",
     "MetricsCoordinator": "services.metrics_service",
     "create_metrics_coordinator": "services.metrics_service",
+    "SystemPromptCoordinator": "services.system_prompt_runtime",
+    "PlanningCoordinator": "services.planning_runtime",
+    "PlanningConfig": "services.planning_runtime",
+    "PlanningMode": "services.planning_runtime",
+    "PlanningResult": "services.planning_runtime",
+    # SDK-owned compatibility / extension surfaces
     "SafetyCoordinator": "victor_sdk.safety",
     "SafetyRule": "victor_sdk.safety",
     "SafetyCheckResult": "victor_sdk.safety",
     "SafetyStats": "victor_sdk.safety",
     "SafetyAction": "victor_sdk.safety",
     "SafetyCategory": "victor_sdk.safety",
-    "SystemPromptCoordinator": "services.system_prompt_runtime",
-    "PlanningCoordinator": "services.planning_runtime",
-    "PlanningConfig": "services.planning_runtime",
-    "PlanningMode": "services.planning_runtime",
-    "PlanningResult": "services.planning_runtime",
-    # SDK-based coordinators
     "ConversationCoordinator": "victor_sdk.conversation",
     "TurnType": "victor_sdk.conversation",
     "ConversationTurn": "victor_sdk.conversation",
@@ -95,7 +102,7 @@ _MODULE_MEMBERS = {
     "safety_state_passed": [
         "SafetyStatePassedCoordinator",
     ],
-    # Stage transition coordination (Phase 1 optimization)
+    # Stage transition coordination compatibility wrappers over services
     "stage_transition_coordinator": [
         "StageTransitionCoordinator",
         "TransitionDecision",
@@ -144,6 +151,59 @@ _DEPRECATED_EXPORTS = {
         "from victor.agent.services."
     ),
 }
+
+_SDK_SAFETY_EXPORTS = frozenset(
+    {
+        "SafetyCoordinator",
+        "SafetyRule",
+        "SafetyCheckResult",
+        "SafetyStats",
+        "SafetyAction",
+        "SafetyCategory",
+    }
+)
+
+_SDK_CONVERSATION_EXPORTS = frozenset(
+    {
+        "ConversationCoordinator",
+        "TurnType",
+        "ConversationTurn",
+        "ConversationStats",
+        "ConversationContext",
+    }
+)
+
+
+def _get_deprecation_warning(name: str) -> str | None:
+    """Return the deprecation warning message for a compatibility export."""
+    if name in _DEPRECATED_EXPORTS:
+        return _DEPRECATED_EXPORTS[name]
+
+    if name == "SafetyCoordinator":
+        return (
+            "victor.agent.coordinators.SafetyCoordinator is deprecated SDK "
+            "compatibility surface. Prefer victor_sdk.safety.SafetyCoordinator "
+            "for extensions or SafetyStatePassedCoordinator for agent runtime "
+            "policy seams."
+        )
+    if name in _SDK_SAFETY_EXPORTS:
+        return (
+            f"victor.agent.coordinators.{name} is deprecated SDK compatibility "
+            f"surface. Prefer victor_sdk.safety.{name} directly."
+        )
+    if name == "ConversationCoordinator":
+        return (
+            "victor.agent.coordinators.ConversationCoordinator is deprecated SDK "
+            "compatibility surface. Prefer victor_sdk.conversation."
+            "ConversationCoordinator directly."
+        )
+    if name in _SDK_CONVERSATION_EXPORTS:
+        return (
+            f"victor.agent.coordinators.{name} is deprecated SDK compatibility "
+            f"surface. Prefer victor_sdk.conversation.{name} directly."
+        )
+
+    return None
 
 
 def __getattr__(name: str) -> Any:
@@ -206,9 +266,9 @@ def __getattr__(name: str) -> Any:
             module = importlib.import_module("victor_sdk.conversation")
 
         value = getattr(module, name)
-        # Apply deprecation warning
-        if name in _DEPRECATED_EXPORTS:
-            warnings.warn(_DEPRECATED_EXPORTS[name], DeprecationWarning, stacklevel=2)
+        warning = _get_deprecation_warning(name)
+        if warning is not None:
+            warnings.warn(warning, DeprecationWarning, stacklevel=2)
         globals()[name] = value
         return value
 
@@ -219,9 +279,10 @@ def __getattr__(name: str) -> Any:
         else:
             module = importlib.import_module(f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}")
         value = getattr(module, name)
-        if name in _DEPRECATED_EXPORTS:
+        warning = _get_deprecation_warning(name)
+        if warning is not None:
             warnings.warn(
-                _DEPRECATED_EXPORTS[name],
+                warning,
                 DeprecationWarning,
                 stacklevel=2,
             )

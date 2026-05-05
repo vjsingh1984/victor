@@ -15,6 +15,7 @@
 """Tests for ToolFacade domain facade."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from victor.agent.facades.tool_facade import ToolFacade
@@ -177,6 +178,40 @@ class TestToolFacadeProperties:
         new_chain = MagicMock(name="new_chain")
         facade.middleware_chain = new_chain
         assert facade.middleware_chain is new_chain
+
+    def test_runtime_state_host_keeps_tool_budget_live(self):
+        """ToolFacade should reflect the canonical tool budget from the runtime host."""
+        runtime_state_host = SimpleNamespace(tool_budget=75)
+        facade = ToolFacade(
+            tools=MagicMock(name="tools"),
+            tool_pipeline=MagicMock(name="pipeline"),
+            tool_executor=MagicMock(name="executor"),
+            tool_selector=MagicMock(name="selector"),
+            tool_budget=10,
+            runtime_state_host=runtime_state_host,
+        )
+
+        assert facade.tool_budget == 75
+
+        runtime_state_host.tool_budget = 125
+        assert facade.tool_budget == 125
+
+    def test_runtime_state_host_tool_budget_setter_updates_canonical_state(self):
+        """ToolFacade compatibility setter should write through to the runtime host."""
+        runtime_state_host = SimpleNamespace(tool_budget=50)
+        facade = ToolFacade(
+            tools=MagicMock(name="tools"),
+            tool_pipeline=MagicMock(name="pipeline"),
+            tool_executor=MagicMock(name="executor"),
+            tool_selector=MagicMock(name="selector"),
+            tool_budget=10,
+            runtime_state_host=runtime_state_host,
+        )
+
+        facade.tool_budget = 200
+
+        assert runtime_state_host.tool_budget == 200
+        assert facade.tool_budget == 200
 
     def test_safety_checker_property(self, facade):
         """SafetyChecker property returns the checker."""

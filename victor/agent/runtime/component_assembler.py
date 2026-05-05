@@ -144,7 +144,7 @@ class ComponentAssembler:
         from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
         if get_feature_flag_manager().is_enabled(FeatureFlag.USE_STAGE_TRANSITION_COORDINATOR):
-            from victor.agent.coordinators import (
+            from victor.agent.services import (
                 StageTransitionCoordinator,
                 HybridTransitionStrategy,
             )
@@ -255,7 +255,7 @@ class ComponentAssembler:
 
         orchestrator._iteration_coordinator: Optional[IterationCoordinator] = None
 
-        # Task analyzer and canonical prompt runtime support
+        # Task analyzer for prompt/runtime classification fallback
         from victor.agent.task_analyzer import get_task_analyzer
 
         orchestrator._task_analyzer = get_task_analyzer()
@@ -264,16 +264,6 @@ class ComponentAssembler:
                 orchestrator._task_analyzer.set_runtime_subject(orchestrator)
             except Exception as exc:
                 logger.debug("Task analyzer runtime-subject binding skipped: %s", exc)
-        orchestrator._prompt_runtime_support = factory.create_prompt_runtime_support(
-            prompt_builder=orchestrator.prompt_builder,
-            get_context_window=orchestrator._get_model_context_window,
-            provider_name=orchestrator.provider_name,
-            model_name=orchestrator.model,
-            get_tools=lambda: orchestrator.tools,
-            get_mode_controller=lambda: orchestrator.mode_controller,
-            task_analyzer=orchestrator._task_analyzer,
-            session_id=getattr(orchestrator, "_session_id", ""),
-        )
 
     @staticmethod
     def assemble_intelligence(

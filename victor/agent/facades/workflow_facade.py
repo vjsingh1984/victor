@@ -45,6 +45,7 @@ class WorkflowFacade:
         - workflow_runtime: Workflow runtime boundary components
         - workflow_optimization: Workflow optimization components
         - coordination_advisor: Framework-facing team/workflow advisor surface
+        - runtime_state_host: Canonical runtime owner for mutable workflow state
     """
 
     def __init__(
@@ -54,6 +55,7 @@ class WorkflowFacade:
         workflow_runtime: Optional[Any] = None,
         workflow_optimization: Optional[Any] = None,
         coordination_advisor: Optional[Any] = None,
+        runtime_state_host: Optional[Any] = None,
         mode_workflow_team_coordinator: Any = _DEPRECATED_MODE_WORKFLOW_TEAM_COORDINATOR,
     ) -> None:
         if mode_workflow_team_coordinator is not _DEPRECATED_MODE_WORKFLOW_TEAM_COORDINATOR:
@@ -70,6 +72,7 @@ class WorkflowFacade:
         self._workflow_runtime = workflow_runtime
         self._workflow_optimization = workflow_optimization
         self._coordination_advisor = coordination_advisor
+        self._runtime_state_host = runtime_state_host
 
         logger.debug(
             "WorkflowFacade initialized (registry=%s, optimization=%s, advisor=%s)",
@@ -85,11 +88,19 @@ class WorkflowFacade:
     @property
     def workflow_registry(self) -> Optional[Any]:
         """Workflow registry for workflow lookup."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_workflow_registry",
+                self._workflow_registry,
+            )
         return self._workflow_registry
 
     @workflow_registry.setter
     def workflow_registry(self, value: Any) -> None:
         """Update the workflow registry."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._workflow_registry = value
         self._workflow_registry = value
 
     @property
@@ -105,11 +116,19 @@ class WorkflowFacade:
     @property
     def coordination_advisor(self) -> Optional[Any]:
         """Framework-facing advisor for intelligent team/workflow suggestions."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_coordination_advisor",
+                self._coordination_advisor,
+            )
         return self._coordination_advisor
 
     @coordination_advisor.setter
     def coordination_advisor(self, value: Any) -> None:
         """Update the framework-facing coordination advisor."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._coordination_advisor = value
         self._coordination_advisor = value
 
     @property
@@ -121,7 +140,7 @@ class WorkflowFacade:
             DeprecationWarning,
             stacklevel=2,
         )
-        return self._coordination_advisor
+        return self.coordination_advisor
 
     @mode_workflow_team_coordinator.setter
     def mode_workflow_team_coordinator(self, value: Any) -> None:
@@ -132,4 +151,4 @@ class WorkflowFacade:
             DeprecationWarning,
             stacklevel=2,
         )
-        self._coordination_advisor = value
+        self.coordination_advisor = value

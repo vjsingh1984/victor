@@ -15,6 +15,7 @@
 """Tests for SessionFacade domain facade."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from victor.agent.facades.session_facade import SessionFacade
@@ -132,6 +133,59 @@ class TestSessionFacadeProperties:
     def test_checkpoint_manager_property(self, facade):
         """CheckpointManager property returns the manager."""
         assert facade.checkpoint_manager._mock_name == "checkpoint"
+
+    def test_runtime_state_host_keeps_session_state_live(self):
+        """SessionFacade should reflect the canonical mutable session state."""
+        runtime_state_host = SimpleNamespace(
+            _session_ledger=MagicMock(name="runtime_ledger"),
+            active_session_id="runtime-session",
+            _memory_session_id="runtime-memory",
+        )
+        facade = SessionFacade(
+            session_state=MagicMock(name="state"),
+            session_accessor=MagicMock(name="accessor"),
+            session_ledger=MagicMock(name="stale_ledger"),
+            active_session_id="stale-session",
+            memory_session_id="stale-memory",
+            runtime_state_host=runtime_state_host,
+        )
+
+        assert facade.session_ledger is runtime_state_host._session_ledger
+        assert facade.active_session_id == "runtime-session"
+        assert facade.memory_session_id == "runtime-memory"
+
+        runtime_state_host._session_ledger = MagicMock(name="updated_ledger")
+        runtime_state_host.active_session_id = "updated-session"
+        runtime_state_host._memory_session_id = "updated-memory"
+
+        assert facade.session_ledger is runtime_state_host._session_ledger
+        assert facade.active_session_id == "updated-session"
+        assert facade.memory_session_id == "updated-memory"
+
+    def test_runtime_state_host_setters_update_canonical_session_state(self):
+        """SessionFacade compatibility setters should write through to the runtime host."""
+        runtime_state_host = SimpleNamespace(
+            _session_ledger=MagicMock(name="runtime_ledger"),
+            active_session_id="runtime-session",
+            _memory_session_id="runtime-memory",
+        )
+        facade = SessionFacade(
+            session_state=MagicMock(name="state"),
+            session_accessor=MagicMock(name="accessor"),
+            session_ledger=MagicMock(name="stale_ledger"),
+            active_session_id="stale-session",
+            memory_session_id="stale-memory",
+            runtime_state_host=runtime_state_host,
+        )
+        new_ledger = MagicMock(name="new_ledger")
+
+        facade.session_ledger = new_ledger
+        facade.active_session_id = "new-session"
+        facade.memory_session_id = "new-memory"
+
+        assert runtime_state_host._session_ledger is new_ledger
+        assert runtime_state_host.active_session_id == "new-session"
+        assert runtime_state_host._memory_session_id == "new-memory"
 
 
 class TestSessionFacadeProtocolConformance:

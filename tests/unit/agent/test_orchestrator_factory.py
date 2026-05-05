@@ -451,7 +451,11 @@ class TestCanonicalCoordinatorBuilders:
             analyzer if protocol is TaskAnalyzerProtocol else None
         )
 
-        coordinator = factory.create_system_prompt_coordinator()
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestratorFactory.create_system_prompt_coordinator",
+        ):
+            coordinator = factory.create_system_prompt_coordinator()
 
         assert coordinator._task_analyzer is analyzer
 
@@ -463,7 +467,11 @@ class TestCanonicalCoordinatorBuilders:
             analyzer if protocol is TaskAnalyzerProtocol else None
         )
 
-        runtime = factory.create_prompt_runtime_support()
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestratorFactory.create_prompt_runtime_support",
+        ):
+            runtime = factory.create_prompt_runtime_support()
 
         assert runtime._task_analyzer is analyzer
 

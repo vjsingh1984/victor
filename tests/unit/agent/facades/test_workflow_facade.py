@@ -14,8 +14,10 @@
 
 """Tests for WorkflowFacade domain facade."""
 
-import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
+
+import pytest
 
 from victor.agent.facades.workflow_facade import WorkflowFacade
 from victor.agent.facades.protocols import WorkflowFacadeProtocol
@@ -134,6 +136,64 @@ class TestWorkflowFacadeProperties:
             match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
         ):
             assert facade.mode_workflow_team_coordinator is new_advisor
+
+    def test_runtime_state_host_keeps_workflow_runtime_state_live(self):
+        """WorkflowFacade should reflect canonical mutable workflow runtime state."""
+        runtime_state_host = SimpleNamespace(
+            _workflow_registry=MagicMock(name="runtime_registry"),
+            _coordination_advisor=MagicMock(name="runtime_advisor"),
+        )
+        facade = WorkflowFacade(
+            workflow_registry=MagicMock(name="stale_registry"),
+            workflow_runtime=MagicMock(name="runtime"),
+            workflow_optimization=MagicMock(name="optimization"),
+            coordination_advisor=MagicMock(name="stale_advisor"),
+            runtime_state_host=runtime_state_host,
+        )
+
+        assert facade.workflow_registry is runtime_state_host._workflow_registry
+        assert facade.coordination_advisor is runtime_state_host._coordination_advisor
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
+        ):
+            assert facade.mode_workflow_team_coordinator is runtime_state_host._coordination_advisor
+
+        runtime_state_host._workflow_registry = MagicMock(name="updated_registry")
+        runtime_state_host._coordination_advisor = MagicMock(name="updated_advisor")
+
+        assert facade.workflow_registry is runtime_state_host._workflow_registry
+        assert facade.coordination_advisor is runtime_state_host._coordination_advisor
+
+    def test_runtime_state_host_setters_update_canonical_workflow_state(self):
+        """WorkflowFacade compatibility setters should write through to runtime state."""
+        runtime_state_host = SimpleNamespace(
+            _workflow_registry=MagicMock(name="runtime_registry"),
+            _coordination_advisor=MagicMock(name="runtime_advisor"),
+        )
+        facade = WorkflowFacade(
+            workflow_registry=MagicMock(name="stale_registry"),
+            workflow_runtime=MagicMock(name="runtime"),
+            workflow_optimization=MagicMock(name="optimization"),
+            coordination_advisor=MagicMock(name="stale_advisor"),
+            runtime_state_host=runtime_state_host,
+        )
+        new_registry = MagicMock(name="new_registry")
+        new_advisor = MagicMock(name="new_advisor")
+
+        facade.workflow_registry = new_registry
+        facade.coordination_advisor = new_advisor
+
+        assert runtime_state_host._workflow_registry is new_registry
+        assert runtime_state_host._coordination_advisor is new_advisor
+
+        legacy_advisor = MagicMock(name="legacy_advisor")
+        with pytest.warns(
+            DeprecationWarning,
+            match="WorkflowFacade.mode_workflow_team_coordinator is deprecated",
+        ):
+            facade.mode_workflow_team_coordinator = legacy_advisor
+        assert runtime_state_host._coordination_advisor is legacy_advisor
 
 
 class TestWorkflowFacadeProtocolConformance:

@@ -28,6 +28,12 @@ def test_state_compat_module_removed():
         from victor.agent.services import state_compat  # noqa: F401
 
 
+def test_state_coordinator_module_removed():
+    """Verify that the concrete state_coordinator shim has been removed."""
+    with pytest.raises(ImportError, match="state_coordinator"):
+        import victor.agent.state_coordinator  # noqa: F401
+
+
 def test_recovery_compat_module_removed():
     """Verify that recovery_compat module has been removed."""
     with pytest.raises(ImportError, match="recovery_compat"):

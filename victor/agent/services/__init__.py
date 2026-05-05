@@ -24,6 +24,8 @@ Services:
     ContextService: Context management and metrics
     ProviderService: Provider management and switching
     RecoveryService: Error recovery and resilience
+    StageTransitionCoordinator: Service-owned runtime helper for batched
+        conversation-stage transitions
     RL runtime helpers: Service-first access to the global RL coordinator and
         prompt rollout helpers for benchmark-gated prompt optimization
     SessionService: Session lifecycle management
@@ -31,9 +33,7 @@ Services:
 
 Deprecated compatibility exports retained here:
     PromptRuntimeAdapter: Canonical DI/runtime adapter for PromptRuntimeProtocol
-    PromptRuntimeSupport: Canonical internal fallback support for orchestrator
-        prompt helper seams when UnifiedPromptPipeline is unavailable
-    SystemPromptCoordinator: Deprecated wrapper over UnifiedPromptPipeline
+    SystemPromptCoordinator: Deprecated wrapper over UnifiedPromptPipeline (now delegates to it)
     StreamingRecoveryContext: Moved to RecoveryService for canonical service ownership
 """
 
@@ -79,13 +79,25 @@ from victor.agent.services.prompt_runtime import (
     PromptRuntimeConfig,
     PromptRuntimeContext,
 )
-from victor.agent.services.prompt_runtime_support import PromptRuntimeSupport
 from victor.agent.services.recovery_service import (
     RecoveryService,
     RecoveryContextImpl,
     StreamingRecoveryContext,
 )
 from victor.agent.services.session_service import SessionService, SessionInfoImpl
+from victor.agent.services.stage_transition_runtime import (
+    StageTransitionCoordinator,
+    TransitionDecision,
+    TransitionResult,
+    TurnContext,
+)
+from victor.agent.services.stage_transition_strategies import (
+    EdgeModelTransitionStrategy,
+    HeuristicOnlyTransitionStrategy,
+    HybridTransitionStrategy,
+    TransitionStrategyProtocol,
+    create_transition_strategy,
+)
 from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
 from victor.agent.services.task_runtime import TaskCoordinator
 from victor.agent.services.planning_runtime import (
@@ -127,7 +139,6 @@ __all__ = [
     "PromptRuntimeAdapter",
     "PromptRuntimeConfig",
     "PromptRuntimeContext",
-    "PromptRuntimeSupport",
     "OrchestratorProtocolAdapter",
     "AsyncWriterQueue",
     "ProviderService",
@@ -140,6 +151,14 @@ __all__ = [
     "StreamingRecoveryContext",
     "SessionService",
     "SessionInfoImpl",
+    "StageTransitionCoordinator",
+    "TransitionDecision",
+    "TransitionResult",
+    "TurnContext",
+    "TransitionStrategyProtocol",
+    "HeuristicOnlyTransitionStrategy",
+    "EdgeModelTransitionStrategy",
+    "HybridTransitionStrategy",
     "SystemPromptCoordinator",
     "TaskCoordinator",
     "ToolBudgetExceededError",
@@ -153,6 +172,7 @@ __all__ = [
     "ToolRetryExecutor",
     "TurnExecutor",
     "TurnResult",
+    "create_transition_strategy",
     "create_streaming_chat_executor",
     "create_metrics_coordinator",
     "analyze_prompt_rollout_experiment",

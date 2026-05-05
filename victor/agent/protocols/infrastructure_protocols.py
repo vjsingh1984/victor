@@ -9,12 +9,9 @@ from typing import (
     Optional,
     Protocol,
     Set,
-    TYPE_CHECKING,
     Tuple,
     runtime_checkable,
 )
-
-from victor.core.constants import DEFAULT_VERTICAL
 
 __all__ = [
     "ObservabilityProtocol",
@@ -194,13 +191,10 @@ class RecoveryHandlerProtocol(
     ...
 
 
-@runtime_checkable
-class ResponseSanitizerProtocol(Protocol):
-    """Protocol for response sanitization."""
-
-    def sanitize(self, response: str) -> str:
-        """Sanitize model response."""
-        ...
+# NOTE: ResponseSanitizerProtocol and ReminderManagerProtocol are canonical
+# service-owned runtime protocols in
+# victor.agent.services.protocols.infrastructure_runtime. This module re-exports
+# them at the bottom as deprecated compatibility names.
 
 
 @runtime_checkable
@@ -343,174 +337,9 @@ class DebugLoggerProtocol(Protocol):
         ...
 
 
-@runtime_checkable
-class ReminderManagerProtocol(Protocol):
-    """Protocol for context reminder management.
-
-    Manages intelligent injection of context reminders to reduce token waste.
-    """
-
-    def reset(self) -> None:
-        """Reset state for a new conversation turn."""
-        ...
-
-    def update_state(
-        self,
-        observed_files: Optional[Set[str]] = None,
-        executed_tool: Optional[str] = None,
-        tool_calls: Optional[int] = None,
-        tool_budget: Optional[int] = None,
-        task_complexity: Optional[str] = None,
-        task_hint: Optional[str] = None,
-    ) -> None:
-        """Update the current context state."""
-        ...
-
-    def add_observed_file(self, file_path: str) -> None:
-        """Add a file to the observed files set."""
-        ...
-
-    def get_consolidated_reminder(self, force: bool = False) -> Optional[str]:
-        """Get a consolidated reminder combining all active reminders."""
-        ...
-
-
-@runtime_checkable
-class RLCoordinatorProtocol(Protocol):
-    """Protocol for reinforcement learning coordinator.
-
-    Manages all RL learners with unified SQLite storage, including
-    benchmark-gated prompt rollout experiments.
-    """
-
-    def record_outcome(
-        self,
-        learner_name: str,
-        outcome: Any,
-        vertical: str = DEFAULT_VERTICAL,
-    ) -> None:
-        """Record an outcome for a specific learner."""
-        ...
-
-    def get_recommendation(
-        self,
-        learner_name: str,
-        provider: str,
-        model: str,
-        task_type: str,
-    ) -> Optional[Any]:
-        """Get recommendation from a learner."""
-        ...
-
-    def export_metrics(self) -> Dict[str, Any]:
-        """Export all learned values and metrics for monitoring."""
-        ...
-
-    def create_prompt_rollout_experiment(
-        self,
-        *,
-        section_name: str,
-        provider: str,
-        treatment_hash: str,
-        control_hash: Optional[str] = None,
-        traffic_split: float = 0.1,
-        min_samples_per_variant: int = 50,
-    ) -> Optional[str]:
-        """Create a prompt rollout experiment for an approved prompt candidate."""
-        ...
-
-    async def create_prompt_rollout_experiment_async(
-        self,
-        *,
-        section_name: str,
-        provider: str,
-        treatment_hash: str,
-        control_hash: Optional[str] = None,
-        traffic_split: float = 0.1,
-        min_samples_per_variant: int = 50,
-    ) -> Optional[str]:
-        """Async version of create_prompt_rollout_experiment."""
-        ...
-
-    def analyze_prompt_rollout_experiment(
-        self,
-        *,
-        section_name: str,
-        provider: str,
-        treatment_hash: str,
-    ) -> Optional[Dict[str, Any]]:
-        """Analyze a prompt rollout experiment for a candidate."""
-        ...
-
-    async def analyze_prompt_rollout_experiment_async(
-        self,
-        *,
-        section_name: str,
-        provider: str,
-        treatment_hash: str,
-    ) -> Optional[Dict[str, Any]]:
-        """Async version of analyze_prompt_rollout_experiment."""
-        ...
-
-    def apply_prompt_rollout_recommendation(
-        self,
-        *,
-        section_name: str,
-        provider: str,
-        treatment_hash: str,
-        dry_run: bool = False,
-    ) -> Optional[Dict[str, Any]]:
-        """Apply the recommended rollout/rollback action for a prompt candidate."""
-        ...
-
-    async def apply_prompt_rollout_recommendation_async(
-        self,
-        *,
-        section_name: str,
-        provider: str,
-        treatment_hash: str,
-        dry_run: bool = False,
-    ) -> Optional[Dict[str, Any]]:
-        """Async version of apply_prompt_rollout_recommendation."""
-        ...
-
-    def process_prompt_candidate_evaluation_suite(
-        self,
-        suite: Any,
-        *,
-        min_pass_rate: float = 0.5,
-        promote_best: bool = False,
-        create_rollout: bool = False,
-        rollout_control_hash: Optional[str] = None,
-        rollout_traffic_split: float = 0.1,
-        rollout_min_samples_per_variant: int = 100,
-        analyze_rollout: bool = False,
-        apply_rollout_decision: bool = False,
-        rollout_decision_dry_run: bool = False,
-    ) -> Any:
-        """Process a prompt-candidate benchmark suite through rollout stages."""
-        ...
-
-    async def process_prompt_candidate_evaluation_suite_async(
-        self,
-        suite: Any,
-        *,
-        min_pass_rate: float = 0.5,
-        promote_best: bool = False,
-        create_rollout: bool = False,
-        rollout_control_hash: Optional[str] = None,
-        rollout_traffic_split: float = 0.1,
-        rollout_min_samples_per_variant: int = 100,
-        analyze_rollout: bool = False,
-        apply_rollout_decision: bool = False,
-        rollout_decision_dry_run: bool = False,
-    ) -> Any:
-        """Async version of process_prompt_candidate_evaluation_suite."""
-        ...
-
-    def close(self) -> None:
-        """Close database connection."""
-        ...
+# NOTE: RLCoordinatorProtocol is a canonical service-owned runtime protocol in
+# victor.agent.services.protocols.runtime_support. This module re-exports it at
+# the bottom as a deprecated compatibility name.
 
 
 @runtime_checkable
@@ -839,3 +668,12 @@ class SessionContextLinkerProtocol(Protocol):
     def find_related_sessions(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
         """Semantic search across sessions for cross-session linking."""
         ...
+
+
+from victor.agent.services.protocols.infrastructure_runtime import (
+    ReminderManagerProtocol,
+    ResponseSanitizerProtocol,
+)
+from victor.agent.services.protocols.runtime_support import (
+    RLLearningRuntimeProtocol as RLCoordinatorProtocol,
+)

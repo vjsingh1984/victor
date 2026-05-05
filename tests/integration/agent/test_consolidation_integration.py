@@ -505,8 +505,9 @@ class TestEndToEndIntegration:
         - StateRuntimeAdapter: Wraps ConversationController + ConversationStateMachine
         - PromptRuntimeAdapter: Wraps PromptBuilder with runtime configuration
 
-        Note: Deprecated compatibility shims (StateCoordinator, PromptCoordinator)
-        still exist for backward compatibility but emit deprecation warnings.
+        Note: PromptCoordinator still exists as a deprecated compatibility shim.
+        For state, only the deprecated StateCoordinatorProtocol alias remains;
+        there is no concrete StateCoordinator module anymore.
         """
         from unittest.mock import MagicMock
 

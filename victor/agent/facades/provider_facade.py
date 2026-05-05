@@ -14,18 +14,17 @@
 
 """Provider domain facade for orchestrator decomposition.
 
-Groups LLM provider instance, model selection, switching, health monitoring,
-and rate coordination components behind a single interface.
+Groups LLM provider instance, model selection, and configuration components
+behind a single interface.
 
 This facade wraps already-initialized components from the orchestrator,
 providing a coherent grouping without changing initialization ordering.
 The orchestrator delegates property access through this facade. It does not own
 provider behavior.
 
-Deprecated coordinator properties are retained as compatibility accessors.
-They are no longer owned by ``provider_runtime``; when needed, the facade
-materializes compatibility shims lazily and binds them to the canonical
-``ProviderService``.
+Migration Notes (2026-05-01):
+- provider_coordinator and provider_switch_coordinator removed in v1.0.0
+- Use ProviderService for all provider operations
 """
 
 from __future__ import annotations
@@ -37,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProviderFacade:
-    """Groups LLM provider, model, and coordination components.
+    """Groups LLM provider, model, and configuration components.
 
     Satisfies ``ProviderFacadeProtocol`` structurally.  The orchestrator creates
     this facade after all provider-domain components are initialized, passing
@@ -53,10 +52,11 @@ class ProviderFacade:
         - runtime_state_host: Canonical runtime owner for mutable provider config
         - provider_manager: ProviderManager for lifecycle management
         - provider_runtime: Provider runtime boundary components
-        - provider_coordinator: Deprecated compatibility accessor derived from
-          provider_runtime when supplied explicitly or synthesized lazily
-        - provider_switch_coordinator: Deprecated compatibility accessor
-          derived from provider_runtime when supplied explicitly or synthesized lazily
+        - provider_service: Provider service for all provider operations
+
+    Migration Notes (2026-05-01):
+        - provider_coordinator and provider_switch_coordinator removed
+        - Use ProviderService for all provider operations
     """
 
     def __init__(
@@ -72,8 +72,6 @@ class ProviderFacade:
         provider_manager: Any,
         provider_runtime: Optional[Any] = None,
         provider_service: Optional[Any] = None,
-        provider_coordinator: Optional[Any] = None,
-        provider_switch_coordinator: Optional[Any] = None,
     ) -> None:
         self._provider = provider
         self._model = model
@@ -85,8 +83,6 @@ class ProviderFacade:
         self._provider_manager = provider_manager
         self._provider_runtime = provider_runtime
         self._provider_service = provider_service
-        self._provider_coordinator = provider_coordinator
-        self._provider_switch_coordinator = provider_switch_coordinator
 
         logger.debug(
             "ProviderFacade initialized (provider=%s, model=%s, thinking=%s)",
@@ -102,50 +98,7 @@ class ProviderFacade:
             return None
         return getattr(runtime, component_name, None)
 
-    def _synthesize_provider_coordinator(self) -> Optional[Any]:
-        """Create the deprecated ProviderCoordinator shim lazily when needed."""
-        if self._provider_coordinator is not None:
-            return self._provider_coordinator
-        if self._provider_runtime is None and self._provider_service is None:
-            return None
-        if self._provider_manager is None:
-            return None
 
-        from victor.agent.provider.coordinator import create_provider_coordinator
-
-        coordinator = create_provider_coordinator(provider_manager=self._provider_manager)
-        if self._provider_service is not None and hasattr(
-            coordinator, "bind_provider_service"
-        ):
-            coordinator.bind_provider_service(self._provider_service)
-        self._provider_coordinator = coordinator
-        logger.debug("Materialized deprecated provider_coordinator compatibility shim")
-        return coordinator
-
-    def _synthesize_provider_switch_coordinator(self) -> Optional[Any]:
-        """Create the deprecated ProviderSwitchCoordinator shim lazily when needed."""
-        if self._provider_switch_coordinator is not None:
-            return self._provider_switch_coordinator
-        if self._provider_runtime is None and self._provider_service is None:
-            return None
-        if self._provider_manager is None:
-            return None
-
-        provider_switcher = getattr(self._provider_manager, "_provider_switcher", None)
-        if provider_switcher is None:
-            return None
-
-        from victor.agent.provider.switch_coordinator import (
-            create_provider_switch_coordinator,
-        )
-
-        coordinator = create_provider_switch_coordinator(
-            provider_switcher=provider_switcher,
-            health_monitor=getattr(self._provider_manager, "_health_monitor", None),
-        )
-        self._provider_switch_coordinator = coordinator
-        logger.debug("Materialized deprecated provider_switch_coordinator compatibility shim")
-        return coordinator
 
     # ------------------------------------------------------------------
     # Properties (satisfy ProviderFacadeProtocol)
@@ -244,23 +197,3 @@ class ProviderFacade:
     def provider_runtime(self) -> Optional[Any]:
         """Provider runtime boundary components."""
         return self._provider_runtime
-
-    @property
-    def provider_coordinator(self) -> Optional[Any]:
-        """Provider coordination service."""
-        if self._provider_coordinator is not None:
-            return self._provider_coordinator
-        runtime_component = self._get_runtime_component("provider_coordinator")
-        if runtime_component is not None:
-            return runtime_component
-        return self._synthesize_provider_coordinator()
-
-    @property
-    def provider_switch_coordinator(self) -> Optional[Any]:
-        """Provider switching coordinator."""
-        if self._provider_switch_coordinator is not None:
-            return self._provider_switch_coordinator
-        runtime_component = self._get_runtime_component("provider_switch_coordinator")
-        if runtime_component is not None:
-            return runtime_component
-        return self._synthesize_provider_switch_coordinator()

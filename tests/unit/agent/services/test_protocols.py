@@ -24,6 +24,7 @@ from victor.agent.services.protocols import (
     ChatServiceProtocol,
     ChunkRuntimeProtocol,
     ToolServiceProtocol,
+    CoordinationAdvisorRuntimeProtocol,
     ContextServiceProtocol,
     IntentClassifierProtocol,
     PromptRuntimeProtocol,
@@ -114,8 +115,8 @@ class TestProtocolDefinitions:
         assert StreamingTrackerRuntimeProtocol is not None
         assert ToolExecutionRecoveryRuntimeProtocol is not None
 
-    def test_runtime_alias_protocols_match_legacy_protocol_identity(self):
-        """Alias protocols should preserve identity with compatibility imports."""
+    def test_runtime_protocols_are_service_owned_and_match_legacy_identity(self):
+        """Service runtime protocols should be the canonical host for legacy aliases."""
         with pytest.warns(DeprecationWarning, match="ChunkGeneratorProtocol is deprecated"):
             from victor.agent.protocols import ChunkGeneratorProtocol
 
@@ -148,16 +149,62 @@ class TestProtocolDefinitions:
         assert StreamingRecoveryRuntimeProtocol is StreamingRecoveryCoordinatorProtocol
         assert RLLearningRuntimeProtocol is RLCoordinatorProtocol
 
-    def test_runtime_infrastructure_protocols_match_legacy_protocol_identity(self):
-        """Service-hosted runtime infrastructure protocols should preserve identity."""
-        from victor.agent.protocols import (
-            IntentClassifierProtocol as LegacyIntentClassifierProtocol,
-            ReminderManagerProtocol as LegacyReminderManagerProtocol,
-            ResponseSanitizerProtocol as LegacyResponseSanitizerProtocol,
-            StreamingConfidenceMonitorProtocol as LegacyStreamingConfidenceMonitorProtocol,
-            StreamingHandlerProtocol as LegacyStreamingHandlerProtocol,
-            StreamingMetricsCollectorProtocol as LegacyStreamingMetricsCollectorProtocol,
+        assert CoordinationAdvisorRuntimeProtocol.__module__ == (
+            "victor.agent.services.protocols.runtime_support"
         )
+        assert ChunkRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
+        assert ToolPlanningRuntimeProtocol.__module__ == (
+            "victor.agent.services.protocols.runtime_support"
+        )
+        assert TaskRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
+        assert StateRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
+        assert PromptRuntimeProtocol.__module__ == "victor.agent.services.protocols.runtime_support"
+        assert StreamingRecoveryRuntimeProtocol.__module__ == (
+            "victor.agent.services.protocols.runtime_support"
+        )
+        assert RLLearningRuntimeProtocol.__module__ == (
+            "victor.agent.services.protocols.runtime_support"
+        )
+
+    def test_runtime_infrastructure_protocols_are_service_owned_and_match_legacy_identity(
+        self,
+    ):
+        """Service runtime infrastructure protocols should be canonical hosts."""
+        with pytest.warns(DeprecationWarning, match="IntentClassifierProtocol is deprecated"):
+            from victor.agent.protocols import (
+                IntentClassifierProtocol as LegacyIntentClassifierProtocol,
+            )
+
+        with pytest.warns(DeprecationWarning, match="ReminderManagerProtocol is deprecated"):
+            from victor.agent.protocols import (
+                ReminderManagerProtocol as LegacyReminderManagerProtocol,
+            )
+
+        with pytest.warns(DeprecationWarning, match="ResponseSanitizerProtocol is deprecated"):
+            from victor.agent.protocols import (
+                ResponseSanitizerProtocol as LegacyResponseSanitizerProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="StreamingConfidenceMonitorProtocol is deprecated",
+        ):
+            from victor.agent.protocols import (
+                StreamingConfidenceMonitorProtocol as LegacyStreamingConfidenceMonitorProtocol,
+            )
+
+        with pytest.warns(DeprecationWarning, match="StreamingHandlerProtocol is deprecated"):
+            from victor.agent.protocols import (
+                StreamingHandlerProtocol as LegacyStreamingHandlerProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="StreamingMetricsCollectorProtocol is deprecated",
+        ):
+            from victor.agent.protocols import (
+                StreamingMetricsCollectorProtocol as LegacyStreamingMetricsCollectorProtocol,
+            )
 
         assert IntentClassifierProtocol is LegacyIntentClassifierProtocol
         assert ReminderManagerProtocol is LegacyReminderManagerProtocol
@@ -165,6 +212,25 @@ class TestProtocolDefinitions:
         assert StreamingHandlerProtocol is LegacyStreamingHandlerProtocol
         assert StreamingMetricsCollectorProtocol is LegacyStreamingMetricsCollectorProtocol
         assert StreamingConfidenceMonitorProtocol is LegacyStreamingConfidenceMonitorProtocol
+
+        assert IntentClassifierProtocol.__module__ == (
+            "victor.agent.services.protocols.infrastructure_runtime"
+        )
+        assert ReminderManagerProtocol.__module__ == (
+            "victor.agent.services.protocols.infrastructure_runtime"
+        )
+        assert ResponseSanitizerProtocol.__module__ == (
+            "victor.agent.services.protocols.infrastructure_runtime"
+        )
+        assert StreamingHandlerProtocol.__module__ == (
+            "victor.agent.services.protocols.infrastructure_runtime"
+        )
+        assert StreamingMetricsCollectorProtocol.__module__ == (
+            "victor.agent.services.protocols.infrastructure_runtime"
+        )
+        assert StreamingConfidenceMonitorProtocol.__module__ == (
+            "victor.agent.services.protocols.infrastructure_runtime"
+        )
 
     def test_streaming_runtime_support_aliases_match_canonical_identity(self):
         """Streaming support aliases should preserve identity where canonical hosts exist."""

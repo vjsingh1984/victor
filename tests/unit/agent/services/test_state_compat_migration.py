@@ -3,13 +3,12 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""TDD tests for state_compat migration to canonical API.
+"""TDD tests for live state runtime migration to the canonical API.
 
 Tests that:
-1. StateRuntimeAdapter from state_runtime has core functionality from StateCoordinator
+1. StateRuntimeAdapter preserves the legacy state-coordination contract shape
 2. ConversationController + ConversationStateMachine provide the underlying state
-3. The deprecated StateCoordinator shim properly warns
-4. Migration path is clear for callers
+3. Migration path is clear for callers without a concrete StateCoordinator shim
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from victor.agent.services.state_runtime import StateRuntimeAdapter
 
 
 class TestStateRuntimeAdapterParity:
-    """Verify StateRuntimeAdapter has core StateCoordinator functionality."""
+    """Verify StateRuntimeAdapter preserves the legacy state runtime contract."""
 
     @pytest.fixture
     def mock_controller(self):
@@ -49,7 +48,7 @@ class TestStateRuntimeAdapterParity:
         )
 
     def test_get_current_stage(self, adapter, mock_state_machine):
-        """StateCoordinator.get_current_stage -> StateRuntimeAdapter.get_current_stage"""
+        """Legacy get_current_stage contract maps to StateRuntimeAdapter."""
         mock_state_machine.get_stage.return_value = ConversationStage.READING
         assert adapter.get_current_stage() == ConversationStage.READING
 
@@ -64,7 +63,7 @@ class TestStateRuntimeAdapterParity:
         assert adapter.get_current_stage().value == "execution"
 
     def test_transition_to_success(self, adapter, mock_state_machine):
-        """StateCoordinator.transition_to -> StateRuntimeAdapter.transition_to"""
+        """Legacy transition_to contract maps to StateRuntimeAdapter."""
         mock_state_machine.get_stage.return_value = ConversationStage.PLANNING
         result = adapter.transition_to(ConversationStage.PLANNING)
         assert result is True
@@ -76,14 +75,14 @@ class TestStateRuntimeAdapterParity:
         assert result is True
 
     def test_get_message_history(self, adapter, mock_controller):
-        """StateCoordinator.get_message_history -> StateRuntimeAdapter.get_message_history"""
+        """Legacy get_message_history contract maps to StateRuntimeAdapter."""
         mock_messages = [MagicMock(), MagicMock()]
         mock_controller.messages = mock_messages
         result = adapter.get_message_history()
         assert result == mock_messages
 
     def test_get_recent_messages(self, adapter, mock_controller):
-        """StateCoordinator.get_recent_messages -> StateRuntimeAdapter.get_recent_messages"""
+        """Legacy get_recent_messages contract maps to StateRuntimeAdapter."""
         mock_messages = [
             MagicMock(role="system"),
             MagicMock(role="user"),
@@ -105,7 +104,7 @@ class TestStateRuntimeAdapterParity:
         assert len(result) == 2
 
     def test_is_in_exploration_phase(self, adapter, mock_state_machine):
-        """StateCoordinator.is_in_exploration_phase -> StateRuntimeAdapter.is_in_exploration_phase"""
+        """Legacy exploration-phase contract maps to StateRuntimeAdapter."""
         mock_state_machine.get_stage.return_value = ConversationStage.READING
         assert adapter.is_in_exploration_phase() is True
 
@@ -113,7 +112,7 @@ class TestStateRuntimeAdapterParity:
         assert adapter.is_in_exploration_phase() is False
 
     def test_is_in_execution_phase(self, adapter, mock_state_machine):
-        """StateCoordinator.is_in_execution_phase -> StateRuntimeAdapter.is_in_execution_phase"""
+        """Legacy execution-phase contract maps to StateRuntimeAdapter."""
         mock_state_machine.get_stage.return_value = ConversationStage.EXECUTION
         assert adapter.is_in_execution_phase() is True
 

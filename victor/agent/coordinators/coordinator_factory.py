@@ -49,9 +49,6 @@ from victor.agent.coordinators.factory_support import (
 from victor.agent.coordinators.protocol_dependencies import OrchestratorProtocolAdapter
 from victor.agent.orchestrator_protocols import (
     IAgentOrchestrator,
-    IToolExecutor,
-    IMessageStore,
-    IStateManager,
 )
 
 if TYPE_CHECKING:
@@ -77,9 +74,9 @@ class CoordinatorFactory:
         - SystemPromptCoordinator: Compatibility system prompt wrapper
         - SystemPromptStatePassedCoordinator: Canonical state-passed prompt classification
         - MetricsCoordinator: Metrics collection
-        - SafetyCoordinator: Legacy safety coordination
+        - SafetyCoordinator: SDK-owned compatibility / extension surface
         - SafetyStatePassedCoordinator: Canonical state-passed safety wrapper
-        - ConversationCoordinator: Conversation management
+        - ConversationCoordinator: SDK-owned compatibility / extension surface
 
     Example:
         >>> factory = CoordinatorFactory(container)
@@ -247,7 +244,7 @@ class CoordinatorFactory:
 
     def create_safety_coordinator(self) -> Any:
         """
-        Create safety coordinator with protocol dependencies.
+        Create the deprecated SDK-owned safety compatibility surface.
 
         Returns:
             SafetyCoordinator instance
@@ -256,13 +253,15 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.safety_coordinator import SafetyCoordinator
+            self._warn_sdk_compatibility_surface(
+                "create_safety_coordinator()",
+                "Use create_safety_state_passed_coordinator() for agent runtime "
+                "behavior, or instantiate victor_sdk.safety.SafetyCoordinator "
+                "directly for extensions.",
+            )
+            from victor_sdk.safety import SafetyCoordinator
 
-            # Resolve state manager for safety rules
-            state_manager = self._resolve_state_manager()
-
-            # Create coordinator
-            coordinator = SafetyCoordinator(state_manager=state_manager)
+            coordinator = SafetyCoordinator()
 
             logger.debug("CoordinatorFactory: Created SafetyCoordinator")
             return coordinator
@@ -296,7 +295,7 @@ class CoordinatorFactory:
 
     def create_conversation_coordinator(self) -> Any:
         """
-        Create conversation coordinator with protocol dependencies.
+        Create the deprecated SDK-owned conversation compatibility surface.
 
         Returns:
             ConversationCoordinator instance
@@ -305,17 +304,16 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.conversation_coordinator import ConversationCoordinator
-
-            # Resolve message store
-            message_store = self._resolve_message_store()
-            state_manager = self._resolve_state_manager()
-
-            # Create coordinator
-            coordinator = ConversationCoordinator(
-                message_store=message_store,
-                state_manager=state_manager,
+            self._warn_sdk_compatibility_surface(
+                "create_conversation_coordinator()",
+                "Conversation coordination is not a canonical victor.agent "
+                "runtime surface; instantiate "
+                "victor_sdk.conversation.ConversationCoordinator directly for "
+                "extensions.",
             )
+            from victor_sdk.conversation import ConversationCoordinator
+
+            coordinator = ConversationCoordinator()
 
             logger.debug("CoordinatorFactory: Created ConversationCoordinator")
             return coordinator
@@ -323,6 +321,15 @@ class CoordinatorFactory:
         except Exception as e:
             logger.error(f"CoordinatorFactory: Failed to create ConversationCoordinator: {e}")
             raise RuntimeError(f"Failed to create ConversationCoordinator: {e}") from e
+
+    def _warn_sdk_compatibility_surface(self, method_name: str, guidance: str) -> None:
+        """Warn when legacy factory methods expose SDK-owned compatibility seams."""
+        warnings.warn(
+            f"CoordinatorFactory.{method_name} is a deprecated SDK-owned "
+            f"compatibility surface. {guidance}",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def _resolve_orchestrator(self) -> IAgentOrchestrator:
         """Resolve orchestrator from container or create adapter."""
@@ -342,47 +349,5 @@ class CoordinatorFactory:
             else:
                 logger.warning("CoordinatorFactory: No orchestrator found in container")
                 raise RuntimeError("Orchestrator not found in container")
-
-        return self._orchestrator_adapter
-
-    def _resolve_tool_executor(self) -> IToolExecutor:
-        """Resolve tool executor from container or create adapter."""
-        # Try container first
-        executor = self._container.get_optional(IToolExecutor)
-        if executor is not None:
-            return executor
-
-        # Create adapter from orchestrator
-        orchestrator = self._resolve_orchestrator()
-        if self._orchestrator_adapter is None:
-            self._orchestrator_adapter = OrchestratorProtocolAdapter(orchestrator)
-
-        return self._orchestrator_adapter
-
-    def _resolve_message_store(self) -> IMessageStore:
-        """Resolve message store from container or create adapter."""
-        # Try container first
-        store = self._container.get_optional(IMessageStore)
-        if store is not None:
-            return store
-
-        # Create adapter from orchestrator
-        orchestrator = self._resolve_orchestrator()
-        if self._orchestrator_adapter is None:
-            self._orchestrator_adapter = OrchestratorProtocolAdapter(orchestrator)
-
-        return self._orchestrator_adapter
-
-    def _resolve_state_manager(self) -> IStateManager:
-        """Resolve state manager from container or create adapter."""
-        # Try container first
-        manager = self._container.get_optional(IStateManager)
-        if manager is not None:
-            return manager
-
-        # Create adapter from orchestrator
-        orchestrator = self._resolve_orchestrator()
-        if self._orchestrator_adapter is None:
-            self._orchestrator_adapter = OrchestratorProtocolAdapter(orchestrator)
 
         return self._orchestrator_adapter

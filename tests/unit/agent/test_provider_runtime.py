@@ -83,3 +83,17 @@ def test_create_provider_runtime_components_switch_coordinator_removed():
 
     # ProviderSwitchCoordinator was removed - use ProviderService instead
     assert not hasattr(runtime, "provider_switch_coordinator")
+
+
+def test_create_provider_runtime_components_accepts_legacy_get_provider_service_kwarg():
+    """Older callers passing get_provider_service should not fail."""
+    manager = MagicMock()
+    settings = SimpleNamespace(feature_flags=SimpleNamespace(use_provider_pooling=False))
+
+    runtime = create_provider_runtime_components(
+        settings=settings,
+        provider_manager=manager,
+        get_provider_service=lambda: object(),
+    )
+
+    assert runtime.pool is None

@@ -6,7 +6,6 @@ from typing import (
     Any,
     Dict,
     Protocol,
-    TYPE_CHECKING,
     runtime_checkable,
 )
 
@@ -89,37 +88,6 @@ class SearchRouterProtocol(Protocol):
 
 
 @runtime_checkable
-class IntentClassifierProtocol(Protocol):
-    """Protocol for intent classification service.
-
-    Classifies user intents using ML models.
-    """
-
-    def classify(self, text: str) -> Any:
-        """Classify user intent.
-
-        Args:
-            text: User input text
-
-        Returns:
-            Classified intent (IntentType or similar)
-        """
-        ...
-
-    def get_confidence(self, text: str, intent: Any) -> float:
-        """Get confidence score for a specific intent.
-
-        Args:
-            text: User input text
-            intent: Intent to check
-
-        Returns:
-            Confidence score (0-1)
-        """
-        ...
-
-
-@runtime_checkable
 class TaskTypeHinterProtocol(Protocol):
     """Protocol for task type hint retrieval.
 
@@ -174,3 +142,11 @@ class IToolCallClassifier(Protocol):
             tool_name: Name of the tool to add
         """
         ...
+
+
+# NOTE: IntentClassifierProtocol is a canonical service-owned runtime protocol
+# in victor.agent.services.protocols.infrastructure_runtime. This module
+# re-exports it at the bottom as a deprecated compatibility name.
+
+
+from victor.agent.services.protocols.infrastructure_runtime import IntentClassifierProtocol

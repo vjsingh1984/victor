@@ -91,8 +91,21 @@ def create_provider_runtime_components(
     settings: Any,
     provider_manager: Any,
     pool: Optional[Any] = None,
+    get_provider_service: Optional[Callable[[], Any]] = None,
 ) -> ProviderRuntimeComponents:
-    """Create lazy provider runtime components for orchestrator wiring."""
+    """Create lazy provider runtime components for orchestrator wiring.
+
+    ``get_provider_service`` is accepted as a no-op compatibility kwarg so
+    mixed-version environments do not fail during the coordinator-removal
+    migration. The canonical ProviderService is now initialized directly by the
+    orchestrator.
+    """
+
+    if get_provider_service is not None:
+        logger.debug(
+            "Ignoring deprecated get_provider_service compatibility kwarg in "
+            "create_provider_runtime_components()"
+        )
 
     # Feature-flagged provider pooling
     resolved_pool = pool

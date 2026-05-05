@@ -433,101 +433,10 @@ def _get_provider_runtime_component(
     return getattr(runtime, component_name, None)
 
 
-def _synthesize_provider_coordinator_compat(self: "AgentOrchestrator") -> Optional[Any]:
-    """Materialize the deprecated ProviderCoordinator shim on demand."""
-    if getattr(self, "_provider_runtime", None) is None:
-        return None
-
-    provider_manager = getattr(self, "_provider_manager", None)
-    if provider_manager is None:
-        return None
-
-    from victor.agent.provider.coordinator import create_provider_coordinator
-
-    coordinator = create_provider_coordinator(provider_manager=provider_manager)
-    provider_service = getattr(self, "_provider_service", None)
-    if provider_service is not None and hasattr(coordinator, "bind_provider_service"):
-        coordinator.bind_provider_service(provider_service)
-    self._deprecated_provider_coordinator = coordinator
-    return coordinator
 
 
-def _synthesize_provider_switch_coordinator_compat(self: "AgentOrchestrator") -> Optional[Any]:
-    """Materialize the deprecated ProviderSwitchCoordinator shim on demand."""
-    if getattr(self, "_provider_runtime", None) is None:
-        return None
-
-    provider_manager = getattr(self, "_provider_manager", None)
-    provider_switcher = getattr(provider_manager, "_provider_switcher", None)
-    if provider_switcher is None:
-        return None
-
-    from victor.agent.provider.switch_coordinator import (
-        create_provider_switch_coordinator,
-    )
-
-    coordinator = create_provider_switch_coordinator(
-        provider_switcher=provider_switcher,
-        health_monitor=getattr(provider_manager, "_health_monitor", None),
-    )
-    self._deprecated_provider_switch_coordinator = coordinator
-    return coordinator
 
 
-def _provider_coordinator_get(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated ProviderCoordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator._provider_coordinator is deprecated compatibility surface. "
-        "Use ProviderService instead. This alias lazily materializes a "
-        "compatibility shim when accessed.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    override = getattr(self, "_deprecated_provider_coordinator", None)
-    if override is not None:
-        return override
-    runtime_component = _get_provider_runtime_component(self, "provider_coordinator")
-    if runtime_component is not None:
-        return runtime_component
-    return _synthesize_provider_coordinator_compat(self)
-
-
-def _provider_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
-    warnings.warn(
-        "AgentOrchestrator._provider_coordinator is deprecated compatibility surface. "
-        "Store explicit compatibility overrides on _deprecated_provider_coordinator instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    self._deprecated_provider_coordinator = value
-
-
-def _provider_switch_coordinator_get(self: "AgentOrchestrator") -> Any:
-    """Get the deprecated ProviderSwitchCoordinator compatibility shim."""
-    warnings.warn(
-        "AgentOrchestrator._provider_switch_coordinator is deprecated compatibility surface. "
-        "Use ProviderService instead. This alias lazily materializes a "
-        "compatibility shim when accessed.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    override = getattr(self, "_deprecated_provider_switch_coordinator", None)
-    if override is not None:
-        return override
-    runtime_component = _get_provider_runtime_component(self, "provider_switch_coordinator")
-    if runtime_component is not None:
-        return runtime_component
-    return _synthesize_provider_switch_coordinator_compat(self)
-
-
-def _provider_switch_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
-    warnings.warn(
-        "AgentOrchestrator._provider_switch_coordinator is deprecated compatibility surface. "
-        "Store explicit compatibility overrides on _deprecated_provider_switch_coordinator instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    self._deprecated_provider_switch_coordinator = value
 
 
 def _mode_workflow_team_coordinator_get(self: "AgentOrchestrator") -> Any:
@@ -645,11 +554,6 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "_cumulative_token_usage": (
         _cumulative_token_usage_get,
         _cumulative_token_usage_set,
-    ),
-    "_provider_coordinator": (_provider_coordinator_get, _provider_coordinator_set),
-    "_provider_switch_coordinator": (
-        _provider_switch_coordinator_get,
-        _provider_switch_coordinator_set,
     ),
     "_mode_workflow_team_coordinator": (
         _mode_workflow_team_coordinator_get,

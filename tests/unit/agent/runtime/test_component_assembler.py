@@ -51,7 +51,7 @@ def test_assemble_tools_prefers_canonical_registrar_registration_surface():
     registrar.register_default_tools.assert_called_once_with()
 
 
-def test_assemble_conversation_prefers_canonical_prompt_runtime_support_surface():
+def test_assemble_conversation_does_not_wire_prompt_runtime_support_into_runtime():
     factory = MagicMock()
     factory.create_conversation_controller.return_value = MagicMock()
     factory.create_hierarchical_compaction_manager.return_value = MagicMock()
@@ -62,7 +62,6 @@ def test_assemble_conversation_prefers_canonical_prompt_runtime_support_surface(
     factory.create_streaming_controller.return_value = MagicMock()
     factory.create_streaming_coordinator.return_value = MagicMock()
     factory.create_streaming_chat_handler.return_value = MagicMock()
-    factory.create_prompt_runtime_support.return_value = MagicMock()
 
     container = MagicMock()
     container.register_or_replace = MagicMock()
@@ -111,17 +110,7 @@ def test_assemble_conversation_prefers_canonical_prompt_runtime_support_surface(
             model="claude-3-sonnet",
         )
 
-    factory.create_prompt_runtime_support.assert_called_once()
-    kwargs = factory.create_prompt_runtime_support.call_args.kwargs
-    assert kwargs["prompt_builder"] is orchestrator.prompt_builder
-    assert kwargs["get_context_window"] is orchestrator._get_model_context_window
-    assert kwargs["provider_name"] == orchestrator.provider_name
-    assert kwargs["model_name"] == orchestrator.model
+    factory.create_prompt_runtime_support.assert_not_called()
     assert orchestrator._task_analyzer is analyzer
     analyzer.set_runtime_subject.assert_called_once_with(orchestrator)
-    assert kwargs["task_analyzer"] is analyzer
-    assert callable(kwargs["get_tools"])
-    assert callable(kwargs["get_mode_controller"])
-    assert (
-        orchestrator._prompt_runtime_support is factory.create_prompt_runtime_support.return_value
-    )
+    assert not hasattr(orchestrator, "_prompt_runtime_support")

@@ -44,6 +44,7 @@ class ChatFacade:
         - conversation_state: ConversationStateMachine for stage transitions
         - memory_manager: Optional conversation memory store
         - memory_session_id: Session identifier for memory operations
+        - runtime_state_host: Canonical runtime owner for mutable chat state
         - embedding_store: Optional conversation embedding store
         - intent_classifier: Optional intent classifier
         - intent_detector: Action authorizer / intent detection
@@ -62,6 +63,7 @@ class ChatFacade:
         conversation_state: Any,
         memory_manager: Optional[Any] = None,
         memory_session_id: Optional[str] = None,
+        runtime_state_host: Optional[Any] = None,
         embedding_store: Optional[Any] = None,
         intent_classifier: Optional[Any] = None,
         intent_detector: Optional[Any] = None,
@@ -76,6 +78,7 @@ class ChatFacade:
         self._conversation_state = conversation_state
         self._memory_manager = memory_manager
         self._memory_session_id = memory_session_id
+        self._runtime_state_host = runtime_state_host
         self._embedding_store = embedding_store
         self._intent_classifier = intent_classifier
         self._intent_detector = intent_detector
@@ -119,16 +122,30 @@ class ChatFacade:
     @property
     def memory_session_id(self) -> Optional[str]:
         """Session identifier for memory operations."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_memory_session_id",
+                self._memory_session_id,
+            )
         return self._memory_session_id
 
     @property
     def embedding_store(self) -> Optional[Any]:
         """Optional conversation embedding store."""
+        if self._runtime_state_host is not None:
+            return getattr(
+                self._runtime_state_host,
+                "_conversation_embedding_store",
+                self._embedding_store,
+            )
         return self._embedding_store
 
     @embedding_store.setter
     def embedding_store(self, value: Any) -> None:
         """Update the embedding store (set during lazy init)."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._conversation_embedding_store = value
         self._embedding_store = value
 
     @property
@@ -149,11 +166,15 @@ class ChatFacade:
     @property
     def system_prompt(self) -> str:
         """Current system prompt text."""
+        if self._runtime_state_host is not None:
+            return getattr(self._runtime_state_host, "_system_prompt", self._system_prompt)
         return self._system_prompt
 
     @system_prompt.setter
     def system_prompt(self, value: str) -> None:
         """Update the system prompt."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._system_prompt = value
         self._system_prompt = value
 
     @property
@@ -164,11 +185,15 @@ class ChatFacade:
     @property
     def context_compactor(self) -> Optional[Any]:
         """Context compaction for long conversations."""
+        if self._runtime_state_host is not None:
+            return getattr(self._runtime_state_host, "_context_compactor", self._context_compactor)
         return self._context_compactor
 
     @context_compactor.setter
     def context_compactor(self, value: Any) -> None:
         """Update the context compactor reference."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._context_compactor = value
         self._context_compactor = value
 
     @property

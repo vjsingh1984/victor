@@ -84,17 +84,28 @@ def create_prompt_runtime_support(
     task_analyzer: Optional[Any] = None,
     session_id: str = "",
 ) -> Any:
-    """Create the canonical internal prompt runtime support surface."""
-    from victor.agent.services.prompt_runtime_support import PromptRuntimeSupport
+    """Create the canonical internal prompt runtime support surface.
 
-    return PromptRuntimeSupport(
-        prompt_builder=prompt_builder,
-        get_context_window=get_context_window,
-        provider_name=provider_name,
-        model_name=model_name,
-        get_tools=get_tools,
-        get_mode_controller=get_mode_controller,
+    Migration Notes (2026-05-04):
+    - PromptRuntimeSupport removed
+    - This function now returns UnifiedPromptPipeline
+    - Use UnifiedPromptPipeline directly for new code
+    """
+    from victor.agent.prompt_pipeline import UnifiedPromptPipeline
+    from victor.agent.content_registry import ContentRegistry
+    from victor.agent.optimization_injector import OptimizationInjector
+
+    # Create registry and optimizer
+    registry = ContentRegistry()
+    optimizer = OptimizationInjector()
+
+    return UnifiedPromptPipeline(
+        provider=None,  # Will detect tier as NO_CACHE
+        builder=prompt_builder,
+        registry=registry,
+        optimizer=optimizer,
         task_analyzer=task_analyzer or resolve_task_analyzer(container),
+        get_context_window=get_context_window or (lambda: 128000),
         session_id=session_id,
     )
 

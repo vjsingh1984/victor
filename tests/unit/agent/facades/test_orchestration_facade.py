@@ -15,6 +15,7 @@
 """Tests for OrchestrationFacade domain facade."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from victor.agent.facades.orchestration_facade import OrchestrationFacade
@@ -673,6 +674,176 @@ class TestOrchestrationFacadeProperties:
         new_iter = MagicMock(name="new_iter")
         facade.iteration_coordinator = new_iter
         assert facade.iteration_coordinator is new_iter
+
+    def test_runtime_state_host_keeps_orchestration_runtime_state_live(self):
+        """OrchestrationFacade should reflect canonical mutable orchestration state."""
+        runtime_state_host = SimpleNamespace(
+            _chat_stream_adapter=MagicMock(name="runtime_adapter"),
+            _turn_executor=MagicMock(name="runtime_turn_executor"),
+            _protocol_adapter=MagicMock(name="runtime_protocol_adapter"),
+            _iteration_coordinator=MagicMock(name="runtime_iteration"),
+            _observability=MagicMock(name="runtime_observability"),
+            _runtime_intelligence_integration=MagicMock(name="runtime_intelligence"),
+            _subagent_orchestrator=MagicMock(name="runtime_subagent"),
+        )
+        facade = OrchestrationFacade(
+            chat_stream_adapter=MagicMock(name="stale_adapter"),
+            turn_executor=MagicMock(name="stale_turn_executor"),
+            protocol_adapter=MagicMock(name="stale_protocol_adapter"),
+            iteration_coordinator=MagicMock(name="stale_iteration"),
+            observability=MagicMock(name="stale_observability"),
+            runtime_intelligence_integration=MagicMock(name="stale_intelligence"),
+            subagent_orchestrator=MagicMock(name="stale_subagent"),
+            runtime_state_host=runtime_state_host,
+        )
+
+        assert facade.chat_stream_adapter is runtime_state_host._chat_stream_adapter
+        assert facade.turn_executor is runtime_state_host._turn_executor
+        assert facade.protocol_adapter is runtime_state_host._protocol_adapter
+        assert facade.iteration_coordinator is runtime_state_host._iteration_coordinator
+        assert facade.observability is runtime_state_host._observability
+        assert (
+            facade.runtime_intelligence_integration
+            is runtime_state_host._runtime_intelligence_integration
+        )
+        assert facade.subagent_orchestrator is runtime_state_host._subagent_orchestrator
+
+        runtime_state_host._chat_stream_adapter = MagicMock(name="updated_adapter")
+        runtime_state_host._turn_executor = MagicMock(name="updated_turn_executor")
+        runtime_state_host._protocol_adapter = MagicMock(name="updated_protocol_adapter")
+        runtime_state_host._iteration_coordinator = MagicMock(name="updated_iteration")
+        runtime_state_host._observability = MagicMock(name="updated_observability")
+        runtime_state_host._runtime_intelligence_integration = MagicMock(
+            name="updated_intelligence"
+        )
+        runtime_state_host._subagent_orchestrator = MagicMock(name="updated_subagent")
+
+        assert facade.chat_stream_adapter is runtime_state_host._chat_stream_adapter
+        assert facade.turn_executor is runtime_state_host._turn_executor
+        assert facade.protocol_adapter is runtime_state_host._protocol_adapter
+        assert facade.iteration_coordinator is runtime_state_host._iteration_coordinator
+        assert facade.observability is runtime_state_host._observability
+        assert (
+            facade.runtime_intelligence_integration
+            is runtime_state_host._runtime_intelligence_integration
+        )
+        assert facade.subagent_orchestrator is runtime_state_host._subagent_orchestrator
+
+    def test_runtime_state_host_setters_update_canonical_orchestration_state(self):
+        """Compatibility setters should write through to canonical orchestration state."""
+        runtime_state_host = SimpleNamespace(
+            _turn_executor=MagicMock(name="runtime_turn_executor"),
+            _protocol_adapter=MagicMock(name="runtime_protocol_adapter"),
+            _iteration_coordinator=MagicMock(name="runtime_iteration"),
+            _observability=MagicMock(name="runtime_observability"),
+            _runtime_intelligence_integration=MagicMock(name="runtime_intelligence"),
+            _subagent_orchestrator=MagicMock(name="runtime_subagent"),
+        )
+        facade = OrchestrationFacade(
+            turn_executor=MagicMock(name="stale_turn_executor"),
+            protocol_adapter=MagicMock(name="stale_protocol_adapter"),
+            iteration_coordinator=MagicMock(name="stale_iteration"),
+            observability=MagicMock(name="stale_observability"),
+            runtime_intelligence_integration=MagicMock(name="stale_intelligence"),
+            subagent_orchestrator=MagicMock(name="stale_subagent"),
+            runtime_state_host=runtime_state_host,
+        )
+        new_turn_executor = MagicMock(name="new_turn_executor")
+        new_protocol_adapter = MagicMock(name="new_protocol_adapter")
+        new_iteration = MagicMock(name="new_iteration")
+        new_observability = MagicMock(name="new_observability")
+        new_intelligence = MagicMock(name="new_intelligence")
+        new_subagent = MagicMock(name="new_subagent")
+
+        facade.turn_executor = new_turn_executor
+        facade.protocol_adapter = new_protocol_adapter
+        facade.iteration_coordinator = new_iteration
+        facade.observability = new_observability
+        facade.runtime_intelligence_integration = new_intelligence
+        facade.subagent_orchestrator = new_subagent
+
+        assert runtime_state_host._turn_executor is new_turn_executor
+        assert runtime_state_host._protocol_adapter is new_protocol_adapter
+        assert runtime_state_host._iteration_coordinator is new_iteration
+        assert runtime_state_host._observability is new_observability
+        assert runtime_state_host._runtime_intelligence_integration is new_intelligence
+        assert runtime_state_host._subagent_orchestrator is new_subagent
+
+    def test_runtime_state_host_keeps_deprecated_chat_shims_live(self):
+        """Deprecated orchestration chat shims should reflect canonical host state."""
+        runtime_state_host = SimpleNamespace(
+            _deprecated_chat_coordinator=MagicMock(name="runtime_chat"),
+            _deprecated_tool_coordinator=MagicMock(name="runtime_tool"),
+            _deprecated_session_coordinator=MagicMock(name="runtime_session"),
+            _deprecated_sync_chat_coordinator=MagicMock(name="runtime_sync"),
+            _deprecated_streaming_chat_coordinator=MagicMock(name="runtime_streaming"),
+            _deprecated_unified_chat_coordinator=MagicMock(name="runtime_unified"),
+        )
+        facade = OrchestrationFacade(
+            deprecated_chat_coordinator=MagicMock(name="stale_chat"),
+            deprecated_tool_coordinator=MagicMock(name="stale_tool"),
+            deprecated_session_coordinator=MagicMock(name="stale_session"),
+            deprecated_sync_chat_coordinator=MagicMock(name="stale_sync"),
+            deprecated_streaming_chat_coordinator=MagicMock(name="stale_streaming"),
+            deprecated_unified_chat_coordinator=MagicMock(name="stale_unified"),
+            runtime_state_host=runtime_state_host,
+        )
+
+        with pytest.warns(DeprecationWarning):
+            assert facade.chat_coordinator is runtime_state_host._deprecated_chat_coordinator
+        with pytest.warns(DeprecationWarning):
+            assert facade.tool_coordinator is runtime_state_host._deprecated_tool_coordinator
+        with pytest.warns(DeprecationWarning):
+            assert facade.session_coordinator is runtime_state_host._deprecated_session_coordinator
+        with pytest.warns(DeprecationWarning):
+            assert facade.sync_chat_coordinator is runtime_state_host._deprecated_sync_chat_coordinator
+        with pytest.warns(DeprecationWarning):
+            assert (
+                facade.streaming_chat_coordinator
+                is runtime_state_host._deprecated_streaming_chat_coordinator
+            )
+        with pytest.warns(DeprecationWarning):
+            assert (
+                facade.unified_chat_coordinator
+                is runtime_state_host._deprecated_unified_chat_coordinator
+            )
+
+    def test_runtime_state_host_deprecated_chat_shim_setters_update_canonical_state(self):
+        """Deprecated shim setters should write through to canonical host state."""
+        runtime_state_host = SimpleNamespace(
+            _deprecated_sync_chat_coordinator=MagicMock(name="runtime_sync"),
+            _deprecated_streaming_chat_coordinator=MagicMock(name="runtime_streaming"),
+            _deprecated_unified_chat_coordinator=MagicMock(name="runtime_unified"),
+        )
+        facade = OrchestrationFacade(
+            deprecated_sync_chat_coordinator=MagicMock(name="stale_sync"),
+            deprecated_streaming_chat_coordinator=MagicMock(name="stale_streaming"),
+            deprecated_unified_chat_coordinator=MagicMock(name="stale_unified"),
+            runtime_state_host=runtime_state_host,
+        )
+        new_sync = MagicMock(name="new_sync")
+        new_streaming = MagicMock(name="new_streaming")
+        new_unified = MagicMock(name="new_unified")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.sync_chat_coordinator is deprecated",
+        ):
+            facade.sync_chat_coordinator = new_sync
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.streaming_chat_coordinator is deprecated",
+        ):
+            facade.streaming_chat_coordinator = new_streaming
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.unified_chat_coordinator is deprecated",
+        ):
+            facade.unified_chat_coordinator = new_unified
+
+        assert runtime_state_host._deprecated_sync_chat_coordinator is new_sync
+        assert runtime_state_host._deprecated_streaming_chat_coordinator is new_streaming
+        assert runtime_state_host._deprecated_unified_chat_coordinator is new_unified
 
 
 class TestOrchestrationFacadeProtocolConformance:

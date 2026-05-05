@@ -154,10 +154,25 @@ for _mod, _names in _MODULE_MEMBERS.items():
 __all__ = list(_SUBMODULE_MAP.keys())
 
 _DEPRECATED_EXPORTS = {
+    "IntentClassifierProtocol": (
+        "victor.agent.protocols.IntentClassifierProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.IntentClassifierProtocol."
+    ),
     "CoordinationAdvisorRuntimeProtocol": (
         "victor.agent.protocols.CoordinationAdvisorRuntimeProtocol is deprecated "
         "compatibility surface. Prefer "
         "victor.agent.services.protocols.CoordinationAdvisorRuntimeProtocol."
+    ),
+    "ReminderManagerProtocol": (
+        "victor.agent.protocols.ReminderManagerProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.ReminderManagerProtocol."
+    ),
+    "ResponseSanitizerProtocol": (
+        "victor.agent.protocols.ResponseSanitizerProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.ResponseSanitizerProtocol."
     ),
     "ToolCoordinatorProtocol": (
         "victor.agent.protocols.ToolCoordinatorProtocol is deprecated compatibility "
@@ -187,6 +202,21 @@ _DEPRECATED_EXPORTS = {
         "victor.agent.protocols.StreamingRecoveryCoordinatorProtocol is deprecated "
         "compatibility surface. Prefer "
         "victor.agent.services.protocols.StreamingRecoveryRuntimeProtocol."
+    ),
+    "StreamingHandlerProtocol": (
+        "victor.agent.protocols.StreamingHandlerProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.StreamingHandlerProtocol."
+    ),
+    "StreamingMetricsCollectorProtocol": (
+        "victor.agent.protocols.StreamingMetricsCollectorProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.StreamingMetricsCollectorProtocol."
+    ),
+    "StreamingConfidenceMonitorProtocol": (
+        "victor.agent.protocols.StreamingConfidenceMonitorProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.StreamingConfidenceMonitorProtocol."
     ),
     "RLCoordinatorProtocol": (
         "victor.agent.protocols.RLCoordinatorProtocol is deprecated compatibility "

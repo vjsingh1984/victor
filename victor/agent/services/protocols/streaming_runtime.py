@@ -27,12 +27,13 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, Set, runtime_checkable
 
-from victor.agent.protocols.analysis_protocols import (
+from victor.agent.services.protocols.infrastructure_runtime import (
     IntentClassifierProtocol as StreamingIntentClassifierRuntimeProtocol,
-)
-from victor.agent.protocols.infrastructure_protocols import (
     ReminderManagerProtocol as StreamingReminderRuntimeProtocol,
     ResponseSanitizerProtocol as StreamingSanitizerRuntimeProtocol,
+    StreamingConfidenceMonitorProtocol,
+    StreamingHandlerProtocol,
+    StreamingMetricsCollectorProtocol,
 )
 from victor.agent.services.protocols.runtime_support import (
     ChunkRuntimeProtocol as StreamingChunkRuntimeProtocol,

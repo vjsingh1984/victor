@@ -15,8 +15,10 @@
 """Tests for ResilienceFacade domain facade."""
 
 import asyncio
-import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
+
+import pytest
 
 from victor.agent.facades.resilience_facade import ResilienceFacade
 from victor.agent.facades.protocols import ResilienceFacadeProtocol
@@ -129,6 +131,68 @@ class TestResilienceFacadeProperties:
         event = asyncio.Event()
         facade.cancel_event = event
         assert facade.cancel_event is event
+
+    def test_runtime_state_host_keeps_resilience_runtime_state_live(self):
+        """ResilienceFacade should reflect canonical mutable resilience runtime state."""
+        runtime_state_host = SimpleNamespace(
+            _recovery_handler=MagicMock(name="runtime_handler"),
+            _recovery_integration=MagicMock(name="runtime_integration"),
+            _cancel_event=asyncio.Event(),
+            _is_streaming=True,
+        )
+        facade = ResilienceFacade(
+            resilience_runtime=MagicMock(name="runtime"),
+            recovery_handler=MagicMock(name="stale_handler"),
+            recovery_integration=MagicMock(name="stale_integration"),
+            cancel_event=asyncio.Event(),
+            is_streaming=False,
+            runtime_state_host=runtime_state_host,
+        )
+
+        assert facade.recovery_handler is runtime_state_host._recovery_handler
+        assert facade.recovery_integration is runtime_state_host._recovery_integration
+        assert facade.cancel_event is runtime_state_host._cancel_event
+        assert facade.is_streaming is True
+
+        runtime_state_host._recovery_handler = MagicMock(name="updated_handler")
+        runtime_state_host._recovery_integration = MagicMock(name="updated_integration")
+        runtime_state_host._cancel_event = asyncio.Event()
+        runtime_state_host._is_streaming = False
+
+        assert facade.recovery_handler is runtime_state_host._recovery_handler
+        assert facade.recovery_integration is runtime_state_host._recovery_integration
+        assert facade.cancel_event is runtime_state_host._cancel_event
+        assert facade.is_streaming is False
+
+    def test_runtime_state_host_setters_update_canonical_resilience_state(self):
+        """ResilienceFacade compatibility setters should write through to runtime state."""
+        runtime_state_host = SimpleNamespace(
+            _recovery_handler=MagicMock(name="runtime_handler"),
+            _recovery_integration=MagicMock(name="runtime_integration"),
+            _cancel_event=asyncio.Event(),
+            _is_streaming=False,
+        )
+        facade = ResilienceFacade(
+            resilience_runtime=MagicMock(name="runtime"),
+            recovery_handler=MagicMock(name="stale_handler"),
+            recovery_integration=MagicMock(name="stale_integration"),
+            cancel_event=asyncio.Event(),
+            is_streaming=True,
+            runtime_state_host=runtime_state_host,
+        )
+        new_handler = MagicMock(name="new_handler")
+        new_integration = MagicMock(name="new_integration")
+        new_event = asyncio.Event()
+
+        facade.recovery_handler = new_handler
+        facade.recovery_integration = new_integration
+        facade.cancel_event = new_event
+        facade.is_streaming = True
+
+        assert runtime_state_host._recovery_handler is new_handler
+        assert runtime_state_host._recovery_integration is new_integration
+        assert runtime_state_host._cancel_event is new_event
+        assert runtime_state_host._is_streaming is True
 
 
 class TestResilienceFacadeProtocolConformance:

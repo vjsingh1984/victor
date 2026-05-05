@@ -39,8 +39,7 @@ class TestProviderFacadeInit:
             thinking=True,
             provider_manager=manager,
             provider_runtime=MagicMock(),
-            provider_coordinator=MagicMock(),
-            provider_switch_coordinator=MagicMock(),
+            provider_service=MagicMock(),
         )
 
         assert facade.provider is provider
@@ -70,79 +69,7 @@ class TestProviderFacadeInit:
         assert facade.thinking is False
         assert facade.provider_manager is manager
         assert facade.provider_runtime is None
-        assert facade.provider_coordinator is None
-        assert facade.provider_switch_coordinator is None
-
-    def test_init_derives_deprecated_coordinators_from_runtime(self):
-        """Deprecated coordinator accessors derive from provider runtime by default."""
-        provider = MagicMock()
-        manager = MagicMock()
-        provider_coordinator = MagicMock(name="provider_coordinator")
-        switch_coordinator = MagicMock(name="switch_coordinator")
-        runtime = SimpleNamespace(
-            provider_coordinator=provider_coordinator,
-            provider_switch_coordinator=switch_coordinator,
-        )
-
-        facade = ProviderFacade(
-            provider=provider,
-            model="gpt-4",
-            provider_manager=manager,
-            provider_runtime=runtime,
-        )
-
-        assert facade.provider_runtime is runtime
-        assert facade.provider_coordinator is provider_coordinator
-        assert facade.provider_switch_coordinator is switch_coordinator
-
-    def test_init_synthesizes_deprecated_coordinators_when_runtime_has_no_handles(self):
-        """Deprecated accessors should still materialize compatibility shims."""
-        provider = MagicMock()
-        manager = MagicMock()
-        manager._provider_switcher = MagicMock(name="provider_switcher")
-        manager._health_monitor = MagicMock(name="health_monitor")
-        provider_service = MagicMock(name="provider_service")
-        runtime = SimpleNamespace()
-
-        facade = ProviderFacade(
-            provider=provider,
-            model="gpt-4",
-            provider_manager=manager,
-            provider_runtime=runtime,
-            provider_service=provider_service,
-        )
-
-        provider_coordinator = facade.provider_coordinator
-        switch_coordinator = facade.provider_switch_coordinator
-
-        assert provider_coordinator is not None
-        assert switch_coordinator is not None
-        assert facade.provider_coordinator is provider_coordinator
-        assert facade.provider_switch_coordinator is switch_coordinator
-        assert provider_coordinator._provider_service is provider_service
-
-    def test_init_prefers_explicit_deprecated_coordinator_over_runtime(self):
-        """Explicit compatibility slots still override runtime-derived values."""
-        provider = MagicMock()
-        manager = MagicMock()
-        explicit_provider_coordinator = MagicMock(name="explicit_provider_coordinator")
-        explicit_switch_coordinator = MagicMock(name="explicit_switch_coordinator")
-        runtime = SimpleNamespace(
-            provider_coordinator=MagicMock(name="runtime_provider_coordinator"),
-            provider_switch_coordinator=MagicMock(name="runtime_switch_coordinator"),
-        )
-
-        facade = ProviderFacade(
-            provider=provider,
-            model="gpt-4",
-            provider_manager=manager,
-            provider_runtime=runtime,
-            provider_coordinator=explicit_provider_coordinator,
-            provider_switch_coordinator=explicit_switch_coordinator,
-        )
-
-        assert facade.provider_coordinator is explicit_provider_coordinator
-        assert facade.provider_switch_coordinator is explicit_switch_coordinator
+        assert facade._provider_service is None
 
 
 class TestProviderFacadeProperties:
@@ -160,8 +87,7 @@ class TestProviderFacadeProperties:
             thinking=False,
             provider_manager=MagicMock(name="manager"),
             provider_runtime=MagicMock(name="runtime"),
-            provider_coordinator=MagicMock(name="coordinator"),
-            provider_switch_coordinator=MagicMock(name="switch"),
+            provider_service=MagicMock(name="service"),
         )
 
     def test_provider_property(self, facade):

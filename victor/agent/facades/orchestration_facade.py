@@ -77,6 +77,7 @@ class OrchestrationFacade:
         - observability: ObservabilityIntegration for unified event bus
         - execution_tracer: Execution tracing (if available)
         - tool_call_tracer: Tool call tracing (if available)
+        - runtime_state_host: Canonical runtime owner for mutable orchestration state
         - runtime_intelligence_integration: Runtime-intelligence integration
         - subagent_orchestrator: Sub-agent orchestration
     """
@@ -128,6 +129,7 @@ class OrchestrationFacade:
         observability: Optional[Any] = None,
         execution_tracer: Optional[Any] = None,
         tool_call_tracer: Optional[Any] = None,
+        runtime_state_host: Optional[Any] = None,
         runtime_intelligence_integration: Optional[Any] = None,
         get_runtime_intelligence_integration: Optional[Callable[[], Optional[Any]]] = None,
         subagent_orchestrator: Optional[Any] = None,
@@ -321,6 +323,7 @@ class OrchestrationFacade:
         self._observability = observability
         self._execution_tracer = execution_tracer
         self._tool_call_tracer = tool_call_tracer
+        self._runtime_state_host = runtime_state_host
         self._runtime_intelligence_integration = runtime_intelligence_integration
         self._get_runtime_intelligence_integration = get_runtime_intelligence_integration
         self._subagent_orchestrator = subagent_orchestrator
@@ -351,8 +354,20 @@ class OrchestrationFacade:
     @property
     def chat_stream_adapter(self) -> Optional[Any]:
         """Canonical service-owned chat-stream adapter."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_chat_stream_adapter" in runtime_state:
+                runtime_adapter = runtime_state["_chat_stream_adapter"]
+                if runtime_adapter is not None:
+                    self._chat_stream_adapter = runtime_adapter
+                    return runtime_adapter
+                if self._get_chat_stream_adapter is None:
+                    self._chat_stream_adapter = None
+                    return None
         if self._chat_stream_adapter is None and self._get_chat_stream_adapter is not None:
             self._chat_stream_adapter = self._get_chat_stream_adapter()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._chat_stream_adapter = self._chat_stream_adapter
         return self._chat_stream_adapter
 
     @property
@@ -384,8 +399,16 @@ class OrchestrationFacade:
     def chat_coordinator(self) -> Optional[Any]:
         """Deprecated chat coordinator compatibility shim."""
         route = "direct_slot"
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_deprecated_chat_coordinator" in runtime_state:
+                self._deprecated_chat_coordinator = runtime_state["_deprecated_chat_coordinator"]
         if self._deprecated_chat_coordinator is None and self._get_chat_coordinator is not None:
             self._deprecated_chat_coordinator = self._get_chat_coordinator()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._deprecated_chat_coordinator = (
+                    self._deprecated_chat_coordinator
+                )
             route = "lazy_getter"
         if self._deprecated_chat_coordinator is not None:
             record_deprecated_chat_shim_access("orchestration_facade", "chat_coordinator", route)
@@ -404,8 +427,16 @@ class OrchestrationFacade:
     @property
     def tool_coordinator(self) -> Optional[Any]:
         """Deprecated tool coordinator compatibility shim."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_deprecated_tool_coordinator" in runtime_state:
+                self._deprecated_tool_coordinator = runtime_state["_deprecated_tool_coordinator"]
         if self._deprecated_tool_coordinator is None and self._get_tool_coordinator is not None:
             self._deprecated_tool_coordinator = self._get_tool_coordinator()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._deprecated_tool_coordinator = (
+                    self._deprecated_tool_coordinator
+                )
         if self._deprecated_tool_coordinator is not None:
             warnings.warn(
                 "OrchestrationFacade.tool_coordinator is deprecated. "
@@ -418,11 +449,21 @@ class OrchestrationFacade:
     @property
     def session_coordinator(self) -> Optional[Any]:
         """Deprecated session coordinator compatibility shim."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_deprecated_session_coordinator" in runtime_state:
+                self._deprecated_session_coordinator = runtime_state[
+                    "_deprecated_session_coordinator"
+                ]
         if (
             self._deprecated_session_coordinator is None
             and self._get_session_coordinator is not None
         ):
             self._deprecated_session_coordinator = self._get_session_coordinator()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._deprecated_session_coordinator = (
+                    self._deprecated_session_coordinator
+                )
         if self._deprecated_session_coordinator is not None:
             warnings.warn(
                 "OrchestrationFacade.session_coordinator is deprecated. "
@@ -435,22 +476,38 @@ class OrchestrationFacade:
     @property
     def turn_executor(self) -> Optional[Any]:
         """Execution coordinator for agentic loop."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_turn_executor" in runtime_state:
+                return runtime_state["_turn_executor"]
         return self._turn_executor
 
     @turn_executor.setter
     def turn_executor(self, value: Any) -> None:
         """Update the execution coordinator."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._turn_executor = value
         self._turn_executor = value
 
     @property
     def sync_chat_coordinator(self) -> Optional[Any]:
         """Deprecated sync chat coordinator compatibility shim."""
         route = "direct_slot"
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_deprecated_sync_chat_coordinator" in runtime_state:
+                self._deprecated_sync_chat_coordinator = runtime_state[
+                    "_deprecated_sync_chat_coordinator"
+                ]
         if (
             self._deprecated_sync_chat_coordinator is None
             and self._get_sync_chat_coordinator is not None
         ):
             self._deprecated_sync_chat_coordinator = self._get_sync_chat_coordinator()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._deprecated_sync_chat_coordinator = (
+                    self._deprecated_sync_chat_coordinator
+                )
             route = "lazy_getter"
         if self._deprecated_sync_chat_coordinator is not None:
             record_deprecated_chat_shim_access(
@@ -480,17 +537,29 @@ class OrchestrationFacade:
             DeprecationWarning,
             stacklevel=2,
         )
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._deprecated_sync_chat_coordinator = value
         self._deprecated_sync_chat_coordinator = value
 
     @property
     def streaming_chat_coordinator(self) -> Optional[Any]:
         """Deprecated streaming chat coordinator compatibility shim."""
         route = "direct_slot"
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_deprecated_streaming_chat_coordinator" in runtime_state:
+                self._deprecated_streaming_chat_coordinator = runtime_state[
+                    "_deprecated_streaming_chat_coordinator"
+                ]
         if (
             self._deprecated_streaming_chat_coordinator is None
             and self._get_streaming_chat_coordinator is not None
         ):
             self._deprecated_streaming_chat_coordinator = self._get_streaming_chat_coordinator()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._deprecated_streaming_chat_coordinator = (
+                    self._deprecated_streaming_chat_coordinator
+                )
             route = "lazy_getter"
         if self._deprecated_streaming_chat_coordinator is not None:
             record_deprecated_chat_shim_access(
@@ -520,17 +589,29 @@ class OrchestrationFacade:
             DeprecationWarning,
             stacklevel=2,
         )
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._deprecated_streaming_chat_coordinator = value
         self._deprecated_streaming_chat_coordinator = value
 
     @property
     def unified_chat_coordinator(self) -> Optional[Any]:
         """Deprecated unified chat coordinator compatibility shim."""
         route = "direct_slot"
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_deprecated_unified_chat_coordinator" in runtime_state:
+                self._deprecated_unified_chat_coordinator = runtime_state[
+                    "_deprecated_unified_chat_coordinator"
+                ]
         if (
             self._deprecated_unified_chat_coordinator is None
             and self._get_unified_chat_coordinator is not None
         ):
             self._deprecated_unified_chat_coordinator = self._get_unified_chat_coordinator()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._deprecated_unified_chat_coordinator = (
+                    self._deprecated_unified_chat_coordinator
+                )
             route = "lazy_getter"
         if self._deprecated_unified_chat_coordinator is not None:
             record_deprecated_chat_shim_access(
@@ -560,16 +641,24 @@ class OrchestrationFacade:
             DeprecationWarning,
             stacklevel=2,
         )
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._deprecated_unified_chat_coordinator = value
         self._deprecated_unified_chat_coordinator = value
 
     @property
     def protocol_adapter(self) -> Optional[Any]:
         """Protocol adapter for coordinator communication."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_protocol_adapter" in runtime_state:
+                return runtime_state["_protocol_adapter"]
         return self._protocol_adapter
 
     @protocol_adapter.setter
     def protocol_adapter(self, value: Any) -> None:
         """Update the protocol adapter."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._protocol_adapter = value
         self._protocol_adapter = value
 
     @property
@@ -590,11 +679,17 @@ class OrchestrationFacade:
     @property
     def iteration_coordinator(self) -> Optional[Any]:
         """IterationCoordinator for loop control."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_iteration_coordinator" in runtime_state:
+                return runtime_state["_iteration_coordinator"]
         return self._iteration_coordinator
 
     @iteration_coordinator.setter
     def iteration_coordinator(self, value: Any) -> None:
         """Update the iteration coordinator."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._iteration_coordinator = value
         self._iteration_coordinator = value
 
     @property
@@ -640,11 +735,17 @@ class OrchestrationFacade:
     @property
     def observability(self) -> Optional[Any]:
         """ObservabilityIntegration for unified event bus."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_observability" in runtime_state:
+                return runtime_state["_observability"]
         return self._observability
 
     @observability.setter
     def observability(self, value: Any) -> None:
         """Update the observability integration."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._observability = value
         self._observability = value
 
     @property
@@ -660,26 +761,56 @@ class OrchestrationFacade:
     @property
     def runtime_intelligence_integration(self) -> Optional[Any]:
         """Runtime-intelligence integration."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_runtime_intelligence_integration" in runtime_state:
+                runtime_integration = runtime_state["_runtime_intelligence_integration"]
+                if runtime_integration is not None:
+                    self._runtime_intelligence_integration = runtime_integration
+                    return runtime_integration
+                if self._get_runtime_intelligence_integration is None:
+                    self._runtime_intelligence_integration = None
+                    return None
         if (
             self._runtime_intelligence_integration is None
             and self._get_runtime_intelligence_integration is not None
         ):
             self._runtime_intelligence_integration = self._get_runtime_intelligence_integration()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._runtime_intelligence_integration = (
+                    self._runtime_intelligence_integration
+                )
         return self._runtime_intelligence_integration
 
     @runtime_intelligence_integration.setter
     def runtime_intelligence_integration(self, value: Any) -> None:
         """Update the runtime-intelligence integration."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._runtime_intelligence_integration = value
         self._runtime_intelligence_integration = value
 
     @property
     def subagent_orchestrator(self) -> Optional[Any]:
         """Sub-agent orchestration."""
+        if self._runtime_state_host is not None:
+            runtime_state = getattr(self._runtime_state_host, "__dict__", {})
+            if "_subagent_orchestrator" in runtime_state:
+                runtime_subagent = runtime_state["_subagent_orchestrator"]
+                if runtime_subagent is not None:
+                    self._subagent_orchestrator = runtime_subagent
+                    return runtime_subagent
+                if self._get_subagent_orchestrator is None:
+                    self._subagent_orchestrator = None
+                    return None
         if self._subagent_orchestrator is None and self._get_subagent_orchestrator is not None:
             self._subagent_orchestrator = self._get_subagent_orchestrator()
+            if self._runtime_state_host is not None:
+                self._runtime_state_host._subagent_orchestrator = self._subagent_orchestrator
         return self._subagent_orchestrator
 
     @subagent_orchestrator.setter
     def subagent_orchestrator(self, value: Any) -> None:
         """Update the subagent orchestrator."""
+        if self._runtime_state_host is not None:
+            self._runtime_state_host._subagent_orchestrator = value
         self._subagent_orchestrator = value

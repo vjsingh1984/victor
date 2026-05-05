@@ -56,19 +56,12 @@ class TestAgentRuntimeBootstrapper:
 
     def test_lazy_facades_materialize_from_current_orchestrator_state(self):
         orch = self._make_mock_orchestrator()
-        orch._provider_runtime.provider_coordinator = sentinel.provider_coordinator
-        orch._provider_runtime.provider_switch_coordinator = sentinel.provider_switch_coordinator
 
         AgentRuntimeBootstrapper.create_facades(orch)
 
         assert orch._chat_facade.conversation_controller is orch._conversation_controller
         assert orch._tool_facade.tool_pipeline is orch._tool_pipeline
         assert orch._provider_facade.provider_manager is orch._provider_manager
-        assert orch._provider_facade.provider_coordinator is sentinel.provider_coordinator
-        assert (
-            orch._provider_facade.provider_switch_coordinator
-            is sentinel.provider_switch_coordinator
-        )
         assert orch._session_facade.session_ledger is orch._session_ledger
         assert orch._metrics_facade.metrics_runtime is orch._metrics_runtime
         assert orch._resilience_facade.recovery_coordinator is orch._recovery_coordinator
@@ -97,6 +90,57 @@ class TestAgentRuntimeBootstrapper:
         assert "provider_coordinator" not in kwargs
         assert "provider_switch_coordinator" not in kwargs
 
+    def test_create_facades_chat_facade_derives_live_runtime_state_from_orchestrator(self):
+        orch = self._make_mock_orchestrator()
+
+        with patch("victor.agent.facades.ChatFacade") as facade_cls:
+            AgentRuntimeBootstrapper.create_facades(orch)
+            assert (
+                orch._chat_facade.conversation_controller
+                is facade_cls.return_value.conversation_controller
+            )
+
+        kwargs = facade_cls.call_args.kwargs
+        assert kwargs["runtime_state_host"] is orch
+
+    def test_create_facades_resilience_facade_derives_live_runtime_state_from_orchestrator(self):
+        orch = self._make_mock_orchestrator()
+
+        with patch("victor.agent.facades.ResilienceFacade") as facade_cls:
+            AgentRuntimeBootstrapper.create_facades(orch)
+            assert (
+                orch._resilience_facade.recovery_coordinator
+                is facade_cls.return_value.recovery_coordinator
+            )
+
+        kwargs = facade_cls.call_args.kwargs
+        assert kwargs["runtime_state_host"] is orch
+
+    def test_create_facades_workflow_facade_derives_live_runtime_state_from_orchestrator(self):
+        orch = self._make_mock_orchestrator()
+
+        with patch("victor.agent.facades.WorkflowFacade") as facade_cls:
+            AgentRuntimeBootstrapper.create_facades(orch)
+            assert (
+                orch._workflow_facade.workflow_runtime
+                is facade_cls.return_value.workflow_runtime
+            )
+
+        kwargs = facade_cls.call_args.kwargs
+        assert kwargs["runtime_state_host"] is orch
+
+    def test_create_facades_orchestration_facade_derives_live_runtime_state_from_orchestrator(
+        self,
+    ):
+        orch = self._make_mock_orchestrator()
+
+        with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
+            AgentRuntimeBootstrapper.create_facades(orch)
+            assert orch._orchestration_facade.chat_service is facade_cls.return_value.chat_service
+
+        kwargs = facade_cls.call_args.kwargs
+        assert kwargs["runtime_state_host"] is orch
+
     def test_provider_facade_tracks_current_orchestrator_state_after_materialization(self):
         orch = self._make_mock_orchestrator()
         orch.provider = sentinel.initial_provider
@@ -124,6 +168,202 @@ class TestAgentRuntimeBootstrapper:
         assert provider_facade.temperature == 0.8
         assert provider_facade.max_tokens == 4096
         assert provider_facade.thinking is False
+
+    def test_chat_facade_tracks_current_orchestrator_chat_state_after_materialization(self):
+        orch = self._make_mock_orchestrator()
+        orch._memory_session_id = "initial-memory"
+        orch._conversation_embedding_store = sentinel.initial_embedding_store
+        orch._system_prompt = "initial prompt"
+        orch._context_compactor = sentinel.initial_compactor
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        chat_facade = orch._chat_facade
+        assert chat_facade.memory_session_id == "initial-memory"
+        assert chat_facade.embedding_store is sentinel.initial_embedding_store
+        assert chat_facade.system_prompt == "initial prompt"
+        assert chat_facade.context_compactor is sentinel.initial_compactor
+
+        orch._memory_session_id = "updated-memory"
+        orch._conversation_embedding_store = sentinel.updated_embedding_store
+        orch._system_prompt = "updated prompt"
+        orch._context_compactor = sentinel.updated_compactor
+
+        assert chat_facade.memory_session_id == "updated-memory"
+        assert chat_facade.embedding_store is sentinel.updated_embedding_store
+        assert chat_facade.system_prompt == "updated prompt"
+        assert chat_facade.context_compactor is sentinel.updated_compactor
+
+    def test_tool_facade_tracks_current_orchestrator_budget_after_materialization(self):
+        orch = self._make_mock_orchestrator()
+        orch.tool_budget = 10
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        tool_facade = orch._tool_facade
+        assert tool_facade.tool_budget == 10
+
+        orch.tool_budget = 25
+        assert tool_facade.tool_budget == 25
+
+    def test_session_facade_tracks_current_orchestrator_session_state_after_materialization(self):
+        orch = self._make_mock_orchestrator()
+        orch._session_ledger = sentinel.initial_ledger
+        orch.active_session_id = "initial-session"
+        orch._memory_session_id = "initial-memory"
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        session_facade = orch._session_facade
+        assert session_facade.session_ledger is sentinel.initial_ledger
+        assert session_facade.active_session_id == "initial-session"
+        assert session_facade.memory_session_id == "initial-memory"
+
+        orch._session_ledger = sentinel.updated_ledger
+        orch.active_session_id = "updated-session"
+        orch._memory_session_id = "updated-memory"
+
+        assert session_facade.session_ledger is sentinel.updated_ledger
+        assert session_facade.active_session_id == "updated-session"
+        assert session_facade.memory_session_id == "updated-memory"
+
+    def test_resilience_facade_tracks_current_orchestrator_state_after_materialization(self):
+        orch = self._make_mock_orchestrator()
+        orch._recovery_handler = sentinel.initial_handler
+        orch._recovery_integration = sentinel.initial_integration
+        orch._cancel_event = sentinel.initial_cancel_event
+        orch._is_streaming = False
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        resilience_facade = orch._resilience_facade
+        assert resilience_facade.recovery_handler is sentinel.initial_handler
+        assert resilience_facade.recovery_integration is sentinel.initial_integration
+        assert resilience_facade.cancel_event is sentinel.initial_cancel_event
+        assert resilience_facade.is_streaming is False
+
+        orch._recovery_handler = sentinel.updated_handler
+        orch._recovery_integration = sentinel.updated_integration
+        orch._cancel_event = sentinel.updated_cancel_event
+        orch._is_streaming = True
+
+        assert resilience_facade.recovery_handler is sentinel.updated_handler
+        assert resilience_facade.recovery_integration is sentinel.updated_integration
+        assert resilience_facade.cancel_event is sentinel.updated_cancel_event
+        assert resilience_facade.is_streaming is True
+
+    def test_workflow_facade_tracks_current_orchestrator_state_after_materialization(self):
+        orch = self._make_mock_orchestrator()
+        orch._workflow_registry = sentinel.initial_registry
+        orch._coordination_advisor = sentinel.initial_advisor
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        workflow_facade = orch._workflow_facade
+        assert workflow_facade.workflow_registry is sentinel.initial_registry
+        assert workflow_facade.coordination_advisor is sentinel.initial_advisor
+
+        orch._workflow_registry = sentinel.updated_registry
+        orch._coordination_advisor = sentinel.updated_advisor
+
+        assert workflow_facade.workflow_registry is sentinel.updated_registry
+        assert workflow_facade.coordination_advisor is sentinel.updated_advisor
+
+    def test_orchestration_facade_tracks_current_orchestrator_state_after_materialization(self):
+        orch = self._make_mock_orchestrator()
+        orch._chat_stream_adapter = sentinel.initial_chat_stream_adapter
+        orch._turn_executor = sentinel.initial_turn_executor
+        orch._protocol_adapter = sentinel.initial_protocol_adapter
+        orch._iteration_coordinator = sentinel.initial_iteration_coordinator
+        orch._observability = sentinel.initial_observability
+        orch._runtime_intelligence_integration = sentinel.initial_runtime_intelligence
+        orch._subagent_orchestrator = sentinel.initial_subagent
+        orch._deprecated_chat_coordinator = sentinel.initial_chat_coordinator
+        orch._deprecated_tool_coordinator = sentinel.initial_tool_coordinator
+        orch._deprecated_session_coordinator = sentinel.initial_session_coordinator
+        orch._deprecated_sync_chat_coordinator = sentinel.initial_sync_coordinator
+        orch._deprecated_streaming_chat_coordinator = sentinel.initial_streaming_coordinator
+        orch._deprecated_unified_chat_coordinator = sentinel.initial_unified_coordinator
+
+        AgentRuntimeBootstrapper.create_facades(orch)
+
+        orchestration_facade = orch._orchestration_facade
+        assert orchestration_facade.chat_stream_adapter is sentinel.initial_chat_stream_adapter
+        assert orchestration_facade.turn_executor is sentinel.initial_turn_executor
+        assert orchestration_facade.protocol_adapter is sentinel.initial_protocol_adapter
+        assert orchestration_facade.iteration_coordinator is sentinel.initial_iteration_coordinator
+        assert orchestration_facade.observability is sentinel.initial_observability
+        assert (
+            orchestration_facade.runtime_intelligence_integration
+            is sentinel.initial_runtime_intelligence
+        )
+        assert orchestration_facade.subagent_orchestrator is sentinel.initial_subagent
+        with patch(
+            "victor.agent.facades.orchestration_facade.record_deprecated_chat_shim_access"
+        ):
+            with patch("victor.agent.facades.orchestration_facade.warnings.warn"):
+                assert orchestration_facade.chat_coordinator is sentinel.initial_chat_coordinator
+                assert orchestration_facade.tool_coordinator is sentinel.initial_tool_coordinator
+                assert (
+                    orchestration_facade.session_coordinator
+                    is sentinel.initial_session_coordinator
+                )
+                assert (
+                    orchestration_facade.sync_chat_coordinator
+                    is sentinel.initial_sync_coordinator
+                )
+                assert (
+                    orchestration_facade.streaming_chat_coordinator
+                    is sentinel.initial_streaming_coordinator
+                )
+                assert (
+                    orchestration_facade.unified_chat_coordinator
+                    is sentinel.initial_unified_coordinator
+                )
+
+        orch._chat_stream_adapter = sentinel.updated_chat_stream_adapter
+        orch._turn_executor = sentinel.updated_turn_executor
+        orch._protocol_adapter = sentinel.updated_protocol_adapter
+        orch._iteration_coordinator = sentinel.updated_iteration_coordinator
+        orch._observability = sentinel.updated_observability
+        orch._runtime_intelligence_integration = sentinel.updated_runtime_intelligence
+        orch._subagent_orchestrator = sentinel.updated_subagent
+        orch._deprecated_chat_coordinator = sentinel.updated_chat_coordinator
+        orch._deprecated_tool_coordinator = sentinel.updated_tool_coordinator
+        orch._deprecated_session_coordinator = sentinel.updated_session_coordinator
+        orch._deprecated_sync_chat_coordinator = sentinel.updated_sync_coordinator
+        orch._deprecated_streaming_chat_coordinator = sentinel.updated_streaming_coordinator
+        orch._deprecated_unified_chat_coordinator = sentinel.updated_unified_coordinator
+
+        assert orchestration_facade.chat_stream_adapter is sentinel.updated_chat_stream_adapter
+        assert orchestration_facade.turn_executor is sentinel.updated_turn_executor
+        assert orchestration_facade.protocol_adapter is sentinel.updated_protocol_adapter
+        assert orchestration_facade.iteration_coordinator is sentinel.updated_iteration_coordinator
+        assert orchestration_facade.observability is sentinel.updated_observability
+        assert (
+            orchestration_facade.runtime_intelligence_integration
+            is sentinel.updated_runtime_intelligence
+        )
+        assert orchestration_facade.subagent_orchestrator is sentinel.updated_subagent
+        with patch(
+            "victor.agent.facades.orchestration_facade.record_deprecated_chat_shim_access"
+        ):
+            with patch("victor.agent.facades.orchestration_facade.warnings.warn"):
+                assert orchestration_facade.chat_coordinator is sentinel.updated_chat_coordinator
+                assert orchestration_facade.tool_coordinator is sentinel.updated_tool_coordinator
+                assert (
+                    orchestration_facade.session_coordinator
+                    is sentinel.updated_session_coordinator
+                )
+                assert orchestration_facade.sync_chat_coordinator is sentinel.updated_sync_coordinator
+                assert (
+                    orchestration_facade.streaming_chat_coordinator
+                    is sentinel.updated_streaming_coordinator
+                )
+                assert (
+                    orchestration_facade.unified_chat_coordinator
+                    is sentinel.updated_unified_coordinator
+                )
 
     def test_lazy_orchestration_facade_materializes_state_passed_and_runtime_handles(self):
         orch = self._make_mock_orchestrator()
@@ -191,6 +431,7 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["observability"] is orch._observability
         assert kwargs["execution_tracer"] is getattr(orch, "_execution_tracer", None)
         assert kwargs["tool_call_tracer"] is getattr(orch, "_tool_call_tracer", None)
+        assert kwargs["runtime_state_host"] is orch
         assert callable(kwargs["get_runtime_intelligence_integration"])
         assert callable(kwargs["get_subagent_orchestrator"])
         assert (

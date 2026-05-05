@@ -46,6 +46,7 @@ class AgentRuntimeBootstrapper:
                 conversation_state=orchestrator.conversation_state,
                 memory_manager=orchestrator.memory_manager,
                 memory_session_id=orchestrator._memory_session_id,
+                runtime_state_host=orchestrator,
                 embedding_store=getattr(orchestrator, "_conversation_embedding_store", None),
                 intent_classifier=orchestrator.intent_classifier,
                 intent_detector=orchestrator.intent_detector,
@@ -68,6 +69,7 @@ class AgentRuntimeBootstrapper:
                 tool_graph=orchestrator.tool_graph,
                 tool_registrar=orchestrator.tool_registrar,
                 tool_budget=orchestrator.tool_budget,
+                runtime_state_host=orchestrator,
                 tool_output_formatter=orchestrator._tool_output_formatter,
                 deduplication_tracker=orchestrator._deduplication_tracker,
                 argument_normalizer=orchestrator.argument_normalizer,
@@ -112,6 +114,7 @@ class AgentRuntimeBootstrapper:
                 lifecycle_manager=orchestrator._lifecycle_manager,
                 active_session_id=orchestrator.active_session_id,
                 memory_session_id=orchestrator._memory_session_id,
+                runtime_state_host=orchestrator,
                 profile_name=orchestrator._profile_name,
                 checkpoint_manager=orchestrator._checkpoint_manager,
             ),
@@ -146,6 +149,7 @@ class AgentRuntimeBootstrapper:
                 background_tasks=orchestrator._background_tasks,
                 cancel_event=orchestrator._cancel_event,
                 is_streaming=orchestrator._is_streaming,
+                runtime_state_host=orchestrator,
             ),
             name="resilience_facade",
         )
@@ -156,6 +160,7 @@ class AgentRuntimeBootstrapper:
                 workflow_runtime=orchestrator._workflow_runtime,
                 workflow_optimization=orchestrator._workflow_optimization,
                 coordination_advisor=(orchestrator._coordination_advisor),
+                runtime_state_host=orchestrator,
             ),
             name="workflow_facade",
         )
@@ -210,6 +215,7 @@ class AgentRuntimeBootstrapper:
                 observability=orchestrator._observability,
                 execution_tracer=getattr(orchestrator, "_execution_tracer", None),
                 tool_call_tracer=getattr(orchestrator, "_tool_call_tracer", None),
+                runtime_state_host=orchestrator,
                 get_runtime_intelligence_integration=(
                     lambda: getattr(orchestrator, "runtime_intelligence_integration", None)
                 ),
