@@ -93,6 +93,59 @@ def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
     return {}
 
 
+def _persist_tool_result_message(
+    ctx: ToolResultContext,
+    *,
+    tool_name: str,
+    content: str,
+    tool_call_id: Optional[str],
+    persist_synchronously: bool = False,
+) -> bool:
+    """Persist a tool result message for provider-visible tool-call pairing."""
+    if not ctx.add_message:
+        return False
+
+    add_kwargs: Dict[str, Any] = {
+        "name": tool_name,
+        "tool_call_id": tool_call_id,
+    }
+    if persist_synchronously:
+        add_kwargs["persist_synchronously"] = True
+    try:
+        ctx.add_message("tool", content, **add_kwargs)
+        return True
+    except TypeError:
+        if not persist_synchronously:
+            logger.exception(
+                "Failed to persist tool result message for %s (tool_call_id=%s)",
+                tool_name,
+                tool_call_id,
+            )
+            return False
+        try:
+            ctx.add_message(
+                "tool",
+                content,
+                name=tool_name,
+                tool_call_id=tool_call_id,
+            )
+            return True
+        except Exception:
+            logger.exception(
+                "Failed to persist tool result message for %s (tool_call_id=%s)",
+                tool_name,
+                tool_call_id,
+            )
+            return False
+    except Exception:
+        logger.exception(
+            "Failed to persist tool result message for %s (tool_call_id=%s)",
+            tool_name,
+            tool_call_id,
+        )
+        return False
+
+
 _PREVIEW_ONLY_TOOL_RESULT_FIELDS = frozenset(
     {
         "formatted_output",
@@ -228,115 +281,184 @@ def process_tool_results_with_context(
     results: List[Dict[str, Any]] = []
 
     for call_result in pipeline_result.results:
-        # Invalid tools with tool_call_id must still produce a response per OpenAI spec.
-        if call_result.skipped and not call_result.tool_call_id:
-            continue
-
-        tool_name = call_result.tool_name
-        normalized_args = call_result.arguments or {}
-        output = call_result.result
-        success = call_result.success
-        error_msg = call_result.error
-        elapsed_ms = call_result.execution_time_ms
+        tool_name = getattr(call_result, "tool_name", "unknown") or "unknown"
+        normalized_args = normalize_tool_result_arguments(getattr(call_result, "arguments", {}))
+        elapsed_ms = float(getattr(call_result, "execution_time_ms", 0.0) or 0.0)
         skipped = bool(getattr(call_result, "skipped", False))
         skip_reason = getattr(call_result, "skip_reason", None)
         outcome_kind = getattr(call_result, "outcome_kind", None)
         block_source = getattr(call_result, "block_source", None)
         retryable = getattr(call_result, "retryable", None)
         user_message = getattr(call_result, "user_message", None)
+        tool_call_id = getattr(call_result, "tool_call_id", None)
 
-        ctx.executed_tools.append(tool_name)
-        if tool_name == "read" and "path" in normalized_args:
-            ctx.observed_files.add(str(normalized_args.get("path")))
+        try:
+            # Invalid tools without tool_call_id do not need a provider-visible response.
+            if skipped and not tool_call_id:
+                continue
 
-        if ctx.stream_context is not None:
-            ctx.stream_context.reset_activity_timer()
+            output = call_result.result
+            success = call_result.success
+            error_msg = call_result.error
 
-        if success:
-            if ctx.continuation_prompts > 0:
-                ctx.continuation_prompts = 0
-            if ctx.asking_input_prompts > 0:
-                ctx.asking_input_prompts = 0
+            ctx.executed_tools.append(tool_name)
+            if tool_name == "read" and "path" in normalized_args:
+                ctx.observed_files.add(str(normalized_args.get("path")))
 
-        error_type = type(error_msg).__name__ if error_msg and not success else None
-        if ctx.record_tool_execution:
-            ctx.record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
-        if ctx.conversation_state:
-            ctx.conversation_state.record_tool_execution(tool_name, normalized_args)
+            if ctx.stream_context is not None:
+                ctx.stream_context.reset_activity_timer()
 
-        result_dict: Dict[str, Any] = {"success": success}
-        if output is not None:
-            result_dict["result"] = output
-        if ctx.unified_tracker:
-            ctx.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
+            if success:
+                if ctx.continuation_prompts > 0:
+                    ctx.continuation_prompts = 0
+                if ctx.asking_input_prompts > 0:
+                    ctx.asking_input_prompts = 0
 
-        follow_up_suggestions = None
-        semantic_success = success
-        if isinstance(output, dict):
-            metadata = output.get("metadata")
-            if isinstance(metadata, dict):
-                suggestions = metadata.get("follow_up_suggestions")
-                if isinstance(suggestions, list) and suggestions:
-                    follow_up_suggestions = suggestions
+            error_type = type(error_msg).__name__ if error_msg and not success else None
+            if ctx.record_tool_execution:
+                ctx.record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
+            if ctx.conversation_state:
+                ctx.conversation_state.record_tool_execution(tool_name, normalized_args)
 
-        if success and isinstance(output, dict) and output.get("success") is False:
-            semantic_success = False
-            error_msg = output.get("error", "Operation returned success=False")
+            result_dict: Dict[str, Any] = {"success": success}
+            if output is not None:
+                result_dict["result"] = output
+            if ctx.unified_tracker:
+                ctx.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
-        if semantic_success:
-            error_display = None
-        else:
-            error_display = user_message or error_msg or skip_reason or "Unknown error"
+            follow_up_suggestions = None
+            semantic_success = success
+            if isinstance(output, dict):
+                metadata = output.get("metadata")
+                if isinstance(metadata, dict):
+                    suggestions = metadata.get("follow_up_suggestions")
+                    if isinstance(suggestions, list) and suggestions:
+                        follow_up_suggestions = suggestions
 
-        if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
-            ctx.usage_logger.set_duration_context(elapsed_ms)
-        if ctx.usage_logger:
-            ctx.usage_logger.log_event(
-                "tool_result",
-                {
-                    "tool_name": tool_name,
-                    "success": semantic_success,
-                    "skipped": skipped,
-                    "outcome_kind": outcome_kind,
-                    "block_source": block_source,
-                    "retryable": retryable,
-                    "result": output,
-                    "error": error_display,
-                },
-            )
+            if success and isinstance(output, dict) and output.get("success") is False:
+                semantic_success = False
+                error_msg = output.get("error", "Operation returned success=False")
 
-        if semantic_success:
-            preview_output, llm_output, full_output, was_pruned, pruning_info = (
-                format_and_prune_tool_output(
+            if semantic_success:
+                error_display = None
+            else:
+                error_display = user_message or error_msg or skip_reason or "Unknown error"
+
+            if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
+                ctx.usage_logger.set_duration_context(elapsed_ms)
+            if ctx.usage_logger:
+                ctx.usage_logger.log_event(
+                    "tool_result",
+                    {
+                        "tool_name": tool_name,
+                        "success": semantic_success,
+                        "skipped": skipped,
+                        "outcome_kind": outcome_kind,
+                        "block_source": block_source,
+                        "retryable": retryable,
+                        "result": output,
+                        "error": error_display,
+                    },
+                )
+
+            if semantic_success:
+                preview_output, llm_output, full_output, was_pruned, pruning_info = (
+                    format_and_prune_tool_output(
+                        tool_name=tool_name,
+                        arguments=normalized_args,
+                        output=output,
+                        task_type=ctx.task_type,
+                        formatter=ctx.format_tool_output,
+                    )
+                )
+                _persist_tool_result_message(
+                    ctx,
+                    tool_name=tool_name,
+                    content=llm_output,
+                    tool_call_id=tool_call_id,
+                )
+                results.append(
+                    {
+                        "name": tool_name,
+                        "success": True,
+                        "elapsed": elapsed_ms / 1000,
+                        "args": normalized_args,
+                        "result": preview_output,
+                        "full_result": full_output,
+                        "follow_up_suggestions": follow_up_suggestions,
+                        "was_pruned": was_pruned,
+                        "pruning_info": pruning_info,
+                        "tool_call_id": tool_call_id,
+                        "content": llm_output,
+                        "skipped": skipped,
+                        "outcome_kind": outcome_kind,
+                        "block_source": block_source,
+                        "retryable": retryable,
+                        "user_message": user_message,
+                    }
+                )
+                continue
+
+            if not skipped:
+                sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
+                ctx.failed_tool_signatures.add(sig)
+
+            _not_found = "not found" in str(error_display).lower()
+            _shown_key = f"notfound:{tool_name}" if _not_found else None
+            if not (_shown_key and _shown_key in ctx.shown_tool_errors):
+                if _shown_key and len(ctx.shown_tool_errors) < 500:
+                    ctx.shown_tool_errors.add(_shown_key)
+                if ctx.console and ctx.presentation:
+                    prefix = "Tool call skipped" if skipped else "Tool execution failed"
+                    ctx.console.print(
+                        f"[red]{ctx.presentation.icon('error', with_color=False)} "
+                        f"{prefix}: {error_display}[/] "
+                        f"[dim]({elapsed_ms:.0f}ms)[/dim]"
+                    )
+
+            if isinstance(output, dict):
+                error_output = dict(output)
+            else:
+                error_output = {"error": error_display}
+            if skipped:
+                error_output["skipped"] = True
+                if skip_reason:
+                    error_output["skip_reason"] = skip_reason
+            if outcome_kind:
+                error_output["outcome_kind"] = outcome_kind
+            if block_source:
+                error_output["block_source"] = block_source
+            if retryable is not None:
+                error_output["retryable"] = retryable
+            if user_message:
+                error_output["user_message"] = user_message
+            if ctx.format_tool_output:
+                formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
+            else:
+                formatted_error, _, _, _, _ = format_and_prune_tool_output(
                     tool_name=tool_name,
                     arguments=normalized_args,
-                    output=output,
+                    output=error_output,
                     task_type=ctx.task_type,
-                    formatter=ctx.format_tool_output,
                 )
+            _persist_tool_result_message(
+                ctx,
+                tool_name=tool_name,
+                content=formatted_error,
+                tool_call_id=tool_call_id,
             )
-            if ctx.add_message:
-                # CRITICAL: Send FULL output to LLM for accuracy
-                # llm_output is always the full formatted output (not pruned)
-                ctx.add_message(
-                    "tool",
-                    llm_output,  # Full output - LLM needs complete context
-                    name=tool_name,
-                    tool_call_id=call_result.tool_call_id,
-                )
             results.append(
                 {
                     "name": tool_name,
-                    "success": True,
+                    "success": False,
                     "elapsed": elapsed_ms / 1000,
-                    "args": normalized_args,
-                    "result": preview_output,  # Pruned preview for display when applicable
-                    "full_result": full_output,  # Full display output for expansion/debug
+                    "error": error_display,
+                    "result": formatted_error,
+                    "full_result": formatted_error,
                     "follow_up_suggestions": follow_up_suggestions,
-                    "was_pruned": was_pruned,  # Indicates user preview was truncated (not LLM input)
-                    "pruning_info": pruning_info,
-                    "tool_call_id": call_result.tool_call_id,
-                    "content": llm_output,  # Full output sent to LLM
+                    "was_pruned": False,
+                    "tool_call_id": tool_call_id,
+                    "content": formatted_error,
                     "skipped": skipped,
                     "outcome_kind": outcome_kind,
                     "block_source": block_source,
@@ -344,76 +466,45 @@ def process_tool_results_with_context(
                     "user_message": user_message,
                 }
             )
-            continue
-
-        if not skipped:
-            sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
-            ctx.failed_tool_signatures.add(sig)
-
-        _not_found = "not found" in str(error_display).lower()
-        _shown_key = f"notfound:{tool_name}" if _not_found else None
-        if not (_shown_key and _shown_key in ctx.shown_tool_errors):
-            if _shown_key and len(ctx.shown_tool_errors) < 500:
-                ctx.shown_tool_errors.add(_shown_key)
-            if ctx.console and ctx.presentation:
-                prefix = "Tool call skipped" if skipped else "Tool execution failed"
-                ctx.console.print(
-                    f"[red]{ctx.presentation.icon('error', with_color=False)} "
-                    f"{prefix}: {error_display}[/] "
-                    f"[dim]({elapsed_ms:.0f}ms)[/dim]"
-                )
-
-        if isinstance(output, dict):
-            error_output = dict(output)
-        else:
-            error_output = {"error": error_display}
-        if skipped:
-            error_output["skipped"] = True
-            if skip_reason:
-                error_output["skip_reason"] = skip_reason
-        if outcome_kind:
-            error_output["outcome_kind"] = outcome_kind
-        if block_source:
-            error_output["block_source"] = block_source
-        if retryable is not None:
-            error_output["retryable"] = retryable
-        if user_message:
-            error_output["user_message"] = user_message
-        if ctx.format_tool_output:
-            formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
-        else:
-            formatted_error, _, _, _, _ = format_and_prune_tool_output(
+        except Exception as exc:
+            logger.exception(
+                "Failed to post-process tool result for %s (tool_call_id=%s)",
+                tool_name,
+                tool_call_id,
+            )
+            fallback_error = (
+                f"Tool result post-processing failed for '{tool_name}': {type(exc).__name__}"
+            )
+            fallback_content = (
+                f"Tool result unavailable for '{tool_name}'. Victor failed to post-process this "
+                "tool call, so treat it as failed and continue with the available context."
+            )
+            _persist_tool_result_message(
+                ctx,
                 tool_name=tool_name,
-                arguments=normalized_args,
-                output=error_output,
-                task_type=ctx.task_type,
+                content=fallback_content,
+                tool_call_id=tool_call_id,
+                persist_synchronously=True,
             )
-        if ctx.add_message:
-            ctx.add_message(
-                "tool",
-                formatted_error,
-                name=tool_name,
-                tool_call_id=call_result.tool_call_id,
+            results.append(
+                {
+                    "name": tool_name,
+                    "success": False,
+                    "elapsed": elapsed_ms / 1000,
+                    "error": fallback_error,
+                    "result": fallback_content,
+                    "full_result": fallback_content,
+                    "follow_up_suggestions": None,
+                    "was_pruned": False,
+                    "tool_call_id": tool_call_id,
+                    "content": fallback_content,
+                    "skipped": True,
+                    "outcome_kind": outcome_kind or "tool_result_processing_failed",
+                    "block_source": block_source or "tool_result_processing",
+                    "retryable": False if retryable is None else retryable,
+                    "user_message": fallback_content,
+                }
             )
-        results.append(
-            {
-                "name": tool_name,
-                "success": False,
-                "elapsed": elapsed_ms / 1000,
-                "error": error_display,
-                "result": formatted_error,
-                "full_result": formatted_error,
-                "follow_up_suggestions": follow_up_suggestions,
-                "was_pruned": False,
-                "tool_call_id": call_result.tool_call_id,
-                "content": formatted_error,
-                "skipped": skipped,
-                "outcome_kind": outcome_kind,
-                "block_source": block_source,
-                "retryable": retryable,
-                "user_message": user_message,
-            }
-        )
 
     return results
 

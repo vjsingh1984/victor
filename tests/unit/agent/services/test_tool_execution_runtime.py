@@ -76,3 +76,59 @@ async def test_tool_execution_runtime_executes_pipeline_and_syncs_mutable_state(
     assert host.tool_calls_used == 4
     assert host._continuation_prompts == 5
     assert host._asking_input_prompts == 6
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_runtime_backfills_missing_tool_response_ids():
+    host = _make_runtime_host(
+        conversation=SimpleNamespace(_messages=[]),
+    )
+    host._tool_service.process_tool_results.return_value = [
+        {"name": "read", "success": True, "elapsed": 0.1, "tool_call_id": "call_1"}
+    ]
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    result = await runtime.execute_tool_calls(
+        [
+            {"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}},
+            {"id": "call_2", "name": "metrics", "arguments": {"path": "victor/framework/graph.py"}},
+        ]
+    )
+
+    assert len(result) == 2
+    assert any(entry.get("tool_call_id") == "call_2" for entry in result)
+    host.add_message.assert_called_once_with(
+        "tool",
+        (
+            "Tool result unavailable for 'metrics'. Victor did not complete "
+            "post-processing for this tool call, so treat it as failed and continue "
+            "with the available context."
+        ),
+        name="metrics",
+        tool_call_id="call_2",
+        persist_synchronously=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_runtime_backfill_survives_add_message_failure():
+    host = _make_runtime_host(
+        conversation=SimpleNamespace(_messages=[]),
+    )
+    host.add_message.side_effect = RuntimeError("conversation write failed")
+    host._tool_service.process_tool_results.return_value = []
+    runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+
+    result = await runtime.execute_tool_calls(
+        [
+            {
+                "id": "call_2",
+                "name": "metrics",
+                "arguments": {"path": "victor/framework/graph.py"},
+            },
+        ]
+    )
+
+    assert len(result) == 1
+    assert result[0]["tool_call_id"] == "call_2"
+    assert result[0]["outcome_kind"] == "tool_response_missing"

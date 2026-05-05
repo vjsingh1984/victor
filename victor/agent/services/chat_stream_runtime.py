@@ -402,6 +402,16 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                     )
                     ctx.recovery_events = list(degradation_feedback_payload["recovery_events"])
 
+                state_host._last_stream_task_context = {
+                    "unified_task_type": getattr(ctx, "unified_task_type", None),
+                    "task_classification": getattr(ctx, "task_classification", None),
+                    "complexity_tool_budget": getattr(ctx, "complexity_tool_budget", None),
+                    "coarse_task_type": getattr(ctx, "coarse_task_type", None),
+                    "is_analysis_task": bool(getattr(ctx, "is_analysis_task", False)),
+                    "is_action_task": bool(getattr(ctx, "is_action_task", False)),
+                    "needs_execution": bool(getattr(ctx, "needs_execution", False)),
+                }
+
                 runtime_snapshot = getattr(ctx, "runtime_override_snapshot", None)
                 self._restore_stream_runtime_overrides(runtime_snapshot)
                 ctx.runtime_override_snapshot = None

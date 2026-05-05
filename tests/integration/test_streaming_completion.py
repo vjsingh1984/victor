@@ -18,10 +18,16 @@ Tests that final responses are always displayed to users, even when tool calls
 are present, and that content is preserved when streams end in thinking mode.
 """
 
+from types import SimpleNamespace
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from rich.console import Console
+from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.agent.streaming.context import StreamingChatContext
+from victor.framework.task import TaskComplexity
 from victor.ui.rendering.live_renderer import LiveDisplayRenderer
 
 
@@ -176,6 +182,56 @@ class TestStreamingCompletion:
         assert "Search results found" in full_content
         assert "Here are the top 3 results:" in full_content
         assert "Result 1, Result 2, Result 3" in full_content
+
+    @pytest.mark.asyncio
+    async def test_continuation_request_reuses_prior_stream_task_shape(self):
+        """Continuation prompts should preserve prior task-shape hints in the runtime context."""
+        orch = MagicMock()
+        orch.has_capability.return_value = False
+        orch.get_capability_value.return_value = None
+        orch._cumulative_token_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+        orch._conversation_controller = MagicMock()
+        orch.messages = []
+        orch.settings = SimpleNamespace(recovery_blocked_consecutive_threshold=5)
+        orch._classify_task_keywords.return_value = {}
+        orch._tool_planner = SimpleNamespace(infer_goals_from_message=lambda _: [])
+        orch.tool_budget = 42
+        orch.tool_calls_used = 0
+        orch._task_completion_detector = None
+        orch._pending_continuation_task_context = {
+            "carry_forward_task_shape": True,
+            "coarse_task_type": "analysis",
+            "is_analysis_task": True,
+            "is_action_task": False,
+            "needs_execution": False,
+        }
+
+        runtime = ServiceStreamingRuntime(OrchestratorProtocolAdapter(orch))
+        runtime._prepare_stream = AsyncMock(
+            return_value=(
+                SimpleNamespace(),
+                0.0,
+                0.0,
+                {},
+                30,
+                10,
+                0,
+                False,
+                TrackerTaskType.GENERAL,
+                SimpleNamespace(complexity=TaskComplexity.ANALYSIS),
+                42,
+            )
+        )
+
+        ctx = await runtime._create_stream_context("continue")
+
+        assert ctx.is_analysis_task is True
+        assert ctx.coarse_task_type == "analysis"
+        assert orch._pending_continuation_task_context is None
 
 
 class TestStreamCompletionValidation:

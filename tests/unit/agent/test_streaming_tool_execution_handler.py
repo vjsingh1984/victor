@@ -295,3 +295,88 @@ async def test_execute_tools_records_shell_alias_canonically():
     )
 
     assert stream_ctx.executed_tool_names == {"shell"}
+
+
+@pytest.mark.asyncio
+async def test_execute_tools_persists_skipped_responses_for_truncated_calls():
+    recovery_runtime = SimpleNamespace(
+        check_tool_budget=AsyncMock(return_value=None),
+        truncate_tool_calls=MagicMock(
+            return_value=(
+                [{"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}}],
+                True,
+            )
+        ),
+        filter_blocked_tool_calls=MagicMock(
+            side_effect=lambda _ctx, tool_calls: (tool_calls, [], 0)
+        ),
+        check_blocked_threshold=MagicMock(return_value=None),
+    )
+    chunk_generator = SimpleNamespace(
+        generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
+    )
+    message_adder = SimpleNamespace(add_message=MagicMock())
+    reminder_manager = SimpleNamespace(
+        update_state=MagicMock(),
+        get_consolidated_reminder=MagicMock(return_value=None),
+    )
+    execute_tool_calls = AsyncMock(
+        return_value=[
+            {
+                "name": "read",
+                "success": True,
+                "args": {"path": "victor/framework/graph.py"},
+                "elapsed": 1.0,
+                "tool_call_id": "call_1",
+            }
+        ]
+    )
+
+    async def _unused_async_generator(_stream_ctx):
+        if False:
+            yield None
+
+    handler = ToolExecutionHandler(
+        recovery_runtime=recovery_runtime,
+        chunk_generator=chunk_generator,
+        message_adder=message_adder,
+        reminder_manager=reminder_manager,
+        unified_tracker=SimpleNamespace(unique_resources=set()),
+        settings=SimpleNamespace(tool_call_budget_warning_threshold=250),
+        recovery_context_factory=lambda stream_ctx: {"stream_ctx": stream_ctx},
+        check_progress_with_handler=lambda _stream_ctx: None,
+        handle_force_completion_with_handler=lambda _stream_ctx: None,
+        handle_budget_exhausted=_unused_async_generator,
+        handle_force_final_response=_unused_async_generator,
+        execute_tool_calls=execute_tool_calls,
+        get_tool_status_message=lambda tool_name, tool_args: f"{tool_name}: {tool_args}",
+        observed_files=set(),
+    )
+
+    stream_ctx = StreamingChatContext(user_message="Review graph architecture")
+    result = await handler.execute_tools(
+        stream_ctx=stream_ctx,
+        tool_calls=[
+            {"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}},
+            {"id": "call_2", "name": "metrics", "arguments": {"path": "victor/framework/graph.py"}},
+        ],
+        user_message="Review graph architecture",
+        full_content="inspect graph code",
+        tool_calls_used=0,
+        tool_budget=1,
+    )
+
+    message_adder.add_message.assert_called_once_with(
+        "tool",
+        (
+            "Tool call skipped for 'metrics': Skipped because the remaining tool budget for "
+            "this turn was exhausted. Use a different approach or continue with the "
+            "available context."
+        ),
+        name="metrics",
+        tool_call_id="call_2",
+        persist_synchronously=True,
+    )
+    assert any(tool_result.get("tool_call_id") == "call_2" for tool_result in result.tool_results)
+    assert any(tool_result.get("tool_call_id") == "call_1" for tool_result in result.tool_results)

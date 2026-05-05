@@ -299,3 +299,59 @@ def test_skipped_tool_prefers_structured_user_message_and_metadata():
     assert results[0]["user_message"].startswith("File 'victor/core/container.py'")
     ctx.console.print.assert_called_once()
     assert "already read with the same offset/limit" in ctx.console.print.call_args[0][0]
+
+
+def test_post_processing_failure_still_emits_tool_response():
+    service = _make_service()
+    ctx = _make_ctx(format_tool_output=MagicMock(side_effect=RuntimeError("format failed")))
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="metrics",
+                success=True,
+                result={"summary": "complexity report"},
+                arguments={"path": "victor/framework/graph.py"},
+                tool_call_id="call_metrics_1",
+            )
+        ]
+    )
+
+    results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["success"] is False
+    assert results[0]["tool_call_id"] == "call_metrics_1"
+    assert results[0]["outcome_kind"] == "tool_result_processing_failed"
+    assert "Tool result unavailable for 'metrics'" in results[0]["content"]
+    ctx.add_message.assert_called_once_with(
+        "tool",
+        results[0]["content"],
+        name="metrics",
+        tool_call_id="call_metrics_1",
+        persist_synchronously=True,
+    )
+
+
+def test_post_processing_failure_survives_tool_message_write_failure():
+    service = _make_service()
+    ctx = _make_ctx(
+        format_tool_output=MagicMock(side_effect=RuntimeError("format failed")),
+        add_message=MagicMock(side_effect=RuntimeError("conversation write failed")),
+    )
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="metrics",
+                success=True,
+                result={"summary": "complexity report"},
+                arguments={"path": "victor/framework/graph.py"},
+                tool_call_id="call_metrics_2",
+            )
+        ]
+    )
+
+    results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["success"] is False
+    assert results[0]["tool_call_id"] == "call_metrics_2"
+    assert results[0]["outcome_kind"] == "tool_result_processing_failed"
+    assert "Tool result unavailable for 'metrics'" in results[0]["content"]

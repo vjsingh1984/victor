@@ -113,6 +113,52 @@ class ChatStreamHelperMixin:
             return state_dict.get(name)
         return state_dict.get(f"_{name}", default)
 
+    def _get_last_stream_task_context(self) -> Optional[Dict[str, Any]]:
+        """Return the last persisted streaming task context snapshot, if any."""
+        context = self._get_runtime_capability_value("last_stream_task_context")
+        return context if isinstance(context, dict) else None
+
+    def _resolve_continuation_task_context(
+        self,
+        user_message: str,
+        detected_task_type: TrackerTaskType,
+    ) -> Optional[Dict[str, Any]]:
+        """Return prior task context when a continuation should inherit task shape."""
+        from victor.agent.action_authorizer import split_continuation_request
+
+        is_continuation, continuation_payload = split_continuation_request(user_message)
+        if not is_continuation:
+            return None
+
+        last_context = self._get_last_stream_task_context()
+        if not last_context:
+            return None
+
+        prior_task_type = last_context.get("unified_task_type")
+        if isinstance(prior_task_type, str):
+            try:
+                prior_task_type = TrackerTaskType(prior_task_type)
+            except ValueError:
+                prior_task_type = None
+        if not isinstance(prior_task_type, TrackerTaskType):
+            return None
+
+        payload = continuation_payload.strip()
+        bare_continuation = not payload
+        should_carry_forward = bare_continuation or (
+            detected_task_type == TrackerTaskType.GENERAL
+            and prior_task_type != TrackerTaskType.GENERAL
+        )
+        if not should_carry_forward:
+            return None
+
+        resolved = dict(last_context)
+        resolved["unified_task_type"] = prior_task_type
+        resolved["continuation_payload"] = payload
+        resolved["bare_continuation"] = bare_continuation
+        resolved["carry_forward_task_shape"] = True
+        return resolved
+
     async def _handle_context_and_iteration_limits(
         self,
         user_message: str,
@@ -210,6 +256,19 @@ class ChatStreamHelperMixin:
             usage_analytics.record_turn()
 
         unified_task_type = orch.unified_tracker.detect_task_type(user_message)
+        continuation_task_context = self._resolve_continuation_task_context(
+            user_message, unified_task_type
+        )
+        orch._pending_continuation_task_context = continuation_task_context
+        if continuation_task_context is not None:
+            prior_task_type = continuation_task_context["unified_task_type"]
+            if prior_task_type != unified_task_type:
+                orch.unified_tracker.set_task_type(prior_task_type)
+                unified_task_type = prior_task_type
+            logger.info(
+                "Continuation request detected; carrying forward prior task type: %s",
+                unified_task_type.value,
+            )
         logger.info(f"Task type detected: {unified_task_type.value}")
 
         prompt_requirements = extract_prompt_requirements(user_message)
@@ -251,6 +310,23 @@ class ChatStreamHelperMixin:
         task_classification, complexity_tool_budget = self._prepare_task(
             user_message, unified_task_type
         )
+        if continuation_task_context is not None:
+            prior_task_classification = continuation_task_context.get("task_classification")
+            prior_budget = continuation_task_context.get("complexity_tool_budget")
+            current_complexity = getattr(task_classification, "complexity", None)
+            if prior_task_classification is not None and (
+                continuation_task_context.get("bare_continuation")
+                or current_complexity == TaskComplexity.SIMPLE
+            ):
+                task_classification = prior_task_classification
+                prior_complexity = getattr(prior_task_classification, "complexity", None)
+                if prior_budget is not None:
+                    complexity_tool_budget = int(prior_budget)
+                    orch.unified_tracker.set_tool_budget(complexity_tool_budget)
+                logger.info(
+                    "Continuation request detected; carrying forward prior task complexity: %s",
+                    getattr(prior_complexity, "value", prior_complexity),
+                )
 
         intelligent_context = await intelligent_task if intelligent_task is not None else None
         if intelligent_context:
@@ -300,6 +376,17 @@ class ChatStreamHelperMixin:
         ) = await self._prepare_stream(user_message, **kwargs)
 
         task_keywords = orch._classify_task_keywords(user_message)
+        continuation_task_context = getattr(orch, "_pending_continuation_task_context", None)
+        if (
+            isinstance(continuation_task_context, dict)
+            and continuation_task_context.get("carry_forward_task_shape")
+        ):
+            prior_coarse = continuation_task_context.get("coarse_task_type")
+            if prior_coarse and task_keywords.get("coarse_task_type") in (None, "default", "general"):
+                task_keywords["coarse_task_type"] = prior_coarse
+            for key in ("is_analysis_task", "is_action_task", "needs_execution"):
+                if key in continuation_task_context and not task_keywords.get(key):
+                    task_keywords[key] = bool(continuation_task_context.get(key))
 
         ctx = create_stream_context(
             user_message=user_message,
@@ -362,6 +449,7 @@ class ChatStreamHelperMixin:
         ctx.tool_calls_used = orch.tool_calls_used
         ctx.task_completion_detector = orch._task_completion_detector
         await self._initialize_stream_topology_context(ctx, user_message)
+        orch._pending_continuation_task_context = None
 
         return ctx
 

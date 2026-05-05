@@ -7,6 +7,7 @@ import pytest
 
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.agent.topology_contract import (
     TopologyAction,
     TopologyDecision,
@@ -401,6 +402,13 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
             "completion_tokens": 2,
             "total_tokens": 5,
         },
+        unified_task_type=TrackerTaskType.ANALYZE,
+        task_classification=SimpleNamespace(complexity=TaskComplexity.ANALYSIS),
+        complexity_tool_budget=9,
+        coarse_task_type="analysis",
+        is_analysis_task=True,
+        is_action_task=False,
+        needs_execution=False,
         last_quality_score=0.81,
         topology_events=[
             {
@@ -448,6 +456,49 @@ async def test_service_streaming_runtime_stream_chat_restores_runtime_overrides(
     assert ctx.topology_events[-1]["outcome"]["runtime"] == "streaming"
     assert ctx.runtime_override_snapshot is None
     assert orch._current_stream_context is None
+    assert orch._last_stream_task_context["unified_task_type"] == TrackerTaskType.ANALYZE
+    assert orch._last_stream_task_context["coarse_task_type"] == "analysis"
+
+
+@pytest.mark.asyncio
+async def test_service_streaming_runtime_create_stream_context_applies_pending_continuation_shape():
+    orch = _make_orchestrator_stub()
+    orch.settings = SimpleNamespace(recovery_blocked_consecutive_threshold=5)
+    orch._classify_task_keywords.return_value = {}
+    orch._tool_planner = SimpleNamespace(infer_goals_from_message=lambda _: [])
+    orch.tool_budget = 42
+    orch.tool_calls_used = 0
+    orch._task_completion_detector = None
+    orch._pending_continuation_task_context = {
+        "carry_forward_task_shape": True,
+        "coarse_task_type": "analysis",
+        "is_analysis_task": True,
+        "is_action_task": False,
+        "needs_execution": False,
+    }
+
+    runtime = ServiceStreamingRuntime(orch)
+    runtime._prepare_stream = AsyncMock(
+        return_value=(
+            SimpleNamespace(),
+            0.0,
+            0.0,
+            {},
+            30,
+            10,
+            0,
+            False,
+            TrackerTaskType.GENERAL,
+            SimpleNamespace(complexity=TaskComplexity.ANALYSIS),
+            42,
+        )
+    )
+
+    ctx = await runtime._create_stream_context("continue")
+
+    assert ctx.is_analysis_task is True
+    assert ctx.coarse_task_type == "analysis"
+    assert orch._pending_continuation_task_context is None
 
 
 @pytest.mark.asyncio

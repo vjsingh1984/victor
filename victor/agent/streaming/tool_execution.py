@@ -213,6 +213,68 @@ class ToolExecutionHandler:
         """Update the set of observed files."""
         self._observed_files = files
 
+    def _record_omitted_tool_call_response(
+        self,
+        result: ToolExecutionResult,
+        tool_call: Dict[str, Any],
+        *,
+        reason: str,
+        outcome_kind: str,
+        block_source: str,
+    ) -> None:
+        """Persist a synthetic tool response for a call omitted before execution."""
+        tool_name = tool_call.get("name", "tool")
+        tool_args = tool_call.get("arguments", {}) or {}
+        tool_call_id = tool_call.get("id")
+        content = (
+            f"Tool call skipped for '{tool_name}': {reason} "
+            "Use a different approach or continue with the available context."
+        )
+
+        if tool_call_id:
+            try:
+                self._message_adder.add_message(
+                    "tool",
+                    content,
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                    persist_synchronously=True,
+                )
+            except TypeError:
+                self._message_adder.add_message(
+                    "tool",
+                    content,
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to persist synthetic tool response for %s (tool_call_id=%s)",
+                    tool_name,
+                    tool_call_id,
+                )
+
+        result.tool_results.append(
+            {
+                "name": tool_name,
+                "success": False,
+                "elapsed": 0.0,
+                "args": tool_args,
+                "error": reason,
+                "result": content,
+                "full_result": content,
+                "follow_up_suggestions": None,
+                "was_pruned": False,
+                "tool_call_id": tool_call_id,
+                "content": content,
+                "skipped": True,
+                "outcome_kind": outcome_kind,
+                "block_source": block_source,
+                "retryable": False,
+                "user_message": reason,
+            }
+        )
+
     async def execute_tools(
         self,
         stream_ctx: StreamingChatContext,
@@ -330,20 +392,50 @@ class ToolExecutionHandler:
         if not tool_calls:
             return []
 
+        original_calls = list(tool_calls)
+
         # Truncate to remaining budget
         recovery_ctx = self._recovery_context_factory(stream_ctx)
         remaining = stream_ctx.get_remaining_budget()
-        tool_calls, _ = self._recovery_runtime.truncate_tool_calls(
+        tool_calls, was_truncated = self._recovery_runtime.truncate_tool_calls(
             recovery_ctx,
             tool_calls,
             remaining,
         )
+        if was_truncated and len(tool_calls) < len(original_calls):
+            omitted_calls = original_calls[len(tool_calls) :]
+            result.add_chunk(
+                StreamChunk(
+                    content=(
+                        f"\n[loop] Tool budget limited this turn; skipped "
+                        f"{len(omitted_calls)} queued tool call(s).\n"
+                    )
+                )
+            )
+            for omitted_call in omitted_calls:
+                self._record_omitted_tool_call_response(
+                    result,
+                    omitted_call,
+                    reason="Skipped because the remaining tool budget for this turn was exhausted.",
+                    outcome_kind="budget_exhausted",
+                    block_source="tool_budget",
+                )
 
         # Filter blocked tool calls
         filtered_calls, blocked_chunks, blocked_count = (
             self._recovery_runtime.filter_blocked_tool_calls(recovery_ctx, tool_calls)
         )
         result.add_chunks(blocked_chunks)
+        filtered_call_ids = {id(call) for call in filtered_calls}
+        blocked_calls = [call for call in tool_calls if id(call) not in filtered_call_ids]
+        for blocked_call in blocked_calls:
+            self._record_omitted_tool_call_response(
+                result,
+                blocked_call,
+                reason="Blocked by runtime safeguards after repeated non-progressing attempts.",
+                outcome_kind="tool_blocked",
+                block_source="runtime_guard",
+            )
 
         # Check blocked threshold
         all_blocked = blocked_count > 0 and not filtered_calls
@@ -381,7 +473,7 @@ class ToolExecutionHandler:
 
         # Execute all tool calls
         tool_results = await self._execute_tool_calls_callback(tool_calls)
-        result.tool_results = tool_results
+        result.tool_results.extend(tool_results)
         result.tool_calls_executed = len(tool_calls)
         result.last_tool_name = last_tool_name
         for tool_call in tool_calls:

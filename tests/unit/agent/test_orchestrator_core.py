@@ -3112,6 +3112,43 @@ class TestPrepareStream:
             "[SYSTEM-REMINDER:" in getattr(message, "content", "") for message in messages_after
         )
 
+    @pytest.mark.asyncio
+    async def test_prepare_stream_carries_forward_prior_task_shape_for_bare_continue(
+        self, orchestrator
+    ):
+        """Bare continuation commands should inherit prior task type and complexity."""
+        from victor.agent.unified_task_tracker import TrackerTaskType
+        from victor.framework.task import TaskComplexity
+
+        prior_classification = SimpleNamespace(
+            complexity=TaskComplexity.ANALYSIS,
+            confidence=0.98,
+        )
+        orchestrator._last_stream_task_context = {
+            "unified_task_type": TrackerTaskType.ANALYZE,
+            "task_classification": prior_classification,
+            "complexity_tool_budget": 42,
+            "coarse_task_type": "analysis",
+            "is_analysis_task": True,
+            "is_action_task": False,
+            "needs_execution": False,
+        }
+        orchestrator.unified_tracker.detect_task_type = MagicMock(
+            return_value=TrackerTaskType.GENERAL
+        )
+        orchestrator.task_analyzer.classify_complexity = MagicMock(
+            return_value=SimpleNamespace(
+                complexity=TaskComplexity.SIMPLE,
+                confidence=0.95,
+            )
+        )
+
+        result = await orchestrator._get_chat_stream_adapter()._prepare_stream("continue")
+
+        assert result[8] == TrackerTaskType.ANALYZE
+        assert result[9] is prior_classification
+        assert result[10] == 42
+
 
 class TestApplyTaskGuidance:
     """Tests for _apply_task_guidance method."""

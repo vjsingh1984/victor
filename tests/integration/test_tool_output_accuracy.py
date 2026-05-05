@@ -19,9 +19,10 @@ This is a critical fix - LLM must have complete context to make accurate decisio
 """
 
 import json
+from types import SimpleNamespace
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestToolOutputAccuracy:
@@ -238,6 +239,134 @@ class TestToolServiceIntegration:
             # If was_pruned is True, it means user preview was truncated
             # But LLM still received full output (verified above)
             pass
+
+    def test_process_tool_results_falls_back_to_provider_visible_error_message(self):
+        """Post-processing failures should still emit a tool-role response with the original call ID."""
+        from victor.agent.services.tool_service import ToolResultContext
+        from victor.agent.services.tool_service import process_tool_results_with_context
+
+        ctx = ToolResultContext(
+            executed_tools=[],
+            observed_files=set(),
+            failed_tool_signatures=set(),
+            shown_tool_errors=set(),
+            task_type="unknown",
+        )
+
+        messages_sent_to_llm = []
+
+        def mock_add_message(role, content, **kwargs):
+            messages_sent_to_llm.append({"role": role, "content": content, **kwargs})
+
+        ctx.add_message = mock_add_message
+        ctx.record_tool_execution = lambda *args, **kwargs: None
+        ctx.unified_tracker = None
+        ctx.usage_logger = None
+        ctx.conversation_state = None
+        ctx.stream_context = None
+        ctx.format_tool_output = MagicMock(side_effect=RuntimeError("format failed"))
+
+        from collections import namedtuple
+
+        MockCallResult = namedtuple(
+            "MockCallResult",
+            [
+                "tool_name",
+                "arguments",
+                "result",
+                "success",
+                "error",
+                "execution_time_ms",
+                "skipped",
+                "tool_call_id",
+            ],
+        )
+
+        mock_result = MockCallResult(
+            tool_name="metrics",
+            arguments={"path": "victor/framework/graph.py"},
+            result={"summary": "complexity report"},
+            success=True,
+            error=None,
+            execution_time_ms=100,
+            skipped=False,
+            tool_call_id="call_metrics_1",
+        )
+
+        mock_pipeline_result = MagicMock()
+        mock_pipeline_result.results = [mock_result]
+
+        results = process_tool_results_with_context(mock_pipeline_result, ctx)
+
+        assert len(results) == 1
+        assert results[0]["success"] is False
+        assert results[0]["outcome_kind"] == "tool_result_processing_failed"
+        assert results[0]["tool_call_id"] == "call_metrics_1"
+        assert "Tool result unavailable for 'metrics'" in results[0]["content"]
+        assert messages_sent_to_llm == [
+            {
+                "role": "tool",
+                "content": results[0]["content"],
+                "name": "metrics",
+                "tool_call_id": "call_metrics_1",
+                "persist_synchronously": True,
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_tool_execution_runtime_backfills_missing_provider_visible_tool_responses(self):
+        """Missing tool_call_ids should be backfilled before the provider sees the conversation."""
+        from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
+        from victor.agent.services.tool_execution_runtime import ToolExecutionRuntime
+
+        host = MagicMock()
+        host._tool_pipeline = MagicMock()
+        host._tool_pipeline.execute_tool_calls = AsyncMock(return_value=MagicMock(results=[]))
+        host._tool_pipeline.calls_used = 2
+        host._get_tool_context.return_value = {}
+        host.executed_tools = []
+        host.observed_files = set()
+        host.failed_tool_signatures = set()
+        host._shown_tool_errors = set()
+        host._continuation_prompts = 0
+        host._asking_input_prompts = 0
+        host._record_tool_execution = MagicMock()
+        host.conversation_state = None
+        host.unified_tracker = None
+        host.usage_logger = None
+        host.add_message = MagicMock()
+        host._format_tool_output = None
+        host.console = None
+        host._presentation = None
+        host._current_stream_context = None
+        host._current_task_type = "analysis"
+        host.conversation = SimpleNamespace(_messages=[])
+        host._tool_service = MagicMock()
+        host._tool_service.process_tool_results.return_value = [
+            {"name": "read", "success": True, "elapsed": 0.1, "tool_call_id": "call_1"}
+        ]
+
+        runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
+        results = await runtime.execute_tool_calls(
+            [
+                {"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}},
+                {"id": "call_2", "name": "metrics", "arguments": {"path": "victor/framework/graph.py"}},
+            ]
+        )
+
+        assert len(results) == 2
+        assert any(entry.get("tool_call_id") == "call_2" for entry in results)
+        host.add_message.assert_called_once_with(
+            "tool",
+            (
+                "Tool result unavailable for 'metrics'. Victor did not complete "
+                "post-processing for this tool call, so treat it as failed and continue "
+                "with the available context."
+            ),
+            name="metrics",
+            tool_call_id="call_2",
+            persist_synchronously=True,
+        )
 
 
 class TestBackwardCompatibility:
