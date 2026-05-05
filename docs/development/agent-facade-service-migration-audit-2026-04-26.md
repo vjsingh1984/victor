@@ -1347,6 +1347,43 @@ entire enabled tool set as one undifferentiated guidance surface.
 but the default `ContextSettings.kv_tool_strategy` is now `context_aware`
 instead of `per_turn`.
 
+## Migration Update: Dynamic Tool Hints Prefer Planned Tools (2026-05-04)
+
+**Seam consolidated:** dynamic long-tail tool hints were improved in the
+prompt/runtime layer, but session-locked providers still leaned too heavily on
+generic keyword hints because the per-turn prompt path did not receive the
+current planned tool sequence.
+
+**Canonical owners:**
+
+- `victor.agent.services.tool_planning_runtime.ToolPlanner` remains the
+  canonical source of current-turn planned tools.
+- `victor.agent.services.prompt_builder_runtime.PromptBuilderRuntime` now
+  prefers planned tools when choosing long-tail prompt hints.
+- `victor.agent.services.chat_stream_executor.StreamingChatExecutor` and
+  `victor.agent.services.chat_stream_helpers` explicitly carry that planned
+  sequence through the streaming provider-call path.
+
+**Changes applied:**
+
+1. Added `planned_tools` to the streaming context and passed it into message
+   assembly for both normal and retry provider calls.
+2. Updated tool-selection runtime to accept precomputed planned tools so the
+   tool plan does not need to be recomputed when the caller already has it.
+3. Updated dynamic tool-hint selection to prefer planned tools first, then
+   selector-derived keyword slices, then selected-tool/message heuristics.
+
+**Benefits:**
+
+- Session-locked providers now get per-turn long-tail hints that align with the
+  active execution plan instead of generic keyword matches.
+- The stable system prefix remains unchanged; only the user-prefix hint block
+  reflects current planning state.
+- Tool planning remains singular; prompt hinting reuses it instead of adding a
+  second planning abstraction.
+
+**Breaking changes:** None intended.
+
 **Benefits:**
 
 - Preserved live prompt optimization wiring for all providers, including Tier C

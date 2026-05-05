@@ -116,6 +116,10 @@ Agent / Public API
   per-turn user-prefix path when the current request makes them relevant. This
   prompt-side split is separate from provider tool schemas and from KV/API
   cache mechanics.
+- For cache-friendly/session-locked providers, dynamic long-tail tool hints
+  should prefer the current planned tool sequence when available, then fall
+  back to keyword-selected or selected-tool heuristics. The stable prefix stays
+  fixed; only the per-turn hint block reflects the current plan.
 - Active runtime protocols now have service-owned canonical hosts under
   `victor.agent.services.protocols.runtime_support` and
   `victor.agent.services.protocols.infrastructure_runtime`, including

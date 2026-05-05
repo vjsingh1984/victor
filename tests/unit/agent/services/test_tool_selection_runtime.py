@@ -102,6 +102,52 @@ async def test_tool_selection_runtime_selects_and_filters_tools_with_goals():
 
 
 @pytest.mark.asyncio
+async def test_tool_selection_runtime_reuses_precomputed_planned_tools():
+    provider = MagicMock()
+    provider.supports_tools.return_value = True
+    tool_selector = MagicMock()
+    selected_tools = [SimpleNamespace(name="read_file"), SimpleNamespace(name="search")]
+    tool_selector.select_tools = AsyncMock(return_value=selected_tools)
+    tool_selector.prioritize_by_stage.return_value = selected_tools
+    tool_planner = MagicMock()
+    tool_planner.filter_tools_by_intent.return_value = selected_tools
+    conversation = SimpleNamespace(message_count=MagicMock(return_value=1))
+    precomputed_plan = [SimpleNamespace(name="git_diff")]
+    host = SimpleNamespace(
+        provider=provider,
+        _model_supports_tool_calls=MagicMock(return_value=True),
+        _should_skip_tools_for_turn=MagicMock(return_value=False),
+        observed_files={"app.py"},
+        _tool_planner=tool_planner,
+        conversation=conversation,
+        messages=[_Message("user", "inspect the file")],
+        tool_selector=tool_selector,
+        use_semantic_selection=True,
+        _current_intent=None,
+        _current_user_message="inspect app.py",
+        _apply_kv_tool_strategy=MagicMock(return_value=selected_tools),
+        _sort_tools_for_kv_stability=MagicMock(return_value=selected_tools),
+    )
+    runtime = ToolSelectionRuntime(OrchestratorProtocolAdapter(host))
+
+    result = await runtime.select_tools_for_turn(
+        "inspect app.py",
+        goals=["analyze"],
+        planned_tools=precomputed_plan,
+    )
+
+    assert result == selected_tools
+    tool_planner.plan_tools.assert_not_called()
+    tool_selector.select_tools.assert_awaited_once_with(
+        "inspect app.py",
+        use_semantic=True,
+        conversation_history=[{"role": "user", "content": "inspect the file"}],
+        conversation_depth=1,
+        planned_tools=precomputed_plan,
+    )
+
+
+@pytest.mark.asyncio
 async def test_tool_selection_runtime_preserves_user_request_as_anchor():
     provider = MagicMock()
     provider.supports_tools.return_value = True

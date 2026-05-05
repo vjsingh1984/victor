@@ -19,7 +19,12 @@ class ToolSelectionRuntime:
     def __init__(self, runtime_host: Any) -> None:
         self._runtime = runtime_host
 
-    async def select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
+    async def select_tools_for_turn(
+        self,
+        context_msg: str,
+        goals: Any,
+        planned_tools: Any = None,
+    ) -> Any:
         """Select, prioritize, and filter tools for the current turn."""
         runtime = self._runtime
         provider_supports_tools = runtime.provider.supports_tools()
@@ -32,8 +37,7 @@ class ToolSelectionRuntime:
         if runtime._should_skip_tools_for_turn(context_msg):
             return None
 
-        planned_tools = None
-        if goals:
+        if planned_tools is None and goals:
             available_inputs = ["query"]
             if runtime.observed_files:
                 available_inputs.append("file_contents")

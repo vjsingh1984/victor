@@ -85,6 +85,7 @@ class StreamingChatContext:
 
     # Goals for tool selection
     goals: List[str] = field(default_factory=list)
+    planned_tools: Optional[List[Any]] = None
 
     # Quality tracking
     last_quality_score: float = 0.5

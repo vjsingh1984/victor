@@ -2081,6 +2081,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         current_query: Optional[str] = None,
         *,
         selected_tools: Optional[list[Any]] = None,
+        planned_tools: Optional[list[Any]] = None,
     ) -> List["Message"]:
         """Get context-assembled messages for provider calls.
 
@@ -2188,6 +2189,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             prompt_runtime = self._get_prompt_builder_runtime()
             turn_ctx.dynamic_tool_guidance = prompt_runtime.build_dynamic_tool_guidance(
                 current_query or last_user_msg,
+                planned_tools=planned_tools,
                 selected_tools=selected_tools,
             )
 
@@ -3445,7 +3447,12 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             max_exploration_iterations=max_exploration_iterations,
         )
 
-    async def _select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
+    async def _select_tools_for_turn(
+        self,
+        context_msg: str,
+        goals: Any,
+        planned_tools: Any = None,
+    ) -> Any:
         """Select and prioritize tools for the current turn.
 
         Applies TOOL_NECESSITY check first: if the edge model (or heuristic)
@@ -3456,6 +3463,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         return await self._get_tool_selection_runtime().select_tools_for_turn(
             context_msg,
             goals,
+            planned_tools=planned_tools,
         )
 
     # ------------------------------------------------------------------

@@ -100,7 +100,8 @@ class OrchestratorStub:
     def get_session_tools(self):
         return self._session_tools
 
-    def get_assembled_messages(self, current_query=None):
+    def get_assembled_messages(self, current_query=None, **kwargs):
+        del kwargs
         return self.messages
 
     # Methods moved from DummyCoordinator to OrchestratorStub (pipeline now calls orch directly)

@@ -214,6 +214,7 @@ class PromptBuilderRuntime:
         self,
         user_message: Optional[str],
         *,
+        planned_tools: Optional[Iterable[Any]] = None,
         selected_tools: Optional[Iterable[Any]] = None,
     ) -> str:
         """Build per-turn dynamic tool hints for long-tail tools."""
@@ -228,6 +229,7 @@ class PromptBuilderRuntime:
         relevant_tools = self._select_relevant_dynamic_tools(
             user_message or "",
             dynamic_tools,
+            planned_tools=planned_tools,
             selected_tools=selected_tools,
         )
         if not relevant_tools:
@@ -375,10 +377,18 @@ class PromptBuilderRuntime:
         user_message: str,
         dynamic_tools: list[str],
         *,
+        planned_tools: Optional[Iterable[Any]] = None,
         selected_tools: Optional[Iterable[Any]] = None,
     ) -> list[str]:
         """Choose a compact dynamic tool subset for the current turn."""
         from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
+        planned_dynamic = self._filter_dynamic_tool_names(
+            planned_tools,
+            dynamic_tools,
+        )
+        if planned_dynamic:
+            return planned_dynamic[:6]
 
         selector_dynamic = self._select_dynamic_tools_from_selector(
             user_message,
@@ -398,14 +408,7 @@ class PromptBuilderRuntime:
         except Exception:
             tool_catalog = {}
 
-        selected_dynamic: list[str] = []
-        for tool in selected_tools or []:
-            name = getattr(tool, "name", None)
-            if name is None and isinstance(tool, dict):
-                name = tool.get("name")
-            canonical = canonicalize_core_tool_name(name or "")
-            if canonical and canonical in dynamic_tools and canonical not in selected_dynamic:
-                selected_dynamic.append(canonical)
+        selected_dynamic = self._filter_dynamic_tool_names(selected_tools, dynamic_tools)
 
         user_message_lower = user_message.lower().strip()
         keyword_matches = [
@@ -419,6 +422,28 @@ class PromptBuilderRuntime:
         else:
             relevant = selected_dynamic
         return relevant[:6]
+
+    def _filter_dynamic_tool_names(
+        self,
+        tools: Optional[Iterable[Any]],
+        dynamic_tools: list[str],
+    ) -> list[str]:
+        """Filter a tool iterable down to dynamic tool names in stable order."""
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
+        if not tools:
+            return []
+
+        dynamic_set = set(dynamic_tools)
+        relevant: list[str] = []
+        for tool in tools:
+            name = getattr(tool, "name", None)
+            if name is None and isinstance(tool, dict):
+                name = tool.get("name")
+            canonical = canonicalize_core_tool_name(name or "")
+            if canonical in dynamic_set and canonical not in relevant:
+                relevant.append(canonical)
+        return relevant
 
     def _select_dynamic_tools_from_selector(
         self,

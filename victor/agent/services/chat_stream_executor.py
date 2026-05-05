@@ -294,12 +294,22 @@ class StreamingChatExecutor:
             history = history[:-1]
         return history or None
 
-    async def _get_tools_cached(self, orch: Any, context_msg: str, goals: Any) -> Any:
+    async def _get_tools_cached(
+        self,
+        orch: Any,
+        context_msg: str,
+        goals: Any,
+        planned_tools: Any = None,
+    ) -> Any:
         """Select tools with per-turn caching."""
         if self._last_tool_context == context_msg and self._last_tools is not None:
             return self._last_tools
 
-        tools = await orch._select_tools_for_turn(context_msg, goals)
+        tools = await orch._select_tools_for_turn(
+            context_msg,
+            goals,
+            planned_tools=planned_tools,
+        )
         if tools is not None:
             self._last_tool_context = context_msg
             self._last_tools = tools
@@ -662,12 +672,25 @@ class StreamingChatExecutor:
             if handled:
                 break
 
+            planned_tools = None
+            if goals:
+                available_inputs = ["query"]
+                if orch.observed_files:
+                    available_inputs.append("file_contents")
+                planned_tools = orch._tool_planner.plan_tools(goals, available_inputs)
+            stream_ctx.planned_tools = planned_tools
+
             if getattr(stream_ctx, "is_qa_task", False):
                 tools = None
             elif orch.get_session_tools() is not None:
                 tools = orch.get_session_tools()
             else:
-                tools = await self._get_tools_cached(orch, stream_ctx.context_msg, goals)
+                tools = await self._get_tools_cached(
+                    orch,
+                    stream_ctx.context_msg,
+                    goals,
+                    planned_tools=planned_tools,
+                )
 
             provider_kwargs = dict(getattr(stream_ctx, "provider_kwargs", {}) or {})
             if orch.thinking or provider_kwargs.get("execution_mode") == "escalated_single_agent":

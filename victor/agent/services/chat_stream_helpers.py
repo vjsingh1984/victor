@@ -952,6 +952,7 @@ class ChatStreamHelperMixin:
         assembled = orch.get_assembled_messages(
             current_query=stream_ctx.user_message if stream_ctx else None,
             selected_tools=tools,
+            planned_tools=(stream_ctx.planned_tools if stream_ctx else None),
         )
         async for chunk in orch.provider.stream(
             messages=assembled,
@@ -1075,7 +1076,9 @@ class ChatStreamHelperMixin:
                 recovered_tool_calls = None
 
                 retry_assembled = orch.get_assembled_messages(
-                    current_query=stream_ctx.user_message if stream_ctx else None
+                    current_query=stream_ctx.user_message if stream_ctx else None,
+                    selected_tools=tools,
+                    planned_tools=(stream_ctx.planned_tools if stream_ctx else None),
                 )
                 async for chunk in orch.provider.stream(
                     messages=retry_assembled,

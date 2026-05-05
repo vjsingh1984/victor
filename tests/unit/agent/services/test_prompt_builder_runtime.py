@@ -345,6 +345,31 @@ def test_build_dynamic_tool_guidance_prefers_tool_selector_keyword_slice():
     builder.get_dynamic_tool_guidance_text.assert_called_once_with(["git_diff"])
 
 
+def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
+    builder = SimpleNamespace(
+        dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
+        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: workflow"),
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        tool_selector=SimpleNamespace(
+            select_keywords=MagicMock(return_value=[SimpleNamespace(name="git_diff")])
+        ),
+        tools=SimpleNamespace(list_tools=lambda: []),
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    guidance = runtime.build_dynamic_tool_guidance(
+        "Continue execution",
+        planned_tools=[SimpleNamespace(name="workflow"), SimpleNamespace(name="read")],
+        selected_tools=[SimpleNamespace(name="web_search")],
+    )
+
+    assert guidance == "DYNAMIC TOOL HINTS: workflow"
+    host.tool_selector.select_keywords.assert_not_called()
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["workflow"])
+
+
 def test_build_dynamic_tool_guidance_falls_back_to_selected_dynamic_tools_when_selector_misses():
     builder = SimpleNamespace(
         dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
