@@ -24,6 +24,8 @@ These tests cover:
 - Lifecycle management
 """
 
+import warnings
+
 import pytest
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -1459,6 +1461,27 @@ class TestAgentLifecycle:
             assert a is agent
 
         mock_orchestrator.close.assert_called_once()
+
+    def test_destructor_warns_when_agent_not_closed(self, mock_orchestrator):
+        """__del__ should emit a ResourceWarning when cleanup was skipped."""
+        from victor.framework.agent import Agent
+
+        agent = Agent(mock_orchestrator)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            agent.__del__()
+
+        assert any(item.category is ResourceWarning for item in caught)
+
+    def test_destructor_is_safe_during_interpreter_shutdown(self, mock_orchestrator):
+        """__del__ should not raise when import machinery is already torn down."""
+        from victor.framework.agent import Agent
+
+        agent = Agent(mock_orchestrator)
+
+        with patch("victor.framework.agent.sys.meta_path", None):
+            agent.__del__()
 
     def test_repr(self, mock_orchestrator):
         """__repr__ should return descriptive string."""

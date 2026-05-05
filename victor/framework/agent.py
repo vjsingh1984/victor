@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import inspect
 import logging
+import sys
+import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -1252,15 +1254,25 @@ class Agent:
         await self.close()
 
     def __del__(self) -> None:
-        if hasattr(self, "_orchestrator") and self._orchestrator is not None:
-            import warnings
+        orchestrator = getattr(self, "_orchestrator", None)
+        if orchestrator is None:
+            return
 
+        # Interpreter shutdown can clear import machinery before __del__ runs.
+        # Skip the warning in that state instead of printing a misleading
+        # exception that obscures the real command result.
+        if getattr(sys, "meta_path", None) is None:
+            return
+
+        try:
             warnings.warn(
                 "Agent was not closed. Use 'async with' or call "
                 "'await agent.close()' to release resources.",
                 ResourceWarning,
                 stacklevel=2,
             )
+        except Exception:
+            logger.debug("Skipping Agent.__del__ warning during interpreter shutdown")
 
     def __repr__(self) -> str:
         return f"Agent(provider={self._provider}, model={self._model}, state={self._state})"

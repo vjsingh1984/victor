@@ -47,6 +47,10 @@ Verticals are discovered automatically via the victor.plugins entry point.
 
 import os
 
+from victor._sdk_bootstrap import prefer_repo_local_victor_sdk
+
+prefer_repo_local_victor_sdk(__file__)
+
 try:
     from importlib.metadata import version as _get_version
 
