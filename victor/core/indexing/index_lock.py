@@ -181,6 +181,58 @@ class FileLock:
 import errno
 
 
+class _PathLockHandle:
+    """Async context manager that combines in-process and file locking per use."""
+
+    def __init__(
+        self,
+        registry: "IndexLockRegistry",
+        path_str: str,
+        in_process_lock: asyncio.Lock,
+        lock_file: Optional[Path],
+    ) -> None:
+        self._registry = registry
+        self._path_str = path_str
+        self._in_process_lock = in_process_lock
+        self._lock_file = lock_file
+        self._file_lock: Optional[FileLock] = None
+
+    async def __aenter__(self) -> asyncio.Lock:
+        await self._in_process_lock.acquire()
+        try:
+            if self._lock_file is not None:
+                file_lock = FileLock(self._lock_file)
+                loop = asyncio.get_running_loop()
+                acquired = await loop.run_in_executor(
+                    None,
+                    lambda: file_lock.acquire(timeout=300.0),
+                )
+                if not acquired:
+                    raise TimeoutError(
+                        f"Failed to acquire index lock for {self._path_str} "
+                        "after 300 seconds (another process may be indexing)"
+                    )
+                self._file_lock = file_lock
+                logger.info(
+                    "[IndexLockRegistry] Acquired cross-process lock for %s",
+                    self._path_str,
+                )
+            return self._in_process_lock
+        except Exception:
+            self._in_process_lock.release()
+            raise
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
+        try:
+            if self._file_lock is not None:
+                self._file_lock.release()
+                self._file_lock = None
+        finally:
+            self._registry._mark_lock_used_path(self._path_str)
+            self._in_process_lock.release()
+        return False
+
+
 class IndexLockRegistry:
     """Global registry of path-specific async locks.
 
@@ -211,7 +263,7 @@ class IndexLockRegistry:
     def __init__(self):
         """Initialize IndexLockRegistry."""
         self._path_locks: Dict[str, asyncio.Lock] = {}
-        self._file_locks: Dict[str, FileLock] = {}
+        self._lock_files: Dict[str, Path] = {}
         self._registry_lock = asyncio.Lock()
         self._lock_stats: Dict[str, Dict] = {}  # Track lock usage stats
 
@@ -226,7 +278,7 @@ class IndexLockRegistry:
             cls._instance = cls()
         return cls._instance
 
-    async def acquire_lock(self, path: Path, use_file_lock: bool = True) -> asyncio.Lock:
+    async def acquire_lock(self, path: Path, use_file_lock: bool = True) -> _PathLockHandle:
         """Acquire or create lock for specific path.
 
         Uses double-checked locking pattern for performance:
@@ -239,7 +291,7 @@ class IndexLockRegistry:
             use_file_lock: Whether to use file-based locking for cross-process safety
 
         Returns:
-            asyncio.Lock for this specific path
+            Async context manager for this specific path
 
         Raises:
             TimeoutError: If file lock cannot be acquired within timeout
@@ -251,7 +303,12 @@ class IndexLockRegistry:
             # Update stats
             if path_str in self._lock_stats:
                 self._lock_stats[path_str]["cache_hits"] += 1
-            return self._path_locks[path_str]
+            return _PathLockHandle(
+                self,
+                path_str,
+                self._path_locks[path_str],
+                self._lock_files.get(path_str) if use_file_lock else None,
+            )
 
         # Slow path - acquire registry lock
         start_time = time.time()
@@ -259,30 +316,20 @@ class IndexLockRegistry:
             # Double-check inside lock
             if path_str in self._path_locks:
                 # Another task created it while we waited
-                return self._path_locks[path_str]
+                return _PathLockHandle(
+                    self,
+                    path_str,
+                    self._path_locks[path_str],
+                    self._lock_files.get(path_str) if use_file_lock else None,
+                )
 
-            # Create file lock for cross-process protection
+            lock_file: Optional[Path] = None
             if use_file_lock:
                 from victor.config.settings import get_project_paths
 
                 project_paths = get_project_paths(path)
                 lock_file = project_paths.project_victor_dir / "index.lock"
-
-                file_lock = FileLock(lock_file)
-                # Acquire file lock in thread pool to avoid blocking event loop
-                loop = asyncio.get_event_loop()
-                acquired = await loop.run_in_executor(
-                    None, lambda: file_lock.acquire(timeout=300.0)
-                )
-
-                if not acquired:
-                    raise TimeoutError(
-                        f"Failed to acquire index lock for {path_str} "
-                        f"after 300 seconds (another process may be indexing)"
-                    )
-
-                self._file_locks[path_str] = file_lock
-                logger.info(f"[IndexLockRegistry] Acquired cross-process lock for {path_str}")
+                self._lock_files[path_str] = lock_file
 
             # Create new in-process lock
             self._path_locks[path_str] = asyncio.Lock()
@@ -306,15 +353,18 @@ class IndexLockRegistry:
             self._lock_stats[path_str]["waits"] += 1
             self._lock_stats[path_str]["total_wait_time_ms"] += wait_time_ms
 
-            return self._path_locks[path_str]
+            return _PathLockHandle(
+                self,
+                path_str,
+                self._path_locks[path_str],
+                lock_file if use_file_lock else None,
+            )
 
     async def cleanup_idle_locks(
         self,
         max_idle_seconds: int = 3600,
     ) -> int:
         """Remove locks that haven't been used recently.
-
-        Also releases file locks for cleaned up paths.
 
         Args:
             max_idle_seconds: Remove locks idle longer than this (default: 1 hour)
@@ -338,12 +388,12 @@ class IndexLockRegistry:
 
             # Remove idle locks
             for path_str in idle_paths:
-                # Release file lock if present
-                if path_str in self._file_locks:
-                    self._file_locks[path_str].release()
-                    del self._file_locks[path_str]
+                lock = self._path_locks.get(path_str)
+                if lock is not None and lock.locked():
+                    continue
 
                 del self._path_locks[path_str]
+                self._lock_files.pop(path_str, None)
                 del self._lock_stats[path_str]
                 removed += 1
 
@@ -364,7 +414,10 @@ class IndexLockRegistry:
             path: Path whose lock was used
         """
         path_str = str(path.resolve())
+        self._mark_lock_used_path(path_str)
 
+    def _mark_lock_used_path(self, path_str: str) -> None:
+        """Mark a lock entry as recently used by its normalized path string."""
         if path_str in self._lock_stats:
             self._lock_stats[path_str]["last_used"] = time.time()
 
@@ -386,14 +439,7 @@ class IndexLockRegistry:
         Use with caution in production.
         """
         async with self._registry_lock:
-            # Release all file locks
-            for file_lock in self._file_locks.values():
-                try:
-                    file_lock.release()
-                except Exception as e:
-                    logger.warning(f"[IndexLockRegistry] Error releasing file lock: {e}")
-
-            self._file_locks.clear()
+            self._lock_files.clear()
             self._path_locks.clear()
             self._lock_stats.clear()
             logger.warning("[IndexLockRegistry] All locks cleared")

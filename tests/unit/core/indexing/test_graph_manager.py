@@ -31,9 +31,11 @@ async def reset_graph_manager():
     manager = GraphManager.get_instance()
     await manager.clear_cache()
     manager._watcher_subscribed.clear()
+    manager._watcher_callbacks.clear()
     yield
     await manager.clear_cache()
     manager._watcher_subscribed.clear()
+    manager._watcher_callbacks.clear()
 
 
 @pytest.fixture
@@ -214,6 +216,58 @@ class TestGraphManager:
 
         # Still only one subscription
         assert len(manager._watcher_subscribed) == 1
+
+    @pytest.mark.asyncio
+    async def test_stop_background_refresh_unsubscribes_file_watcher(self, temp_codebase, monkeypatch):
+        """Stopping refresh should detach watcher callbacks and stop idle watchers."""
+        manager = GraphManager.get_instance()
+        root_str = str(temp_codebase.resolve())
+        stop_calls = []
+
+        class FakeWatcher:
+            def __init__(self) -> None:
+                self.subscribers = set()
+                self.unsubscribed = []
+
+            def subscribe(self, callback):
+                self.subscribers.add(callback)
+
+            def unsubscribe(self, callback):
+                self.unsubscribed.append(callback)
+                self.subscribers.discard(callback)
+
+            def get_stats(self):
+                return {"subscribers": len(self.subscribers)}
+
+        fake_watcher = FakeWatcher()
+
+        class FakeWatcherRegistry:
+            def __init__(self) -> None:
+                self._watchers = {root_str: fake_watcher}
+
+            async def get_watcher(self, root, **kwargs):
+                return fake_watcher
+
+            async def stop_watcher(self, root):
+                stop_calls.append(root.resolve())
+                self._watchers.pop(str(root.resolve()), None)
+                return True
+
+        monkeypatch.setattr(
+            "victor.core.indexing.graph_manager.FileWatcherRegistry.get_instance",
+            staticmethod(lambda: FakeWatcherRegistry()),
+        )
+
+        await manager.ensure_background_refresh(temp_codebase)
+        assert root_str in manager._watcher_subscribed
+        assert root_str in manager._watcher_callbacks
+
+        await manager.stop_background_refresh(temp_codebase)
+
+        assert root_str not in manager._watcher_subscribed
+        assert root_str not in manager._watcher_callbacks
+        assert len(fake_watcher.unsubscribed) == 1
+        assert stop_calls == [temp_codebase.resolve()]
 
     @pytest.mark.asyncio
     async def test_file_deleted_marks_stale(self, temp_codebase):

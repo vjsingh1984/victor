@@ -43,6 +43,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
@@ -51,6 +52,93 @@ if TYPE_CHECKING:
     from victor.storage.graph.protocol import GraphStoreProtocol
 
 logger = logging.getLogger(__name__)
+
+_TREE_SITTER_LANGUAGE_MODULES = {
+    "python": ("tree_sitter_python", "language"),
+    "javascript": ("tree_sitter_javascript", "language"),
+    "typescript": ("tree_sitter_typescript", "language_typescript"),
+    "go": ("tree_sitter_go", "language"),
+    "rust": ("tree_sitter_rust", "language"),
+    "java": ("tree_sitter_java", "language"),
+    "c": ("tree_sitter_c", "language"),
+    "cpp": ("tree_sitter_cpp", "language"),
+}
+
+_TREE_SITTER_DEFINITION_TYPES = {
+    "python": {
+        "function_definition",
+        "class_definition",
+        "async_function_definition",
+        "decorated_definition",
+    },
+    "javascript": {
+        "function_declaration",
+        "function_expression",
+        "class_declaration",
+        "class_expression",
+        "method_definition",
+    },
+    "typescript": {
+        "function_declaration",
+        "function_expression",
+        "class_declaration",
+        "class_expression",
+        "method_definition",
+        "interface_declaration",
+        "type_alias_declaration",
+    },
+    "go": {
+        "function_declaration",
+        "type_declaration",
+        "method_declaration",
+    },
+    "rust": {
+        "function_item",
+        "struct_item",
+        "impl_item",
+        "trait_item",
+    },
+    "java": {
+        "method_declaration",
+        "class_declaration",
+        "interface_declaration",
+        "enum_declaration",
+        "record_declaration",
+    },
+}
+
+_TREE_SITTER_NODE_TYPE_MAP = {
+    "function_definition": "function",
+    "async_function_definition": "function",
+    "class_definition": "class",
+    "decorated_definition": "function",
+    "function_declaration": "function",
+    "function_expression": "function",
+    "arrow_function": "function",
+    "class_declaration": "class",
+    "class_expression": "class",
+    "method_definition": "method",
+    "interface_declaration": "interface",
+    "type_alias_declaration": "type_alias",
+    "go_function_declaration": "function",
+    "go_method_declaration": "method",
+    "go_type_declaration": "type",
+    "function_item": "function",
+    "struct_item": "struct",
+    "impl_item": "impl",
+    "trait_item": "trait",
+    "java_method_declaration": "method",
+    "java_class_declaration": "class",
+    "java_interface_declaration": "interface",
+    "enum_declaration": "enum",
+}
+
+_TREE_SITTER_IDENTIFIER_TYPES = {
+    "identifier",
+    "property_identifier",
+    "field_identifier",
+    "type_identifier",
+}
 
 
 # Import at runtime for use in non-type-checked contexts
@@ -146,6 +234,7 @@ class GraphIndexingPipeline:
         self.config = config
         self._ccg_builder = None
         self._files_to_process: Set[str] = set()
+        self._parser_cache: Dict[str, Any] = {}
 
         if config.enable_ccg:
             try:
@@ -357,8 +446,23 @@ class GraphIndexingPipeline:
         Returns:
             Batch processing stats
         """
-        stats = GraphIndexStats()
+        write_batch = getattr(self.graph_store, "write_batch", None)
+        if len(files) > 1 and callable(write_batch):
+            try:
+                stats = GraphIndexStats()
+                async with self._graph_store_write_batch():
+                    for file_path in files:
+                        file_stats = await self._process_file(file_path)
+                        self._merge_stats(stats, file_stats)
+                return stats
+            except Exception as exc:
+                logger.info(
+                    "Graph batch write for %d files failed; retrying per file: %s",
+                    len(files),
+                    exc,
+                )
 
+        stats = GraphIndexStats()
         for file_path in files:
             try:
                 file_stats = await self._process_file(file_path)
@@ -379,46 +483,80 @@ class GraphIndexingPipeline:
         Returns:
             File processing stats
         """
+        stats = GraphIndexStats()
+
+        if not file_path.is_file():
+            await self._handle_vanished_file(file_path)
+            stats.files_deleted += 1
+            return stats
+
         GraphNode, GraphEdge = _get_graph_types()
         from victor.storage.graph.edge_types import EdgeType
 
-        stats = GraphIndexStats()
-        stats.files_processed += 1
+        try:
+            # Detect language
+            language = self._detect_language(file_path)
+            if language == "unknown":
+                stats.files_skipped += 1
+                return stats
 
-        # Detect language
-        language = self._detect_language(file_path)
-        if language == "unknown":
-            stats.files_skipped += 1
+            # Extract symbols using tree-sitter
+            symbol_nodes = await self._extract_symbols(file_path, language)
+
+            # Build symbol edges (CALLS, REFERENCES, CONTAINS)
+            symbol_edges = await self._build_symbol_edges(symbol_nodes, file_path)
+
+            # Build CCG if enabled
+            ccg_nodes: List[Any] = []
+            ccg_edges: List[Any] = []
+            if self.config.enable_ccg and self._ccg_builder:
+                ccg_nodes, ccg_edges = await self._ccg_builder.build_ccg_for_file(
+                    file_path, language
+                )
+
+            async with self._graph_store_write_batch():
+                # Store symbols
+                await self.graph_store.upsert_nodes(symbol_nodes)
+                await self.graph_store.upsert_edges(symbol_edges)
+
+                if ccg_nodes:
+                    await self.graph_store.upsert_nodes(ccg_nodes)
+                if ccg_edges:
+                    await self.graph_store.upsert_edges(ccg_edges)
+
+                # Update file mtime for staleness tracking
+                mtime = file_path.stat().st_mtime
+                await self.graph_store.update_file_mtime(str(file_path), mtime)
+        except FileNotFoundError:
+            await self._handle_vanished_file(file_path)
+            stats.files_deleted += 1
             return stats
 
-        # Extract symbols using tree-sitter
-        symbol_nodes = await self._extract_symbols(file_path, language)
+        stats.files_processed += 1
         stats.nodes_created += len(symbol_nodes)
-
-        # Build symbol edges (CALLS, REFERENCES, CONTAINS)
-        symbol_edges = await self._build_symbol_edges(symbol_nodes, file_path)
         stats.edges_created += len(symbol_edges)
-
-        # Store symbols
-        await self.graph_store.upsert_nodes(symbol_nodes)
-        await self.graph_store.upsert_edges(symbol_edges)
-
-        # Build CCG if enabled
-        if self.config.enable_ccg and self._ccg_builder:
-            ccg_nodes, ccg_edges = await self._ccg_builder.build_ccg_for_file(file_path, language)
-            stats.ccg_nodes_created += len(ccg_nodes)
-            stats.ccg_edges_created += len(ccg_edges)
-
-            if ccg_nodes:
-                await self.graph_store.upsert_nodes(ccg_nodes)
-            if ccg_edges:
-                await self.graph_store.upsert_edges(ccg_edges)
-
-        # Update file mtime for staleness tracking
-        mtime = file_path.stat().st_mtime
-        await self.graph_store.update_file_mtime(str(file_path), mtime)
+        stats.ccg_nodes_created += len(ccg_nodes)
+        stats.ccg_edges_created += len(ccg_edges)
 
         return stats
+
+    async def _handle_vanished_file(self, file_path: Path) -> None:
+        """Drop graph state for a file that disappeared during indexing."""
+        logger.info("Skipping vanished file during graph indexing: %s", file_path)
+        try:
+            await self.graph_store.delete_by_file(str(file_path))
+        except Exception as exc:
+            logger.debug("Failed to clean vanished file %s from graph store: %s", file_path, exc)
+
+    @asynccontextmanager
+    async def _graph_store_write_batch(self):
+        """Use store-native batched writes when available."""
+        write_batch = getattr(self.graph_store, "write_batch", None)
+        if callable(write_batch):
+            async with write_batch():
+                yield
+            return
+        yield
 
     def _detect_language(self, file_path: Path) -> str:
         """Detect programming language from file extension.
@@ -484,33 +622,7 @@ class GraphIndexingPipeline:
 
         # Use tree-sitter to extract symbols
         try:
-            # Try new API (tree-sitter 0.25+ with language packages)
-            import tree_sitter as ts
-
-            # Language module mapping (matches tree_sitter_manager)
-            lang_modules = {
-                "python": ("tree_sitter_python", "language"),
-                "javascript": ("tree_sitter_javascript", "language"),
-                "typescript": ("tree_sitter_typescript", "language_typescript"),
-                "go": ("tree_sitter_go", "language"),
-                "rust": ("tree_sitter_rust", "language"),
-                "java": ("tree_sitter_java", "language"),
-                "c": ("tree_sitter_c", "language"),
-                "cpp": ("tree_sitter_cpp", "language"),
-            }
-
-            if language not in lang_modules:
-                raise ValueError(f"Unsupported language: {language}")
-
-            module_name, func_name = lang_modules[language]
-            lang_module = __import__(module_name)
-            lang_func = getattr(lang_module, func_name)
-            lang_obj = lang_func()
-            ts_language = (
-                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
-            )
-
-            parser = ts.Parser(ts_language)
+            parser = self._get_tree_sitter_parser(language)
             tree = parser.parse(bytes(source_code, "utf-8"))
 
             # Extract function/class definitions
@@ -547,15 +659,15 @@ class GraphIndexingPipeline:
 
         nodes: List[Any] = []
         source_lines = source_code.splitlines()
+        definition_types = _TREE_SITTER_DEFINITION_TYPES.get(language, set())
+        file_str = str(file_path)
+        map_node_type = _TREE_SITTER_NODE_TYPE_MAP.get
 
-        def extract(node: Any, parent_id: str | None = None, depth: int = 0) -> None:
-            if not hasattr(node, "type"):
-                return
-
+        def extract(node: Any, parent_id: str | None = None) -> None:
             node_type = node.type
 
             # Check if this is a definition we care about
-            if self._is_definition_type(node_type, language):
+            if node_type in definition_types:
                 # Get line numbers
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
@@ -574,7 +686,7 @@ class GraphIndexingPipeline:
                 # Generate node ID
                 import hashlib
 
-                node_id = hashlib.sha256(f"{file_path}:{name}:{start_line}".encode()).hexdigest()[
+                node_id = hashlib.sha256(f"{file_str}:{name}:{start_line}".encode()).hexdigest()[
                     :16
                 ]
 
@@ -584,9 +696,9 @@ class GraphIndexingPipeline:
                 # Create node
                 graph_node = GraphNode(
                     node_id=node_id,
-                    type=self._map_node_type(node_type),
+                    type=map_node_type(node_type, "unknown"),
                     name=name,
-                    file=str(file_path),
+                    file=file_str,
                     line=start_line,
                     end_line=end_line,
                     lang=language,
@@ -604,12 +716,12 @@ class GraphIndexingPipeline:
                 )
 
                 # Recurse into children (for nested classes/functions)
-                for child in node.children:
-                    extract(child, graph_node.node_id, depth + 1)
+                for child in self._iter_tree_children(node):
+                    extract(child, graph_node.node_id)
             else:
                 # Continue traversing
-                for child in node.children:
-                    extract(child, parent_id, depth + 1)
+                for child in self._iter_tree_children(node):
+                    extract(child, parent_id)
 
         extract(root_node)
         return nodes
@@ -624,50 +736,7 @@ class GraphIndexingPipeline:
         Returns:
             True if this is a definition type
         """
-        definition_types = {
-            "python": {
-                "function_definition",
-                "class_definition",
-                "async_function_definition",
-                "decorated_definition",
-            },
-            "javascript": {
-                "function_declaration",
-                "function_expression",
-                "class_declaration",
-                "class_expression",
-                "method_definition",
-            },
-            "typescript": {
-                "function_declaration",
-                "function_expression",
-                "class_declaration",
-                "class_expression",
-                "method_definition",
-                "interface_declaration",
-                "type_alias_declaration",
-            },
-            "go": {
-                "function_declaration",
-                "type_declaration",
-                "method_declaration",
-            },
-            "rust": {
-                "function_item",
-                "struct_item",
-                "impl_item",
-                "trait_item",
-            },
-            "java": {
-                "method_declaration",
-                "class_declaration",
-                "interface_declaration",
-                "enum_declaration",
-                "record_declaration",
-            },
-        }
-
-        return node_type in definition_types.get(language, set())
+        return node_type in _TREE_SITTER_DEFINITION_TYPES.get(language, set())
 
     def _map_node_type(self, tree_sitter_type: str) -> str:
         """Map tree-sitter node type to our graph node type.
@@ -678,37 +747,7 @@ class GraphIndexingPipeline:
         Returns:
             Graph node type string
         """
-        type_map = {
-            # Python
-            "function_definition": "function",
-            "async_function_definition": "function",
-            "class_definition": "class",
-            "decorated_definition": "function",
-            # JavaScript/TypeScript
-            "function_declaration": "function",
-            "function_expression": "function",
-            "arrow_function": "function",
-            "class_declaration": "class",
-            "class_expression": "class",
-            "method_definition": "method",
-            "interface_declaration": "interface",
-            "type_alias_declaration": "type_alias",
-            # Go
-            "go_function_declaration": "function",
-            "go_method_declaration": "method",
-            "go_type_declaration": "type",
-            # Rust
-            "function_item": "function",
-            "struct_item": "struct",
-            "impl_item": "impl",
-            "trait_item": "trait",
-            # Java
-            "java_method_declaration": "method",
-            "java_class_declaration": "class",
-            "java_interface_declaration": "interface",
-            "enum_declaration": "enum",
-        }
-        return type_map.get(tree_sitter_type, "unknown")
+        return _TREE_SITTER_NODE_TYPE_MAP.get(tree_sitter_type, "unknown")
 
     def _extract_name(self, node: Any) -> str:
         """Extract name from a definition node.
@@ -720,18 +759,7 @@ class GraphIndexingPipeline:
             Name string
         """
 
-        # Find the first identifier child
-        def find_identifier(n: Any) -> str | None:
-            if hasattr(n, "type") and n.type == "identifier":
-                text = getattr(n, "text", b"")
-                return text.decode() if isinstance(text, bytes) else text
-            for child in getattr(n, "children", []):
-                result = find_identifier(child)
-                if result:
-                    return result
-            return None
-
-        name = find_identifier(node)
+        name = self._extract_name_from_node(node)
         return name or "<unnamed>"
 
     def _extract_signature(
@@ -805,11 +833,9 @@ class GraphIndexingPipeline:
 
         # JavaScript/TypeScript: check modifiers
         if language in {"javascript", "typescript"}:
-            for child in getattr(node, "children", []):
-                if hasattr(child, "type") and child.type == "property_identifier":
-                    text = getattr(child, "text", b"")
-                    if isinstance(text, bytes):
-                        text = text.decode()
+            for child in self._iter_tree_children(node):
+                if child.type == "property_identifier":
+                    text = self._node_text(child)
                     if text == "private":
                         return "private"
                     if text == "protected":
@@ -818,16 +844,67 @@ class GraphIndexingPipeline:
 
         # Java: check modifiers
         if language == "java":
-            for child in getattr(node, "children", []):
-                if hasattr(child, "type") and child.type in {"modifiers", "modifier", "annotation"}:
-                    text = getattr(child, "text", b"")
-                    if isinstance(text, bytes):
-                        text = text.decode()
+            for child in self._iter_tree_children(node):
+                if child.type in {"modifiers", "modifier", "annotation"}:
+                    text = self._node_text(child)
                     if "private" in text:
                         return "private"
                     if "protected" in text:
                         return "protected"
             return "public"
+
+        return None
+
+    def _get_tree_sitter_parser(self, language: str) -> Any:
+        """Get or create a cached tree-sitter parser for a language."""
+        parser = self._parser_cache.get(language)
+        if parser is not None:
+            return parser
+
+        if language not in _TREE_SITTER_LANGUAGE_MODULES:
+            raise ValueError(f"Unsupported language: {language}")
+
+        import tree_sitter as ts
+
+        module_name, func_name = _TREE_SITTER_LANGUAGE_MODULES[language]
+        lang_module = __import__(module_name)
+        lang_func = getattr(lang_module, func_name)
+        lang_obj = lang_func()
+        ts_language = ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
+
+        parser = ts.Parser(ts_language)
+        self._parser_cache[language] = parser
+        return parser
+
+    def _iter_tree_children(self, node: Any) -> Any:
+        """Return named children when available to avoid punctuation-heavy traversal."""
+        try:
+            children = node.named_children
+        except AttributeError:
+            children = node.children
+        return children
+
+    def _node_text(self, node: Any) -> str:
+        """Return node text decoded as UTF-8."""
+        text = node.text
+        if isinstance(text, str):
+            return text
+        if isinstance(text, memoryview):
+            text = text.tobytes()
+        if isinstance(text, bytearray):
+            text = bytes(text)
+        if isinstance(text, bytes):
+            return text.decode("utf-8", errors="ignore")
+        return str(text)
+
+    def _extract_identifier_text(self, node: Any) -> str | None:
+        """Extract identifier-like text from a node or its immediate named children."""
+        if node.type in _TREE_SITTER_IDENTIFIER_TYPES:
+            return self._node_text(node)
+
+        for child in self._iter_tree_children(node):
+            if child.type in _TREE_SITTER_IDENTIFIER_TYPES:
+                return self._node_text(child)
 
         return None
 
@@ -1017,33 +1094,14 @@ class GraphIndexingPipeline:
         edges: List[Any] = []
 
         try:
-            import tree_sitter as ts
-
             # Get language module
             language = self._detect_language(file_path)
-            lang_modules = {
-                "python": ("tree_sitter_python", "language"),
-                "javascript": ("tree_sitter_javascript", "language"),
-                "typescript": ("tree_sitter_typescript", "language_typescript"),
-                "go": ("tree_sitter_go", "language"),
-                "rust": ("tree_sitter_rust", "language"),
-                "java": ("tree_sitter_java", "language"),
-            }
-
-            if language not in lang_modules:
+            if language not in _TREE_SITTER_LANGUAGE_MODULES:
                 return edges
-
-            module_name, func_name = lang_modules[language]
-            lang_module = __import__(module_name)
-            lang_func = getattr(lang_module, func_name)
-            lang_obj = lang_func()
-            ts_language = (
-                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
-            )
 
             # Parse source
             source_code = file_path.read_text(encoding="utf-8")
-            parser = ts.Parser(ts_language)
+            parser = self._get_tree_sitter_parser(language)
             tree = parser.parse(bytes(source_code, "utf-8"))
 
             # Use handler to detect calls
@@ -1103,37 +1161,18 @@ class GraphIndexingPipeline:
 
         # Try tree-sitter for call analysis
         try:
-            import tree_sitter as ts
-
             # Detect language
             language = self._detect_language(file_path)
             if language == "unknown":
                 return edges
 
             # Get language module
-            lang_modules = {
-                "python": ("tree_sitter_python", "language"),
-                "javascript": ("tree_sitter_javascript", "language"),
-                "typescript": ("tree_sitter_typescript", "language_typescript"),
-                "go": ("tree_sitter_go", "language"),
-                "rust": ("tree_sitter_rust", "language"),
-                "java": ("tree_sitter_java", "language"),
-            }
-
-            if language not in lang_modules:
+            if language not in _TREE_SITTER_LANGUAGE_MODULES:
                 return edges
-
-            module_name, func_name = lang_modules[language]
-            lang_module = __import__(module_name)
-            lang_func = getattr(lang_module, func_name)
-            lang_obj = lang_func()
-            ts_language = (
-                ts.Language(lang_obj) if not isinstance(lang_obj, ts.Language) else lang_obj
-            )
 
             # Parse source
             source_code = file_path.read_text(encoding="utf-8")
-            parser = ts.Parser(ts_language)
+            parser = self._get_tree_sitter_parser(language)
             tree = parser.parse(bytes(source_code, "utf-8"))
 
             # Find function calls
@@ -1183,9 +1222,6 @@ class GraphIndexingPipeline:
         def extract(node: Any, parent_function: str | None = None) -> None:
             nonlocal current_function
 
-            if not hasattr(node, "type"):
-                return
-
             node_type = node.type
 
             # Track current function scope
@@ -1209,7 +1245,7 @@ class GraphIndexingPipeline:
                     calls.append((current_function, callee_name))
 
             # Recurse
-            for child in node.children:
+            for child in self._iter_tree_children(node):
                 extract(child, parent_function)
 
         extract(root_node)
@@ -1224,18 +1260,20 @@ class GraphIndexingPipeline:
         Returns:
             Name string or None
         """
-        # Look for "name" child
-        for child in node.children:
-            if hasattr(child, "type") and child.type == "identifier":
-                if hasattr(child, "text"):
-                    return child.text.decode("utf-8", errors="ignore")
+        try:
+            name_node = node.child_by_field_name("name")
+        except AttributeError:
+            name_node = None
 
-            # Also check for named children
-            if hasattr(child, "children"):
-                for subchild in child.children:
-                    if hasattr(subchild, "type") and subchild.type == "identifier":
-                        if hasattr(subchild, "text"):
-                            return subchild.text.decode("utf-8", errors="ignore")
+        if name_node is not None:
+            name = self._extract_identifier_text(name_node)
+            if name:
+                return name
+
+        for child in self._iter_tree_children(node):
+            name = self._extract_identifier_text(child)
+            if name:
+                return name
         return None
 
     def _extract_callee_name(self, call_node: Any, language: str) -> str | None:
@@ -1252,25 +1290,26 @@ class GraphIndexingPipeline:
         # For JS/TS: call_expression -> member_expression or identifier
 
         def find_identifier(node: Any) -> str | None:
-            if hasattr(node, "type") and node.type == "identifier":
-                if hasattr(node, "text"):
-                    return node.text.decode("utf-8", errors="ignore")
-            for child in node.children:
+            identifier = self._extract_identifier_text(node)
+            if identifier:
+                return identifier
+            for child in self._iter_tree_children(node):
                 result = find_identifier(child)
                 if result:
                     return result
             return None
 
         # For Python, look at first child of call
-        if language == "python" and call_node.children:
-            func_node = call_node.children[0]
+        children = self._iter_tree_children(call_node)
+        if language == "python" and children:
+            func_node = children[0]
             if func_node.type == "identifier":
-                return func_node.text.decode("utf-8", errors="ignore")
+                return self._node_text(func_node)
             elif func_node.type == "attribute":
                 # For method calls like obj.method(), get the method name
-                for child in func_node.children:
-                    if child.type == "identifier":
-                        return child.text.decode("utf-8", errors="ignore")
+                for child in self._iter_tree_children(func_node):
+                    if child.type in _TREE_SITTER_IDENTIFIER_TYPES:
+                        return self._node_text(child)
 
         # For JS/TS, find first identifier
         elif language in ("javascript", "typescript"):

@@ -67,6 +67,7 @@ class GraphManager:
         self._graph_cache: Dict[str, Dict] = {}
         self._cache_lock = asyncio.Lock()
         self._watcher_subscribed: set[str] = set()
+        self._watcher_callbacks: Dict[str, Any] = {}
         self._background_refresh: Dict[str, Dict[str, Any]] = {}
         self._refresh_tasks: Dict[str, asyncio.Task[None]] = {}
 
@@ -224,14 +225,34 @@ class GraphManager:
         )
 
         # Subscribe to file changes
-        file_watcher.subscribe(
-            lambda e: asyncio.create_task(self._on_file_change(e, root, exec_ctx))
-        )
+        def callback(event: FileChangeEvent) -> asyncio.Task[Any]:
+            return asyncio.create_task(self._on_file_change(event, root, exec_ctx))
+
+        file_watcher.subscribe(callback)
 
         # Mark as subscribed
         self._watcher_subscribed.add(root_str)
+        self._watcher_callbacks[root_str] = callback
 
         logger.info(f"[GraphManager] Subscribed to file watcher for {root_str}")
+
+    async def _unsubscribe_file_watcher(self, root_str: str) -> None:
+        """Detach GraphManager from a root watcher and stop it if no subscribers remain."""
+        callback = self._watcher_callbacks.pop(root_str, None)
+        self._watcher_subscribed.discard(root_str)
+        if callback is None:
+            return
+
+        watcher_registry = FileWatcherRegistry.get_instance()
+        watcher = getattr(watcher_registry, "_watchers", {}).get(root_str)
+        if watcher is None:
+            return
+
+        watcher.unsubscribe(callback)
+        logger.info(f"[GraphManager] Unsubscribed from file watcher for {root_str}")
+
+        if watcher.get_stats().get("subscribers", 0) == 0:
+            await watcher_registry.stop_watcher(Path(root_str))
 
     async def _on_file_change(
         self,
@@ -380,6 +401,7 @@ class GraphManager:
                 await asyncio.gather(task, return_exceptions=True)
                 stopped += 1
             self._background_refresh.pop(root_str, None)
+            await self._unsubscribe_file_watcher(root_str)
 
         return stopped
 
