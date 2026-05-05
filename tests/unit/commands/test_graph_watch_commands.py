@@ -271,6 +271,50 @@ def test_graph_watch_status_reports_last_refresh_details(tmp_path):
     assert "1.25s" in output
 
 
+def test_graph_watch_status_reports_last_refresh_error_details(tmp_path):
+    """Status should surface the latest background refresh error from the manifest."""
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    pid_file = tmp_path / "graph-watch.pid"
+    manifest_file = tmp_path / "graph-watch.json"
+    manifest_file.write_text(
+        json.dumps(
+            {
+                "running": True,
+                "last_refresh": {
+                    "changed": 0,
+                    "deleted": 0,
+                    "unchanged": 0,
+                    "errors": 1,
+                    "duration_seconds": 0.0,
+                    "completed_at": 1_777_597_000.0,
+                    "last_error": "Too many open files",
+                    "error_type": "OSError",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    record_console = Console(record=True, force_terminal=False, width=160)
+
+    with (
+        patch.object(graph_cmd, "console", record_console),
+        patch.object(graph_cmd, "_resolve_graph_watch_pid_file", return_value=pid_file),
+        patch.object(graph_cmd, "_default_graph_watch_manifest_file", return_value=manifest_file),
+        patch.object(
+            graph_cmd, "_default_graph_watch_lock_file", return_value=tmp_path / "graph-watch.lock"
+        ),
+    ):
+        graph_cmd.graph_watch_status(path=str(project_root), pid_file=pid_file)
+
+    output = record_console.export_text().lower()
+    assert "refresh errors" in output
+    assert "1" in output
+    assert "last error" in output
+    assert "too many open files" in output
+    assert "oserror" in output
+
+
 def test_summarize_graph_watch_health_reports_active_refresh_counts() -> None:
     """Compact health summaries should include current refresh counts for live surfaces."""
     summary, state = graph_cmd.summarize_graph_watch_health(

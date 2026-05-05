@@ -70,6 +70,7 @@ class GraphManager:
         self._watcher_callbacks: Dict[str, Any] = {}
         self._background_refresh: Dict[str, Dict[str, Any]] = {}
         self._refresh_tasks: Dict[str, asyncio.Task[None]] = {}
+        self._refresh_failures: Dict[str, Dict[str, Any]] = {}
 
     @classmethod
     def get_instance(cls) -> "GraphManager":
@@ -159,6 +160,7 @@ class GraphManager:
         debounce_seconds: float = 0.3,
         build_now: bool = False,
         on_refresh_complete: Optional[Any] = None,
+        on_refresh_error: Optional[Any] = None,
     ) -> Optional[Any]:
         """Ensure file watching plus incremental persisted-graph refresh for a root.
 
@@ -180,6 +182,7 @@ class GraphManager:
             "exec_ctx": exec_ctx,
             "pending": False,
             "on_refresh_complete": on_refresh_complete,
+            "on_refresh_error": on_refresh_error,
         }
 
         initial_stats = None
@@ -310,6 +313,7 @@ class GraphManager:
         try:
             while True:
                 await self._refresh_graph_index(root)
+                self._refresh_failures.pop(root_str, None)
                 refresh_config = self._background_refresh.get(root_str)
                 if not refresh_config or not refresh_config.get("pending", False):
                     break
@@ -317,11 +321,38 @@ class GraphManager:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.error("[GraphManager] Background refresh failed for %s: %s", root_str, exc)
+            self._record_refresh_failure(root, exc)
+            await self._notify_refresh_error(root, exc)
+            logger.info("[GraphManager] Background refresh deferred for %s: %s", root_str, exc)
         finally:
             task = self._refresh_tasks.get(root_str)
             if task is current_task:
                 self._refresh_tasks.pop(root_str, None)
+
+    def _record_refresh_failure(self, root: Path, exc: Exception) -> None:
+        """Track a recoverable background refresh failure for a root."""
+        root_str = str(root.resolve())
+        existing = self._refresh_failures.get(root_str, {})
+        self._refresh_failures[root_str] = {
+            "count": int(existing.get("count", 0)) + 1,
+            "last_error": str(exc),
+            "error_type": type(exc).__name__,
+            "last_failed_at": datetime.now().timestamp(),
+        }
+
+    async def _notify_refresh_error(self, root: Path, exc: Exception) -> None:
+        """Notify optional background refresh error callbacks."""
+        refresh_config = self._background_refresh.get(str(root.resolve()))
+        if not refresh_config:
+            return
+
+        callback = refresh_config.get("on_refresh_error")
+        if not callable(callback):
+            return
+
+        callback_result = callback(root, exc)
+        if inspect.isawaitable(callback_result):
+            await callback_result
 
     async def _refresh_graph_index(self, root: Path) -> Any:
         """Incrementally refresh the persisted graph and synthetic edges for a root."""
@@ -401,6 +432,7 @@ class GraphManager:
                 await asyncio.gather(task, return_exceptions=True)
                 stopped += 1
             self._background_refresh.pop(root_str, None)
+            self._refresh_failures.pop(root_str, None)
             await self._unsubscribe_file_watcher(root_str)
 
         return stopped
@@ -424,6 +456,7 @@ class GraphManager:
             "active_refresh_tasks": sum(
                 1 for task in self._refresh_tasks.values() if not task.done()
             ),
+            "refresh_failures": dict(self._refresh_failures),
             "graph_details": {
                 key: {
                     "built_at": entry.get("built_at"),

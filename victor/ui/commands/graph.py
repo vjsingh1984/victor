@@ -555,7 +555,7 @@ async def _init_context_async(
     node_count = stats.get("node_count", stats.get("nodes", 0))
 
     if node_count == 0:
-        console.print(f"[yellow]Warning:[/yellow] No graph data found")
+        console.print("[yellow]Warning:[/yellow] No graph data found")
         console.print("[dim]Run 'victor graph index' first to build the graph[/dim]")
         console.print("[dim]Proceeding with standard init.md generation...[/dim]")
 
@@ -677,6 +677,28 @@ def _record_graph_watch_refresh(project_root: Path, stats: Any) -> Path:
             "errors": getattr(stats, "error_count", 0),
             "duration_seconds": getattr(stats, "processing_time_seconds", 0.0),
             "completed_at": time.time(),
+        },
+    )
+
+
+def _record_graph_watch_refresh_failure(project_root: Path, exc: Exception) -> Path:
+    """Persist the latest incremental refresh failure for graph watch status."""
+    root_path = project_root.resolve()
+    state = _inspect_graph_watch_daemon(
+        _default_graph_watch_pid_file(root_path), remove_stale=False
+    )
+    return _write_graph_watch_manifest(
+        root_path,
+        state,
+        last_refresh={
+            "changed": 0,
+            "deleted": 0,
+            "unchanged": 0,
+            "errors": 1,
+            "duration_seconds": 0.0,
+            "completed_at": time.time(),
+            "last_error": str(exc),
+            "error_type": type(exc).__name__,
         },
     )
 
@@ -855,6 +877,9 @@ async def _watch_async(
     def _on_refresh_complete(refreshed_root: Path, stats: Any) -> None:
         _record_graph_watch_refresh(refreshed_root, stats)
 
+    def _on_refresh_error(refreshed_root: Path, exc: Exception) -> None:
+        _record_graph_watch_refresh_failure(refreshed_root, exc)
+
     initial_stats = await manager.ensure_background_refresh(
         root_path,
         enable_ccg=enable_ccg,
@@ -862,6 +887,7 @@ async def _watch_async(
         debounce_seconds=debounce_seconds,
         build_now=build_now,
         on_refresh_complete=_on_refresh_complete,
+        on_refresh_error=_on_refresh_error,
     )
 
     if initial_stats is not None:
@@ -1148,6 +1174,13 @@ def graph_watch_status(
         duration_seconds = last_refresh.get("duration_seconds")
         if isinstance(duration_seconds, (int, float)):
             table.add_row("Refresh duration", f"{duration_seconds:.2f}s")
+        last_error = last_refresh.get("last_error")
+        if isinstance(last_error, str) and last_error.strip():
+            error_type = last_refresh.get("error_type")
+            if isinstance(error_type, str) and error_type.strip():
+                table.add_row("Last error", f"{error_type}: {last_error}")
+            else:
+                table.add_row("Last error", last_error)
     console.print(table)
 
 

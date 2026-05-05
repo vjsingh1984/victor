@@ -337,6 +337,38 @@ class TestFileWatcherInitializer:
         assert unchanged == 1
 
     @pytest.mark.asyncio
+    async def test_graph_manager_background_refresh_invokes_async_error_callback(
+        self, temp_project, monkeypatch
+    ):
+        """Recoverable refresh failures should flow through async error callbacks."""
+        manager = GraphManager.get_instance()
+        callback_events: list[tuple[Path, str, str]] = []
+
+        async def _on_refresh_error(root: Path, exc: Exception) -> None:
+            callback_events.append((root, type(exc).__name__, str(exc)))
+
+        await manager.ensure_background_refresh(
+            temp_project,
+            enable_ccg=False,
+            on_refresh_error=_on_refresh_error,
+        )
+
+        async def _boom(_root: Path):
+            raise OSError(24, "Too many open files")
+
+        monkeypatch.setattr(manager, "_refresh_graph_index", _boom)
+
+        await manager._run_refresh_loop(temp_project.resolve())
+
+        assert callback_events == [
+            (temp_project.resolve(), "OSError", "[Errno 24] Too many open files")
+        ]
+        failure = manager.get_stats()["refresh_failures"][str(temp_project.resolve())]
+        assert failure["count"] == 1
+        assert failure["error_type"] == "OSError"
+        assert "Too many open files" in failure["last_error"]
+
+    @pytest.mark.asyncio
     async def test_graph_manager_background_refresh_indexes_new_file(self, temp_project):
         """Background refresh should index newly created files."""
         graph_store, manager = await self._build_initial_graph(temp_project)

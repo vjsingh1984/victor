@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -136,6 +137,23 @@ def _ctx_value(exec_ctx: Optional[Dict[str, Any]], key: str, default: Any = None
 
 def _normalize_relpath(file_path: str) -> str:
     return file_path.replace("\\", "/").strip()
+
+
+def _project_graph_watch_daemon_active(root_path: Path) -> bool:
+    """Return True when a project-scoped graph-watch daemon is alive."""
+    pid_file = get_project_paths(root_path).project_victor_dir / "graph-watch.pid"
+    try:
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return False
+
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except ProcessLookupError:
+        return False
 
 
 def _graph_mode_value(mode: str | GraphMode) -> str:
@@ -1737,14 +1755,12 @@ async def graph(
     Enhanced with file watching for automatic cache invalidation.
     """
     # Subscribe to file watcher for automatic cache invalidation (only once per root)
-    from pathlib import Path as PathlibPath
-    from victor.core.indexing.file_watcher import FileWatcherRegistry
     from victor.core.indexing.graph_manager import GraphManager
 
     root_path = _resolve_root_path(path)
 
     # Subscribe GraphManager to file watcher for this root
-    if not reindex:
+    if not reindex and not _project_graph_watch_daemon_active(root_path):
         try:
             manager = GraphManager.get_instance()
             await manager.ensure_background_refresh(root_path, exec_ctx=_exec_ctx)

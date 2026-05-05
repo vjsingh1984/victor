@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -235,6 +236,38 @@ async def test_graph_tool_accepts_enum_mode_values(monkeypatch, tmp_path: Path):
     assert result["requested_mode"] == "stats"
     assert result["mode"] == "stats"
     assert result["result"]["nodes"] == 7
+
+
+@pytest.mark.asyncio
+async def test_graph_tool_skips_local_background_refresh_when_daemon_is_active(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    fake_index = SimpleNamespace(graph_store=store, files={})
+
+    async def _fake_get_or_build_index(*args, **kwargs):
+        return fake_index, False
+
+    fake_manager = SimpleNamespace(ensure_background_refresh=AsyncMock())
+
+    monkeypatch.setattr(graph_tool_module, "_get_or_build_index", _fake_get_or_build_index)
+    monkeypatch.setattr(graph_tool_module, "_project_graph_watch_daemon_active", lambda _root: True)
+    monkeypatch.setattr(
+        "victor.core.indexing.graph_manager.GraphManager.get_instance",
+        staticmethod(lambda: fake_manager),
+    )
+
+    result = await graph_tool_module.graph(
+        mode="stats",
+        path=str(tmp_path),
+        _exec_ctx={"settings": SimpleNamespace(codebase_graph_store="memory")},
+    )
+
+    assert result["success"] is True
+    fake_manager.ensure_background_refresh.assert_not_awaited()
 
 
 def test_graph_tool_schema_exposes_mode_and_direction_enums():

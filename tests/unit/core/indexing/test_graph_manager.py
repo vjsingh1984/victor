@@ -32,10 +32,12 @@ async def reset_graph_manager():
     await manager.clear_cache()
     manager._watcher_subscribed.clear()
     manager._watcher_callbacks.clear()
+    manager._refresh_failures.clear()
     yield
     await manager.clear_cache()
     manager._watcher_subscribed.clear()
     manager._watcher_callbacks.clear()
+    manager._refresh_failures.clear()
 
 
 @pytest.fixture
@@ -371,3 +373,34 @@ class TestGraphManager:
 
         # All should be fresh
         assert stats["fresh_graphs"] == 3
+
+    @pytest.mark.asyncio
+    async def test_background_refresh_failure_is_tracked_and_reported(
+        self, temp_codebase, monkeypatch
+    ):
+        """Recoverable background refresh failures should be tracked without raising."""
+        manager = GraphManager.get_instance()
+        root = temp_codebase.resolve()
+        root_str = str(root)
+        notified = []
+
+        manager._background_refresh[root_str] = {
+            "pending": False,
+            "on_refresh_error": lambda refreshed_root, exc: notified.append((refreshed_root, exc)),
+        }
+
+        async def _boom(_root):
+            raise OSError(24, "Too many open files")
+
+        monkeypatch.setattr(manager, "_refresh_graph_index", _boom)
+
+        await manager._run_refresh_loop(root)
+
+        assert len(notified) == 1
+        assert notified[0][0] == root
+        assert "Too many open files" in str(notified[0][1])
+
+        failure = manager.get_stats()["refresh_failures"][root_str]
+        assert failure["count"] == 1
+        assert failure["error_type"] == "OSError"
+        assert "Too many open files" in failure["last_error"]
