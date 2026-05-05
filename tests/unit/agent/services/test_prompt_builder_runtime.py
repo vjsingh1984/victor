@@ -311,6 +311,7 @@ def test_build_dynamic_tool_guidance_uses_relevant_dynamic_tools():
     builder.get_dynamic_tool_guidance_text.assert_called_once_with(
         ["web_search"],
         selection_source="message_keywords",
+        tool_rationale={"web_search": "Search the web for documentation"},
     )
 
 
@@ -367,7 +368,10 @@ def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
 
     guidance = runtime.build_dynamic_tool_guidance(
         "Continue execution",
-        planned_tools=[SimpleNamespace(name="workflow"), SimpleNamespace(name="read")],
+        planned_tools=[
+            SimpleNamespace(name="workflow", description="Coordinate multi-step execution"),
+            SimpleNamespace(name="read", description="Read file contents"),
+        ],
         selected_tools=[SimpleNamespace(name="web_search")],
     )
 
@@ -376,6 +380,7 @@ def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
     builder.get_dynamic_tool_guidance_text.assert_called_once_with(
         ["workflow"],
         selection_source="planned_tools",
+        tool_rationale={"workflow": "Coordinate multi-step execution"},
     )
 
 
@@ -423,7 +428,10 @@ def test_build_dynamic_tool_guidance_passes_goals_and_intent_context():
     guidance = runtime.build_dynamic_tool_guidance(
         "Continue execution",
         goals=["inspect repo changes", "verify docs"],
-        planned_tools=[SimpleNamespace(name="workflow"), SimpleNamespace(name="read")],
+        planned_tools=[
+            SimpleNamespace(name="workflow", description="Coordinate multi-step execution"),
+            SimpleNamespace(name="read", description="Read file contents"),
+        ],
         selected_tools=[SimpleNamespace(name="web_search")],
     )
 
@@ -433,6 +441,44 @@ def test_build_dynamic_tool_guidance_passes_goals_and_intent_context():
         goals=["inspect repo changes", "verify docs"],
         current_intent="read_only",
         selection_source="planned_tools",
+        tool_rationale={"workflow": "Coordinate multi-step execution"},
+    )
+
+
+def test_build_dynamic_tool_guidance_uses_registry_metadata_for_tool_rationale():
+    builder = SimpleNamespace(
+        dynamic_prompt_tools=["web_search", "git_diff"],
+        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: web_search"),
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        tools=SimpleNamespace(
+            list_tools=lambda: [
+                SimpleNamespace(
+                    name="web_search",
+                    description="Search the web for documentation",
+                    metadata=SimpleNamespace(
+                        use_cases=["Check upstream docs for API changes"],
+                        keywords=["docs", "documentation", "web"],
+                    ),
+                ),
+                SimpleNamespace(
+                    name="git_diff",
+                    description="Inspect recent repository changes",
+                    metadata=SimpleNamespace(keywords=["diff", "patch"]),
+                ),
+            ]
+        ),
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    guidance = runtime.build_dynamic_tool_guidance("Search docs for the latest API behavior")
+
+    assert guidance == "DYNAMIC TOOL HINTS: web_search"
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(
+        ["web_search"],
+        selection_source="message_keywords",
+        tool_rationale={"web_search": "Check upstream docs for API changes"},
     )
 
 

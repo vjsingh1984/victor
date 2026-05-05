@@ -1435,6 +1435,43 @@ goal/intent rationale that made those hints actionable.
 
 **Breaking changes:** None intended.
 
+## Migration Update: Dynamic Tool Hints Reuse Tool Metadata (2026-05-04)
+
+**Seam consolidated:** dynamic long-tail tool hints already carried current
+plan focus and intent guard context, but the per-turn hint text still lacked
+compact per-tool rationale even when planned tools or registry metadata already
+contained that information.
+
+**Canonical owners:**
+
+- `victor.agent.services.prompt_builder_runtime.PromptBuilderRuntime` remains
+  the runtime owner for selecting dynamic long-tail hints and now extracts
+  concise per-tool rationale from existing planned/selected tool objects or the
+  tool registry.
+- `victor.agent.prompt_builder.SystemPromptBuilder` remains the rendering owner
+  for the user-prefix hint block.
+
+**Changes applied:**
+
+1. Added compact tool-rationale extraction from planned tools, selected tools,
+   and the registry, preferring explicit metadata use-cases/priority hints and
+   falling back to tool descriptions.
+2. Passed that rationale into `SystemPromptBuilder.get_dynamic_tool_guidance_text()`
+   alongside the existing plan-focus and intent-guard context.
+3. Rendered the rationale as a short `tool (reason)` list inside the existing
+   dynamic user-prefix hint block.
+
+**Benefits:**
+
+- Dynamic long-tail hints now explain why a specific less-common tool is
+  relevant using information the runtime already has.
+- Prompt specificity improves without creating a second planning or selection
+  abstraction.
+- Stable-prefix economics remain unchanged; only the per-turn user-prefix hint
+  block becomes more informative.
+
+**Breaking changes:** None intended.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).

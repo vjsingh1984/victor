@@ -251,6 +251,14 @@ class PromptBuilderRuntime:
         if selection_source:
             guidance_kwargs["selection_source"] = selection_source
 
+        tool_rationale = self._build_dynamic_tool_rationale(
+            relevant_tools,
+            planned_tools=planned_tools,
+            selected_tools=selected_tools,
+        )
+        if tool_rationale:
+            guidance_kwargs["tool_rationale"] = tool_rationale
+
         return builder.get_dynamic_tool_guidance_text(relevant_tools, **guidance_kwargs)
 
     def get_system_prompt(self) -> str:
@@ -494,6 +502,105 @@ class PromptBuilderRuntime:
             if canonical in dynamic_set and canonical not in selected_dynamic:
                 selected_dynamic.append(canonical)
         return selected_dynamic
+
+    def _build_dynamic_tool_rationale(
+        self,
+        relevant_tools: list[str],
+        *,
+        planned_tools: Optional[Iterable[Any]] = None,
+        selected_tools: Optional[Iterable[Any]] = None,
+    ) -> dict[str, str]:
+        """Build compact per-tool rationale from existing metadata and descriptions."""
+        tool_catalog: dict[str, Any] = {}
+        self._extend_tool_catalog(tool_catalog, planned_tools)
+        self._extend_tool_catalog(tool_catalog, selected_tools)
+
+        registry = getattr(self._runtime, "tools", None)
+        if registry is not None and hasattr(registry, "list_tools"):
+            try:
+                self._extend_tool_catalog(tool_catalog, registry.list_tools(), overwrite=False)
+            except Exception as exc:
+                logger.debug("Tool registry unavailable for dynamic prompt rationale: %s", exc)
+
+        rationale: dict[str, str] = {}
+        for tool_name in relevant_tools:
+            summary = self._extract_tool_rationale(tool_catalog.get(tool_name))
+            if summary:
+                rationale[tool_name] = summary
+        return rationale
+
+    @staticmethod
+    def _extend_tool_catalog(
+        catalog: dict[str, Any],
+        tools: Optional[Iterable[Any]],
+        *,
+        overwrite: bool = True,
+    ) -> None:
+        """Add canonicalized tool objects to a lookup catalog."""
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
+        if not tools:
+            return
+
+        for tool in tools:
+            name = getattr(tool, "name", None)
+            if name is None and isinstance(tool, dict):
+                name = tool.get("name")
+            canonical = canonicalize_core_tool_name(name or "")
+            if not canonical:
+                continue
+            if overwrite or canonical not in catalog:
+                catalog[canonical] = tool
+
+    def _extract_tool_rationale(self, tool: Any) -> Optional[str]:
+        """Extract a compact rationale string from existing tool metadata."""
+        if tool is None:
+            return None
+
+        metadata = getattr(tool, "metadata", None)
+        if metadata is None and isinstance(tool, dict):
+            metadata = tool.get("metadata")
+
+        for field_name in ("use_cases", "priority_hints"):
+            values = self._get_metadata_values(metadata, field_name)
+            if values:
+                summary = self._compact_tool_rationale(values[0])
+                if summary:
+                    return summary
+
+        description = getattr(tool, "description", None)
+        if description is None and isinstance(tool, dict):
+            description = tool.get("description")
+        return self._compact_tool_rationale(description)
+
+    @staticmethod
+    def _get_metadata_values(metadata: Any, field_name: str) -> list[str]:
+        """Read list-like metadata values from dict or object metadata."""
+        if metadata is None:
+            return []
+
+        values = getattr(metadata, field_name, None)
+        if values is None and isinstance(metadata, dict):
+            values = metadata.get(field_name)
+        if not values:
+            return []
+        if isinstance(values, str):
+            values = [values]
+        return [str(value).strip() for value in values if str(value).strip()]
+
+    @staticmethod
+    def _compact_tool_rationale(text: Any) -> Optional[str]:
+        """Reduce description-like text to a short single-clause rationale."""
+        if text is None:
+            return None
+        normalized = " ".join(str(text).strip().split())
+        if not normalized:
+            return None
+
+        sentence = normalized.split(".")[0].strip(" ;:-")
+        if len(sentence) > 96:
+            sentence = sentence[:93].rstrip() + "..."
+        return sentence or None
 
     @staticmethod
     def _normalize_dynamic_tool_goals(goals: Optional[Iterable[str]]) -> list[str]:

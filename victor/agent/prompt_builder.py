@@ -472,6 +472,7 @@ class SystemPromptBuilder:
         goals: Optional[List[str]] = None,
         current_intent: Optional[str] = None,
         selection_source: Optional[str] = None,
+        tool_rationale: Optional[Dict[str, str]] = None,
     ) -> str:
         """Render dynamic tool hints for user-prefix injection.
 
@@ -501,6 +502,15 @@ class SystemPromptBuilder:
             guidance += "These tools came from the current planned tool sequence. "
         elif selection_source == "keyword_selector":
             guidance += "These tools matched the current turn's explicit tool keywords. "
+
+        if tool_rationale:
+            rationale_parts = []
+            for tool_name in listed:
+                rationale = tool_rationale.get(tool_name)
+                if rationale:
+                    rationale_parts.append(f"{tool_name} ({rationale})")
+            if rationale_parts:
+                guidance += f"Relevant use hints: {'; '.join(rationale_parts)}. "
 
         if goals:
             compact_goals = [goal.strip() for goal in goals if goal and goal.strip()]

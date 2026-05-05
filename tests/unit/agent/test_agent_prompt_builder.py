@@ -187,10 +187,16 @@ class TestSystemPromptBuilder:
             goals=["inspect repo changes", "verify docs"],
             current_intent="read_only",
             selection_source="planned_tools",
+            tool_rationale={
+                "web_search": "Check upstream docs for API changes",
+                "workflow": "Coordinate multi-step execution",
+            },
         )
 
         assert "DYNAMIC TOOL HINTS" in result
         assert "web_search, workflow" in result
+        assert "web_search (Check upstream docs for API changes)" in result
+        assert "workflow (Coordinate multi-step execution)" in result
         assert "Current plan focus: inspect repo changes; verify docs." in result
         assert "Current intent guard: read only." in result
         assert "planned tool sequence" in result

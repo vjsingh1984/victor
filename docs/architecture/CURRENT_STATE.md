@@ -121,7 +121,10 @@ Agent / Public API
   back to keyword-selected or selected-tool heuristics. The stable prefix stays
   fixed; only the per-turn hint block reflects the current plan. When planner
   goals or an active intent guard are available, the hint block should surface
-  that compact rationale rather than emitting a generic tool list.
+  that compact rationale rather than emitting a generic tool list. When
+  existing tool descriptions or metadata use-cases are available, the hint
+  block may also surface concise per-tool reasons without triggering a second
+  planning pass.
 - Active runtime protocols now have service-owned canonical hosts under
   `victor.agent.services.protocols.runtime_support` and
   `victor.agent.services.protocols.infrastructure_runtime`, including
