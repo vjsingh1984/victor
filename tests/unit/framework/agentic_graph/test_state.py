@@ -97,6 +97,7 @@ class TestAgenticLoopStateModel:
         assert "query" in state.keys()
         assert "Test" in state.values()
         assert ("query", "Test") in state.items()
+        assert state.keys() == list(type(state).model_fields.keys())
 
     def test_model_validation(self):
         """Test Pydantic validation."""

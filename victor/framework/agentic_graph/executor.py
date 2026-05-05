@@ -279,8 +279,7 @@ class AgenticLoopGraphExecutor:
         Returns:
             Dictionary with execution metrics
         """
-        # Get node list from graph (_nodes is the internal attribute)
-        graph_nodes = list(self.graph._nodes.keys()) if hasattr(self.graph, "_nodes") else []
+        graph_nodes = list(getattr(self.graph, "node_ids", []))
 
         return {
             "max_iterations": self.max_iterations,

@@ -33,40 +33,18 @@ Pattern:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+from victor.framework.agentic_graph._state_utils import GraphStateInput, unwrap_state
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
-from victor.framework.graph import CopyOnWriteState
 
 if TYPE_CHECKING:
     from victor.runtime.context import RuntimeExecutionContext
 
 logger = logging.getLogger(__name__)
 
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def _unwrap_state(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
-) -> AgenticLoopStateModel:
-    """Unwrap state from CopyOnWriteState if needed."""
-    if isinstance(state, CopyOnWriteState):
-        unwrapped = state.get_state()
-        if isinstance(unwrapped, AgenticLoopStateModel):
-            return unwrapped
-        elif isinstance(unwrapped, dict):
-            return AgenticLoopStateModel(**unwrapped)
-        else:
-            return unwrapped
-    elif isinstance(state, AgenticLoopStateModel):
-        return state
-    elif isinstance(state, dict):
-        return AgenticLoopStateModel(**state)
-    else:
-        return state
+# Backward-compatible alias for tests and older imports.
+_unwrap_state = unwrap_state
 
 
 def _get_execution_context(state: AgenticLoopStateModel) -> Optional["RuntimeExecutionContext"]:
@@ -136,7 +114,7 @@ def _get_prompt_orchestrator(state: AgenticLoopStateModel) -> Any:
 
 
 async def chat_service_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     message: Optional[str] = None,
     conversation_history: Optional[List[Dict[str, Any]]] = None,
 ) -> AgenticLoopStateModel:
@@ -153,7 +131,7 @@ async def chat_service_node(
     Returns:
         Updated state with chat response
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     # Get message from parameter or state
     query = message or state.query
@@ -197,7 +175,7 @@ async def chat_service_node(
 
 
 async def tool_service_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     tool_name: str,
     tool_args: Optional[Dict[str, Any]] = None,
 ) -> AgenticLoopStateModel:
@@ -214,7 +192,7 @@ async def tool_service_node(
     Returns:
         Updated state with tool result
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     # Get service accessor
     services = _get_service_accessor(state)
@@ -270,7 +248,7 @@ async def tool_service_node(
 
 
 async def context_service_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     query: Optional[str] = None,
     max_results: int = 10,
 ) -> AgenticLoopStateModel:
@@ -287,7 +265,7 @@ async def context_service_node(
     Returns:
         Updated state with retrieved context
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     # Get query from parameter or state
     search_query = query or state.query
@@ -347,7 +325,7 @@ async def context_service_node(
 
 
 async def provider_service_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     provider_name: Optional[str] = None,
     model_name: Optional[str] = None,
 ) -> AgenticLoopStateModel:
@@ -364,7 +342,7 @@ async def provider_service_node(
     Returns:
         Updated state with provider information
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     # Get service accessor
     services = _get_service_accessor(state)
@@ -401,7 +379,7 @@ async def provider_service_node(
 
 
 async def prompt_service_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     base_prompt: Optional[str] = None,
     *,
     builder_type: str = "framework",
@@ -414,7 +392,7 @@ async def prompt_service_node(
     It uses PromptOrchestrator from RuntimeExecutionContext metadata when
     available, otherwise falls back to the shared global facade.
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     prompt_orchestrator = _get_prompt_orchestrator(state)
     context = dict(state.context or {})

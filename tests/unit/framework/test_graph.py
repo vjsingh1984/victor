@@ -390,6 +390,14 @@ class TestStateGraph:
         assert result is graph
         assert len(graph._nodes) == 2
 
+    def test_node_ids_reflect_registered_nodes(self):
+        """node_ids should expose registered nodes without reaching into internals."""
+        graph = StateGraph(SimpleState)
+
+        graph.add_node("a", increment_node).add_node("b", double_node)
+
+        assert graph.node_ids == ["a", "b"]
+
     def test_add_duplicate_node_raises(self):
         """add_node should raise for duplicate nodes."""
         graph = StateGraph(SimpleState)

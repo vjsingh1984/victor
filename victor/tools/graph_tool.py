@@ -785,6 +785,44 @@ def _resolve_root_path(path: str) -> Path:
     return root_path
 
 
+def _current_project_root() -> Path:
+    return Path(get_project_paths().project_root).resolve()
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _should_reuse_project_graph_root(
+    *,
+    requested_path: str,
+    requested_mode: str,
+    node: Optional[str],
+    source: Optional[str],
+    target: Optional[str],
+    file: Optional[str],
+    query: Optional[str],
+) -> bool:
+    if requested_mode in {GraphMode.OVERVIEW.value, GraphMode.FILE_DEPS.value}:
+        return False
+    if file:
+        return False
+
+    project_root = _current_project_root()
+    requested_subject = _resolve_requested_subject_path(requested_path)
+    if requested_subject == project_root or not _is_relative_to(requested_subject, project_root):
+        return False
+
+    if requested_subject.is_file():
+        return True
+
+    return any(value for value in (node, source, target, query))
+
+
 def _has_enhanced_codebase_index_provider() -> bool:
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
@@ -1754,10 +1792,36 @@ async def graph(
 
     Enhanced with file watching for automatic cache invalidation.
     """
+    requested_mode = _graph_mode_value(mode)
+    normalized_mode = _normalize_graph_mode_alias(
+        mode,
+        node=node,
+        source=source,
+        target=target,
+        file=file,
+        query=query,
+    )
+    root_path = _resolve_root_path(path)
+    if _should_reuse_project_graph_root(
+        requested_path=path,
+        requested_mode=normalized_mode,
+        node=node,
+        source=source,
+        target=target,
+        file=file,
+        query=query,
+    ):
+        project_root = _current_project_root()
+        if root_path != project_root:
+            logger.info(
+                "[graph] Reusing project graph root %s for nested request scoped to %s",
+                project_root,
+                path,
+            )
+            root_path = project_root
+
     # Subscribe to file watcher for automatic cache invalidation (only once per root)
     from victor.core.indexing.graph_manager import GraphManager
-
-    root_path = _resolve_root_path(path)
 
     # Subscribe GraphManager to file watcher for this root
     if not reindex and not _project_graph_watch_daemon_active(root_path):
@@ -1768,15 +1832,6 @@ async def graph(
             # Non-fatal: log warning but continue
             logger.warning(f"[graph] Failed to subscribe to file watcher: {e}")
 
-    requested_mode = _graph_mode_value(mode)
-    normalized_mode = _normalize_graph_mode_alias(
-        mode,
-        node=node,
-        source=source,
-        target=target,
-        file=file,
-        query=query,
-    )
     try:
         if not reindex and normalized_mode == "stats" and _project_graph_has_data(root_path):
             return {
@@ -1804,7 +1859,7 @@ async def graph(
                 "result": await _run_graph_sql_query_for_root(root_path, query),
             }
 
-        loaded = await _load_graph(path, reindex=reindex, exec_ctx=_exec_ctx)
+        loaded = await _load_graph(str(root_path), reindex=reindex, exec_ctx=_exec_ctx)
 
         # Handle pipe-separated modes (e.g., "callers|callees")
         # Expand into multiple results combined

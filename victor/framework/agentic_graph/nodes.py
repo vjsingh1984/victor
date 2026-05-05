@@ -30,11 +30,11 @@ Each node is a pure function that receives state and returns updated state.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+from victor.framework.agentic_graph._state_utils import GraphStateInput, unwrap_state
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
 from victor.framework.evaluation_nodes import EvaluationDecision
-from victor.framework.graph import CopyOnWriteState
 
 if TYPE_CHECKING:
     from victor.framework.evaluation_nodes import EnhancedCompletionEvaluator
@@ -44,43 +44,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _unwrap_state(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
-) -> AgenticLoopStateModel:
-    """Unwrap state from CopyOnWriteState if needed.
-
-    Args:
-        state: State object (may be wrapped in CopyOnWriteState)
-
-    Returns:
-        Unwrapped AgenticLoopStateModel
-    """
-    if isinstance(state, CopyOnWriteState):
-        # Get the underlying state
-        unwrapped = state.get_state()
-        if isinstance(unwrapped, AgenticLoopStateModel):
-            return unwrapped
-        elif isinstance(unwrapped, dict):
-            return AgenticLoopStateModel(**unwrapped)
-        else:
-            # Fallback: treat as AgenticLoopStateModel
-            return unwrapped
-    elif isinstance(state, AgenticLoopStateModel):
-        return state
-    elif isinstance(state, dict):
-        return AgenticLoopStateModel(**state)
-    else:
-        # Last resort: assume it's already compatible
-        return state
-
-
 # =============================================================================
 # PERCEIVE Node
 # =============================================================================
 
 
 async def perceive_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     runtime_intelligence: Optional[Any] = None,
     perception_integration: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -101,7 +71,7 @@ async def perceive_node(
         Updated state with perception results
     """
     # Unwrap state if needed
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     try:
         # Use provided service or fallback
@@ -175,7 +145,7 @@ async def perceive_node(
 
 
 async def plan_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     planning_coordinator: Optional[Any] = None,
     use_llm_planning: bool = False,
 ) -> AgenticLoopStateModel:
@@ -192,7 +162,7 @@ async def plan_node(
     Returns:
         Updated state with execution plan
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
     if use_llm_planning and planning_coordinator is not None:
         # LLM-based planning
         try:
@@ -276,7 +246,7 @@ def _build_fast_path_plan(state: AgenticLoopStateModel) -> Dict[str, Any]:
 
 
 async def act_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     turn_executor: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
     """ACT stage: Execute the plan.
@@ -290,7 +260,7 @@ async def act_node(
     Returns:
         Updated state with action results
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     try:
         if turn_executor is not None:
@@ -358,7 +328,7 @@ async def act_node(
 
 
 async def evaluate_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     evaluator: Optional[Any] = None,
     fulfillment_detector: Optional[Any] = None,
     enable_fulfillment_check: bool = False,
@@ -379,7 +349,7 @@ async def evaluate_node(
     Returns:
         Updated state with evaluation results
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
     try:
         if evaluator is not None:
             # Use provided evaluator
@@ -483,7 +453,7 @@ def _default_evaluation(state: AgenticLoopStateModel) -> Dict[str, Any]:
 # =============================================================================
 
 
-def decide_edge(state: Union[AgenticLoopStateModel, CopyOnWriteState, Any]) -> str:
+def decide_edge(state: GraphStateInput) -> str:
     """DECIDE stage: Route to next node based on evaluation.
 
     This is a conditional edge function for StateGraph that determines
@@ -495,18 +465,7 @@ def decide_edge(state: Union[AgenticLoopStateModel, CopyOnWriteState, Any]) -> s
     Returns:
         Next node name: "perceive", "act", or "__end__"
     """
-    state = _unwrap_state(state)
-    """DECIDE stage: Route to next node based on evaluation.
-
-    This is a conditional edge function for StateGraph that determines
-    the next node based on the evaluation decision.
-
-    Args:
-        state: Current agentic loop state (with evaluation from EVALUATE stage)
-
-    Returns:
-        Next node name: "perceive", "act", or "__end__"
-    """
+    state = unwrap_state(state)
     # Check max iterations first
     if state.iteration >= state.max_iterations:
         return "__end__"

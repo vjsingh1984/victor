@@ -270,6 +270,64 @@ async def test_graph_tool_skips_local_background_refresh_when_daemon_is_active(
     fake_manager.ensure_background_refresh.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_graph_tool_reuses_project_root_for_nested_node_queries(
+    monkeypatch, tmp_path: Path
+):
+    from victor.tools import graph_tool as graph_tool_module
+
+    project_root = tmp_path.resolve()
+    nested_root = project_root / "victor" / "framework" / "agentic_graph"
+    nested_root.mkdir(parents=True)
+
+    store = MemoryGraphStore()
+    await _seed_graph(store)
+    analyzer = graph_tool_module.GraphAnalyzer()
+    for node in await store.get_all_nodes():
+        analyzer.add_node(node)
+    for edge in await store.get_all_edges():
+        analyzer.add_edge(edge)
+
+    loaded = graph_tool_module.LoadedGraph(
+        root_path=project_root,
+        index=SimpleNamespace(graph_store=store, files={}),
+        graph_store=store,
+        analyzer=analyzer,
+        rebuilt=False,
+    )
+    captured: dict[str, str] = {}
+
+    async def _fake_load_graph(path: str, **kwargs):
+        captured["path"] = path
+        return loaded
+
+    fake_manager = SimpleNamespace(ensure_background_refresh=AsyncMock())
+
+    monkeypatch.setattr(graph_tool_module, "_load_graph", _fake_load_graph)
+    monkeypatch.setattr(graph_tool_module, "get_project_paths", lambda *_args, **_kwargs: SimpleNamespace(project_root=project_root))
+    monkeypatch.setattr(
+        graph_tool_module,
+        "_project_graph_watch_daemon_active",
+        lambda root: Path(root).resolve() == project_root,
+    )
+    monkeypatch.setattr(
+        "victor.core.indexing.graph_manager.GraphManager.get_instance",
+        staticmethod(lambda: fake_manager),
+    )
+
+    result = await graph_tool_module.graph(
+        mode="neighbors",
+        path=str(nested_root),
+        node="start",
+        depth=1,
+        _exec_ctx={"settings": SimpleNamespace(codebase_graph_store="memory")},
+    )
+
+    assert result["success"] is True
+    assert captured["path"] == str(project_root)
+    fake_manager.ensure_background_refresh.assert_not_awaited()
+
+
 def test_graph_tool_schema_exposes_mode_and_direction_enums():
     from victor.tools import graph_tool as graph_tool_module
 

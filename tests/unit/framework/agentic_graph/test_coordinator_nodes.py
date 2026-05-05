@@ -270,6 +270,21 @@ class TestSafetyNode:
 
         mock_coordinator.check.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_safety_node_records_error_and_fails_closed(self):
+        """Safety node exceptions should not silently fail open."""
+        state = create_initial_state(query="Push code")
+        state = state.model_copy(update={"plan": {"tool_calls": ["git", "push"]}})
+
+        mock_coordinator = AsyncMock()
+        mock_coordinator.check = AsyncMock(side_effect=RuntimeError("boom"))
+
+        result = await safety_node(state, safety_coordinator=mock_coordinator)
+
+        assert result.context is not None
+        assert result.context["all_tools_safe"] is False
+        assert result.context["safety_error"] == "boom"
+
 
 class TestSystemPromptNode:
     """Tests for system_prompt_node."""

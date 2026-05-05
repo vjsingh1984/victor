@@ -2332,6 +2332,11 @@ class StateGraph(Generic[StateType]):
         logger.debug(f"Added node: {node_id}")
         return self
 
+    @property
+    def node_ids(self) -> List[str]:
+        """Return the graph's node identifiers."""
+        return list(self._nodes.keys())
+
     def add_edge(
         self,
         source: str,

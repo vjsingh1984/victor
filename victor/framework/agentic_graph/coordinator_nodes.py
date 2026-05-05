@@ -36,10 +36,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+from victor.framework.agentic_graph._state_utils import GraphStateInput, unwrap_state
 from victor.framework.agentic_graph.state import AgenticLoopStateModel
-from victor.framework.graph import CopyOnWriteState
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.state_context import (
@@ -51,37 +51,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def _unwrap_state(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
-) -> AgenticLoopStateModel:
-    """Unwrap state from CopyOnWriteState if needed.
-
-    Args:
-        state: State object (may be wrapped in CopyOnWriteState)
-
-    Returns:
-        Unwrapped AgenticLoopStateModel
-    """
-    if isinstance(state, CopyOnWriteState):
-        unwrapped = state.get_state()
-        if isinstance(unwrapped, AgenticLoopStateModel):
-            return unwrapped
-        elif isinstance(unwrapped, dict):
-            return AgenticLoopStateModel(**unwrapped)
-        else:
-            return unwrapped
-    elif isinstance(state, AgenticLoopStateModel):
-        return state
-    elif isinstance(state, dict):
-        return AgenticLoopStateModel(**state)
-    else:
-        return state
+# Backward-compatible alias for tests and older imports.
+_unwrap_state = unwrap_state
 
 
 def _create_context_snapshot(
@@ -204,7 +175,7 @@ class CoordinatorAdapter:
 
     async def call(
         self,
-        state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+        state: GraphStateInput,
         method_name: str,
         **kwargs,
     ) -> AgenticLoopStateModel:
@@ -218,7 +189,7 @@ class CoordinatorAdapter:
         Returns:
             Updated state with coordinator transitions applied
         """
-        state = _unwrap_state(state)
+        state = unwrap_state(state)
 
         # Create context snapshot
         snapshot = _create_context_snapshot(state, self._orchestrator)
@@ -248,7 +219,7 @@ class CoordinatorAdapter:
 
 
 async def exploration_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     exploration_coordinator: Optional[Any] = None,
     orchestrator: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -265,7 +236,7 @@ async def exploration_node(
     Returns:
         Updated state with exploration findings
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     # Skip if no query
     if not state.query:
@@ -303,7 +274,7 @@ async def exploration_node(
 
 
 async def safety_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     safety_coordinator: Optional[Any] = None,
     orchestrator: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -320,7 +291,7 @@ async def safety_node(
     Returns:
         Updated state with safety check results
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     # Extract proposed tool calls from plan
     plan = state.plan or {}
@@ -378,8 +349,11 @@ async def safety_node(
             logger.warning("Safety node: Some tools were blocked")
 
     except Exception as e:
-        logger.warning(f"Safety node failed: {e}")
-        # Continue without safety checks - fail open for now
+        logger.error(f"Safety node failed: {e}")
+        context = dict(state.context or {})
+        context["all_tools_safe"] = False
+        context["safety_error"] = str(e)
+        state = state.model_copy(update={"context": context})
 
     return state
 
@@ -390,7 +364,7 @@ async def safety_node(
 
 
 async def system_prompt_node(
-    state: Union[AgenticLoopStateModel, CopyOnWriteState, Any],
+    state: GraphStateInput,
     system_prompt_coordinator: Optional[Any] = None,
     orchestrator: Optional[Any] = None,
 ) -> AgenticLoopStateModel:
@@ -406,7 +380,7 @@ async def system_prompt_node(
     Returns:
         Updated state with task classification
     """
-    state = _unwrap_state(state)
+    state = unwrap_state(state)
 
     # Skip if no query
     if not state.query:

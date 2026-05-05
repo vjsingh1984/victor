@@ -202,23 +202,7 @@ class AgenticLoopStateModel(BaseModel):
 
     def keys(self) -> List[str]:
         """Return list of keys (dict-like)."""
-        return [
-            "query",
-            "iteration",
-            "max_iterations",
-            "stage",
-            "perception",
-            "task_type",
-            "complexity",
-            "plan",
-            "action_result",
-            "tool_results",
-            "evaluation",
-            "progress_scores",
-            "fulfillment",
-            "context",
-            "conversation_history",
-        ]
+        return list(type(self).model_fields.keys())
 
     def values(self) -> List[Any]:
         """Return list of values (dict-like)."""
@@ -230,23 +214,7 @@ class AgenticLoopStateModel(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to plain dict (excluding internal fields)."""
-        return {
-            "query": self.query,
-            "iteration": self.iteration,
-            "max_iterations": self.max_iterations,
-            "stage": self.stage,
-            "perception": self.perception,
-            "task_type": self.task_type,
-            "complexity": self.complexity,
-            "plan": self.plan,
-            "action_result": self.action_result,
-            "tool_results": self.tool_results,
-            "evaluation": self.evaluation,
-            "progress_scores": self.progress_scores,
-            "fulfillment": self.fulfillment,
-            "context": self.context,
-            "conversation_history": self.conversation_history,
-        }
+        return {key: getattr(self, key) for key in self.keys()}
 
 
 # =============================================================================
