@@ -92,13 +92,14 @@ class StreamingChatExecutor:
         """Return a stable comparison key for visible content suppression."""
         return re.sub(r"\s+", " ", content).strip().lower()
 
-    def _prepare_visible_content(self, content: str, *, user_message: str = "") -> str:
-        """Normalize model output for display and conversation history."""
+    @staticmethod
+    def _normalize_visible_candidate(content: str, *, user_message: str = "") -> str:
+        """Normalize raw model output into a display candidate without deduping."""
         if not content or not content.strip():
             return ""
 
         display_content = strip_active_completion_markers(content)
-        if not display_content:
+        if not display_content or not display_content.strip():
             return ""
 
         if user_message:
@@ -109,6 +110,14 @@ class StreamingChatExecutor:
             ).strip()
             if not display_content:
                 return ""
+
+        return display_content
+
+    def _prepare_visible_content(self, content: str, *, user_message: str = "") -> str:
+        """Normalize model output for display and conversation history."""
+        display_content = self._normalize_visible_candidate(content, user_message=user_message)
+        if not display_content:
+            return ""
 
         display_content = self._visible_output_deduplicator.process(display_content).strip()
         if not display_content:
@@ -123,6 +132,102 @@ class StreamingChatExecutor:
 
         self._prev_visible_content = normalized_key
         return display_content
+
+    @staticmethod
+    def _get_task_completion_summary(detector: Any) -> str:
+        """Return the detector's last completion summary without active markers."""
+        state = getattr(detector, "_state", None)
+        summary = getattr(state, "last_summary", "") if state is not None else ""
+        return strip_active_completion_markers(summary).strip()
+
+    @staticmethod
+    def _build_final_marker_chunk(orch: Any) -> StreamChunk:
+        """Return a terminal marker chunk even when no text is available."""
+        generator = getattr(orch, "_chunk_generator", None)
+        marker_factory = getattr(generator, "generate_final_marker_chunk", None)
+        if callable(marker_factory):
+            return marker_factory()
+        return StreamChunk(content="", is_final=True)
+
+    def _resolve_terminal_visible_output(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+        *,
+        full_content: str,
+        user_message: str,
+    ) -> tuple[str, Optional[str]]:
+        """Pick the best visible terminal response from provider and summary fallbacks."""
+        detector = getattr(orch, "_task_completion_detector", None)
+        candidates = (
+            ("provider_response", full_content),
+            ("completion_summary", self._get_task_completion_summary(detector)),
+            ("compaction_summary", getattr(stream_ctx, "compaction_summary", "")),
+        )
+
+        sanitizer = getattr(orch, "sanitizer", None)
+        for source, candidate in candidates:
+            normalized = self._normalize_visible_candidate(candidate, user_message=user_message)
+            if not normalized:
+                continue
+
+            sanitized = sanitizer.sanitize(normalized) if sanitizer else normalized
+            if isinstance(sanitized, str) and sanitized.strip():
+                return sanitized.strip(), source
+
+            plain_text = sanitizer.strip_markup(normalized) if sanitizer else normalized
+            if isinstance(plain_text, str) and plain_text.strip():
+                return plain_text.strip(), source
+
+        return "", None
+
+    def _build_terminal_delivery_chunk(
+        self,
+        orch: Any,
+        stream_ctx: Any,
+        *,
+        full_content: str,
+        user_message: str,
+    ) -> StreamChunk:
+        """Guarantee a visible terminal assistant chunk or an explicit final marker."""
+        terminal_content, content_source = self._resolve_terminal_visible_output(
+            orch,
+            stream_ctx,
+            full_content=full_content,
+            user_message=user_message,
+        )
+
+        if terminal_content:
+            orch.add_message("assistant", terminal_content, persist_synchronously=True)
+            self._append_stream_event(
+                stream_ctx,
+                "provider_status_events",
+                {
+                    "source": "streaming_executor",
+                    "kind": "final_chunk_emitted",
+                    "response_source": content_source,
+                    "iteration": getattr(stream_ctx, "total_iterations", 0),
+                    "content_length": len(terminal_content),
+                },
+            )
+            if content_source and content_source != "provider_response":
+                logger.warning(
+                    "Terminal response content recovered from %s fallback (provider output was not visible)",
+                    content_source,
+                )
+            return orch._chunk_generator.generate_content_chunk(terminal_content, is_final=True)
+
+        self._append_stream_event(
+            stream_ctx,
+            "provider_status_events",
+            {
+                "source": "streaming_executor",
+                "kind": "final_marker_emitted",
+                "iteration": getattr(stream_ctx, "total_iterations", 0),
+            },
+        )
+        logger.warning("No visible terminal assistant content available; emitting final marker only")
+        return self._build_final_marker_chunk(orch)
 
     @staticmethod
     def _append_stream_event(stream_ctx: Any, field_name: str, event: dict[str, Any]) -> None:
@@ -897,6 +1002,7 @@ class StreamingChatExecutor:
                 if recovery_action.action in ("retry", "force_summary"):
                     continue
 
+            assistant_content_yielded = False
             if full_content:
                 visible_content = self._prepare_visible_content(
                     full_content,
@@ -906,25 +1012,49 @@ class StreamingChatExecutor:
                     _prev_iteration_had_content = True
                 sanitized = orch.sanitizer.sanitize(visible_content)
                 if sanitized:
-                    orch.add_message("assistant", sanitized, tool_calls=tool_calls)
-                    if tool_calls or (forced_task_completion and not tool_calls):
+                    orch.add_message(
+                        "assistant",
+                        sanitized,
+                        tool_calls=tool_calls,
+                        persist_synchronously=forced_task_completion and not tool_calls,
+                    )
+                    assistant_content_yielded = True
+                    yield orch._chunk_generator.generate_content_chunk(
+                        sanitized,
+                        is_final=forced_task_completion and not tool_calls,
+                    )
+                    if forced_task_completion and not tool_calls:
+                        return
+                else:
+                    plain_text = orch.sanitizer.strip_markup(
+                        visible_content
+                        or self._normalize_visible_candidate(
+                            full_content,
+                            user_message=getattr(stream_ctx, "user_message", ""),
+                        )
+                    )
+                    if plain_text:
+                        orch.add_message(
+                            "assistant",
+                            plain_text,
+                            tool_calls=tool_calls,
+                            persist_synchronously=forced_task_completion and not tool_calls,
+                        )
+                        assistant_content_yielded = True
                         yield orch._chunk_generator.generate_content_chunk(
-                            sanitized,
+                            plain_text,
                             is_final=forced_task_completion and not tool_calls,
                         )
                         if forced_task_completion and not tool_calls:
                             return
-                else:
-                    plain_text = orch.sanitizer.strip_markup(visible_content)
-                    if plain_text:
-                        orch.add_message("assistant", plain_text, tool_calls=tool_calls)
-                        if tool_calls or (forced_task_completion and not tool_calls):
-                            yield orch._chunk_generator.generate_content_chunk(
-                                plain_text,
-                                is_final=forced_task_completion and not tool_calls,
-                            )
-                            if forced_task_completion and not tool_calls:
-                                return
+                    elif forced_task_completion and not tool_calls:
+                        yield self._build_terminal_delivery_chunk(
+                            orch,
+                            stream_ctx,
+                            full_content=full_content,
+                            user_message=user_message,
+                        )
+                        return
             elif tool_calls:
                 orch.add_message("assistant", "", tool_calls=tool_calls)
             else:
@@ -1186,6 +1316,19 @@ class StreamingChatExecutor:
                         ]
 
                     if continuation_result.should_return:
+                        continuation_visible = any(
+                            bool(getattr(chunk, "content", "").strip())
+                            for chunk in continuation_result.chunks
+                        )
+                        if not tool_calls and not assistant_content_yielded and not continuation_visible:
+                            yield self._build_terminal_delivery_chunk(
+                                orch,
+                                stream_ctx,
+                                full_content=full_content,
+                                user_message=user_message,
+                            )
+                        elif not continuation_result.chunks:
+                            yield self._build_final_marker_chunk(orch)
                         return
 
                 if not runtime_owner._tool_execution_handler:

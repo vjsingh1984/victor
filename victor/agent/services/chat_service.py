@@ -1173,6 +1173,7 @@ class ChatService:
         tool_call_id: Optional[str] = None,
         tool_calls: Optional[list] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        persist_synchronously: bool = False,
     ) -> None:
         """Persist a message to memory and emit usage analytics.
 
@@ -1214,7 +1215,7 @@ class ChatService:
                 except RuntimeError:
                     loop = None
 
-                if loop is not None and loop.is_running():
+                if loop is not None and loop.is_running() and not persist_synchronously:
                     loop.run_in_executor(
                         None,
                         lambda: memory_manager.add_message(**add_kwargs),

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
 
 from victor.agent.conversation.history_metadata import build_internal_history_metadata
@@ -955,14 +956,114 @@ class ChatStreamHelperMixin:
             selected_tools=tools,
             planned_tools=(stream_ctx.planned_tools if stream_ctx else None),
         )
-        async for chunk in orch.provider.stream(
+        provider_stream = orch.provider.stream(
             messages=assembled,
             model=orch.model,
             temperature=orch.temperature,
             max_tokens=orch.max_tokens,
             tools=tools,
             **provider_kwargs,
-        ):
+        )
+        provider_iterator = provider_stream.__aiter__()
+
+        heartbeat_interval = max(
+            1.0,
+            float(getattr(orch.settings, "stream_provider_wait_heartbeat_seconds", 15.0)),
+        )
+        stall_timeout = max(
+            heartbeat_interval,
+            float(
+                getattr(
+                    orch.settings,
+                    "stream_provider_stall_timeout_seconds",
+                    getattr(orch.settings, "stream_idle_timeout_seconds", 300.0),
+                )
+            ),
+        )
+        waiting_since = time.monotonic()
+        first_chunk_received = False
+
+        while True:
+            pending_next = asyncio.create_task(provider_iterator.__anext__())
+            try:
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(
+                            asyncio.shield(pending_next),
+                            timeout=heartbeat_interval,
+                        )
+                        break
+                    except asyncio.TimeoutError:
+                        waited_seconds = time.monotonic() - waiting_since
+                        event_kind = (
+                            "provider_waiting" if not first_chunk_received else "still_generating"
+                        )
+                        self._record_provider_status_event(
+                            stream_ctx,
+                            event_kind,
+                            waited_seconds=round(waited_seconds, 3),
+                            model=getattr(orch, "model", None),
+                        )
+                        logger.info(
+                            "[provider-stream] %s after %.1fs (model=%s)",
+                            event_kind,
+                            waited_seconds,
+                            getattr(orch, "model", "unknown"),
+                        )
+                        if waited_seconds >= stall_timeout:
+                            logger.error(
+                                "[provider-stream] Stall timeout after %.1fs without provider chunk",
+                                waited_seconds,
+                            )
+                            self._record_provider_status_event(
+                                stream_ctx,
+                                "provider_stall_timeout",
+                                waited_seconds=round(waited_seconds, 3),
+                                model=getattr(orch, "model", None),
+                            )
+                            pending_next.cancel()
+                            try:
+                                await pending_next
+                            except (asyncio.CancelledError, Exception):
+                                pass
+                            close_stream = getattr(provider_stream, "aclose", None)
+                            if callable(close_stream):
+                                try:
+                                    await close_stream()
+                                except Exception:
+                                    logger.debug(
+                                        "Failed closing stalled provider stream", exc_info=True
+                                    )
+                            raise ProviderTimeoutError(
+                                f"Provider stream stalled for {waited_seconds:.1f}s without chunks"
+                            )
+            except StopAsyncIteration:
+                self._record_provider_status_event(
+                    stream_ctx,
+                    "completion_detected",
+                    waited_seconds=round(time.monotonic() - waiting_since, 3),
+                    model=getattr(orch, "model", None),
+                    reason="stream_end",
+                    content_length=len(full_content),
+                    tool_call_count=len(tool_calls) if tool_calls else 0,
+                )
+                break
+
+            if hasattr(stream_ctx, "reset_activity_timer"):
+                stream_ctx.reset_activity_timer()
+
+            if not first_chunk_received:
+                first_chunk_received = True
+                self._record_provider_status_event(
+                    stream_ctx,
+                    "first_token_received",
+                    waited_seconds=round(time.monotonic() - waiting_since, 3),
+                    model=getattr(orch, "model", None),
+                    has_content=bool(getattr(chunk, "content", "")),
+                    has_tool_calls=bool(getattr(chunk, "tool_calls", None)),
+                )
+
+            waiting_since = time.monotonic()
             chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
                 chunk,
                 consecutive_garbage_chunks,
@@ -997,6 +1098,15 @@ class ChatStreamHelperMixin:
                 # Tool calls signal the end of this turn — the SSE stream is done.
                 # Break immediately; do NOT start a new stream call with the same
                 # messages (that would duplicate full_content).
+                self._record_provider_status_event(
+                    stream_ctx,
+                    "completion_detected",
+                    waited_seconds=0.0,
+                    model=getattr(orch, "model", None),
+                    reason="tool_calls",
+                    content_length=len(full_content),
+                    tool_call_count=len(tool_calls),
+                )
                 logger.debug("Tool calls received, breaking stream loop")
                 break
 
@@ -1021,6 +1131,28 @@ class ChatStreamHelperMixin:
 
         stream_ctx.total_tokens = total_tokens
         return full_content, tool_calls, total_tokens, garbage_detected
+
+    @staticmethod
+    def _record_provider_status_event(
+        stream_ctx: "StreamingChatContext",
+        kind: str,
+        **payload: Any,
+    ) -> None:
+        """Record structured provider-wait telemetry on the mutable stream context."""
+        events = getattr(stream_ctx, "provider_status_events", None)
+        if not isinstance(events, list):
+            events = []
+            stream_ctx.provider_status_events = events
+
+        events.append(
+            {
+                "source": "streaming_provider",
+                "kind": kind,
+                "timestamp": time.time(),
+                "iteration": getattr(stream_ctx, "total_iterations", 0),
+                **payload,
+            }
+        )
 
     def _handle_stream_chunk(
         self,
@@ -1090,6 +1222,8 @@ class ChatStreamHelperMixin:
                     tools=tools,
                     **provider_kwargs,
                 ):
+                    if hasattr(stream_ctx, "reset_activity_timer"):
+                        stream_ctx.reset_activity_timer()
                     if chunk.content:
                         full_content += chunk.content
                     if chunk.tool_calls:

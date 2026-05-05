@@ -24,6 +24,8 @@ from textual.widgets import Button, DataTable, Footer, Input, Label
 from victor.agent.response_sanitizer import create_streaming_filter
 from victor.framework.events import EventType
 from victor.ui.rendering.utils import (
+    extract_tool_call_arguments,
+    extract_tool_result_payload,
     StreamDeltaNormalizer,
     is_thinking_status_message,
     normalize_reasoning_content,
@@ -927,6 +929,35 @@ class VictorTUI(App):
             except Exception:
                 return True
 
+        def handle_tool_result(tool_data: dict[str, Any], default_tool_name: str = "tool") -> None:
+            """Render a normalized tool-result payload into the TUI."""
+            tool_name = str(tool_data.get("name", default_tool_name))
+            error_message = tool_data.get("error")
+            if isinstance(error_message, str) and error_message.strip():
+                self._add_error_message(f"{tool_name}: {error_message.strip()}")
+            if tool_data.get("was_pruned") and should_show_tool_pruning_notice():
+                self._add_system_message(
+                    f"Tool output for {tool_name} was pruned before sending to the model."
+                )
+
+            arguments = tool_data.get("arguments", {})
+            preview_source = tool_data.get("original_result")
+            if preview_source is None:
+                preview_source = tool_data.get("result")
+
+            self._finish_tool_call(
+                success=tool_data.get("success", True),
+                elapsed=tool_data.get("elapsed"),
+                follow_up_suggestions=tool_data.get("follow_up_suggestions"),
+                tool_name=tool_name,
+                arguments=arguments,
+                output_preview=build_tool_output_preview(
+                    tool_name,
+                    arguments,
+                    preview_source,
+                ),
+            )
+
         def process_content(raw_content: str) -> None:
             """Normalize and route content through the shared inline-thinking filter."""
             nonlocal thinking_visible, thinking_buffer
@@ -1008,22 +1039,22 @@ class VictorTUI(App):
                         try:
                             self._show_tool_call(
                                 event.tool_name or "unknown",
-                                event.metadata.get("arguments", {}) if event.metadata else {} or {},
+                                extract_tool_call_arguments(event),
                             )
                         except Exception as e:
                             logger.warning(f"Failed to show tool call: {e}")
 
                     elif event.type == EventType.TOOL_RESULT:
                         try:
-                            result_data = event.result or {}
-                            self._finish_tool_call(
-                                success=result_data.get("success", True),
-                                elapsed=result_data.get("elapsed"),
+                            result_data = extract_tool_result_payload(event)
+                            handle_tool_result(
+                                result_data,
+                                default_tool_name=event.tool_name or "tool",
                             )
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
 
-                elif isinstance(getattr(chunk, "metadata", None), dict):
+                elif isinstance(getattr(event, "metadata", None), dict):
                     metadata = event.metadata or {}
 
                     if "status" in metadata:
@@ -1073,26 +1104,7 @@ class VictorTUI(App):
                     elif "tool_result" in metadata:
                         tool_data = metadata["tool_result"]
                         try:
-                            tool_name = str(tool_data.get("name", "tool"))
-                            error_message = tool_data.get("error")
-                            if isinstance(error_message, str) and error_message.strip():
-                                self._add_error_message(f"{tool_name}: {error_message.strip()}")
-                            if tool_data.get("was_pruned") and should_show_tool_pruning_notice():
-                                self._add_system_message(
-                                    f"Tool output for {tool_name} was pruned before sending to the model."
-                                )
-                            self._finish_tool_call(
-                                success=tool_data.get("success", True),
-                                elapsed=tool_data.get("elapsed"),
-                                follow_up_suggestions=tool_data.get("follow_up_suggestions"),
-                                tool_name=tool_name,
-                                arguments=tool_data.get("arguments", {}),
-                                output_preview=build_tool_output_preview(
-                                    tool_name,
-                                    tool_data.get("arguments", {}),
-                                    tool_data.get("result"),
-                                ),
-                            )
+                            handle_tool_result(tool_data)
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
 
@@ -1114,7 +1126,7 @@ class VictorTUI(App):
                         except Exception as e:
                             logger.warning(f"Failed to update thinking content: {e}")
 
-                elif hasattr(chunk, "content") and event.content:
+                elif hasattr(event, "content") and event.content:
                     # Simple content chunk
                     process_content(event.content)
 

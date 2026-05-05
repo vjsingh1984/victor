@@ -3158,6 +3158,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             content: Message content
             **kwargs: Additional fields (name, tool_call_id, tool_calls)
         """
+        persist_synchronously = bool(kwargs.pop("persist_synchronously", False))
         preview_keys = {
             "preview_body",
             "preview_kind",
@@ -3214,6 +3215,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             tool_call_id=kwargs.get("tool_call_id"),
             tool_calls=kwargs.get("tool_calls"),
             metadata=kwargs.get("metadata"),
+            persist_synchronously=persist_synchronously,
         )
 
     async def chat(

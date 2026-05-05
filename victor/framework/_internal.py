@@ -26,11 +26,13 @@ import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
 from victor.agent.config import FrameworkCompatibleAgentConfig, normalize_agent_config
+from victor.core.completion_markers import strip_active_completion_markers
 from victor.framework.event_registry import EventTarget, get_event_registry
 from victor.framework.events import (
     AgentExecutionEvent,
     EventType,
     error_event,
+    milestone_event,
     stream_end_event,
     stream_start_event,
 )
@@ -340,6 +342,7 @@ async def stream_with_events(
     """
     registry = get_event_registry()
     output_state = DirectResponseOutputState(response_prompt or prompt)
+    saw_content_event = False
 
     # Emit stream start
     yield stream_start_event()
@@ -348,6 +351,10 @@ async def stream_with_events(
         async for chunk in orchestrator.stream_chat(prompt):
             metadata = getattr(chunk, "metadata", None)
             chunk_metadata = metadata if isinstance(metadata, dict) else {}
+
+            status_message = chunk_metadata.get("status") or chunk_metadata.get("status_update")
+            if status_message:
+                yield milestone_event(str(status_message), metadata=chunk_metadata)
 
             reasoning_content = chunk_metadata.get("reasoning_content")
             if reasoning_content:
@@ -363,6 +370,7 @@ async def stream_with_events(
                 metadata=chunk_metadata,
             )
             if content:
+                saw_content_event = True
                 yield registry.from_external(
                     {"content": content},
                     "content",
@@ -414,12 +422,22 @@ async def stream_with_events(
 
         final_content, final_metadata = output_state.flush_stream_content()
         if final_content:
+            saw_content_event = True
             yield registry.from_external(
                 {"content": final_content},
                 "content",
                 EventTarget.STREAM_CHUNK,
                 metadata=final_metadata,
             )
+        elif not saw_content_event:
+            fallback_content = _get_stream_completion_fallback(orchestrator, output_state)
+            if fallback_content:
+                yield registry.from_external(
+                    {"content": fallback_content},
+                    "content",
+                    EventTarget.STREAM_CHUNK,
+                    metadata={"source": "completion_summary_fallback"},
+                )
 
         # Emit stream end
         yield stream_end_event(success=True)
@@ -461,6 +479,20 @@ def format_context_message(context: Dict[str, Any]) -> Optional[str]:
             parts.append(f"{key}: {value}")
 
     return "\n".join(parts) if parts else None
+
+
+def _get_stream_completion_fallback(
+    orchestrator: Any,
+    output_state: DirectResponseOutputState,
+) -> str:
+    """Return a best-effort terminal content fallback for swallowed streams."""
+    detector = getattr(orchestrator, "_task_completion_detector", None)
+    state = getattr(detector, "_state", None) if detector is not None else None
+    last_summary = getattr(state, "last_summary", "") if state is not None else ""
+    normalized = strip_active_completion_markers(last_summary or "").strip()
+    if not normalized:
+        return ""
+    return output_state.normalize_final_response(normalized).strip()
 
 
 def collect_tool_calls(events: List[AgentExecutionEvent]) -> List[Dict[str, Any]]:

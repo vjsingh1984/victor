@@ -149,6 +149,7 @@ class StreamingChatContext:
     topology_events: List[Dict[str, Any]] = field(default_factory=list)
     degradation_events: List[Dict[str, Any]] = field(default_factory=list)
     recovery_events: List[Dict[str, Any]] = field(default_factory=list)
+    provider_status_events: List[Dict[str, Any]] = field(default_factory=list)
     runtime_override_snapshot: Optional[Dict[str, Any]] = None
 
     def elapsed_time(self) -> float:

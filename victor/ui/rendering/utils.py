@@ -6,6 +6,7 @@ renderer implementations to ensure consistent visual output.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
 import re
 from typing import Any
@@ -154,6 +155,72 @@ def format_tool_display_name(name: str) -> str:
         return normalized[:1].lower() + normalized[1:]
 
     return normalized
+
+
+def _coerce_mapping_dict(value: Any) -> dict[str, Any]:
+    """Return a shallow dict for mapping-like values."""
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
+
+
+def extract_tool_call_arguments(event: Any) -> dict[str, Any]:
+    """Extract tool-call arguments from either Agent or VictorClient events."""
+    arguments = getattr(event, "arguments", None)
+    if isinstance(arguments, Mapping):
+        return dict(arguments)
+
+    metadata = _coerce_mapping_dict(getattr(event, "metadata", None))
+    metadata_arguments = metadata.get("arguments")
+    if isinstance(metadata_arguments, Mapping):
+        return dict(metadata_arguments)
+
+    tool_start = metadata.get("tool_start")
+    if isinstance(tool_start, Mapping):
+        nested_arguments = tool_start.get("arguments")
+        if isinstance(nested_arguments, Mapping):
+            return dict(nested_arguments)
+
+    return {}
+
+
+def extract_tool_result_payload(event: Any) -> dict[str, Any]:
+    """Normalize tool-result payloads across Agent and VictorClient streams."""
+    metadata = _coerce_mapping_dict(getattr(event, "metadata", None))
+    nested_payload = metadata.get("tool_result")
+    result_payload = getattr(event, "result", None)
+
+    payload: dict[str, Any] = {}
+    if isinstance(nested_payload, Mapping):
+        payload.update(dict(nested_payload))
+
+    top_level_payload = {
+        key: metadata[key]
+        for key in (
+            "success",
+            "elapsed",
+            "arguments",
+            "error",
+            "follow_up_suggestions",
+            "result",
+            "original_result",
+            "was_pruned",
+            "name",
+        )
+        if key in metadata
+    }
+    payload.update(top_level_payload)
+
+    if isinstance(result_payload, Mapping):
+        payload.update(dict(result_payload))
+    elif result_payload is not None and "result" not in payload:
+        payload["result"] = result_payload
+
+    payload.setdefault("name", getattr(event, "tool_name", None) or "unknown")
+    payload.setdefault("success", getattr(event, "success", True))
+    payload.setdefault("arguments", extract_tool_call_arguments(event))
+
+    return payload
 
 
 def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:

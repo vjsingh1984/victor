@@ -302,6 +302,28 @@ class TestStreamWithEvents:
         assert thinking_events[0].content == "Let me think..."
 
     @pytest.mark.asyncio
+    async def test_stream_status_metadata_becomes_milestone_event(self):
+        """Status-bearing chunks should surface as milestone events for framework consumers."""
+        mock_orchestrator = MagicMock()
+
+        async def mock_stream_chat(prompt):
+            chunk = MagicMock()
+            chunk.content = ""
+            chunk.metadata = {"status": "Waiting for provider..."}
+            chunk.tool_calls = None
+            yield chunk
+
+        mock_orchestrator.stream_chat = mock_stream_chat
+
+        events = []
+        async for event in stream_with_events(mock_orchestrator, "test"):
+            events.append(event)
+
+        milestone_events = [e for e in events if e.type == EventType.MILESTONE]
+        assert len(milestone_events) == 1
+        assert milestone_events[0].milestone == "Waiting for provider..."
+
+    @pytest.mark.asyncio
     async def test_stream_tool_call_events(self):
         """Test that tool calls in chunks become tool_call events."""
         mock_orchestrator = MagicMock()
@@ -450,6 +472,31 @@ class TestStreamWithEvents:
         content_events = [e for e in events if e.type == EventType.CONTENT]
         assert [event.content for event in content_events] == ["READY"]
         assert content_events[0].metadata == {"source": "model"}
+
+    @pytest.mark.asyncio
+    async def test_stream_uses_completion_summary_fallback_when_no_content_event_was_emitted(self):
+        """A swallowed stream should recover the persisted completion summary."""
+        mock_orchestrator = MagicMock()
+        mock_orchestrator._task_completion_detector = MagicMock(
+            _state=MagicMock(last_summary="Final architecture findings")
+        )
+
+        async def mock_stream_chat(prompt):
+            chunk = MagicMock()
+            chunk.content = ""
+            chunk.metadata = None
+            chunk.tool_calls = None
+            yield chunk
+
+        mock_orchestrator.stream_chat = mock_stream_chat
+
+        events = []
+        async for event in stream_with_events(mock_orchestrator, "Summarize the graph design"):
+            events.append(event)
+
+        content_events = [e for e in events if e.type == EventType.CONTENT]
+        assert [event.content for event in content_events] == ["Final architecture findings"]
+        assert content_events[0].metadata["source"] == "completion_summary_fallback"
 
 
 class TestFormatContextMessage:

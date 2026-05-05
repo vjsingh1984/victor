@@ -73,7 +73,7 @@ async def test_pipeline_invokes_intent_and_continuation_handlers():
     async for chunk in pipeline.run("task"):
         chunks.append(chunk.content)
 
-    assert chunks == ["intent", "cont"]
+    assert chunks == ["assistant notes", "intent", "cont"]
     assert len(coordinator._intent_classification_handler.calls) == 1
     assert len(coordinator._continuation_handler.calls) == 1
     assert coordinator._orchestrator._cumulative_prompt_interventions == 7
@@ -675,11 +675,41 @@ async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_c
     async for _ in pipeline.run("summarize"):
         pass
 
-    assert ("assistant", "Key findings", {"tool_calls": None}) in added_messages
+    assert any(
+        role == "assistant" and content == "Key findings" and kwargs.get("tool_calls") is None
+        for role, content, kwargs in added_messages
+    )
     assert (
         coordinator._intent_classification_handler.calls[0]["full_content"]
         == f"{SUMMARY_MARKER} Key findings"
     )
+
+
+@pytest.mark.asyncio
+async def test_pipeline_recovers_forced_completion_output_when_visible_block_is_suppressed():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    final_text = "Final findings mention graph and metrics but are complete."
+    coordinator._provider_response = (f"{SUMMARY_MARKER} {final_text}", None, None, False)
+
+    detector = SimpleNamespace(
+        _state=SimpleNamespace(last_summary=f"{SUMMARY_MARKER} {final_text}"),
+        reset=MagicMock(),
+        analyze_response=MagicMock(),
+        get_completion_confidence=MagicMock(return_value=CompletionConfidence.HIGH),
+    )
+    coordinator._orchestrator._task_completion_detector = detector
+    coordinator._orchestrator._conversation_controller = SimpleNamespace(
+        persist_compaction_summary=MagicMock(),
+        inject_compaction_context=MagicMock(),
+    )
+
+    pipeline = StreamingChatExecutor(coordinator)
+    pipeline._prev_visible_content = pipeline._normalize_visible_content_key(final_text)
+
+    chunks = [chunk async for chunk in pipeline.run("summarize architecture")]
+
+    assert [chunk.content for chunk in chunks] == [final_text]
+    assert chunks[0].is_final is True
 
 
 @pytest.mark.asyncio

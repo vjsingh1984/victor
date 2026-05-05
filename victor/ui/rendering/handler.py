@@ -13,6 +13,8 @@ from victor.agent.response_sanitizer import create_streaming_filter
 from victor.framework.events import EventType
 from victor.ui.rendering.protocol import StreamRenderer
 from victor.ui.rendering.utils import (
+    extract_tool_call_arguments,
+    extract_tool_result_payload,
     StreamDeltaNormalizer,
     is_thinking_status_message,
     normalize_reasoning_content,
@@ -123,12 +125,12 @@ async def stream_response(
             if event.type == EventType.TOOL_CALL:
                 renderer.on_tool_start(
                     name=event.tool_name or "unknown",
-                    arguments=event.metadata.get("arguments", {}) if event.metadata else {},
+                    arguments=extract_tool_call_arguments(event),
                 )
             elif event.type == EventType.TOOL_RESULT:
-                result_data = event.result or {}
+                result_data = extract_tool_result_payload(event)
                 tool_result_kwargs = {
-                    "name": event.tool_name or "unknown",
+                    "name": str(result_data.get("name", event.tool_name or "unknown")),
                     "success": result_data.get("success", True),
                     "elapsed": result_data.get("elapsed", 0),
                     "arguments": result_data.get("arguments", {}),

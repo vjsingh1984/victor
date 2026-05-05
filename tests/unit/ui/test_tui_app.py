@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from textual.messages import UpdateScroll
 
+from victor.framework.events import AgentExecutionEvent, EventType
 from victor.ui.tui.app import TUIConsoleAdapter, VictorTUI
 from victor.ui.tui.session import Message
 from victor.ui.tui.widgets import ToolCallWidget
@@ -286,14 +287,11 @@ def test_load_project_session_async_uses_to_thread() -> None:
 
     history = MagicMock()
     history.messages = [ProviderMessage(role="assistant", content="a1")]
-    persistence = MagicMock()
-    persistence.load_session = MagicMock()
+    store = MagicMock()
+    store.load_session = MagicMock()
 
     with (
-        patch(
-            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
-            return_value=persistence,
-        ),
+        patch("victor.agent.conversation.store.ConversationStore", return_value=store),
         patch(
             "victor.agent.message_history.MessageHistory.from_dict",
             return_value=history,
@@ -310,7 +308,7 @@ def test_load_project_session_async_uses_to_thread() -> None:
     ):
         asyncio.run(app._load_project_session_async("project-session-1"))
 
-    to_thread.assert_awaited_once_with(persistence.load_session, "project-session-1")
+    to_thread.assert_awaited_once_with(store.load_session, "project-session-1")
     assert app._replay_transcript_async.await_count == 1
     replay_messages = app._replay_transcript_async.await_args.args[0]
     assert len(replay_messages) == 1
@@ -332,14 +330,11 @@ def test_load_project_session_async_replays_preview_sidecar_messages() -> None:
 
     history = MagicMock()
     history.messages = [ProviderMessage(role="assistant", content="done")]
-    persistence = MagicMock()
-    persistence.load_session = MagicMock()
+    store = MagicMock()
+    store.load_session = MagicMock()
 
     with (
-        patch(
-            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
-            return_value=persistence,
-        ),
+        patch("victor.agent.conversation.store.ConversationStore", return_value=store),
         patch(
             "victor.agent.message_history.MessageHistory.from_dict",
             return_value=history,
@@ -399,8 +394,8 @@ def test_load_project_session_replays_preview_sidecar_messages() -> None:
 
     history = MagicMock()
     history.messages = [ProviderMessage(role="assistant", content="done")]
-    persistence = MagicMock()
-    persistence.load_session.return_value = {
+    store = MagicMock()
+    store.load_session.return_value = {
         "conversation": {
             "messages": [],
             "preview_messages": [
@@ -421,10 +416,7 @@ def test_load_project_session_replays_preview_sidecar_messages() -> None:
     }
 
     with (
-        patch(
-            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
-            return_value=persistence,
-        ),
+        patch("victor.agent.conversation.store.ConversationStore", return_value=store),
         patch(
             "victor.agent.message_history.MessageHistory.from_dict",
             return_value=history,
@@ -578,7 +570,7 @@ def test_stream_response_handles_metadata_tool_results_with_follow_ups() -> None
             },
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("trace main"))
 
@@ -589,6 +581,62 @@ def test_stream_response_handles_metadata_tool_results_with_follow_ups() -> None
         tool_name="code_search",
         arguments={"query": "main entry point"},
         output_preview=None,
+    )
+
+
+def test_stream_response_handles_agent_tool_events_with_follow_ups() -> None:
+    """Direct AgentExecutionEvent streams should normalize tool payloads in TUI."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_tool_call = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._record_message = MagicMock()
+
+    follow_ups = [
+        {
+            "command": 'graph(mode="neighbors", node="GraphAnalyzer", depth=2)',
+            "description": "Inspect nearby graph nodes.",
+        }
+    ]
+
+    async def _stream():
+        yield AgentExecutionEvent(
+            type=EventType.TOOL_CALL,
+            tool_name="graph",
+            arguments={"mode": "find", "query": "graph"},
+        )
+        yield AgentExecutionEvent(
+            type=EventType.TOOL_RESULT,
+            tool_name="graph",
+            result="Tool completed successfully.",
+            success=True,
+            metadata={
+                "tool_result": {
+                    "name": "graph",
+                    "success": True,
+                    "elapsed": 0.25,
+                    "arguments": {"mode": "find", "query": "graph"},
+                    "follow_up_suggestions": follow_ups,
+                    "result": "preview graph output",
+                }
+            },
+        )
+
+    app.agent.stream = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("review graph"))
+
+    app._show_tool_call.assert_called_once_with("graph", {"mode": "find", "query": "graph"})
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.25,
+        follow_up_suggestions=follow_ups,
+        tool_name="graph",
+        arguments={"mode": "find", "query": "graph"},
+        output_preview="preview graph output",
     )
 
 
@@ -655,7 +703,7 @@ def test_stream_response_surfaces_tool_result_error_details() -> None:
             },
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("trace main"))
 
@@ -695,7 +743,7 @@ def test_stream_response_surfaces_pruned_tool_notice() -> None:
             },
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("trace main"))
 
@@ -737,7 +785,7 @@ def test_stream_response_respects_disabled_tool_pruning_notice() -> None:
             },
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     with patch(
         "victor.config.tool_settings.get_tool_settings",
@@ -780,7 +828,7 @@ def test_stream_response_forwards_tool_result_preview() -> None:
             },
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("preview"))
 
@@ -818,7 +866,7 @@ def test_stream_response_respects_disabled_tool_preview_setting() -> None:
             },
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     with patch(
         "victor.config.tool_settings.get_tool_settings",
@@ -855,7 +903,7 @@ def test_stream_response_surfaces_file_preview_metadata() -> None:
             metadata={"path": "/tmp/test.py", "file_preview": "print('hello')"},
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("preview"))
 
@@ -884,7 +932,7 @@ def test_stream_response_surfaces_edit_preview_metadata() -> None:
             metadata={"path": "/tmp/test.py", "edit_preview": "-old\n+new"},
         )
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("preview"))
 
@@ -937,7 +985,7 @@ def test_stream_response_normalizes_cumulative_content_snapshots() -> None:
         yield StreamChunk(content="Hello world", metadata=None)
         yield StreamChunk(content="Hello world", metadata=None)
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("hello"))
 
@@ -964,7 +1012,7 @@ def test_stream_response_normalizes_cumulative_reasoning_snapshots() -> None:
         yield StreamChunk(content="", metadata={"reasoning_content": "Plan carefully"})
         yield StreamChunk(content="Done", metadata=None)
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("hello"))
 
@@ -989,7 +1037,7 @@ def test_stream_response_handles_reasoning_and_content_same_chunk() -> None:
     async def _stream():
         yield StreamChunk(content="Answer", metadata={"reasoning_content": "Thinking"})
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("hello"))
 
@@ -1016,7 +1064,7 @@ def test_stream_response_strips_provider_reasoning_prefix() -> None:
         yield StreamChunk(content="", metadata={"reasoning_content": "💭 Thinking...Plan"})
         yield StreamChunk(content="Answer", metadata=None)
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("hello"))
 
@@ -1041,7 +1089,7 @@ def test_stream_response_maps_generic_thinking_status_to_panel() -> None:
         yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
         yield StreamChunk(content="Answer", metadata=None)
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("hello"))
 
@@ -1067,7 +1115,7 @@ def test_stream_response_routes_non_thinking_status_to_status_bar() -> None:
         yield StreamChunk(content="", metadata={"status": "Starting..."})
         yield StreamChunk(content="Answer", metadata=None)
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("hello"))
 
@@ -1095,7 +1143,7 @@ def test_stream_response_handles_inline_thinking_markers() -> None:
         yield StreamChunk(content="</think>", metadata=None)
         yield StreamChunk(content="Visible", metadata=None)
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     asyncio.run(app._stream_response("hello"))
 
@@ -1124,7 +1172,7 @@ def test_stream_response_aborts_excessive_inline_thinking() -> None:
         yield StreamChunk(content="123456", metadata=None)
         yield StreamChunk(content="Visible", metadata=None)
 
-    app.agent.stream_chat = MagicMock(return_value=_stream())
+    app.agent.stream = MagicMock(return_value=_stream())
 
     with patch("victor.agent.response_sanitizer.StreamingContentFilter.MAX_THINKING_CONTENT", 5):
         asyncio.run(app._stream_response("hello"))
