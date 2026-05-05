@@ -607,6 +607,7 @@ markers = [
     "workflows: marks workflow-related tests",
     "agents: marks multi-agent tests",
     "hitl: marks human-in-the-loop tests",
+    "monte_carlo: marks tests as Monte Carlo statistical tests",
 ]
 filterwarnings = [
     # Ignore PytestCollectionWarning for non-test classes in victor module

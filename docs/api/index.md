@@ -43,6 +43,7 @@ agent.chat()  # Interactive chat loop
 | **Configuration** | Settings and profiles | [../users/reference/config.md](../users/reference/config.md) |
 | **Providers** | LLM provider adapters | [providers.md](providers.md) |
 | **Core** | Events, state, teams, errors | [core.md](core.md) |
+| **Bayesian** | Bayes-consistent orchestration | [bayesian.md](bayesian.md) |
 
 ## Key Concepts
 
@@ -332,6 +333,7 @@ agent = Agent(
   - [Configuration API](../users/reference/config.md) - Settings and profiles
   - [Provider API](providers.md) - Provider customization
   - [Core APIs](core.md) - Events, state, workflows
+  - [Bayesian API](bayesian.md) - Bayes-consistent multi-agent orchestration
 
 - See examples:
   - [Quickstart Guide](../guides/quickstart.md)

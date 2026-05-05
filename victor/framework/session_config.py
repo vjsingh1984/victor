@@ -47,6 +47,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+from victor.framework.bayesian_config import BayesianConfig
+
 DEFAULT_PROVIDER_MODELS = {
     "anthropic": "claude-3-5-sonnet-20241022",
     "openai": "gpt-4o",
@@ -249,6 +251,7 @@ class SessionConfig:
     smart_routing: SmartRoutingConfig = field(default_factory=SmartRoutingConfig)
     tool_output: ToolOutputConfig = field(default_factory=ToolOutputConfig)
     provider_override: ProviderOverrideConfig = field(default_factory=ProviderOverrideConfig)
+    bayesian: BayesianConfig = field(default_factory=BayesianConfig)
 
     # --- Convenience shorthands (populate sub-configs) ---
 
@@ -291,6 +294,14 @@ class SessionConfig:
         auth_mode: Optional[str] = None,
         provider_timeout: Optional[int] = None,
         coding_plan: bool = False,
+        # Bayesian orchestration flags
+        enable_bayesian: bool = True,
+        force_bayesian: bool = False,
+        simple_threshold: float = 0.3,
+        complex_threshold: float = 0.7,
+        enable_voi: bool = True,
+        enable_correlation: bool = True,
+        min_agents_for_bayesian: int = 2,
     ) -> "SessionConfig":
         """Create a ``SessionConfig`` from flat CLI flags.
 
@@ -370,6 +381,15 @@ class SessionConfig:
                 auth_mode=auth_mode,
                 timeout=provider_timeout,
                 coding_plan=coding_plan,
+            ),
+            bayesian=BayesianConfig.from_cli_flags(
+                enable_bayesian=enable_bayesian,
+                force_bayesian=force_bayesian,
+                simple_threshold=simple_threshold,
+                complex_threshold=complex_threshold,
+                enable_voi=enable_voi,
+                enable_correlation=enable_correlation,
+                min_agents_for_bayesian=min_agents_for_bayesian,
             ),
         )
 

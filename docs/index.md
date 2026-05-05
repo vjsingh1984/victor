@@ -40,6 +40,11 @@
 2. [Development Setup](developers/development/setup.md) - Dev environment
 3. [Documentation Standards](developers/DOCUMENTATION_STANDARDS.md) - Writing docs
 
+### Advanced Features
+1. [Bayesian Orchestration](bayesian_orchestration.md) - Bayes-consistent multi-agent coordination
+2. [Prompt Optimization](../docs/architecture/migration.md) - Runtime prompt evolution
+3. [Multi-Agent Teams](../docs/guides/MULTI_AGENT_TEAMS.md) - Team formations and coordination
+
 ## Visual Format Legend
 
 | Format | Usage | Example |

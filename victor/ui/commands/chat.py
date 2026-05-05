@@ -105,6 +105,14 @@ def _collect_runtime_override_kwargs(
     fallback_chain: Optional[str],
     tool_preview: bool,
     enable_pruning: bool,
+    # Bayesian orchestration parameters
+    enable_bayesian: bool,
+    force_bayesian: bool,
+    simple_threshold: float,
+    complex_threshold: float,
+    enable_voi: bool,
+    enable_correlation: bool,
+    min_agents_for_bayesian: int,
 ) -> dict[str, Any]:
     """Return only non-default runtime override kwargs for chat execution helpers."""
     kwargs: dict[str, Any] = {}
@@ -127,6 +135,22 @@ def _collect_runtime_override_kwargs(
         kwargs["tool_preview"] = tool_preview
     if enable_pruning:
         kwargs["enable_pruning"] = enable_pruning
+
+    # Bayesian orchestration defaults (only add if non-default)
+    if not enable_bayesian:
+        kwargs["enable_bayesian"] = enable_bayesian
+    if force_bayesian:
+        kwargs["force_bayesian"] = force_bayesian
+    if simple_threshold != 0.3:
+        kwargs["simple_threshold"] = simple_threshold
+    if complex_threshold != 0.7:
+        kwargs["complex_threshold"] = complex_threshold
+    if not enable_voi:
+        kwargs["enable_voi"] = enable_voi
+    if not enable_correlation:
+        kwargs["enable_correlation"] = enable_correlation
+    if min_agents_for_bayesian != 2:
+        kwargs["min_agents_for_bayesian"] = min_agents_for_bayesian
 
     return kwargs
 
@@ -157,6 +181,14 @@ def _build_session_config(
     endpoint: Optional[str] = None,
     auth_mode: Optional[str] = None,
     coding_plan: bool = False,
+    # Bayesian orchestration parameters
+    enable_bayesian: bool = True,
+    force_bayesian: bool = False,
+    simple_threshold: float = 0.3,
+    complex_threshold: float = 0.7,
+    enable_voi: bool = True,
+    enable_correlation: bool = True,
+    min_agents_for_bayesian: int = 2,
 ) -> SessionConfig:
     """Create a normalized SessionConfig from chat CLI flags."""
     return SessionConfig.from_cli_flags(
@@ -184,6 +216,13 @@ def _build_session_config(
         endpoint=endpoint,
         auth_mode=auth_mode,
         coding_plan=coding_plan,
+        enable_bayesian=enable_bayesian,
+        force_bayesian=force_bayesian,
+        simple_threshold=simple_threshold,
+        complex_threshold=complex_threshold,
+        enable_voi=enable_voi,
+        enable_correlation=enable_correlation,
+        min_agents_for_bayesian=min_agents_for_bayesian,
     )
 
 
@@ -795,6 +834,49 @@ def chat(
         help="Broaden tool output pruning beyond the safe default read-heavy scope.",
         rich_help_panel="Tool Output",
     ),
+    # Bayesian Orchestration options (complexity-based routing)
+    enable_bayesian: bool = typer.Option(
+        True,
+        "--enable-bayesian/--no-enable-bayesian",
+        help="Enable Bayesian orchestration for complex queries (default: yes).",
+        rich_help_panel="Bayesian Orchestration",
+    ),
+    force_bayesian: bool = typer.Option(
+        False,
+        "--force-bayesian",
+        help="Force ALL queries through Bayesian orchestration (for testing).",
+        rich_help_panel="Bayesian Orchestration",
+    ),
+    simple_threshold: float = typer.Option(
+        0.3,
+        "--simple-threshold",
+        help="Complexity score below which queries use simple fast path (0.0-1.0, default: 0.3).",
+        rich_help_panel="Bayesian Orchestration",
+    ),
+    complex_threshold: float = typer.Option(
+        0.7,
+        "--complex-threshold",
+        help="Complexity score above which queries use Bayesian orchestration (0.0-1.0, default: 0.7).",
+        rich_help_panel="Bayesian Orchestration",
+    ),
+    enable_voi: bool = typer.Option(
+        True,
+        "--enable-voi/--no-enable-voi",
+        help="Enable Value of Information-based agent selection (default: yes).",
+        rich_help_panel="Bayesian Orchestration",
+    ),
+    enable_correlation: bool = typer.Option(
+        True,
+        "--enable-correlation/--no-enable-correlation",
+        help="Enable correlation-aware consensus (default: yes).",
+        rich_help_panel="Bayesian Orchestration",
+    ),
+    min_agents_for_bayesian: int = typer.Option(
+        2,
+        "--min-agents-for-bayesian",
+        help="Minimum number of agents required to trigger Bayesian orchestration (default: 2).",
+        rich_help_panel="Bayesian Orchestration",
+    ),
 ):
     """Start interactive chat or send a one-shot message.
 
@@ -1076,6 +1158,13 @@ victor chat --sessionid abc123            # Resume session
                 endpoint=endpoint,
                 auth_mode=auth_mode,
                 coding_plan=coding_plan,
+                enable_bayesian=enable_bayesian,
+                force_bayesian=force_bayesian,
+                simple_threshold=simple_threshold,
+                complex_threshold=complex_threshold,
+                enable_voi=enable_voi,
+                enable_correlation=enable_correlation,
+                min_agents_for_bayesian=min_agents_for_bayesian,
             )
         except ValueError as exc:
             console.print(f"[bold red]Error:[/] {exc}")
@@ -1108,6 +1197,13 @@ victor chat --sessionid abc123            # Resume session
                 fallback_chain=fallback_chain,
                 tool_preview=tool_preview,
                 enable_pruning=enable_pruning,
+                enable_bayesian=enable_bayesian,
+                force_bayesian=force_bayesian,
+                simple_threshold=simple_threshold,
+                complex_threshold=complex_threshold,
+                enable_voi=enable_voi,
+                enable_correlation=enable_correlation,
+                min_agents_for_bayesian=min_agents_for_bayesian,
             )
             run_sync(
                 run_oneshot(
@@ -1145,6 +1241,13 @@ victor chat --sessionid abc123            # Resume session
                 fallback_chain=fallback_chain,
                 tool_preview=tool_preview,
                 enable_pruning=enable_pruning,
+                enable_bayesian=enable_bayesian,
+                force_bayesian=force_bayesian,
+                simple_threshold=simple_threshold,
+                complex_threshold=complex_threshold,
+                enable_voi=enable_voi,
+                enable_correlation=enable_correlation,
+                min_agents_for_bayesian=min_agents_for_bayesian,
             )
             run_sync(
                 run_interactive(
@@ -1236,6 +1339,14 @@ async def run_oneshot(
     # Tool output preview parameters
     tool_preview: bool = True,
     enable_pruning: bool = False,
+    # Bayesian orchestration parameters
+    enable_bayesian: bool = True,
+    force_bayesian: bool = False,
+    simple_threshold: float = 0.3,
+    complex_threshold: float = 0.7,
+    enable_voi: bool = True,
+    enable_correlation: bool = True,
+    min_agents_for_bayesian: int = 2,
     session_config: Optional[SessionConfig] = None,
 ) -> None:
     """Run a single message and exit.
@@ -1269,6 +1380,13 @@ async def run_oneshot(
         planning_model=planning_model,
         mode=mode,
         show_reasoning=show_reasoning,
+        enable_bayesian=enable_bayesian,
+        force_bayesian=force_bayesian,
+        simple_threshold=simple_threshold,
+        complex_threshold=complex_threshold,
+        enable_voi=enable_voi,
+        enable_correlation=enable_correlation,
+        min_agents_for_bayesian=min_agents_for_bayesian,
     )
     session_runner = FrameworkSessionRunner(settings, config)
     prepared_state = session_runner.prepare_state(
@@ -1653,6 +1771,14 @@ async def run_interactive(
     # Tool output preview parameters
     tool_preview: bool = True,
     enable_pruning: bool = False,
+    # Bayesian orchestration parameters
+    enable_bayesian: bool = True,
+    force_bayesian: bool = False,
+    simple_threshold: float = 0.3,
+    complex_threshold: float = 0.7,
+    enable_voi: bool = True,
+    enable_correlation: bool = True,
+    min_agents_for_bayesian: int = 2,
     session_config: Optional[SessionConfig] = None,
 ) -> None:
     """Run interactive CLI mode.
@@ -1681,6 +1807,13 @@ async def run_interactive(
         planning_model=planning_model,
         mode=mode,
         show_reasoning=show_reasoning,
+        enable_bayesian=enable_bayesian,
+        force_bayesian=force_bayesian,
+        simple_threshold=simple_threshold,
+        complex_threshold=complex_threshold,
+        enable_voi=enable_voi,
+        enable_correlation=enable_correlation,
+        min_agents_for_bayesian=min_agents_for_bayesian,
     )
     session_runner = FrameworkSessionRunner(settings, config)
     prepared_state = session_runner.prepare_state(
