@@ -1396,6 +1396,45 @@ current planned tool sequence.
 **Breaking changes:** None. This restores the intended canonical runtime path
 without removing any compatibility surfaces.
 
+## Migration Update: Dynamic Tool Hints Carry Planner Rationale (2026-05-04)
+
+**Seam consolidated:** dynamic long-tail tool hints were already plan-aware,
+but the rendered prompt text still looked generic. Cached/session-locked
+providers were therefore getting the right long-tail tools without the compact
+goal/intent rationale that made those hints actionable.
+
+**Canonical owners:**
+
+- `victor.agent.services.prompt_builder_runtime.PromptBuilderRuntime` remains
+  the canonical runtime surface for selecting dynamic long-tail prompt hints.
+- `victor.agent.prompt_builder.SystemPromptBuilder` owns the final rendering of
+  those hints for the per-turn user-prefix path.
+- `victor.agent.orchestrator.AgentOrchestrator` and
+  `victor.agent.services.chat_stream_helpers` carry the current turn's planner
+  goals into that runtime surface without introducing a second planning layer.
+
+**Changes applied:**
+
+1. `get_assembled_messages()` now forwards current planner goals alongside
+   selected and planned tools into `PromptBuilderRuntime`.
+2. `PromptBuilderRuntime` now tags the dynamic hint source
+   (`planned_tools`, `keyword_selector`, `message_keywords`, or
+   `selected_tools`) and passes compact goal/intent context when available.
+3. `SystemPromptBuilder.get_dynamic_tool_guidance_text()` now renders that
+   context as plan-focus / intent-guard rationale instead of only listing tool
+   names.
+
+**Benefits:**
+
+- Dynamic long-tail hints remain cheap and per-turn, but now explain *why* a
+  given less-common tool is relevant.
+- The planner stays singular: prompt hinting reuses existing goals and intent
+  state instead of recomputing planning logic inside the prompt layer.
+- Stable system-prefix economics remain unchanged; only the user-prefix hint
+  block becomes more specific.
+
+**Breaking changes:** None intended.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).

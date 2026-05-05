@@ -308,7 +308,10 @@ def test_build_dynamic_tool_guidance_uses_relevant_dynamic_tools():
     guidance = runtime.build_dynamic_tool_guidance("Search docs for the latest API behavior")
 
     assert guidance == "DYNAMIC TOOL HINTS: web_search"
-    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["web_search"])
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(
+        ["web_search"],
+        selection_source="message_keywords",
+    )
 
 
 def test_build_dynamic_tool_guidance_prefers_tool_selector_keyword_slice():
@@ -342,7 +345,10 @@ def test_build_dynamic_tool_guidance_prefers_tool_selector_keyword_slice():
         planned_tools=None,
         _record=False,
     )
-    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["git_diff"])
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(
+        ["git_diff"],
+        selection_source="keyword_selector",
+    )
 
 
 def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
@@ -367,7 +373,10 @@ def test_build_dynamic_tool_guidance_prefers_planned_tools_over_keyword_slice():
 
     assert guidance == "DYNAMIC TOOL HINTS: workflow"
     host.tool_selector.select_keywords.assert_not_called()
-    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["workflow"])
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(
+        ["workflow"],
+        selection_source="planned_tools",
+    )
 
 
 def test_build_dynamic_tool_guidance_falls_back_to_selected_dynamic_tools_when_selector_misses():
@@ -390,7 +399,41 @@ def test_build_dynamic_tool_guidance_falls_back_to_selected_dynamic_tools_when_s
     )
 
     assert guidance == "DYNAMIC TOOL HINTS: workflow"
-    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["workflow"])
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(
+        ["workflow"],
+        selection_source="selected_tools",
+    )
+
+
+def test_build_dynamic_tool_guidance_passes_goals_and_intent_context():
+    builder = SimpleNamespace(
+        dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
+        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: workflow"),
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        tool_selector=SimpleNamespace(
+            select_keywords=MagicMock(return_value=[SimpleNamespace(name="git_diff")])
+        ),
+        tools=SimpleNamespace(list_tools=lambda: []),
+        _current_intent="read_only",
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    guidance = runtime.build_dynamic_tool_guidance(
+        "Continue execution",
+        goals=["inspect repo changes", "verify docs"],
+        planned_tools=[SimpleNamespace(name="workflow"), SimpleNamespace(name="read")],
+        selected_tools=[SimpleNamespace(name="web_search")],
+    )
+
+    assert guidance == "DYNAMIC TOOL HINTS: workflow"
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(
+        ["workflow"],
+        goals=["inspect repo changes", "verify docs"],
+        current_intent="read_only",
+        selection_source="planned_tools",
+    )
 
 
 def test_get_set_and_append_system_prompt_delegate_to_builder():

@@ -119,7 +119,9 @@ Agent / Public API
 - For cache-friendly/session-locked providers, dynamic long-tail tool hints
   should prefer the current planned tool sequence when available, then fall
   back to keyword-selected or selected-tool heuristics. The stable prefix stays
-  fixed; only the per-turn hint block reflects the current plan.
+  fixed; only the per-turn hint block reflects the current plan. When planner
+  goals or an active intent guard are available, the hint block should surface
+  that compact rationale rather than emitting a generic tool list.
 - Active runtime protocols now have service-owned canonical hosts under
   `victor.agent.services.protocols.runtime_support` and
   `victor.agent.services.protocols.infrastructure_runtime`, including

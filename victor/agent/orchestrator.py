@@ -2082,6 +2082,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         *,
         selected_tools: Optional[list[Any]] = None,
         planned_tools: Optional[list[Any]] = None,
+        goals: Optional[list[str]] = None,
     ) -> List["Message"]:
         """Get context-assembled messages for provider calls.
 
@@ -2189,6 +2190,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             prompt_runtime = self._get_prompt_builder_runtime()
             turn_ctx.dynamic_tool_guidance = prompt_runtime.build_dynamic_tool_guidance(
                 current_query or last_user_msg,
+                goals=goals,
                 planned_tools=planned_tools,
                 selected_tools=selected_tools,
             )

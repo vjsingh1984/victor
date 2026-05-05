@@ -951,6 +951,7 @@ class ChatStreamHelperMixin:
 
         assembled = orch.get_assembled_messages(
             current_query=stream_ctx.user_message if stream_ctx else None,
+            goals=(stream_ctx.goals if stream_ctx else None),
             selected_tools=tools,
             planned_tools=(stream_ctx.planned_tools if stream_ctx else None),
         )
@@ -1077,6 +1078,7 @@ class ChatStreamHelperMixin:
 
                 retry_assembled = orch.get_assembled_messages(
                     current_query=stream_ctx.user_message if stream_ctx else None,
+                    goals=(stream_ctx.goals if stream_ctx else None),
                     selected_tools=tools,
                     planned_tools=(stream_ctx.planned_tools if stream_ctx else None),
                 )

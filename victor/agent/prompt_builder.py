@@ -465,7 +465,14 @@ class SystemPromptBuilder:
         """Return long-tail tools that should be hinted dynamically per turn."""
         return list(getattr(self, "dynamic_prompt_tools", []) or [])
 
-    def get_dynamic_tool_guidance_text(self, relevant_tools: Optional[List[str]] = None) -> str:
+    def get_dynamic_tool_guidance_text(
+        self,
+        relevant_tools: Optional[List[str]] = None,
+        *,
+        goals: Optional[List[str]] = None,
+        current_intent: Optional[str] = None,
+        selection_source: Optional[str] = None,
+    ) -> str:
         """Render dynamic tool hints for user-prefix injection.
 
         These hints are separate from provider tool schemas. They keep stable,
@@ -485,11 +492,28 @@ class SystemPromptBuilder:
         if more_count:
             tool_list = f"{tool_list}, and {more_count} more"
 
-        return (
+        guidance = (
             "DYNAMIC TOOL HINTS: The stable system prompt covers the core tools. "
             f"For this turn, the following less-common tools are relevant if needed: {tool_list}. "
-            "Only call these dynamic tools when the current task clearly requires them."
         )
+
+        if selection_source == "planned_tools":
+            guidance += "These tools came from the current planned tool sequence. "
+        elif selection_source == "keyword_selector":
+            guidance += "These tools matched the current turn's explicit tool keywords. "
+
+        if goals:
+            compact_goals = [goal.strip() for goal in goals if goal and goal.strip()]
+            if compact_goals:
+                guidance += f"Current plan focus: {'; '.join(compact_goals[:3])}. "
+
+        if current_intent:
+            readable_intent = current_intent.replace("_", " ").replace("-", " ").strip()
+            if readable_intent:
+                guidance += f"Current intent guard: {readable_intent}. "
+
+        guidance += "Only call these dynamic tools when the current task clearly requires them."
+        return guidance
 
     def get_max_exploration_depth(self) -> int:
         """Get the maximum exploration depth for the current provider and task complexity.

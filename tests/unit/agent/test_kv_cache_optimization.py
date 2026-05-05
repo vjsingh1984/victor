@@ -9,6 +9,7 @@ Verifies that:
 - Prompt builder uses reduced + cached sections for KV providers
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -354,6 +355,52 @@ class TestDynamicContentInjection:
 
         assert orch._optimization_injector._last_failure_category is None
         assert orch._optimization_injector._last_failure_error is None
+
+    def test_prompt_pipeline_passes_goals_into_dynamic_tool_guidance(self):
+        """Per-turn dynamic tool hints should receive planner goals from the stream path."""
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.providers.base import Message
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch._context_assembler = None
+        orch.messages = [
+            Message(role="system", content="system prompt"),
+            Message(role="user", content="hello"),
+        ]
+        orch._prompt_pipeline = MagicMock()
+        orch._prompt_pipeline.compose_turn_prefix.return_value = ""
+        orch._record_prompt_optimization_metadata = MagicMock()
+        orch._optimization_injector = None
+        orch._reminder_manager = None
+        orch._system_prompt_frozen = False
+        orch._last_sorted_tool_names = None
+        orch.provider_name = "test-provider"
+        orch._model = "test-model"
+        orch._current_task_type = "edit"
+        orch.get_skill_user_prefix = MagicMock(return_value=None)
+        prompt_runtime = MagicMock()
+        prompt_runtime.build_dynamic_tool_guidance.return_value = ""
+        orch._get_prompt_builder_runtime = MagicMock(return_value=prompt_runtime)
+
+        selected_tools = [SimpleNamespace(name="web_search")]
+        planned_tools = [SimpleNamespace(name="workflow")]
+        goals = ["inspect repo changes", "verify docs"]
+
+        AgentOrchestrator.get_assembled_messages(
+            orch,
+            current_query="Check upstream docs and repo changes",
+            selected_tools=selected_tools,
+            planned_tools=planned_tools,
+            goals=goals,
+        )
+
+        prompt_runtime.build_dynamic_tool_guidance.assert_called_once_with(
+            "Check upstream docs and repo changes",
+            planned_tools=planned_tools,
+            selected_tools=selected_tools,
+            goals=goals,
+        )
 
 
 # =====================================================================

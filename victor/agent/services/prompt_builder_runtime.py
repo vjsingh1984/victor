@@ -214,6 +214,7 @@ class PromptBuilderRuntime:
         self,
         user_message: Optional[str],
         *,
+        goals: Optional[Iterable[str]] = None,
         planned_tools: Optional[Iterable[Any]] = None,
         selected_tools: Optional[Iterable[Any]] = None,
     ) -> str:
@@ -226,7 +227,7 @@ class PromptBuilderRuntime:
         if not dynamic_tools:
             return ""
 
-        relevant_tools = self._select_relevant_dynamic_tools(
+        relevant_tools, selection_source = self._select_relevant_dynamic_tools(
             user_message or "",
             dynamic_tools,
             planned_tools=planned_tools,
@@ -235,7 +236,22 @@ class PromptBuilderRuntime:
         if not relevant_tools:
             return ""
 
-        return builder.get_dynamic_tool_guidance_text(relevant_tools)
+        guidance_kwargs: dict[str, Any] = {}
+
+        normalized_goals = self._normalize_dynamic_tool_goals(goals)
+        if normalized_goals:
+            guidance_kwargs["goals"] = normalized_goals
+
+        current_intent = self._normalize_dynamic_tool_intent(
+            getattr(self._runtime, "_current_intent", None)
+        )
+        if current_intent:
+            guidance_kwargs["current_intent"] = current_intent
+
+        if selection_source:
+            guidance_kwargs["selection_source"] = selection_source
+
+        return builder.get_dynamic_tool_guidance_text(relevant_tools, **guidance_kwargs)
 
     def get_system_prompt(self) -> str:
         """Return the current prompt-builder output for protocol consumers."""
@@ -379,7 +395,7 @@ class PromptBuilderRuntime:
         *,
         planned_tools: Optional[Iterable[Any]] = None,
         selected_tools: Optional[Iterable[Any]] = None,
-    ) -> list[str]:
+    ) -> tuple[list[str], Optional[str]]:
         """Choose a compact dynamic tool subset for the current turn."""
         from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
@@ -388,14 +404,14 @@ class PromptBuilderRuntime:
             dynamic_tools,
         )
         if planned_dynamic:
-            return planned_dynamic[:6]
+            return planned_dynamic[:6], "planned_tools"
 
         selector_dynamic = self._select_dynamic_tools_from_selector(
             user_message,
             dynamic_tools,
         )
         if selector_dynamic:
-            return selector_dynamic[:6]
+            return selector_dynamic[:6], "keyword_selector"
 
         tool_catalog = {}
         try:
@@ -419,9 +435,11 @@ class PromptBuilderRuntime:
 
         if keyword_matches:
             relevant = keyword_matches
+            selection_source = "message_keywords"
         else:
             relevant = selected_dynamic
-        return relevant[:6]
+            selection_source = "selected_tools" if selected_dynamic else None
+        return relevant[:6], selection_source
 
     def _filter_dynamic_tool_names(
         self,
@@ -476,6 +494,31 @@ class PromptBuilderRuntime:
             if canonical in dynamic_set and canonical not in selected_dynamic:
                 selected_dynamic.append(canonical)
         return selected_dynamic
+
+    @staticmethod
+    def _normalize_dynamic_tool_goals(goals: Optional[Iterable[str]]) -> list[str]:
+        """Normalize planner goals for compact prompt rendering."""
+        if not goals:
+            return []
+
+        normalized: list[str] = []
+        for goal in goals:
+            if goal is None:
+                continue
+            text = str(goal).strip()
+            if text and text not in normalized:
+                normalized.append(text)
+        return normalized[:3]
+
+    @staticmethod
+    def _normalize_dynamic_tool_intent(current_intent: Any) -> Optional[str]:
+        """Normalize current intent for dynamic tool guidance."""
+        if current_intent is None:
+            return None
+        if hasattr(current_intent, "value"):
+            current_intent = current_intent.value
+        text = str(current_intent).strip()
+        return text or None
 
     @staticmethod
     def _tool_matches_message(tool: Any, tool_name: str, user_message_lower: str) -> bool:

@@ -178,6 +178,23 @@ class TestSystemPromptBuilder:
         assert "code analyst" in result.lower()
         assert "tool" in result.lower()
 
+    def test_dynamic_tool_guidance_text_includes_goals_and_intent_rationale(self):
+        """Dynamic tool hints should expose the current plan rationale without replanning."""
+        builder = SystemPromptBuilder(provider_name="anthropic", model="claude-3")
+
+        result = builder.get_dynamic_tool_guidance_text(
+            ["workflow", "web_search"],
+            goals=["inspect repo changes", "verify docs"],
+            current_intent="read_only",
+            selection_source="planned_tools",
+        )
+
+        assert "DYNAMIC TOOL HINTS" in result
+        assert "web_search, workflow" in result
+        assert "Current plan focus: inspect repo changes; verify docs." in result
+        assert "Current intent guard: read only." in result
+        assert "planned tool sequence" in result
+
 
 class TestBuildSystemPromptFunction:
     """Tests for the build_system_prompt convenience function."""
