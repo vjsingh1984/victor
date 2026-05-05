@@ -18,6 +18,21 @@ from victor.framework.init_synthesizer import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _stub_expensive_init_enrichment(monkeypatch):
+    """Keep synthesize() unit tests isolated from repo-scale graph/doc discovery."""
+    monkeypatch.setattr(
+        InitSynthesizer,
+        "_pre_synthesis_discovery",
+        AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        InitSynthesizer,
+        "_enrich_with_project_docs",
+        staticmethod(lambda base_content: base_content),
+    )
+
+
 class TestInitSynthesizer:
     """Core synthesize() method tests."""
 
@@ -78,6 +93,22 @@ class TestInitSynthesizer:
         assert "```" not in result
 
     @pytest.mark.asyncio
+    async def test_synthesize_with_agent_omits_none_model(self):
+        """Provider calls should not receive model=None as an explicit override."""
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.return_value = MagicMock(content="# init.md\n\nProject overview.")
+
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
+
+        synthesizer = InitSynthesizer()
+        await synthesizer.synthesize("raw data here", agent=mock_agent)
+
+        assert "model" not in mock_provider.chat.call_args.kwargs
+
+    @pytest.mark.asyncio
     async def test_synthesize_prompt_contains_base_content(self):
         """The synthesis prompt includes the base_content."""
         mock_provider = AsyncMock()
@@ -95,8 +126,8 @@ class TestInitSynthesizer:
         assert any("UNIQUE_BASE_DATA_12345" in str(m) for m in messages)
 
     @pytest.mark.asyncio
-    async def test_synthesize_handles_failure_gracefully(self):
-        """If provider.chat() raises, return empty string."""
+    async def test_synthesize_propagates_provider_failure(self):
+        """If provider.chat() raises, synthesis failure propagates to the caller."""
         mock_provider = AsyncMock()
         mock_provider.name = "test-provider"
         mock_provider.chat.side_effect = RuntimeError("LLM failed")
@@ -105,9 +136,82 @@ class TestInitSynthesizer:
         mock_agent.model = None
 
         synthesizer = InitSynthesizer()
-        result = await synthesizer.synthesize("data", agent=mock_agent)
+        with pytest.raises(RuntimeError, match="LLM failed"):
+            await synthesizer.synthesize("data", agent=mock_agent)
 
-        assert result == ""
+    @pytest.mark.asyncio
+    async def test_preflight_provider_ollama_raises_on_unreachable_server(self):
+        """Unreachable local Ollama should fail fast before chat retries."""
+        mock_provider = MagicMock()
+        mock_provider.base_url = "http://localhost:11434"
+        mock_provider.list_models = AsyncMock(side_effect=RuntimeError("connect failed"))
+
+        synthesizer = InitSynthesizer()
+
+        with pytest.raises(Exception, match="Ollama server unavailable"):
+            await synthesizer._preflight_provider("ollama", mock_provider, "qwen3:8b")
+
+    @pytest.mark.asyncio
+    async def test_preflight_provider_ollama_picks_first_available_model(self):
+        """If no model is configured, Ollama preflight should choose one."""
+        mock_provider = MagicMock()
+        mock_provider.base_url = "http://localhost:11434"
+        mock_provider.list_models = AsyncMock(
+            return_value=[{"name": "qwen3:8b"}, {"name": "gemma4:31b"}]
+        )
+
+        synthesizer = InitSynthesizer()
+        result = await synthesizer._preflight_provider("ollama", mock_provider, None)
+
+        assert result == "qwen3:8b"
+
+    @pytest.mark.asyncio
+    async def test_run_with_fresh_agent_uses_resolved_default_model(self):
+        """Fresh provider path should resolve the configured default model."""
+        mock_provider = MagicMock()
+        mock_provider.list_models = AsyncMock(return_value=[{"name": "profile-default"}])
+        mock_provider.chat = AsyncMock(return_value=MagicMock(content="# init"))
+        mock_provider.close = AsyncMock()
+        mock_provider.base_url = "http://localhost:11434"
+
+        mock_settings = MagicMock()
+        mock_settings.default_provider = None
+        mock_settings.default_model = None
+        mock_settings.load_profiles.return_value = {
+            "default": MagicMock(provider="ollama", model="profile-default")
+        }
+        mock_settings.provider = MagicMock(
+            default_provider="ollama",
+            default_model="local-default",
+        )
+
+        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_provider):
+            with patch("victor.config.settings.load_settings", return_value=mock_settings):
+                synthesizer = InitSynthesizer()
+                result = await synthesizer._run_with_fresh_agent("prompt", "ollama", None)
+
+        assert result == "# init"
+        assert mock_provider.chat.call_args.kwargs["model"] == "profile-default"
+
+    def test_resolve_provider_selection_prefers_default_profile(self):
+        """Init synthesis should honor the default profile before provider defaults."""
+        mock_settings = MagicMock()
+        mock_settings.default_provider = None
+        mock_settings.default_model = None
+        mock_settings.load_profiles.return_value = {
+            "default": MagicMock(provider="ollama", model="gemma4:31b")
+        }
+        mock_settings.provider = MagicMock(
+            default_provider="ollama",
+            default_model="qwen3.5:27b-q4_K_M",
+        )
+
+        with patch("victor.config.settings.load_settings", return_value=mock_settings):
+            synthesizer = InitSynthesizer()
+            provider, model = synthesizer._resolve_provider_selection(None, None)
+
+        assert provider == "ollama"
+        assert model == "gemma4:31b"
 
 
 class TestInitSynthesizerToolsFallback:

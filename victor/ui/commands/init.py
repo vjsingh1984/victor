@@ -15,6 +15,11 @@ from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
 from victor.core.indexing.graph_enrichment import ensure_project_graph_enriched
 from victor.core.utils.capability_loader import load_codebase_analyzer_attr
+from victor.ui.commands.init_content import (
+    ensure_architecture_evidence_section,
+    count_architecture_patterns,
+    ensure_architecture_patterns_section,
+)
 from victor.tools.common import latest_mtime
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
@@ -101,6 +106,11 @@ async def _generate_init_content_async(
                 exclude_dirs=exclude_dirs,
                 agent=agent,
             )
+        finally:
+            if agent is not None and hasattr(agent, "close"):
+                close_result = agent.close()
+                if inspect.isawaitable(close_result):
+                    await close_result
     elif mode == "index":
         generate_victor_md_from_index = cast(
             Callable[..., Awaitable[str]],
@@ -814,12 +824,11 @@ providers:
                             incremental=not force,  # force=True wipes clean, force=False is incremental
                         )
                         pipeline = GraphIndexingPipeline(graph_store, config)
-                        return await pipeline.index_repository()
+                        stats = await pipeline.index_repository()
+                        db_stats = await graph_store.stats()
+                        return stats, db_stats
 
-                    stats = asyncio.run(_build_ccg_index())
-
-                    # Get total database stats for context
-                    db_stats = asyncio.run(graph_store.stats())
+                    stats, db_stats = asyncio.run(_build_ccg_index())
 
                     if stats.files_processed or stats.files_deleted:
                         console.print(
@@ -901,11 +910,14 @@ providers:
             else:
                 content = new_content
 
+            content = ensure_architecture_patterns_section(content, graph_ctx)
+            content = ensure_architecture_evidence_section(content, graph_ctx)
+
             target_path.write_text(content, encoding="utf-8")
             console.print(f"[green]✓[/] Created {target_path}")
 
             component_count = content.count("| `")
-            pattern_count = content.count(". **") + content.count("Pattern:")
+            pattern_count = count_architecture_patterns(content)
             console.print(f"[dim]  - Detected {component_count} key components[/]")
             console.print(f"[dim]  - Found {pattern_count} architecture patterns[/]")
 

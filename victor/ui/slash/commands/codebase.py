@@ -24,6 +24,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from victor.core.utils.capability_loader import load_codebase_analyzer_attr
+from victor.ui.commands.init_content import count_architecture_patterns
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -237,7 +238,7 @@ class InitCommand(BaseSlashCommand):
             # Show what was detected
             lines = content.split("\n")
             component_count = content.count("| `")
-            pattern_count = content.count(". **") + content.count("Pattern:")
+            pattern_count = count_architecture_patterns(content)
 
             ctx.console.print(
                 f"[dim]  Lines: {len(lines)}, Components: {component_count}, Patterns: {pattern_count}[/]"

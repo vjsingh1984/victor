@@ -1664,3 +1664,53 @@ class TestCodebaseCommands:
 
         assert target_path.read_text(encoding="utf-8") == generated
         assert "Created" in stdout.getvalue()
+
+    @pytest.mark.asyncio
+    async def test_init_command_reports_architecture_pattern_count(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """InitCommand should count markdown architecture bullets accurately."""
+        from victor.ui.slash.commands.codebase import InitCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        target_path = tmp_path / ".victor" / "init.md"
+        project_victor_dir = target_path.parent
+
+        monkeypatch.setattr(
+            "victor.config.settings.get_project_paths",
+            lambda: SimpleNamespace(
+                project_context_file=target_path,
+                project_victor_dir=project_victor_dir,
+            ),
+        )
+
+        generated = """# init.md
+
+## Architecture Patterns
+
+- **Facade**: One entry point
+- **Registry**: Shared extension lookup
+"""
+
+        def load_attr(name: str):
+            if name == "generate_smart_victor_md":
+                return lambda: generated
+            if name == "generate_enhanced_init_md":
+                return AsyncMock(return_value="# deep init\n")
+            if name == "generate_victor_md_from_index":
+                return AsyncMock(return_value="# index init\n")
+            raise AssertionError(f"unexpected analyzer export requested: {name}")
+
+        monkeypatch.setattr(
+            "victor.ui.slash.commands.codebase.load_codebase_analyzer_attr", load_attr
+        )
+
+        ctx = CommandContext(console=console, settings=settings, args=[])
+
+        await InitCommand().execute(ctx)
+
+        assert "Patterns: 2" in stdout.getvalue()

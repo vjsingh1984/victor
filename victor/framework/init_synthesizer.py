@@ -423,7 +423,96 @@ class InitSynthesizer:
             return await self._run_with_fresh_agent(prompt, provider_name, model)
         except Exception as e:
             logger.warning("Init synthesis via orchestrator failed: %s", e)
-            return ""
+            raise
+
+    async def _preflight_provider(
+        self,
+        provider_name: Optional[str],
+        provider_instance: Any,
+        model: Optional[str],
+    ) -> Optional[str]:
+        """Fail fast for providers that support a cheap availability probe."""
+        if provider_name != "ollama":
+            return model
+
+        list_models = getattr(provider_instance, "list_models", None)
+        if not callable(list_models):
+            return model
+
+        from victor.core.errors import ProviderError
+
+        try:
+            models = await list_models()
+        except Exception as exc:
+            base_url = getattr(provider_instance, "base_url", "unknown")
+            raise ProviderError(
+                message=f"Ollama server unavailable at {base_url}: {exc}",
+                provider="ollama",
+                raw_error=exc,
+            ) from exc
+
+        available_names = [
+            str(item.get("name") or item.get("model") or "").strip()
+            for item in models
+            if isinstance(item, dict)
+        ]
+        available_names = [name for name in available_names if name]
+
+        if model is None:
+            if not available_names:
+                raise ProviderError(
+                    message="Ollama server is reachable but has no models available",
+                    provider="ollama",
+                )
+            model = available_names[0]
+            logger.info(
+                "[init] No model configured for Ollama init synthesis; using %s",
+                model,
+            )
+
+        if model:
+            available_name_set = set(available_names)
+            if available_name_set and model not in available_name_set:
+                logger.warning(
+                    "[init] Ollama model %s not reported by %s (available: %s)",
+                    model,
+                    getattr(provider_instance, "base_url", "unknown"),
+                    ", ".join(sorted(available_name_set)[:8]),
+                )
+        return model
+
+    @staticmethod
+    def _resolve_provider_selection(
+        provider: Optional[str],
+        model: Optional[str],
+    ) -> tuple[str, Optional[str]]:
+        """Resolve provider/model using default profile first, then settings defaults."""
+        from victor.config.settings import load_settings
+
+        settings = load_settings()
+        provider_settings = getattr(settings, "provider", None)
+        profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+        default_profile = profiles.get("default") if isinstance(profiles, dict) else None
+        profile_provider = getattr(default_profile, "provider", None)
+        profile_model = getattr(default_profile, "model", None)
+
+        resolved_provider = (
+            provider
+            or profile_provider
+            or getattr(settings, "default_provider", None)
+            or getattr(provider_settings, "default_provider", None)
+            or "ollama"
+        )
+        resolved_model = model
+        if resolved_model is None and profile_model and (
+            provider is None or profile_provider == resolved_provider
+        ):
+            resolved_model = profile_model
+        if resolved_model is None:
+            resolved_model = getattr(settings, "default_model", None) or getattr(
+                provider_settings, "default_model", None
+            )
+        return resolved_provider, resolved_model
 
     async def _call_initialized_provider(
         self,
@@ -455,7 +544,8 @@ class InitSynthesizer:
         _start = _time.monotonic()
 
         chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
-        chat_kwargs["model"] = model
+        if model is not None:
+            chat_kwargs["model"] = model
         response = await provider_instance.chat(messages=messages, **chat_kwargs)
 
         _elapsed_ms = (_time.monotonic() - _start) * 1000
@@ -488,21 +578,18 @@ class InitSynthesizer:
         - Single LLM call: prompt in → markdown out
         - Still gets provider-level logging (API_CALL_START/SUCCESS)
         """
+        provider_instance: Any = None
         try:
             from victor.providers.base import Message
             from victor.providers.registry import ProviderRegistry
 
-            if not provider:
-                from victor.config.settings import load_settings
-
-                settings = load_settings()
-                provider = getattr(settings, "default_provider", "ollama")
-                model = model or getattr(settings, "default_model", None)
+            provider, model = self._resolve_provider_selection(provider, model)
 
             provider_instance = ProviderRegistry.create(provider)
             if not provider_instance:
-                logger.warning("Could not create provider %s", provider)
-                return ""
+                raise RuntimeError(f"Could not create provider {provider}")
+
+            model = await self._preflight_provider(provider, provider_instance, model)
 
             import time as _time
 
@@ -520,11 +607,20 @@ class InitSynthesizer:
             # Only pass model when explicitly set — lets provider use its own default
             # when model=None (passing None overrides the method's default parameter)
             chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
-            chat_kwargs["model"] = model
+            if model is not None:
+                chat_kwargs["model"] = model
             response = await provider_instance.chat(messages=messages, **chat_kwargs)
             _elapsed_ms = (_time.monotonic() - _start) * 1000
             content = response.content if response else ""
             result = self._clean(content)
+
+            if not result:
+                from victor.core.errors import ProviderError
+
+                raise ProviderError(
+                    message="Init synthesis returned empty content",
+                    provider=provider,
+                )
 
             logger.info(
                 "[init←LLM] provider=%s model=%s duration=%.1fs "
@@ -584,11 +680,15 @@ class InitSynthesizer:
             except Exception:
                 pass  # Usage logging is best-effort
 
-            await provider_instance.close()
             return result
         except Exception as e:
             logger.warning("Init synthesis via provider failed: %s", e)
-            return ""
+            raise
+        finally:
+            if provider_instance is not None:
+                close = getattr(provider_instance, "close", None)
+                if callable(close):
+                    await close()
 
     async def _run_agent_with_tools(
         self,
