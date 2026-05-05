@@ -40,6 +40,7 @@ from victor.tools.code_search_tool import (
     _probe_index_integrity,
     _schedule_file_change_refresh,
     clear_index_cache,
+    mark_index_cache_stale_for_path,
 )
 
 
@@ -1224,7 +1225,9 @@ class TestStructuralIndexPersistence:
         assert fake_cache[str(root)]["watcher_subscribed"] is True
 
     @pytest.mark.asyncio
-    async def test_get_or_build_index_rebuilds_when_manifest_mismatch(self, tmp_path, monkeypatch):
+    async def test_get_or_build_index_returns_stale_index_when_manifest_mismatch(
+        self, tmp_path, monkeypatch
+    ):
         root = tmp_path / "repo"
         root.mkdir()
         (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
@@ -1280,8 +1283,7 @@ class TestStructuralIndexPersistence:
             _build_codebase_embedding_config(settings, root)
         )
         assert index is mock_index
-        assert rebuilt is True
-        mock_index.index_codebase.assert_awaited_once()
+        assert rebuilt is False
         assert fake_cache[str(root)]["index"] is mock_index
         assert (
             build_codebase_index_manifest(_build_codebase_embedding_config(settings, root))
@@ -1733,6 +1735,33 @@ class TestFileWatcherIncrementalUpdates:
 
         index.incremental_reindex.assert_awaited_once()
         assert cache_entry["stale"] is True
+
+    def test_mark_index_cache_stale_for_path_marks_matching_roots(self, tmp_path, monkeypatch):
+        root = tmp_path / "repo"
+        root.mkdir()
+        nested = root / "pkg"
+        nested.mkdir()
+        changed_file = nested / "module.py"
+        changed_file.write_text("print('hi')\n", encoding="utf-8")
+
+        fake_cache = {
+            str(root): {"stale": False},
+            str(nested): {"stale": False},
+            str(tmp_path / "other"): {"stale": False},
+        }
+
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache
+        )
+
+        marked = mark_index_cache_stale_for_path(str(changed_file))
+
+        assert marked == 2
+        assert fake_cache[str(root)]["stale"] is True
+        assert fake_cache[str(nested)]["stale"] is True
+        assert fake_cache[str(tmp_path / "other")]["stale"] is False
 
     @pytest.mark.asyncio
     async def test_on_file_change_acquires_index_lock_before_incremental_reindex(

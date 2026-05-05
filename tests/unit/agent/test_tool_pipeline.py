@@ -5,6 +5,7 @@ import logging
 
 import pytest
 
+from victor.agent.tool_call_tracker import ToolCallTracker
 from victor.agent.tool_pipeline import (
     ToolCallResult,
     ToolPipeline,
@@ -175,6 +176,24 @@ class TestExecuteToolCalls:
 
         assert "/tmp/f.py:None:None" not in pipeline._read_file_timestamps
 
+    async def test_write_file_marks_code_search_index_stale(self, pipeline, mock_tool_executor):
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="write",
+            success=True,
+            result="updated",
+            execution_time=0.01,
+        )
+
+        with patch(
+            "victor.tools.code_search_tool.mark_index_cache_stale_for_path",
+            return_value=2,
+        ) as mark_stale:
+            await pipeline.execute_tool_calls(
+                [{"name": "write_file", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+            )
+
+        mark_stale.assert_called_once()
+
     async def test_duplicate_read_sets_structured_skip_metadata(self, pipeline):
         with patch.object(pipeline, "_is_duplicate_read", return_value=True):
             result = await pipeline.execute_tool_calls(
@@ -220,6 +239,59 @@ class TestExecuteToolCalls:
         log_text = " ".join(log_capture)
         # Should mention tools were skipped
         assert "skipped" in log_text.lower()
+
+    async def test_write_clears_search_dedup_history_for_verification(self, mock_tool_registry):
+        executor = MagicMock()
+        executor.execute = AsyncMock(
+            side_effect=[
+                ToolExecutionResult(
+                    tool_name="code_search",
+                    success=True,
+                    result="before",
+                    execution_time=0.01,
+                ),
+                ToolExecutionResult(
+                    tool_name="write",
+                    success=True,
+                    result="updated",
+                    execution_time=0.01,
+                ),
+                ToolExecutionResult(
+                    tool_name="code_search",
+                    success=True,
+                    result="after",
+                    execution_time=0.01,
+                ),
+            ]
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(
+                enable_idempotent_caching=False,
+                enable_output_aggregation=False,
+                enable_synthesis_checkpoints=False,
+                enable_semantic_caching=False,
+            ),
+            deduplication_tracker=ToolCallTracker(),
+        )
+
+        search_call = [{"name": "code_search", "arguments": {"query": "node_ids"}}]
+        write_call = [{"name": "write", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+
+        first = await pipeline.execute_tool_calls(search_call, {})
+        assert first.results[0].skipped is False
+
+        with patch(
+            "victor.tools.code_search_tool.mark_index_cache_stale_for_path",
+            return_value=1,
+        ):
+            await pipeline.execute_tool_calls(write_call, {})
+
+        second = await pipeline.execute_tool_calls(search_call, {})
+        assert second.results[0].skipped is False
+        assert second.results[0].result == "after"
+        assert executor.execute.await_count == 3
 
 
 class TestLRUToolCache:

@@ -19,8 +19,8 @@ from victor.framework.search import HybridSearchEngine, create_hybrid_search_eng
 from victor.framework.rl.learners.semantic_threshold import SemanticThresholdLearner
 from victor.agent.tool_call_tracker import ToolCallTracker as ToolDeduplicationTracker
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
-from victor.tools.base import ToolRegistry
 from victor.agent.tool_executor import ToolExecutor
+from victor.tools.registry import ToolRegistry
 
 
 class TestHybridSearchIntegration:
@@ -351,6 +351,61 @@ class TestToolPipelineDeduplicationIntegration:
         # Different args should not be redundant
         is_redundant = tracker.is_redundant("test_tool", {"arg1": "value3"})
         assert is_redundant is False
+
+    async def test_write_invalidates_search_freshness_state(self, tmp_path: Path):
+        """A successful write should allow a follow-up code search to execute fresh."""
+        tools = Mock(spec=ToolRegistry)
+        tools.is_tool_enabled.return_value = True
+        executor = Mock(spec=ToolExecutor)
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        changed_file = repo_root / "module.py"
+        changed_file.write_text("print('before')\n", encoding="utf-8")
+        fake_index_cache = {str(repo_root.resolve()): {"stale": False}}
+
+        executor.execute = AsyncMock(
+            side_effect=[
+                Mock(success=True, result="before", error=None, execution_time=0.01),
+                Mock(success=True, result="updated", error=None, execution_time=0.01),
+                Mock(success=True, result="after", error=None, execution_time=0.01),
+            ]
+        )
+
+        pipeline = ToolPipeline(
+            tool_registry=tools,
+            tool_executor=executor,
+            config=ToolPipelineConfig(
+                tool_budget=25,
+                enable_idempotent_caching=False,
+                enable_output_aggregation=False,
+                enable_synthesis_checkpoints=False,
+                enable_semantic_caching=False,
+            ),
+            deduplication_tracker=ToolDeduplicationTracker(window_size=10),
+        )
+
+        search_call = [{"name": "code_search", "arguments": {"query": "node_ids", "path": str(repo_root)}}]
+        write_call = [{"name": "write", "arguments": {"path": str(changed_file), "content": "print('after')"}}]
+
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        with patch.object(
+            code_search_tool_module,
+            "_get_index_cache",
+            lambda exec_ctx=None: fake_index_cache,
+        ):
+            first = await pipeline.execute_tool_calls(search_call, {})
+            assert first.results[0].skipped is False
+
+            write_result = await pipeline.execute_tool_calls(write_call, {})
+            assert write_result.results[0].success is True
+
+            second = await pipeline.execute_tool_calls(search_call, {})
+
+        assert fake_index_cache[str(repo_root.resolve())]["stale"] is True
+        assert second.results[0].skipped is False
+        assert second.results[0].result == "after"
+        assert executor.execute.await_count == 3
 
 
 class TestEndToEndIntegration:

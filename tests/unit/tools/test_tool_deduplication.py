@@ -98,6 +98,25 @@ class TestToolCallTracker:
 
         assert is_dup is False
 
+    def test_invalidate_for_modified_path_clears_searches_and_matching_reads(self, tmp_path):
+        """Edits should clear stale search history and reads for the modified file only."""
+        tracker = ToolCallTracker()
+        changed = tmp_path / "changed.py"
+        untouched = tmp_path / "untouched.py"
+        changed.write_text("print('x')\n")
+        untouched.write_text("print('y')\n")
+
+        tracker.add_call("code_search", {"query": "node_ids", "path": str(tmp_path)})
+        tracker.add_call("read_file", {"path": str(changed)})
+        tracker.add_call("read_file", {"path": str(untouched)})
+
+        removed = tracker.invalidate_for_modified_path(str(changed))
+
+        assert removed == 2
+        assert tracker.is_redundant("code_search", {"query": "node_ids", "path": str(tmp_path)}) is False
+        assert tracker.is_redundant("read_file", {"path": str(changed)}) is False
+        assert tracker.is_redundant("read_file", {"path": str(untouched)}) is True
+
 
 class TestSearchRedundancy:
     """Test search/grep redundancy detection."""

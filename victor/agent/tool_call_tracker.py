@@ -35,6 +35,7 @@ import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Set
 
 from victor.agent.file_state import FileStateSnapshot, capture_file_state
@@ -345,6 +346,57 @@ class ToolCallTracker:
         """Clear all tracked tool calls."""
         self.recent_calls.clear()
         logger.debug("Cleared tool call tracker")
+
+    def invalidate_for_modified_path(self, path: str) -> int:
+        """Drop potentially stale call history after a file modification.
+
+        Repeated searches should be allowed after edits because earlier search
+        results may no longer reflect the current codebase. File-specific read
+        history for the modified path is also cleared.
+
+        Args:
+            path: Modified file path
+
+        Returns:
+            Number of tracked calls removed
+        """
+
+        try:
+            normalized_target = str(Path(path).expanduser().resolve())
+        except Exception:
+            normalized_target = str(path)
+
+        retained: Deque[TrackedToolCall] = deque(maxlen=self.window_size)
+        removed = 0
+
+        for recent in self.recent_calls:
+            if recent.tool_name in {"grep", "code_search", "semantic_code_search"}:
+                removed += 1
+                continue
+
+            recent_path = (
+                recent.args.get("path") or recent.args.get("file_path") or recent.args.get("file")
+            )
+            if recent_path:
+                try:
+                    normalized_recent = str(Path(str(recent_path)).expanduser().resolve())
+                except Exception:
+                    normalized_recent = str(recent_path)
+                if normalized_recent == normalized_target:
+                    removed += 1
+                    continue
+
+            retained.append(recent)
+
+        if removed:
+            self.recent_calls = retained
+            logger.debug(
+                "Invalidated %d tracked tool call(s) after modifying %s",
+                removed,
+                normalized_target,
+            )
+
+        return removed
 
     def get_duplicate_count(self) -> int:
         """Get number of exact duplicate calls in recent history.

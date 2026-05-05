@@ -83,6 +83,60 @@ def clear_index_cache() -> None:
     _INDEX_CACHE.clear()
 
 
+def mark_index_cache_stale_for_path(
+    file_path: str,
+    *,
+    exec_ctx: Optional[Dict[str, Any]] = None,
+) -> int:
+    """Mark cached indexes stale when a file changes before watchers catch up.
+
+    This is used by write/edit flows to proactively invalidate any in-process
+    semantic indexes that include the modified file. It closes the freshness
+    gap between a successful edit and the asynchronous file-watcher update.
+
+    Args:
+        file_path: Modified file path
+        exec_ctx: Optional execution context used to resolve DI-backed caches
+
+    Returns:
+        Number of cached index roots marked stale
+    """
+
+    try:
+        changed_path = Path(file_path).expanduser().resolve()
+    except Exception:
+        changed_path = Path(file_path)
+
+    stale_count = 0
+    for root_key, cache_entry in _get_index_cache(exec_ctx).items():
+        if not isinstance(cache_entry, dict):
+            continue
+        try:
+            root_path = Path(root_key).expanduser().resolve()
+        except Exception:
+            continue
+
+        try:
+            changed_path.relative_to(root_path)
+        except ValueError:
+            continue
+
+        cache_entry["stale"] = True
+        cache_entry["stale_reason"] = "modified_file"
+        cache_entry["last_invalidated_path"] = str(changed_path)
+        cache_entry["invalidated_at"] = time.time()
+        stale_count += 1
+
+    if stale_count:
+        logger.info(
+            "[code_search] Marked %d cached index root(s) stale after file change: %s",
+            stale_count,
+            changed_path,
+        )
+
+    return stale_count
+
+
 def _get_instance_attr(obj: Any, name: str, default: Any = None) -> Any:
     """Read explicitly assigned instance attributes without triggering mock fallbacks."""
 

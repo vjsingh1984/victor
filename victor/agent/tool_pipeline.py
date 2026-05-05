@@ -1363,6 +1363,49 @@ class ToolPipeline:
 
         return len(to_remove)
 
+    def _invalidate_post_edit_freshness_state(
+        self,
+        file_path: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, int]:
+        """Invalidate freshness-sensitive state after a successful edit/write."""
+        summary = {
+            "idempotent_cache_entries": self.invalidate_file_cache(file_path),
+            "search_index_roots": 0,
+            "dedup_tracker_calls": 0,
+        }
+
+        if self.semantic_cache is not None:
+            self.semantic_cache.invalidate(file_path)
+
+        try:
+            from victor.tools.code_search_tool import mark_index_cache_stale_for_path
+
+            summary["search_index_roots"] = mark_index_cache_stale_for_path(
+                file_path,
+                exec_ctx=context,
+            )
+        except Exception as exc:
+            logger.debug("Failed to mark code_search index stale for %s: %s", file_path, exc)
+
+        tracker = self.deduplication_tracker
+        invalidate_tracker = getattr(tracker, "invalidate_for_modified_path", None)
+        if callable(invalidate_tracker):
+            try:
+                summary["dedup_tracker_calls"] = int(invalidate_tracker(file_path) or 0)
+            except Exception as exc:
+                logger.debug("Failed to invalidate deduplication tracker for %s: %s", file_path, exc)
+
+        logger.debug(
+            "Post-edit freshness invalidation for %s: cache=%d index_roots=%d dedup_calls=%d",
+            file_path,
+            summary["idempotent_cache_entries"],
+            summary["search_index_roots"],
+            summary["dedup_tracker_calls"],
+        )
+        return summary
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics.
 
@@ -2548,14 +2591,10 @@ class ToolPipeline:
                     logger.debug(f"Semantic cache store failed (data error): {e}")
 
         # Invalidate caches when files are modified (write/edit tools)
-        if call_result.success and tool_name.lower() in ("write", "edit"):
+        if call_result.success and canonicalize_core_tool_name(tool_name.lower()) in ("write", "edit"):
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             if file_path:
-                # Invalidate idempotent cache
-                self.invalidate_file_cache(file_path)
-                # Invalidate semantic cache
-                if self.semantic_cache is not None:
-                    self.semantic_cache.invalidate(file_path)
+                self._invalidate_post_edit_freshness_state(file_path, context=context)
                 logger.debug(f"Invalidated caches for modified file: {file_path}")
 
         # Record successful tool call in deduplication tracker
