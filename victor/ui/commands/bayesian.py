@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Bayesian orchestration monitoring CLI command."""
+"""Bayesian orchestration monitoring commands."""
+
+from __future__ import annotations
 
 from typing import Optional
 
@@ -24,19 +26,26 @@ from victor.framework.rl.monitoring.reporting import (
     parse_agent_ids,
 )
 
-app = typer.Typer(help="Bayesian orchestration monitoring and metrics")
+bayesian_app = typer.Typer(
+    name="bayesian",
+    help="Inspect Bayesian orchestration metrics and historical learning.",
+)
 
 
-@app.command()
+@bayesian_app.command()
 def summary(
     days: int = typer.Option(
         DEFAULT_BAYESIAN_LOOKBACK_DAYS,
         "--days",
         help="Number of days to look back",
     ),
-    output: Optional[str] = typer.Option(None, help="Export summary to JSON file"),
-):
-    """Show system summary of Bayesian orchestration metrics."""
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        help="Export summary to JSON file",
+    ),
+) -> None:
+    """Show a system summary of Bayesian orchestration metrics."""
     service = get_bayesian_monitoring_service()
     typer.echo(service.render_summary(days))
     if output:
@@ -44,7 +53,7 @@ def summary(
         typer.echo(f"\nSummary exported to {output}")
 
 
-@app.command()
+@bayesian_app.command()
 def reliability(
     agent_ids: Optional[str] = typer.Option(
         None,
@@ -56,8 +65,12 @@ def reliability(
         "--days",
         help="Number of days to look back",
     ),
-    export: Optional[str] = typer.Option(None, help="Export to CSV file"),
-):
+    export: Optional[str] = typer.Option(
+        None,
+        "--export",
+        help="Export to CSV file",
+    ),
+) -> None:
     """Show agent reliability trends."""
     service = get_bayesian_monitoring_service()
     parsed_agent_ids = parse_agent_ids(agent_ids)
@@ -67,34 +80,38 @@ def reliability(
         typer.echo(f"\nReliability trends exported to {export}")
 
 
-@app.command()
+@bayesian_app.command()
 def consensus(
     days: int = typer.Option(
         DEFAULT_BAYESIAN_LOOKBACK_DAYS,
         "--days",
         help="Number of days to look back",
     ),
-):
+) -> None:
     """Show consensus performance statistics."""
     service = get_bayesian_monitoring_service()
     typer.echo(service.render_consensus(days))
 
 
-@app.command()
+@bayesian_app.command()
 def voi(
-    agent_id: Optional[str] = typer.Option(None, "--agent", help="Specific agent ID"),
+    agent_id: Optional[str] = typer.Option(
+        None,
+        "--agent",
+        help="Specific agent ID",
+    ),
     days: int = typer.Option(
         DEFAULT_BAYESIAN_LOOKBACK_DAYS,
         "--days",
         help="Number of days to look back",
     ),
-):
+) -> None:
     """Show Value of Information statistics."""
     service = get_bayesian_monitoring_service()
     typer.echo(service.render_voi(agent_id, days))
 
 
-@app.command()
+@bayesian_app.command()
 def correlations(
     agents: str = typer.Argument(..., help="Comma-separated list of agent IDs"),
     days: int = typer.Option(
@@ -102,8 +119,8 @@ def correlations(
         "--days",
         help="Number of days to look back",
     ),
-):
-    """Show correlation matrix heatmap."""
+) -> None:
+    """Show an agent correlation matrix heatmap."""
     parsed_agent_ids = parse_agent_ids(agents)
     if not parsed_agent_ids:
         raise typer.BadParameter("At least one agent ID is required.")
@@ -111,18 +128,18 @@ def correlations(
     typer.echo(service.render_correlations(parsed_agent_ids, days))
 
 
-@app.command()
+@bayesian_app.command()
 def belief(
     belief_id: str = typer.Argument(..., help="Belief state ID"),
-    export: Optional[str] = typer.Option(None, help="Export evolution to CSV file"),
-):
+    export: Optional[str] = typer.Option(
+        None,
+        "--export",
+        help="Export evolution to CSV file",
+    ),
+) -> None:
     """Show belief state evolution."""
     service = get_bayesian_monitoring_service()
     typer.echo(service.render_belief(belief_id))
     if export:
         service.export_belief_csv(belief_id, export)
         typer.echo(f"\nBelief evolution exported to {export}")
-
-
-if __name__ == "__main__":
-    app()

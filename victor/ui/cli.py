@@ -34,6 +34,7 @@ except (ImportError, AttributeError):
 
 from victor.core.utils.capability_loader import load_coding_analyze_app
 from victor.ui.commands.benchmark import benchmark_app
+from victor.ui.commands.bayesian import bayesian_app
 from victor.ui.commands.capabilities import capabilities_app
 from victor.ui.commands.chat import chat_app, _run_default_interactive
 from victor.ui.commands.config import config_app
@@ -379,6 +380,7 @@ app.add_typer(embeddings_app, rich_help_panel="Data & Sessions")
 
 # --- Observability ---
 app.add_typer(dashboard_app, rich_help_panel="Observability")
+app.add_typer(bayesian_app, rich_help_panel="Observability")
 app.add_typer(observability_app, name="observability", rich_help_panel="Observability")
 
 # --- Documentation ---

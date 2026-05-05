@@ -493,6 +493,7 @@ class TestAllCommandsRegistered:
         "serialization",
         "learning",
         "mlstats",
+        "bayesian",
     ]
 
     # Expected aliases mapping
@@ -524,6 +525,7 @@ class TestAllCommandsRegistered:
         "serialization": ["serialize", "ser"],
         "learning": ["qlearn", "rl"],
         "mlstats": ["ml", "analytics"],
+        "bayesian": ["bayes"],
     }
 
     def test_all_commands_registered(self):
@@ -607,7 +609,7 @@ class TestSlashCommandCategories:
         settings = MagicMock()
         handler = SlashCommandHandler(console=console, settings=settings)
 
-        metrics_commands = ["cost", "metrics", "mlstats", "learning"]
+        metrics_commands = ["cost", "metrics", "mlstats", "learning", "bayesian"]
         for cmd in metrics_commands:
             assert handler.registry.has(cmd), f"Metrics command '{cmd}' missing"
 
@@ -1591,6 +1593,43 @@ class TestMetricsCommands:
         meta = cmd.metadata
 
         assert meta.name == "mlstats"
+
+    def test_bayesian_command_metadata(self):
+        """Test BayesianCommand metadata."""
+        from victor.ui.slash.commands.bayesian import BayesianCommand
+
+        cmd = BayesianCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "bayesian"
+        assert "bayes" in meta.aliases
+        assert meta.category == "metrics"
+
+    def test_bayesian_command_shows_summary(self):
+        """Test BayesianCommand renders summary output."""
+        from victor.ui.slash.commands.bayesian import BayesianCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        service = MagicMock()
+        service.render_summary.return_value = "Bayesian summary body"
+
+        with patch(
+            "victor.ui.slash.commands.bayesian.get_bayesian_monitoring_service",
+            return_value=service,
+        ):
+            BayesianCommand().execute(
+                CommandContext(
+                    console=console,
+                    settings=settings,
+                    args=["summary", "--days", "14"],
+                )
+            )
+
+        output = stdout.getvalue()
+        assert "Bayesian summary body" in output
+        service.render_summary.assert_called_once_with(14)
 
 
 # =============================================================================

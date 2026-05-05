@@ -22,7 +22,7 @@ This package contains all slash command implementations organized by category:
 - tools: tools, context, lmstudio, mcp
 - navigation: directory, changes, snapshots, commit
 - mode: mode, build, explore, plan
-- metrics: cost, metrics, serialization, learning, mlstats
+- metrics: cost, metrics, serialization, learning, mlstats, bayesian
 - codebase: reindex, review, init
 - checkpoint: checkpoint (save, list, restore, diff, timeline)
 - entities: entities (list, search, show, related, stats, clear)
@@ -33,6 +33,7 @@ Commands are auto-discovered and registered when the slash module is loaded.
 
 # Import all command modules to trigger registration
 from victor.ui.slash.commands import (
+    bayesian,
     checkpoint,
     codebase,
     debug,
@@ -50,6 +51,7 @@ from victor.ui.slash.commands import (
 
 __all__ = [
     "checkpoint",
+    "bayesian",
     "codebase",
     "debug",
     "entities",

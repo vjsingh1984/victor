@@ -521,6 +521,47 @@ All Bayesian components use SQLite databases:
 - **Global Database** (`~/.victor/victor.db`): Cross-project learning data
 - **Project Database** (`./.victor/project.db`): Project-specific data
 
+## CLI and Chat Usage
+
+Victor now exposes Bayesian monitoring from both the top-level CLI and mid-session chat slash commands.
+
+### Top-Level CLI
+
+Use the `victor bayesian` command group to inspect historical Bayesian learning and orchestration data:
+
+```bash
+victor bayesian summary --days 14
+victor bayesian reliability --agents agent_a,agent_b --days 30
+victor bayesian consensus --days 30
+victor bayesian voi --agent agent_a --days 14
+victor bayesian correlations agent_a,agent_b,agent_c --days 30
+victor bayesian belief belief-123
+```
+
+Exports are supported for the surfaces that already have file exporters:
+
+```bash
+victor bayesian summary --output /tmp/bayesian-summary.json
+victor bayesian reliability --agents agent_a,agent_b --export /tmp/reliability.csv
+victor bayesian belief belief-123 --export /tmp/belief.csv
+```
+
+### Mid-Session Slash Command
+
+Inside `victor chat`, use `/bayesian` to inspect the same historical data without leaving the session:
+
+```text
+/bayesian summary
+/bayesian summary --days 14
+/bayesian reliability agent_a,agent_b 30
+/bayesian consensus 30
+/bayesian voi agent_a 14
+/bayesian correlations agent_a,agent_b,agent_c 30
+/bayesian belief belief-123
+```
+
+The slash command also supports `--days`, `--agents`, `--agent`, `--output`, and `--export` where relevant.
+
 ## Performance Considerations
 
 ### Thompson Sampling

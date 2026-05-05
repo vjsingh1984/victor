@@ -271,6 +271,7 @@ Slash commands provide quick access to Victor's features without leaving the TUI
 | `/cost` | `/spending` | Show token costs |
 | `/metrics` | | Show session metrics |
 | `/mlstats` | | Show ML/RL statistics |
+| `/bayesian [summary\|reliability\|consensus\|voi\|correlations\|belief]` | `/bayes` | Inspect Bayesian orchestration metrics and historical learning |
 
 ### Codebase Commands
 

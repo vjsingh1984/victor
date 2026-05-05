@@ -14,11 +14,16 @@
 
 """Integration tests for Bayesian orchestration in chat command."""
 
+import io
+from unittest.mock import MagicMock, patch
+
 import pytest
+from rich.console import Console
 from typer.testing import CliRunner
 
 from victor.agent.complexity_detector import QueryComplexityDetector, ComplexityLevel
 from victor.framework.session_config import SessionConfig
+from victor.ui.slash import SlashCommandHandler
 
 
 @pytest.mark.integration
@@ -386,3 +391,46 @@ class TestChatCommandBayesianFlags:
         # Values are stored as-is (validation would be added separately)
         assert config.bayesian.simple_threshold == 1.5
         assert config.bayesian.complex_threshold == 2.0
+
+
+@pytest.mark.integration
+class TestBayesianMonitoringSurfaces:
+    """Test Bayesian monitoring remains wired through CLI and chat surfaces."""
+
+    def test_top_level_cli_bayesian_summary_dispatches_to_shared_service(self):
+        """The top-level CLI should expose the Bayesian monitoring surface."""
+        from victor.ui.cli import app
+
+        service = MagicMock()
+        service.render_summary.return_value = "Integrated Bayesian summary"
+        runner = CliRunner()
+
+        with patch(
+            "victor.ui.commands.bayesian.get_bayesian_monitoring_service",
+            return_value=service,
+        ):
+            result = runner.invoke(app, ["bayesian", "summary", "--days", "14"])
+
+        assert result.exit_code == 0
+        assert "Integrated Bayesian summary" in result.output
+        service.render_summary.assert_called_once_with(14)
+
+    @pytest.mark.asyncio
+    async def test_slash_handler_executes_bayesian_alias_via_shared_service(self):
+        """The chat slash alias should remain wired to Bayesian monitoring."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+        service = MagicMock()
+        service.render_summary.return_value = "Integrated slash Bayesian summary"
+
+        with patch(
+            "victor.ui.slash.commands.bayesian.get_bayesian_monitoring_service",
+            return_value=service,
+        ):
+            result = await handler.execute("/bayes summary 21")
+
+        assert result is True
+        assert "Integrated slash Bayesian summary" in stdout.getvalue()
+        service.render_summary.assert_called_once_with(21)
