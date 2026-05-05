@@ -1555,6 +1555,32 @@ over `UnifiedPromptPipeline`.
 **Breaking changes:** None. Deprecated compatibility imports still resolve and
 warn; only their internal delegation path changed.
 
+## Migration Update: Prompt Compatibility Guardrails Tightened (2026-05-05)
+
+**Seam consolidated:** The prompt compatibility import guard only blocked
+direct `from ... import ...` usage, leaving easy drift paths through package
+re-exports and plain module imports.
+
+**Changes applied:**
+
+1. Extended the AST import guard to detect
+   `from victor.agent.services import SystemPromptCoordinator` and
+   `from victor.agent.services import PromptRuntimeSupport`.
+2. Extended the same guard to detect direct module imports such as
+   `import victor.agent.services.prompt_runtime_support`.
+3. Added synthetic regression cases so future changes to the guard must keep
+   covering those bypass forms.
+
+**Benefits:**
+
+- Reduces the chance that internal production code reattaches itself to the
+  deprecated prompt compatibility layer through alternate import styles
+- Makes the remaining compatibility seam easier to retire in a later breaking
+  release because new internal dependencies are harder to introduce
+
+**Breaking changes:** None. This only strengthens internal regression
+guardrails.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).
