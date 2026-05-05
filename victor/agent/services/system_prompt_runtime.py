@@ -63,14 +63,17 @@ class SystemPromptCoordinator:
         get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
         task_analyzer: Optional[Any] = None,
         session_id: str = "",
+        *,
+        _emit_deprecation_warning: bool = True,
     ):
-        warnings.warn(
-            "SystemPromptCoordinator is deprecated and will be removed in v1.0.0. "
-            "Use UnifiedPromptPipeline from victor.agent.prompt_pipeline instead. "
-            "This compatibility wrapper now delegates to UnifiedPromptPipeline.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        if _emit_deprecation_warning:
+            warnings.warn(
+                "SystemPromptCoordinator is deprecated and will be removed in v1.0.0. "
+                "Use UnifiedPromptPipeline from victor.agent.prompt_pipeline instead. "
+                "This compatibility wrapper now delegates to UnifiedPromptPipeline.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         # Store parameters for compatibility but don't use them
         self._prompt_builder = prompt_builder

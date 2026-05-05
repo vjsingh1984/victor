@@ -10,6 +10,19 @@ from unittest.mock import MagicMock, patch
 from victor.agent.services.prompt_runtime_support import PromptRuntimeSupport
 
 
+def test_prompt_runtime_support_build_uses_system_prompt_coordinator_wrapper():
+    runtime = PromptRuntimeSupport(prompt_builder=MagicMock())
+
+    with patch(
+        "victor.agent.services.system_prompt_runtime.SystemPromptCoordinator.build_system_prompt",
+        return_value="delegated prompt",
+    ) as build_prompt:
+        result = runtime.build_system_prompt()
+
+    assert result == "delegated prompt"
+    build_prompt.assert_called_once_with()
+
+
 def test_build_system_prompt_large_context_includes_parallel_budget():
     builder = MagicMock()
     builder.build.return_value = "You are a helpful assistant."

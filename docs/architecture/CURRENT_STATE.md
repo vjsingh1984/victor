@@ -99,7 +99,9 @@ Agent / Public API
 - `PromptRuntimeSupport` and `SystemPromptCoordinator` are compatibility-only
   prompt helper surfaces. Internal runtime assembly no longer wires
   `PromptRuntimeSupport`; public compatibility paths may still use it through
-  the deprecated coordinator surface.
+  the deprecated coordinator surface. `PromptRuntimeSupport` is now a thin
+  wrapper over `SystemPromptCoordinator`, and both delegate prompt behavior to
+  `UnifiedPromptPipeline`.
 - `PromptRuntimeAdapter` remains the canonical DI/runtime surface for
   `PromptRuntimeProtocol`, but its system-prompt build path now delegates to
   `UnifiedPromptPipeline`. The adapter still owns only the narrow mutable

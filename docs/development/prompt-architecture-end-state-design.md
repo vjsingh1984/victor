@@ -1,7 +1,7 @@
 # Prompt Architecture End State Design
 
 **Date:** 2026-05-04
-**Status:** Phase 1 Implemented (2026-05-05), Phases 2-3 Pending
+**Status:** Phases 1-2 Implemented (2026-05-05), Phase 3 Pending
 **Related:** Agent Facade Service Migration Audit
 
 ## Problem Statement
@@ -138,7 +138,7 @@ UnifiedPromptPipeline.build_system_prompt()
    - Test that PromptRuntimeAdapter calls UnifiedPromptPipeline
    - Verify protocol conformance maintained
 
-### Phase 2: Migrate SystemPromptCoordinator
+### Phase 2: Migrate SystemPromptCoordinator - Completed 2026-05-05
 
 1. **Update SystemPromptCoordinator** to use UnifiedPromptPipeline directly
    - Remove inheritance from PromptRuntimeSupport
@@ -148,6 +148,11 @@ UnifiedPromptPipeline.build_system_prompt()
 2. **Update ComponentAssembler**
    - Always create UnifiedPromptPipeline (no conditional fallback)
    - Remove PromptRuntimeSupport creation
+
+3. **Reduce PromptRuntimeSupport to a thin compatibility wrapper**
+   - Preserve deprecated import path only
+   - Delegate shared behavior through `SystemPromptCoordinator`
+   - Keep legacy task-analyzer method-name compatibility where still needed
 
 ### Phase 3: Remove PromptRuntimeSupport
 
