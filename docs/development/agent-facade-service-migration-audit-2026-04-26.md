@@ -1472,11 +1472,54 @@ contained that information.
 
 **Breaking changes:** None intended.
 
+## Migration Update: PromptRuntimeAdapter Delegates To UnifiedPromptPipeline (2026-05-05)
+
+**Seam consolidated:** `PromptRuntimeAdapter` still owned a separate
+`PromptBuilder`-driven system-prompt assembly path even though
+`UnifiedPromptPipeline` was already the canonical prompt owner for the
+orchestrator runtime.
+
+**Canonical owners:**
+
+- `victor.agent.prompt_pipeline.UnifiedPromptPipeline` remains the single
+  owner of prompt assembly decisions
+- `victor.agent.services.prompt_runtime.PromptRuntimeAdapter` remains the DI
+  surface for `PromptRuntimeProtocol`, but now forwards its build path through
+  the canonical pipeline
+- `victor.agent.services.prompt_runtime_support.PromptRuntimeSupport` and
+  `victor.agent.services.system_prompt_runtime.SystemPromptCoordinator` remain
+  compatibility-only prompt helper surfaces
+
+**Changes applied:**
+
+1. Refactored `PromptRuntimeAdapter.build_system_prompt(...)` to prepare its
+   mutable runtime state on a fresh builder, then delegate final system-prompt
+   assembly through `UnifiedPromptPipeline`.
+2. Kept fallback policy behavior in the adapter so protocol consumers still
+   get a safe prompt if pipeline-driven assembly fails.
+3. Added regression coverage proving `PromptRuntimeAdapter` now invokes
+   `UnifiedPromptPipeline` while preserving task hints, additional sections,
+   safety rules, grounding mode, and extra context.
+4. Updated current-state and design docs to mark prompt-runtime convergence
+   Phase 1 as implemented.
+
+**Benefits:**
+
+- Removed the last separate system-prompt assembly path from the canonical
+  prompt runtime adapter
+- Preserved the narrow mutable prompt protocol without creating a new prompt
+  owner
+- Kept prompt-runtime convergence incremental: adapter delegation now matches
+  the designed end state while compatibility shims stay untouched
+
+**Breaking changes:** None. `PromptRuntimeProtocol` and
+`PromptRuntimeAdapter` remain stable; only the internal build path changed.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).
 2. ~~**ToolRegistrar plugin-loading abstraction**~~ - **COMPLETED** (2026-05-04): Refactored `_load_plugin_tools()` to delegate to PluginLoader component. Improved SRP compliance by removing ~40 lines of implementation detail. ToolRegistrar is now a thinner facade.
-3. ~~**Design long-term prompt end state**~~ - **DESIGNED** (2026-05-04): Created comprehensive design proposal for aligning PromptRuntimeProtocol, PromptRuntimeSupport, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md` for detailed proposal. Key recommendation: UnifiedPromptPipeline as single authority, PromptRuntimeAdapter as thin protocol wrapper, remove PromptRuntimeSupport.
+3. ~~**Design long-term prompt end state**~~ - **PHASE 1 IMPLEMENTED** (2026-05-05): Created and started implementing the convergence plan for aligning PromptRuntimeProtocol, PromptRuntimeSupport, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md`. Completed: PromptRuntimeAdapter now delegates its system-prompt build path through UnifiedPromptPipeline. Remaining: Phase 2 migrate SystemPromptCoordinator fully off compatibility fallback logic; Phase 3 remove PromptRuntimeSupport in a breaking release.
 4. ~~**StateCoordinator retirement**~~ - **COMPLETED** (2026-05-04): Already retired to ConversationController ownership. See `docs/development/state-coordinator-retirement-analysis.md` for details. StateCoordinator class removed, only protocol alias remains for type checking. ConversationController + ConversationStateMachine + StateRuntimeAdapter provide canonical functionality.
    Note: StateRuntimeProtocol already uses StateRuntimeAdapter; protocol definition is service-native and does not alias StateCoordinatorProtocol.
 5. ~~**External package compatibility validation**~~ - **COMPLETED**: Verified external verticals (victor-coding, victor-research, victor-invest) do not import from removed subservices (13/13 tests pass, zero impact on external packages)

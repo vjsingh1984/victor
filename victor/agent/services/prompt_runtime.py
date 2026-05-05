@@ -98,6 +98,39 @@ class PromptRuntimeAdapter:
         include_hints: bool = True,
     ) -> str:
         """Build the complete system prompt for the provided task context."""
+        builder = self._prepare_builder(context, include_hints=include_hints)
+
+        try:
+            prompt = self._build_with_pipeline(builder)
+        except Exception:
+            logger.exception("Failed to build system prompt via UnifiedPromptPipeline.")
+            try:
+                prompt = builder.build()
+            except Exception:
+                logger.exception("Failed to build system prompt. Using fallback.")
+                prompt = self._policy.build_fallback_prompt(context)
+            else:
+                if not prompt.strip():
+                    logger.warning("Empty system prompt produced; using fallback string.")
+                    prompt = self._policy.build_fallback_prompt(context)
+
+        if self._on_prompt_built:
+            self._on_prompt_built(prompt, context)
+
+        logger.debug(
+            "Built system prompt for task_type=%s, length=%d chars",
+            context.task_type,
+            len(prompt),
+        )
+        return prompt
+
+    def _prepare_builder(
+        self,
+        context: PromptRuntimeContext,
+        *,
+        include_hints: bool,
+    ) -> PromptBuilder:
+        """Assemble mutable prompt state into a fresh builder instance."""
         builder = PromptBuilder()
 
         if self._base_identity:
@@ -151,24 +184,19 @@ class PromptRuntimeAdapter:
         except Exception:
             logger.exception("System prompt policy enforcement failed. Continuing without policy.")
 
-        try:
-            prompt = builder.build()
-        except Exception:
-            logger.exception("Failed to build system prompt. Using fallback.")
-            prompt = self._policy.build_fallback_prompt(context)
-        else:
-            if not prompt.strip():
-                logger.warning("Empty system prompt produced; using fallback string.")
-                prompt = self._policy.build_fallback_prompt(context)
+        return builder
 
-        if self._on_prompt_built:
-            self._on_prompt_built(prompt, context)
+    def _build_with_pipeline(self, builder: PromptBuilder) -> str:
+        """Delegate canonical prompt assembly to UnifiedPromptPipeline."""
+        from victor.agent.prompt_pipeline import UnifiedPromptPipeline
 
-        logger.debug(
-            "Built system prompt for task_type=%s, length=%d chars",
-            context.task_type,
-            len(prompt),
+        pipeline = UnifiedPromptPipeline(
+            provider=None,
+            builder=builder,
         )
+        prompt = pipeline.build_system_prompt()
+        if not prompt.strip():
+            raise ValueError("UnifiedPromptPipeline returned an empty system prompt")
         return prompt
 
     def _add_vertical_sections(

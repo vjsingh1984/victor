@@ -100,6 +100,11 @@ Agent / Public API
   prompt helper surfaces. Internal runtime assembly no longer wires
   `PromptRuntimeSupport`; public compatibility paths may still use it through
   the deprecated coordinator surface.
+- `PromptRuntimeAdapter` remains the canonical DI/runtime surface for
+  `PromptRuntimeProtocol`, but its system-prompt build path now delegates to
+  `UnifiedPromptPipeline`. The adapter still owns only the narrow mutable
+  protocol state: task hints, extra sections, grounding mode, and safety
+  rules.
 - Live prompt optimization remains canonical on
   `victor.agent.prompt_pipeline.UnifiedPromptPipeline` for **all** provider
   tiers. GEPA/MiPROv2/CoT-distillation guidance, experiment-memory guidance,

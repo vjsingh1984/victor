@@ -1,7 +1,7 @@
 # Prompt Architecture End State Design
 
 **Date:** 2026-05-04
-**Status:** Design Proposal
+**Status:** Phase 1 Implemented (2026-05-05), Phases 2-3 Pending
 **Related:** Agent Facade Service Migration Audit
 
 ## Problem Statement
@@ -12,7 +12,7 @@ The current prompt architecture has three overlapping components that create con
    - Implements `PromptRuntimeProtocol` for DI consumers
    - Provides narrow mutable prompt coordination contract
    - Handles task hints, grounding mode, safety rules
-   - Delegates to PromptBuilder for actual assembly
+   - Now delegates system-prompt assembly through `UnifiedPromptPipeline`
 
 2. **PromptRuntimeSupport** (`victor/agent/services/prompt_runtime_support.py`)
    - Internal fallback when UnifiedPromptPipeline is unavailable
@@ -127,7 +127,7 @@ UnifiedPromptPipeline.build_system_prompt()
 
 ## Implementation Plan
 
-### Phase 1: Consolidate PromptRuntimeAdapter (Backward Compatible)
+### Phase 1: Consolidate PromptRuntimeAdapter (Backward Compatible) - Completed 2026-05-05
 
 1. **Refactor PromptRuntimeAdapter** to delegate to UnifiedPromptPipeline
    - PromptRuntimeAdapter becomes a thin wrapper around UnifiedPromptPipeline
