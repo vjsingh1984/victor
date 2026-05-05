@@ -290,6 +290,10 @@ def test_graph_watch_status_reports_last_refresh_error_details(tmp_path):
                     "completed_at": 1_777_597_000.0,
                     "last_error": "Too many open files",
                     "error_type": "OSError",
+                    "error_category": "resource_exhaustion",
+                    "recoverable": True,
+                    "retry_delay_seconds": 15.0,
+                    "operator_guidance": "Reduce concurrent watcher/index activity.",
                 },
             }
         ),
@@ -313,6 +317,12 @@ def test_graph_watch_status_reports_last_refresh_error_details(tmp_path):
     assert "last error" in output
     assert "too many open files" in output
     assert "oserror" in output
+    assert "error category" in output
+    assert "resource_exhaustion" in output
+    assert "recoverable" in output
+    assert "retry backoff" in output
+    assert "15.00s" in output
+    assert "operator guidance" in output
 
 
 def test_summarize_graph_watch_health_reports_active_refresh_counts() -> None:
@@ -331,6 +341,25 @@ def test_summarize_graph_watch_health_reports_active_refresh_counts() -> None:
 
     assert summary == "Graph: ok c2 d1 u7"
     assert state == "active"
+
+
+def test_summarize_graph_watch_health_reports_retry_backoff() -> None:
+    """Compact health summaries should surface retry backoff after recoverable failures."""
+    summary, state = graph_cmd.summarize_graph_watch_health(
+        {
+            "running": True,
+            "last_refresh": {
+                "changed": 0,
+                "deleted": 0,
+                "unchanged": 0,
+                "errors": 1,
+                "retry_delay_seconds": 12.6,
+            },
+        }
+    )
+
+    assert summary == "Graph: retry 13s"
+    assert state == "warning"
 
 
 def test_summarize_graph_watch_health_reports_stale_or_missing_state() -> None:

@@ -18,6 +18,7 @@ These tests verify the LangGraph-compatible StateGraph implementation
 including cyclic workflows, checkpointing, and typed state management.
 """
 
+import logging
 import pytest
 from typing import TypedDict, Optional, List
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -493,6 +494,18 @@ class TestStateGraphCompile:
 
         with pytest.raises(ValueError, match="not found"):
             graph.compile()
+
+    def test_compile_warns_on_implicit_dead_end(self, caplog):
+        """compile should warn when a reachable node has no outgoing edges."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("a", increment_node)
+        graph.set_entry_point("a")
+
+        with caplog.at_level(logging.WARNING):
+            compiled = graph.compile()
+
+        assert isinstance(compiled, CompiledGraph)
+        assert "has no outgoing edges and will terminate implicitly" in caplog.text
 
 
 # =============================================================================
@@ -1071,6 +1084,17 @@ class TestDefaultStateMerger:
         branches = [{"a": 99}]
         default_state_merger(base, branches)
         assert base["a"] == 1
+
+    def test_warns_on_conflicting_parallel_writes(self, caplog):
+        """Conflicting keys should emit a last-write-wins warning."""
+        base = {"a": 1}
+        branches = [{"a": 10}, {"a": 20}]
+
+        with caplog.at_level(logging.WARNING):
+            merged = default_state_merger(base, branches)
+
+        assert merged["a"] == 20
+        assert "Parallel state merge conflict" in caplog.text
 
 
 class TestSendFanOut:

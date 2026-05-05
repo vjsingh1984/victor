@@ -40,6 +40,32 @@ from victor.framework.agentic_graph.nodes import (
 logger = logging.getLogger(__name__)
 
 
+def _resolve_dependency(
+    value: Optional[Any],
+    resolver: Optional[Callable[[], Any]],
+) -> Optional[Any]:
+    """Resolve a node dependency from a live resolver or a static fallback."""
+    return resolver() if resolver is not None else value
+
+
+def _bind_configured_node(
+    node_fn: Callable[..., Any],
+    /,
+    **dependencies: tuple[Optional[Any], Optional[Callable[[], Any]]],
+) -> Callable[[Any], Any]:
+    """Create a named node wrapper that resolves dependencies at execution time."""
+
+    def _configured_node(state: Any) -> Any:
+        resolved_dependencies = {
+            name: _resolve_dependency(value, resolver)
+            for name, (value, resolver) in dependencies.items()
+        }
+        return node_fn(state, **resolved_dependencies)
+
+    _configured_node.__name__ = getattr(node_fn, "__name__", "configured_node")
+    return _configured_node
+
+
 def create_agentic_loop_graph(
     max_iterations: int = 10,
     enable_fulfillment: bool = True,
@@ -101,54 +127,36 @@ def create_agentic_loop_graph(
 
     graph.add_node(
         "perceive",
-        lambda state: perceive_node(
-            state,
-            runtime_intelligence=(
-                runtime_intelligence_resolver()
-                if runtime_intelligence_resolver is not None
-                else runtime_intelligence
-            ),
+        _bind_configured_node(
+            perceive_node,
+            runtime_intelligence=(runtime_intelligence, runtime_intelligence_resolver),
         ),
     )
 
     graph.add_node(
         "plan",
-        lambda state: plan_node(
-            state,
-            planning_coordinator=(
-                planning_coordinator_resolver()
-                if planning_coordinator_resolver is not None
-                else planning_coordinator
-            ),
-            use_llm_planning=(
-                use_llm_planning_resolver()
-                if use_llm_planning_resolver is not None
-                else use_llm_planning
-            ),
+        _bind_configured_node(
+            plan_node,
+            planning_coordinator=(planning_coordinator, planning_coordinator_resolver),
+            use_llm_planning=(use_llm_planning, use_llm_planning_resolver),
         ),
     )
 
     graph.add_node(
         "act",
-        lambda state: act_node(
-            state,
-            turn_executor=(
-                turn_executor_resolver() if turn_executor_resolver is not None else turn_executor
-            ),
+        _bind_configured_node(
+            act_node,
+            turn_executor=(turn_executor, turn_executor_resolver),
         ),
     )
 
     graph.add_node(
         "evaluate",
-        lambda state: evaluate_node(
-            state,
-            evaluator=(evaluator_resolver() if evaluator_resolver is not None else evaluator),
-            fulfillment_detector=(
-                fulfillment_detector_resolver()
-                if fulfillment_detector_resolver is not None
-                else fulfillment_detector
-            ),
-            enable_fulfillment_check=enable_fulfillment,
+        _bind_configured_node(
+            evaluate_node,
+            evaluator=(evaluator, evaluator_resolver),
+            fulfillment_detector=(fulfillment_detector, fulfillment_detector_resolver),
+            enable_fulfillment_check=(enable_fulfillment, None),
         ),
     )
 

@@ -62,6 +62,31 @@ class TestAgenticLoopGraphBuilder:
         # Check that nodes exist (implementation may vary)
         assert compiled is not None
 
+    @pytest.mark.asyncio
+    async def test_builder_resolves_runtime_dependencies_at_node_execution(self, monkeypatch):
+        """Resolver-backed dependencies should be evaluated when the node runs."""
+        captured = {}
+
+        async def _fake_perceive_node(state, runtime_intelligence=None):
+            captured["state"] = state
+            captured["runtime_intelligence"] = runtime_intelligence
+            return state
+
+        monkeypatch.setattr(
+            "victor.framework.agentic_graph.builder.perceive_node",
+            _fake_perceive_node,
+        )
+
+        graph = create_agentic_loop_graph(
+            runtime_intelligence="static-runtime",
+            runtime_intelligence_resolver=lambda: "dynamic-runtime",
+        )
+
+        await graph._nodes["perceive"].func({"query": "verify"})
+
+        assert captured["state"] == {"query": "verify"}
+        assert captured["runtime_intelligence"] == "dynamic-runtime"
+
 
 class TestAgenticLoopGraphExecutor:
     """Tests for AgenticLoopGraphExecutor."""

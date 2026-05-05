@@ -403,4 +403,39 @@ class TestGraphManager:
         failure = manager.get_stats()["refresh_failures"][root_str]
         assert failure["count"] == 1
         assert failure["error_type"] == "OSError"
+        assert failure["category"] == "resource_exhaustion"
+        assert failure["recoverable"] is True
+        assert failure["severity"] == "warning"
+        assert failure["retry_delay_seconds"] == 5.0
+        assert failure["error_code"] == 24
+        assert isinstance(failure["next_retry_at"], float)
         assert "Too many open files" in failure["last_error"]
+
+    @pytest.mark.asyncio
+    async def test_background_refresh_retries_transient_missing_file_once(
+        self, temp_codebase, monkeypatch
+    ):
+        """Transient file races should be retried once before surfacing as failures."""
+        manager = GraphManager.get_instance()
+        root = temp_codebase.resolve()
+        root_str = str(root)
+        calls = 0
+
+        manager._background_refresh[root_str] = {
+            "pending": False,
+            "on_refresh_error": None,
+        }
+
+        async def _flaky_refresh(_root):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise FileNotFoundError(2, "No such file or directory")
+            return None
+
+        monkeypatch.setattr(manager, "_refresh_graph_index", _flaky_refresh)
+
+        await manager._run_refresh_loop(root)
+
+        assert calls == 2
+        assert root_str not in manager.get_stats()["refresh_failures"]

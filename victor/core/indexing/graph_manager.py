@@ -23,6 +23,7 @@ Pattern: Singleton + Observer + Cache + Repository
 from __future__ import annotations
 
 import asyncio
+import errno
 import inspect
 import logging
 from datetime import datetime
@@ -38,7 +39,57 @@ from victor.core.indexing.index_lock import IndexLockRegistry
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["GraphManager"]
+__all__ = ["GraphManager", "classify_refresh_error"]
+
+
+def _extract_os_error_code(exc: BaseException) -> Optional[int]:
+    """Best-effort extraction of an OS error number from an exception chain."""
+    current: Optional[BaseException] = exc
+    while current is not None:
+        if isinstance(current, OSError) and current.errno is not None:
+            return current.errno
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def classify_refresh_error(exc: Exception, *, failure_count: int = 1) -> Dict[str, Any]:
+    """Classify a graph refresh failure for health tracking and retry policy."""
+    error_code = _extract_os_error_code(exc)
+    retry_delay_seconds = 10.0
+    recoverable = True
+    severity = "warning"
+    category = "unexpected_refresh_failure"
+    operator_guidance = "Inspect the graph refresh stack trace if the failure persists."
+
+    if isinstance(exc, FileNotFoundError) or error_code == errno.ENOENT:
+        category = "transient_missing_file"
+        retry_delay_seconds = 0.5
+        operator_guidance = (
+            "Retry after the filesystem settles; this commonly happens during deletes or temp-file churn."
+        )
+    elif error_code in {errno.EMFILE, errno.ENFILE} or "Too many open files" in str(exc):
+        category = "resource_exhaustion"
+        retry_delay_seconds = min(60.0, 5.0 * max(1, failure_count))
+        operator_guidance = (
+            "Reduce concurrent watcher/index activity or raise the open-file limit before retrying."
+        )
+    elif isinstance(exc, TimeoutError):
+        category = "lock_timeout"
+        retry_delay_seconds = min(30.0, 2.0 * max(1, failure_count))
+        operator_guidance = "Another process may be indexing this project; retry after the lock clears."
+    else:
+        recoverable = False
+        severity = "error"
+        operator_guidance = "Inspect the exception and graph indexing pipeline for a deterministic bug."
+
+    return {
+        "error_code": error_code,
+        "category": category,
+        "recoverable": recoverable,
+        "severity": severity,
+        "retry_delay_seconds": retry_delay_seconds,
+        "operator_guidance": operator_guidance,
+    }
 
 
 class GraphManager:
@@ -304,15 +355,48 @@ class GraphManager:
             return
 
         refresh_config["pending"] = False
+        retry_delay_seconds = 0.0
+        failure = self._refresh_failures.get(root_str)
+        if isinstance(failure, dict):
+            next_retry_at = failure.get("next_retry_at")
+            if isinstance(next_retry_at, (int, float)):
+                retry_delay_seconds = max(0.0, float(next_retry_at) - datetime.now().timestamp())
+                if retry_delay_seconds > 0:
+                    failure["suppressed_events"] = int(failure.get("suppressed_events", 0)) + 1
+
+        if retry_delay_seconds > 0:
+            logger.debug(
+                "[GraphManager] Delaying background refresh for %s by %.2fs after %s",
+                root_str,
+                retry_delay_seconds,
+                failure.get("category", "refresh_failure") if isinstance(failure, dict) else "error",
+            )
+            self._refresh_tasks[root_str] = asyncio.create_task(
+                self._run_refresh_loop(root.resolve(), startup_delay_seconds=retry_delay_seconds)
+            )
+            return
+
         self._refresh_tasks[root_str] = asyncio.create_task(self._run_refresh_loop(root.resolve()))
 
-    async def _run_refresh_loop(self, root: Path) -> None:
+    async def _run_refresh_loop(self, root: Path, startup_delay_seconds: float = 0.0) -> None:
         """Run one or more coalesced incremental refresh passes for a root."""
         root_str = str(root.resolve())
         current_task = asyncio.current_task()
         try:
+            if startup_delay_seconds > 0:
+                await asyncio.sleep(startup_delay_seconds)
+
             while True:
-                await self._refresh_graph_index(root)
+                try:
+                    await self._refresh_graph_index(root)
+                except FileNotFoundError as exc:
+                    logger.info(
+                        "[GraphManager] Background refresh saw transient missing file for %s; retrying once: %s",
+                        root_str,
+                        exc,
+                    )
+                    await asyncio.sleep(0.1)
+                    await self._refresh_graph_index(root)
                 self._refresh_failures.pop(root_str, None)
                 refresh_config = self._background_refresh.get(root_str)
                 if not refresh_config or not refresh_config.get("pending", False):
@@ -321,24 +405,40 @@ class GraphManager:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._record_refresh_failure(root, exc)
+            failure = self._record_refresh_failure(root, exc)
             await self._notify_refresh_error(root, exc)
-            logger.info("[GraphManager] Background refresh deferred for %s: %s", root_str, exc)
+            logger.info(
+                "[GraphManager] Background refresh deferred for %s: category=%s recoverable=%s retry_in=%.2fs error=%s",
+                root_str,
+                failure.get("category", "unknown"),
+                failure.get("recoverable", False),
+                float(failure.get("retry_delay_seconds", 0.0) or 0.0),
+                exc,
+            )
         finally:
             task = self._refresh_tasks.get(root_str)
             if task is current_task:
                 self._refresh_tasks.pop(root_str, None)
 
-    def _record_refresh_failure(self, root: Path, exc: Exception) -> None:
+    def _record_refresh_failure(self, root: Path, exc: Exception) -> Dict[str, Any]:
         """Track a recoverable background refresh failure for a root."""
         root_str = str(root.resolve())
         existing = self._refresh_failures.get(root_str, {})
-        self._refresh_failures[root_str] = {
-            "count": int(existing.get("count", 0)) + 1,
+        count = int(existing.get("count", 0)) + 1
+        classification = classify_refresh_error(exc, failure_count=count)
+        failure = {
+            "count": count,
             "last_error": str(exc),
             "error_type": type(exc).__name__,
             "last_failed_at": datetime.now().timestamp(),
+            "suppressed_events": int(existing.get("suppressed_events", 0)),
+            **classification,
         }
+        failure["next_retry_at"] = failure["last_failed_at"] + float(
+            failure.get("retry_delay_seconds", 0.0) or 0.0
+        )
+        self._refresh_failures[root_str] = failure
+        return failure
 
     async def _notify_refresh_error(self, root: Path, exc: Exception) -> None:
         """Notify optional background refresh error callbacks."""

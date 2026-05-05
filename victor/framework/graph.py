@@ -840,8 +840,22 @@ def default_state_merger(
         Merged state dictionary
     """
     merged = dict(base_state)
+    conflicting_keys: Set[str] = set()
     for bs in branch_states:
+        for key, value in bs.items():
+            if key not in merged:
+                continue
+            try:
+                if merged[key] != value:
+                    conflicting_keys.add(str(key))
+            except Exception:
+                conflicting_keys.add(str(key))
         merged.update(bs)
+    if conflicting_keys:
+        logger.warning(
+            "Parallel state merge conflict on keys %s; applying last-write-wins semantics",
+            sorted(conflicting_keys),
+        )
     return merged
 
 
@@ -1493,118 +1507,82 @@ class GraphEventEmitter:
         self.graph_id = graph_id
         self.emit_events = emit_events
 
-    def emit_graph_started(self, entry_point: str, node_count: int, thread_id: str):
-        """Emit graph started event."""
+    def _emit(self, event_name: str, payload: Dict[str, Any]) -> None:
+        """Emit a lifecycle event and swallow observability failures."""
         if not self.emit_events:
             return
 
         try:
             from victor.core.events import get_observability_bus as get_event_bus
 
-            bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "graph_started",
+            get_event_bus().emit_lifecycle_event(
+                event_name,
                 {
                     "graph_id": self.graph_id,
                     "source": "StateGraph",
-                    "entry_point": entry_point,
-                    "node_count": node_count,
-                    "thread_id": thread_id,
+                    **payload,
                 },
             )
         except Exception as e:
-            logger.warning(f"Failed to emit graph_started event: {e}")
+            logger.warning(f"Failed to emit {event_name} event: {e}")
+
+    def emit_graph_started(self, entry_point: str, node_count: int, thread_id: str):
+        """Emit graph started event."""
+        self._emit(
+            "graph_started",
+            {
+                "entry_point": entry_point,
+                "node_count": node_count,
+                "thread_id": thread_id,
+            },
+        )
 
     def emit_node_start(self, node_id: str, iteration: int):
         """Emit node start event."""
-        if not self.emit_events:
-            return
-
-        try:
-            from victor.core.events import get_observability_bus as get_event_bus
-
-            bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "node_start",
-                {
-                    "graph_id": self.graph_id,
-                    "source": "StateGraph",
-                    "node_id": node_id,
-                    "iteration": iteration,
-                },
-            )
-        except Exception as e:
-            logger.warning(f"Failed to emit node_start event: {e}")
+        self._emit(
+            "node_start",
+            {
+                "node_id": node_id,
+                "iteration": iteration,
+            },
+        )
 
     def emit_node_complete(self, node_id: str, iteration: int, duration: float):
         """Emit node complete event."""
-        if not self.emit_events:
-            return
-
-        try:
-            from victor.core.events import get_observability_bus as get_event_bus
-
-            bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "node_end",
-                {
-                    "graph_id": self.graph_id,
-                    "source": "StateGraph",
-                    "node_id": node_id,
-                    "iteration": iteration,
-                    "duration": duration,
-                    "success": True,
-                },
-            )
-        except Exception as e:
-            logger.warning(f"Failed to emit node_end event: {e}")
+        self._emit(
+            "node_end",
+            {
+                "node_id": node_id,
+                "iteration": iteration,
+                "duration": duration,
+                "success": True,
+            },
+        )
 
     def emit_graph_completed(
         self, success: bool, iterations: int, duration: float, node_count: int
     ):
         """Emit graph completed event."""
-        if not self.emit_events:
-            return
-
-        try:
-            from victor.core.events import get_observability_bus as get_event_bus
-
-            bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "graph_completed",
-                {
-                    "graph_id": self.graph_id,
-                    "source": "StateGraph",
-                    "success": success,
-                    "iterations": iterations,
-                    "duration": duration,
-                    "node_count": node_count,
-                },
-            )
-        except Exception as e:
-            logger.warning(f"Failed to emit graph_completed event: {e}")
+        self._emit(
+            "graph_completed",
+            {
+                "success": success,
+                "iterations": iterations,
+                "duration": duration,
+                "node_count": node_count,
+            },
+        )
 
     def emit_graph_error(self, error: str, iterations: int, duration: float):
         """Emit graph error event."""
-        if not self.emit_events:
-            return
-
-        try:
-            from victor.core.events import get_observability_bus as get_event_bus
-
-            bus = get_event_bus()
-            bus.emit_lifecycle_event(
-                "graph_error",
-                {
-                    "graph_id": self.graph_id,
-                    "source": "StateGraph",
-                    "error": error,
-                    "iterations": iterations,
-                    "duration": duration,
-                },
-            )
-        except Exception as e:
-            logger.warning(f"Failed to emit graph_error event: {e}")
+        self._emit(
+            "graph_error",
+            {
+                "error": error,
+                "iterations": iterations,
+                "duration": duration,
+            },
+        )
 
 
 class CompiledGraph(Generic[StateType]):
@@ -2500,6 +2478,9 @@ class StateGraph(Generic[StateType]):
         errors = self._validate()
         if errors:
             raise ValueError(f"Invalid graph: {'; '.join(errors)}")
+        warnings = self._validation_warnings()
+        for warning in warnings:
+            logger.warning("StateGraph validation warning: %s", warning)
 
         # Create config (use from_legacy to support both legacy and focused config formats)
         config = GraphConfig.from_legacy(
@@ -2558,6 +2539,23 @@ class StateGraph(Generic[StateType]):
                 errors.append(f"Node '{node_id}' is unreachable")
 
         return errors
+
+    def _validation_warnings(self) -> List[str]:
+        """Return non-fatal structural warnings for the graph."""
+        warnings: List[str] = []
+        reachable = self._find_reachable()
+
+        for node_id in reachable:
+            if node_id == END:
+                continue
+            outgoing_edges = self._edges.get(node_id, [])
+            if outgoing_edges:
+                continue
+            warnings.append(
+                f"Node '{node_id}' has no outgoing edges and will terminate implicitly"
+            )
+
+        return warnings
 
     def _find_reachable(self) -> Set[str]:
         """Find all reachable nodes from entry point."""

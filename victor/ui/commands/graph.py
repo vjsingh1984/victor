@@ -683,10 +683,13 @@ def _record_graph_watch_refresh(project_root: Path, stats: Any) -> Path:
 
 def _record_graph_watch_refresh_failure(project_root: Path, exc: Exception) -> Path:
     """Persist the latest incremental refresh failure for graph watch status."""
+    from victor.core.indexing.graph_manager import classify_refresh_error
+
     root_path = project_root.resolve()
     state = _inspect_graph_watch_daemon(
         _default_graph_watch_pid_file(root_path), remove_stale=False
     )
+    failure = classify_refresh_error(exc)
     return _write_graph_watch_manifest(
         root_path,
         state,
@@ -699,6 +702,12 @@ def _record_graph_watch_refresh_failure(project_root: Path, exc: Exception) -> P
             "completed_at": time.time(),
             "last_error": str(exc),
             "error_type": type(exc).__name__,
+            "error_code": failure.get("error_code"),
+            "error_category": failure.get("category"),
+            "recoverable": failure.get("recoverable"),
+            "severity": failure.get("severity"),
+            "retry_delay_seconds": failure.get("retry_delay_seconds"),
+            "operator_guidance": failure.get("operator_guidance"),
         },
     )
 
@@ -759,6 +768,9 @@ def summarize_graph_watch_health(manifest: Optional[dict[str, Any]]) -> tuple[st
     errors = int(last_refresh.get("errors", 0) or 0)
 
     if errors > 0:
+        retry_delay_seconds = last_refresh.get("retry_delay_seconds")
+        if isinstance(retry_delay_seconds, (int, float)) and retry_delay_seconds > 0:
+            return f"Graph: retry {int(round(float(retry_delay_seconds)))}s", "warning"
         return f"Graph: err {errors} c{changed} d{deleted}", "warning"
     return f"Graph: ok c{changed} d{deleted} u{unchanged}", "active"
 
@@ -1181,6 +1193,18 @@ def graph_watch_status(
                 table.add_row("Last error", f"{error_type}: {last_error}")
             else:
                 table.add_row("Last error", last_error)
+        error_category = last_refresh.get("error_category")
+        if isinstance(error_category, str) and error_category.strip():
+            table.add_row("Error category", error_category)
+        recoverable = last_refresh.get("recoverable")
+        if isinstance(recoverable, bool):
+            table.add_row("Recoverable", "yes" if recoverable else "no")
+        retry_delay_seconds = last_refresh.get("retry_delay_seconds")
+        if isinstance(retry_delay_seconds, (int, float)) and retry_delay_seconds > 0:
+            table.add_row("Retry backoff", f"{retry_delay_seconds:.2f}s")
+        operator_guidance = last_refresh.get("operator_guidance")
+        if isinstance(operator_guidance, str) and operator_guidance.strip():
+            table.add_row("Operator guidance", operator_guidance)
     console.print(table)
 
 
