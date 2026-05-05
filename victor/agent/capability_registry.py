@@ -112,7 +112,7 @@ class OrchestratorCapabilityMixin:
         """
         # Warn if registering deprecated capability
         if capability.deprecated:
-            logger.warning(
+            logger.info(
                 f"Registering deprecated capability: {capability.name} "
                 f"(v{capability.version}). {capability.deprecated_message}"
             )

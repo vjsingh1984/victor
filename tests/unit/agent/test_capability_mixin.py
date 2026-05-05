@@ -443,6 +443,14 @@ class TestCapabilityRegistryMixin:
 
         assert value == {"name": "runtime-intelligence"}
 
+    def test_init_does_not_log_warning_for_builtin_deprecated_alias(self, caplog):
+        """Compatibility alias registration should not spam interactive startup logs."""
+        caplog.set_level("WARNING", logger="victor.agent.capability_registry")
+
+        MockOrchestrator()
+
+        assert "Registering deprecated capability" not in caplog.text
+
     def test_get_capability_value_raises_for_unknown(self, orchestrator):
         """Test get_capability_value raises for unknown capability."""
         with pytest.raises(KeyError, match="not found"):
