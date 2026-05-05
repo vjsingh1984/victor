@@ -120,7 +120,6 @@ from victor.core.container import MetricsServiceProtocol, LoggerServiceProtocol
 
 # Service protocols for DI resolution
 from victor.agent.protocols import (
-    ResponseSanitizerProtocol,
     ComplexityClassifierProtocol,
     ActionAuthorizerProtocol,
     SearchRouterProtocol,
@@ -134,6 +133,7 @@ from victor.agent.protocols import (
     ToolSequenceTrackerProtocol,
     ContextCompactorProtocol,
 )
+from victor.agent.services.protocols import ResponseSanitizerProtocol
 
 # Mixins (used at class definition time)
 from victor.protocols.mode_aware import ModeAwareMixin
@@ -2076,18 +2076,26 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 return None
         return session_tools
 
-    def get_assembled_messages(self, current_query: Optional[str] = None) -> List["Message"]:
+    def get_assembled_messages(
+        self,
+        current_query: Optional[str] = None,
+        *,
+        selected_tools: Optional[list[Any]] = None,
+    ) -> List["Message"]:
         """Get context-assembled messages for provider calls.
 
         When context assembler is available: keeps system prompt + ledger +
         last N full turns + score-selected older messages within budget.
         Falls back to raw self.messages when assembler unavailable.
 
-        When cache_optimization is enabled, dynamic content (skills, reminders,
-        task guidance) is prepended to the last user message instead of being
-        injected as system messages. This keeps the system prompt byte-identical
-        across turns for provider prefix caching (90% discount).
+        When the canonical prompt pipeline is available, dynamic prompt guidance
+        (skills, reminders, GEPA/MiPRO/CoT optimizations, credit guidance) is
+        prepended to the last user message instead of being injected as system
+        messages. For KV-capable providers this also keeps the system prompt
+        byte-identical across turns for provider prefix caching.
         """
+        self._get_prompt_builder_runtime().ensure_system_prompt_current()
+
         assembler = getattr(self, "_context_assembler", None)
         if assembler is None:
             messages = list(self.messages)
@@ -2139,62 +2147,68 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
                 getattr(self, "_last_sorted_tool_names", None) is not None,
             )
 
-        # Cache-friendly: prepend dynamic content to last user message
-        # Gate on _kv_optimization_enabled so KV-only providers (Ollama) also benefit
-        if self._kv_optimization_enabled and messages:
+        # Canonical per-turn prompt optimizations live on the prompt pipeline.
+        # KV-capable providers additionally benefit from stable system-prompt
+        # caching, but Tier C providers still need the same dynamic guidance.
+        prefix = ""
+        pipeline = getattr(self, "_prompt_pipeline", None)
+        if messages and pipeline:
             # Use UnifiedPromptPipeline for per-turn prefix composition
-            pipeline = getattr(self, "_prompt_pipeline", None)
-            if pipeline:
-                from victor.agent.prompt_pipeline import TurnContext
+            from victor.agent.prompt_pipeline import TurnContext
 
-                # Build turn context for the pipeline
-                injector = getattr(self, "_optimization_injector", None)
-                turn_ctx = TurnContext(
-                    provider_name=self.provider_name or "",
-                    model=getattr(self, "_model", "") or "",
-                    task_type=getattr(self, "_current_task_type", "default"),
-                    active_skill_prompt=(
-                        self.get_skill_user_prefix()
-                        if hasattr(self, "get_skill_user_prefix")
-                        else None
-                    ),
-                    last_turn_failed=(
-                        injector._last_failure_category is not None if injector else False
-                    ),
-                    last_failure_category=(injector._last_failure_category if injector else None),
-                    last_failure_error=(injector._last_failure_error if injector else None),
-                )
+            # Build turn context for the pipeline
+            injector = getattr(self, "_optimization_injector", None)
+            turn_ctx = TurnContext(
+                provider_name=self.provider_name or "",
+                model=getattr(self, "_model", "") or "",
+                task_type=getattr(self, "_current_task_type", "default"),
+                active_skill_prompt=(
+                    self.get_skill_user_prefix() if hasattr(self, "get_skill_user_prefix") else None
+                ),
+                last_turn_failed=(
+                    injector._last_failure_category is not None if injector else False
+                ),
+                last_failure_category=(injector._last_failure_category if injector else None),
+                last_failure_error=(injector._last_failure_error if injector else None),
+                task_guidance_text=getattr(self, "_dynamic_task_guidance", None),
+            )
 
-                # Get context reminders
-                reminder_mgr = getattr(self, "_reminder_manager", None)
-                if reminder_mgr:
-                    turn_ctx.reminder_text = reminder_mgr.get_user_message_prefix()
+            # Get context reminders
+            reminder_mgr = getattr(self, "_reminder_manager", None)
+            if reminder_mgr:
+                turn_ctx.reminder_text = reminder_mgr.get_user_message_prefix()
 
-                # Get last user message text for KNN few-shot matching
-                last_user_msg = ""
-                for m in reversed(messages):
-                    if m.role == "user":
-                        last_user_msg = m.content[:200]
-                        break
+            # Get last user message text for KNN few-shot matching
+            last_user_msg = ""
+            for m in reversed(messages):
+                if m.role == "user":
+                    last_user_msg = m.content[:200]
+                    break
 
-                prefix = pipeline.compose_turn_prefix(last_user_msg, turn_ctx)
-                self._record_prompt_optimization_metadata(turn_ctx)
+            prompt_runtime = self._get_prompt_builder_runtime()
+            turn_ctx.dynamic_tool_guidance = prompt_runtime.build_dynamic_tool_guidance(
+                current_query or last_user_msg,
+                selected_tools=selected_tools,
+            )
 
-                # Clear failure state after injecting hint
-                if injector and turn_ctx.last_turn_failed:
-                    injector._last_failure_category = None
-                    injector._last_failure_error = None
+            prefix = pipeline.compose_turn_prefix(last_user_msg, turn_ctx)
+            self._record_prompt_optimization_metadata(turn_ctx)
 
-            if prefix:
-                from victor.providers.base import Message as Msg
+            # Clear failure state after injecting hint
+            if injector and turn_ctx.last_turn_failed:
+                injector._last_failure_category = None
+                injector._last_failure_error = None
 
-                for i in range(len(messages) - 1, -1, -1):
-                    if messages[i].role == "user":
-                        messages[i] = Msg(
-                            role="user",
-                            content=prefix + messages[i].content,
-                        )
-                        break
+        if prefix:
+            from victor.providers.base import Message as Msg
+
+            for i in range(len(messages) - 1, -1, -1):
+                if messages[i].role == "user":
+                    messages[i] = Msg(
+                        role="user",
+                        content=prefix + messages[i].content,
+                    )
+                    break
 
         return messages
 
@@ -2878,8 +2892,8 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         """Build the system prompt via the canonical prompt runtime surface.
 
         Delegates to UnifiedPromptPipeline.build_system_prompt() when
-        available. Falls back to PromptRuntimeSupport, then inline logic
-        during __init__ before the pipeline is created.
+        available. Falls back to the prompt-builder runtime helper during
+        early initialization or compatibility-only pipeline failures.
         """
         self._sync_prompt_builder_runtime_state()
 
@@ -2892,16 +2906,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def _emit_prompt_used_event(self, prompt: str) -> None:
         """Emit PROMPT_USED event for RL prompt template learner.
 
-        Delegates to UnifiedPromptPipeline or PromptRuntimeSupport.
+        Delegates to UnifiedPromptPipeline or the legacy coordinator shim.
         """
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             pipeline._emit_prompt_used_event(prompt)
-            return
-
-        runtime_support = getattr(self, "_prompt_runtime_support", None)
-        if runtime_support is not None:
-            runtime_support._emit_prompt_used_event(prompt)
             return
 
         legacy_coordinator = getattr(self, "_system_prompt_coordinator", None)
@@ -2911,17 +2920,24 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def _resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.
 
-        Delegates to UnifiedPromptPipeline or PromptRuntimeSupport.
+        Delegates to UnifiedPromptPipeline, then falls back to direct runtime
+        dependency resolution.
         """
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             return pipeline.resolve_shell_variant(tool_name)
 
-        runtime_support = getattr(self, "_prompt_runtime_support", None)
-        if runtime_support is not None:
-            return runtime_support.resolve_shell_variant(tool_name)
+        try:
+            from victor.agent.shell_resolver import resolve_shell_variant
 
-        return self._system_prompt_coordinator.resolve_shell_variant(tool_name)
+            return resolve_shell_variant(
+                tool_name,
+                getattr(self, "tools", None),
+                getattr(self, "mode_controller", None),
+            )
+        except Exception as exc:
+            logger.debug("Shell resolver unavailable during runtime fallback: %s", exc)
+            return tool_name
 
     def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
         """Prefix a prompt with the thinking disable prefix if supported.
@@ -2957,7 +2973,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
-        Delegates to PromptRuntimeSupport.classify_task_keywords().
+        Delegates to UnifiedPromptPipeline or TaskAnalyzer directly.
 
         Args:
             user_message: The user's input message
@@ -2969,18 +2985,27 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if pipeline is not None:
             return pipeline.classify_task_keywords(user_message)
 
-        runtime_support = getattr(self, "_prompt_runtime_support", None)
-        if runtime_support is not None:
-            return runtime_support.classify_task_keywords(user_message)
+        task_analyzer = getattr(self, "_task_analyzer", None)
+        if task_analyzer is not None:
+            try:
+                method = getattr(
+                    task_analyzer,
+                    "classify_task_keywords",
+                    getattr(task_analyzer, "classify_keywords", None),
+                )
+                if method is not None:
+                    return method(user_message)
+            except Exception as exc:
+                logger.debug("Task keyword classification fallback failed: %s", exc)
 
-        return self._system_prompt_coordinator.classify_task_keywords(user_message)
+        return {"task_type": "default", "confidence": 0.0}
 
     def _classify_task_with_context(
         self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
-        Delegates to UnifiedPromptPipeline or PromptRuntimeSupport.
+        Delegates to UnifiedPromptPipeline or TaskAnalyzer directly.
 
         Args:
             user_message: The user's input message
@@ -2993,11 +3018,20 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         if pipeline is not None:
             return pipeline.classify_task_with_context(user_message, history)
 
-        runtime_support = getattr(self, "_prompt_runtime_support", None)
-        if runtime_support is not None:
-            return runtime_support.classify_task_with_context(user_message, history)
+        task_analyzer = getattr(self, "_task_analyzer", None)
+        if task_analyzer is not None:
+            try:
+                method = getattr(
+                    task_analyzer,
+                    "classify_task_with_context",
+                    getattr(task_analyzer, "classify_with_context", None),
+                )
+                if method is not None:
+                    return method(user_message, history)
+            except Exception as exc:
+                logger.debug("Context-aware task classification fallback failed: %s", exc)
 
-        return self._system_prompt_coordinator.classify_task_with_context(user_message, history)
+        return {"task_type": "default", "confidence": 0.0}
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
@@ -3660,15 +3694,18 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
             return self._apply_context_aware_strategy(tools)
 
         # Original implementation for backward compatibility
-        strategy = "per_turn"
+        strategy = "context_aware"
         try:
             ctx = getattr(self, "settings", None)
             if ctx is not None:
                 context = getattr(ctx, "context", None)
                 if context is not None:
-                    strategy = getattr(context, "kv_tool_strategy", "per_turn")
+                    strategy = getattr(context, "kv_tool_strategy", "context_aware")
         except Exception:
             pass
+
+        if strategy == "context_aware":
+            return self._apply_context_aware_strategy(tools)
 
         if strategy == "session_stable":
             cached = getattr(self, "_session_semantic_tools", None)

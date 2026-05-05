@@ -259,12 +259,12 @@ class TestDeterministicToolOrdering:
 
 
 # =====================================================================
-# Fix 3: Dynamic content injection gated on _kv_optimization_enabled
+# Fix 3: Dynamic content injection stays pipeline-owned even without KV cache
 # =====================================================================
 
 
 class TestDynamicContentInjection:
-    """Test dynamic content injection into user messages for KV providers."""
+    """Test dynamic content injection into user messages for the prompt pipeline."""
 
     def test_kv_provider_injects_skills_into_user_message(self):
         """Skills/reminders go into user message when KV optimization is active."""
@@ -287,6 +287,73 @@ class TestDynamicContentInjection:
         assert messages[0].content == "system prompt"  # Unchanged
         assert "[Skill: code_review]" in messages[1].content
         assert "hello" in messages[1].content
+
+    def test_no_cache_provider_still_injects_prompt_pipeline_prefix(self):
+        """Tier C providers still receive GEPA/MiPRO/CoT guidance through the live pipeline."""
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.providers.base import Message
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch._context_assembler = None
+        orch.messages = [
+            Message(role="system", content="system prompt"),
+            Message(role="user", content="hello"),
+        ]
+        orch._prompt_pipeline = MagicMock()
+        orch._prompt_pipeline.compose_turn_prefix.return_value = (
+            "<system-reminder>\nUse the evolved prompt candidate.\n</system-reminder>\n\n"
+        )
+        orch._record_prompt_optimization_metadata = MagicMock()
+        orch._optimization_injector = None
+        orch._reminder_manager = None
+        orch._system_prompt_frozen = False
+        orch._last_sorted_tool_names = None
+        orch.provider_name = "test-provider"
+        orch._model = "test-model"
+        orch._current_task_type = "edit"
+        orch.get_skill_user_prefix = MagicMock(return_value=None)
+
+        result = AgentOrchestrator.get_assembled_messages(orch)
+
+        orch._prompt_pipeline.compose_turn_prefix.assert_called_once()
+        orch._record_prompt_optimization_metadata.assert_called_once()
+        assert result[0].content == "system prompt"
+        assert "Use the evolved prompt candidate." in result[1].content
+        assert result[1].content.endswith("hello")
+
+    def test_no_cache_provider_clears_failure_hint_state_after_injection(self):
+        """Failure-hint injection remains one-shot even when KV caching is disabled."""
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.providers.base import Message
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch._context_assembler = None
+        orch.messages = [
+            Message(role="system", content="system prompt"),
+            Message(role="user", content="retry"),
+        ]
+        orch._prompt_pipeline = MagicMock()
+        orch._prompt_pipeline.compose_turn_prefix.return_value = (
+            "<system-reminder>\nRetry with the failure hint.\n</system-reminder>\n\n"
+        )
+        orch._record_prompt_optimization_metadata = MagicMock()
+        orch._reminder_manager = None
+        orch._system_prompt_frozen = False
+        orch._last_sorted_tool_names = None
+        orch.provider_name = "test-provider"
+        orch._model = "test-model"
+        orch._current_task_type = "edit"
+        orch.get_skill_user_prefix = MagicMock(return_value=None)
+        orch._optimization_injector = MagicMock()
+        orch._optimization_injector._last_failure_category = "file_not_found"
+        orch._optimization_injector._last_failure_error = "missing file"
+
+        AgentOrchestrator.get_assembled_messages(orch)
+
+        assert orch._optimization_injector._last_failure_category is None
+        assert orch._optimization_injector._last_failure_error is None
 
 
 # =====================================================================
@@ -376,17 +443,18 @@ class TestKVToolSelectionStrategy:
     """Test configurable tool selection strategies for KV providers.
 
     Three strategies:
+    - 'context_aware': Stable core tools with economy-first locking when it helps
     - 'per_turn': Fresh semantic selection each turn (max relevance, breaks KV prefix)
     - 'session_stable': Lock semantic selection after first query (KV stable, may miss tools)
     - 'session_full': Lock all 48 tools (only for API-caching providers)
     """
 
-    def test_setting_defaults_to_per_turn(self):
-        """Default kv_tool_strategy is 'per_turn'."""
+    def test_setting_defaults_to_context_aware(self):
+        """Default kv_tool_strategy is 'context_aware'."""
         from victor.config.context_settings import ContextSettings
 
         settings = ContextSettings()
-        assert settings.kv_tool_strategy == "per_turn"
+        assert settings.kv_tool_strategy == "context_aware"
 
     def test_setting_accepts_session_stable(self):
         """kv_tool_strategy can be set to 'session_stable'."""
@@ -494,6 +562,29 @@ class TestKVToolSelectionStrategy:
         kwargs = orch._emit_tool_strategy_event.call_args.kwargs
         assert kwargs["provider"] is orch.provider
         assert "provider_category" not in kwargs
+
+    def test_default_strategy_prefers_context_aware_for_kv_only_providers(self):
+        """KV-only providers should default to the context-aware strategy."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
+        orch._is_tool_strategy_v2_enabled.return_value = False
+        orch._apply_context_aware_strategy = MagicMock(return_value=["stable-tools"])
+
+        ctx = MagicMock()
+        ctx.kv_tool_strategy = "context_aware"
+        settings = MagicMock()
+        settings.context = ctx
+        orch.settings = settings
+
+        tool_a = MagicMock()
+        tool_a.name = "read"
+
+        result = AgentOrchestrator._apply_kv_tool_strategy(orch, [tool_a])
+
+        assert result == ["stable-tools"]
+        orch._apply_context_aware_strategy.assert_called_once_with([tool_a])
 
 
 # =====================================================================

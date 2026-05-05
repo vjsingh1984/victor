@@ -564,5 +564,5 @@ class TestSettingsWiring:
         cs = ContextSettings()
         assert cs.cache_optimization_enabled is True
         assert cs.kv_optimization_enabled is True
-        assert cs.kv_tool_strategy == "per_turn"
+        assert cs.kv_tool_strategy == "context_aware"
         assert cs.tiered_schema_enabled is True

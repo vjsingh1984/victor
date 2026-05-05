@@ -950,7 +950,8 @@ class ChatStreamHelperMixin:
         total_tokens: float = 0
 
         assembled = orch.get_assembled_messages(
-            current_query=stream_ctx.user_message if stream_ctx else None
+            current_query=stream_ctx.user_message if stream_ctx else None,
+            selected_tools=tools,
         )
         async for chunk in orch.provider.stream(
             messages=assembled,

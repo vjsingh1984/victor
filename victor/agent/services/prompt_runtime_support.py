@@ -3,34 +3,25 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Canonical fallback runtime support for prompt-related orchestrator seams.
+"""Compatibility-only prompt runtime support wrapper.
 
-This class backs the live orchestrator fallback path when
-``UnifiedPromptPipeline`` is unavailable. It owns:
-
-- system prompt construction from the shared prompt builder
-- prompt-used RL event emission
-- shell variant resolution
-- task keyword/context classification
-
-The deprecated ``SystemPromptCoordinator`` compatibility shim subclasses this
-implementation for public import stability.
+.. deprecated::
+    Superseded by ``victor.agent.prompt_pipeline.UnifiedPromptPipeline``.
+    This module exists only to preserve deprecated imports while keeping
+    live prompt orchestration on the canonical pipeline path.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from victor.agent.task_analyzer import TaskAnalyzer
-    from victor.tools.registry import ToolRegistry
+import warnings
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class PromptRuntimeSupport:
-    """Canonical internal support object for prompt-related runtime fallback."""
+    """Deprecated compatibility wrapper over ``UnifiedPromptPipeline``."""
 
     def __init__(
         self,
@@ -38,11 +29,18 @@ class PromptRuntimeSupport:
         get_context_window: Optional[Callable[[], int]] = None,
         provider_name: str = "",
         model_name: str = "",
-        get_tools: Optional[Callable[[], Optional["ToolRegistry"]]] = None,
+        get_tools: Optional[Callable[[], Optional[Any]]] = None,
         get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
-        task_analyzer: Optional["TaskAnalyzer"] = None,
+        task_analyzer: Optional[Any] = None,
         session_id: str = "",
-    ):
+    ) -> None:
+        warnings.warn(
+            "PromptRuntimeSupport is deprecated and will be removed in v1.0.0. "
+            "Use UnifiedPromptPipeline from victor.agent.prompt_pipeline instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self._prompt_builder = prompt_builder
         self._get_context_window = get_context_window or (lambda: 128000)
         self._provider_name = provider_name
@@ -51,103 +49,70 @@ class PromptRuntimeSupport:
         self._get_mode_controller = get_mode_controller
         self._task_analyzer = task_analyzer
         self._session_id = session_id
+        self._pipeline = None
+
+        if prompt_builder is None:
+            return
+
+        try:
+            from victor.agent.content_registry import ContentRegistry
+            from victor.agent.optimization_injector import OptimizationInjector
+            from victor.agent.prompt_pipeline import UnifiedPromptPipeline
+
+            self._pipeline = UnifiedPromptPipeline(
+                provider=None,
+                builder=prompt_builder,
+                registry=ContentRegistry(),
+                optimizer=OptimizationInjector(),
+                task_analyzer=task_analyzer,
+                get_context_window=self._get_context_window,
+                session_id=session_id,
+            )
+            logger.debug("PromptRuntimeSupport delegated to UnifiedPromptPipeline")
+        except Exception as exc:
+            logger.debug("PromptRuntimeSupport pipeline initialization failed: %s", exc)
 
     def build_system_prompt(self) -> str:
-        """Build system prompt with dynamic parallel read budget."""
-        if self._prompt_builder is None:
-            return ""
-
-        base_prompt: str = self._prompt_builder.build()
-
-        context_window = self._get_context_window()
-        if context_window >= 32768:
-            try:
-                from victor.agent.context_compactor import calculate_parallel_read_budget
-
-                budget = calculate_parallel_read_budget(context_window)
-                base_prompt = f"{base_prompt}\n\n{budget.to_prompt_hint()}"
-            except Exception:
-                pass
-
-        self._emit_prompt_used_event(base_prompt)
-        return base_prompt
-
-    def _emit_prompt_used_event(self, prompt: str) -> None:
-        """Emit PROMPT_USED event for RL prompt template learner."""
-        try:
-            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
-
-            hooks = get_rl_hooks()
-            if hooks is None:
-                return
-
-            is_local = self._provider_name.lower() in {"ollama", "lmstudio", "vllm"}
-            prompt_lower = prompt.lower()
-
-            event = RLEvent(
-                type=RLEventType.PROMPT_USED,
-                success=True,
-                quality_score=0.5,
-                provider=self._provider_name,
-                model=self._model_name,
-                task_type="general",
-                metadata={
-                    "prompt_style": "detailed" if is_local else "structured",
-                    "prompt_length": len(prompt),
-                    "has_examples": "example" in prompt_lower or "e.g." in prompt_lower,
-                    "has_thinking_prompt": "step by step" in prompt_lower,
-                    "has_constraints": "must" in prompt_lower or "always" in prompt_lower,
-                    "session_id": self._session_id,
-                },
-            )
-            hooks.emit(event)
-        except Exception as e:
-            logger.debug("Failed to emit prompt_used event: %s", e)
+        """Build the compatibility system prompt through the canonical pipeline."""
+        if self._pipeline is not None:
+            return self._pipeline.build_system_prompt()
+        if self._prompt_builder is not None:
+            return self._prompt_builder.build()
+        return ""
 
     def resolve_shell_variant(self, tool_name: str) -> str:
-        """Resolve shell aliases to the appropriate enabled shell variant."""
-        try:
-            from victor.agent.shell_resolver import resolve_shell_variant
-
-            return resolve_shell_variant(
-                tool_name,
-                self._get_tools() if self._get_tools else None,
-                self._get_mode_controller() if self._get_mode_controller else None,
-            )
-        except Exception:
-            return tool_name
+        """Resolve shell aliases through the canonical pipeline when available."""
+        if self._pipeline is not None:
+            return self._pipeline.resolve_shell_variant(tool_name)
+        return tool_name
 
     def classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
-        """Classify task type based on keywords."""
-        if self._task_analyzer:
+        """Classify the current task via the canonical pipeline when available."""
+        analyzer = self._task_analyzer
+        if analyzer is not None and hasattr(analyzer, "classify_task_keywords"):
             try:
-                method = getattr(
-                    self._task_analyzer,
-                    "classify_task_keywords",
-                    getattr(self._task_analyzer, "classify_keywords", None),
-                )
-                if method:
-                    return method(user_message)
-            except Exception:
-                pass
+                return analyzer.classify_task_keywords(user_message)
+            except Exception as exc:
+                logger.debug("PromptRuntimeSupport keyword classification failed: %s", exc)
+        if self._pipeline is not None:
+            return self._pipeline.classify_task_keywords(user_message)
         return {"task_type": "default", "confidence": 0.0}
 
     def classify_task_with_context(
-        self, user_message: str, history: Optional[List[Any]] = None
+        self,
+        user_message: str,
+        history: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Classify task type with conversation history context."""
-        if self._task_analyzer:
+        """Classify the current task with history context."""
+        analyzer = self._task_analyzer
+        if analyzer is not None and hasattr(analyzer, "classify_task_with_context"):
             try:
-                method = getattr(
-                    self._task_analyzer,
-                    "classify_task_with_context",
-                    getattr(self._task_analyzer, "classify_with_context", None),
+                return analyzer.classify_task_with_context(user_message, history)
+            except Exception as exc:
+                logger.debug(
+                    "PromptRuntimeSupport contextual classification failed: %s",
+                    exc,
                 )
-                if method:
-                    return method(user_message, history)
-            except Exception:
-                pass
+        if self._pipeline is not None:
+            return self._pipeline.classify_task_with_context(user_message, history)
         return {"task_type": "default", "confidence": 0.0}
-
-
-__all__ = ["PromptRuntimeSupport"]

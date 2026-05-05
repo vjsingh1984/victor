@@ -308,6 +308,8 @@ class SystemPromptBuilder:
         self.prompt_contributors = prompt_contributors or []
         self.task_type = task_type
         self.available_tools = available_tools or []
+        self.stable_prompt_tools = list(self.available_tools)
+        self.dynamic_prompt_tools: List[str] = []
         self.enrichment_service = enrichment_service
         self.vertical = vertical or DEFAULT_VERTICAL
         self.concise_mode = concise_mode
@@ -436,7 +438,8 @@ class SystemPromptBuilder:
             return ""
 
         guidance = self._tool_guidance.get_guidance_prompt(
-            task_type=self.task_type, available_tools=self.available_tools
+            task_type=self.task_type,
+            available_tools=self.get_stable_prompt_tools(),
         )
 
         if guidance:
@@ -446,6 +449,47 @@ class SystemPromptBuilder:
             )
 
         return guidance
+
+    def get_task_guidance_text(self) -> str:
+        """Expose task guidance for runtimes that inject it outside the system prompt."""
+        return self._get_task_guidance_section()
+
+    def get_stable_prompt_tools(self) -> List[str]:
+        """Return the stable tool set used in the system-prompt surface."""
+        tools = getattr(self, "stable_prompt_tools", None)
+        if tools is None:
+            tools = self.available_tools
+        return list(tools or [])
+
+    def get_dynamic_prompt_tools(self) -> List[str]:
+        """Return long-tail tools that should be hinted dynamically per turn."""
+        return list(getattr(self, "dynamic_prompt_tools", []) or [])
+
+    def get_dynamic_tool_guidance_text(self, relevant_tools: Optional[List[str]] = None) -> str:
+        """Render dynamic tool hints for user-prefix injection.
+
+        These hints are separate from provider tool schemas. They keep stable,
+        frequently used tools in the system prompt while surfacing long-tail
+        tools only when the current turn likely needs them.
+        """
+        source_tools = relevant_tools if relevant_tools is not None else self.get_dynamic_prompt_tools()
+        normalized_tools = sorted(
+            {canonicalize_core_tool_name(tool) for tool in source_tools if tool}
+        )
+        if not normalized_tools:
+            return ""
+
+        listed = normalized_tools[:6]
+        more_count = max(0, len(normalized_tools) - len(listed))
+        tool_list = ", ".join(listed)
+        if more_count:
+            tool_list = f"{tool_list}, and {more_count} more"
+
+        return (
+            "DYNAMIC TOOL HINTS: The stable system prompt covers the core tools. "
+            f"For this turn, the following less-common tools are relevant if needed: {tool_list}. "
+            "Only call these dynamic tools when the current task clearly requires them."
+        )
 
     def get_max_exploration_depth(self) -> int:
         """Get the maximum exploration depth for the current provider and task complexity.
@@ -584,7 +628,7 @@ class SystemPromptBuilder:
     def _get_tool_constraint_section(self) -> str:
         """Get tool constraint section listing available tools."""
         normalized_tools = sorted(
-            {canonicalize_core_tool_name(tool) for tool in self.available_tools if tool}
+            {canonicalize_core_tool_name(tool) for tool in self.get_stable_prompt_tools() if tool}
         )
         if not normalized_tools:
             return ""

@@ -475,7 +475,12 @@ longer the canonical runtime implementation behind DI:
   prompt assembly; `PromptRuntimeAdapter` only covers the narrower protocol
   contract
 
-## TDD Update: Canonical Prompt Runtime Support Fallback Surface
+## Historical TDD Update: PromptRuntimeSupport Fallback Surface
+
+This slice is preserved as historical context only. It was superseded later on
+2026-05-04 when internal orchestrator runtime assembly stopped wiring
+`PromptRuntimeSupport`, leaving it and `SystemPromptCoordinator` as
+compatibility-only prompt helper surfaces.
 
 A fourteenth TDD slice removed the live internal dependency on the deprecated
 `SystemPromptCoordinator` runtime object while keeping the public compatibility
@@ -1086,6 +1091,273 @@ as if they remained available.
 
 **Breaking changes:** None. The concrete state shims were already absent; this
 batch aligns docs and guardrails with the actual repo state.
+
+## Migration Update: Runtime Support Protocols Rehosted Under Services (2026-05-04)
+
+**Seam consolidated:** `victor.agent.services.protocols.runtime_support` still
+implemented its core coordination/runtime protocol names as aliases over
+coordinator-era protocol definitions, which left the wrong module as the real
+host for service-owned runtime abstractions.
+
+**Canonical owners:**
+
+- `victor.agent.services.protocols.runtime_support` now owns:
+  - `CoordinationAdvisorRuntimeProtocol`
+  - `ToolPlanningRuntimeProtocol`
+  - `TaskRuntimeProtocol`
+  - `StateRuntimeProtocol`
+  - `PromptRuntimeProtocol`
+- `victor.agent.protocols` compatibility names now alias back to those
+  service-owned protocol definitions and remain deprecated.
+
+**Changes applied:**
+
+1. Moved the core coordination/runtime protocol definitions into
+   `victor.agent.services.protocols.runtime_support`.
+2. Reduced `victor.agent.protocols.coordination_protocols` to a compatibility
+   alias layer for those runtime protocol names while keeping truly legacy-only
+   coordination protocols in place.
+3. Added regression coverage proving the canonical runtime protocol objects are
+   hosted by `runtime_support.py` while preserving identity with deprecated
+   compatibility imports.
+4. Added an AST-based import guard preventing internal production code from
+   importing the deprecated coordinator-era protocol names.
+
+**Benefits:**
+
+- Made the service layer the actual host of service-owned runtime protocols
+- Preserved backward compatibility for deprecated protocol imports without
+  leaving coordinator-era modules as the source of truth
+- Added guardrails against future drift back to `victor.agent.protocols` for
+  active runtime protocol surfaces
+
+**Breaking changes:** None. Legacy protocol imports still resolve and warn, but
+the canonical definitions now live under `victor.agent.services.protocols`.
+
+## Migration Update: Remaining Runtime Support Protocols Rehosted Under Services (2026-05-04)
+
+**Seam consolidated:** After the coordination/runtime protocol move,
+`runtime_support.py` still aliased the remaining active runtime contracts for
+chunk generation, streaming recovery, and RL back to legacy protocol modules.
+
+**Canonical owners:**
+
+- `victor.agent.services.protocols.runtime_support` now also owns:
+  - `ChunkRuntimeProtocol`
+  - `StreamingRecoveryRuntimeProtocol`
+  - `RLLearningRuntimeProtocol`
+- `victor.agent.protocols.streaming_protocols.ChunkGeneratorProtocol`
+- `victor.agent.protocols.streaming_protocols.StreamingRecoveryCoordinatorProtocol`
+- `victor.agent.protocols.infrastructure_protocols.RLCoordinatorProtocol`
+  now exist only as deprecated compatibility aliases back to the service-owned
+  protocol definitions.
+
+**Changes applied:**
+
+1. Moved the chunk-generation, streaming-recovery, and RL runtime protocol
+   definitions into `victor.agent.services.protocols.runtime_support`.
+2. Reduced the legacy streaming and infrastructure protocol modules to
+   compatibility alias hosts for those names.
+3. Extended regression coverage to assert those protocol objects are hosted by
+   `runtime_support.py` while preserving identity with deprecated imports.
+4. Expanded the AST-based import guard so internal production code cannot
+   import the legacy chunk/recovery/RL protocol names.
+
+**Benefits:**
+
+- Completed the service-owned hosting move for the active runtime protocol
+  surface in `runtime_support.py`
+- Preserved backward compatibility for deprecated protocol imports while making
+  the service layer the real source of truth
+- Added guardrails against drift back to legacy protocol modules for active
+  runtime seams
+
+**Breaking changes:** None. Legacy protocol imports still resolve and warn, but
+the canonical definitions now live under `victor.agent.services.protocols`.
+
+## Migration Update: Runtime Infrastructure Protocols Rehosted Under Services (2026-05-04)
+
+**Seam consolidated:** `victor.agent.services.protocols.infrastructure_runtime`
+still aliased the remaining runtime-facing infrastructure contracts back to
+legacy analysis, infrastructure, and streaming protocol modules. That left the
+service layer presenting canonical names while the old protocol package still
+owned the actual definitions.
+
+**Canonical owners:**
+
+- `victor.agent.services.protocols.infrastructure_runtime` now owns:
+  - `IntentClassifierProtocol`
+  - `ReminderManagerProtocol`
+  - `ResponseSanitizerProtocol`
+  - `StreamingHandlerProtocol`
+  - `StreamingMetricsCollectorProtocol`
+  - `StreamingConfidenceMonitorProtocol`
+- Legacy names in:
+  - `victor.agent.protocols.analysis_protocols`
+  - `victor.agent.protocols.infrastructure_protocols`
+  - `victor.agent.protocols.streaming_protocols`
+  now exist only as compatibility aliases back to the service-owned protocol
+  definitions.
+
+**Changes applied:**
+
+1. Moved the remaining runtime-facing infrastructure protocol definitions into
+   `victor.agent.services.protocols.infrastructure_runtime`.
+2. Reduced the legacy analysis, infrastructure, and streaming protocol modules
+   to compatibility alias layers for those names.
+3. Updated `victor.agent.services.protocols.streaming_runtime` and
+   `victor.agent.orchestrator` to import the canonical service-owned protocol
+   surfaces instead of the legacy protocol package.
+4. Extended regression coverage and the AST import guard so internal
+   production code cannot drift back to the deprecated runtime protocol names.
+
+**Benefits:**
+
+- Completed service-owned hosting for the active runtime-facing infrastructure
+  protocol surface
+- Preserved backward compatibility for deprecated protocol imports while making
+  the service layer the actual source of truth
+- Removed the last production runtime import of these protocol names from
+  `victor.agent.protocols`
+
+**Breaking changes:** None. Legacy protocol imports still resolve and warn, but
+the canonical definitions now live under `victor.agent.services.protocols`.
+
+## Migration Update: PromptRuntimeSupport Demoted To Compatibility-Only (2026-05-04)
+
+**Seam consolidated:** `ComponentAssembler` and prompt-builder fallback helpers
+still wired `PromptRuntimeSupport` into the live orchestrator runtime even
+though `UnifiedPromptPipeline` already owned the active prompt assembly path.
+
+**Canonical owners:**
+
+- `victor.agent.prompt_pipeline.UnifiedPromptPipeline` remains the canonical
+  owner of orchestrator-managed live prompt assembly
+- `victor.agent.services.prompt_runtime.PromptRuntimeAdapter` remains the DI
+  surface for `PromptRuntimeProtocol`
+- `victor.agent.services.prompt_runtime_support.PromptRuntimeSupport` and
+  `victor.agent.services.system_prompt_runtime.SystemPromptCoordinator` are now
+  compatibility-only prompt helper surfaces
+
+**Changes applied:**
+
+1. Removed live runtime assembly of `PromptRuntimeSupport` from
+   `ComponentAssembler.assemble_conversation(...)`.
+2. Updated `PromptBuilderRuntime.build_system_prompt_fallback()` to use the
+   orchestrator's own prompt-used hook instead of reaching into a support
+   object.
+3. Updated orchestrator prompt helper fallbacks (`_resolve_shell_variant`,
+   `_classify_task_keywords`, `_classify_task_with_context`) to use direct
+   runtime dependencies when the pipeline is unavailable.
+4. Added a guard preventing new internal runtime imports of
+   `PromptRuntimeSupport` or `create_prompt_runtime_support(...)` outside the
+   explicit compatibility files.
+
+**Benefits:**
+
+- Removed the last internal runtime assembly dependency on
+  `PromptRuntimeSupport`
+- Kept deprecated coordinator/support paths available for compatibility
+  without leaving them as production runtime owners
+- Clarified the prompt architecture boundary: pipeline for live orchestration,
+  protocol adapter for DI, coordinator/support only for compatibility
+
+**Breaking changes:** None. `PromptRuntimeSupport` and `SystemPromptCoordinator`
+still exist for compatibility, but the internal orchestrator runtime no longer
+depends on them.
+
+## Migration Update: Prompt Optimization Wiring Preserved Across Provider Tiers (2026-05-04)
+
+**Seam consolidated:** `AgentOrchestrator.get_assembled_messages()` was still
+gating prompt-pipeline turn-prefix injection on `_kv_optimization_enabled`,
+which meant Tier C / non-KV providers could bypass live prompt optimization
+content even though `UnifiedPromptPipeline` already owned the canonical
+GEPA/MiPROv2/CoT/failure/credit path.
+
+**Canonical owners:**
+
+- `victor.agent.prompt_pipeline.UnifiedPromptPipeline` remains the canonical
+  live prompt optimization and per-turn prefix owner
+- `victor.agent.services.runtime_intelligence.RuntimeIntelligenceService`
+  remains the canonical bundle provider for GEPA/MiPROv2/experiment-memory
+  prompt guidance
+- KV-specific flags remain cache-strategy controls only; they are not the
+  ownership boundary for whether prompt optimization executes
+
+**Changes applied:**
+
+1. Updated `AgentOrchestrator.get_assembled_messages()` so prompt-pipeline
+   turn-prefix composition runs whenever the canonical pipeline is present,
+   not only when KV prefix caching is enabled.
+2. Kept KV-only observability (`_kv_prefix_fingerprint()` logging) scoped to
+   KV-capable providers.
+3. Added regression coverage proving non-KV/Tier C providers still route
+   prompt optimizations and one-shot failure hints through the live pipeline.
+4. Added repo guidance in `AGENTS.md` and `CLAUDE.md` so future migration work
+   does not reintroduce a KV-only optimization assumption.
+
+## Migration Update: Prompt Invalidation and Core-vs-Dynamic Tool Prompting (2026-05-04)
+
+**Seam consolidated:** frozen prompt management and tool-prompt placement were
+still too implicit. The runtime could detect some state changes only through
+manual refresh paths, query classification on frozen tiers could be dropped
+instead of moved to the per-turn path, and the system prompt still treated the
+entire enabled tool set as one undifferentiated guidance surface.
+
+**Canonical owners:**
+
+- `victor.agent.services.prompt_builder_runtime.PromptBuilderRuntime` now owns
+  frozen-prompt invalidation and dynamic prompt-side tool/task guidance
+  derivation.
+- `victor.agent.prompt_pipeline.UnifiedPromptPipeline` remains the canonical
+  per-turn user-prefix owner for query guidance, prompt optimization, and
+  long-tail tool hints.
+- `victor.agent.prompt_builder.SystemPromptBuilder` remains the canonical
+  system-prompt builder, but now distinguishes stable core-tool guidance from
+  dynamic long-tail tool hints.
+
+**Changes applied:**
+
+1. Added explicit prompt-runtime invalidation based on provider/model,
+   mode-guidance, stable core-tool set, and `.victor/init.md` changes.
+2. Force-reload project context when invalidation has already detected an
+   `init.md` change, so prompt refreshes do not reuse stale TTL-cached content.
+3. Preserved query classification on frozen tiers by moving task guidance into
+   the pipeline-backed per-turn prefix instead of forcing a system-prompt
+   rebuild.
+4. Split tool prompting into stable core-tool guidance for the system prompt
+   and per-turn dynamic hints for long-tail tools, reusing provider-aware tool
+   tier configuration rather than introducing a second tool-core taxonomy.
+5. Switched the default KV-only tool strategy toward `context_aware` so local
+   KV providers favor stable core tools and economy-first locking by default.
+
+**Benefits:**
+
+- Stable prompts now stay fresh based on explicit invalidators instead of only
+  workspace resets or manual refresh calls.
+- Prompt quality no longer regresses on frozen tiers when query classification
+  changes mid-session.
+- Tool prompting is cheaper and more stable: core tools remain in the stable
+  prefix while less-common tool hints move to the per-turn path only when
+  relevant.
+- KV-only providers now default closer to the desired latency/accuracy balance
+  without disabling live prompt optimization.
+
+**Breaking changes:** None intended. The public runtime surfaces are unchanged,
+but the default `ContextSettings.kv_tool_strategy` is now `context_aware`
+instead of `per_turn`.
+
+**Benefits:**
+
+- Preserved live prompt optimization wiring for all providers, including Tier C
+  providers without KV caching
+- Kept GEPA, MiPROv2, CoT distillation, failure hints, experiment-memory
+  guidance, and credit-driven prompt guidance on the canonical runtime path
+- Clarified the architectural boundary: KV support affects prefix-stability and
+  cache economics, not whether prompt optimization logic executes
+
+**Breaking changes:** None. This restores the intended canonical runtime path
+without removing any compatibility surfaces.
 
 ## Follow-up Work
 

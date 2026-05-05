@@ -108,6 +108,20 @@ Use the smallest layer that fits the change:
 - If the existing implementation is close but not sufficient, refactor toward the smallest clear abstraction that improves reuse, maintainability, and scalability without widening scope unnecessarily.
 - When refactoring is required, favor well-bounded class and protocol design, explicit ownership, and composition-oriented patterns that keep the solution extensible for future features.
 
+## Agent Runtime Target State
+
+When changing `victor/agent`, preserve the determined target shape:
+
+- The runtime is **service-first**, not facade-first and not coordinator-first.
+- Canonical effectful runtime owners are `ChatService`, `ToolService`, `SessionService`, `ContextService`, `ProviderService`, and `RecoveryService`.
+- **State-passed** is selective and should stay focused on read-heavy/policy seams such as exploration, safety, system-prompt classification, and coordination recommendation.
+- Prompt optimization is pipeline-owned for **all** providers. Keep GEPA, MiPROv2, CoT distillation, experiment-memory guidance, and credit guidance wired through `UnifiedPromptPipeline` + `RuntimeIntelligenceService`; KV caching only changes prefix-stability strategy, not whether optimizations run.
+- Keep prompt placement disciplined: stable system-prefix content should cover base instructions, `.victor/init.md`, and core tool guidance; task-specific query guidance and infrequently used tool hints belong in the per-turn user-prefix path. Frozen prompts should be treated as stable-until-invalidated, not stable-for-the-entire-session.
+- Facades are grouping and compatibility surfaces only. They must not become business-logic owners.
+- Deprecated coordinators and coordinator-named shims are compatibility-only. Do not expand them or route new production behavior through them.
+- Do not create a new parallel abstraction layer. Prefer shrinking `AgentOrchestrator` into a composition root and moving effectful behavior into canonical services.
+- For session concerns specifically: `SessionService` is the canonical owner; `SessionFacade` is compatibility/grouping only; `SessionCoordinator` is legacy.
+
 Large framework-level changes usually need more than code:
 - Changes to `victor/framework/` public APIs, protocol definitions, workflow DSL structure, or major architecture patterns likely need a FEP and docs updates.
 - For version changes, update `VERSION` and use `python scripts/sync_version.py` so root and `victor-sdk/` stay aligned.

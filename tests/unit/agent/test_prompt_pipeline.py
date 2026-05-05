@@ -319,6 +319,35 @@ class TestComposeTurnPrefix:
         prefix = pipeline.compose_turn_prefix("Write code", ctx)
         assert "coding mode" in prefix
 
+    def test_query_task_guidance_can_be_injected_via_prefix(self):
+        """Frozen-tier query guidance should move to the turn prefix."""
+        pipeline = _make_pipeline()
+        ctx = self._make_turn_context(
+            task_guidance_text="TASK GUIDANCE: Plan before coding. Test incrementally.",
+        )
+
+        prefix = pipeline.compose_turn_prefix("Write code", ctx)
+
+        assert "TASK GUIDANCE" in prefix
+        assert "Plan before coding" in prefix
+
+    def test_dynamic_tool_guidance_can_be_injected_via_prefix(self):
+        """Long-tail tool hints belong in the user-prefix path, not the frozen prompt."""
+        pipeline = _make_pipeline()
+        ctx = self._make_turn_context(
+            dynamic_tool_guidance=(
+                "DYNAMIC TOOL HINTS: The stable system prompt covers the core tools. "
+                "For this turn, the following less-common tools are relevant if needed: "
+                "web_search, git_diff."
+            ),
+        )
+
+        prefix = pipeline.compose_turn_prefix("Check upstream docs and repo changes", ctx)
+
+        assert "DYNAMIC TOOL HINTS" in prefix
+        assert "web_search" in prefix
+        assert "git_diff" in prefix
+
     def test_empty_when_no_dynamic_content(self):
         """Returns empty string when nothing dynamic to inject."""
         pipeline = _make_pipeline(optimizer=None)

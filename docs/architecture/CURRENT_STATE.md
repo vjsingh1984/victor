@@ -66,6 +66,8 @@ Agent / Public API
 | Context management | `victor.agent.services.context_service.ContextService` | Service-owned runtime |
 | Provider management | `victor.agent.services.provider_service.ProviderService` via `provider_management_runtime.py` | Provider runtime no longer owns provider coordinators |
 | Recovery and resilience | `victor.agent.services.recovery_service.RecoveryService` | Service-owned runtime |
+| Live conversation-stage state | `victor.agent.services.state_runtime.StateRuntimeAdapter` over `ConversationController` + `ConversationStateMachine` | No concrete `StateCoordinator` shim remains; only the deprecated protocol alias remains for compatibility |
+| Conversation stage-transition batching | `victor.agent.services.stage_transition_runtime.StageTransitionCoordinator` | Internal service-owned runtime helper; coordinator path is compatibility only |
 | Exploration decisions | `victor.agent.coordinators.ExplorationStatePassedCoordinator` | Selective state-passed seam |
 | System-prompt / task classification | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` | Selective state-passed seam |
 | Safety checks | `victor.agent.coordinators.SafetyStatePassedCoordinator` | Selective state-passed seam |
@@ -79,6 +81,56 @@ Agent / Public API
   modules as live architecture. Treat most remaining files there as
   compatibility seams, examples, protocols, or historical helpers unless
   verified otherwise.
+- Stage-transition batching was moved to `victor/agent/services/` on
+  2026-05-04. The coordinator modules remain compatibility re-export paths,
+  but internal production code should import the service-owned runtime.
+- `CoordinatorFactory.create_safety_coordinator()` and
+  `CoordinatorFactory.create_conversation_coordinator()` are deprecated
+  SDK-owned compatibility helpers. They are not canonical `victor/agent`
+  runtime ownership surfaces.
+- Package-level `victor.agent.coordinators` re-exports of SDK-owned safety and
+  conversation symbols are also compatibility-only and now warn explicitly.
+  New code should import those symbols from `victor_sdk.safety` or
+  `victor_sdk.conversation` directly.
+- The old concrete state shim modules are gone. `victor.agent.state_coordinator`
+  and `victor.agent.services.state_compat` should not be reintroduced. The
+  only remaining state-side compatibility surface is the deprecated
+  `StateCoordinatorProtocol` alias in `victor.agent.protocols`.
+- `PromptRuntimeSupport` and `SystemPromptCoordinator` are compatibility-only
+  prompt helper surfaces. Internal runtime assembly no longer wires
+  `PromptRuntimeSupport`; public compatibility paths may still use it through
+  the deprecated coordinator surface.
+- Live prompt optimization remains canonical on
+  `victor.agent.prompt_pipeline.UnifiedPromptPipeline` for **all** provider
+  tiers. GEPA/MiPROv2/CoT-distillation guidance, experiment-memory guidance,
+  failure hints, and credit/reputation guidance should flow through the
+  pipeline-backed per-turn prefix path; KV support only changes cache-stable
+  prefix strategy and observability, not whether those optimizations run.
+- Frozen prompt management is now explicit rather than session-blind. The live
+  prompt runtime refreshes the stable system prompt when provider/model,
+  mode-guidance, stable core-tool set, or `.victor/init.md` change. Query
+  classification guidance for frozen tiers is injected through the per-turn
+  user-prefix path instead of forcing a system-prompt rebuild.
+- Tool prompting is split intentionally. Stable core-tool guidance stays in the
+  system prompt; infrequently used or long-tail tool hints belong in the
+  per-turn user-prefix path when the current request makes them relevant. This
+  prompt-side split is separate from provider tool schemas and from KV/API
+  cache mechanics.
+- Active runtime protocols now have service-owned canonical hosts under
+  `victor.agent.services.protocols.runtime_support` and
+  `victor.agent.services.protocols.infrastructure_runtime`, including
+  coordination, state, prompt, chunk generation, streaming recovery, RL,
+  intent classification, reminder management, response sanitization, and
+  streaming handler/metrics/confidence seams. Legacy names in
+  `victor.agent.protocols` such as `ToolPlannerProtocol`,
+  `TaskCoordinatorProtocol`, `StateCoordinatorProtocol`,
+  `PromptCoordinatorProtocol`, `ChunkGeneratorProtocol`,
+  `StreamingRecoveryCoordinatorProtocol`, `RLCoordinatorProtocol`,
+  `IntentClassifierProtocol`, `ReminderManagerProtocol`,
+  `ResponseSanitizerProtocol`, `StreamingHandlerProtocol`,
+  `StreamingMetricsCollectorProtocol`, and
+  `StreamingConfidenceMonitorProtocol` are deprecated compatibility aliases
+  only.
 - Provider compatibility remains explicit. `provider_runtime.py` no longer owns
   `provider_coordinator` or `provider_switch_coordinator`; deprecated accessors
   now materialize compatibility shims on demand.

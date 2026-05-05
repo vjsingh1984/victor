@@ -182,6 +182,8 @@ class TurnContext:
     last_failure_category: Optional[str] = None
     last_failure_error: Optional[str] = None
     reminder_text: Optional[str] = None
+    task_guidance_text: Optional[str] = None
+    dynamic_tool_guidance: Optional[str] = None
     prompt_optimization_metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -450,6 +452,9 @@ class UnifiedPromptPipeline:
         if self.enable_prompt_completeness_guard:
             guidance = self._build_prompt_completeness_guidance(user_message, turn_context)
             add_block("prompt_completeness", guidance)
+
+        add_block("task_guidance", turn_context.task_guidance_text)
+        add_block("dynamic_tool_guidance", turn_context.dynamic_tool_guidance)
 
         # 1. GEPA/MiPRO/CoT/failure optimizations via canonical runtime intelligence
         optimization_bundle = None

@@ -142,6 +142,12 @@ class CoordinationBuildersMixin:
         session_id: str = "",
     ) -> Any:
         """Create the compatibility system prompt runtime."""
+        warnings.warn(
+            "OrchestratorFactory.create_system_prompt_coordinator is deprecated. "
+            "Use UnifiedPromptPipeline or create_system_prompt_state_passed_coordinator instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         coordinator = build_system_prompt_coordinator(
             container=self.container,
             prompt_builder=prompt_builder,
@@ -168,7 +174,13 @@ class CoordinationBuildersMixin:
         task_analyzer: Optional[Any] = None,
         session_id: str = "",
     ) -> Any:
-        """Create the canonical internal prompt runtime support surface."""
+        """Create the compatibility-only prompt runtime support surface."""
+        warnings.warn(
+            "OrchestratorFactory.create_prompt_runtime_support is deprecated. "
+            "Use UnifiedPromptPipeline instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         runtime = build_prompt_runtime_support(
             container=self.container,
             prompt_builder=prompt_builder,

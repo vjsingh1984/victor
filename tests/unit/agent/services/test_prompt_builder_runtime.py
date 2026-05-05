@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import os
+
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.prompt_builder_runtime import PromptBuilderRuntime
 
@@ -21,6 +23,8 @@ def test_sync_prompt_builder_runtime_state_updates_builder_and_invalidates_cache
     runtime.sync_prompt_builder_runtime_state()
 
     assert builder.available_tools == ["read", "write"]
+    assert builder.stable_prompt_tools == ["read", "write"]
+    assert builder.dynamic_prompt_tools == []
     assert builder.mode_prompt_addition == "new mode"
     builder.invalidate_cache.assert_called_once_with()
 
@@ -41,12 +45,14 @@ def test_sync_prompt_builder_runtime_state_clears_stale_values_on_errors():
     runtime.sync_prompt_builder_runtime_state()
 
     assert builder.available_tools == []
+    assert builder.stable_prompt_tools == []
+    assert builder.dynamic_prompt_tools == []
     assert builder.mode_prompt_addition == ""
     builder.invalidate_cache.assert_called_once_with()
 
 
-def test_build_system_prompt_fallback_prefers_runtime_support():
-    runtime_support = MagicMock()
+def test_build_system_prompt_fallback_prefers_runtime_emit_hook():
+    prompt_used_hook = MagicMock()
     prompt_orchestrator = MagicMock()
     prompt_orchestrator.build_system_prompt.return_value = "runtime prompt"
     host = SimpleNamespace(
@@ -58,7 +64,7 @@ def test_build_system_prompt_fallback_prefers_runtime_support():
         ),
         get_enabled_tools=MagicMock(return_value=set()),
         get_mode_system_prompt=MagicMock(return_value=""),
-        _prompt_runtime_support=runtime_support,
+        _emit_prompt_used_event=prompt_used_hook,
         _system_prompt_coordinator=None,
         _prompt_orchestrator=prompt_orchestrator,
         provider_name="anthropic",
@@ -77,7 +83,7 @@ def test_build_system_prompt_fallback_prefers_runtime_support():
         task_type="edit",
         builder=host.prompt_builder,
         get_context_window=host._get_model_context_window,
-        on_prompt_built=runtime_support._emit_prompt_used_event,
+        on_prompt_built=prompt_used_hook,
     )
 
 
@@ -135,7 +141,11 @@ def test_update_system_prompt_for_query_updates_runtime_and_conversation():
 
 
 def test_update_system_prompt_for_query_skips_when_prompt_is_frozen():
-    builder = SimpleNamespace(invalidate_cache=MagicMock())
+    builder = SimpleNamespace(
+        invalidate_cache=MagicMock(),
+        get_task_guidance_text=MagicMock(return_value="TASK GUIDANCE: Plan before coding."),
+        query_classification=None,
+    )
     host = SimpleNamespace(
         prompt_builder=builder,
         build_system_prompt=MagicMock(),
@@ -148,6 +158,7 @@ def test_update_system_prompt_for_query_skips_when_prompt_is_frozen():
 
     builder.invalidate_cache.assert_not_called()
     host.build_system_prompt.assert_not_called()
+    assert host._dynamic_task_guidance == "TASK GUIDANCE: Plan before coding."
 
 
 def test_refresh_system_prompt_preserves_existing_classification():
@@ -171,6 +182,190 @@ def test_refresh_system_prompt_preserves_existing_classification():
     assert host._system_prompt_frozen is False
     assert host._session_tools is None
     runtime.update_system_prompt_for_query.assert_called_once_with(query_classification="existing")
+
+
+def test_sync_prompt_builder_runtime_state_splits_stable_and_dynamic_tools():
+    builder = SimpleNamespace(
+        available_tools=[],
+        stable_prompt_tools=[],
+        dynamic_prompt_tools=[],
+        mode_prompt_addition="",
+        invalidate_cache=MagicMock(),
+        provider_name="anthropic",
+        model="claude",
+        provider_caches=True,
+        provider_has_kv_cache=True,
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        get_enabled_tools=MagicMock(return_value={"read", "shell", "web_search"}),
+        get_mode_system_prompt=MagicMock(return_value=""),
+        _get_model_context_window=lambda: 32768,
+        provider=SimpleNamespace(
+            supports_prompt_caching=lambda: True,
+            supports_kv_prefix_caching=lambda: True,
+        ),
+        provider_name="anthropic",
+        model="claude",
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    runtime.sync_prompt_builder_runtime_state()
+
+    assert builder.stable_prompt_tools == ["read", "shell"]
+    assert builder.dynamic_prompt_tools == ["web_search"]
+
+
+def test_ensure_system_prompt_current_refreshes_when_project_context_changes(tmp_path):
+    from victor.context.project_context import ProjectContext
+
+    root = tmp_path
+    context_dir = root / ".victor"
+    context_dir.mkdir(exist_ok=True)
+    context_file = context_dir / "init.md"
+    context_file.write_text("Initial context", encoding="utf-8")
+
+    project_context = ProjectContext(root_path=str(root))
+    assert project_context.load(force_reload=True) is True
+
+    builder = SimpleNamespace(
+        available_tools=["read", "shell"],
+        stable_prompt_tools=["read", "shell"],
+        dynamic_prompt_tools=[],
+        mode_prompt_addition="",
+        invalidate_cache=MagicMock(),
+        provider_name="anthropic",
+        model="claude",
+        provider_caches=True,
+        provider_has_kv_cache=True,
+        query_classification=None,
+    )
+    pipeline = SimpleNamespace(is_frozen=True)
+    pipeline.unfreeze = MagicMock(side_effect=lambda: setattr(pipeline, "is_frozen", False))
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        get_enabled_tools=MagicMock(return_value={"read", "shell"}),
+        get_mode_system_prompt=MagicMock(return_value=""),
+        _get_model_context_window=lambda: 128000,
+        provider=SimpleNamespace(
+            supports_prompt_caching=lambda: True,
+            supports_kv_prefix_caching=lambda: True,
+        ),
+        provider_name="anthropic",
+        model="claude",
+        project_context=project_context,
+        build_system_prompt=MagicMock(return_value="rebuilt prompt"),
+        conversation=None,
+        _prompt_pipeline=pipeline,
+        _system_prompt_frozen=True,
+        _kv_optimization_enabled=True,
+        _session_tools=["read"],
+        _session_semantic_tools=["shell"],
+        _system_prompt="rebuilt prompt\n\nInitial context",
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    runtime.ensure_system_prompt_current()
+    host.build_system_prompt.assert_not_called()
+
+    context_file.write_text("Updated context", encoding="utf-8")
+    stat = context_file.stat()
+    os.utime(context_file, (stat.st_atime, stat.st_mtime + 5))
+
+    runtime.ensure_system_prompt_current()
+
+    host.build_system_prompt.assert_called_once_with()
+    host._prompt_pipeline.unfreeze.assert_called_once_with()
+    assert host._session_tools is None
+    assert host._session_semantic_tools is None
+    assert "Updated context" in host._system_prompt
+
+
+def test_build_dynamic_tool_guidance_uses_relevant_dynamic_tools():
+    builder = SimpleNamespace(
+        dynamic_prompt_tools=["web_search", "git_diff"],
+        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: web_search"),
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        tools=SimpleNamespace(
+            list_tools=lambda: [
+                SimpleNamespace(
+                    name="web_search",
+                    description="Search the web for documentation",
+                    metadata=SimpleNamespace(keywords=["docs", "documentation", "web"]),
+                ),
+                SimpleNamespace(
+                    name="git_diff",
+                    description="Inspect recent repository changes",
+                    metadata=SimpleNamespace(keywords=["diff", "patch"]),
+                ),
+            ]
+        ),
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    guidance = runtime.build_dynamic_tool_guidance("Search docs for the latest API behavior")
+
+    assert guidance == "DYNAMIC TOOL HINTS: web_search"
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["web_search"])
+
+
+def test_build_dynamic_tool_guidance_prefers_tool_selector_keyword_slice():
+    builder = SimpleNamespace(
+        dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
+        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: git_diff"),
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        tool_selector=SimpleNamespace(
+            select_keywords=MagicMock(
+                return_value=[
+                    SimpleNamespace(name="read"),
+                    SimpleNamespace(name="git_diff"),
+                    SimpleNamespace(name="shell"),
+                ]
+            )
+        ),
+        tools=SimpleNamespace(list_tools=lambda: []),
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    guidance = runtime.build_dynamic_tool_guidance(
+        "Check the patch and summarize the repo delta",
+        selected_tools=[SimpleNamespace(name="read"), SimpleNamespace(name="workflow")],
+    )
+
+    assert guidance == "DYNAMIC TOOL HINTS: git_diff"
+    host.tool_selector.select_keywords.assert_called_once_with(
+        "Check the patch and summarize the repo delta",
+        planned_tools=None,
+        _record=False,
+    )
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["git_diff"])
+
+
+def test_build_dynamic_tool_guidance_falls_back_to_selected_dynamic_tools_when_selector_misses():
+    builder = SimpleNamespace(
+        dynamic_prompt_tools=["web_search", "git_diff", "workflow"],
+        get_dynamic_tool_guidance_text=MagicMock(return_value="DYNAMIC TOOL HINTS: workflow"),
+    )
+    host = SimpleNamespace(
+        prompt_builder=builder,
+        tool_selector=SimpleNamespace(
+            select_keywords=MagicMock(return_value=[SimpleNamespace(name="read")])
+        ),
+        tools=SimpleNamespace(list_tools=lambda: []),
+    )
+    runtime = PromptBuilderRuntime(OrchestratorProtocolAdapter(host))
+
+    guidance = runtime.build_dynamic_tool_guidance(
+        "Continue execution",
+        selected_tools=[SimpleNamespace(name="workflow"), SimpleNamespace(name="read")],
+    )
+
+    assert guidance == "DYNAMIC TOOL HINTS: workflow"
+    builder.get_dynamic_tool_guidance_text.assert_called_once_with(["workflow"])
 
 
 def test_get_set_and_append_system_prompt_delegate_to_builder():

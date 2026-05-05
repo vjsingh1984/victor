@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from pathlib import Path
+from typing import Any, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +23,24 @@ class PromptBuilderRuntime:
             return
 
         cache_invalidated = False
+        tool_state_changed = False
         try:
             enabled_tools = sorted(runtime.get_enabled_tools())
             if builder.available_tools != enabled_tools:
                 builder.available_tools = enabled_tools
-                cache_invalidated = True
+                tool_state_changed = True
         except Exception as exc:
             logger.debug("Failed to sync enabled tools into prompt builder: %s", exc)
             if builder.available_tools:
                 builder.available_tools = []
-                cache_invalidated = True
+                tool_state_changed = True
+
+        stable_tools, dynamic_tools = self._split_prompt_tools(getattr(builder, "available_tools", []))
+        if not hasattr(builder, "stable_prompt_tools") or builder.stable_prompt_tools != stable_tools:
+            builder.stable_prompt_tools = stable_tools
+            cache_invalidated = True
+        if not hasattr(builder, "dynamic_prompt_tools") or builder.dynamic_prompt_tools != dynamic_tools:
+            builder.dynamic_prompt_tools = dynamic_tools
 
         try:
             mode_prompt = runtime.get_mode_system_prompt()
@@ -44,8 +53,64 @@ class PromptBuilderRuntime:
                 builder.mode_prompt_addition = ""
                 cache_invalidated = True
 
+        provider = getattr(runtime, "provider", None)
+        provider_name = (getattr(runtime, "provider_name", "") or "").lower()
+        if getattr(builder, "provider_name", "") != provider_name:
+            builder.provider_name = provider_name
+            cache_invalidated = True
+            self._sync_tool_guidance_strategy(builder, provider_name)
+
+        model = getattr(runtime, "model", "") or ""
+        if getattr(builder, "model", "") != model:
+            builder.model = model
+            cache_invalidated = True
+
+        provider_caches = bool(
+            provider is not None
+            and hasattr(provider, "supports_prompt_caching")
+            and provider.supports_prompt_caching()
+        )
+        if getattr(builder, "provider_caches", False) != provider_caches:
+            builder.provider_caches = provider_caches
+            cache_invalidated = True
+
+        provider_has_kv_cache = bool(
+            provider is not None
+            and hasattr(provider, "supports_kv_prefix_caching")
+            and provider.supports_kv_prefix_caching()
+        )
+        if getattr(builder, "provider_has_kv_cache", False) != provider_has_kv_cache:
+            builder.provider_has_kv_cache = provider_has_kv_cache
+            cache_invalidated = True
+
+        if tool_state_changed:
+            runtime._session_tools = None
+            runtime._session_semantic_tools = None
+
         if cache_invalidated:
             builder.invalidate_cache()
+
+    def ensure_system_prompt_current(self) -> None:
+        """Refresh the live system prompt when frozen-prefix inputs change."""
+        runtime = self._runtime
+        if getattr(runtime, "_prompt_refresh_in_progress", False):
+            return
+
+        self._reload_project_context_if_needed()
+        self.sync_prompt_builder_runtime_state()
+
+        current_signature = self._compute_prompt_signature()
+        previous_signature = getattr(runtime, "_prompt_runtime_signature", None)
+        if previous_signature is None:
+            runtime._prompt_runtime_signature = current_signature
+            return
+
+        if previous_signature == current_signature:
+            return
+
+        logger.info("[cache] Prompt runtime signature changed; refreshing frozen prompt")
+        self._force_reload_project_context()
+        self.refresh_system_prompt()
 
     def build_system_prompt_fallback(self) -> str:
         """Build the non-pipeline system prompt path."""
@@ -60,16 +125,9 @@ class PromptBuilderRuntime:
 
             prompt_orchestrator = get_prompt_orchestrator()
 
-        prompt_built_hook = None
-        runtime_support = getattr(runtime, "_prompt_runtime_support", None)
-        if runtime_support is not None and hasattr(runtime_support, "_emit_prompt_used_event"):
-            prompt_built_hook = runtime_support._emit_prompt_used_event
-        else:
-            legacy_coordinator = getattr(runtime, "_system_prompt_coordinator", None)
-            if legacy_coordinator is not None and hasattr(
-                legacy_coordinator, "_emit_prompt_used_event"
-            ):
-                prompt_built_hook = legacy_coordinator._emit_prompt_used_event
+        prompt_built_hook = getattr(runtime, "_emit_prompt_used_event", None)
+        if not callable(prompt_built_hook):
+            prompt_built_hook = None
 
         return prompt_orchestrator.build_system_prompt(
             builder_type="legacy",
@@ -91,25 +149,30 @@ class PromptBuilderRuntime:
     def update_system_prompt_for_query(self, query_classification=None) -> None:
         """Rebuild the runtime system prompt with query-aware classification."""
         runtime = self._runtime
+        builder = getattr(runtime, "prompt_builder", None)
+        if query_classification is not None and builder is not None:
+            builder.query_classification = query_classification
+
         pipeline = getattr(runtime, "_prompt_pipeline", None)
         is_frozen = (
             pipeline.is_frozen if pipeline else getattr(runtime, "_system_prompt_frozen", False)
         )
         if getattr(runtime, "_kv_optimization_enabled", False) and is_frozen:
+            runtime._dynamic_task_guidance = self._get_task_guidance_text(builder)
             logger.debug("[cache] System prompt frozen - skipping rebuild for query classification")
             return
 
-        builder = getattr(runtime, "prompt_builder", None)
         if query_classification is not None and builder is not None:
-            builder.query_classification = query_classification
             builder.invalidate_cache()
 
         base_system_prompt = runtime.build_system_prompt()
         runtime._system_prompt = self.compose_system_prompt(base_system_prompt)
+        runtime._dynamic_task_guidance = None
 
         if getattr(runtime, "_kv_optimization_enabled", False):
             runtime._system_prompt_frozen = True
 
+        runtime._prompt_runtime_signature = self._compute_prompt_signature()
         self.sync_conversation_system_prompt()
 
     def refresh_system_prompt(
@@ -120,24 +183,57 @@ class PromptBuilderRuntime:
     ) -> None:
         """Reset prompt runtime caches and rebuild the active system prompt."""
         runtime = self._runtime
-        pipeline = getattr(runtime, "_prompt_pipeline", None)
-        if pipeline is not None:
-            pipeline.unfreeze()
-        runtime._system_prompt_frozen = False
-        runtime._session_tools = None
+        if getattr(runtime, "_prompt_refresh_in_progress", False):
+            return
 
-        builder = getattr(runtime, "prompt_builder", None)
-        if builder is not None:
-            builder.invalidate_cache()
+        runtime._prompt_refresh_in_progress = True
+        try:
+            pipeline = getattr(runtime, "_prompt_pipeline", None)
+            if pipeline is not None:
+                pipeline.unfreeze()
+            runtime._system_prompt_frozen = False
+            runtime._session_tools = None
+            runtime._session_semantic_tools = None
 
-        if (
-            query_classification is None
-            and preserve_existing_classification
-            and builder is not None
-        ):
-            query_classification = getattr(builder, "query_classification", None)
+            builder = getattr(runtime, "prompt_builder", None)
+            if builder is not None:
+                builder.invalidate_cache()
 
-        self.update_system_prompt_for_query(query_classification=query_classification)
+            if (
+                query_classification is None
+                and preserve_existing_classification
+                and builder is not None
+            ):
+                query_classification = getattr(builder, "query_classification", None)
+
+            self.update_system_prompt_for_query(query_classification=query_classification)
+        finally:
+            runtime._prompt_refresh_in_progress = False
+
+    def build_dynamic_tool_guidance(
+        self,
+        user_message: Optional[str],
+        *,
+        selected_tools: Optional[Iterable[Any]] = None,
+    ) -> str:
+        """Build per-turn dynamic tool hints for long-tail tools."""
+        builder = getattr(self._runtime, "prompt_builder", None)
+        if builder is None or not hasattr(builder, "get_dynamic_tool_guidance_text"):
+            return ""
+
+        dynamic_tools = list(getattr(builder, "dynamic_prompt_tools", []) or [])
+        if not dynamic_tools:
+            return ""
+
+        relevant_tools = self._select_relevant_dynamic_tools(
+            user_message or "",
+            dynamic_tools,
+            selected_tools=selected_tools,
+        )
+        if not relevant_tools:
+            return ""
+
+        return builder.get_dynamic_tool_guidance_text(relevant_tools)
 
     def get_system_prompt(self) -> str:
         """Return the current prompt-builder output for protocol consumers."""
@@ -173,3 +269,204 @@ class PromptBuilderRuntime:
                 from victor.providers.base import Message
 
                 conversation._messages[0] = Message(role="system", content=prompt)
+
+    def _split_prompt_tools(self, available_tools: Iterable[str]) -> tuple[list[str], list[str]]:
+        """Split enabled tools into stable core tools and dynamic long-tail tools."""
+        from victor.config.tool_tiers import get_provider_category, get_provider_tool_tier
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
+        runtime = self._runtime
+        try:
+            provider_category = get_provider_category(runtime._get_model_context_window())
+        except Exception:
+            provider_category = "large"
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for tool in available_tools:
+            canonical = canonicalize_core_tool_name(tool)
+            if canonical and canonical not in seen:
+                normalized.append(canonical)
+                seen.add(canonical)
+
+        stable: list[str] = []
+        dynamic: list[str] = []
+        for tool_name in normalized:
+            tier = get_provider_tool_tier(tool_name, provider_category)
+            if tier in {"FULL", "COMPACT"}:
+                stable.append(tool_name)
+            else:
+                dynamic.append(tool_name)
+        return stable, dynamic
+
+    def _reload_project_context_if_needed(self) -> None:
+        """Refresh .victor/init.md content when the backing file changed."""
+        project_context = getattr(self._runtime, "project_context", None)
+        if project_context is None or not hasattr(project_context, "load"):
+            return
+        try:
+            project_context.load(force_reload=False)
+        except Exception as exc:
+            logger.debug("Failed to refresh project context before prompt assembly: %s", exc)
+
+    def _force_reload_project_context(self) -> None:
+        """Bypass TTL caching when prompt invalidation already detected a context change."""
+        project_context = getattr(self._runtime, "project_context", None)
+        if project_context is None or not hasattr(project_context, "load"):
+            return
+        try:
+            project_context.load(force_reload=True)
+        except Exception as exc:
+            logger.debug("Failed to force-reload project context before prompt refresh: %s", exc)
+
+    def _compute_project_context_signature(self) -> tuple[str, float, int]:
+        """Fingerprint project-context state for prompt invalidation."""
+        project_context = getattr(self._runtime, "project_context", None)
+        if project_context is None:
+            return ("", 0.0, 0)
+
+        context_file = getattr(project_context, "context_file", None)
+        if isinstance(context_file, Path):
+            try:
+                stat = context_file.stat()
+                return (str(context_file), stat.st_mtime, stat.st_size)
+            except OSError:
+                pass
+
+        content = getattr(project_context, "content", "") or ""
+        return ("", 0.0, len(content))
+
+    def _compute_prompt_signature(self) -> tuple[Any, ...]:
+        """Compute the frozen prompt invalidation signature."""
+        builder = getattr(self._runtime, "prompt_builder", None)
+        if builder is None:
+            return ()
+        return (
+            getattr(builder, "provider_name", ""),
+            getattr(builder, "model", ""),
+            getattr(builder, "mode_prompt_addition", ""),
+            tuple(getattr(builder, "stable_prompt_tools", []) or []),
+            self._compute_project_context_signature(),
+        )
+
+    @staticmethod
+    def _get_task_guidance_text(builder: Any) -> Optional[str]:
+        """Read the current query guidance text from the prompt builder."""
+        if builder is None:
+            return None
+        if hasattr(builder, "get_task_guidance_text"):
+            return builder.get_task_guidance_text() or None
+        if hasattr(builder, "_get_task_guidance_section"):
+            return builder._get_task_guidance_section() or None
+        return None
+
+    @staticmethod
+    def _sync_tool_guidance_strategy(builder: Any, provider_name: str) -> None:
+        """Refresh provider-specific tool guidance when provider identity changes."""
+        try:
+            from victor.agent.provider_tool_guidance import get_tool_guidance_strategy
+
+            builder._tool_guidance = get_tool_guidance_strategy(provider_name)
+        except Exception:
+            pass
+
+    def _select_relevant_dynamic_tools(
+        self,
+        user_message: str,
+        dynamic_tools: list[str],
+        *,
+        selected_tools: Optional[Iterable[Any]] = None,
+    ) -> list[str]:
+        """Choose a compact dynamic tool subset for the current turn."""
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
+        selector_dynamic = self._select_dynamic_tools_from_selector(
+            user_message,
+            dynamic_tools,
+        )
+        if selector_dynamic:
+            return selector_dynamic[:6]
+
+        tool_catalog = {}
+        try:
+            registry = getattr(self._runtime, "tools", None)
+            if registry is not None and hasattr(registry, "list_tools"):
+                for tool in registry.list_tools():
+                    name = canonicalize_core_tool_name(getattr(tool, "name", ""))
+                    if name:
+                        tool_catalog[name] = tool
+        except Exception:
+            tool_catalog = {}
+
+        selected_dynamic: list[str] = []
+        for tool in selected_tools or []:
+            name = getattr(tool, "name", None)
+            if name is None and isinstance(tool, dict):
+                name = tool.get("name")
+            canonical = canonicalize_core_tool_name(name or "")
+            if canonical and canonical in dynamic_tools and canonical not in selected_dynamic:
+                selected_dynamic.append(canonical)
+
+        user_message_lower = user_message.lower().strip()
+        keyword_matches = [
+            tool_name
+            for tool_name in dynamic_tools
+            if self._tool_matches_message(tool_catalog.get(tool_name), tool_name, user_message_lower)
+        ]
+
+        if keyword_matches:
+            relevant = keyword_matches
+        else:
+            relevant = selected_dynamic
+        return relevant[:6]
+
+    def _select_dynamic_tools_from_selector(
+        self,
+        user_message: str,
+        dynamic_tools: list[str],
+    ) -> list[str]:
+        """Reuse the canonical keyword/stage selector when available."""
+        selector = getattr(self._runtime, "tool_selector", None)
+        if selector is None or not hasattr(selector, "select_keywords"):
+            return []
+        try:
+            selected_tools = selector.select_keywords(
+                user_message,
+                planned_tools=None,
+                _record=False,
+            )
+        except Exception as exc:
+            logger.debug("Tool selector unavailable for dynamic prompt guidance: %s", exc)
+            return []
+
+        from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
+        selected_dynamic: list[str] = []
+        dynamic_set = set(dynamic_tools)
+        for tool in selected_tools or []:
+            name = getattr(tool, "name", None)
+            if name is None and isinstance(tool, dict):
+                name = tool.get("name")
+            canonical = canonicalize_core_tool_name(name or "")
+            if canonical in dynamic_set and canonical not in selected_dynamic:
+                selected_dynamic.append(canonical)
+        return selected_dynamic
+
+    @staticmethod
+    def _tool_matches_message(tool: Any, tool_name: str, user_message_lower: str) -> bool:
+        """Heuristic keyword match for dynamic tool guidance."""
+        if not user_message_lower:
+            return False
+        if tool_name.replace("_", " ") in user_message_lower:
+            return True
+        if tool_name in user_message_lower:
+            return True
+        metadata = getattr(tool, "metadata", None)
+        keywords = getattr(metadata, "keywords", []) if metadata is not None else []
+        if any(str(keyword).lower() in user_message_lower for keyword in keywords or []):
+            return True
+        description = getattr(tool, "description", "") or ""
+        for word in description.lower().split()[:10]:
+            if len(word) > 4 and word in user_message_lower:
+                return True
+        return False
