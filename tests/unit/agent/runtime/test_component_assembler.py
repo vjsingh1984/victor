@@ -52,16 +52,17 @@ def test_assemble_tools_prefers_canonical_registrar_registration_surface():
 
 
 def test_assemble_conversation_does_not_wire_prompt_runtime_support_into_runtime():
-    factory = MagicMock()
-    factory.create_conversation_controller.return_value = MagicMock()
-    factory.create_hierarchical_compaction_manager.return_value = MagicMock()
-    factory.create_session_ledger.return_value = MagicMock()
-    factory.create_lifecycle_manager.return_value = MagicMock()
-    factory.create_tool_deduplication_tracker.return_value = MagicMock()
-    factory.create_tool_pipeline.return_value = MagicMock()
-    factory.create_streaming_controller.return_value = MagicMock()
-    factory.create_streaming_coordinator.return_value = MagicMock()
-    factory.create_streaming_chat_handler.return_value = MagicMock()
+    factory = SimpleNamespace(
+        create_conversation_controller=MagicMock(return_value=MagicMock()),
+        create_hierarchical_compaction_manager=MagicMock(return_value=MagicMock()),
+        create_session_ledger=MagicMock(return_value=MagicMock()),
+        create_lifecycle_manager=MagicMock(return_value=MagicMock()),
+        create_tool_deduplication_tracker=MagicMock(return_value=MagicMock()),
+        create_tool_pipeline=MagicMock(return_value=MagicMock()),
+        create_streaming_controller=MagicMock(return_value=MagicMock()),
+        create_streaming_coordinator=MagicMock(return_value=MagicMock()),
+        create_streaming_chat_handler=MagicMock(return_value=MagicMock()),
+    )
 
     container = MagicMock()
     container.register_or_replace = MagicMock()
@@ -110,7 +111,7 @@ def test_assemble_conversation_does_not_wire_prompt_runtime_support_into_runtime
             model="claude-3-sonnet",
         )
 
-    factory.create_prompt_runtime_support.assert_not_called()
     assert orchestrator._task_analyzer is analyzer
     analyzer.set_runtime_subject.assert_called_once_with(orchestrator)
+    assert not hasattr(factory, "create_prompt_runtime_support")
     assert not hasattr(orchestrator, "_prompt_runtime_support")

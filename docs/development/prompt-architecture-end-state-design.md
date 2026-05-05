@@ -1,12 +1,13 @@
 # Prompt Architecture End State Design
 
 **Date:** 2026-05-04
-**Status:** Phases 1-2 Implemented (2026-05-05), Phase 3 Pending
+**Status:** Implemented (2026-05-05)
 **Related:** Agent Facade Service Migration Audit
 
 ## Problem Statement
 
-The current prompt architecture has three overlapping components that create confusion:
+Before the 2026-05-05 convergence cleanup, the prompt architecture had three
+overlapping components that created confusion:
 
 1. **PromptRuntimeAdapter** (`victor/agent/services/prompt_runtime.py`)
    - Implements `PromptRuntimeProtocol` for DI consumers
@@ -15,10 +16,11 @@ The current prompt architecture has three overlapping components that create con
    - Now delegates system-prompt assembly through `UnifiedPromptPipeline`
 
 2. **PromptRuntimeSupport** (`victor/agent/services/prompt_runtime_support.py`)
-   - Internal fallback when UnifiedPromptPipeline is unavailable
-   - Used in compatibility shims (SystemPromptCoordinator)
-   - Overlaps with PromptRuntimeAdapter functionality
-   - Adds task classification, shell variant resolution
+   - Removed on 2026-05-05
+   - Previously acted as an internal fallback when UnifiedPromptPipeline was unavailable
+   - Previously used in compatibility shims (SystemPromptCoordinator)
+   - Overlapped with PromptRuntimeAdapter functionality
+   - Added task classification, shell variant resolution
 
 3. **UnifiedPromptPipeline** (`victor/agent/prompt_pipeline.py`)
    - Canonical owner of orchestrator-managed live prompt assembly
@@ -154,7 +156,7 @@ UnifiedPromptPipeline.build_system_prompt()
    - Delegate shared behavior through `SystemPromptCoordinator`
    - Keep legacy task-analyzer method-name compatibility where still needed
 
-### Phase 3: Remove PromptRuntimeSupport
+### Phase 3: Remove PromptRuntimeSupport - Completed 2026-05-05
 
 1. **Delete PromptRuntimeSupport class**
    - Delete `victor/agent/services/prompt_runtime_support.py`
@@ -181,7 +183,12 @@ UnifiedPromptPipeline.build_system_prompt()
 
 ### Risk: Breaking changes for external consumers
 
-**Mitigation:** PromptRuntimeProtocol interface remains stable. PromptRuntimeAdapter continues to implement it, just delegates internally. External consumers see no API changes.
+**Outcome:** Phase 3 intentionally introduced a breaking change by removing
+`victor.agent.services.prompt_runtime_support` and
+`OrchestratorFactory.create_prompt_runtime_support(...)`. The stable
+service-owned runtime surface remains `PromptRuntimeProtocol` via
+`PromptRuntimeAdapter`, and the only remaining deprecated prompt compatibility
+wrapper is `SystemPromptCoordinator`.
 
 ### Risk: Performance regression from delegation layers
 
@@ -203,10 +210,10 @@ UnifiedPromptPipeline.build_system_prompt()
 
 After this design is implemented:
 
-1. Update migration audit with completed Phase 1/2/3
-2. Mark prompt end state design as COMPLETED
-3. Move to next follow-up item: StateCoordinator retirement path
-4. Consider provider coordinator cleanup (breaking release)
+1. Keep current-state and migration-audit docs aligned if the remaining
+   `SystemPromptCoordinator` compatibility wrapper changes.
+2. Add or tighten guardrails before removing `SystemPromptCoordinator` in a
+   later breaking-release batch.
 
 ## Open Questions
 

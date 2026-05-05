@@ -545,6 +545,10 @@ class TestEndToEndIntegration:
         with pytest.raises(ImportError, match="prompt_compat"):
             from victor.agent.services import prompt_compat  # noqa: F401
 
+        # prompt_runtime_support module should not be importable
+        with pytest.raises(ImportError, match="prompt_runtime_support"):
+            import victor.agent.services.prompt_runtime_support  # noqa: F401
+
     def test_canonical_runtime_imports_work(self):
         """Test that canonical runtime imports work correctly."""
         from unittest.mock import MagicMock

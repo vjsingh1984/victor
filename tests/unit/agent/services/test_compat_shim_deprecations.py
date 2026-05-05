@@ -40,6 +40,12 @@ def test_recovery_compat_module_removed():
         from victor.agent.services import recovery_compat  # noqa: F401
 
 
+def test_prompt_runtime_support_module_removed():
+    """Verify that prompt_runtime_support module has been removed."""
+    with pytest.raises(ImportError, match="prompt_runtime_support"):
+        import victor.agent.services.prompt_runtime_support  # noqa: F401
+
+
 # Verify canonical imports still work
 def test_canonical_prompt_runtime_imports():
     """Verify canonical prompt runtime imports work."""

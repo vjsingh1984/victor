@@ -1,6 +1,6 @@
 # Victor Agent Runtime — Current State
 
-**Last Updated**: 2026-05-04
+**Last Updated**: 2026-05-05
 
 **Scope**: This is the authoritative current-state document for the
 `victor/agent` runtime architecture. Historical ADRs, migration guides, and
@@ -96,12 +96,11 @@ Agent / Public API
   and `victor.agent.services.state_compat` should not be reintroduced. The
   only remaining state-side compatibility surface is the deprecated
   `StateCoordinatorProtocol` alias in `victor.agent.protocols`.
-- `PromptRuntimeSupport` and `SystemPromptCoordinator` are compatibility-only
-  prompt helper surfaces. Internal runtime assembly no longer wires
-  `PromptRuntimeSupport`; public compatibility paths may still use it through
-  the deprecated coordinator surface. `PromptRuntimeSupport` is now a thin
-  wrapper over `SystemPromptCoordinator`, and both delegate prompt behavior to
-  `UnifiedPromptPipeline`.
+- `SystemPromptCoordinator` is the only remaining deprecated prompt
+  compatibility surface. `PromptRuntimeSupport` was removed on 2026-05-05 as a
+  breaking cleanup. Internal runtime assembly no longer wires any separate
+  prompt-support object, and new code should use `UnifiedPromptPipeline`
+  directly.
 - `PromptRuntimeAdapter` remains the canonical DI/runtime surface for
   `PromptRuntimeProtocol`, but its system-prompt build path now delegates to
   `UnifiedPromptPipeline`. The adapter still owns only the narrow mutable

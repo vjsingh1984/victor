@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Guardrails for PromptRuntimeSupport compatibility-only usage."""
+"""Guardrails for removed prompt-runtime support and remaining compatibility usage."""
 
 from __future__ import annotations
 
@@ -18,7 +18,6 @@ ALLOWED_FILES = {
     Path("victor/agent/coordinators/factory_support.py"),
     Path("victor/agent/factory/coordination_builders.py"),
     Path("victor/agent/services/__init__.py"),
-    Path("victor/agent/services/prompt_runtime_support.py"),
     Path("victor/agent/services/system_prompt_runtime.py"),
 }
 

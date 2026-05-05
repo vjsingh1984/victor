@@ -1581,11 +1581,49 @@ re-exports and plain module imports.
 **Breaking changes:** None. This only strengthens internal regression
 guardrails.
 
+## Migration Update: PromptRuntimeSupport Removed (2026-05-05)
+
+**Seam consolidated:** `PromptRuntimeSupport` remained as an extra deprecated
+module and `OrchestratorFactory.create_prompt_runtime_support(...)` remained as
+an extra dead factory path even after the prompt runtime and compatibility
+wrappers had converged on `UnifiedPromptPipeline`.
+
+**Canonical owners:**
+
+- `victor.agent.prompt_pipeline.UnifiedPromptPipeline` remains the single
+  prompt assembly owner
+- `victor.agent.services.prompt_runtime.PromptRuntimeAdapter` remains the DI
+  implementation of `PromptRuntimeProtocol`
+- `victor.agent.services.system_prompt_runtime.SystemPromptCoordinator` remains
+  the only deprecated prompt compatibility wrapper
+
+**Changes applied:**
+
+1. Deleted `victor.agent.services.prompt_runtime_support`.
+2. Removed `create_prompt_runtime_support(...)` from the coordinator helper and
+   `OrchestratorFactory` compatibility builder surface.
+3. Replaced direct module tests with removal assertions and added integration
+   coverage proving the module is no longer importable while canonical prompt
+   surfaces still work.
+4. Updated the prompt-runtime import guard and current-state docs to reflect
+   the new breaking state.
+
+**Benefits:**
+
+- Removed the last extra compatibility module on the prompt path
+- Removed a dead factory seam that could have reintroduced prompt-surface
+  proliferation
+- Simplified the remaining prompt compatibility story to one wrapper:
+  `SystemPromptCoordinator` only
+
+**Breaking changes:** Yes. `victor.agent.services.prompt_runtime_support` and
+`OrchestratorFactory.create_prompt_runtime_support(...)` have been removed.
+
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).
 2. ~~**ToolRegistrar plugin-loading abstraction**~~ - **COMPLETED** (2026-05-04): Refactored `_load_plugin_tools()` to delegate to PluginLoader component. Improved SRP compliance by removing ~40 lines of implementation detail. ToolRegistrar is now a thinner facade.
-3. ~~**Design long-term prompt end state**~~ - **PHASES 1-2 IMPLEMENTED** (2026-05-05): Created and started implementing the convergence plan for aligning PromptRuntimeProtocol, PromptRuntimeSupport, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md`. Completed: PromptRuntimeAdapter now delegates its system-prompt build path through UnifiedPromptPipeline, and PromptRuntimeSupport is reduced to a thin wrapper over SystemPromptCoordinator. Remaining: Phase 3 remove PromptRuntimeSupport in a breaking release and finish retiring the extra compatibility surface.
+3. ~~**Design long-term prompt end state**~~ - **IMPLEMENTED** (2026-05-05): Completed the convergence plan for aligning PromptRuntimeProtocol, PromptRuntimeSupport, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md`. Completed: PromptRuntimeAdapter now delegates its system-prompt build path through UnifiedPromptPipeline, PromptRuntimeSupport was removed, and the prompt compatibility story is reduced to `SystemPromptCoordinator` only.
 4. ~~**StateCoordinator retirement**~~ - **COMPLETED** (2026-05-04): Already retired to ConversationController ownership. See `docs/development/state-coordinator-retirement-analysis.md` for details. StateCoordinator class removed, only protocol alias remains for type checking. ConversationController + ConversationStateMachine + StateRuntimeAdapter provide canonical functionality.
    Note: StateRuntimeProtocol already uses StateRuntimeAdapter; protocol definition is service-native and does not alias StateCoordinatorProtocol.
 5. ~~**External package compatibility validation**~~ - **COMPLETED**: Verified external verticals (victor-coding, victor-research, victor-invest) do not import from removed subservices (13/13 tests pass, zero impact on external packages)
