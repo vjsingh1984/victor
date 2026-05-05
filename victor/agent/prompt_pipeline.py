@@ -14,8 +14,8 @@
 
 """Unified prompt assembly pipeline.
 
-Consolidates PromptComposer, SystemPromptCoordinator, and orchestrator
-frozen-prompt glue into a single module that owns:
+Consolidates PromptComposer, the former SystemPromptCoordinator seam, and
+orchestrator frozen-prompt glue into a single module that owns:
 - Provider tier detection and content routing
 - System prompt building + freezing (Tier A/B) or per-turn rebuild (Tier C)
 - Per-turn user prefix composition (GEPA, credit, failure hints, skills)
@@ -25,7 +25,7 @@ frozen-prompt glue into a single module that owns:
 
 Replaces:
 - victor.agent.prompt_composer.PromptComposer
-- victor.agent.coordinators.system_prompt_coordinator.SystemPromptCoordinator
+- the removed system-prompt compatibility wrapper path
 - Orchestrator's _system_prompt_frozen flag and manual TurnContext bridging
 
 Usage:
@@ -243,7 +243,7 @@ class PromptCompletenessAssessment:
 class UnifiedPromptPipeline:
     """Single owner of all prompt assembly decisions.
 
-    Replaces PromptComposer + SystemPromptCoordinator + orchestrator
+    Replaces PromptComposer + the former SystemPromptCoordinator seam + orchestrator
     frozen-prompt glue code.
 
     Lifecycle:
@@ -539,7 +539,7 @@ class UnifiedPromptPipeline:
         return "<system-reminder>\n" + reminder_body + "\n</system-reminder>\n\n"
 
     # ----------------------------------------------------------------
-    # Migrated from SystemPromptCoordinator
+    # Migrated from the removed SystemPromptCoordinator seam
     # ----------------------------------------------------------------
 
     def resolve_shell_variant(self, tool_name: str) -> str:

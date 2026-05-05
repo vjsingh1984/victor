@@ -33,7 +33,6 @@ Services:
 
 Deprecated compatibility exports retained here:
     PromptRuntimeAdapter: Canonical DI/runtime adapter for PromptRuntimeProtocol
-    SystemPromptCoordinator: Deprecated wrapper over UnifiedPromptPipeline (now delegates to it)
     StreamingRecoveryContext: Moved to RecoveryService for canonical service ownership
 """
 
@@ -98,7 +97,6 @@ from victor.agent.services.stage_transition_strategies import (
     TransitionStrategyProtocol,
     create_transition_strategy,
 )
-from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
 from victor.agent.services.task_runtime import TaskCoordinator
 from victor.agent.services.planning_runtime import (
     PlanningConfig,
@@ -159,7 +157,6 @@ __all__ = [
     "HeuristicOnlyTransitionStrategy",
     "EdgeModelTransitionStrategy",
     "HybridTransitionStrategy",
-    "SystemPromptCoordinator",
     "TaskCoordinator",
     "ToolBudgetExceededError",
     "ToolCallValidation",

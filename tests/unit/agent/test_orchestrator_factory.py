@@ -443,21 +443,8 @@ class TestCanonicalCoordinatorBuilders:
         assert isinstance(coordinator, ExplorationStatePassedCoordinator)
         assert coordinator._project_root == Path("/tmp/factory-project")
 
-    def test_create_system_prompt_coordinator_binds_task_analyzer(self, factory, mock_container):
-        from victor.agent.protocols import TaskAnalyzerProtocol
-
-        analyzer = MagicMock()
-        mock_container.get_optional.side_effect = lambda protocol: (
-            analyzer if protocol is TaskAnalyzerProtocol else None
-        )
-
-        with pytest.warns(
-            DeprecationWarning,
-            match="OrchestratorFactory.create_system_prompt_coordinator",
-        ):
-            coordinator = factory.create_system_prompt_coordinator()
-
-        assert coordinator._task_analyzer is analyzer
+    def test_system_prompt_coordinator_factory_removed(self, factory):
+        assert not hasattr(factory, "create_system_prompt_coordinator")
 
     def test_prompt_runtime_support_factory_removed(self, factory):
         assert not hasattr(factory, "create_prompt_runtime_support")

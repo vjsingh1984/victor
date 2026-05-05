@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -43,7 +43,6 @@ from victor.agent.coordinators.factory_support import (
     create_exploration_coordinator as build_exploration_coordinator,
     create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
     create_safety_state_passed_coordinator as build_safety_state_passed_coordinator,
-    create_system_prompt_coordinator as build_system_prompt_coordinator,
     create_system_prompt_state_passed_coordinator as build_system_prompt_state_passed_coordinator,
 )
 from victor.agent.coordinators.protocol_dependencies import OrchestratorProtocolAdapter
@@ -71,7 +70,6 @@ class CoordinatorFactory:
     Supported surfaces:
         - ExplorationCoordinator: Canonical read-only exploration runtime
         - ExplorationStatePassedCoordinator: Snapshot/transition exploration wrapper
-        - SystemPromptCoordinator: Compatibility system prompt wrapper
         - SystemPromptStatePassedCoordinator: Canonical state-passed prompt classification
         - MetricsCoordinator: Metrics collection
         - SafetyCoordinator: SDK-owned compatibility / extension surface
@@ -145,47 +143,6 @@ class CoordinatorFactory:
                 e,
             )
             raise RuntimeError(f"Failed to create ExplorationStatePassedCoordinator: {e}") from e
-
-    def create_system_prompt_coordinator(
-        self,
-        *,
-        prompt_builder: Any = None,
-        get_context_window: Optional[Callable[[], int]] = None,
-        provider_name: str = "",
-        model_name: str = "",
-        get_tools: Optional[Callable[[], Optional[Any]]] = None,
-        get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
-        task_analyzer: Optional[Any] = None,
-        session_id: str = "",
-    ) -> Any:
-        """
-        Create system prompt coordinator with protocol dependencies.
-
-        Returns:
-            SystemPromptCoordinator instance
-
-        Raises:
-            RuntimeError: If coordinator creation fails
-        """
-        try:
-            coordinator = build_system_prompt_coordinator(
-                container=self._container,
-                prompt_builder=prompt_builder,
-                get_context_window=get_context_window,
-                provider_name=provider_name,
-                model_name=model_name,
-                get_tools=get_tools,
-                get_mode_controller=get_mode_controller,
-                task_analyzer=task_analyzer,
-                session_id=session_id,
-            )
-
-            logger.debug("CoordinatorFactory: Created SystemPromptCoordinator")
-            return coordinator
-
-        except Exception as e:
-            logger.error(f"CoordinatorFactory: Failed to create SystemPromptCoordinator: {e}")
-            raise RuntimeError(f"Failed to create SystemPromptCoordinator: {e}") from e
 
     def create_system_prompt_state_passed_coordinator(
         self,

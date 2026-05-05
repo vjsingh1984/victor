@@ -51,7 +51,7 @@ def test_assemble_tools_prefers_canonical_registrar_registration_surface():
     registrar.register_default_tools.assert_called_once_with()
 
 
-def test_assemble_conversation_does_not_wire_prompt_runtime_support_into_runtime():
+def test_assemble_conversation_does_not_wire_removed_prompt_compatibility_into_runtime():
     factory = SimpleNamespace(
         create_conversation_controller=MagicMock(return_value=MagicMock()),
         create_hierarchical_compaction_manager=MagicMock(return_value=MagicMock()),
@@ -113,5 +113,7 @@ def test_assemble_conversation_does_not_wire_prompt_runtime_support_into_runtime
 
     assert orchestrator._task_analyzer is analyzer
     analyzer.set_runtime_subject.assert_called_once_with(orchestrator)
+    assert not hasattr(factory, "create_system_prompt_coordinator")
     assert not hasattr(factory, "create_prompt_runtime_support")
+    assert not hasattr(orchestrator, "_system_prompt_coordinator")
     assert not hasattr(orchestrator, "_prompt_runtime_support")

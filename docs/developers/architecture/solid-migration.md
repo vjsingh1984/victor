@@ -235,7 +235,7 @@ compatibility-only forwarding layer. Its resolution order is:
 New runtime code should bind or call the first two surfaces directly and avoid
 wiring the legacy hook unless it is preserving older integration behavior.
 | State-passed exploration | `victor.agent.coordinators.ExplorationStatePassedCoordinator` or `OrchestrationFacade.exploration_state_passed` | direct orchestrator-coupled exploration glue |
-| State-passed system prompt logic | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` or `OrchestrationFacade.system_prompt_state_passed` | `system_prompt_coordinator` compatibility imports |
+| State-passed system prompt logic | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` or `OrchestrationFacade.system_prompt_state_passed` | reintroducing removed prompt-coordinator compatibility imports |
 | State-passed safety logic | `victor.agent.coordinators.SafetyStatePassedCoordinator` or `OrchestrationFacade.safety_state_passed` | using `SafetyCoordinator` when snapshot/transition flow is intended |
 
 ```python

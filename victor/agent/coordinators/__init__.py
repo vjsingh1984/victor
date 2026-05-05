@@ -48,7 +48,6 @@ _SUBMODULE_MAP: dict[str, str] = {
     "ExplorationResult": "services.exploration_runtime",
     "MetricsCoordinator": "services.metrics_service",
     "create_metrics_coordinator": "services.metrics_service",
-    "SystemPromptCoordinator": "services.system_prompt_runtime",
     "PlanningCoordinator": "services.planning_runtime",
     "PlanningConfig": "services.planning_runtime",
     "PlanningMode": "services.planning_runtime",
@@ -117,8 +116,9 @@ _MODULE_MEMBERS = {
         "create_transition_strategy",
     ],
     # NOTE: exploration_coordinator, metrics_coordinator, safety_coordinator,
-    # system_prompt_coordinator, planning_coordinator, session_coordinator,
-    # turn_executor, conversation_coordinator removed as deprecated shims.
+    # planning_coordinator, session_coordinator, turn_executor, and the former
+    # system_prompt_coordinator compatibility wrapper were removed as
+    # deprecated shims.
     # These now import directly from services for backward compatibility.
     # See __getattr__ below for service-level re-exports.
 }
@@ -226,7 +226,6 @@ def __getattr__(name: str) -> Any:
         "SafetyStats",
         "SafetyAction",
         "SafetyCategory",
-        "SystemPromptCoordinator",
         "PlanningCoordinator",
         "PlanningConfig",
         "PlanningMode",
@@ -252,8 +251,6 @@ def __getattr__(name: str) -> Any:
             "SafetyCategory",
         }:
             module = importlib.import_module("victor_sdk.safety")
-        elif name == "SystemPromptCoordinator":
-            module = importlib.import_module("victor.agent.services.system_prompt_runtime")
         elif name in {"PlanningCoordinator", "PlanningConfig", "PlanningMode", "PlanningResult"}:
             module = importlib.import_module("victor.agent.services.planning_runtime")
         elif name in {

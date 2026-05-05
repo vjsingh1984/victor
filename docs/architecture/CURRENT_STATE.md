@@ -29,7 +29,7 @@ as the steady-state design.
   explicit compatibility shims. Internal production code should not expand
   those seams.
 
-## Verified Runtime Shape (2026-05-04)
+## Verified Runtime Shape (2026-05-05)
 
 ```text
 Agent / Public API
@@ -96,11 +96,11 @@ Agent / Public API
   and `victor.agent.services.state_compat` should not be reintroduced. The
   only remaining state-side compatibility surface is the deprecated
   `StateCoordinatorProtocol` alias in `victor.agent.protocols`.
-- `SystemPromptCoordinator` is the only remaining deprecated prompt
-  compatibility surface. `PromptRuntimeSupport` was removed on 2026-05-05 as a
-  breaking cleanup. Internal runtime assembly no longer wires any separate
-  prompt-support object, and new code should use `UnifiedPromptPipeline`
-  directly.
+- All deprecated prompt compatibility wrappers were removed on 2026-05-05.
+  Internal runtime assembly no longer wires any separate prompt-support or
+  prompt-coordinator object. New runtime code should use
+  `UnifiedPromptPipeline` directly, and state-passed prompt classification
+  should use `SystemPromptStatePassedCoordinator`.
 - `PromptRuntimeAdapter` remains the canonical DI/runtime surface for
   `PromptRuntimeProtocol`, but its system-prompt build path now delegates to
   `UnifiedPromptPipeline`. The adapter still owns only the narrow mutable

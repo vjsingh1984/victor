@@ -40,6 +40,11 @@ class ExplodingContainer:
 class TestCoordinatorFactoryCompatibility:
     """Ensure the factory's legacy coordinator methods stay compatibility-only."""
 
+    def test_create_system_prompt_coordinator_removed(self) -> None:
+        factory = CoordinatorFactory(ExplodingContainer())
+
+        assert not hasattr(factory, "create_system_prompt_coordinator")
+
     def test_create_safety_coordinator_returns_sdk_surface(self) -> None:
         factory = CoordinatorFactory(ExplodingContainer())
 

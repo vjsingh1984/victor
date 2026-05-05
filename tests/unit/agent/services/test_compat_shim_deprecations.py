@@ -46,6 +46,12 @@ def test_prompt_runtime_support_module_removed():
         import victor.agent.services.prompt_runtime_support  # noqa: F401
 
 
+def test_system_prompt_runtime_module_removed():
+    """Verify that system_prompt_runtime module has been removed."""
+    with pytest.raises(ImportError, match="system_prompt_runtime"):
+        import victor.agent.services.system_prompt_runtime  # noqa: F401
+
+
 # Verify canonical imports still work
 def test_canonical_prompt_runtime_imports():
     """Verify canonical prompt runtime imports work."""
@@ -58,6 +64,15 @@ def test_canonical_prompt_runtime_imports():
     assert PromptRuntimeAdapter is not None
     assert PromptRuntimeConfig is not None
     assert PromptRuntimeContext is not None
+
+
+def test_canonical_system_prompt_state_passed_imports():
+    """Verify canonical state-passed system prompt imports work."""
+    from victor.agent.coordinators.system_prompt_state_passed import (
+        SystemPromptStatePassedCoordinator,
+    )
+
+    assert SystemPromptStatePassedCoordinator is not None
 
 
 def test_canonical_state_runtime_imports():
@@ -85,6 +100,7 @@ def test_prompt_coordinator_not_exported_from_services():
 
     assert "PromptCoordinator" not in dir(services)
     assert "create_prompt_coordinator" not in dir(services)
+    assert "SystemPromptCoordinator" not in dir(services)
 
 
 def test_state_coordinator_not_exported_from_services():

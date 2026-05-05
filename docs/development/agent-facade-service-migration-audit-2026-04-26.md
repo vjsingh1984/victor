@@ -57,8 +57,9 @@ Prompt migration has two distinct canonical surfaces:
   the narrower mutable prompt-runtime contract
 - `UnifiedPromptPipeline` remains the canonical owner of orchestrator-managed
   live prompt assembly
-- `SystemPromptCoordinator` is a compatibility wrapper around the live
-  orchestrator prompt path, not the end-state prompt owner
+- `SystemPromptCoordinator` was removed on 2026-05-05; prompt classification
+  now stays on `SystemPromptStatePassedCoordinator` and live prompt assembly
+  stays on `UnifiedPromptPipeline`
 
 ## Verified Orchestrator Bridge Sites
 
@@ -1594,8 +1595,7 @@ wrappers had converged on `UnifiedPromptPipeline`.
   prompt assembly owner
 - `victor.agent.services.prompt_runtime.PromptRuntimeAdapter` remains the DI
   implementation of `PromptRuntimeProtocol`
-- `victor.agent.services.system_prompt_runtime.SystemPromptCoordinator` remains
-  the only deprecated prompt compatibility wrapper
+- no prompt compatibility wrapper remains on the live runtime path
 
 **Changes applied:**
 
@@ -1613,17 +1613,60 @@ wrappers had converged on `UnifiedPromptPipeline`.
 - Removed the last extra compatibility module on the prompt path
 - Removed a dead factory seam that could have reintroduced prompt-surface
   proliferation
-- Simplified the remaining prompt compatibility story to one wrapper:
-  `SystemPromptCoordinator` only
+- Simplified the prompt migration story ahead of the final wrapper removal
 
 **Breaking changes:** Yes. `victor.agent.services.prompt_runtime_support` and
 `OrchestratorFactory.create_prompt_runtime_support(...)` have been removed.
+
+## Migration Update: SystemPromptCoordinator Removed (2026-05-05)
+
+**Seam consolidated:** `SystemPromptCoordinator` remained as the last dead
+prompt compatibility wrapper, and both `OrchestratorFactory` and
+`CoordinatorFactory` still exposed matching creation methods even though the
+live runtime had already converged on `UnifiedPromptPipeline` and the
+state-passed prompt-classification seam.
+
+**Canonical owners:**
+
+- `victor.agent.prompt_pipeline.UnifiedPromptPipeline` remains the single live
+  prompt assembly owner
+- `victor.agent.services.prompt_runtime.PromptRuntimeAdapter` remains the DI
+  implementation of `PromptRuntimeProtocol`
+- `victor.agent.coordinators.SystemPromptStatePassedCoordinator` remains the
+  canonical state-passed prompt-classification seam
+
+**Changes applied:**
+
+1. Deleted `victor.agent.services.system_prompt_runtime`.
+2. Removed `SystemPromptCoordinator` re-exports from
+   `victor.agent.services` and `victor.agent.coordinators`.
+3. Removed `create_system_prompt_coordinator(...)` from the shared factory
+   helper, `OrchestratorFactory`, and `CoordinatorFactory`.
+4. Removed the dead `_system_prompt_coordinator` fallback branch from the
+   orchestrator prompt event hook.
+5. Added unit and integration coverage proving the removed module and factory
+   methods no longer resolve while canonical prompt assembly and
+   `SystemPromptStatePassedCoordinator` continue to work.
+
+**Benefits:**
+
+- Eliminated the last deprecated prompt wrapper from the runtime layer
+- Removed dead factory surfaces that could have reintroduced prompt ownership
+  ambiguity
+- Left the prompt architecture with a single live assembly owner and one clear
+  state-passed classification seam
+
+**Breaking changes:** Yes. `victor.agent.services.system_prompt_runtime`,
+`from victor.agent.services import SystemPromptCoordinator`,
+`from victor.agent.coordinators import SystemPromptCoordinator`,
+`OrchestratorFactory.create_system_prompt_coordinator(...)`, and
+`CoordinatorFactory.create_system_prompt_coordinator(...)` have been removed.
 
 ## Follow-up Work
 
 1. ~~**Bridge-avoidance test naming**~~ - **DECIDED**: No renaming needed. Tests already use canonical method names. Old private wrappers have been removed. Test names accurately describe what they test (canonical API usage, compatibility alias behavior).
 2. ~~**ToolRegistrar plugin-loading abstraction**~~ - **COMPLETED** (2026-05-04): Refactored `_load_plugin_tools()` to delegate to PluginLoader component. Improved SRP compliance by removing ~40 lines of implementation detail. ToolRegistrar is now a thinner facade.
-3. ~~**Design long-term prompt end state**~~ - **IMPLEMENTED** (2026-05-05): Completed the convergence plan for aligning PromptRuntimeProtocol, PromptRuntimeSupport, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md`. Completed: PromptRuntimeAdapter now delegates its system-prompt build path through UnifiedPromptPipeline, PromptRuntimeSupport was removed, and the prompt compatibility story is reduced to `SystemPromptCoordinator` only.
+3. ~~**Design long-term prompt end state**~~ - **IMPLEMENTED** (2026-05-05): Completed the convergence plan for aligning PromptRuntimeProtocol, prompt compatibility shims, and UnifiedPromptPipeline. See `docs/development/prompt-architecture-end-state-design.md`. Completed: PromptRuntimeAdapter now delegates its system-prompt build path through UnifiedPromptPipeline, `PromptRuntimeSupport` was removed, and `SystemPromptCoordinator` was removed. The canonical prompt surfaces are now `UnifiedPromptPipeline`, `PromptRuntimeAdapter`, and `SystemPromptStatePassedCoordinator`.
 4. ~~**StateCoordinator retirement**~~ - **COMPLETED** (2026-05-04): Already retired to ConversationController ownership. See `docs/development/state-coordinator-retirement-analysis.md` for details. StateCoordinator class removed, only protocol alias remains for type checking. ConversationController + ConversationStateMachine + StateRuntimeAdapter provide canonical functionality.
    Note: StateRuntimeProtocol already uses StateRuntimeAdapter; protocol definition is service-native and does not alias StateCoordinatorProtocol.
 5. ~~**External package compatibility validation**~~ - **COMPLETED**: Verified external verticals (victor-coding, victor-research, victor-invest) do not import from removed subservices (13/13 tests pass, zero impact on external packages)

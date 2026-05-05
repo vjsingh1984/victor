@@ -1,9 +1,9 @@
 """State-passed system prompt coordinator (SPA-3).
 
-Wraps SystemPromptCoordinator's task classification with the state-passed
-pattern. The prompt-building itself is a side-effect-free read operation
-that doesn't need transitions, but task classification results should be
-stored as state transitions for downstream coordinators.
+Provides the canonical state-passed task-classification seam for prompt
+handling. Prompt building itself stays on the service-owned prompt pipeline,
+but classification results should be stored as state transitions for
+downstream coordinators.
 
 Usage:
     snapshot = create_snapshot(orchestrator)

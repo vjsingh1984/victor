@@ -937,7 +937,7 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
         )
 
         # UnifiedPromptPipeline: consolidated prompt assembly (replaces
-        # PromptComposer + SystemPromptCoordinator + frozen-prompt glue).
+        # PromptComposer + the older frozen-prompt glue layers).
         try:
             from victor.agent.content_registry import create_default_registry
             from victor.agent.optimization_injector import OptimizationInjector
@@ -2910,16 +2910,11 @@ class AgentOrchestrator(ModeAwareMixin, OrchestratorCapabilityMixin):
     def _emit_prompt_used_event(self, prompt: str) -> None:
         """Emit PROMPT_USED event for RL prompt template learner.
 
-        Delegates to UnifiedPromptPipeline or the legacy coordinator shim.
+        Delegates to UnifiedPromptPipeline.
         """
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             pipeline._emit_prompt_used_event(prompt)
-            return
-
-        legacy_coordinator = getattr(self, "_system_prompt_coordinator", None)
-        if legacy_coordinator is not None:
-            legacy_coordinator._emit_prompt_used_event(prompt)
 
     def _resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 
 def create_exploration_coordinator() -> Any:
@@ -42,33 +42,6 @@ def create_exploration_state_passed_coordinator(
     return ExplorationStatePassedCoordinator(
         project_root=project_root or resolve_project_root(settings),
         max_results=max_results,
-    )
-
-
-def create_system_prompt_coordinator(
-    *,
-    container: Any,
-    prompt_builder: Any = None,
-    get_context_window: Optional[Callable[[], int]] = None,
-    provider_name: str = "",
-    model_name: str = "",
-    get_tools: Optional[Callable[[], Optional[Any]]] = None,
-    get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
-    task_analyzer: Optional[Any] = None,
-    session_id: str = "",
-) -> Any:
-    """Create the compatibility system prompt runtime."""
-    from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
-
-    return SystemPromptCoordinator(
-        prompt_builder=prompt_builder,
-        get_context_window=get_context_window,
-        provider_name=provider_name,
-        model_name=model_name,
-        get_tools=get_tools,
-        get_mode_controller=get_mode_controller,
-        task_analyzer=task_analyzer or resolve_task_analyzer(container),
-        session_id=session_id,
     )
 
 

@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Guardrails for removed prompt-runtime support and remaining compatibility usage."""
+"""Guardrails for removed prompt compatibility surfaces."""
 
 from __future__ import annotations
 
@@ -12,14 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path("victor")
-ALLOWED_FILES = {
-    Path("victor/agent/coordinators/__init__.py"),
-    Path("victor/agent/coordinators/coordinator_factory.py"),
-    Path("victor/agent/coordinators/factory_support.py"),
-    Path("victor/agent/factory/coordination_builders.py"),
-    Path("victor/agent/services/__init__.py"),
-    Path("victor/agent/services/system_prompt_runtime.py"),
-}
+ALLOWED_FILES: set[Path] = set()
 
 
 def _find_prompt_runtime_import_violations(path: Path, source: str) -> list[str]:
@@ -102,6 +95,17 @@ def test_guard_catches_plain_module_imports() -> None:
 
     assert violations == [
         "victor/agent/example.py:1 imports prompt_runtime_support module directly"
+    ]
+
+
+def test_guard_catches_removed_coordinator_package_imports() -> None:
+    violations = _find_prompt_runtime_import_violations(
+        Path("victor/agent/example.py"),
+        "from victor.agent.coordinators import SystemPromptCoordinator\n",
+    )
+
+    assert violations == [
+        "victor/agent/example.py:1 imports SystemPromptCoordinator from coordinators"
     ]
 
 

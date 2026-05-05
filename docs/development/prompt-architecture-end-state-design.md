@@ -31,7 +31,7 @@ overlapping components that created confusion:
 **Issues:**
 - Unclear ownership boundaries between the three components
 - PromptRuntimeAdapter and PromptRuntimeSupport have overlapping responsibilities
-- Compatibility shims (SystemPromptCoordinator) create confusion
+- Compatibility shims created confusion and delayed full convergence
 - No clear path to deprecation
 
 ## Proposed End State
@@ -83,7 +83,8 @@ UnifiedPromptPipeline.build_system_prompt()
 **Rationale:**
 - PromptRuntimeSupport was created as a fallback for compatibility shims
 - With UnifiedPromptPipeline as single authority, no need for fallback
-- SystemPromptCoordinator compatibility shim can directly use UnifiedPromptPipeline
+- The former SystemPromptCoordinator compatibility shim could delegate directly
+  to UnifiedPromptPipeline until it was removed
 - Removes ~200 LOC of duplicate/overlapping code
 
 **Migration path:**
@@ -171,6 +172,22 @@ UnifiedPromptPipeline.build_system_prompt()
    - Document PromptRuntimeProtocol as service layer interface
    - Remove PromptRuntimeSupport references
 
+### Phase 4: Remove SystemPromptCoordinator - Completed 2026-05-05
+
+1. **Delete SystemPromptCoordinator class**
+   - Delete `victor/agent/services/system_prompt_runtime.py`
+   - Remove service and coordinator package re-exports
+
+2. **Delete compatibility factory paths**
+   - Remove `create_system_prompt_coordinator(...)` from
+     `OrchestratorFactory` and `CoordinatorFactory`
+   - Remove the helper from `victor/agent/coordinators/factory_support.py`
+
+3. **Tighten runtime ownership**
+   - Remove the dead `_system_prompt_coordinator` fallback from the orchestrator
+   - Keep prompt ownership on `UnifiedPromptPipeline` and prompt
+     classification on `SystemPromptStatePassedCoordinator`
+
 ## Benefits
 
 1. **Clearer ownership:** UnifiedPromptPipeline is unambiguous single authority
@@ -183,12 +200,14 @@ UnifiedPromptPipeline.build_system_prompt()
 
 ### Risk: Breaking changes for external consumers
 
-**Outcome:** Phase 3 intentionally introduced a breaking change by removing
+**Outcome:** Phases 3 and 4 intentionally introduced breaking changes by removing
 `victor.agent.services.prompt_runtime_support` and
-`OrchestratorFactory.create_prompt_runtime_support(...)`. The stable
-service-owned runtime surface remains `PromptRuntimeProtocol` via
-`PromptRuntimeAdapter`, and the only remaining deprecated prompt compatibility
-wrapper is `SystemPromptCoordinator`.
+`OrchestratorFactory.create_prompt_runtime_support(...)`, then removing
+`victor.agent.services.system_prompt_runtime`,
+`OrchestratorFactory.create_system_prompt_coordinator(...)`, and
+`CoordinatorFactory.create_system_prompt_coordinator(...)`. The stable
+service-owned runtime surfaces remain `PromptRuntimeProtocol` via
+`PromptRuntimeAdapter` and the orchestrator-owned `UnifiedPromptPipeline`.
 
 ### Risk: Performance regression from delegation layers
 
@@ -196,24 +215,27 @@ wrapper is `SystemPromptCoordinator`.
 
 ### Risk: Compatibility shims break during migration
 
-**Mitigation:** Incremental migration with tests at each phase. Keep SystemPromptCoordinator working throughout.
+**Mitigation:** The compatibility shims were removed only after the canonical
+prompt adapter, pipeline, and state-passed coordinator paths were already
+covered by regression and integration tests.
 
 ## Testing Strategy
 
 1. **Phase 1:** Test PromptRuntimeAdapter delegation to UnifiedPromptPipeline
 2. **Phase 2:** Test SystemPromptCoordinator uses UnifiedPromptPipeline correctly
 3. **Phase 3:** Test PromptRuntimeSupport removal doesn't break functionality
-4. **Integration tests:** Verify end-to-end prompt building works
-5. **Performance tests:** Benchmark to ensure no regression
+4. **Phase 4:** Test SystemPromptCoordinator removal doesn't break canonical prompt paths
+5. **Integration tests:** Verify end-to-end prompt building works
+6. **Performance tests:** Benchmark to ensure no regression
 
 ## Follow-up Work
 
 After this design is implemented:
 
-1. Keep current-state and migration-audit docs aligned if the remaining
-   `SystemPromptCoordinator` compatibility wrapper changes.
-2. Add or tighten guardrails before removing `SystemPromptCoordinator` in a
-   later breaking-release batch.
+1. Keep current-state and migration-audit docs aligned if prompt ownership
+   moves again.
+2. Consider whether prompt-classification concerns should stay under the
+   state-passed coordinator or move behind a narrower service-native protocol.
 
 ## Open Questions
 

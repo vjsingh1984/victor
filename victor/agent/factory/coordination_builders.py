@@ -33,7 +33,6 @@ from victor.agent.coordinators.factory_support import (
     create_exploration_coordinator as build_exploration_coordinator,
     create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
     create_safety_state_passed_coordinator as build_safety_state_passed_coordinator,
-    create_system_prompt_coordinator as build_system_prompt_coordinator,
     create_system_prompt_state_passed_coordinator as build_system_prompt_state_passed_coordinator,
 )
 
@@ -126,39 +125,6 @@ class CoordinationBuildersMixin:
             max_results=max_results,
         )
         logger.debug("ExplorationStatePassedCoordinator created")
-        return coordinator
-
-    def create_system_prompt_coordinator(
-        self,
-        *,
-        prompt_builder: Any = None,
-        get_context_window: Optional[Callable[[], int]] = None,
-        provider_name: str = "",
-        model_name: str = "",
-        get_tools: Optional[Callable[[], Optional[Any]]] = None,
-        get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
-        task_analyzer: Optional[Any] = None,
-        session_id: str = "",
-    ) -> Any:
-        """Create the compatibility system prompt runtime."""
-        warnings.warn(
-            "OrchestratorFactory.create_system_prompt_coordinator is deprecated. "
-            "Use UnifiedPromptPipeline or create_system_prompt_state_passed_coordinator instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        coordinator = build_system_prompt_coordinator(
-            container=self.container,
-            prompt_builder=prompt_builder,
-            get_context_window=get_context_window,
-            provider_name=provider_name,
-            model_name=model_name,
-            get_tools=get_tools,
-            get_mode_controller=get_mode_controller,
-            task_analyzer=task_analyzer,
-            session_id=session_id,
-        )
-        logger.debug("SystemPromptCoordinator created")
         return coordinator
 
     def create_system_prompt_state_passed_coordinator(

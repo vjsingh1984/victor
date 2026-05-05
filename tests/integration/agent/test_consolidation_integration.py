@@ -549,6 +549,10 @@ class TestEndToEndIntegration:
         with pytest.raises(ImportError, match="prompt_runtime_support"):
             import victor.agent.services.prompt_runtime_support  # noqa: F401
 
+        # system_prompt_runtime module should not be importable
+        with pytest.raises(ImportError, match="system_prompt_runtime"):
+            import victor.agent.services.system_prompt_runtime  # noqa: F401
+
     def test_canonical_runtime_imports_work(self):
         """Test that canonical runtime imports work correctly."""
         from unittest.mock import MagicMock
@@ -572,3 +576,9 @@ class TestEndToEndIntegration:
             config=prompt_config,
         )
         assert prompt_adapter is not None
+
+        from victor.agent.coordinators.system_prompt_state_passed import (
+            SystemPromptStatePassedCoordinator,
+        )
+
+        assert SystemPromptStatePassedCoordinator is not None
