@@ -145,6 +145,79 @@ class TieredDecisionService:
         self._failed_tiers: Set[str] = set()
         self._detected_provider: Optional[str] = None  # Cached provider detection
 
+    @staticmethod
+    def _normalize_provider_name(provider_name: Optional[str]) -> Optional[str]:
+        """Normalize provider names and ignore placeholder values."""
+        if not provider_name:
+            return None
+        normalized = provider_name.strip().lower()
+        if normalized in {"", "auto", "none", "unknown"}:
+            return None
+        return normalized
+
+    def _cache_detected_provider(
+        self,
+        provider_name: Optional[str],
+        *,
+        source: str,
+    ) -> Optional[str]:
+        """Persist a detected provider if it is meaningful."""
+        normalized = self._normalize_provider_name(provider_name)
+        if normalized is None:
+            return None
+        self._detected_provider = normalized
+        logger.debug(f"Auto-detected provider from {source}: {normalized}")
+        return normalized
+
+    def _detect_provider_from_service_container(self) -> Optional[str]:
+        """Detect the active provider from DI-managed runtime services."""
+        try:
+            from victor.agent.services.protocols import ProviderServiceProtocol
+            from victor.core import get_container
+
+            container = get_container()
+
+            provider_service = container.get_optional(ProviderServiceProtocol)
+            if provider_service is not None:
+                try:
+                    provider_info = provider_service.get_current_provider_info()
+                except Exception:
+                    provider_info = None
+
+                provider_name = self._cache_detected_provider(
+                    getattr(provider_info, "provider_name", None),
+                    source="ProviderServiceProtocol.get_current_provider_info()",
+                )
+                if provider_name:
+                    return provider_name
+
+                provider_name = self._cache_detected_provider(
+                    getattr(provider_service, "provider_name", None),
+                    source="ProviderServiceProtocol.provider_name",
+                )
+                if provider_name:
+                    return provider_name
+
+            # Try ProviderManager (legacy)
+            try:
+                from victor.agent.provider_manager import ProviderManager
+
+                provider_mgr = container.get_optional(ProviderManager)
+                if provider_mgr is not None:
+                    provider_name = self._cache_detected_provider(
+                        getattr(provider_mgr, "provider_name", None),
+                        source="ProviderManager",
+                    )
+                    if provider_name:
+                        return provider_name
+            except Exception:
+                pass
+
+        except Exception:
+            pass
+
+        return None
+
     def _detect_active_provider(self) -> Optional[str]:
         """Detect the active provider from the orchestrator.
 
@@ -161,69 +234,33 @@ class TieredDecisionService:
             return self._detected_provider
 
         # Try to get from service container
-        try:
-            from victor.core import get_container
-
-            container = get_container()
-
-            # Try ProviderService first (new service layer)
-            try:
-                from victor.agent.services.protocols.provider_service import (
-                    ProviderService,
-                )
-
-                provider_service = container.get(ProviderService)
-                if provider_service:
-                    provider_name = getattr(provider_service, "provider_name", None)
-                    if provider_name:
-                        self._detected_provider = provider_name
-                        logger.debug(
-                            f"Auto-detected provider from ProviderService: {provider_name}"
-                        )
-                        return provider_name
-            except Exception:
-                pass
-
-            # Try ProviderManager (legacy)
-            try:
-                from victor.agent.provider_manager import ProviderManager
-
-                provider_mgr = container.get(ProviderManager)
-                if provider_mgr:
-                    provider_name = getattr(provider_mgr, "provider_name", None)
-                    if provider_name:
-                        self._detected_provider = provider_name
-                        logger.debug(
-                            f"Auto-detected provider from ProviderManager: {provider_name}"
-                        )
-                        return provider_name
-            except Exception:
-                pass
-
-        except Exception:
-            pass
+        provider_name = self._detect_provider_from_service_container()
+        if provider_name:
+            return provider_name
 
         # Try settings
         try:
             from victor.config.settings import Settings
 
             settings = Settings()
-            if hasattr(settings, "default_provider") and settings.provider.default_provider:
-                self._detected_provider = settings.provider.default_provider
-                logger.debug(
-                    f"Auto-detected provider from settings: {settings.provider.default_provider}"
-                )
-                return settings.provider.default_provider
+            default_provider = getattr(getattr(settings, "provider", None), "default_provider", None)
+            provider_name = self._cache_detected_provider(
+                default_provider,
+                source="settings",
+            )
+            if provider_name:
+                return provider_name
         except Exception:
             pass
 
         # Try environment variable
         try:
-            provider = os.getenv("VICTOR_PROVIDER")
-            if provider:
-                self._detected_provider = provider.lower()
-                logger.debug(f"Auto-detected provider from env var: {provider}")
-                return self._detected_provider
+            provider_name = self._cache_detected_provider(
+                os.getenv("VICTOR_PROVIDER"),
+                source="env var",
+            )
+            if provider_name:
+                return provider_name
         except Exception:
             pass
 

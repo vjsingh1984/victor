@@ -14,6 +14,7 @@ Covers:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -233,6 +234,55 @@ class TestDecisionServiceSettings:
 
 class TestProviderAgnosticTiers:
     """Provider-agnostic tier system tests."""
+
+    def test_auto_detection_from_provider_service_info(self):
+        """Auto-detection should prefer the live provider service info."""
+        from victor.agent.services.tiered_decision_service import TieredDecisionService
+        from victor.config.decision_settings import DecisionServiceSettings
+
+        config = DecisionServiceSettings()
+        service = TieredDecisionService(config)
+
+        provider_service = MagicMock()
+        provider_service.get_current_provider_info.return_value = SimpleNamespace(
+            provider_name="zai"
+        )
+        provider_service.provider_name = "ollama"
+
+        container = MagicMock()
+        container.get_optional.side_effect = lambda service_type: (
+            provider_service if service_type.__name__ == "ProviderServiceProtocol" else None
+        )
+
+        with patch("victor.core.get_container", return_value=container):
+            provider = service._detect_active_provider()
+
+        assert provider == "zai"
+        provider_service.get_current_provider_info.assert_called_once_with()
+
+    def test_auto_detection_from_provider_service_property(self):
+        """Auto-detection should fall back to provider_service.provider_name."""
+        from victor.agent.services.tiered_decision_service import TieredDecisionService
+        from victor.config.decision_settings import DecisionServiceSettings
+
+        config = DecisionServiceSettings()
+        service = TieredDecisionService(config)
+
+        provider_service = MagicMock()
+        provider_service.get_current_provider_info.return_value = SimpleNamespace(
+            provider_name="none"
+        )
+        provider_service.provider_name = "ZAI"
+
+        container = MagicMock()
+        container.get_optional.side_effect = lambda service_type: (
+            provider_service if service_type.__name__ == "ProviderServiceProtocol" else None
+        )
+
+        with patch("victor.core.get_container", return_value=container):
+            provider = service._detect_active_provider()
+
+        assert provider == "zai"
 
     def test_auto_detection_from_settings(self):
         """Auto-detection falls back to settings.default_provider."""
