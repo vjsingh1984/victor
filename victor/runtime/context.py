@@ -124,6 +124,7 @@ class ResolvedRuntimeServices:
 
 def _services_from_accessor(accessor: Any) -> ResolvedRuntimeServices:
     """Build a resolved runtime service bundle from a typed accessor."""
+
     def _service_attr(name: str) -> Any:
         if isinstance(accessor, ServiceAccessor):
             return getattr(accessor, name, None)

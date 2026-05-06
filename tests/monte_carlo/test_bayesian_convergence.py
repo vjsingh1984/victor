@@ -275,8 +275,12 @@ class TestVoIAccuracy:
             agent_message = "Yes" if actual_outcome == "success" else "No"
 
             # Get likelihood
-            likelihood_success = observation_learner.get_likelihood("agent_a", agent_message, "success")
-            likelihood_failure = observation_learner.get_likelihood("agent_a", agent_message, "failure")
+            likelihood_success = observation_learner.get_likelihood(
+                "agent_a", agent_message, "success"
+            )
+            likelihood_failure = observation_learner.get_likelihood(
+                "agent_a", agent_message, "failure"
+            )
 
             # Compute posterior
             belief.compute_posterior(
@@ -290,7 +294,9 @@ class TestVoIAccuracy:
                 return -sum(p * math.log(p) if p > 0 else 0 for p in dist.values())
 
             prior_entropy = compute_entropy({"success": 0.5, "failure": 0.5})
-            posterior_entropy = compute_entropy(belief.outcome_belief)  # Posterior is stored in belief
+            posterior_entropy = compute_entropy(
+                belief.outcome_belief
+            )  # Posterior is stored in belief
             actual_gain = prior_entropy - posterior_entropy
 
             voi_predictions.append(predicted_voi)

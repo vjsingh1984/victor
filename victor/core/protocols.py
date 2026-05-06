@@ -387,7 +387,6 @@ class RuntimeIntelligencePipelineProtocol(Protocol):
         """
         ...
 
-
     def should_continue(self) -> tuple[bool, str]:
         """Check if processing should continue.
 

@@ -24,7 +24,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FACADE_SPECS = (
     ("victor/agent/facades/chat_facade.py", "ChatFacade"),

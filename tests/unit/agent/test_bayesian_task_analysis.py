@@ -76,7 +76,6 @@ class TestBayesianTaskAnalysisInit:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.SEARCH,
             agent_reliability=reliability.copy(),
@@ -96,7 +95,6 @@ class TestPosteriorUpdate:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -120,7 +118,6 @@ class TestPosteriorUpdate:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.COMPLEX,
             tool_budget=20,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.GENERATION,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -148,7 +145,6 @@ class TestPosteriorUpdate:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -172,7 +168,6 @@ class TestPosteriorUpdate:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -199,7 +194,6 @@ class TestEntropyComputation:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -216,7 +210,6 @@ class TestEntropyComputation:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 1.0, "failure": 0.0},
@@ -230,7 +223,6 @@ class TestEntropyComputation:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -250,7 +242,6 @@ class TestEntropyComputation:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.COMPLEX,
             tool_budget=20,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.GENERATION,
             outcome_belief={"success": 0.33, "partial": 0.33, "failure": 0.34},
@@ -271,7 +262,6 @@ class TestVoIComputation:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -288,7 +278,6 @@ class TestVoIComputation:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.99, "failure": 0.01},
@@ -305,7 +294,6 @@ class TestVoIComputation:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             outcome_belief={"success": 0.5, "failure": 0.5},
@@ -326,7 +314,6 @@ class TestBeliefPersistence:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.COMPLEX,
             tool_budget=20,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.GENERATION,
             outcome_belief={"success": 0.7, "failure": 0.3},
@@ -356,7 +343,6 @@ class TestBeliefPersistence:
         analysis = BayesianTaskAnalysis(
             complexity=TaskComplexity.SIMPLE,
             tool_budget=10,
-
             complexity_confidence=0.8,
             unified_task_type=UnifiedTaskType.EDIT,
             **stored_belief,

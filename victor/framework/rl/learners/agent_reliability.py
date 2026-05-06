@@ -68,15 +68,13 @@ class AgentReliabilityLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Ensure rl_agent_reliability table exists."""
-        self.db.execute(
-            f"""CREATE TABLE IF NOT EXISTS rl_agent_reliability (
+        self.db.execute(f"""CREATE TABLE IF NOT EXISTS rl_agent_reliability (
             agent_id TEXT NOT NULL PRIMARY KEY,
             alpha_reliability REAL NOT NULL DEFAULT {PRIOR_ALPHA},
             beta_reliability REAL NOT NULL DEFAULT {PRIOR_BETA},
             sample_count INTEGER NOT NULL DEFAULT 0,
             last_updated TEXT NOT NULL
-        )"""
-        )
+        )""")
 
         # Create index for faster lookups
         self.db.execute(
@@ -123,11 +121,11 @@ class AgentReliabilityLearner(BaseLearner):
             (
                 agent_id,
                 PRIOR_ALPHA + alpha_increment,  # Initial alpha with increment
-                PRIOR_BETA + beta_increment,   # Initial beta with increment
+                PRIOR_BETA + beta_increment,  # Initial beta with increment
                 1,  # Initial sample count
                 datetime.now().isoformat(),
                 alpha_increment,  # Increment alpha
-                beta_increment,   # Increment beta
+                beta_increment,  # Increment beta
                 datetime.now().isoformat(),
             ),
         )
@@ -160,8 +158,7 @@ class AgentReliabilityLearner(BaseLearner):
 
         # Check if this is a new agent (only prior, no samples)
         cursor = self.db.execute(
-            "SELECT sample_count FROM rl_agent_reliability WHERE agent_id=?",
-            (agent_id,)
+            "SELECT sample_count FROM rl_agent_reliability WHERE agent_id=?", (agent_id,)
         )
         result = cursor.fetchone()
 
@@ -302,18 +299,13 @@ class AgentReliabilityLearner(BaseLearner):
         calibration_error = outcome.metadata.get("calibration_error", 0.5)
 
         if not agent_id:
-            logger.warning(
-                f"Missing agent_id in outcome metadata: "
-                f"{outcome.metadata.keys()}"
-            )
+            logger.warning(f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}")
             return
 
         # Record the prediction result
         self.record_prediction_result(agent_id, was_correct, calibration_error)
 
-    def get_recommendation(
-        self, context: Dict[str, Any]
-    ) -> Optional[RLRecommendation]:
+    def get_recommendation(self, context: Dict[str, Any]) -> Optional[RLRecommendation]:
         """Get reliability recommendation for given context.
 
         Args:
@@ -398,13 +390,11 @@ class AgentReliabilityLearner(BaseLearner):
         Returns:
             Dict with aggregate reliability metrics
         """
-        cursor = self.db.execute(
-            """SELECT agent_id,
+        cursor = self.db.execute("""SELECT agent_id,
                       sample_count,
                       CAST(alpha_reliability AS REAL) / (alpha_reliability + beta_reliability) as expected_reliability
                FROM rl_agent_reliability
-            """
-        )
+            """)
 
         stats = {}
         for row in cursor.fetchall():

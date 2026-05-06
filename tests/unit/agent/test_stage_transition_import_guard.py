@@ -31,7 +31,6 @@ import ast
 import os
 from pathlib import Path
 
-
 LEGACY_STAGE_TRANSITION_EXPORTS = {
     "StageTransitionCoordinator",
     "TransitionDecision",

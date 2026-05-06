@@ -2929,7 +2929,9 @@ class TestIntelligentPipelineIntegration:
             "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._prepare_runtime_intelligence_request("test task", "analysis")
+            result = await orchestrator._prepare_runtime_intelligence_request(
+                "test task", "analysis"
+            )
 
         assert result is not None
         assert result["recommended_mode"] == "explore"
@@ -2948,7 +2950,9 @@ class TestIntelligentPipelineIntegration:
             "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._prepare_runtime_intelligence_request("test task", "analysis")
+            result = await orchestrator._prepare_runtime_intelligence_request(
+                "test task", "analysis"
+            )
 
         assert result is None
 
@@ -2972,7 +2976,9 @@ class TestIntelligentPipelineIntegration:
             "runtime_intelligence_integration",
             property(lambda self: mock_integration),
         ):
-            result = await orchestrator._validate_runtime_intelligence_response("", "query", 5, "analysis")
+            result = await orchestrator._validate_runtime_intelligence_response(
+                "", "query", 5, "analysis"
+            )
             assert result is None
 
             result = await orchestrator._validate_runtime_intelligence_response(
@@ -3057,7 +3063,9 @@ class TestIntelligentPipelineIntegration:
         """Test _record_runtime_intelligence_outcome handles errors."""
         mock_integration = MagicMock()
         # Mock the new method name (TD-002 refactoring)
-        mock_integration.record_runtime_intelligence_outcome = MagicMock(side_effect=Exception("Error"))
+        mock_integration.record_runtime_intelligence_outcome = MagicMock(
+            side_effect=Exception("Error")
+        )
         with patch.object(
             type(orchestrator),
             "runtime_intelligence_integration",

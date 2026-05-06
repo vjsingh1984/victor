@@ -35,11 +35,19 @@ class PromptBuilderRuntime:
                 builder.available_tools = []
                 tool_state_changed = True
 
-        stable_tools, dynamic_tools = self._split_prompt_tools(getattr(builder, "available_tools", []))
-        if not hasattr(builder, "stable_prompt_tools") or builder.stable_prompt_tools != stable_tools:
+        stable_tools, dynamic_tools = self._split_prompt_tools(
+            getattr(builder, "available_tools", [])
+        )
+        if (
+            not hasattr(builder, "stable_prompt_tools")
+            or builder.stable_prompt_tools != stable_tools
+        ):
             builder.stable_prompt_tools = stable_tools
             cache_invalidated = True
-        if not hasattr(builder, "dynamic_prompt_tools") or builder.dynamic_prompt_tools != dynamic_tools:
+        if (
+            not hasattr(builder, "dynamic_prompt_tools")
+            or builder.dynamic_prompt_tools != dynamic_tools
+        ):
             builder.dynamic_prompt_tools = dynamic_tools
 
         try:
@@ -438,7 +446,9 @@ class PromptBuilderRuntime:
         keyword_matches = [
             tool_name
             for tool_name in dynamic_tools
-            if self._tool_matches_message(tool_catalog.get(tool_name), tool_name, user_message_lower)
+            if self._tool_matches_message(
+                tool_catalog.get(tool_name), tool_name, user_message_lower
+            )
         ]
 
         if keyword_matches:

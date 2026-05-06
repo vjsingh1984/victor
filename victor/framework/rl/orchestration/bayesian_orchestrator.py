@@ -76,8 +76,7 @@ class BayesianOrchestrationService:
 
     def _ensure_tables(self) -> None:
         """Ensure required database tables exist."""
-        self.db.execute(
-            """CREATE TABLE IF NOT EXISTS rl_belief_history (
+        self.db.execute("""CREATE TABLE IF NOT EXISTS rl_belief_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             belief_id TEXT NOT NULL,
             success_prob REAL NOT NULL,
@@ -86,13 +85,11 @@ class BayesianOrchestrationService:
             agent_id TEXT,
             message TEXT,
             timestamp TEXT NOT NULL
-        )"""
-        )
+        )""")
 
         # Create indexes
         self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_belief_history_id "
-            "ON rl_belief_history(belief_id)"
+            "CREATE INDEX IF NOT EXISTS idx_belief_history_id " "ON rl_belief_history(belief_id)"
         )
         self.db.execute(
             "CREATE INDEX IF NOT EXISTS idx_belief_history_timestamp "
@@ -240,8 +237,7 @@ class BayesianOrchestrationService:
         # Apply reliability weighting to likelihood
         # P(z|Y)^α_i
         weighted_likelihood = {
-            outcome: prob ** reliability_weight
-            for outcome, prob in likelihood.items()
+            outcome: prob**reliability_weight for outcome, prob in likelihood.items()
         }
 
         # Compute posterior
@@ -362,8 +358,9 @@ class BayesianOrchestrationService:
         is_affirming = any(kw in message_lower for kw in affirm_keywords)
         is_denying = any(kw in message_lower for kw in deny_keywords)
 
-        was_correct = (is_affirming and actual_outcome == "success") or \
-                     (is_denying and actual_outcome == "failure")
+        was_correct = (is_affirming and actual_outcome == "success") or (
+            is_denying and actual_outcome == "failure"
+        )
 
         # Record observation in observation model
         self.observation_learner.record_observation(
@@ -385,9 +382,7 @@ class BayesianOrchestrationService:
             f"correct={was_correct}"
         )
 
-    def get_belief_history(
-        self, belief_id: str, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    def get_belief_history(self, belief_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get history of belief state changes.
 
         Args:
@@ -410,14 +405,16 @@ class BayesianOrchestrationService:
         history = []
         for row in cursor.fetchall():
             success_prob, failure_prob, entropy, agent_id, message, timestamp = row
-            history.append({
-                "success_prob": success_prob,
-                "failure_prob": failure_prob,
-                "entropy": entropy,
-                "agent_id": agent_id,
-                "message": message,
-                "timestamp": timestamp,
-            })
+            history.append(
+                {
+                    "success_prob": success_prob,
+                    "failure_prob": failure_prob,
+                    "entropy": entropy,
+                    "agent_id": agent_id,
+                    "message": message,
+                    "timestamp": timestamp,
+                }
+            )
 
         return history
 

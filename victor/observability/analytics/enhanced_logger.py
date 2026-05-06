@@ -438,10 +438,9 @@ class EnhancedUsageLogger:
         if depth >= 20:
             return f"<max_depth:{type(data).__name__}>"
 
-        track_identity = (
-            isinstance(data, (dict, MappingProxyType, list, tuple, set, frozenset))
-            or hasattr(data, "__dict__")
-        )
+        track_identity = isinstance(
+            data, (dict, MappingProxyType, list, tuple, set, frozenset)
+        ) or hasattr(data, "__dict__")
         obj_id = id(data)
         if track_identity:
             if obj_id in seen:
@@ -452,7 +451,9 @@ class EnhancedUsageLogger:
             if isinstance(data, dict) or isinstance(data, MappingProxyType):
                 sanitized: Dict[Any, Any] = {}
                 for key, value in dict(data).items():
-                    safe_key = key if isinstance(key, (str, int, float, bool)) or key is None else str(key)
+                    safe_key = (
+                        key if isinstance(key, (str, int, float, bool)) or key is None else str(key)
+                    )
                     sanitized[safe_key] = self._sanitize_log_data_inner(value, seen, depth + 1)
                 return sanitized
 

@@ -243,7 +243,9 @@ class TieredDecisionService:
             from victor.config.settings import Settings
 
             settings = Settings()
-            default_provider = getattr(getattr(settings, "provider", None), "default_provider", None)
+            default_provider = getattr(
+                getattr(settings, "provider", None), "default_provider", None
+            )
             provider_name = self._cache_detected_provider(
                 default_provider,
                 source="settings",

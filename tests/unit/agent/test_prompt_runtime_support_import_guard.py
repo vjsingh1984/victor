@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 ROOT = Path("victor")
 ALLOWED_FILES: set[Path] = set()
 
@@ -47,7 +46,8 @@ def _find_prompt_runtime_import_violations(path: Path, source: str) -> list[str]
                 disallowed = {
                     alias.name
                     for alias in node.names
-                    if alias.name in {
+                    if alias.name
+                    in {
                         "create_prompt_runtime_support",
                         "create_system_prompt_coordinator",
                     }

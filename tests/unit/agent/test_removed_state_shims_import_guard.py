@@ -19,7 +19,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 ROOT = Path("victor")
 REMOVED_STATE_MODULES = frozenset(
     {
@@ -47,6 +46,8 @@ def test_internal_code_does_not_import_deleted_state_shim_modules() -> None:
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name in REMOVED_STATE_MODULES:
-                        violations.append(f"{path}:{node.lineno} imports removed module {alias.name}")
+                        violations.append(
+                            f"{path}:{node.lineno} imports removed module {alias.name}"
+                        )
 
     assert not violations, "\n".join(violations)

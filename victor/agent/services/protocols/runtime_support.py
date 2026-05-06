@@ -491,6 +491,7 @@ class RLLearningRuntimeProtocol(Protocol):
         """Close database connection."""
         ...
 
+
 __all__ = [
     "ChunkRuntimeProtocol",
     "CoordinationAdvisorRuntimeProtocol",

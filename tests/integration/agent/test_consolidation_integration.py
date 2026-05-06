@@ -622,4 +622,6 @@ class TestEndToEndIntegration:
         assert "ModeWorkflowTeamCoordinatorProtocol" not in coordination.__all__
 
         with pytest.raises(ImportError, match="ModeWorkflowTeamCoordinatorProtocol"):
-            from victor.protocols.coordination import ModeWorkflowTeamCoordinatorProtocol  # noqa: F401
+            from victor.protocols.coordination import (
+                ModeWorkflowTeamCoordinatorProtocol,
+            )  # noqa: F401

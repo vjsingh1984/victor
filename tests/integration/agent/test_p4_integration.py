@@ -384,8 +384,12 @@ class TestToolPipelineDeduplicationIntegration:
             deduplication_tracker=ToolDeduplicationTracker(window_size=10),
         )
 
-        search_call = [{"name": "code_search", "arguments": {"query": "node_ids", "path": str(repo_root)}}]
-        write_call = [{"name": "write", "arguments": {"path": str(changed_file), "content": "print('after')"}}]
+        search_call = [
+            {"name": "code_search", "arguments": {"query": "node_ids", "path": str(repo_root)}}
+        ]
+        write_call = [
+            {"name": "write", "arguments": {"path": str(changed_file), "content": "print('after')"}}
+        ]
 
         import victor.tools.code_search_tool as code_search_tool_module
 

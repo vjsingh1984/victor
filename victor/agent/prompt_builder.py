@@ -480,7 +480,9 @@ class SystemPromptBuilder:
         frequently used tools in the system prompt while surfacing long-tail
         tools only when the current turn likely needs them.
         """
-        source_tools = relevant_tools if relevant_tools is not None else self.get_dynamic_prompt_tools()
+        source_tools = (
+            relevant_tools if relevant_tools is not None else self.get_dynamic_prompt_tools()
+        )
         normalized_tools = sorted(
             {canonicalize_core_tool_name(tool) for tool in source_tools if tool}
         )

@@ -52,6 +52,7 @@ def create_interaction_runtime_components(
     from victor.agent.services.recovery_service import RecoveryService
     from victor.agent.services.session_service import SessionService
     from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+
     resolved_services = runtime_services or ResolvedRuntimeServices()
 
     resolved_tool_service = resolved_services.tool

@@ -66,10 +66,7 @@ class TestChatBayesianIntegration:
 
     def test_session_config_custom_thresholds(self):
         """Test custom complexity thresholds."""
-        config = SessionConfig.from_cli_flags(
-            simple_threshold=0.5,
-            complex_threshold=0.9
-        )
+        config = SessionConfig.from_cli_flags(simple_threshold=0.5, complex_threshold=0.9)
 
         assert config.bayesian.simple_threshold == 0.5
         assert config.bayesian.complex_threshold == 0.9
@@ -99,7 +96,9 @@ class TestChatBayesianIntegration:
         for query in simple_queries:
             analysis = complexity_detector.analyze(query)
             assert analysis.level == ComplexityLevel.SIMPLE, f"Query should be SIMPLE: {query}"
-            assert complexity_detector.should_use_bayesian(query) is False, f"Should not use Bayesian: {query}"
+            assert (
+                complexity_detector.should_use_bayesian(query) is False
+            ), f"Should not use Bayesian: {query}"
 
     def test_complexity_detector_moderate_queries(self, complexity_detector):
         """Test moderate queries are classified correctly."""

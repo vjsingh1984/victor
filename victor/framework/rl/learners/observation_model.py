@@ -58,8 +58,14 @@ def categorize_message(message: str, outcome: str, confidence: float) -> str:
 
     # Check for uncertainty indicators
     uncertain_keywords = [
-        "maybe", "possibly", "might", "uncertain", "not sure",
-        "could be", "probably", "likely"
+        "maybe",
+        "possibly",
+        "might",
+        "uncertain",
+        "not sure",
+        "could be",
+        "probably",
+        "likely",
     ]
     if any(keyword in message_lower for keyword in uncertain_keywords):
         return "uncertain"
@@ -67,16 +73,21 @@ def categorize_message(message: str, outcome: str, confidence: float) -> str:
     # Check for negative/denying indicators (agent predicts failure)
     # Check deny BEFORE affirm to handle "won't work" correctly
     deny_keywords = [
-        "no", "wrong", "incorrect", "bad", "fail", "doesn't",
-        "won't", "can't", "not work"
+        "no",
+        "wrong",
+        "incorrect",
+        "bad",
+        "fail",
+        "doesn't",
+        "won't",
+        "can't",
+        "not work",
     ]
     if any(keyword in message_lower for keyword in deny_keywords):
         return "deny"
 
     # Check for positive/affirming indicators (agent predicts success)
-    affirm_keywords = [
-        "yes", "correct", "right", "good", "success", "works"
-    ]
+    affirm_keywords = ["yes", "correct", "right", "good", "success", "works"]
     if any(keyword in message_lower for keyword in affirm_keywords):
         return "affirm"
 
@@ -121,8 +132,7 @@ class ObservationModelLearner(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Ensure rl_observation_model table exists."""
-        self.db.execute(
-            f"""CREATE TABLE IF NOT EXISTS rl_observation_model (
+        self.db.execute(f"""CREATE TABLE IF NOT EXISTS rl_observation_model (
             agent_id TEXT NOT NULL,
             outcome_type TEXT NOT NULL,
             message_category TEXT NOT NULL,
@@ -131,8 +141,7 @@ class ObservationModelLearner(BaseLearner):
             sample_count INTEGER NOT NULL DEFAULT 0,
             last_updated TEXT NOT NULL,
             PRIMARY KEY (agent_id, outcome_type, message_category)
-        )"""
-        )
+        )""")
 
         # Create index for faster lookups
         self.db.execute(
@@ -187,10 +196,10 @@ class ObservationModelLearner(BaseLearner):
                 actual_outcome,
                 category,
                 PRIOR_ALPHA + alpha_increment,  # Initial alpha with increment
-                PRIOR_BETA + beta_increment,   # Initial beta with increment
+                PRIOR_BETA + beta_increment,  # Initial beta with increment
                 datetime.now().isoformat(),
                 alpha_increment,  # Increment alpha
-                beta_increment,   # Increment beta
+                beta_increment,  # Increment beta
                 datetime.now().isoformat(),
             ),
         )
@@ -260,9 +269,7 @@ class ObservationModelLearner(BaseLearner):
         elif sample_count < 10:
             posterior_mean = alpha / (alpha + beta)
             exploration_scale = sample_count / (sample_count + 5.0)
-            likelihood = posterior_mean + exploration_scale * (
-                sampled_likelihood - posterior_mean
-            )
+            likelihood = posterior_mean + exploration_scale * (sampled_likelihood - posterior_mean)
         else:
             likelihood = sampled_likelihood
 
@@ -291,8 +298,14 @@ class ObservationModelLearner(BaseLearner):
 
         # Check for uncertainty indicators
         uncertain_keywords = [
-            "maybe", "possibly", "might", "uncertain", "not sure",
-            "could be", "probably", "likely"
+            "maybe",
+            "possibly",
+            "might",
+            "uncertain",
+            "not sure",
+            "could be",
+            "probably",
+            "likely",
         ]
         if any(keyword in message_lower for keyword in uncertain_keywords):
             return "uncertain"
@@ -300,25 +313,28 @@ class ObservationModelLearner(BaseLearner):
         # Check for negative/denying indicators (agent predicts failure)
         # Check deny BEFORE affirm to handle "won't work" correctly
         deny_keywords = [
-            "no", "wrong", "incorrect", "bad", "fail", "doesn't",
-            "won't", "can't", "not work"
+            "no",
+            "wrong",
+            "incorrect",
+            "bad",
+            "fail",
+            "doesn't",
+            "won't",
+            "can't",
+            "not work",
         ]
         if any(keyword in message_lower for keyword in deny_keywords):
             return "deny"
 
         # Check for positive/affirming indicators (agent predicts success)
-        affirm_keywords = [
-            "yes", "correct", "right", "good", "success", "works"
-        ]
+        affirm_keywords = ["yes", "correct", "right", "good", "success", "works"]
         if any(keyword in message_lower for keyword in affirm_keywords):
             return "affirm"
 
         # Default to uncertain if no clear signal
         return "uncertain"
 
-    def _get_parameters(
-        self, agent_id: str, outcome: str, category: str
-    ) -> Dict[str, float]:
+    def _get_parameters(self, agent_id: str, outcome: str, category: str) -> Dict[str, float]:
         """Get Beta parameters for (agent, outcome, category).
 
         Args:
@@ -398,7 +414,9 @@ class ObservationModelLearner(BaseLearner):
                         "outcome_count": 0,
                     }
 
-                calibration_by_category[message_category]["total_error"] += outcome_calibration_error
+                calibration_by_category[message_category][
+                    "total_error"
+                ] += outcome_calibration_error
                 calibration_by_category[message_category]["total_samples"] += total_samples
                 calibration_by_category[message_category]["outcome_count"] += 1
 
@@ -477,9 +495,7 @@ class ObservationModelLearner(BaseLearner):
         # Record the observation
         self.record_observation(agent_id, message, actual_outcome, confidence)
 
-    def get_recommendation(
-        self, context: Dict[str, Any]
-    ) -> Optional[RLRecommendation]:
+    def get_recommendation(self, context: Dict[str, Any]) -> Optional[RLRecommendation]:
         """Get likelihood recommendation for given context.
 
         Args:
@@ -522,10 +538,7 @@ class ObservationModelLearner(BaseLearner):
             return 0.0
 
         # Reward based on average calibration error across all categories
-        total_error = sum(
-            cat.get("calibration_error", 0.5)
-            for cat in calibration.values()
-        )
+        total_error = sum(cat.get("calibration_error", 0.5) for cat in calibration.values())
         avg_error = total_error / len(calibration) if calibration else 0.5
 
         # Reward is negative of error (lower error = higher reward)
@@ -533,8 +546,7 @@ class ObservationModelLearner(BaseLearner):
         reward = max(-1.0, min(1.0, -avg_error))
 
         logger.debug(
-            f"Computed reward for {agent_id}: {reward:.4f} "
-            f"(calibration_error={avg_error:.4f})"
+            f"Computed reward for {agent_id}: {reward:.4f} " f"(calibration_error={avg_error:.4f})"
         )
 
         return reward
@@ -545,14 +557,12 @@ class ObservationModelLearner(BaseLearner):
         Returns:
             Dict with aggregate calibration metrics
         """
-        cursor = self.db.execute(
-            """SELECT agent_id,
+        cursor = self.db.execute("""SELECT agent_id,
                       SUM(sample_count) as total_samples,
                       AVG(CAST(alpha AS REAL) / CAST(alpha + beta AS REAL)) as avg_expected_prob
                FROM rl_observation_model
                GROUP BY agent_id
-            """
-        )
+            """)
 
         stats = {}
         for row in cursor.fetchall():

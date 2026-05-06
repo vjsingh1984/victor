@@ -202,9 +202,7 @@ def ensure_architecture_patterns_section(content: str, graph_context: Optional[d
     }
 
     missing_lines = [
-        f"- {pattern}"
-        for pattern in fallback_patterns
-        if pattern.lower() not in existing_items
+        f"- {pattern}" for pattern in fallback_patterns if pattern.lower() not in existing_items
     ]
     if not missing_lines:
         return content

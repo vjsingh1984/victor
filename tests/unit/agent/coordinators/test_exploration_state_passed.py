@@ -120,13 +120,11 @@ class TestExplorationStatePassedExplore:
                 max_results=7,
             )
             call_kwargs = mock.call_args
+            assert call_kwargs.kwargs.get("project_root") == Path("/tmp/runtime") or call_kwargs[
+                1
+            ].get("project_root") == Path("/tmp/runtime")
             assert (
-                call_kwargs.kwargs.get("project_root") == Path("/tmp/runtime")
-                or call_kwargs[1].get("project_root") == Path("/tmp/runtime")
-            )
-            assert (
-                call_kwargs.kwargs.get("max_results") == 7
-                or call_kwargs[1].get("max_results") == 7
+                call_kwargs.kwargs.get("max_results") == 7 or call_kwargs[1].get("max_results") == 7
             )
 
     @pytest.mark.asyncio

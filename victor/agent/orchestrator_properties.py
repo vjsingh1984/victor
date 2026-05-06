@@ -251,12 +251,11 @@ def _runtime_intelligence_integration(
             logger.debug(f"RuntimeIntelligencePipeline dependencies not available: {e}")
             self._runtime_intelligence_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(
-                f"Failed to initialize RuntimeIntelligencePipeline (config error): {e}"
-            )
+            logger.warning(f"Failed to initialize RuntimeIntelligencePipeline (config error): {e}")
             self._runtime_intelligence_enabled = False
 
     return self._runtime_intelligence_integration
+
 
 def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
     """Get the sub-agent orchestrator (lazy init)."""
@@ -431,8 +430,6 @@ def _get_provider_runtime_component(
     if runtime is None:
         return None
     return getattr(runtime, component_name, None)
-
-
 
 
 # =====================================================================

@@ -271,9 +271,7 @@ async def test_graph_tool_skips_local_background_refresh_when_daemon_is_active(
 
 
 @pytest.mark.asyncio
-async def test_graph_tool_reuses_project_root_for_nested_node_queries(
-    monkeypatch, tmp_path: Path
-):
+async def test_graph_tool_reuses_project_root_for_nested_node_queries(monkeypatch, tmp_path: Path):
     from victor.tools import graph_tool as graph_tool_module
 
     project_root = tmp_path.resolve()
@@ -304,7 +302,11 @@ async def test_graph_tool_reuses_project_root_for_nested_node_queries(
     fake_manager = SimpleNamespace(ensure_background_refresh=AsyncMock())
 
     monkeypatch.setattr(graph_tool_module, "_load_graph", _fake_load_graph)
-    monkeypatch.setattr(graph_tool_module, "get_project_paths", lambda *_args, **_kwargs: SimpleNamespace(project_root=project_root))
+    monkeypatch.setattr(
+        graph_tool_module,
+        "get_project_paths",
+        lambda *_args, **_kwargs: SimpleNamespace(project_root=project_root),
+    )
     monkeypatch.setattr(
         graph_tool_module,
         "_project_graph_watch_daemon_active",

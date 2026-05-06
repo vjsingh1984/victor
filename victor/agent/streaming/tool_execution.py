@@ -446,7 +446,9 @@ class ToolExecutionHandler:
         if not has_progress_signal:
             return None
 
-        relief_amount = max(1, int(getattr(self._settings, "tool_budget_progress_relief_amount", 10)))
+        relief_amount = max(
+            1, int(getattr(self._settings, "tool_budget_progress_relief_amount", 10))
+        )
         missing_calls = requested_tool_calls - remaining
         relief_amount = min(relief_amount, missing_calls)
         if relief_amount <= 0:
@@ -713,7 +715,11 @@ def create_tool_execution_handler(
     def _set_budget_limit(budget: int) -> int:
         unified_tracker = getattr(orchestrator, "unified_tracker", None)
         if getattr(unified_tracker, "_sticky_user_budget", False):
-            return int(getattr(unified_tracker, "tool_budget", getattr(orchestrator, "tool_budget", budget)))
+            return int(
+                getattr(
+                    unified_tracker, "tool_budget", getattr(orchestrator, "tool_budget", budget)
+                )
+            )
 
         effective_budget = int(budget)
         if unified_tracker is not None and hasattr(unified_tracker, "set_tool_budget"):

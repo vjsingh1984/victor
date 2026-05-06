@@ -91,7 +91,9 @@ async def test_turn_executor_uses_shared_state_passed_exploration_coordinator() 
     assert orchestrator.conversation_state["explored_files"] == [
         "victor/agent/services/exploration_runtime.py"
     ]
-    assert orchestrator.conversation_state["exploration_summary"] == "shared state-passed exploration"
+    assert (
+        orchestrator.conversation_state["exploration_summary"] == "shared state-passed exploration"
+    )
     chat_context.add_message.assert_called_once_with(
         "user",
         "[Parallel exploration results]\nshared state-passed exploration",

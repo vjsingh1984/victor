@@ -449,8 +449,12 @@ class TestConsensusStrategies:
 
         # Check agent contributions to understand weighting
         contributions = consensus["agent_contributions"]
-        agent_a_weight = contributions["agent_a"].get("adjusted_weight", contributions["agent_a"].get("weight", 1.0))
-        agent_b_weight = contributions["agent_b"].get("adjusted_weight", contributions["agent_b"].get("weight", 1.0))
+        agent_a_weight = contributions["agent_a"].get(
+            "adjusted_weight", contributions["agent_a"].get("weight", 1.0)
+        )
+        agent_b_weight = contributions["agent_b"].get(
+            "adjusted_weight", contributions["agent_b"].get("weight", 1.0)
+        )
 
         # agent_a should have higher weight due to more training
         # But the actual outcome depends on the specific weights

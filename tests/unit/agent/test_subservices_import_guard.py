@@ -100,9 +100,7 @@ def _check_subservice_import(file_path: Path) -> bool:
         "from victor.agent.services.tools.protocols import ToolExecutorProtocol\n",
     ],
 )
-def test_removed_subservice_import_patterns_are_rejected(
-    tmp_path: Path, source: str
-) -> None:
+def test_removed_subservice_import_patterns_are_rejected(tmp_path: Path, source: str) -> None:
     """Catch exact package imports and submodule imports for removed subservices."""
     sample = tmp_path / "sample.py"
     sample.write_text(source, encoding="utf-8")
@@ -119,9 +117,7 @@ def test_removed_subservice_import_patterns_are_rejected(
         "from victor.agent.services.tool_service import ToolService\n",
     ],
 )
-def test_canonical_service_import_patterns_remain_allowed(
-    tmp_path: Path, source: str
-) -> None:
+def test_canonical_service_import_patterns_remain_allowed(tmp_path: Path, source: str) -> None:
     """Allow canonical service imports that replaced the removed subservices."""
     sample = tmp_path / "sample.py"
     sample.write_text(source, encoding="utf-8")

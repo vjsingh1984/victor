@@ -178,7 +178,9 @@ class BayesianMonitoringService:
     ) -> str:
         """Render an agent correlation matrix and notable pairs."""
         matrix = self.monitor.get_correlation_matrix(list(agent_ids), days)
-        lines = [self.renderer.render_heatmap(matrix, f"Agent Correlations (Last {days} days)").rstrip()]
+        lines = [
+            self.renderer.render_heatmap(matrix, f"Agent Correlations (Last {days} days)").rstrip()
+        ]
         lines.append("")
         lines.append("Highly Correlated Pairs (|correlation| > 0.7):")
 

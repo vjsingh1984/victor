@@ -119,8 +119,7 @@ class TestAgentRuntimeBootstrapper:
         with patch("victor.agent.facades.WorkflowFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
             assert (
-                orch._workflow_facade.workflow_runtime
-                is facade_cls.return_value.workflow_runtime
+                orch._workflow_facade.workflow_runtime is facade_cls.return_value.workflow_runtime
             )
 
         kwargs = facade_cls.call_args.kwargs

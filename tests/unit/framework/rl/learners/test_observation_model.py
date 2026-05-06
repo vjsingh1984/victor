@@ -207,7 +207,7 @@ class TestObservationRecording:
             cursor = conn.execute(
                 "SELECT message_category FROM rl_observation_model "
                 "WHERE agent_id='agent_a' AND message_category=?",
-                (expected_category,)
+                (expected_category,),
             )
             result = cursor.fetchone()
             assert result is not None

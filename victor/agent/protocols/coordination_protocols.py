@@ -19,7 +19,6 @@ from victor.agent.services.protocols.runtime_support import (
     ToolPlanningRuntimeProtocol as ToolPlannerProtocol,
 )
 
-
 __all__ = [
     "CoordinationAdvisorRuntimeProtocol",
     "ToolPlannerProtocol",

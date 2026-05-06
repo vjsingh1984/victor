@@ -20,7 +20,6 @@ from unittest.mock import MagicMock
 from victor.agent.facades.orchestration_facade import OrchestrationFacade
 from victor.agent.facades.protocols import OrchestrationFacadeProtocol
 
-
 REMOVED_COMPAT_PROPERTIES = (
     "chat_coordinator",
     "tool_coordinator",

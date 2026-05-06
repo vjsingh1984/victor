@@ -158,9 +158,7 @@ class IterationCoordinator:
                     settings, "tool_call_budget_warning_threshold", 250
                 ),
                 budget_warning_pct=getattr(settings, "tool_call_budget_warning_pct", 0.8),
-                budget_warning_remaining=getattr(
-                    settings, "tool_call_budget_warning_remaining", 5
-                ),
+                budget_warning_remaining=getattr(settings, "tool_call_budget_warning_remaining", 5),
             )
         else:
             self._config = CoordinatorConfig()

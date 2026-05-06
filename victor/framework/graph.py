@@ -2551,9 +2551,7 @@ class StateGraph(Generic[StateType]):
             outgoing_edges = self._edges.get(node_id, [])
             if outgoing_edges:
                 continue
-            warnings.append(
-                f"Node '{node_id}' has no outgoing edges and will terminate implicitly"
-            )
+            warnings.append(f"Node '{node_id}' has no outgoing edges and will terminate implicitly")
 
         return warnings
 

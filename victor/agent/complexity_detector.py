@@ -73,9 +73,18 @@ class QueryComplexityDetector:
 
     # Ambiguity indicators
     AMBIGUITY_KEYWORDS = {
-        "maybe", "perhaps", "possibly", "might", "could",
-        "uncertain", "unclear", "depends", "context",
-        "not sure", "don't know", "unsure",
+        "maybe",
+        "perhaps",
+        "possibly",
+        "might",
+        "could",
+        "uncertain",
+        "unclear",
+        "depends",
+        "context",
+        "not sure",
+        "don't know",
+        "unsure",
     }
 
     def __init__(
@@ -153,7 +162,9 @@ class QueryComplexityDetector:
 
         # Confidence is how far we are from thresholds
         if level == ComplexityLevel.COMPLEX:
-            confidence = (complexity_score - self.complex_threshold) / (1.0 - self.complex_threshold)
+            confidence = (complexity_score - self.complex_threshold) / (
+                1.0 - self.complex_threshold
+            )
         elif level == ComplexityLevel.SIMPLE:
             confidence = 1.0 - (complexity_score / self.simple_threshold)
         else:  # MODERATE
@@ -264,10 +275,20 @@ class QueryComplexityDetector:
         """
         # Domain-specific terms (technical jargon)
         domain_terms = {
-            "machine learning", "neural network", "api", "database",
-            "algorithm", "data structure", "design pattern",
-            "microservice", "kubernetes", "docker", "ci/cd",
-            "authentication", "authorization", "encryption",
+            "machine learning",
+            "neural network",
+            "api",
+            "database",
+            "algorithm",
+            "data structure",
+            "design pattern",
+            "microservice",
+            "kubernetes",
+            "docker",
+            "ci/cd",
+            "authentication",
+            "authorization",
+            "encryption",
         }
 
         query_lower = query.lower()

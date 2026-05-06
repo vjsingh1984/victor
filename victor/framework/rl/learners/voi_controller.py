@@ -76,8 +76,7 @@ class VoIController(BaseLearner):
 
     def _ensure_tables(self) -> None:
         """Ensure rl_voi_history table exists."""
-        self.db.execute(
-            """CREATE TABLE IF NOT EXISTS rl_voi_history (
+        self.db.execute("""CREATE TABLE IF NOT EXISTS rl_voi_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             agent_id TEXT NOT NULL,
             predicted_voi REAL NOT NULL,
@@ -86,17 +85,14 @@ class VoIController(BaseLearner):
             was_beneficial BOOLEAN NOT NULL,
             timestamp TEXT NOT NULL,
             metadata TEXT
-        )"""
-        )
+        )""")
 
         # Create indexes for faster lookups
         self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_voi_history_agent "
-            "ON rl_voi_history(agent_id)"
+            "CREATE INDEX IF NOT EXISTS idx_voi_history_agent " "ON rl_voi_history(agent_id)"
         )
         self.db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_voi_history_timestamp "
-            "ON rl_voi_history(timestamp)"
+            "CREATE INDEX IF NOT EXISTS idx_voi_history_timestamp " "ON rl_voi_history(timestamp)"
         )
 
     def compute_voi(
@@ -195,12 +191,14 @@ class VoIController(BaseLearner):
                 reliability_weight=reliability,
             )
 
-            agent_vois.append({
-                "agent_id": agent_id,
-                "voi": voi,
-                "reliability": reliability,
-                "should_query": voi > 0,
-            })
+            agent_vois.append(
+                {
+                    "agent_id": agent_id,
+                    "voi": voi,
+                    "reliability": reliability,
+                    "should_query": voi > 0,
+                }
+            )
 
         # Sort by VoI descending
         agent_vois.sort(key=lambda x: x["voi"], reverse=True)
@@ -297,8 +295,7 @@ class VoIController(BaseLearner):
         Returns:
             Dict mapping agent_id to VoI stats
         """
-        cursor = self.db.execute(
-            """SELECT
+        cursor = self.db.execute("""SELECT
                   agent_id,
                   COUNT(*) as query_count,
                   SUM(CASE WHEN was_beneficial THEN 1 ELSE 0 END) as beneficial_count,
@@ -306,8 +303,7 @@ class VoIController(BaseLearner):
                   AVG(actual_information_gain) as avg_actual_gain
                FROM rl_voi_history
                GROUP BY agent_id
-            """
-        )
+            """)
 
         stats = {}
         for row in cursor.fetchall():
@@ -337,20 +333,13 @@ class VoIController(BaseLearner):
         was_beneficial = outcome.metadata.get("was_beneficial", False)
 
         if not agent_id:
-            logger.warning(
-                f"Missing agent_id in outcome metadata: "
-                f"{outcome.metadata.keys()}"
-            )
+            logger.warning(f"Missing agent_id in outcome metadata: " f"{outcome.metadata.keys()}")
             return
 
         # Record the query outcome
-        self.record_query_outcome(
-            agent_id, predicted_voi, actual_gain, query_cost, was_beneficial
-        )
+        self.record_query_outcome(agent_id, predicted_voi, actual_gain, query_cost, was_beneficial)
 
-    def get_recommendation(
-        self, context: Dict[str, Any]
-    ) -> Optional[RLRecommendation]:
+    def get_recommendation(self, context: Dict[str, Any]) -> Optional[RLRecommendation]:
         """Get VoI recommendation for given context.
 
         Args:

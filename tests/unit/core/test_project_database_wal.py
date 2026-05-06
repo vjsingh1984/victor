@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from victor.core.database import ProjectDatabaseManager, get_project_database, reset_project_database
+from victor.core.database import (
+    ProjectDatabaseManager,
+    get_project_database,
+    reset_project_database,
+)
 
 
 def _assert_project_connection_pragmas(db: ProjectDatabaseManager) -> None:

@@ -220,7 +220,9 @@ class TestGraphManager:
         assert len(manager._watcher_subscribed) == 1
 
     @pytest.mark.asyncio
-    async def test_stop_background_refresh_unsubscribes_file_watcher(self, temp_codebase, monkeypatch):
+    async def test_stop_background_refresh_unsubscribes_file_watcher(
+        self, temp_codebase, monkeypatch
+    ):
         """Stopping refresh should detach watcher callbacks and stop idle watchers."""
         manager = GraphManager.get_instance()
         root_str = str(temp_codebase.resolve())

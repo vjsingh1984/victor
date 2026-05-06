@@ -200,9 +200,7 @@ class MIPROv2Strategy:
                 provider = getattr(trace, "provider", "unknown")
                 model = getattr(trace, "model", "unknown")
                 tool_calls = getattr(trace, "tool_calls", 0)
-                descriptor = (
-                    f"provider={provider}, model={model}, tool_calls={tool_calls}"
-                )
+                descriptor = f"provider={provider}, model={model}, tool_calls={tool_calls}"
             if failures:
                 descriptor = f"{descriptor}, failures=[{', '.join(failures)}]"
             examples.append(f"Example {i} ({task}, score={score:.1f}): {descriptor}")

@@ -523,9 +523,7 @@ class OrchestratorIntegration:
             )
             return None
         except (ValueError, TypeError) as e:
-            logger.debug(
-                f"RuntimeIntelligencePipeline prepare_request failed (data error): {e}"
-            )
+            logger.debug(f"RuntimeIntelligencePipeline prepare_request failed (data error): {e}")
             return None
 
     async def validate_runtime_intelligence_response(
@@ -592,9 +590,7 @@ class OrchestratorIntegration:
             )
             return None
         except (ValueError, TypeError) as e:
-            logger.debug(
-                f"RuntimeIntelligencePipeline validate_response failed (data error): {e}"
-            )
+            logger.debug(f"RuntimeIntelligencePipeline validate_response failed (data error): {e}")
             return None
 
     def record_runtime_intelligence_outcome(

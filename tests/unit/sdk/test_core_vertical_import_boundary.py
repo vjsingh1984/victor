@@ -138,9 +138,7 @@ class TestCoreDoesNotImportExternalVerticals:
             for f, line, mod in violations
             if not any(
                 # Match both "from victor_coding..." and "import victor_coding..."
-                mod == known or
-                mod.startswith(f"from {known}") or
-                mod.startswith(f"import {known}")
+                mod == known or mod.startswith(f"from {known}") or mod.startswith(f"import {known}")
                 for known in known_violations
             )
         ]
@@ -176,7 +174,9 @@ class TestCoreDoesNotImportExternalVerticals:
         for _, _, mod in violations:
             # Strip "from " or "import " prefix to get the raw module name
             if mod.startswith("from "):
-                actual_violation_prefixes.add(mod[5:].split()[0])  # Remove "from " and take first word
+                actual_violation_prefixes.add(
+                    mod[5:].split()[0]
+                )  # Remove "from " and take first word
             elif mod.startswith("import "):
                 actual_violation_prefixes.add(mod[7:])  # Remove "import "
             else:
@@ -184,10 +184,14 @@ class TestCoreDoesNotImportExternalVerticals:
 
         # Check for stale entries (violations that are fixed but still in baseline)
         for package, known_imports in KNOWN_VIOLATIONS.items():
-            stale = {imp for imp in known_imports if not any(
-                actual == imp or actual.startswith(f"{imp}.") or imp.startswith(f"{actual}.")
-                for actual in actual_violation_prefixes
-            )}
+            stale = {
+                imp
+                for imp in known_imports
+                if not any(
+                    actual == imp or actual.startswith(f"{imp}.") or imp.startswith(f"{actual}.")
+                    for actual in actual_violation_prefixes
+                )
+            }
             if stale:
                 pytest.fail(
                     f"Package {package} has stale KNOWN_VIOLATIONS entries (violations fixed!):\n"

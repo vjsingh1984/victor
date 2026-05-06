@@ -504,8 +504,10 @@ class InitSynthesizer:
             or "ollama"
         )
         resolved_model = model
-        if resolved_model is None and profile_model and (
-            provider is None or profile_provider == resolved_provider
+        if (
+            resolved_model is None
+            and profile_model
+            and (provider is None or profile_provider == resolved_provider)
         ):
             resolved_model = profile_model
         if resolved_model is None:

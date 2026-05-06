@@ -98,7 +98,9 @@ class BayesianCommand(BaseSlashCommand):
                 raw_agents = positionals[0]
                 day_index = 1
             if not raw_agents:
-                ctx.console.print("[yellow]Usage: /bayesian correlations <agent_a,agent_b,...> [days][/]")
+                ctx.console.print(
+                    "[yellow]Usage: /bayesian correlations <agent_a,agent_b,...> [days][/]"
+                )
                 return
             days = self._resolve_days(ctx, positionals, index=day_index)
             self._print_report(

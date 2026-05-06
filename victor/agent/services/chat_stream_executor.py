@@ -226,7 +226,9 @@ class StreamingChatExecutor:
                 "iteration": getattr(stream_ctx, "total_iterations", 0),
             },
         )
-        logger.warning("No visible terminal assistant content available; emitting final marker only")
+        logger.warning(
+            "No visible terminal assistant content available; emitting final marker only"
+        )
         return self._build_final_marker_chunk(orch)
 
     @staticmethod
@@ -1320,7 +1322,11 @@ class StreamingChatExecutor:
                             bool(getattr(chunk, "content", "").strip())
                             for chunk in continuation_result.chunks
                         )
-                        if not tool_calls and not assistant_content_yielded and not continuation_visible:
+                        if (
+                            not tool_calls
+                            and not assistant_content_yielded
+                            and not continuation_visible
+                        ):
                             yield self._build_terminal_delivery_chunk(
                                 orch,
                                 stream_ctx,

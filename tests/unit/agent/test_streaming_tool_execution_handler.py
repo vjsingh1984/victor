@@ -303,7 +303,13 @@ async def test_execute_tools_persists_skipped_responses_for_truncated_calls():
         check_tool_budget=AsyncMock(return_value=None),
         truncate_tool_calls=MagicMock(
             return_value=(
-                [{"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}}],
+                [
+                    {
+                        "id": "call_1",
+                        "name": "read",
+                        "arguments": {"path": "victor/framework/graph.py"},
+                    }
+                ],
                 True,
             )
         ),
@@ -532,6 +538,7 @@ async def test_execute_tools_grants_progress_based_budget_relief_from_current_tr
     assert stream_ctx.tool_budget == 6
     assert stream_ctx.budget_relief_uses == 1
     assert any(
-        chunk.content == "[tool] Progress detected; extending tool budget to 6 calls for this turn.\n"
+        chunk.content
+        == "[tool] Progress detected; extending tool budget to 6 calls for this turn.\n"
         for chunk in result.chunks
     )

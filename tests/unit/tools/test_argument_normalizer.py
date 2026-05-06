@@ -286,8 +286,7 @@ class TestNormalizeArgumentsAST:
         normalizer = ArgumentNormalizer()
         args = {
             "value": (
-                '{"file_path":"victor/framework/graph_protocols.py",'
-                '"text":"line1\\nline2"}'
+                '{"file_path":"victor/framework/graph_protocols.py",' '"text":"line1\\nline2"}'
             )
         }
         result, strategy = normalizer.normalize_arguments(args, "write")

@@ -99,7 +99,9 @@ async def test_victor_client_reset_conversation_handles_missing_service() -> Non
 
 
 @pytest.mark.asyncio
-async def test_victor_client_reset_conversation_resolves_chat_service_from_context_container() -> None:
+async def test_victor_client_reset_conversation_resolves_chat_service_from_context_container() -> (
+    None
+):
     """Test reset_conversation uses canonical runtime service resolution."""
     config = SessionConfig()
     client = VictorClient(config, container=object())

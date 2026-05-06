@@ -398,12 +398,15 @@ class ChatStreamHelperMixin:
 
         task_keywords = orch._classify_task_keywords(user_message)
         continuation_task_context = getattr(orch, "_pending_continuation_task_context", None)
-        if (
-            isinstance(continuation_task_context, dict)
-            and continuation_task_context.get("carry_forward_task_shape")
+        if isinstance(continuation_task_context, dict) and continuation_task_context.get(
+            "carry_forward_task_shape"
         ):
             prior_coarse = continuation_task_context.get("coarse_task_type")
-            if prior_coarse and task_keywords.get("coarse_task_type") in (None, "default", "general"):
+            if prior_coarse and task_keywords.get("coarse_task_type") in (
+                None,
+                "default",
+                "general",
+            ):
                 task_keywords["coarse_task_type"] = prior_coarse
             for key in ("is_analysis_task", "is_action_task", "needs_execution"):
                 if key in continuation_task_context and not task_keywords.get(key):

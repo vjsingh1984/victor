@@ -62,8 +62,7 @@ class CorrelationTracker:
 
     def _ensure_tables(self) -> None:
         """Ensure required database tables exist."""
-        self.db.execute(
-            """CREATE TABLE IF NOT EXISTS rl_agent_correlations (
+        self.db.execute("""CREATE TABLE IF NOT EXISTS rl_agent_correlations (
             agent_id_1 TEXT NOT NULL,
             agent_id_2 TEXT NOT NULL,
             agreement_count INTEGER NOT NULL,
@@ -72,8 +71,7 @@ class CorrelationTracker:
             correlation_coefficient REAL NOT NULL,
             last_updated TEXT NOT NULL,
             PRIMARY KEY (agent_id_1, agent_id_2)
-        )"""
-        )
+        )""")
 
         # Create indexes
         self.db.execute(
@@ -373,12 +371,10 @@ class CorrelationTracker:
                 (agent_id, agent_id),
             )
         else:
-            cursor = self.db.execute(
-                """SELECT agent_id_1, agent_id_2, agreement_count,
+            cursor = self.db.execute("""SELECT agent_id_1, agent_id_2, agreement_count,
                           disagreement_count, total_pairs, correlation_coefficient
                    FROM rl_agent_correlations
-                """
-            )
+                """)
 
         stats = defaultdict(lambda: {"correlations": {}})
 
@@ -409,9 +405,7 @@ class CorrelationTracker:
 
         return dict(stats)
 
-    def get_highly_correlated_pairs(
-        self, threshold: float = 0.7
-    ) -> List[Tuple[str, str, float]]:
+    def get_highly_correlated_pairs(self, threshold: float = 0.7) -> List[Tuple[str, str, float]]:
         """Get pairs of agents with high correlation.
 
         Args:

@@ -182,10 +182,11 @@ class TaskCoordinator:
         task_classification = self.task_analyzer.classify_complexity(user_message)
         complexity_tool_budget = DEFAULT_BUDGETS.get(task_classification.complexity, 15)
         task_type_value = str(getattr(unified_task_type, "value", unified_task_type))
-        if (
-            task_classification.complexity == TaskComplexity.SIMPLE
-            and task_type_value in {"edit", "create", "create_simple"}
-        ):
+        if task_classification.complexity == TaskComplexity.SIMPLE and task_type_value in {
+            "edit",
+            "create",
+            "create_simple",
+        }:
             intent_result = self.task_analyzer.detect_intent(user_message)
             if intent_result.intent == ActionIntent.WRITE_ALLOWED:
                 task_classification = TaskClassification(

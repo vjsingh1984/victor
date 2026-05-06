@@ -66,8 +66,7 @@ class BayesianConsensusBuilder:
 
     def _ensure_tables(self) -> None:
         """Ensure required database tables exist."""
-        self.db.execute(
-            """CREATE TABLE IF NOT EXISTS rl_bayesian_consensus (
+        self.db.execute("""CREATE TABLE IF NOT EXISTS rl_bayesian_consensus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             belief_id TEXT NOT NULL,
             recommended_outcome TEXT NOT NULL,
@@ -77,8 +76,7 @@ class BayesianConsensusBuilder:
             timestamp TEXT NOT NULL,
             actual_outcome TEXT,
             was_correct BOOLEAN
-        )"""
-        )
+        )""")
 
         # Create indexes
         self.db.execute(
@@ -226,14 +224,26 @@ class BayesianConsensusBuilder:
 
             # Check for success indicators
             success_keywords = [
-                "yes", "correct", "right", "good", "success",
-                "works", "will", "should"
+                "yes",
+                "correct",
+                "right",
+                "good",
+                "success",
+                "works",
+                "will",
+                "should",
             ]
 
             # Check for failure indicators
             failure_keywords = [
-                "no", "wrong", "incorrect", "bad", "fail",
-                "doesn't", "won't", "can't"
+                "no",
+                "wrong",
+                "incorrect",
+                "bad",
+                "fail",
+                "doesn't",
+                "won't",
+                "can't",
             ]
 
             success_count = sum(1 for kw in success_keywords if kw in message_lower)
@@ -305,8 +315,8 @@ class BayesianConsensusBuilder:
         # Get base reliability weights for all agents
         base_weights = {}
         for agent_id in agent_votes.keys():
-            base_weights[agent_id] = self.orchestration_service.reliability_learner.get_reliability_weight(
-                agent_id
+            base_weights[agent_id] = (
+                self.orchestration_service.reliability_learner.get_reliability_weight(agent_id)
             )
 
         # Adjust weights for correlations if tracker available
@@ -443,15 +453,13 @@ class BayesianConsensusBuilder:
         Returns:
             Dict with aggregate consensus metrics
         """
-        cursor = self.db.execute(
-            """SELECT
+        cursor = self.db.execute("""SELECT
                   COUNT(*) as total_consensus,
                   SUM(CASE WHEN was_correct THEN 1 ELSE 0 END) as correct_count,
                   AVG(confidence) as avg_confidence,
                   AVG(CASE WHEN was_correct THEN 1 ELSE 0 END) as accuracy
                FROM rl_bayesian_consensus
-            """
-        )
+            """)
 
         result = cursor.fetchone()
 

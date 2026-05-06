@@ -45,7 +45,8 @@ class TestBayesianMetricsMonitor:
 
         # Create tables using BayesianOrchestrationService
         BayesianOrchestrationService = __import__(
-            "victor.framework.rl.orchestration.bayesian_orchestrator", fromlist=["BayesianOrchestrationService"]
+            "victor.framework.rl.orchestration.bayesian_orchestrator",
+            fromlist=["BayesianOrchestrationService"],
         ).BayesianOrchestrationService
 
         service = BayesianOrchestrationService(
@@ -79,7 +80,8 @@ class TestBayesianMetricsMonitor:
 
         # Create tables
         BayesianOrchestrationService = __import__(
-            "victor.framework.rl.orchestration.bayesian_orchestrator", fromlist=["BayesianOrchestrationService"]
+            "victor.framework.rl.orchestration.bayesian_orchestrator",
+            fromlist=["BayesianOrchestrationService"],
         ).BayesianOrchestrationService
 
         service = BayesianOrchestrationService(
@@ -115,7 +117,8 @@ class TestMetricsExporter:
 
         # Create tables and insert test data
         BayesianOrchestrationService = __import__(
-            "victor.framework.rl.orchestration.bayesian_orchestrator", fromlist=["BayesianOrchestrationService"]
+            "victor.framework.rl.orchestration.bayesian_orchestrator",
+            fromlist=["BayesianOrchestrationService"],
         ).BayesianOrchestrationService
 
         service = BayesianOrchestrationService(
@@ -156,7 +159,8 @@ class TestMetricsExporter:
 
         # Create tables
         BayesianOrchestrationService = __import__(
-            "victor.framework.rl.orchestration.bayesian_orchestrator", fromlist=["BayesianOrchestrationService"]
+            "victor.framework.rl.orchestration.bayesian_orchestrator",
+            fromlist=["BayesianOrchestrationService"],
         ).BayesianOrchestrationService
 
         service = BayesianOrchestrationService(

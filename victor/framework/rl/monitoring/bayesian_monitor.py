@@ -49,9 +49,7 @@ class BayesianMetricsMonitor:
         """
         self.db = db_connection
 
-    def get_belief_evolution(
-        self, belief_id: str, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    def get_belief_evolution(self, belief_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get belief state evolution over time.
 
         Args:
@@ -194,9 +192,7 @@ class BayesianMetricsMonitor:
 
         return calibration
 
-    def get_voi_statistics(
-        self, agent_id: Optional[str] = None, days: int = 7
-    ) -> Dict[str, Any]:
+    def get_voi_statistics(self, agent_id: Optional[str] = None, days: int = 7) -> Dict[str, Any]:
         """Get Value of Information statistics.
 
         Args:
@@ -296,9 +292,7 @@ class BayesianMetricsMonitor:
                 "per_agent": {},
             }
 
-    def get_consensus_performance(
-        self, days: int = 7
-    ) -> Dict[str, Any]:
+    def get_consensus_performance(self, days: int = 7) -> Dict[str, Any]:
         """Get consensus formation performance.
 
         Args:
@@ -325,7 +319,11 @@ class BayesianMetricsMonitor:
                 "accuracy": 0.0,
                 "mean_confidence": 0.0,
                 "agreement_distribution": {"unanimous": 0, "partial": 0, "divergent": 0},
-                "by_agreement": {"unanimous": {"total": 0, "correct": 0}, "partial": {"total": 0, "correct": 0}, "divergent": {"total": 0, "correct": 0}},
+                "by_agreement": {
+                    "unanimous": {"total": 0, "correct": 0},
+                    "partial": {"total": 0, "correct": 0},
+                    "divergent": {"total": 0, "correct": 0},
+                },
             }
 
             for row in cursor:
@@ -358,7 +356,11 @@ class BayesianMetricsMonitor:
                 "accuracy": 0.0,
                 "mean_confidence": 0.0,
                 "agreement_distribution": {"unanimous": 0, "partial": 0, "divergent": 0},
-                "by_agreement": {"unanimous": {"total": 0, "correct": 0}, "partial": {"total": 0, "correct": 0}, "divergent": {"total": 0, "correct": 0}},
+                "by_agreement": {
+                    "unanimous": {"total": 0, "correct": 0},
+                    "partial": {"total": 0, "correct": 0},
+                    "divergent": {"total": 0, "correct": 0},
+                },
             }
 
     def get_correlation_matrix(
@@ -579,9 +581,7 @@ class MetricsExporter:
 
         logger.info(f"Exported reliability trends to {output_path}")
 
-    def export_summary_json(
-        self, output_path: str, days: int = 7
-    ) -> None:
+    def export_summary_json(self, output_path: str, days: int = 7) -> None:
         """Export system summary to JSON.
 
         Args:

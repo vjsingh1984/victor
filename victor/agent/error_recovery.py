@@ -279,9 +279,7 @@ class MissingParameterHandler(ErrorRecoveryHandler):
                 return RecoveryResult(
                     action=RecoveryAction.RETRY_WITH_INFERRED,
                     modified_args=recovered_args,
-                    user_message=(
-                        "Recovered structured arguments from wrapped value payload"
-                    ),
+                    user_message=("Recovered structured arguments from wrapped value payload"),
                 )
 
         if missing_params and all(param in self.DEFAULTS for param in missing_params):
@@ -294,7 +292,8 @@ class MissingParameterHandler(ErrorRecoveryHandler):
                 action=RecoveryAction.RETRY_WITH_DEFAULTS,
                 modified_args={**args, **defaults},
                 user_message=(
-                    "Using default values for " + ", ".join(f"'{param}'" for param in missing_params)
+                    "Using default values for "
+                    + ", ".join(f"'{param}'" for param in missing_params)
                 ),
             )
 

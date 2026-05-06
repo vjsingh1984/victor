@@ -64,9 +64,7 @@ def classify_refresh_error(exc: Exception, *, failure_count: int = 1) -> Dict[st
     if isinstance(exc, FileNotFoundError) or error_code == errno.ENOENT:
         category = "transient_missing_file"
         retry_delay_seconds = 0.5
-        operator_guidance = (
-            "Retry after the filesystem settles; this commonly happens during deletes or temp-file churn."
-        )
+        operator_guidance = "Retry after the filesystem settles; this commonly happens during deletes or temp-file churn."
     elif error_code in {errno.EMFILE, errno.ENFILE} or "Too many open files" in str(exc):
         category = "resource_exhaustion"
         retry_delay_seconds = min(60.0, 5.0 * max(1, failure_count))
@@ -76,11 +74,15 @@ def classify_refresh_error(exc: Exception, *, failure_count: int = 1) -> Dict[st
     elif isinstance(exc, TimeoutError):
         category = "lock_timeout"
         retry_delay_seconds = min(30.0, 2.0 * max(1, failure_count))
-        operator_guidance = "Another process may be indexing this project; retry after the lock clears."
+        operator_guidance = (
+            "Another process may be indexing this project; retry after the lock clears."
+        )
     else:
         recoverable = False
         severity = "error"
-        operator_guidance = "Inspect the exception and graph indexing pipeline for a deterministic bug."
+        operator_guidance = (
+            "Inspect the exception and graph indexing pipeline for a deterministic bug."
+        )
 
     return {
         "error_code": error_code,
@@ -369,7 +371,11 @@ class GraphManager:
                 "[GraphManager] Delaying background refresh for %s by %.2fs after %s",
                 root_str,
                 retry_delay_seconds,
-                failure.get("category", "refresh_failure") if isinstance(failure, dict) else "error",
+                (
+                    failure.get("category", "refresh_failure")
+                    if isinstance(failure, dict)
+                    else "error"
+                ),
             )
             self._refresh_tasks[root_str] = asyncio.create_task(
                 self._run_refresh_loop(root.resolve(), startup_delay_seconds=retry_delay_seconds)

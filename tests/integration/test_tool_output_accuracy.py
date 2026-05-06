@@ -349,8 +349,16 @@ class TestToolServiceIntegration:
         runtime = ToolExecutionRuntime(OrchestratorProtocolAdapter(host))
         results = await runtime.execute_tool_calls(
             [
-                {"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}},
-                {"id": "call_2", "name": "metrics", "arguments": {"path": "victor/framework/graph.py"}},
+                {
+                    "id": "call_1",
+                    "name": "read",
+                    "arguments": {"path": "victor/framework/graph.py"},
+                },
+                {
+                    "id": "call_2",
+                    "name": "metrics",
+                    "arguments": {"path": "victor/framework/graph.py"},
+                },
             ]
         )
 

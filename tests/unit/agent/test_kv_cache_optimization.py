@@ -119,7 +119,9 @@ class TestSystemPromptFreezing:
         type(orch_host)._cache_optimization_enabled = PropertyMock(return_value=False)
         orch_host._system_prompt_frozen = False
         orch_host._system_prompt = ""
-        orch_host._prompt_pipeline = None  # No pipeline, so is_frozen will check _system_prompt_frozen
+        orch_host._prompt_pipeline = (
+            None  # No pipeline, so is_frozen will check _system_prompt_frozen
+        )
 
         # Mock prompt_builder
         orch_host.prompt_builder = MagicMock()

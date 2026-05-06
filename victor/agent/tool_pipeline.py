@@ -1395,7 +1395,9 @@ class ToolPipeline:
             try:
                 summary["dedup_tracker_calls"] = int(invalidate_tracker(file_path) or 0)
             except Exception as exc:
-                logger.debug("Failed to invalidate deduplication tracker for %s: %s", file_path, exc)
+                logger.debug(
+                    "Failed to invalidate deduplication tracker for %s: %s", file_path, exc
+                )
 
         logger.debug(
             "Post-edit freshness invalidation for %s: cache=%d index_roots=%d dedup_calls=%d",
@@ -2591,7 +2593,10 @@ class ToolPipeline:
                     logger.debug(f"Semantic cache store failed (data error): {e}")
 
         # Invalidate caches when files are modified (write/edit tools)
-        if call_result.success and canonicalize_core_tool_name(tool_name.lower()) in ("write", "edit"):
+        if call_result.success and canonicalize_core_tool_name(tool_name.lower()) in (
+            "write",
+            "edit",
+        ):
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             if file_path:
                 self._invalidate_post_edit_freshness_state(file_path, context=context)

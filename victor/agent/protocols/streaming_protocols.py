@@ -175,6 +175,5 @@ from victor.agent.services.protocols.runtime_support import (
     StreamingRecoveryRuntimeProtocol as StreamingRecoveryCoordinatorProtocol,
 )
 
-
 # Alias: some modules reference StreamingCoordinatorProtocol
 StreamingCoordinatorProtocol = StreamingControllerProtocol

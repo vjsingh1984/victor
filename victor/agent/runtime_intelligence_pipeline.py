@@ -334,9 +334,7 @@ class RuntimeIntelligencePipeline:
                     grounding_threshold_learner=grounding_threshold_learner,
                 )
             except Exception as e:
-                logger.warning(
-                    f"[RuntimeIntelligencePipeline] Grounding verifier init failed: {e}"
-                )
+                logger.warning(f"[RuntimeIntelligencePipeline] Grounding verifier init failed: {e}")
         return self._grounding_verifier
 
     def _emit_grounding_event(
@@ -388,9 +386,7 @@ class RuntimeIntelligencePipeline:
 
                 self._resilient_executor = ResilientExecutor()
             except Exception as e:
-                logger.warning(
-                    f"[RuntimeIntelligencePipeline] Resilient executor init failed: {e}"
-                )
+                logger.warning(f"[RuntimeIntelligencePipeline] Resilient executor init failed: {e}")
         return self._resilient_executor
 
     def _get_output_deduplicator(self) -> OutputDeduplicator:

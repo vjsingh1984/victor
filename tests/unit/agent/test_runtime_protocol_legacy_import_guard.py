@@ -19,7 +19,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 ROOT = Path("victor")
 LEGACY_RUNTIME_PROTOCOL_EXPORTS = frozenset(
     {

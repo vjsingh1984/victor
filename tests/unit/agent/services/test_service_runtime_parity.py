@@ -126,9 +126,7 @@ def test_tool_service_records_native_passthrough_parse_diagnostics(caplog):
     tool_adapter = MagicMock()
     tool_adapter.provider_name = "zai"
     tool_adapter.model = "glm-5.1"
-    raw_tool_calls = [
-        {"name": "write", "arguments": {"path": "notes.txt", "content": "hello"}}
-    ]
+    raw_tool_calls = [{"name": "write", "arguments": {"path": "notes.txt", "content": "hello"}}]
 
     with caplog.at_level(logging.INFO):
         tool_calls, remaining = service.parse_and_validate_tool_calls(

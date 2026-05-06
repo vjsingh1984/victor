@@ -346,6 +346,8 @@ class CoordinationAdvisorProtocol(Protocol):
             TeamSuggestionAction to take
         """
         ...
+
+
 @runtime_checkable
 class TeamSelectionStrategyProtocol(Protocol):
     """Protocol for team selection strategies.

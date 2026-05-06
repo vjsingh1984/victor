@@ -17,6 +17,7 @@ async def test_acquire_lock_releases_file_lock_after_context(tmp_path, monkeypat
         "victor.config.settings.get_project_paths",
         lambda _path: types.SimpleNamespace(project_victor_dir=root / ".victor"),
     )
+
     def _fake_acquire(self, timeout=300.0):
         acquire_calls.append((self.lock_file, timeout))
         self._lock_fd = 1
@@ -51,6 +52,7 @@ async def test_acquire_lock_marks_usage_on_context_exit(tmp_path, monkeypatch):
         "victor.config.settings.get_project_paths",
         lambda _path: types.SimpleNamespace(project_victor_dir=root / ".victor"),
     )
+
     def _fake_acquire_noop(self, timeout=300.0):
         self._lock_fd = 1
         return True

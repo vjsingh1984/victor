@@ -77,9 +77,7 @@ def _coerce_completion_response(
             else getattr(result, "tool_calls", [])
         )
         usage = (
-            result.get("usage")
-            if isinstance(result, Mapping)
-            else getattr(result, "usage", None)
+            result.get("usage") if isinstance(result, Mapping) else getattr(result, "usage", None)
         )
         stop_reason = (
             result.get("stop_reason", "stop")

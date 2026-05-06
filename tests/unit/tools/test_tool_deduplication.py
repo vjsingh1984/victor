@@ -113,7 +113,10 @@ class TestToolCallTracker:
         removed = tracker.invalidate_for_modified_path(str(changed))
 
         assert removed == 2
-        assert tracker.is_redundant("code_search", {"query": "node_ids", "path": str(tmp_path)}) is False
+        assert (
+            tracker.is_redundant("code_search", {"query": "node_ids", "path": str(tmp_path)})
+            is False
+        )
         assert tracker.is_redundant("read_file", {"path": str(changed)}) is False
         assert tracker.is_redundant("read_file", {"path": str(untouched)}) is True
 
