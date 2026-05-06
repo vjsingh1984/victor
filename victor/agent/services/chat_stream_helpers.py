@@ -30,6 +30,7 @@ from victor.core.errors import (
     ProviderTimeoutError,
 )
 from victor.framework.task.direct_response import classify_direct_response_prompt
+from victor.framework.request_scope_heuristics import is_ambiguous_write_followup_request
 from victor.framework.topology_runtime import prepare_topology_runtime_contract
 from victor.framework.task import TaskComplexity
 from victor.providers.base import Message, StreamChunk
@@ -117,6 +118,17 @@ class ChatStreamHelperMixin:
         """Return the last persisted streaming task context snapshot, if any."""
         context = self._get_runtime_capability_value("last_stream_task_context")
         return context if isinstance(context, dict) else None
+
+    @staticmethod
+    def _should_promote_general_task_to_edit(user_message: str) -> bool:
+        """Return whether an underspecified write follow-up should be treated as edit work."""
+        from victor.agent.action_authorizer import ActionIntent, detect_intent
+
+        intent_result = detect_intent(user_message)
+        return (
+            intent_result.intent == ActionIntent.WRITE_ALLOWED
+            and is_ambiguous_write_followup_request(user_message)
+        )
 
     def _resolve_continuation_task_context(
         self,
@@ -269,6 +281,15 @@ class ChatStreamHelperMixin:
                 "Continuation request detected; carrying forward prior task type: %s",
                 unified_task_type.value,
             )
+        elif (
+            unified_task_type == TrackerTaskType.GENERAL
+            and self._should_promote_general_task_to_edit(user_message)
+        ):
+            orch.unified_tracker.set_task_type(TrackerTaskType.EDIT)
+            unified_task_type = TrackerTaskType.EDIT
+            logger.info(
+                "Promoted general task type to edit for explicit write-authorized follow-up request"
+            )
         logger.info(f"Task type detected: {unified_task_type.value}")
 
         prompt_requirements = extract_prompt_requirements(user_message)
@@ -411,6 +432,8 @@ class ChatStreamHelperMixin:
         ctx.complexity_tool_budget = complexity_tool_budget
 
         task_type_val = task_keywords.get("task_type", "default")
+        unified_task_type_val = getattr(unified_task_type, "value", "")
+        unified_is_action = unified_task_type_val in ("edit", "create", "create_simple")
         # Use keyword-based classification as fallback when embedding classifier returns GENERAL
         # but keywords suggest analysis (e.g., "structural analysis", "framework analysis")
         keyword_is_analysis = task_keywords.get(
@@ -425,15 +448,15 @@ class ChatStreamHelperMixin:
             or unified_is_analysis
             or (unified_task_type.value == "general" and keyword_is_analysis)
         )
-        ctx.is_action_task = task_keywords.get(
-            "is_action_task",
-            task_type_val in ("action", "create_simple", "create_complex"),
+        ctx.is_action_task = bool(task_keywords.get("is_action_task")) or unified_is_action
+        ctx.needs_execution = bool(task_keywords.get("needs_execution")) or task_type_val in (
+            "execution",
+            "action",
         )
-        ctx.needs_execution = task_keywords.get(
-            "needs_execution",
-            task_type_val in ("execution", "action"),
-        )
-        ctx.coarse_task_type = task_keywords.get("coarse_task_type", task_type_val)
+        coarse_task_type = task_keywords.get("coarse_task_type", task_type_val)
+        if coarse_task_type in (None, "default", "general") and unified_is_action:
+            coarse_task_type = "action"
+        ctx.coarse_task_type = coarse_task_type
 
         if task_classification and hasattr(task_classification, "complexity"):
             ctx.is_complex_task = task_classification.complexity in (

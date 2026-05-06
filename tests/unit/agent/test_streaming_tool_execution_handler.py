@@ -380,3 +380,158 @@ async def test_execute_tools_persists_skipped_responses_for_truncated_calls():
     )
     assert any(tool_result.get("tool_call_id") == "call_2" for tool_result in result.tool_results)
     assert any(tool_result.get("tool_call_id") == "call_1" for tool_result in result.tool_results)
+
+
+@pytest.mark.asyncio
+async def test_execute_tools_budget_exhaustion_emits_fallback_and_synthetic_tool_responses():
+    recovery_runtime = SimpleNamespace(
+        check_tool_budget=AsyncMock(return_value=None),
+        truncate_tool_calls=MagicMock(),
+        filter_blocked_tool_calls=MagicMock(),
+        check_blocked_threshold=MagicMock(),
+    )
+    message_adder = SimpleNamespace(add_message=MagicMock())
+
+    async def _unused_async_generator(_stream_ctx):
+        if False:
+            yield None
+
+    handler = ToolExecutionHandler(
+        recovery_runtime=recovery_runtime,
+        chunk_generator=SimpleNamespace(
+            generate_tool_start_chunk=MagicMock(),
+            generate_tool_result_chunks=MagicMock(return_value=[]),
+        ),
+        message_adder=message_adder,
+        reminder_manager=SimpleNamespace(
+            update_state=MagicMock(),
+            get_consolidated_reminder=MagicMock(return_value=None),
+        ),
+        unified_tracker=SimpleNamespace(unique_resources=set()),
+        settings=SimpleNamespace(tool_call_budget_warning_threshold=250),
+        recovery_context_factory=lambda stream_ctx: {"stream_ctx": stream_ctx},
+        check_progress_with_handler=lambda _stream_ctx: None,
+        handle_force_completion_with_handler=lambda _stream_ctx: None,
+        handle_budget_exhausted=_unused_async_generator,
+        handle_force_final_response=_unused_async_generator,
+        execute_tool_calls=AsyncMock(),
+        get_tool_status_message=lambda tool_name, tool_args: f"{tool_name}: {tool_args}",
+        observed_files=set(),
+    )
+
+    stream_ctx = StreamingChatContext(
+        user_message="Address the remaining findings",
+        tool_calls_used=10,
+        tool_budget=10,
+    )
+    result = await handler.execute_tools(
+        stream_ctx=stream_ctx,
+        tool_calls=[
+            {"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}},
+            {"id": "call_2", "name": "edit", "arguments": {"path": "victor/framework/graph.py"}},
+        ],
+        user_message="Address the remaining findings",
+        full_content="",
+        tool_calls_used=10,
+        tool_budget=10,
+    )
+
+    assert result.should_return is True
+    assert [chunk.content for chunk in result.chunks] == [
+        "[tool] Tool budget reached (10); skipped 2 queued tool call(s).\n",
+        (
+            "Unable to continue tool execution in this turn. Start a follow-up turn or "
+            "increase the tool budget if more tool work is required.\n"
+        ),
+    ]
+    assert any(tool_result.get("tool_call_id") == "call_1" for tool_result in result.tool_results)
+    assert any(tool_result.get("tool_call_id") == "call_2" for tool_result in result.tool_results)
+    assert message_adder.add_message.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_tools_grants_progress_based_budget_relief_from_current_tracker_state():
+    recovery_runtime = SimpleNamespace(
+        check_tool_budget=AsyncMock(return_value=None),
+        truncate_tool_calls=MagicMock(
+            side_effect=lambda _ctx, tool_calls, remaining: (
+                tool_calls[:remaining],
+                len(tool_calls) > remaining,
+            )
+        ),
+        filter_blocked_tool_calls=MagicMock(
+            side_effect=lambda _ctx, tool_calls: (tool_calls, [], 0)
+        ),
+        check_blocked_threshold=MagicMock(return_value=None),
+    )
+    chunk_generator = SimpleNamespace(
+        generate_tool_start_chunk=MagicMock(return_value=StreamChunk(content="start")),
+        generate_tool_result_chunks=MagicMock(return_value=[StreamChunk(content="done")]),
+    )
+    execute_tool_calls = AsyncMock(
+        return_value=[
+            {"name": "read", "success": True, "args": {}, "elapsed": 1.0},
+            {"name": "edit", "success": True, "args": {}, "elapsed": 1.0},
+        ]
+    )
+    set_tool_budget_limit = MagicMock(side_effect=lambda budget: budget)
+
+    async def _unused_async_generator(_stream_ctx):
+        if False:
+            yield None
+
+    handler = ToolExecutionHandler(
+        recovery_runtime=recovery_runtime,
+        chunk_generator=chunk_generator,
+        message_adder=SimpleNamespace(add_message=MagicMock()),
+        reminder_manager=SimpleNamespace(
+            update_state=MagicMock(),
+            get_consolidated_reminder=MagicMock(return_value=None),
+        ),
+        unified_tracker=SimpleNamespace(unique_resources={"graph.py", "builder.py", "state.py"}),
+        settings=SimpleNamespace(
+            tool_call_budget_warning_threshold=250,
+            tool_call_budget_warning_pct=0.8,
+            tool_call_budget_warning_remaining=2,
+            tool_budget_progress_relief_enabled=True,
+            tool_budget_progress_relief_amount=2,
+            tool_budget_progress_relief_max_uses=1,
+        ),
+        recovery_context_factory=lambda stream_ctx: {"stream_ctx": stream_ctx},
+        check_progress_with_handler=lambda _stream_ctx: None,
+        handle_force_completion_with_handler=lambda _stream_ctx: None,
+        handle_budget_exhausted=_unused_async_generator,
+        handle_force_final_response=_unused_async_generator,
+        execute_tool_calls=execute_tool_calls,
+        get_tool_status_message=lambda tool_name, tool_args: f"{tool_name}: {tool_args}",
+        set_tool_budget_limit=set_tool_budget_limit,
+        observed_files=set(),
+    )
+
+    stream_ctx = StreamingChatContext(
+        user_message="Address the remaining findings comprehensively",
+        tool_calls_used=4,
+        tool_budget=5,
+        is_action_task=True,
+    )
+    result = await handler.execute_tools(
+        stream_ctx=stream_ctx,
+        tool_calls=[
+            {"id": "call_1", "name": "read", "arguments": {"path": "victor/framework/graph.py"}},
+            {"id": "call_2", "name": "edit", "arguments": {"path": "victor/framework/graph.py"}},
+        ],
+        user_message="Address the remaining findings comprehensively",
+        full_content="",
+        tool_calls_used=4,
+        tool_budget=5,
+    )
+
+    set_tool_budget_limit.assert_called_once_with(6)
+    execute_tool_calls.assert_awaited_once()
+    assert result.tool_calls_executed == 2
+    assert stream_ctx.tool_budget == 6
+    assert stream_ctx.budget_relief_uses == 1
+    assert any(
+        chunk.content == "[tool] Progress detected; extending tool budget to 6 calls for this turn.\n"
+        for chunk in result.chunks
+    )

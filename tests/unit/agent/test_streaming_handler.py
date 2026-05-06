@@ -569,6 +569,61 @@ class TestToolBudgetMethods:
         assert result.chunks
         assert "Approaching tool budget limit" in result.chunks[0].content
 
+    def test_check_tool_budget_warns_on_ratio_threshold(self, handler):
+        """Warn when the used/total ratio reaches the configured threshold."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=10,
+            tool_calls_used=8,
+        )
+        result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.8,
+            warning_remaining=1,
+        )
+        assert result is not None
+        assert "2 remaining" in result.chunks[0].content
+
+    def test_check_tool_budget_warns_on_low_remaining(self, handler):
+        """Warn when only a few tool calls remain even if the absolute threshold is low."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=40,
+            tool_calls_used=36,
+        )
+        result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.95,
+            warning_remaining=4,
+        )
+        assert result is not None
+        assert "4 remaining" in result.chunks[0].content
+
+    def test_check_tool_budget_warns_only_once_per_turn(self, handler):
+        """Repeated checks should not spam duplicate warnings."""
+        ctx = StreamingChatContext(
+            user_message="test",
+            tool_budget=10,
+            tool_calls_used=8,
+        )
+        first_result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.8,
+            warning_remaining=2,
+        )
+        second_result = handler.check_tool_budget(
+            ctx,
+            warning_threshold=250,
+            warning_pct=0.8,
+            warning_remaining=2,
+        )
+        assert first_result is not None
+        assert second_result is None
+        assert ctx.budget_warning_shown is True
+
     def test_check_tool_budget_exhausted_no_warning(self, handler):
         """No warning when budget exhausted (0 remaining)."""
         ctx = StreamingChatContext(

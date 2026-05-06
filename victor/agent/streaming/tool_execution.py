@@ -174,6 +174,7 @@ class ToolExecutionHandler:
         handle_force_final_response: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
         execute_tool_calls: Callable[[List[Dict]], Any],
         get_tool_status_message: Callable[[str, Dict], str],
+        set_tool_budget_limit: Optional[Callable[[int], int]] = None,
         observed_files: Optional[Set[str]] = None,
     ):
         """Initialize the tool execution handler.
@@ -192,6 +193,7 @@ class ToolExecutionHandler:
             handle_force_final_response: Async generator for force final response.
             execute_tool_calls: Callback to execute tool calls.
             get_tool_status_message: Function to generate tool status messages.
+            set_tool_budget_limit: Callback to update the canonical turn budget.
             observed_files: Set of observed files (for reminder tracking).
         """
         self._recovery_runtime = recovery_runtime
@@ -205,6 +207,7 @@ class ToolExecutionHandler:
         self._handle_force_completion_with_handler = handle_force_completion_with_handler
         self._handle_budget_exhausted = handle_budget_exhausted
         self._handle_force_final_response = handle_force_final_response
+        self._set_tool_budget_limit = set_tool_budget_limit
         self._execute_tool_calls_callback = execute_tool_calls
         self._get_tool_status_message = get_tool_status_message
         self._observed_files = observed_files or set()
@@ -318,9 +321,54 @@ class ToolExecutionHandler:
         if budget_warning:
             result.add_chunk(budget_warning)
 
+        # Keep progress signals current before deciding whether to grant budget relief.
+        stream_ctx.unique_resources = self._unified_tracker.unique_resources
+        relief_chunk = self._maybe_extend_budget_for_progress(
+            stream_ctx,
+            requested_tool_calls=len(tool_calls or []),
+            current_budget=tool_budget,
+        )
+        if relief_chunk is not None:
+            result.add_chunk(relief_chunk)
+            remaining = stream_ctx.get_remaining_budget()
+
         # Check budget exhausted
         if remaining <= 0:
+            if tool_calls:
+                for pending_call in tool_calls:
+                    self._record_omitted_tool_call_response(
+                        result,
+                        pending_call,
+                        reason="Skipped because the remaining tool budget for this turn was exhausted.",
+                        outcome_kind="budget_exhausted",
+                        block_source="tool_budget",
+                    )
+            logger.warning(
+                "Tool budget exhausted before executing %s queued tool call(s); "
+                "turn budget=%s used=%s",
+                len(tool_calls) if tool_calls else 0,
+                tool_budget,
+                tool_calls_used,
+            )
             exhausted_result = await self._handle_budget_exhausted_phase(stream_ctx)
+            if not exhausted_result.chunks:
+                exhausted_result.add_chunk(
+                    StreamChunk(
+                        content=(
+                            f"[tool] Tool budget reached ({stream_ctx.tool_budget}); "
+                            f"skipped {len(tool_calls) if tool_calls else 0} queued tool call(s).\n"
+                        )
+                    )
+                )
+                exhausted_result.add_chunk(
+                    StreamChunk(
+                        content=(
+                            "Unable to continue tool execution in this turn. Start a follow-up "
+                            "turn or increase the tool budget if more tool work is required.\n"
+                        ),
+                        is_final=True,
+                    )
+                )
             result.add_chunks(exhausted_result.chunks)
             result.should_return = True
             return result
@@ -355,10 +403,84 @@ class ToolExecutionHandler:
         """Check if budget warning should be shown."""
         recovery_ctx = self._recovery_context_factory(stream_ctx)
         warning_threshold = getattr(self._settings, "tool_call_budget_warning_threshold", 250)
-        budget_warning = self._recovery_runtime.check_tool_budget(recovery_ctx, warning_threshold)
+        warning_pct = getattr(self._settings, "tool_call_budget_warning_pct", 0.8)
+        warning_remaining = getattr(self._settings, "tool_call_budget_warning_remaining", 5)
+        budget_warning = self._recovery_runtime.check_tool_budget(
+            recovery_ctx,
+            warning_threshold,
+            warning_pct,
+            warning_remaining,
+        )
         if inspect.isawaitable(budget_warning):
             return await budget_warning
         return budget_warning
+
+    def _maybe_extend_budget_for_progress(
+        self,
+        stream_ctx: StreamingChatContext,
+        *,
+        requested_tool_calls: int,
+        current_budget: int,
+    ) -> Optional[StreamChunk]:
+        """Grant a bounded one-time budget extension for in-progress action tasks."""
+        if requested_tool_calls <= 0:
+            return None
+        if not getattr(self._settings, "tool_budget_progress_relief_enabled", True):
+            return None
+        max_uses = max(0, int(getattr(self._settings, "tool_budget_progress_relief_max_uses", 1)))
+        if getattr(stream_ctx, "budget_relief_uses", 0) >= max_uses:
+            return None
+        if not stream_ctx.is_action_task:
+            return None
+        if stream_ctx.force_completion:
+            return None
+
+        remaining = stream_ctx.get_remaining_budget()
+        if remaining >= requested_tool_calls:
+            return None
+
+        executed_tool_names = {name.lower() for name in stream_ctx.executed_tool_names}
+        has_progress_signal = bool(executed_tool_names & {"edit", "write", "shell", "test"})
+        has_progress_signal = has_progress_signal or len(stream_ctx.unique_resources) >= 3
+        has_progress_signal = has_progress_signal or len(self._observed_files) >= 3
+        if not has_progress_signal:
+            return None
+
+        relief_amount = max(1, int(getattr(self._settings, "tool_budget_progress_relief_amount", 10)))
+        missing_calls = requested_tool_calls - remaining
+        relief_amount = min(relief_amount, missing_calls)
+        if relief_amount <= 0:
+            return None
+
+        target_budget = max(current_budget, stream_ctx.tool_budget) + relief_amount
+        effective_budget = target_budget
+        if callable(self._set_tool_budget_limit):
+            try:
+                effective_budget = int(self._set_tool_budget_limit(target_budget))
+            except Exception:
+                logger.exception("Failed to apply progress-based tool budget relief")
+                return None
+
+        if effective_budget <= stream_ctx.tool_budget:
+            return None
+
+        stream_ctx.tool_budget = effective_budget
+        stream_ctx.budget_relief_uses += 1
+        stream_ctx.budget_warning_shown = False
+        logger.info(
+            "Granted progress-based tool budget relief: +%s call(s) -> %s total "
+            "(requested=%s remaining_before=%s)",
+            effective_budget - current_budget,
+            effective_budget,
+            requested_tool_calls,
+            remaining,
+        )
+        return StreamChunk(
+            content=(
+                f"[tool] Progress detected; extending tool budget to {effective_budget} calls "
+                f"for this turn.\n"
+            )
+        )
 
     async def _handle_budget_exhausted_phase(
         self, stream_ctx: StreamingChatContext
@@ -556,6 +678,23 @@ async def _noop_async_generator(stream_ctx: StreamingChatContext):
     yield  # Make it an async generator
 
 
+async def _default_budget_exhausted_generator(stream_ctx: StreamingChatContext):
+    """Fallback generator for budget exhaustion when no runtime hook is provided."""
+    yield StreamChunk(
+        content=(
+            f"[tool] Tool budget reached ({stream_ctx.tool_budget}); "
+            "skipping remaining tool calls.\n"
+        )
+    )
+    yield StreamChunk(
+        content=(
+            "Unable to continue tool execution in this turn. Start a follow-up turn or "
+            "increase the tool budget if more tool work is required.\n"
+        ),
+        is_final=True,
+    )
+
+
 def create_tool_execution_handler(
     orchestrator: "AgentOrchestrator",
 ) -> ToolExecutionHandler:
@@ -570,6 +709,34 @@ def create_tool_execution_handler(
     from victor.agent.orchestrator_utils import get_tool_status_message
 
     recovery_context_factory = orchestrator.create_recovery_context
+
+    def _set_budget_limit(budget: int) -> int:
+        unified_tracker = getattr(orchestrator, "unified_tracker", None)
+        if getattr(unified_tracker, "_sticky_user_budget", False):
+            return int(getattr(unified_tracker, "tool_budget", getattr(orchestrator, "tool_budget", budget)))
+
+        effective_budget = int(budget)
+        if unified_tracker is not None and hasattr(unified_tracker, "set_tool_budget"):
+            unified_tracker.set_tool_budget(effective_budget)
+            effective_budget = int(getattr(unified_tracker, "tool_budget", effective_budget))
+
+        orchestrator.tool_budget = effective_budget
+
+        task_coordinator = getattr(orchestrator, "task_coordinator", None)
+        if task_coordinator is not None and hasattr(task_coordinator, "tool_budget"):
+            try:
+                task_coordinator.tool_budget = effective_budget
+            except Exception:
+                logger.debug("Failed to sync task coordinator tool budget", exc_info=True)
+
+        tool_service = getattr(orchestrator, "_tool_service", None)
+        if tool_service is not None and hasattr(tool_service, "set_tool_budget"):
+            try:
+                tool_service.set_tool_budget(effective_budget)
+            except Exception:
+                logger.debug("Failed to sync tool service budget", exc_info=True)
+
+        return effective_budget
 
     return ToolExecutionHandler(
         recovery_runtime=(
@@ -590,11 +757,12 @@ def create_tool_execution_handler(
             _noop_force_completion,
         ),
         handle_budget_exhausted=getattr(
-            orchestrator, "_handle_budget_exhausted", _noop_async_generator
+            orchestrator, "_handle_budget_exhausted", _default_budget_exhausted_generator
         ),
         handle_force_final_response=getattr(
             orchestrator, "_handle_force_final_response", _noop_async_generator
         ),
+        set_tool_budget_limit=_set_budget_limit,
         execute_tool_calls=orchestrator.execute_tool_calls,
         get_tool_status_message=get_tool_status_message,
         observed_files=(set(orchestrator.observed_files) if orchestrator.observed_files else set()),

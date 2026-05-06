@@ -245,10 +245,15 @@ class StageTransitionCoordinator:
 
     def _should_calibrate(self, result: TransitionResult) -> bool:
         """Check if read-only exploration calibration should be applied."""
+        from victor.agent.action_authorizer import ActionIntent
+
         if result.new_stage != ConversationStage.EXECUTION:
             return False
 
         if result.confidence < 0.95:
+            return False
+
+        if getattr(self._state_machine, "_action_intent", None) == ActionIntent.WRITE_ALLOWED:
             return False
 
         files_read = len(self._state_machine.state.observed_files)

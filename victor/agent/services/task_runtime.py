@@ -132,7 +132,8 @@ class TaskCoordinator:
         """
         from victor.agent.prompt_builder import get_task_type_hint
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
-        from victor.framework.task import TaskComplexity, DEFAULT_BUDGETS
+        from victor.agent.action_authorizer import ActionIntent
+        from victor.framework.task import TaskClassification, TaskComplexity, DEFAULT_BUDGETS
         from victor.framework.task.direct_response import classify_direct_response_prompt
 
         direct_response = classify_direct_response_prompt(user_message)
@@ -180,6 +181,31 @@ class TaskCoordinator:
         # Classify task complexity and adjust tool budget
         task_classification = self.task_analyzer.classify_complexity(user_message)
         complexity_tool_budget = DEFAULT_BUDGETS.get(task_classification.complexity, 15)
+        task_type_value = str(getattr(unified_task_type, "value", unified_task_type))
+        if (
+            task_classification.complexity == TaskComplexity.SIMPLE
+            and task_type_value in {"edit", "create", "create_simple"}
+        ):
+            intent_result = self.task_analyzer.detect_intent(user_message)
+            if intent_result.intent == ActionIntent.WRITE_ALLOWED:
+                task_classification = TaskClassification(
+                    complexity=TaskComplexity.ACTION,
+                    tool_budget=DEFAULT_BUDGETS.get(TaskComplexity.ACTION, 50),
+                    confidence=max(
+                        float(getattr(task_classification, "confidence", 0.0)),
+                        float(getattr(intent_result, "confidence", 0.0)),
+                        0.85,
+                    ),
+                    matched_patterns=[
+                        *list(getattr(task_classification, "matched_patterns", []) or []),
+                        "write_intent_task_shape",
+                    ],
+                )
+                complexity_tool_budget = task_classification.tool_budget
+                logger.info(
+                    "Promoted simple task complexity to action based on explicit write intent "
+                    "and edit/create task shape"
+                )
 
         if task_classification.complexity == TaskComplexity.SIMPLE:
             # Override with simpler budget for simple tasks

@@ -834,7 +834,7 @@ class TestPhase2ContextAwareCalibration:
         from unittest.mock import patch, MagicMock
         from victor.agent.action_authorizer import ActionIntent
 
-        sm = ConversationStateMachine(action_intent=ActionIntent.WRITE_ALLOWED)
+        sm = ConversationStateMachine(action_intent=ActionIntent.AMBIGUOUS)
         sm.state.stage = ConversationStage.READING
 
         # Simulate reading 15 files without editing
@@ -857,6 +857,32 @@ class TestPhase2ContextAwareCalibration:
 
             # Should calibrate to ANALYSIS despite edge model saying EXECUTION
             assert result == (ConversationStage.ANALYSIS, 0.7)
+
+    def test_context_calibration_write_allowed_with_many_reads_stays_execution(self):
+        """Explicit write intent should not be downgraded just because planning needed reads."""
+        from unittest.mock import patch, MagicMock
+        from victor.agent.action_authorizer import ActionIntent
+
+        sm = ConversationStateMachine(action_intent=ActionIntent.WRITE_ALLOWED)
+        sm.state.stage = ConversationStage.READING
+
+        for i in range(15):
+            sm.state.observed_files.add(f"file_{i}.py")
+
+        decision = self._make_decision_result("execution", 0.97)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with (
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            result = sm._detect_stage_with_edge_model(ConversationStage.READING)
+
+            assert result == (ConversationStage.EXECUTION, 0.97)
 
     def test_context_calibration_read_only_intent(self):
         """Phase 2: READ_ONLY intent should bias-correct edge model EXECUTION suggestions."""

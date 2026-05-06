@@ -2,6 +2,7 @@ from victor.framework.request_scope_heuristics import (
     contains_keyword_marker,
     conversation_history_has_explicit_target,
     has_ambiguous_target_reference,
+    is_ambiguous_write_followup_request,
 )
 
 
@@ -24,6 +25,16 @@ def test_has_ambiguous_target_reference_ignores_relative_clause_that():
 
 def test_has_ambiguous_target_reference_detects_true_follow_up_reference():
     assert has_ambiguous_target_reference("fix that first and add tests") is True
+
+
+def test_has_ambiguous_target_reference_detects_plural_follow_up_reference():
+    assert has_ambiguous_target_reference("fix these first and add tests") is True
+
+
+def test_is_ambiguous_write_followup_request_detects_context_dependent_remediation():
+    assert is_ambiguous_write_followup_request("address them comprehensively") is True
+    assert is_ambiguous_write_followup_request("resolve the remaining findings") is True
+    assert is_ambiguous_write_followup_request("summarize the findings") is False
 
 
 def test_conversation_history_has_explicit_target_detects_recent_file_reference():

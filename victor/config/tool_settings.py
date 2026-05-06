@@ -20,6 +20,34 @@ class ToolSettings(BaseModel):
             BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
         )
     )
+    tool_call_budget_warning_pct: float = Field(
+        default=0.8,
+        ge=0.5,
+        le=0.99,
+        description="Warn when tool usage reaches this fraction of the turn budget",
+    )
+    tool_call_budget_warning_remaining: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        description="Warn when this many or fewer tool calls remain in the current turn",
+    )
+    tool_budget_progress_relief_enabled: bool = Field(
+        default=True,
+        description="Allow a bounded one-time budget extension when action tasks show progress",
+    )
+    tool_budget_progress_relief_amount: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum number of extra tool calls to grant for progress-based relief",
+    )
+    tool_budget_progress_relief_max_uses: int = Field(
+        default=1,
+        ge=0,
+        le=5,
+        description="Maximum number of progress-based budget relief grants per turn",
+    )
     tool_calling_models: Dict[str, list[str]] = Field(
         default_factory=_load_tool_capable_patterns_from_yaml
     )

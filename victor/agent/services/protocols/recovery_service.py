@@ -292,6 +292,8 @@ class RecoveryServiceProtocol(Protocol):
         self,
         ctx: Any,
         warning_threshold: int = 250,
+        warning_pct: float = 0.8,
+        warning_remaining: int = 5,
     ) -> Any:
         """Check whether the streaming tool budget is approaching exhaustion."""
         ...

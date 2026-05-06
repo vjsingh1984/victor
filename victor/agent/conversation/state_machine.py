@@ -724,12 +724,18 @@ class ConversationStateMachine:
             # Calibrate edge model results based on actual behavior, not counting
             # ============================================================================
             if result == ConversationStage.EXECUTION and confidence >= 0.95:
+                from victor.agent.action_authorizer import ActionIntent
+
                 files_read = len(self.state.observed_files)
                 files_modified = len(self.state.modified_files)
 
                 # If reading many files without editing, distrust EXECUTION
                 # This happens when edge model is overconfident or biased
-                if files_read > 10 and files_modified == 0:
+                if (
+                    self._action_intent != ActionIntent.WRITE_ALLOWED
+                    and files_read > 10
+                    and files_modified == 0
+                ):
                     logger.warning(
                         f"Edge model calibration: {stage_name} ({confidence:.2f}) → ANALYSIS. "
                         f"Reason: Agent has read {files_read} files without any edits. "

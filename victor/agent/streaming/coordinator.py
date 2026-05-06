@@ -102,6 +102,8 @@ class CoordinatorConfig:
     Attributes:
         session_idle_timeout: Maximum idle time in seconds.
         budget_warning_threshold: Tool calls before budget warning.
+        budget_warning_pct: Fraction of tool budget used before warning.
+        budget_warning_remaining: Warn when this many or fewer tool calls remain.
         consecutive_blocked_limit: Blocked attempts before force.
         total_blocked_limit: Total blocked attempts before force.
         max_empty_responses: Empty responses before recovery.
@@ -109,6 +111,8 @@ class CoordinatorConfig:
 
     session_idle_timeout: float = 180.0
     budget_warning_threshold: int = 250
+    budget_warning_pct: float = 0.8
+    budget_warning_remaining: int = 5
     consecutive_blocked_limit: int = DEFAULT_BLOCKED_CONSECUTIVE_THRESHOLD
     total_blocked_limit: int = DEFAULT_BLOCKED_TOTAL_THRESHOLD
     max_empty_responses: int = 3
@@ -146,7 +150,20 @@ class IterationCoordinator:
         self._handler = handler
         self._loop_detector = loop_detector
         self._settings = settings
-        self._config = config or CoordinatorConfig()
+        if config is not None:
+            self._config = config
+        elif settings is not None:
+            self._config = CoordinatorConfig(
+                budget_warning_threshold=getattr(
+                    settings, "tool_call_budget_warning_threshold", 250
+                ),
+                budget_warning_pct=getattr(settings, "tool_call_budget_warning_pct", 0.8),
+                budget_warning_remaining=getattr(
+                    settings, "tool_call_budget_warning_remaining", 5
+                ),
+            )
+        else:
+            self._config = CoordinatorConfig()
 
     @property
     def config(self) -> CoordinatorConfig:
@@ -254,7 +271,12 @@ class IterationCoordinator:
             IterationResult if additional action needed, None otherwise.
         """
         # Check budget warning
-        budget_result = self._handler.check_tool_budget(ctx, self._config.budget_warning_threshold)
+        budget_result = self._handler.check_tool_budget(
+            ctx,
+            self._config.budget_warning_threshold,
+            self._config.budget_warning_pct,
+            self._config.budget_warning_remaining,
+        )
         if budget_result is not None:
             return budget_result
 

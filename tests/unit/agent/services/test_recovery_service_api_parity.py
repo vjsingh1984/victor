@@ -234,7 +234,10 @@ class TestRecoveryServiceDelegationBehavior:
 
         # Verify delegation to streaming_handler
         mocks["streaming_handler"].check_tool_budget.assert_called_once_with(
-            mock_ctx.streaming_context, 250
+            mock_ctx.streaming_context,
+            250,
+            0.8,
+            5,
         )
         assert result is None
 

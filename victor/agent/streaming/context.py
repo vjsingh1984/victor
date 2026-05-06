@@ -131,6 +131,8 @@ class StreamingChatContext:
     tool_calls_used: int = 0
     unique_resources: Set[str] = field(default_factory=set)
     executed_tool_names: Set[str] = field(default_factory=set)
+    budget_warning_shown: bool = False
+    budget_relief_uses: int = 0
 
     # Compaction tracking (P0 fix for post-compaction continuation)
     compaction_occurred: bool = False
@@ -292,9 +294,22 @@ class StreamingChatContext:
         """Check if tool budget is exhausted."""
         return self.get_remaining_budget() <= 0
 
-    def is_approaching_budget_limit(self, warning_threshold: int = 250) -> bool:
+    def is_approaching_budget_limit(
+        self,
+        warning_threshold: int = 250,
+        warning_pct: float = 0.8,
+        warning_remaining: int = 5,
+    ) -> bool:
         """Check if approaching budget limit."""
-        return self.tool_calls_used >= warning_threshold and self.get_remaining_budget() > 0
+        remaining = self.get_remaining_budget()
+        if remaining <= 0 or self.tool_budget <= 0:
+            return False
+
+        dynamic_remaining = min(max(1, self.tool_budget // 5), max(1, warning_remaining))
+        over_absolute_threshold = self.tool_calls_used >= max(1, warning_threshold)
+        over_ratio_threshold = (self.tool_calls_used / self.tool_budget) >= warning_pct
+        low_remaining = remaining <= dynamic_remaining
+        return over_absolute_threshold or over_ratio_threshold or low_remaining
 
     def record_tool_execution(self, count: int = 1) -> None:
         """Record tool calls used."""

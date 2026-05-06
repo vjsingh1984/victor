@@ -502,6 +502,45 @@ async def test_service_streaming_runtime_create_stream_context_applies_pending_c
 
 
 @pytest.mark.asyncio
+async def test_service_streaming_runtime_promotes_write_followup_to_action_shape():
+    orch = _make_orchestrator_stub()
+    orch.settings = SimpleNamespace(recovery_blocked_consecutive_threshold=5)
+    orch._classify_task_keywords.return_value = {
+        "coarse_task_type": "default",
+        "is_action_task": False,
+        "needs_execution": False,
+    }
+    orch._tool_planner = SimpleNamespace(infer_goals_from_message=lambda _: [])
+    orch.tool_budget = 60
+    orch.tool_calls_used = 0
+    orch._task_completion_detector = None
+
+    runtime = ServiceStreamingRuntime(orch)
+    runtime._prepare_stream = AsyncMock(
+        return_value=(
+            SimpleNamespace(),
+            0.0,
+            0.0,
+            {},
+            30,
+            10,
+            0,
+            False,
+            TrackerTaskType.EDIT,
+            SimpleNamespace(complexity=TaskComplexity.ACTION),
+            60,
+        )
+    )
+
+    ctx = await runtime._create_stream_context(
+        "Are you able to address them. if yes please address them comprehensively."
+    )
+
+    assert ctx.is_action_task is True
+    assert ctx.coarse_task_type == "action"
+
+
+@pytest.mark.asyncio
 async def test_service_streaming_runtime_stream_chat_normalizes_recovery_events():
     orch = _make_orchestrator_stub()
     orch._runtime_intelligence = SimpleNamespace(record_topology_outcome=MagicMock())

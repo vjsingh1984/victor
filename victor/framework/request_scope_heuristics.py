@@ -12,7 +12,7 @@ from functools import lru_cache
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
 _DIRECT_AMBIGUOUS_REFERENCE_PATTERN = re.compile(
-    r"\b(?:it|this|same thing|same one|above|below)\b",
+    r"\b(?:it|this|them|these|those|same thing|same one|above|below)\b",
     flags=re.IGNORECASE,
 )
 _THAT_PATTERN = re.compile(r"\bthat\b", flags=re.IGNORECASE)
@@ -31,6 +31,16 @@ _BARE_FILENAME_PATTERN = re.compile(
 )
 _SCOPE_HINT_PATTERN = re.compile(r"`([^`]{3,80})`")
 _TARGET_KEYS = ("file", "file_path", "path", "target", "component", "symbol")
+_REMEDIATION_ACTION_PATTERN = re.compile(
+    r"\b(?:address|handle|tackle|resolve|fix|implement|apply|finish|complete|"
+    r"update|modify|edit|refactor|consolidate|merge|deduplicate|remove|reduce)\b",
+    flags=re.IGNORECASE,
+)
+_FOLLOW_UP_SCOPE_PATTERN = re.compile(
+    r"\b(?:remaining|rest|last|final|findings|issues|concerns|problems|tasks|"
+    r"feedback|changes|fixes|recommendations|optimizations)\b",
+    flags=re.IGNORECASE,
+)
 
 
 @lru_cache(maxsize=None)
@@ -57,6 +67,15 @@ def has_ambiguous_target_reference(text: str) -> bool:
             continue
         return True
     return False
+
+
+def is_ambiguous_write_followup_request(text: str) -> bool:
+    """Return whether text looks like a write request that depends on prior context."""
+    if not text:
+        return False
+    if not _REMEDIATION_ACTION_PATTERN.search(text):
+        return False
+    return has_ambiguous_target_reference(text) or bool(_FOLLOW_UP_SCOPE_PATTERN.search(text))
 
 
 def content_has_explicit_target(text: str) -> bool:

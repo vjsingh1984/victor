@@ -643,22 +643,41 @@ class StreamingChatHandler:
         return create_continue_result()
 
     def check_tool_budget(
-        self, ctx: StreamingChatContext, warning_threshold: int = 250
+        self,
+        ctx: StreamingChatContext,
+        warning_threshold: int = 250,
+        warning_pct: float = 0.8,
+        warning_remaining: int = 5,
     ) -> Optional[IterationResult]:
         """Check tool budget and generate warning if approaching limit.
 
         Args:
             ctx: The streaming context
-            warning_threshold: Number of tool calls before warning
+            warning_threshold: Absolute used-call threshold before warning
+            warning_pct: Fraction of budget used before warning
+            warning_remaining: Warn when this many or fewer calls remain
 
         Returns:
             IterationResult with warning chunk if approaching limit, None otherwise
         """
-        if ctx.is_approaching_budget_limit(warning_threshold):
+        if ctx.budget_warning_shown:
+            return None
+
+        if ctx.is_approaching_budget_limit(
+            warning_threshold=warning_threshold,
+            warning_pct=warning_pct,
+            warning_remaining=warning_remaining,
+        ):
+            ctx.budget_warning_shown = True
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
+            remaining = ctx.get_remaining_budget()
             result.add_chunk(
                 StreamChunk(
-                    content=f"[tool] {self._presentation.icon('warning', with_color=False)} Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} calls used\n"
+                    content=(
+                        f"[tool] {self._presentation.icon('warning', with_color=False)} "
+                        f"Approaching tool budget limit: {ctx.tool_calls_used}/{ctx.tool_budget} "
+                        f"calls used ({remaining} remaining)\n"
+                    )
                 )
             )
             return result

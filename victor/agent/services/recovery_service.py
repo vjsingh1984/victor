@@ -879,19 +879,31 @@ class RecoveryService:
         self,
         ctx: Any,
         warning_threshold: int = 250,
+        warning_pct: float = 0.8,
+        warning_remaining: int = 5,
     ) -> Any:
         """Check whether the streaming tool budget is approaching exhaustion."""
         if self._streaming_handler is not None:
             result = self._streaming_handler.check_tool_budget(
                 ctx.streaming_context,
                 warning_threshold,
+                warning_pct,
+                warning_remaining,
             )
             if result and result.chunks:
                 return result.chunks[0]
             return None
 
         if self._recovery_coordinator is not None:
-            return self._recovery_coordinator.check_tool_budget(ctx, warning_threshold)
+            try:
+                return self._recovery_coordinator.check_tool_budget(
+                    ctx,
+                    warning_threshold,
+                    warning_pct,
+                    warning_remaining,
+                )
+            except TypeError:
+                return self._recovery_coordinator.check_tool_budget(ctx, warning_threshold)
         return None
 
     def truncate_tool_calls(

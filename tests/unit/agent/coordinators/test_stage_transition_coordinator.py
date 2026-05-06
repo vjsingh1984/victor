@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from victor.agent.action_authorizer import ActionIntent
 from victor.agent.coordinators.stage_transition_coordinator import (
     StageTransitionCoordinator,
     TransitionDecision,
@@ -120,6 +121,7 @@ class TestStageTransitionCoordinator:
         sm._get_tools_for_stage.return_value = {"read", "edit", "write"}
         sm.state.observed_files = set()
         sm.state.modified_files = set()
+        sm._action_intent = ActionIntent.AMBIGUOUS
         return sm
 
     @pytest.fixture
@@ -382,6 +384,28 @@ class TestStageTransitionCoordinator:
         assert calibrated_result.confidence == 0.7
         assert calibrated_result.calibration_applied is True
         assert "Calibration applied" in calibrated_result.reason
+
+    def test_calibration_skipped_for_write_allowed_execution(self, mock_state_machine):
+        """Explicit write intent should preserve EXECUTION even after heavy reading."""
+        for i in range(11):
+            mock_state_machine.state.observed_files.add(f"file{i}.py")
+        mock_state_machine.state.modified_files = set()
+        mock_state_machine._action_intent = ActionIntent.WRITE_ALLOWED
+
+        strategy_result = TransitionResult(
+            decision=TransitionDecision.EDGE_MODEL_TRANSITION,
+            new_stage=ConversationStage.EXECUTION,
+            confidence=0.97,
+            reason="Edge model",
+            edge_model_called=True,
+        )
+
+        coordinator = StageTransitionCoordinator(
+            state_machine=mock_state_machine,
+            strategy=MagicMock(),
+        )
+
+        assert coordinator._should_calibrate(strategy_result) is False
 
     def test_get_statistics(self, coordinator):
         """Test getting coordinator statistics."""
