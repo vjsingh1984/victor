@@ -105,6 +105,34 @@ class TestMissingParameterHandler:
         assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
         assert result.modified_args["path"] == "."
 
+    def test_handle_recovers_wrapped_value_payload_for_write(self, handler):
+        """Wrapped write payloads should be recovered before default retries."""
+        error = Exception("Error: Missing required arguments: path, content")
+        result = handler.handle(
+            error,
+            "write",
+            {
+                "value": (
+                    '{"file_path":"victor/framework/graph_protocols.py",'
+                    '"text":"print(\\"hi\\")\\n"}'
+                )
+            },
+        )
+
+        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.modified_args == {
+            "path": "victor/framework/graph_protocols.py",
+            "content": 'print("hi")\n',
+        }
+
+    def test_handle_skips_when_multi_param_error_has_unknown_values(self, handler):
+        """Multi-parameter missing errors should not retry with partial defaults."""
+        error = Exception("Error: Missing required arguments: path, content")
+        result = handler.handle(error, "write", {})
+
+        assert result.action == RecoveryAction.SKIP
+        assert "path, content" in result.user_message
+
     def test_handle_provides_default_for_limit(self, handler):
         """Test default value for 'limit' parameter."""
         error = Exception("'limit' is a required property")

@@ -267,6 +267,34 @@ class TestNormalizeArgumentsAST:
         assert isinstance(result["ops"], list)
         assert result["ops"][0]["content"] == "line1\nline2"
 
+    def test_write_value_envelope_with_wrapped_dict_payload(self):
+        """Canonical write should recover dict payloads wrapped in a generic value key."""
+        normalizer = ArgumentNormalizer()
+        args = {
+            "value": {
+                "path": "victor/framework/graph_protocols.py",
+                "content": "print('hi')\n",
+            }
+        }
+        result, strategy = normalizer.normalize_arguments(args, "write")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert result["path"] == "victor/framework/graph_protocols.py"
+        assert result["content"] == "print('hi')\n"
+
+    def test_write_value_envelope_with_aliases_in_json_string(self):
+        """Canonical write should recover wrapped JSON strings and normalize aliases."""
+        normalizer = ArgumentNormalizer()
+        args = {
+            "value": (
+                '{"file_path":"victor/framework/graph_protocols.py",'
+                '"text":"line1\\nline2"}'
+            )
+        }
+        result, strategy = normalizer.normalize_arguments(args, "write")
+        assert strategy == NormalizationStrategy.DIRECT
+        assert result["path"] == "victor/framework/graph_protocols.py"
+        assert result["content"] == "line1\nline2"
+
 
 class TestNormalizeArgumentsRegex:
     """Tests for normalize_arguments - regex normalization path."""

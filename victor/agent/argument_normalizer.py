@@ -327,41 +327,81 @@ class ArgumentNormalizer:
         op_keys = {"type", "path", "content", "old_str", "new_str", "new_path"}
         return bool(op_keys & set(value.keys()))
 
+    def _apply_tool_aliases_without_stats(
+        self, payload: Dict[str, Any], tool_name: str
+    ) -> Dict[str, Any]:
+        """Apply canonical parameter aliases without mutating normalization stats."""
+        tool_aliases = self.parameter_aliases.get(tool_name, {})
+        if not tool_aliases:
+            return dict(payload)
+
+        normalized: Dict[str, Any] = {}
+        for param, value in payload.items():
+            canonical_param = tool_aliases.get(param, param)
+            if canonical_param not in normalized:
+                normalized[canonical_param] = value
+        return normalized
+
     def _unwrap_tool_specific_value_envelope(
         self, arguments: Dict[str, Any], tool_name: str
     ) -> Dict[str, Any]:
         """Recover known tool payloads wrapped in a generic ``value`` envelope."""
-        if canonicalize_core_tool_name(tool_name) != "edit":
-            return arguments
-
         if set(arguments.keys()) != {"value"}:
             return arguments
 
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
         payload = arguments.get("value")
         if isinstance(payload, str):
             parsed = self._parse_structured_string(payload)
             if parsed is not _STRUCTURED_PARSE_FAILED:
                 payload = parsed
 
+        if isinstance(payload, dict):
+            aliased_payload = self._apply_tool_aliases_without_stats(payload, canonical_tool_name)
+
+            envelope_param_map = {
+                "write": {"path", "content"},
+                "read": {"path"},
+                "ls": {"path"},
+                "shell": {"cmd"},
+                "grep": {"query"},
+                "search": {"query"},
+                "code_search": {"query"},
+                "semantic_code_search": {"query"},
+            }
+            required_params = envelope_param_map.get(canonical_tool_name)
+            if required_params and required_params.issubset(aliased_payload.keys()):
+                logger.info(
+                    "[%s] Recovered wrapped %s payload from value envelope",
+                    self.provider_name,
+                    canonical_tool_name,
+                )
+                return aliased_payload
+
+            if canonical_tool_name != "edit":
+                return arguments
+
+            if "ops" in aliased_payload or "operations" in aliased_payload:
+                logger.info(
+                    "[%s] Recovered wrapped edit payload from value envelope",
+                    self.provider_name,
+                )
+                return aliased_payload
+            if self._looks_like_edit_operation(aliased_payload):
+                logger.info(
+                    "[%s] Recovered single wrapped edit operation from value envelope",
+                    self.provider_name,
+                )
+                return {"ops": [aliased_payload]}
+
+        if canonical_tool_name != "edit":
+            return arguments
+
         if isinstance(payload, list):
             logger.info(
                 "[%s] Recovered wrapped edit payload from value envelope", self.provider_name
             )
             return {"ops": payload}
-
-        if isinstance(payload, dict):
-            if "ops" in payload or "operations" in payload:
-                logger.info(
-                    "[%s] Recovered wrapped edit payload from value envelope",
-                    self.provider_name,
-                )
-                return payload
-            if self._looks_like_edit_operation(payload):
-                logger.info(
-                    "[%s] Recovered single wrapped edit operation from value envelope",
-                    self.provider_name,
-                )
-                return {"ops": [payload]}
 
         return arguments
 

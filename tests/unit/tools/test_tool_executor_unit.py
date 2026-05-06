@@ -1255,6 +1255,51 @@ class TestToolExecutorUnknownArguments:
             ops=[{"type": "create", "path": "test.txt", "content": "hi"}]
         )
 
+    @pytest.mark.asyncio
+    async def test_execute_recovers_wrapped_write_value_envelope_before_validation(self):
+        """Write should unwrap generic value envelopes before strict validation runs."""
+        from victor.agent.tool_executor import ValidationMode
+        from victor.tools.base import AccessMode, ToolValidationResult
+
+        registry = ToolRegistry()
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "write"
+        mock_tool.access_mode = AccessMode.WRITE
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "content": {"type": "string"},
+            },
+            "required": ["path", "content"],
+            "additionalProperties": False,
+        }
+        mock_tool.validate_parameters_detailed = MagicMock(
+            return_value=ToolValidationResult.success()
+        )
+        mock_tool.execute = AsyncMock(return_value={"success": True})
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            validation_mode=ValidationMode.STRICT,
+        )
+
+        result = await executor.execute(
+            "write",
+            {
+                "value": (
+                    '{"path":"victor/framework/graph_protocols.py","content":"print(\\"hi\\")\\n"}'
+                )
+            },
+        )
+
+        assert result.success is True
+        mock_tool.validate_parameters_detailed.assert_called_once_with(
+            path="victor/framework/graph_protocols.py",
+            content='print("hi")\n',
+        )
+
 
 class TestToolExecutorHooks:
     """Tests for ToolExecutor hook execution."""

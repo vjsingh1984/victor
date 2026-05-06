@@ -24,7 +24,9 @@ SOLID Principles Applied:
 Implements GAP-10 from Grok/DeepSeek provider testing.
 """
 
+import ast
 from abc import ABC, abstractmethod
+import json
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
@@ -156,6 +158,93 @@ class MissingParameterHandler(ErrorRecoveryHandler):
         r"missing required argument[s]?: (\w+)",
     ]
 
+    def _extract_missing_params(self, error_str: str) -> List[str]:
+        """Extract all missing parameter names from an error message."""
+        list_patterns = [
+            r"missing \d+ required positional argument[s]?:\s*(.+)$",
+            r"required parameter[s]?\s+(.+?)\s+was not provided",
+            r"required parameter[s]?\s+(.+?)\s+were not provided",
+            r"missing required argument[s]?:\s*(.+)$",
+            r"(.+?)\s+is a required property",
+            r"(.+?)\s+are required properties",
+        ]
+
+        for pattern in list_patterns:
+            match = re.search(pattern, error_str, re.IGNORECASE)
+            if not match:
+                continue
+
+            raw_params = match.group(1).strip().rstrip(".")
+            params = [
+                token
+                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", raw_params)
+                if token.lower()
+                not in {
+                    "and",
+                    "or",
+                    "required",
+                    "require",
+                    "parameter",
+                    "parameters",
+                    "argument",
+                    "arguments",
+                    "property",
+                    "properties",
+                    "positional",
+                    "provided",
+                    "was",
+                    "were",
+                    "missing",
+                }
+            ]
+            if params:
+                return list(dict.fromkeys(params))
+
+        quoted_params = re.findall(r"'(\w+)'", error_str)
+        if quoted_params:
+            return list(dict.fromkeys(quoted_params))
+
+        return []
+
+    def _recover_wrapped_value_arguments(
+        self, args: Dict[str, Any], missing_params: List[str], tool_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Recover structured tool args wrapped inside a generic value envelope."""
+        if set(args.keys()) != {"value"}:
+            return None
+
+        payload = args.get("value")
+        if isinstance(payload, str):
+            for parser in (json.loads, ast.literal_eval):
+                try:
+                    payload = parser(payload)
+                    break
+                except Exception:
+                    continue
+
+        if not isinstance(payload, dict):
+            return None
+
+        try:
+            from victor.agent.argument_normalizer import ArgumentNormalizer
+
+            payload, _ = ArgumentNormalizer(provider_name="recovery").normalize_parameter_aliases(
+                payload,
+                tool_name,
+            )
+        except Exception:
+            payload = dict(payload)
+
+        if not all(param in payload for param in missing_params):
+            return None
+
+        self._logger.info(
+            "Recovered wrapped value envelope for %s with params: %s",
+            tool_name,
+            ", ".join(sorted(payload.keys())),
+        )
+        return payload
+
     def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         # Check for various missing parameter/argument patterns
@@ -181,35 +270,42 @@ class MissingParameterHandler(ErrorRecoveryHandler):
         return False
 
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
-        # Extract missing parameter from error message
         error_str = str(error)
-        param_name = None
+        missing_params = self._extract_missing_params(error_str)
 
-        for pattern in self.PATTERNS:
-            match = re.search(pattern, error_str, re.IGNORECASE)
-            if match:
-                param_name = match.group(1)
-                break
+        if missing_params:
+            recovered_args = self._recover_wrapped_value_arguments(args, missing_params, tool_name)
+            if recovered_args is not None:
+                return RecoveryResult(
+                    action=RecoveryAction.RETRY_WITH_INFERRED,
+                    modified_args=recovered_args,
+                    user_message=(
+                        "Recovered structured arguments from wrapped value payload"
+                    ),
+                )
 
-        # Fallback: look for quoted parameter names
-        if not param_name:
-            quoted_match = re.search(r"'(\w+)'", error_str)
-            if quoted_match:
-                param_name = quoted_match.group(1)
-
-        if param_name and param_name in self.DEFAULTS:
+        if missing_params and all(param in self.DEFAULTS for param in missing_params):
+            defaults = {param: self.DEFAULTS[param] for param in missing_params}
             self._logger.info(
-                f"Providing default value for missing param '{param_name}': {self.DEFAULTS[param_name]}"
+                "Providing default values for missing params %s",
+                defaults,
             )
             return RecoveryResult(
                 action=RecoveryAction.RETRY_WITH_DEFAULTS,
-                modified_args={**args, param_name: self.DEFAULTS[param_name]},
-                user_message=f"Using default value for '{param_name}'",
+                modified_args={**args, **defaults},
+                user_message=(
+                    "Using default values for " + ", ".join(f"'{param}'" for param in missing_params)
+                ),
             )
+
+        param_name = missing_params[0] if missing_params else None
 
         return RecoveryResult(
             action=RecoveryAction.SKIP,
-            user_message=f"Cannot infer value for required parameter '{param_name}'",
+            user_message=(
+                "Cannot infer value for required parameter(s): "
+                + ", ".join(missing_params or ([param_name] if param_name else ["unknown"]))
+            ),
         )
 
 
