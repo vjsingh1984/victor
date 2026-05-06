@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import json
 import logging
+import inspect
 from abc import abstractmethod
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -208,10 +209,15 @@ class HttpxOpenAICompatProvider(BaseProvider):
         ``HTTPStatusError`` carries the provider's error payload and can be
         retried/classified consistently by the shared resilience layer.
         """
-        request = self.client.build_request("POST", "/chat/completions", json=payload)
-        response = await self.client.send(request, stream=True)
+        stream_context = self.client.stream("POST", "/chat/completions", json=payload)
+        response = await stream_context.__aenter__()
+        response._victor_stream_context = stream_context  # type: ignore[attr-defined]
+
         if response.status_code != 200:
-            await response.aread()
+            try:
+                await response.aread()
+            finally:
+                await stream_context.__aexit__(None, None, None)
             response.raise_for_status()
         return response
 
@@ -484,7 +490,13 @@ class HttpxOpenAICompatProvider(BaseProvider):
                             "%s JSON decode error on SSE line: %s", self.name, line[:100]
                         )
             finally:
-                await response.aclose()
+                stream_context = getattr(response, "_victor_stream_context", None)
+                if stream_context is not None:
+                    await stream_context.__aexit__(None, None, None)
+                else:
+                    close_result = response.aclose()
+                    if inspect.isawaitable(close_result):
+                        await close_result
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(

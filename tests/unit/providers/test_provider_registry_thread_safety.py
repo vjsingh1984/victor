@@ -44,6 +44,7 @@ class TestProviderRegistryThreadSafety:
         _lazy_provider_specs["test_thread"] = _LazyProviderSpec(
             module_path="fake.module",
             class_name="FakeProvider",
+            primary_name="test_thread",
         )
 
         errors = []

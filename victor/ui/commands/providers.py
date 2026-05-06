@@ -33,15 +33,22 @@ def list_providers() -> None:
 
 def _list_providers_impl() -> None:
     available_providers = ProviderRegistry.list_providers()
-    aliases = ProviderRegistry.get_aliases()
+    raw_aliases = ProviderRegistry.get_aliases()
+    aliases = raw_aliases if isinstance(raw_aliases, dict) else {}
 
     # Build reverse mapping: primary provider -> list of aliases
     primary_to_aliases: Dict[str, List[str]] = {}
-    for alias, primary in aliases.items():
-        if primary not in primary_to_aliases:
-            primary_to_aliases[primary] = []
-        if alias != primary:
-            primary_to_aliases[primary].append(alias)
+    primary_providers = set()
+    for provider in available_providers:
+        primary = aliases.get(provider, provider)
+        if not isinstance(primary, str) or not primary:
+            primary = provider
+        primary_providers.add(primary)
+        if provider != primary:
+            primary_to_aliases.setdefault(primary, []).append(provider)
+
+    if not primary_providers:
+        primary_providers = set(available_providers)
 
     # Provider info: (status, features)
     provider_info = {
@@ -81,10 +88,9 @@ def _list_providers_impl() -> None:
     table.add_column("Features")
     table.add_column("Aliases", style="dim")
 
-    # Show only primary providers
-    primary_providers = sorted(set(primary_to_aliases.keys()))
+    sorted_primary_providers = sorted(primary_providers)
 
-    for provider in primary_providers:
+    for provider in sorted_primary_providers:
         info = provider_info.get(provider)
         if info:
             status, features = info
@@ -95,8 +101,11 @@ def _list_providers_impl() -> None:
             table.add_row(provider, "❓ Unknown", "", "")
 
     console.print(table)
+    alias_count = sum(
+        1 for provider in available_providers if aliases.get(provider, provider) != provider
+    )
     console.print(
-        f"\n[dim]Total: {len(primary_providers)} providers ({len(available_providers) - len(primary_providers)} aliases hidden)[/]"
+        f"\n[dim]Total: {len(sorted_primary_providers)} providers ({alias_count} aliases hidden)[/]"
     )
     console.print("[dim]Use 'victor profiles' to see configured profiles[/]")
 

@@ -345,8 +345,9 @@ class BaseProvider(ABC):
         self._use_circuit_breaker = use_circuit_breaker
         self._circuit_breaker: Optional[CircuitBreaker] = None
         if use_circuit_breaker:
+            breaker_name = f"provider_{self.__class__.__name__}_{id(self):x}"
             self._circuit_breaker = CircuitBreakerRegistry.get_or_create(
-                name=f"provider_{self.__class__.__name__}",
+                name=breaker_name,
                 failure_threshold=circuit_breaker_failure_threshold,
                 recovery_timeout=circuit_breaker_recovery_timeout,
                 excluded_exceptions=(ProviderAuthError,),
