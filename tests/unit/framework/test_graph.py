@@ -39,6 +39,7 @@ from victor.framework.graph import (
     SubgraphNode,
     Send,
     default_state_merger,
+    strict_state_merger,
     END,
     START,
     create_graph,
@@ -1171,6 +1172,23 @@ class TestDefaultStateMerger:
         assert merged["a"] == 20
         assert "Parallel state merge conflict" in caplog.text
 
+    def test_strict_merger_raises_on_conflicting_parallel_writes(self):
+        """strict_state_merger should fail fast on conflicting keys."""
+        base = {"a": 1}
+        branches = [{"a": 10}, {"a": 20}]
+
+        with pytest.raises(ValueError, match="Parallel state merge conflict"):
+            strict_state_merger(base, branches)
+
+    def test_strict_merger_merges_when_branches_do_not_conflict(self):
+        """strict_state_merger should merge non-conflicting branches."""
+        base = {"a": 1}
+        branches = [{"b": 10}, {"c": 20}]
+
+        merged = strict_state_merger(base, branches)
+
+        assert merged == {"a": 1, "b": 10, "c": 20}
+
 
 class TestSendFanOut:
     """Tests for Send dataclass and fan-out execution."""
@@ -1289,6 +1307,31 @@ class TestSendFanOut:
         # sum_merger: 0 + 10 + 20 = 30
         assert result.state["count"] == 30
 
+    async def test_fan_out_with_strict_merger_fails_on_conflict(self):
+        """strict_state_merger should surface conflicting branch writes."""
+
+        async def identity(state):
+            return state
+
+        def fanout(state):
+            return [
+                Send(node="a", state={"count": 10}),
+                Send(node="b", state={"count": 20}),
+            ]
+
+        graph = StateGraph()
+        graph.add_node("start", identity)
+        graph.add_node("a", identity)
+        graph.add_node("b", identity)
+        graph.set_entry_point("start")
+        graph.add_conditional_edge("start", fanout, {"x": "a", "y": "b"})
+        graph.add_state_merger(strict_state_merger)
+
+        app = graph.compile()
+        result = await app.invoke({"count": 0})
+        assert result.success is False
+        assert "Parallel state merge conflict" in result.error
+
     async def test_fan_out_node_history(self):
         """Fan-out branches appear in node_history as send:<node>."""
 
@@ -1338,6 +1381,7 @@ class TestSendFanOut:
 
         assert "Send" in graph_all
         assert "default_state_merger" in graph_all
+        assert "strict_state_merger" in graph_all
         assert "SubgraphNode" in graph_all
 
 

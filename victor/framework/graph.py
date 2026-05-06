@@ -870,6 +870,49 @@ def default_state_merger(
     return merged
 
 
+def strict_state_merger(
+    base_state: Dict[str, Any],
+    branch_states: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Merge branch states but fail fast on conflicting parallel writes.
+
+    Args:
+        base_state: The state before the fan-out
+        branch_states: List of state dicts returned by each branch
+
+    Returns:
+        Merged state dictionary when no conflicts are present.
+
+    Raises:
+        ValueError: If two branches write incompatible values to the same key.
+    """
+    merged = dict(base_state)
+    conflicting_keys: Set[str] = set()
+
+    for bs in branch_states:
+        for key, value in bs.items():
+            if key not in merged:
+                continue
+            try:
+                if merged[key] != value:
+                    conflicting_keys.add(str(key))
+            except Exception:
+                conflicting_keys.add(str(key))
+
+        if conflicting_keys:
+            break
+
+        merged.update(bs)
+
+    if conflicting_keys:
+        raise ValueError(
+            "Parallel state merge conflict on keys "
+            f"{sorted(conflicting_keys)}; strict_state_merger requires an explicit resolver"
+        )
+
+    return merged
+
+
 @dataclass
 class Edge:
     """Represents an edge between nodes.
@@ -2891,6 +2934,7 @@ __all__ = [
     # Fan-out / parallel execution
     "Send",
     "default_state_merger",
+    "strict_state_merger",
     # State management
     "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
     "AgentStateModel",  # Example Pydantic state model (recommended over TypedDict)
