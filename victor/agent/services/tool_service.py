@@ -646,7 +646,80 @@ class ToolService:
 
         self._tool_call_parser: Optional[Any] = ToolCallParser()
         self._tool_call_validator: Optional[Any] = ToolCallValidator()
+        self._last_tool_call_parse_diagnostics: Optional[Dict[str, Any]] = None
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
+
+    @staticmethod
+    def _count_tool_calls(tool_calls: Optional[Any]) -> int:
+        """Count tool calls across list/dict/None inputs."""
+        if isinstance(tool_calls, list):
+            return len(tool_calls)
+        if isinstance(tool_calls, dict):
+            return 1
+        return 0
+
+    def _record_tool_call_parse_diagnostics(
+        self,
+        *,
+        tool_adapter: Any,
+        parse_method: str,
+        adapter_parse_invoked: bool,
+        raw_tool_call_count: int,
+        extracted_tool_call_count: int,
+        final_tool_call_count: int,
+        confidence: float,
+        warnings: Optional[List[str]] = None,
+    ) -> None:
+        """Persist and log tool-call parsing diagnostics for observability."""
+        warning_list = list(warnings or [])
+        provider_name = getattr(tool_adapter, "provider_name", None) or "unknown"
+        model_name = getattr(tool_adapter, "model", None) or "unknown"
+        diagnostics = {
+            "provider_name": provider_name,
+            "model_name": model_name,
+            "parse_method": parse_method or "none",
+            "adapter_parse_invoked": adapter_parse_invoked,
+            "raw_tool_call_count": raw_tool_call_count,
+            "extracted_tool_call_count": extracted_tool_call_count,
+            "final_tool_call_count": final_tool_call_count,
+            "confidence": confidence,
+            "warning_count": len(warning_list),
+            "warnings": warning_list,
+            "fallback_used": parse_method not in {"none", "native", "native_passthrough"},
+            "native_passthrough": parse_method == "native_passthrough",
+        }
+        self._last_tool_call_parse_diagnostics = diagnostics
+
+        if final_tool_call_count > 0 or raw_tool_call_count > 0 or warning_list:
+            self._logger.info(
+                "tool_call_parse provider=%s model=%s parse_method=%s "
+                "adapter_parse_invoked=%s raw_tool_call_count=%d "
+                "extracted_tool_call_count=%d final_tool_call_count=%d "
+                "warning_count=%d fallback_used=%s",
+                provider_name,
+                model_name,
+                diagnostics["parse_method"],
+                adapter_parse_invoked,
+                raw_tool_call_count,
+                extracted_tool_call_count,
+                final_tool_call_count,
+                diagnostics["warning_count"],
+                diagnostics["fallback_used"],
+            )
+        else:
+            self._logger.debug(
+                "tool_call_parse provider=%s model=%s parse_method=%s raw_tool_call_count=%d",
+                provider_name,
+                model_name,
+                diagnostics["parse_method"],
+                raw_tool_call_count,
+            )
+
+    def get_last_tool_call_parse_diagnostics(self) -> Optional[Dict[str, Any]]:
+        """Return the most recent tool-call parse diagnostics snapshot."""
+        if self._last_tool_call_parse_diagnostics is None:
+            return None
+        return dict(self._last_tool_call_parse_diagnostics)
 
     def _get_budget_limit(self) -> int:
         """Return the active tool budget ceiling."""
@@ -1853,12 +1926,24 @@ class ToolService:
         tool_adapter: Any,
     ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
         """Parse, validate, normalize, and filter tool calls from provider output."""
+        raw_tool_call_count = self._count_tool_calls(tool_calls)
+        parse_method = "native_passthrough" if raw_tool_call_count else "none"
+        adapter_parse_invoked = False
+        extracted_tool_call_count = raw_tool_call_count
+        parse_confidence = 1.0
+        parse_warnings: List[str] = []
+
         if not tool_calls and full_content:
             self._logger.debug(
                 "No native tool_calls, attempting fallback parsing on content len=%s",
                 len(full_content),
             )
+            adapter_parse_invoked = True
             parse_result = tool_adapter.parse_tool_calls(full_content, tool_calls)
+            parse_method = getattr(parse_result, "parse_method", "none") or "none"
+            parse_confidence = getattr(parse_result, "confidence", 1.0)
+            parse_warnings = list(getattr(parse_result, "warnings", []) or [])
+            extracted_tool_call_count = self._count_tool_calls(parse_result.tool_calls)
             for warning in parse_result.warnings:
                 self._logger.warning(f"Tool call parse warning: {warning}")
             if parse_result.tool_calls:
@@ -1930,6 +2015,16 @@ class ToolService:
                 if isinstance(parsed_args, dict):
                     tc["arguments"] = parser.normalize_args(tc.get("name", ""), parsed_args)
 
+        self._record_tool_call_parse_diagnostics(
+            tool_adapter=tool_adapter,
+            parse_method=parse_method,
+            adapter_parse_invoked=adapter_parse_invoked,
+            raw_tool_call_count=raw_tool_call_count,
+            extracted_tool_call_count=extracted_tool_call_count,
+            final_tool_call_count=self._count_tool_calls(tool_calls),
+            confidence=parse_confidence,
+            warnings=parse_warnings,
+        )
         return tool_calls, full_content
 
     def normalize_tool_call(

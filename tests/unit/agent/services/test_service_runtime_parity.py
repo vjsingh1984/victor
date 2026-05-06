@@ -1,5 +1,6 @@
 """Focused tests for service runtime parity helpers."""
 
+import logging
 from types import SimpleNamespace
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -75,6 +76,82 @@ def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
 
     assert tool_calls == [{"name": "read", "arguments": {"path": "a.py"}}]
     assert remaining == "trimmed content"
+
+
+def test_tool_service_records_fallback_parse_diagnostics(caplog):
+    service = _make_tool_service()
+    parser = MagicMock()
+    parser.normalize_args.side_effect = lambda _name, args: args
+    service.bind_runtime_components(tool_call_parser=parser)
+    service.set_enabled_tools({"read"})
+
+    tool_call = SimpleNamespace(to_dict=lambda: {"name": "read", "arguments": {"path": "a.py"}})
+    parse_result = SimpleNamespace(
+        tool_calls=[tool_call],
+        warnings=["native parse empty"],
+        remaining_content="trimmed content",
+        parse_method="json_fallback",
+        confidence=0.82,
+    )
+    tool_adapter = MagicMock()
+    tool_adapter.provider_name = "openai"
+    tool_adapter.model = "qwen2.5-coder:1.5b"
+    tool_adapter.parse_tool_calls.return_value = parse_result
+
+    with caplog.at_level(logging.INFO):
+        service.parse_and_validate_tool_calls(None, "content", tool_adapter)
+
+    diagnostics = service.get_last_tool_call_parse_diagnostics()
+    assert diagnostics is not None
+    assert diagnostics["provider_name"] == "openai"
+    assert diagnostics["model_name"] == "qwen2.5-coder:1.5b"
+    assert diagnostics["parse_method"] == "json_fallback"
+    assert diagnostics["adapter_parse_invoked"] is True
+    assert diagnostics["raw_tool_call_count"] == 0
+    assert diagnostics["extracted_tool_call_count"] == 1
+    assert diagnostics["final_tool_call_count"] == 1
+    assert diagnostics["warning_count"] == 1
+    assert diagnostics["fallback_used"] is True
+    assert "tool_call_parse provider=openai model=qwen2.5-coder:1.5b" in caplog.text
+    assert "parse_method=json_fallback" in caplog.text
+
+
+def test_tool_service_records_native_passthrough_parse_diagnostics(caplog):
+    service = _make_tool_service()
+    parser = MagicMock()
+    parser.normalize_args.side_effect = lambda _name, args: args
+    service.bind_runtime_components(tool_call_parser=parser)
+    service.set_enabled_tools({"write"})
+
+    tool_adapter = MagicMock()
+    tool_adapter.provider_name = "zai"
+    tool_adapter.model = "glm-5.1"
+    raw_tool_calls = [
+        {"name": "write", "arguments": {"path": "notes.txt", "content": "hello"}}
+    ]
+
+    with caplog.at_level(logging.INFO):
+        tool_calls, remaining = service.parse_and_validate_tool_calls(
+            raw_tool_calls,
+            "",
+            tool_adapter,
+        )
+
+    assert tool_calls == raw_tool_calls
+    assert remaining == ""
+    diagnostics = service.get_last_tool_call_parse_diagnostics()
+    assert diagnostics is not None
+    assert diagnostics["provider_name"] == "zai"
+    assert diagnostics["model_name"] == "glm-5.1"
+    assert diagnostics["parse_method"] == "native_passthrough"
+    assert diagnostics["adapter_parse_invoked"] is False
+    assert diagnostics["raw_tool_call_count"] == 1
+    assert diagnostics["extracted_tool_call_count"] == 1
+    assert diagnostics["final_tool_call_count"] == 1
+    assert diagnostics["fallback_used"] is False
+    assert diagnostics["native_passthrough"] is True
+    assert "tool_call_parse provider=zai model=glm-5.1" in caplog.text
+    assert "parse_method=native_passthrough" in caplog.text
 
 
 def test_tool_service_validate_tool_call_matches_legacy_contract():
