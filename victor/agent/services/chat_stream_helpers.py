@@ -438,6 +438,9 @@ class ChatStreamHelperMixin:
         task_type_val = task_keywords.get("task_type", "default")
         unified_task_type_val = getattr(unified_task_type, "value", "")
         unified_is_action = unified_task_type_val in ("edit", "create", "create_simple")
+        classification_complexity = getattr(task_classification, "complexity", None)
+        classification_is_action = classification_complexity == TaskComplexity.ACTION
+        classification_is_analysis = classification_complexity == TaskComplexity.ANALYSIS
         # Use keyword-based classification as fallback when embedding classifier returns GENERAL
         # but keywords suggest analysis (e.g., "structural analysis", "framework analysis")
         keyword_is_analysis = task_keywords.get(
@@ -450,15 +453,23 @@ class ChatStreamHelperMixin:
         ctx.is_analysis_task = (
             keyword_is_analysis
             or unified_is_analysis
+            or classification_is_analysis
             or (unified_task_type.value == "general" and keyword_is_analysis)
         )
-        ctx.is_action_task = bool(task_keywords.get("is_action_task")) or unified_is_action
-        ctx.needs_execution = bool(task_keywords.get("needs_execution")) or task_type_val in (
-            "execution",
-            "action",
+        ctx.is_action_task = (
+            bool(task_keywords.get("is_action_task"))
+            or unified_is_action
+            or classification_is_action
+        )
+        ctx.needs_execution = (
+            bool(task_keywords.get("needs_execution"))
+            or task_type_val in ("execution", "action")
+            or classification_is_action
         )
         coarse_task_type = task_keywords.get("coarse_task_type", task_type_val)
-        if coarse_task_type in (None, "default", "general") and unified_is_action:
+        if coarse_task_type in (None, "default", "general") and (
+            unified_is_action or classification_is_action
+        ):
             coarse_task_type = "action"
         ctx.coarse_task_type = coarse_task_type
 

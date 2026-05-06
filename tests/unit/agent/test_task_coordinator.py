@@ -148,6 +148,33 @@ class TestTaskPreparation:
         assert budget >= 50
         mock_task_analyzer.detect_intent.assert_called_with("Address them comprehensively.")
 
+    def test_prepare_task_promotes_remediation_followup_even_for_design_task_type(
+        self, task_coordinator, mock_task_analyzer, mock_conversation_controller
+    ):
+        """Write-authorized remediation follow-ups should not stay on SIMPLE/design budgets."""
+        from victor.framework.task import TaskComplexity
+
+        complexity_result = Mock()
+        complexity_result.complexity = TaskComplexity.SIMPLE
+        complexity_result.confidence = 0.58
+        complexity_result.matched_patterns = []
+        mock_task_analyzer.classify_complexity.return_value = complexity_result
+
+        intent_result = Mock()
+        intent_result.intent = ActionIntent.WRITE_ALLOWED
+        intent_result.confidence = 0.88
+        intent_result.prompt_guard = None
+        mock_task_analyzer.detect_intent.return_value = intent_result
+
+        classification, budget = task_coordinator.prepare_task(
+            "continue to address the remaining findings and suggestions",
+            Mock(value="design"),
+            mock_conversation_controller,
+        )
+
+        assert classification.complexity == TaskComplexity.ACTION
+        assert budget >= 50
+
     def test_prepare_task_with_task_hint(self, task_coordinator, mock_conversation_controller):
         """Test task preparation with task hint injection."""
         from unittest.mock import patch

@@ -484,6 +484,66 @@ class TestChatServiceControllerBackedContext(BaseChatServiceTest):
         assert "self._context.add_message(msg)" not in source
 
 
+class TestChatServicePlanningStreaming(BaseChatServiceTest):
+    """Tests for planning-aware streaming behavior."""
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_auto_detects_plan_mode_requests(self):
+        service = self._create_test_service()
+        planning_response = CompletionResponse(content="planned", role="assistant")
+        planning_handler = mock.AsyncMock(return_value=planning_response)
+        stream_handler_called = False
+
+        async def _stream_handler(user_message, **kwargs):
+            nonlocal stream_handler_called
+            stream_handler_called = True
+            yield StreamChunk(content=f"stream:{user_message}", is_final=True)
+
+        service.bind_runtime_components(
+            planning_handler=planning_handler,
+            stream_chat_handler=_stream_handler,
+        )
+
+        chunks = [
+            chunk
+            async for chunk in service.stream_chat(
+                "continue addressing the findings in plan mode"
+            )
+        ]
+
+        assert [chunk.content for chunk in chunks] == ["planned"]
+        assert chunks[0].is_final is True
+        planning_handler.assert_awaited_once_with("continue addressing the findings in plan mode")
+        assert stream_handler_called is False
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_forwards_use_planning_to_stream_runtime(self):
+        service = self._create_test_service()
+        planning_response = CompletionResponse(content="planned", role="assistant")
+        planning_handler = mock.AsyncMock(return_value=planning_response)
+        stream_handler_called = False
+
+        async def _stream_handler(user_message, **kwargs):
+            nonlocal stream_handler_called
+            stream_handler_called = True
+            yield StreamChunk(content=f"stream:{user_message}", is_final=True)
+
+        service.bind_runtime_components(
+            planning_handler=planning_handler,
+            stream_chat_handler=_stream_handler,
+        )
+
+        response = await service.chat(
+            "quick prompt",
+            stream=True,
+            use_planning=True,
+        )
+
+        assert response.content == "planned"
+        planning_handler.assert_awaited_once_with("quick prompt")
+        assert stream_handler_called is False
+
+
 class TestStreamingExecutorIntegration:
     """Tests verifying the canonical streaming executor owns loop behavior."""
 

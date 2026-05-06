@@ -110,6 +110,52 @@ class TaskCoordinator:
     # Task Preparation
     # =====================================================================
 
+    @staticmethod
+    def _is_write_remediation_followup(
+        user_message: str,
+        *,
+        intent_result: Any,
+    ) -> bool:
+        """Return whether a write-authorized follow-up is asking to address prior findings."""
+        from victor.agent.action_authorizer import ActionIntent, split_continuation_request
+
+        if getattr(intent_result, "intent", None) != ActionIntent.WRITE_ALLOWED:
+            return False
+
+        is_continuation, continuation_payload = split_continuation_request(user_message)
+        candidate = (continuation_payload if is_continuation else user_message).strip().lower()
+        if not candidate:
+            return False
+
+        remediation_terms = (
+            "address",
+            "apply",
+            "fix",
+            "handle",
+            "implement",
+            "improve",
+            "remediate",
+            "resolve",
+            "tackle",
+        )
+        target_terms = (
+            "feedback",
+            "finding",
+            "findings",
+            "gap",
+            "gaps",
+            "issue",
+            "issues",
+            "recommendation",
+            "recommendations",
+            "suggestion",
+            "suggestions",
+        )
+
+        return any(term in candidate for term in remediation_terms) and any(
+            term in candidate for term in target_terms
+        )
+
     def prepare_task(
         self,
         user_message: str,
@@ -182,13 +228,25 @@ class TaskCoordinator:
         task_classification = self.task_analyzer.classify_complexity(user_message)
         complexity_tool_budget = DEFAULT_BUDGETS.get(task_classification.complexity, 15)
         task_type_value = str(getattr(unified_task_type, "value", unified_task_type))
-        if task_classification.complexity == TaskComplexity.SIMPLE and task_type_value in {
-            "edit",
-            "create",
-            "create_simple",
-        }:
+        if task_classification.complexity == TaskComplexity.SIMPLE:
             intent_result = self.task_analyzer.detect_intent(user_message)
-            if intent_result.intent == ActionIntent.WRITE_ALLOWED:
+            remediation_followup = self._is_write_remediation_followup(
+                user_message,
+                intent_result=intent_result,
+            )
+            should_promote_for_action = (
+                task_type_value in {"edit", "create", "create_simple"}
+                or remediation_followup
+            )
+            if (
+                intent_result.intent == ActionIntent.WRITE_ALLOWED
+                and should_promote_for_action
+            ):
+                matched_patterns = list(getattr(task_classification, "matched_patterns", []) or [])
+                if task_type_value in {"edit", "create", "create_simple"}:
+                    matched_patterns.append("write_intent_task_shape")
+                if remediation_followup:
+                    matched_patterns.append("write_intent_remediation_followup")
                 task_classification = TaskClassification(
                     complexity=TaskComplexity.ACTION,
                     tool_budget=DEFAULT_BUDGETS.get(TaskComplexity.ACTION, 50),
@@ -197,15 +255,12 @@ class TaskCoordinator:
                         float(getattr(intent_result, "confidence", 0.0)),
                         0.85,
                     ),
-                    matched_patterns=[
-                        *list(getattr(task_classification, "matched_patterns", []) or []),
-                        "write_intent_task_shape",
-                    ],
+                    matched_patterns=matched_patterns,
                 )
                 complexity_tool_budget = task_classification.tool_budget
                 logger.info(
                     "Promoted simple task complexity to action based on explicit write intent "
-                    "and edit/create task shape"
+                    "for a write-oriented implementation follow-up"
                 )
 
         if task_classification.complexity == TaskComplexity.SIMPLE:

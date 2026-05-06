@@ -190,6 +190,7 @@ class ChatService:
             chunks = []
             async for chunk in self.stream_chat(
                 user_message,
+                use_planning=use_planning,
                 _preserve_turn_state=True,
                 **kwargs,
             ):
@@ -221,9 +222,25 @@ class ChatService:
         Raises:
             RuntimeError: If the canonical streaming runtime is not bound
         """
+        from victor.providers.base import StreamChunk
+
+        use_planning = kwargs.pop("use_planning", None)
         preserve_turn_state = kwargs.pop("_preserve_turn_state", False)
         if not preserve_turn_state:
             self._prepare_new_turn()
+
+        if self._planning_handler is not None:
+            should_plan = use_planning is True or (
+                use_planning is None and self._should_use_planning(user_message)
+            )
+            if should_plan:
+                response = await self._planning_handler(user_message)
+                if isinstance(response, dict):
+                    content = str(response.get("content", "") or "")
+                else:
+                    content = str(getattr(response, "content", response) or "")
+                yield StreamChunk(content=content, is_final=True)
+                return
 
         handler = self._stream_chat_handler
         if handler is None:
@@ -1039,23 +1056,14 @@ class ChatService:
             if service._should_use_planning("analyze the code"):
                 # Use planning
         """
-        # Simple heuristic: multi-step keywords
-        multi_step_indicators = [
-            "analyze",
-            "architecture",
-            "design",
-            "evaluate",
-            "review",
-            "refactor",
-            "implement",
-            "debug",
-            "optimize",
-            "test",
-            "document",
-        ]
+        from victor.agent.planning.constants import COMPLEXITY_KEYWORDS, STEP_INDICATORS
 
         message_lower = user_message.lower()
-        return any(indicator in message_lower for indicator in multi_step_indicators)
+        if any(indicator in message_lower for indicator in COMPLEXITY_KEYWORDS):
+            return True
+
+        step_matches = sum(1 for indicator in STEP_INDICATORS if indicator in message_lower)
+        return step_matches >= 2
 
     def _prepare_task(self, user_message: str, task_type: str) -> tuple[Dict[str, Any], int]:
         """Prepare task-specific guidance and budget adjustments.
